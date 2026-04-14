@@ -1,0 +1,90 @@
+[
+  {
+    "version": "v0.9",
+    "createSurface": {
+      "surfaceId": "choice-surface",
+      "catalogId": "https://a2ui.org/specification/v0_9/basic_catalog.json"
+    }
+  },
+  {
+    "version": "v0.9",
+    "updateDataModel": {
+      "surfaceId": "choice-surface",
+      "path": "/",
+      "value": {
+        "selectedLang": [],
+        "customLang": ""
+      }
+    }
+  },
+  {
+    "version": "v0.9",
+    "updateComponents": {
+      "surfaceId": "choice-surface",
+      "components": [
+        {
+          "component": "Card",
+          "id": "root",
+          "child": "form-col"
+        },
+        {
+          "component": "Column",
+          "id": "form-col",
+          "children": ["question", "lang-picker", "custom-lang-field", "submit-row"]
+        },
+        {
+          "component": "Text",
+          "id": "question",
+          "text": "## Which programming language do you prefer?\n\nPlease select your **favorite** language from the list below.\n- You can also specify a custom language.\n- Click *Submit* when done.",
+          "variant": "body"
+        },
+        {
+          "component": "ChoicePicker",
+          "id": "lang-picker",
+          "label": "Programming Language",
+          "variant": "mutuallyExclusive",
+          "value": { "path": "/selectedLang" },
+          "options": [
+            { "label": "Python", "value": "python" },
+            { "label": "JavaScript", "value": "javascript" },
+            { "label": "Go", "value": "go" },
+            { "label": "Rust", "value": "rust" },
+            { "label": "Other", "value": "other" }
+          ]
+        },
+        {
+          "component": "TextField",
+          "id": "custom-lang-field",
+          "label": "If other, please specify",
+          "variant": "shortText",
+          "value": { "path": "/customLang" }
+        },
+        {
+          "component": "Row",
+          "id": "submit-row",
+          "children": ["submit-btn"]
+        },
+        {
+          "component": "Button",
+          "id": "submit-btn",
+          "variant": "secondary",
+          "child": "submit-label",
+          "action": {
+            "event": {
+              "name": "submit_preference",
+              "context": {
+                "selected": { "path": "/selectedLang" },
+                "custom": { "path": "/customLang" }
+              }
+            }
+          }
+        },
+        {
+          "component": "Text",
+          "id": "submit-label",
+          "text": "Submit"
+        }
+      ]
+    }
+  }
+]

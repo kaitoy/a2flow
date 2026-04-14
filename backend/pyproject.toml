@@ -1,0 +1,21 @@
+[project]
+name = "a2flow"
+version = "0.1.0"
+description = "Google ADK agent with SSE streaming"
+requires-python = ">=3.11"
+dependencies = [
+    "google-adk>=1.28.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-dotenv>=1.0.0",
+    "litellm>=1.50.0",
+    "ag-ui-protocol>=0.1.15",
+    "ag-ui-adk>=0.6.0",
+    "a2ui-agent-sdk>=0.2.1",
+]
+
+[project.scripts]
+start = "backend.main:app"
+
+[tool.uv]
+dev-dependencies = []
