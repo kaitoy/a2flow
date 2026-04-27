@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { Message } from '@/store/chatSlice';
+import { type A2UIUserAction } from '@ag-ui/a2ui-middleware';
 import { MessageBubble } from './MessageBubble';
 
 export function MessageList({
@@ -9,7 +10,7 @@ export function MessageList({
   onAction,
 }: {
   messages: Message[];
-  onAction?: (message: string) => void;
+  onAction?: (action: A2UIUserAction) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 

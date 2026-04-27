@@ -58,13 +58,22 @@ const chatSlice = createSlice({
       if (msg) msg.isStreaming = false;
     },
     addA2uiMessage(state, action: PayloadAction<{ id: string; payload: unknown }>) {
-      state.messages.push({
-        id: action.payload.id,
-        role: 'assistant',
-        content: '',
-        isStreaming: false,
-        a2uiPayload: JSON.stringify(action.payload.payload),
-      });
+      const existing = state.messages.find((m) => m.id === action.payload.id);
+      if (existing) {
+        existing.a2uiPayload = JSON.stringify(action.payload.payload);
+      } else {
+        state.messages.push({
+          id: action.payload.id,
+          role: 'assistant',
+          content: '',
+          isStreaming: false,
+          a2uiPayload: JSON.stringify(action.payload.payload),
+        });
+      }
+    },
+    startRun(state) {
+      state.isRunning = true;
+      state.error = null;
     },
     finishRun(state) {
       state.isRunning = false;
@@ -93,6 +102,7 @@ export const {
   appendDelta,
   endAssistantMessage,
   addA2uiMessage,
+  startRun,
   finishRun,
   setError,
   clearError,

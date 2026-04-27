@@ -5,12 +5,8 @@ import { MessageProcessor } from '@a2ui/web_core/v0_9';
 import { A2uiSurface, MarkdownContext, type ReactComponentImplementation } from '@a2ui/react/v0_9';
 import type { SurfaceModel } from '@a2ui/web_core/v0_9';
 import { marked } from 'marked';
+import { type A2UIUserAction } from '@ag-ui/a2ui-middleware';
 import { tailwindCatalog } from './a2uiCatalog';
-
-interface A2uiClientAction {
-  name: string;
-  context: Record<string, unknown>;
-}
 
 const markdownRenderer = (text: string) => Promise.resolve(marked(text) as string);
 
@@ -19,7 +15,7 @@ export function A2uiRenderer({
   onAction,
 }: {
   payload: unknown;
-  onAction?: (message: string) => void;
+  onAction?: (action: A2UIUserAction) => void;
 }) {
   const [surfaces, setSurfaces] = useState<SurfaceModel<ReactComponentImplementation>[]>([]);
   const onActionRef = useRef(onAction);
@@ -30,9 +26,14 @@ export function A2uiRenderer({
     const actionSubs: { unsubscribe: () => void }[] = [];
 
     const sub = processor.onSurfaceCreated((surface) => {
-      const actionSub = surface.onAction.subscribe((action: A2uiClientAction) => {
-        const message = JSON.stringify({ action: action.name, ...action.context });
-        onActionRef.current?.(message);
+      const actionSub = surface.onAction.subscribe((action: A2UIUserAction) => {
+        onActionRef.current?.({
+          name: action.name,
+          surfaceId: surface.id,
+          sourceComponentId: action.sourceComponentId,
+          context: action.context,
+          timestamp: new Date().toISOString(),
+        });
       });
       actionSubs.push(actionSub);
       setSurfaces((prev) => [...prev, surface]);

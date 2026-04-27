@@ -1,6 +1,7 @@
 'use client';
 
 import type { Message } from '@/store/chatSlice';
+import { type A2UIUserAction } from '@ag-ui/a2ui-middleware';
 import { A2uiRenderer } from './A2uiRenderer';
 
 export function MessageBubble({
@@ -8,7 +9,7 @@ export function MessageBubble({
   onAction,
 }: {
   message: Message;
-  onAction?: (message: string) => void;
+  onAction?: (action: A2UIUserAction) => void;
 }) {
   const isUser = message.role === 'user';
 

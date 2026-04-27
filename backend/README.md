@@ -1,6 +1,6 @@
 # A2Flow Backend
 
-A Google ADK agent with [A2UI](https://a2ui.org/) support. Accepts prompts via HTTP POST and streams responses as AG-UI SSE events. The agent can return plain text or structured A2UI JSON payloads for rich UI rendering.
+A Google ADK agent with [A2UI](https://a2ui.org/) support. Accepts prompts via HTTP POST and streams responses as AG-UI SSE events. The agent can return plain text or structured A2UI surfaces for rich UI rendering.
 
 ## Requirements
 
@@ -9,7 +9,7 @@ A Google ADK agent with [A2UI](https://a2ui.org/) support. Accepts prompts via H
 
 ## A2UI support
 
-The agent uses [`a2ui-agent-sdk`](https://pypi.org/project/a2ui-agent-sdk/) with `SendA2uiToClientToolset` and the bundled Basic Catalog (v0.9). When the LLM decides to render rich UI, it calls the `send_a2ui_json_to_client` tool with a JSON payload. The SDK validates the payload against the catalog schema and the result is forwarded to the client as tool call events in the AG-UI SSE stream.
+A2UI rendering is handled entirely on the frontend by `@ag-ui/a2ui-middleware`. The middleware injects the `render_a2ui` tool into each `RunAgentInput` before it reaches the backend. The backend agent uses `AGUIToolset` (from `ag-ui-adk`) as a placeholder; the `ag-ui-adk` bridge replaces it at runtime with a `ClientProxyToolset` that exposes the frontend-injected tools to the LLM. When the LLM calls `render_a2ui`, the bridge streams `TOOL_CALL_*` events which the middleware converts into `ACTIVITY_SNAPSHOT` events on the client side.
 
 ## Setup
 

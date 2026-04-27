@@ -1,4 +1,6 @@
 import { HttpAgent } from '@ag-ui/client';
+import { A2UIMiddleware, type A2UIInlineCatalogSchema } from '@ag-ui/a2ui-middleware';
+import basicCatalogJson from '../generated/basic_catalog.json';
 import logger from './logger';
 
 const API_BASE = process.env.BACKEND_BASE_URL ?? 'http://localhost:8000';
@@ -18,8 +20,13 @@ export async function createSession(userId: string): Promise<string> {
 }
 
 export function createChatAgent(sessionId: string): HttpAgent {
-  return new HttpAgent({
+  const agent = new HttpAgent({
     url: `${API_BASE}/agent`,
     threadId: sessionId,
   });
+  agent.use(new A2UIMiddleware({
+    injectA2UITool: true,
+    schema: basicCatalogJson as unknown as A2UIInlineCatalogSchema,
+  }));
+  return agent;
 }

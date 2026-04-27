@@ -34,3 +34,6 @@ frontend/.env.local
 .claude
 
 tsconfig.tsbuildinfo
+
+# Generated at build time
+frontend/src/generated/

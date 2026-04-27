@@ -2,28 +2,35 @@ import os
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.models.lite_llm import LiteLlm
-from a2ui.adk.send_a2ui_to_client_toolset import SendA2uiToClientToolset
-from a2ui.basic_catalog import BasicCatalog
-from a2ui.schema.manager import A2uiSchemaManager
-from a2ui.schema.constants import VERSION_0_9
+from ag_ui_adk import AGUIToolset, CONTEXT_STATE_KEY
 
 LITELLM_PREFIX = "litellm:"
 
-_EXAMPLES_PATH = os.path.join(os.path.dirname(__file__), "a2ui", "examples", "*.json")
 
-_schema_manager = A2uiSchemaManager(
-    version=VERSION_0_9,
-    catalogs=[BasicCatalog.get_config(VERSION_0_9)],
-)
-_allowed_components=["Text", "Card", "Button", "Modal", "Row", "Column", "List", "TextField", "ChoicePicker"]
-_a2ui_catalog = _schema_manager.get_selected_catalog(
-    allowed_components=_allowed_components,
-)
-_a2ui_examples = _a2ui_catalog.load_examples(_EXAMPLES_PATH)
+class A2UIInstructionProvider:
+    def __init__(self, base_instruction: str) -> None:
+        self._base = base_instruction
 
-
-def _a2ui_examples_provider(_: ReadonlyContext) -> str:
-    return _a2ui_examples
+    def __call__(self, ctx: ReadonlyContext) -> str:
+        context_entries = ctx.state.get(CONTEXT_STATE_KEY, [])
+        a2ui_rules = (
+            "# A2UI Rules\n"
+            "When creating responses or requesting input from the user, use A2UI as appropriate.\n\n"
+            "IMPORTANT: When your response contains Markdown (headings, lists, code blocks, bold, italic, etc.), "
+            "you MUST render it via A2UI using Text components. Plain text messages do not render Markdown "
+            "formatting, so users will see raw symbols (e.g. **bold**, ## Heading) instead of formatted text. "
+            "Always use render_a2ui with Text components (with appropriate variant) to deliver any Markdown content."
+        )
+        parts = [self._base, a2ui_rules]
+        if context_entries:
+            context_text = "\n\n".join(
+                f"# {entry['description']}\n{entry['value']}"
+                for entry in context_entries
+            )
+            parts.append(context_text)
+        instruction = "\n\n".join(parts)
+        print(instruction)
+        return instruction
 
 
 def create_agent() -> LlmAgent:
@@ -37,27 +44,6 @@ def create_agent() -> LlmAgent:
     """
     model_env = os.getenv("LLM_MODEL", "gemini-2.0-flash")
     role_description = os.getenv("ROLE_DESCRIPTION", "You are a helpful assistant.")
-    instruction = _schema_manager.generate_system_prompt(
-        role_description=role_description,
-        workflow_description=(
-            "Use send_a2ui_json_to_client tool to show structured UI when appropriate. "
-            "If the tool returns an error, read the validation error carefully, fix the JSON, and call the tool again silently without generating any text message to the user. "
-            "IMPORTANT: When building the a2ui_json argument, all string values in the JSON must use escape sequences for special characters. "
-            "Newlines must be written as \\n (backslash + n), NOT as literal line breaks. "
-            "For example: \"text\": \"line1\\nline2\" is correct; a string with an actual newline character is invalid JSON and will cause a parse error."
-        ),
-        ui_description=(
-            "Use Card to frame key information or forms. "
-            "Use Row/Column for layout. "
-            "Use Text for displaying explanations or results in Markdown format. "
-            "Use TextField and ChoicePicker for user input. "
-            "Use Button for actions. "
-            "Use Modal for confirmations or supplemental details."
-        ),
-        include_schema=False,   # Injected per-request by SendA2uiToClientToolset.process_llm_request;
-        include_examples=False, # including here causes ADK template substitution to raise KeyError on {expression}.
-        allowed_components=_allowed_components,
-    )
 
     if model_env.startswith(LITELLM_PREFIX):
         model_name = model_env[len(LITELLM_PREFIX):]
@@ -65,15 +51,9 @@ def create_agent() -> LlmAgent:
     else:
         model = model_env
 
-    a2ui_toolset = SendA2uiToClientToolset(
-        a2ui_enabled=True,
-        a2ui_catalog=_a2ui_catalog,
-        a2ui_examples=_a2ui_examples_provider,
-    )
-
     return LlmAgent(
         name="simple_agent",
         model=model,
-        instruction=instruction,
-        tools=[a2ui_toolset],
+        instruction=A2UIInstructionProvider(role_description),
+        tools=[AGUIToolset()],
     )

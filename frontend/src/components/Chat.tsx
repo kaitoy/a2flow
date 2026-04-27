@@ -8,7 +8,7 @@ import { useAppDispatch } from '@/store/hooks';
 
 export function Chat() {
   const dispatch = useAppDispatch();
-  const { messages, isRunning, error, sendMessage } = useChat();
+  const { messages, isRunning, error, sendMessage, sendA2uiAction } = useChat();
 
   return (
     <div className="flex flex-col h-screen bg-white">
@@ -29,7 +29,7 @@ export function Chat() {
         </div>
       )}
 
-      <MessageList messages={messages} onAction={sendMessage} />
+      <MessageList messages={messages} onAction={sendA2uiAction} />
       <ChatInput onSend={sendMessage} disabled={isRunning} />
     </div>
   );

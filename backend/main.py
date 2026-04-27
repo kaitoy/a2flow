@@ -60,18 +60,6 @@ class SessionResponse(BaseModel):
 
 # ---------- session endpoints ----------
 
-@app.get("/hoge")
-async def hoge():
-    """Create a new session."""
-    print("#######################")
-    print(adk_agent._adk_agent.instruction)
-    tools = adk_agent._adk_agent.tools
-    toolset = tools[0]
-    tools = toolset._ui_tools
-    print(tools[0].description)
-
-    print(tools[0].name)
-
 @app.post("/sessions", response_model=SessionResponse, status_code=201)
 async def create_session(request: SessionCreateRequest):
     """Create a new session."""

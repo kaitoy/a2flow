@@ -14,6 +14,9 @@ importers:
       '@a2ui/web_core':
         specifier: 0.9.1-alpha.3
         version: 0.9.1-alpha.3
+      '@ag-ui/a2ui-middleware':
+        specifier: ^0.0.5
+        version: 0.0.5(@ag-ui/client@0.0.52)(rxjs@7.8.1)
       '@ag-ui/client':
         specifier: ^0.0.52
         version: 0.0.52
@@ -81,6 +84,12 @@ packages:
 
   '@a2ui/web_core@0.9.1-alpha.3':
     resolution: {integrity: sha512-82CJfTx3jGLgInR8mJHF2y3IhqqIUYPTWxS20PMeOkF9aHVTMNqlWP8QHp7YlPDQBEMzgT1ts7ujMQLgX8VuvA==}
+
+  '@ag-ui/a2ui-middleware@0.0.5':
+    resolution: {integrity: sha512-nhF8LBzq36BmLR1O3nStxqSpIu1+4//ttqOyQgiXUsKZK1znCyN4q4MBTARrkFa7CuFr3fcNTiZuS4V1HRUHTw==}
+    peerDependencies:
+      '@ag-ui/client': '>=0.0.40'
+      rxjs: 7.8.1
 
   '@ag-ui/client@0.0.52':
     resolution: {integrity: sha512-U407VvDDwR5qs8TiyN1qY38x87qMWc2n0epw8iA5aa1qwzCKBBDgg3Fkm4JogQf0X4jwNsz8HUbIZrBB56mrpg==}
@@ -439,6 +448,10 @@ packages:
   chokidar@3.6.0:
     resolution: {integrity: sha512-7VT13fmjotKpGipCW9JEQAusEPE+Ei8nl6/g4FBAmIm0GOOLMua9NDDo/DWp0ZAxCr3cPq5ZpBqmPAQgDda2Pw==}
     engines: {node: '>= 8.10.0'}
+
+  clarinet@0.12.6:
+    resolution: {integrity: sha512-0FR+TrvLbYHLjhzs9oeIbd3yfZmd4u2DzYQEjUTm2dNfh4Y/9RIRWPjsm3aBtrVEpjKI7+lWa4ouqEXoml84mQ==}
+    engines: {chrome: '>=16.0.912', firefox: '>=0.8.0', node: '>=0.3.6'}
 
   client-only@0.0.1:
     resolution: {integrity: sha512-IV3Ou0jSMzZrd3pZ48nLkT9DA7Ag1pnPzaiQhpW7c3RbcqqzvzzVu+L8gfqMp/8IM2MQtSiqaCxrrcfu8I8rMA==}
@@ -941,6 +954,12 @@ snapshots:
       zod: 3.25.76
       zod-to-json-schema: 3.25.2(zod@3.25.76)
 
+  '@ag-ui/a2ui-middleware@0.0.5(@ag-ui/client@0.0.52)(rxjs@7.8.1)':
+    dependencies:
+      '@ag-ui/client': 0.0.52
+      clarinet: 0.12.6
+      rxjs: 7.8.1
+
   '@ag-ui/client@0.0.52':
     dependencies:
       '@ag-ui/core': 0.0.52
@@ -1225,6 +1244,8 @@ snapshots:
       readdirp: 3.6.0
     optionalDependencies:
       fsevents: 2.3.3
+
+  clarinet@0.12.6: {}
 
   client-only@0.0.1: {}
 

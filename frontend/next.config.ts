@@ -3,7 +3,11 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: __dirname,
-  turbopack: {},
+  turbopack: {
+    resolveAlias: {
+      crypto: './src/lib/crypto-shim.ts',
+    },
+  },
   webpack(config, { isServer }) {
     if (!isServer) {
       config.resolve.fallback = {
@@ -11,6 +15,7 @@ const nextConfig: NextConfig = {
         fs: false,
         net: false,
         tls: false,
+        crypto: false,
       };
     }
     return config;
