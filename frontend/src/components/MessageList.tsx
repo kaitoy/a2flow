@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { Message } from '@/store/chatSlice';
+import type { Message } from '@ag-ui/core';
 import { type A2UIUserAction } from '@ag-ui/a2ui-middleware';
 import { MessageBubble } from './MessageBubble';
 
 export function MessageList({
   messages,
+  isStreaming = false,
   onAction,
 }: {
   messages: Message[];
+  isStreaming?: boolean;
   onAction?: (action: A2UIUserAction) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -25,8 +27,13 @@ export function MessageList({
           Start a conversation
         </div>
       )}
-      {messages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} onAction={onAction} />
+      {messages.map((msg, i) => (
+        <MessageBubble
+          key={msg.id}
+          message={msg}
+          isStreaming={isStreaming && i === messages.length - 1}
+          onAction={onAction}
+        />
       ))}
       <div ref={bottomRef} />
     </div>

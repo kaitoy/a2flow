@@ -121,7 +121,46 @@ A2uiRenderer
 
 ---
 
-## 6. User action — feedback loop
+## 6. Session restore — ActivityMessage synthesis
+
+When a user revisits a session URL (`/sessions/{id}`), `useChat` fetches the message history via
+`GET /sessions/{id}/messages`. The backend converts stored ADK events using
+`adk_events_to_messages()`, which only produces `UserMessage`, `AssistantMessage`, and
+`ToolMessage`. It has no knowledge of `A2UIActivityType`; `ActivityMessage` objects are normally
+created by `A2UIMiddleware` during live streaming and are never persisted.
+
+To restore A2UI surfaces on reload, the `resumeSession` reducer in `chatSlice.ts` runs a
+post-processing step via the `synthesizeA2UIActivityMessages` generator before storing the
+messages:
+
+```
+GET /sessions/{id}/messages
+  └─ adk_events_to_messages()  →  [...UserMessage, AssistantMessage(tool_calls=[render_a2ui]), ToolMessage, ...]
+       └─ dispatch(resumeSession({ messages }))
+            └─ chatSlice.resumeSession reducer
+                 └─ synthesizeA2UIActivityMessages(messages)  ← generator
+                      for each AssistantMessage with a render_a2ui toolCall:
+                        yield AssistantMessage            (pass-through)
+                        yield ActivityMessage {
+                          id:           "a2ui-surface-{surfaceId}-{toolCallId}",
+                          role:         "activity",
+                          activityType: "a2ui-surface",
+                          content:      { a2ui_operations: [
+                            { version: "v0.9", createSurface:   { surfaceId, catalogId } },
+                            { version: "v0.9", updateComponents: { surfaceId, components } },
+                            { version: "v0.9", updateDataModel:  { surfaceId, value: data } }  // if data present
+                          ]}
+                        }
+                 └─ state.messages = [...generator result]
+```
+
+The synthesized `ActivityMessage` ID uses the same format as `A2UIMiddleware` does during live
+streaming (`a2ui-surface-{surfaceId}-{toolCallId}`). This ensures the `addActivityMessage`
+upsert logic in the reducer matches correctly if the same surface is updated in a later turn.
+
+---
+
+## 7. User action — feedback loop
 
 When the user interacts with a rendered surface (e.g. clicks a `Button`), `useChat` sends the action as the **tool result for the preceding `render_a2ui` call**:
 

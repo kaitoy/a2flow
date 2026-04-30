@@ -1,20 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   setSession,
+  resumeSession,
   addUserMessage,
   startAssistantMessage,
   appendDelta,
   endAssistantMessage,
-  addA2uiMessage,
+  addActivityMessage,
   startRun,
   finishRun,
   setError,
 } from '@/store/chatSlice';
-import { A2UIActivityType, A2UI_OPERATIONS_KEY, RENDER_A2UI_TOOL_NAME, type A2UIUserAction } from '@ag-ui/a2ui-middleware';
-import { createSession, createChatAgent } from '@/lib/api';
+import { RENDER_A2UI_TOOL_NAME, type A2UIUserAction } from '@ag-ui/a2ui-middleware';
+import { createSession, createChatAgent, getSessionMessages } from '@/lib/api';
 import logger from '@/lib/logger';
 import { logAgUiEvent } from '@/lib/devEventLogger';
 import type { AppDispatch } from '@/store';
@@ -35,15 +37,10 @@ function makeEventHandlers(
       dispatch(appendDelta({ messageId: event.messageId, delta: event.delta }));
     },
     onTextMessageEndEvent: async ({ event }) => {
-      dispatch(endAssistantMessage(event.messageId));
+      dispatch(endAssistantMessage());
     },
     onActivitySnapshotEvent: async ({ event }) => {
-      if (event.activityType === A2UIActivityType) {
-        const operations = event.content[A2UI_OPERATIONS_KEY];
-        if (operations != null) {
-          dispatch(addA2uiMessage({ id: event.messageId, payload: operations }));
-        }
-      }
+      dispatch(addActivityMessage({ id: event.messageId, activityType: event.activityType, content: event.content as Record<string, unknown> }));
     },
     onToolCallEndEvent: async ({ event, toolCallName }) => {
       if (toolCallName === RENDER_A2UI_TOOL_NAME) {
@@ -56,6 +53,7 @@ function makeEventHandlers(
   };
 }
 
+
 function formatActionContent(action: A2UIUserAction): string {
   const name = action.name ?? 'unknown_action';
   const surfaceId = action.surfaceId ?? 'unknown_surface';
@@ -65,22 +63,40 @@ function formatActionContent(action: A2UIUserAction): string {
   return text;
 }
 
-export function useChat() {
+export function useChat(initialSessionId: string) {
+  const router = useRouter();
   const dispatch = useAppDispatch();
-  const { messages, sessionId, userId, isRunning, error } = useAppSelector(
+  const { messages, sessionId, userId, isRunning, isStreaming, error } = useAppSelector(
     (s) => s.chat,
   );
   const pendingRenderToolCallIds = useRef<string[]>([]);
 
   useEffect(() => {
-    if (sessionId) return;
-    createSession(userId)
-      .then((id) => dispatch(setSession(id)))
-      .catch((err) => {
-        logger.error(err, 'failed to create session');
-        dispatch(setError('Failed to connect to the server.'));
-      });
-  }, [sessionId, userId, dispatch]);
+    dispatch(setSession(initialSessionId));
+    getSessionMessages(initialSessionId, userId)
+      .then((messages) => dispatch(resumeSession({ sessionId: initialSessionId, messages })))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const switchSession = useCallback(
+    (targetSessionId: string) => {
+      if (isRunning) return;
+      router.push(`/sessions/${targetSessionId}`);
+    },
+    [isRunning, router],
+  );
+
+  const newSession = useCallback(async () => {
+    if (isRunning) return;
+    try {
+      const id = await createSession(userId);
+      router.push(`/sessions/${id}`);
+    } catch (err) {
+      logger.error(err, 'failed to create session');
+      dispatch(setError('Failed to connect to the server.'));
+    }
+  }, [userId, isRunning, router, dispatch]);
 
   const sendMessage = useCallback(
     async (prompt: string) => {
@@ -144,5 +160,5 @@ export function useChat() {
     [sessionId, userId, isRunning, dispatch],
   );
 
-  return { messages, isRunning, error, sendMessage, sendA2uiAction };
+  return { messages, sessionId, isRunning, isStreaming, error, sendMessage, sendA2uiAction, switchSession, newSession };
 }

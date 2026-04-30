@@ -12,9 +12,10 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-from ag_ui_adk import ADKAgent, add_adk_fastapi_endpoint
+from ag_ui_adk import ADKAgent, add_adk_fastapi_endpoint, adk_events_to_messages
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from google.adk.sessions import InMemorySessionService
 from pydantic import BaseModel
 
@@ -40,6 +41,7 @@ adk_agent = ADKAgent(
     user_id_extractor=lambda input: input.forwarded_props.get("userId", "user"),
     session_service=session_service,
     use_thread_id_as_session_id=True,
+    emit_messages_snapshot=True,
 )
 
 add_adk_fastapi_endpoint(app, adk_agent, path="/agent")
@@ -91,6 +93,20 @@ async def list_sessions(user_id: str):
         )
         for s in response.sessions
     ]
+
+
+@app.get("/sessions/{session_id}/messages")
+async def get_session_messages(session_id: str, user_id: str):
+    """Get message history for a session."""
+    session = await session_service.get_session(
+        app_name=APP_NAME,
+        user_id=user_id,
+        session_id=session_id,
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    messages = adk_events_to_messages(session.events)
+    return JSONResponse([m.model_dump(mode="json", by_alias=True) for m in messages])
 
 
 @app.delete("/sessions/{session_id}", status_code=204)

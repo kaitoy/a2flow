@@ -29,7 +29,6 @@ class A2UIInstructionProvider:
             )
             parts.append(context_text)
         instruction = "\n\n".join(parts)
-        print(instruction)
         return instruction
 
 

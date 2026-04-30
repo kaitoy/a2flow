@@ -24,6 +24,7 @@ Thumbs.db
 # Next.js
 frontend/.next/
 frontend/out/
+frontend/next-env.d.ts
 
 # pnpm
 frontend/node_modules/
