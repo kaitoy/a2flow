@@ -12,10 +12,12 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-from ag_ui_adk import ADKAgent, add_adk_fastapi_endpoint, adk_events_to_messages
-from fastapi import FastAPI, HTTPException
+from ag_ui.core import RunAgentInput, SystemMessage
+from ag_ui.encoder import EventEncoder
+from ag_ui_adk import ADKAgent, adk_events_to_messages
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from google.adk.sessions import InMemorySessionService
 from pydantic import BaseModel
 
@@ -44,7 +46,16 @@ adk_agent = ADKAgent(
     emit_messages_snapshot=True,
 )
 
-add_adk_fastapi_endpoint(app, adk_agent, path="/agent")
+@app.post("/agent")
+async def agent_endpoint(input_data: RunAgentInput, request: Request):
+    # Exclude SystemMessage to prevent prompt injection: ag_ui_adk appends its content directly to agent instructions
+    filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
+    input_data = input_data.model_copy(update={"messages": filtered})
+    encoder = EventEncoder(accept=request.headers.get("accept"))
+    async def event_generator():
+        async for event in adk_agent.run(input_data):
+            yield encoder.encode(event)
+    return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
 
 
 # ---------- request / response models ----------
