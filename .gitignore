@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv/
 
+# Ruff
+.ruff_cache/
+
 # Environment variables
 .env
 .env.local
@@ -32,7 +35,7 @@ frontend/node_modules/
 # env
 frontend/.env.local
 
-.claude
+.claude/settings.local.json
 
 tsconfig.tsbuildinfo
 

@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/hooks/ruff_fix.py\"",
+            "statusMessage": "Running Ruff..."
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/hooks/biome_fix.py\"",
+            "statusMessage": "Running Biome..."
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/hooks/mypy_check.py\"",
+            "statusMessage": "Running mypy..."
+          }
+        ]
+      }
+    ]
+  }
+}

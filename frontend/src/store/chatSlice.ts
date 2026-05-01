@@ -1,40 +1,48 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { Message } from '@ag-ui/core';
-import { RENDER_A2UI_TOOL_NAME, A2UIActivityType, A2UI_OPERATIONS_KEY } from '@ag-ui/a2ui-middleware';
+import {
+  A2UI_OPERATIONS_KEY,
+  A2UIActivityType,
+  RENDER_A2UI_TOOL_NAME,
+} from "@ag-ui/a2ui-middleware";
+import type { Message } from "@ag-ui/core";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 export type { Message };
 
 function* synthesizeA2UIActivityMessages(messages: Message[]): Generator<Message> {
   for (const msg of messages) {
     yield msg;
-    if (msg.role !== 'assistant' || !msg.toolCalls) continue;
+    if (msg.role !== "assistant" || !msg.toolCalls) continue;
     for (const tc of msg.toolCalls) {
       if (tc.function.name !== RENDER_A2UI_TOOL_NAME) continue;
       let args: Record<string, unknown>;
       try {
         args = JSON.parse(
-          typeof tc.function.arguments === 'string'
+          typeof tc.function.arguments === "string"
             ? tc.function.arguments
             : JSON.stringify(tc.function.arguments)
         );
-      } catch { continue; }
+      } catch {
+        continue;
+      }
       const { surfaceId, catalogId, components, data } = args as {
-        surfaceId?: string; catalogId?: string;
-        components?: unknown[]; data?: unknown;
+        surfaceId?: string;
+        catalogId?: string;
+        components?: unknown[];
+        data?: unknown;
       };
       if (!surfaceId) continue;
       const ops: Record<string, unknown>[] = [
-        { version: 'v0.9', createSurface: { surfaceId, catalogId } },
-        { version: 'v0.9', updateComponents: { surfaceId, components: components ?? [] } },
+        { version: "v0.9", createSurface: { surfaceId, catalogId } },
+        { version: "v0.9", updateComponents: { surfaceId, components: components ?? [] } },
       ];
-      if (data != null) ops.push({ version: 'v0.9', updateDataModel: { surfaceId, value: data } });
+      if (data != null) ops.push({ version: "v0.9", updateDataModel: { surfaceId, value: data } });
       yield {
         // ID format mirrors A2UIMiddleware's live-streaming synthesis:
         //   messageId = `a2ui-surface-${surfaceId}-${toolCallId}`
         // Keeping the same format ensures addActivityMessage's upsert logic
         // (which matches by id) works correctly if a surface is later updated.
         id: `a2ui-surface-${surfaceId}-${tc.id}`,
-        role: 'activity',
+        role: "activity",
         activityType: A2UIActivityType,
         content: { [A2UI_OPERATIONS_KEY]: ops },
       } as Message;
@@ -54,14 +62,14 @@ interface ChatState {
 const initialState: ChatState = {
   messages: [],
   sessionId: null,
-  userId: 'user',
+  userId: "user",
   isRunning: false,
   isStreaming: false,
   error: null,
 };
 
 const chatSlice = createSlice({
-  name: 'chat',
+  name: "chat",
   initialState,
   reducers: {
     setSession(state, action: PayloadAction<string>) {
@@ -81,7 +89,7 @@ const chatSlice = createSlice({
     addUserMessage(state, action: PayloadAction<{ id: string; content: string }>) {
       state.messages.push({
         id: action.payload.id,
-        role: 'user',
+        role: "user",
         content: action.payload.content,
       });
       state.isRunning = true;
@@ -90,26 +98,29 @@ const chatSlice = createSlice({
     startAssistantMessage(state, action: PayloadAction<string>) {
       state.messages.push({
         id: action.payload,
-        role: 'assistant',
-        content: '',
+        role: "assistant",
+        content: "",
       });
       state.isStreaming = true;
     },
     appendDelta(state, action: PayloadAction<{ messageId: string; delta: string }>) {
       const msg = state.messages.find((m) => m.id === action.payload.messageId);
-      if (msg && msg.role === 'assistant') msg.content = (msg.content ?? '') + action.payload.delta;
+      if (msg && msg.role === "assistant") msg.content = (msg.content ?? "") + action.payload.delta;
     },
     endAssistantMessage(state) {
       state.isStreaming = false;
     },
-    addActivityMessage(state, action: PayloadAction<{ id: string; activityType: string; content: Record<string, unknown> }>) {
+    addActivityMessage(
+      state,
+      action: PayloadAction<{ id: string; activityType: string; content: Record<string, unknown> }>
+    ) {
       const existing = state.messages.find((m) => m.id === action.payload.id);
-      if (existing && existing.role === 'activity') {
+      if (existing && existing.role === "activity") {
         existing.content = action.payload.content;
       } else {
         state.messages.push({
           id: action.payload.id,
-          role: 'activity',
+          role: "activity",
           activityType: action.payload.activityType,
           content: action.payload.content,
         });

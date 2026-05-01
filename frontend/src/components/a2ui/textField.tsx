@@ -1,15 +1,15 @@
-import { useId } from 'react';
-import { createComponentImplementation } from '@a2ui/react/v0_9';
-import { TextFieldApi } from '@a2ui/web_core/v0_9/basic_catalog';
+import { createComponentImplementation } from "@a2ui/react/v0_9";
+import { TextFieldApi } from "@a2ui/web_core/v0_9/basic_catalog";
+import { useId } from "react";
 
 export const customTextField = createComponentImplementation(TextFieldApi, ({ props }) => {
   const id = useId();
-  const isLong = props.variant === 'longText';
+  const isLong = props.variant === "longText";
   const type =
-    props.variant === 'number' ? 'number' : props.variant === 'obscured' ? 'password' : 'text';
+    props.variant === "number" ? "number" : props.variant === "obscured" ? "password" : "text";
   const inputCls =
-    'block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm ' +
-    'focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
+    "block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm " +
+    "focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
   const hasError = props.validationErrors && props.validationErrors.length > 0;
 
   return (
@@ -24,7 +24,7 @@ export const customTextField = createComponentImplementation(TextFieldApi, ({ pr
           id={id}
           className={inputCls}
           rows={4}
-          value={props.value ?? ''}
+          value={props.value ?? ""}
           onChange={(e) => props.setValue?.(e.target.value)}
         />
       ) : (
@@ -32,13 +32,11 @@ export const customTextField = createComponentImplementation(TextFieldApi, ({ pr
           id={id}
           type={type}
           className={inputCls}
-          value={props.value ?? ''}
+          value={props.value ?? ""}
           onChange={(e) => props.setValue?.(e.target.value)}
         />
       )}
-      {hasError && (
-        <span className="text-xs text-red-600">{props.validationErrors![0]}</span>
-      )}
+      {hasError && <span className="text-xs text-red-600">{props.validationErrors?.[0]}</span>}
     </div>
   );
 });

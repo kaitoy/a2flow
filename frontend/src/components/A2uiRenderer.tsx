@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { MessageProcessor } from '@a2ui/web_core/v0_9';
-import { A2uiSurface, MarkdownContext, type ReactComponentImplementation } from '@a2ui/react/v0_9';
-import type { SurfaceModel } from '@a2ui/web_core/v0_9';
-import { marked } from 'marked';
-import { type A2UIUserAction } from '@ag-ui/a2ui-middleware';
-import { tailwindCatalog } from './a2uiCatalog';
+import { A2uiSurface, MarkdownContext, type ReactComponentImplementation } from "@a2ui/react/v0_9";
+import type { SurfaceModel } from "@a2ui/web_core/v0_9";
+import { MessageProcessor } from "@a2ui/web_core/v0_9";
+import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
+import { marked } from "marked";
+import { useEffect, useRef, useState } from "react";
+import { tailwindCatalog } from "./a2uiCatalog";
 
 const markdownRenderer = (text: string) => Promise.resolve(marked(text) as string);
 
@@ -44,9 +44,11 @@ export function A2uiRenderer({
 
     return () => {
       setSurfaces([]);
-      actionSubs.forEach((s) => s.unsubscribe());
+      actionSubs.forEach((s) => {
+        s.unsubscribe();
+      });
     };
-  }, []);
+  }, [payload]);
 
   if (surfaces.length === 0) return null;
 

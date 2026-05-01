@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import type { Message } from '@ag-ui/core';
-import { type A2UIUserAction } from '@ag-ui/a2ui-middleware';
-import { MessageBubble } from './MessageBubble';
+import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
+import type { Message } from "@ag-ui/core";
+import { useEffect, useRef } from "react";
+import { MessageBubble } from "./MessageBubble";
 
 export function MessageList({
   messages,
@@ -17,8 +17,8 @@ export function MessageList({
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6">

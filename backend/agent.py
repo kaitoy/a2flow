@@ -1,8 +1,9 @@
 import os
+
+from ag_ui_adk import CONTEXT_STATE_KEY, AGUIToolset
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.models.lite_llm import LiteLlm
-from ag_ui_adk import AGUIToolset, CONTEXT_STATE_KEY
 
 LITELLM_PREFIX = "litellm:"
 
@@ -44,8 +45,9 @@ def create_agent() -> LlmAgent:
     model_env = os.getenv("LLM_MODEL", "gemini-2.0-flash")
     role_description = os.getenv("ROLE_DESCRIPTION", "You are a helpful assistant.")
 
+    model: LiteLlm | str
     if model_env.startswith(LITELLM_PREFIX):
-        model_name = model_env[len(LITELLM_PREFIX):]
+        model_name = model_env[len(LITELLM_PREFIX) :]
         model = LiteLlm(model=model_name)
     else:
         model = model_env

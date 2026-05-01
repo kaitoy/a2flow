@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useRef, type KeyboardEvent } from 'react';
+import { type KeyboardEvent, useRef, useState } from "react";
 
 interface Props {
   onSend: (message: string) => void;
@@ -8,21 +8,21 @@ interface Props {
 }
 
 export function ChatInput({ onSend, disabled }: Props) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
     onSend(trimmed);
-    setValue('');
+    setValue("");
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = "auto";
     }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -31,7 +31,7 @@ export function ChatInput({ onSend, disabled }: Props) {
   const handleInput = () => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = 'auto';
+    el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   };
 
@@ -50,6 +50,7 @@ export function ChatInput({ onSend, disabled }: Props) {
           className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 max-h-40 overflow-y-auto"
         />
         <button
+          type="button"
           onClick={handleSend}
           disabled={disabled || !value.trim()}
           className="shrink-0 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

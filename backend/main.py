@@ -1,6 +1,7 @@
 import logging
 import os
 import uuid
+from collections.abc import AsyncGenerator
 
 from dotenv import load_dotenv
 
@@ -12,16 +13,16 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-from ag_ui.core import RunAgentInput, SystemMessage
-from ag_ui.encoder import EventEncoder
-from ag_ui_adk import ADKAgent, adk_events_to_messages
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
-from google.adk.sessions import InMemorySessionService
-from pydantic import BaseModel
+from ag_ui.core import RunAgentInput, SystemMessage  # noqa: E402
+from ag_ui.encoder import EventEncoder  # noqa: E402
+from ag_ui_adk import ADKAgent, adk_events_to_messages  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse, StreamingResponse  # noqa: E402
+from google.adk.sessions import InMemorySessionService  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
-from agent import create_agent
+from agent import create_agent  # noqa: E402
 
 APP_NAME = "A2Flow"
 
@@ -35,7 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-session_service = InMemorySessionService()
+session_service = InMemorySessionService()  # type: ignore[no-untyped-call]
 
 adk_agent = ADKAgent(
     adk_agent=create_agent(),
@@ -46,19 +47,25 @@ adk_agent = ADKAgent(
     emit_messages_snapshot=True,
 )
 
+
 @app.post("/agent")
-async def agent_endpoint(input_data: RunAgentInput, request: Request):
+async def agent_endpoint(
+    input_data: RunAgentInput, request: Request
+) -> StreamingResponse:
     # Exclude SystemMessage to prevent prompt injection: ag_ui_adk appends its content directly to agent instructions
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
-    encoder = EventEncoder(accept=request.headers.get("accept"))
-    async def event_generator():
+    encoder = EventEncoder(accept=request.headers.get("accept") or "")
+
+    async def event_generator() -> AsyncGenerator[str, None]:
         async for event in adk_agent.run(input_data):
             yield encoder.encode(event)
+
     return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
 
 
 # ---------- request / response models ----------
+
 
 class SessionCreateRequest(BaseModel):
     user_id: str
@@ -73,8 +80,9 @@ class SessionResponse(BaseModel):
 
 # ---------- session endpoints ----------
 
+
 @app.post("/sessions", response_model=SessionResponse, status_code=201)
-async def create_session(request: SessionCreateRequest):
+async def create_session(request: SessionCreateRequest) -> SessionResponse:
     """Create a new session."""
     session_id = request.session_id or str(uuid.uuid4())
     session = await session_service.create_session(
@@ -90,7 +98,7 @@ async def create_session(request: SessionCreateRequest):
 
 
 @app.get("/sessions", response_model=list[SessionResponse])
-async def list_sessions(user_id: str):
+async def list_sessions(user_id: str) -> list[SessionResponse]:
     """List all sessions for a user."""
     response = await session_service.list_sessions(
         app_name=APP_NAME,
@@ -107,7 +115,7 @@ async def list_sessions(user_id: str):
 
 
 @app.get("/sessions/{session_id}/messages")
-async def get_session_messages(session_id: str, user_id: str):
+async def get_session_messages(session_id: str, user_id: str) -> JSONResponse:
     """Get message history for a session."""
     session = await session_service.get_session(
         app_name=APP_NAME,
@@ -121,7 +129,7 @@ async def get_session_messages(session_id: str, user_id: str):
 
 
 @app.delete("/sessions/{session_id}", status_code=204)
-async def delete_session(session_id: str, user_id: str):
+async def delete_session(session_id: str, user_id: str) -> None:
     """Delete a session."""
     session = await session_service.get_session(
         app_name=APP_NAME,
@@ -139,8 +147,9 @@ async def delete_session(session_id: str, user_id: str):
 
 # ---------- health ----------
 
+
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
