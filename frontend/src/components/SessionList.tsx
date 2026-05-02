@@ -32,21 +32,23 @@ export function SessionList({
   }, [userId]);
 
   return (
-    <div className="flex flex-col w-56 shrink-0 border-r border-gray-200 bg-gray-50 h-full">
-      <div className="shrink-0 px-3 py-3 border-b border-gray-200">
+    <div className="flex flex-col w-60 shrink-0 border-r border-outline-variant bg-surface-container-low h-full">
+      <div className="shrink-0 px-3 py-3 border-b border-outline-variant">
         <button
           type="button"
           onClick={onNew}
           disabled={disabled}
-          className="w-full rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+          className="w-full rounded bg-primary-container px-3 py-1.5 text-[12px] leading-[16px] font-bold uppercase tracking-[0.04em] text-on-primary-container hover:bg-primary disabled:opacity-50"
         >
           + New session
         </button>
       </div>
       <div className="flex-1 overflow-y-auto py-2">
-        {loading && sessions.length === 0 && <p className="px-3 text-xs text-gray-400">Loading…</p>}
+        {loading && sessions.length === 0 && (
+          <p className="px-3 text-xs text-on-surface-variant">Loading…</p>
+        )}
         {!loading && sessions.length === 0 && (
-          <p className="px-3 text-xs text-gray-400">No sessions</p>
+          <p className="px-3 text-xs text-on-surface-variant">No sessions</p>
         )}
         {sessions.map((s) => {
           const isActive = s.session_id === currentSessionId;
@@ -66,14 +68,14 @@ export function SessionList({
               title={s.session_id}
               className={`w-full text-left px-3 py-2 text-xs truncate ${
                 isActive
-                  ? "bg-gray-200 text-gray-900 font-medium"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-primary-container text-on-primary-container font-medium"
+                  : "text-on-surface-variant hover:bg-surface-container"
               } disabled:cursor-default`}
             >
-              <span className="block truncate font-mono text-[10px] text-gray-400">
+              <span className="block truncate font-mono text-[10px] text-on-surface-variant/60">
                 {s.session_id.slice(0, 8)}…
               </span>
-              <span className="block">{label}</span>
+              <span className="block text-on-surface">{label}</span>
             </button>
           );
         })}

@@ -3,13 +3,13 @@ import { ButtonApi } from "@a2ui/web_core/v0_9/basic_catalog";
 
 export const customButton = createComponentImplementation(ButtonApi, ({ props, buildChild }) => {
   const base =
-    "inline-flex items-center cursor-pointer rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+    "inline-flex items-center cursor-pointer rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
   const variant =
     props.variant === "primary"
-      ? "px-4 py-2 bg-blue-600 text-white border-0 hover:bg-blue-700"
+      ? "px-4 py-2 bg-primary-container text-on-primary-container border-0 text-sm font-medium hover:bg-primary"
       : props.variant === "borderless"
-        ? "px-2 py-1 text-blue-600 bg-transparent border-0 hover:underline"
-        : "px-4 py-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50";
+        ? "px-4 py-2 bg-white text-primary border border-primary text-xs font-semibold uppercase tracking-[0.04em] hover:bg-surface-container-low"
+        : "px-4 py-2 bg-transparent text-primary border-0 text-sm font-medium hover:bg-surface-container-low";
 
   return (
     <button

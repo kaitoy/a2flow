@@ -36,7 +36,7 @@ export function ChatInput({ onSend, disabled }: Props) {
   };
 
   return (
-    <div className="border-t border-gray-200 px-4 py-3 bg-white">
+    <div className="border-t border-outline-variant px-4 py-3 bg-surface-container-lowest">
       <div className="flex items-end gap-2 max-w-3xl mx-auto">
         <textarea
           ref={textareaRef}
@@ -47,13 +47,13 @@ export function ChatInput({ onSend, disabled }: Props) {
           placeholder="Message… (Enter to send, Shift+Enter for newline)"
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 max-h-40 overflow-y-auto"
+          className="flex-1 resize-none rounded border border-outline px-4 py-2 text-sm text-on-surface focus:outline-none focus:border-primary-container disabled:opacity-50 max-h-40 overflow-y-auto"
         />
         <button
           type="button"
           onClick={handleSend}
           disabled={disabled || !value.trim()}
-          className="shrink-0 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="shrink-0 rounded bg-primary-container px-4 py-2 text-sm font-medium text-on-primary-container hover:bg-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           Send
         </button>

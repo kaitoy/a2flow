@@ -47,10 +47,10 @@ export function MessageBubble({
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-3`}>
       <div
-        className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
+        className={`max-w-[75%] px-4 py-2.5 rounded text-sm leading-relaxed whitespace-pre-wrap break-words ${
           isUser
-            ? "bg-blue-600 text-white rounded-br-sm"
-            : "bg-gray-100 text-gray-900 rounded-bl-sm"
+            ? "bg-primary-container text-on-primary-container"
+            : "bg-surface-container border border-outline-variant text-on-surface"
         }`}
       >
         {textContent || (isStreaming ? null : "\u00a0")}

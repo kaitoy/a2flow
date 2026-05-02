@@ -33,7 +33,9 @@ export const customChoicePicker = createComponentImplementation(
     return (
       <div className="flex flex-col gap-2 w-full">
         {props.label && (
-          <strong className="text-sm font-semibold text-gray-700">{String(props.label)}</strong>
+          <strong className="text-[12px] leading-[16px] font-bold text-on-surface-variant uppercase tracking-[0.04em]">
+            {String(props.label)}
+          </strong>
         )}
         {props.filterable && (
           <input
@@ -41,7 +43,7 @@ export const customChoicePicker = createComponentImplementation(
             placeholder="Filter options..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="rounded border border-outline px-3 py-1.5 text-sm focus:border-primary-container focus:outline-none"
           />
         )}
         <div className={isChips ? "flex flex-row flex-wrap gap-2" : "flex flex-col gap-2"}>
@@ -55,8 +57,8 @@ export const customChoicePicker = createComponentImplementation(
                   onClick={() => onToggle(String(opt.value))}
                   className={
                     isSelected
-                      ? "px-3 py-1 rounded-full text-sm bg-blue-600 text-white border border-blue-600 cursor-pointer"
-                      : "px-3 py-1 rounded-full text-sm bg-white text-gray-700 border border-gray-300 hover:border-blue-400 cursor-pointer"
+                      ? "px-3 py-1 rounded text-sm bg-primary-container text-on-primary-container border border-primary-container cursor-pointer"
+                      : "px-3 py-1 rounded text-sm bg-surface-container-high text-on-surface border border-outline-variant hover:bg-surface-container cursor-pointer"
                   }
                 >
                   {String(opt.label)}
@@ -70,9 +72,9 @@ export const customChoicePicker = createComponentImplementation(
                   checked={isSelected}
                   onChange={() => onToggle(String(opt.value))}
                   name={isMutuallyExclusive ? name : undefined}
-                  className="h-4 w-4 accent-blue-600"
+                  className="h-4 w-4 accent-primary-container"
                 />
-                <span className="text-sm text-gray-700">{String(opt.label)}</span>
+                <span className="text-sm text-on-surface">{String(opt.label)}</span>
               </label>
             );
           })}
