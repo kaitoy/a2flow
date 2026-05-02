@@ -12,7 +12,10 @@
     "lint": "biome lint ./src",
     "format": "biome format --write ./src",
     "check": "biome check --write ./src",
-    "ci": "biome ci ./src"
+    "ci": "biome ci ./src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@a2ui/react": "0.9.0-alpha.3",
@@ -30,12 +33,20 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "^4.1.5",
     "autoprefixer": "^10.4.0",
+    "jsdom": "^29.1.1",
+    "msw": "^2.14.2",
     "postcss": "^8.5.0",
     "tailwindcss": "^3.4.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.5"
   }
 }

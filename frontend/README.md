@@ -99,6 +99,55 @@ src/
 
 For the full end-to-end A2UI flow (build-time schema download → tool injection → LLM call → event conversion → rendering → action feedback loop), see [docs/a2ui-flow.md](../docs/a2ui-flow.md).
 
+## Testing
+
+Unit tests are implemented with [Vitest](https://vitest.dev/), [Testing Library](https://testing-library.com/), and [MSW](https://mswjs.io/).
+
+### Running tests
+
+```bash
+# Run all tests once
+pnpm test
+
+# Watch mode
+pnpm test:watch
+
+# Run with coverage report
+pnpm test:coverage
+```
+
+### Test structure
+
+| Tool | Purpose |
+|---|---|
+| Vitest | Test runner |
+| @testing-library/react | Rendering and assertions for components and hooks |
+| @testing-library/user-event | User interaction simulation |
+| MSW (Mock Service Worker) | Backend API mocking |
+
+Test files live next to the source files they cover, named `*.test.ts(x)`.
+
+Shared test infrastructure (custom renderer, MSW server, mocks) lives under `src/test/`:
+
+```
+src/test/
+├── setup.ts           # Global setup (MSW server, jest-dom matchers)
+├── test-utils.tsx     # Custom render wrapped in Redux Provider
+├── mocks/
+│   ├── next-navigation.ts  # Stub for next/navigation
+│   └── next-font.ts        # Stub for next/font/google
+└── msw/
+    ├── handlers.ts    # MSW request handlers for the backend API
+    └── server.ts      # MSW server instance
+```
+
+### Mocking strategy
+
+- **Backend REST API** — intercepted via MSW
+- **Agent streaming** (`/agent` endpoint) — `HttpAgent` from `@ag-ui/client` is mocked at the module level (SSE streaming is not practical to simulate with MSW in jsdom)
+- **`next/navigation`** — replaced with a stub via `resolve.alias` in `vitest.config.ts`
+- **`@a2ui/react` / `@a2ui/web_core`** — mocked per test file with `vi.mock()` at the `A2uiRenderer` boundary to avoid the complex dependency chain
+
 ## Environment variables
 
 | Variable | Default | Description |
