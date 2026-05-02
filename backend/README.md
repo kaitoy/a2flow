@@ -80,6 +80,18 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 cd backend && uv run uvicorn main:app --reload
 ```
 
+## Testing
+
+```bash
+cd backend && uv run pytest
+```
+
+No LLM API keys are required to run the tests. Pass `-v` for verbose output:
+
+```bash
+cd backend && uv run pytest -v
+```
+
 ## API
 
 ### Session management

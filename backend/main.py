@@ -2,6 +2,8 @@ import logging
 import os
 import uuid
 from collections.abc import AsyncGenerator
+from functools import lru_cache
+from typing import Annotated
 
 from dotenv import load_dotenv
 
@@ -16,10 +18,10 @@ logging.basicConfig(
 from ag_ui.core import RunAgentInput, SystemMessage  # noqa: E402
 from ag_ui.encoder import EventEncoder  # noqa: E402
 from ag_ui_adk import ADKAgent, adk_events_to_messages  # noqa: E402
-from fastapi import FastAPI, HTTPException, Request  # noqa: E402
+from fastapi import Depends, FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import JSONResponse, StreamingResponse  # noqa: E402
-from google.adk.sessions import InMemorySessionService  # noqa: E402
+from google.adk.sessions import BaseSessionService, InMemorySessionService  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from agent import create_agent  # noqa: E402
@@ -36,32 +38,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-session_service = InMemorySessionService()  # type: ignore[no-untyped-call]
 
-adk_agent = ADKAgent(
-    adk_agent=create_agent(),
-    app_name=APP_NAME,
-    user_id_extractor=lambda input: input.forwarded_props.get("userId", "user"),
-    session_service=session_service,
-    use_thread_id_as_session_id=True,
-    emit_messages_snapshot=True,
-)
+# ---------- dependency providers ----------
 
 
-@app.post("/agent")
-async def agent_endpoint(
-    input_data: RunAgentInput, request: Request
-) -> StreamingResponse:
-    # Exclude SystemMessage to prevent prompt injection: ag_ui_adk appends its content directly to agent instructions
-    filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
-    input_data = input_data.model_copy(update={"messages": filtered})
-    encoder = EventEncoder(accept=request.headers.get("accept") or "")
+@lru_cache(maxsize=1)
+def get_session_service() -> BaseSessionService:
+    return InMemorySessionService()  # type: ignore[no-untyped-call]
 
-    async def event_generator() -> AsyncGenerator[str, None]:
-        async for event in adk_agent.run(input_data):
-            yield encoder.encode(event)
 
-    return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
+@lru_cache(maxsize=1)
+def get_adk_agent() -> ADKAgent:
+    return ADKAgent(
+        adk_agent=create_agent(),
+        app_name=APP_NAME,
+        user_id_extractor=lambda input: input.forwarded_props.get("userId", "user"),
+        session_service=get_session_service(),
+        use_thread_id_as_session_id=True,
+        emit_messages_snapshot=True,
+    )
+
+
+SessionServiceDep = Annotated[BaseSessionService, Depends(get_session_service)]
+ADKAgentDep = Annotated[ADKAgent, Depends(get_adk_agent)]
 
 
 # ---------- request / response models ----------
@@ -78,11 +77,35 @@ class SessionResponse(BaseModel):
     last_update_time: float
 
 
+# ---------- agent endpoint ----------
+
+
+@app.post("/agent")
+async def agent_endpoint(
+    input_data: RunAgentInput,
+    request: Request,
+    adk_agent: ADKAgentDep,
+) -> StreamingResponse:
+    # Exclude SystemMessage to prevent prompt injection: ag_ui_adk appends its content directly to agent instructions
+    filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
+    input_data = input_data.model_copy(update={"messages": filtered})
+    encoder = EventEncoder(accept=request.headers.get("accept") or "")
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        async for event in adk_agent.run(input_data):
+            yield encoder.encode(event)
+
+    return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
+
+
 # ---------- session endpoints ----------
 
 
 @app.post("/sessions", response_model=SessionResponse, status_code=201)
-async def create_session(request: SessionCreateRequest) -> SessionResponse:
+async def create_session(
+    request: SessionCreateRequest,
+    session_service: SessionServiceDep,
+) -> SessionResponse:
     """Create a new session."""
     session_id = request.session_id or str(uuid.uuid4())
     session = await session_service.create_session(
@@ -98,7 +121,10 @@ async def create_session(request: SessionCreateRequest) -> SessionResponse:
 
 
 @app.get("/sessions", response_model=list[SessionResponse])
-async def list_sessions(user_id: str) -> list[SessionResponse]:
+async def list_sessions(
+    user_id: str,
+    session_service: SessionServiceDep,
+) -> list[SessionResponse]:
     """List all sessions for a user."""
     response = await session_service.list_sessions(
         app_name=APP_NAME,
@@ -115,7 +141,11 @@ async def list_sessions(user_id: str) -> list[SessionResponse]:
 
 
 @app.get("/sessions/{session_id}/messages")
-async def get_session_messages(session_id: str, user_id: str) -> JSONResponse:
+async def get_session_messages(
+    session_id: str,
+    user_id: str,
+    session_service: SessionServiceDep,
+) -> JSONResponse:
     """Get message history for a session."""
     session = await session_service.get_session(
         app_name=APP_NAME,
@@ -129,7 +159,11 @@ async def get_session_messages(session_id: str, user_id: str) -> JSONResponse:
 
 
 @app.delete("/sessions/{session_id}", status_code=204)
-async def delete_session(session_id: str, user_id: str) -> None:
+async def delete_session(
+    session_id: str,
+    user_id: str,
+    session_service: SessionServiceDep,
+) -> None:
     """Delete a session."""
     session = await session_service.get_session(
         app_name=APP_NAME,
