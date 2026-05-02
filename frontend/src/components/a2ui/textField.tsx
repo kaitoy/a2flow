@@ -1,15 +1,14 @@
 import { createComponentImplementation } from "@a2ui/react/v0_9";
 import { TextFieldApi } from "@a2ui/web_core/v0_9/basic_catalog";
 import { useId } from "react";
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 
 export const customTextField = createComponentImplementation(TextFieldApi, ({ props }) => {
   const id = useId();
   const isLong = props.variant === "longText";
   const type =
     props.variant === "number" ? "number" : props.variant === "obscured" ? "password" : "text";
-  const inputCls =
-    "block w-full rounded border border-outline px-3 py-2 text-sm text-on-surface " +
-    "focus:border-primary-container focus:outline-none";
   const hasError = props.validationErrors && props.validationErrors.length > 0;
 
   return (
@@ -23,18 +22,16 @@ export const customTextField = createComponentImplementation(TextFieldApi, ({ pr
         </label>
       )}
       {isLong ? (
-        <textarea
+        <Textarea
           id={id}
-          className={inputCls}
           rows={4}
           value={props.value ?? ""}
           onChange={(e) => props.setValue?.(e.target.value)}
         />
       ) : (
-        <input
+        <Input
           id={id}
           type={type}
-          className={inputCls}
           value={props.value ?? ""}
           onChange={(e) => props.setValue?.(e.target.value)}
         />

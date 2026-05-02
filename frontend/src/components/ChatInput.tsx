@@ -1,6 +1,8 @@
 "use client";
 
 import { type KeyboardEvent, useRef, useState } from "react";
+import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
 
 interface Props {
   onSend: (message: string) => void;
@@ -38,7 +40,7 @@ export function ChatInput({ onSend, disabled }: Props) {
   return (
     <div className="border-t border-outline-variant px-4 py-3 bg-surface-container-lowest">
       <div className="flex items-end gap-2 max-w-3xl mx-auto">
-        <textarea
+        <Textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -47,16 +49,16 @@ export function ChatInput({ onSend, disabled }: Props) {
           placeholder="Message… (Enter to send, Shift+Enter for newline)"
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none rounded border border-outline px-4 py-2 text-sm text-on-surface focus:outline-none focus:border-primary-container disabled:opacity-50 max-h-40 overflow-y-auto"
+          className="flex-1 resize-none max-h-40 overflow-y-auto"
         />
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onClick={handleSend}
           disabled={disabled || !value.trim()}
-          className="shrink-0 rounded bg-primary-container px-4 py-2 text-sm font-medium text-on-primary-container hover:bg-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="shrink-0"
         >
           Send
-        </button>
+        </Button>
       </div>
     </div>
   );

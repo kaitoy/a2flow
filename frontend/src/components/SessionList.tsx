@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { listSessions, type SessionInfo } from "@/lib/api";
+import { Button } from "./ui/button";
 
 interface SessionListProps {
   userId: string;
@@ -34,14 +35,9 @@ export function SessionList({
   return (
     <div className="flex flex-col w-60 shrink-0 border-r border-outline-variant bg-surface-container-low h-full">
       <div className="shrink-0 px-3 py-3 border-b border-outline-variant">
-        <button
-          type="button"
-          onClick={onNew}
-          disabled={disabled}
-          className="w-full rounded bg-primary-container px-3 py-1.5 text-[12px] leading-[16px] font-bold uppercase tracking-[0.04em] text-on-primary-container hover:bg-primary disabled:opacity-50"
-        >
+        <Button variant="primary" onClick={onNew} disabled={disabled} className="w-full">
           + New session
-        </button>
+        </Button>
       </div>
       <div className="flex-1 overflow-y-auto py-2">
         {loading && sessions.length === 0 && (
