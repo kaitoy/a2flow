@@ -22,7 +22,7 @@ class A2UIInstructionProvider:
             "formatting, so users will see raw symbols (e.g. **bold**, ## Heading) instead of formatted text. "
             "Always use render_a2ui with Text components (with appropriate variant) to deliver any Markdown content."
         )
-        parts = [self._base, a2ui_rules]
+        parts = [f"# Role\n{self._base}", a2ui_rules]
         if context_entries:
             context_text = "\n\n".join(
                 f"# {entry['description']}\n{entry['value']}"
