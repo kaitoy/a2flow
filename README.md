@@ -18,7 +18,7 @@ A chat application that connects a [Google ADK](https://google.github.io/adk-doc
 ```
 a2flow/
 ├── backend/   # FastAPI + Google ADK agent
-└── frontend/  # Next.js 15 chat UI
+└── frontend/  # Next.js 16 chat UI
 ```
 
 ## Quick start
