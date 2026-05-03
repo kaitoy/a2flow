@@ -5,7 +5,17 @@ from collections.abc import AsyncGenerator
 from functools import lru_cache
 from typing import Annotated
 
+from ag_ui.core import RunAgentInput, SystemMessage
+from ag_ui.encoder import EventEncoder
+from ag_ui_adk import ADKAgent, adk_events_to_messages
 from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+from google.adk.sessions import BaseSessionService, InMemorySessionService
+from pydantic import BaseModel
+
+from agent import create_agent
 
 load_dotenv()
 
@@ -14,17 +24,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%S",
     level=logging.INFO,
 )
-
-from ag_ui.core import RunAgentInput, SystemMessage  # noqa: E402
-from ag_ui.encoder import EventEncoder  # noqa: E402
-from ag_ui_adk import ADKAgent, adk_events_to_messages  # noqa: E402
-from fastapi import Depends, FastAPI, HTTPException, Request  # noqa: E402
-from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import JSONResponse, StreamingResponse  # noqa: E402
-from google.adk.sessions import BaseSessionService, InMemorySessionService  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
-
-from agent import create_agent  # noqa: E402
 
 APP_NAME = "A2Flow"
 
