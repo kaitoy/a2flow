@@ -12,7 +12,8 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from google.adk.sessions import BaseSessionService, InMemorySessionService
+from google.adk.sessions import BaseSessionService
+from google.adk.sessions.sqlite_session_service import SqliteSessionService
 from pydantic import BaseModel
 
 from agent import create_agent
@@ -43,7 +44,8 @@ app.add_middleware(
 
 @lru_cache(maxsize=1)
 def get_session_service() -> BaseSessionService:
-    return InMemorySessionService()  # type: ignore[no-untyped-call]
+    db_path = os.getenv("SESSION_DB_URL", "sqlite:///sessions.db")
+    return SqliteSessionService(db_path)
 
 
 @lru_cache(maxsize=1)

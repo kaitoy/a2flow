@@ -62,6 +62,23 @@ PORT=8000
 
 Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted.
 
+### Session storage
+
+```env
+SESSION_DB_URL=sqlite:///sessions.db
+```
+
+SQLite URL for session persistence via `SqliteSessionService`. Supports SQLAlchemy-style URLs (`sqlite:///relative.db` or `sqlite:////absolute/path.db`). Defaults to `sqlite:///sessions.db` (relative to the working directory).
+
+The database is created automatically on first run with the following tables:
+
+| Table | Description |
+|---|---|
+| `app_states` | App-level shared state |
+| `user_states` | Per-user state shared across sessions |
+| `sessions` | Session metadata and session-level state |
+| `events` | Full event history per session (JSON) |
+
 ### CORS
 
 ```env

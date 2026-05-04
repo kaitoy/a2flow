@@ -24,6 +24,9 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# SQLite databases
+*.db
+
 # Next.js
 frontend/.next/
 frontend/out/
