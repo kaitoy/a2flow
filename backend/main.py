@@ -2,6 +2,8 @@ import logging
 import os
 import uuid
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Annotated
 
@@ -15,8 +17,17 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from google.adk.sessions import BaseSessionService
 from google.adk.sessions.sqlite_session_service import SqliteSessionService
 from pydantic import BaseModel
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from agent import create_agent
+from database import (
+    AgentSkill,
+    AgentSkillCreate,
+    AgentSkillUpdate,
+    get_session,
+    init_db,
+)
 
 load_dotenv()
 
@@ -28,7 +39,18 @@ logging.basicConfig(
 
 APP_NAME = "A2Flow"
 
-app = FastAPI(title="A2Flow", description="Google ADK agent with SSE streaming")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    await init_db()
+    yield
+
+
+app = FastAPI(
+    title=APP_NAME,
+    description="Google ADK agent with SSE streaming",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -62,6 +84,7 @@ def get_adk_agent() -> ADKAgent:
 
 SessionServiceDep = Annotated[BaseSessionService, Depends(get_session_service)]
 ADKAgentDep = Annotated[ADKAgent, Depends(get_adk_agent)]
+DBSessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 # ---------- request / response models ----------
@@ -178,6 +201,70 @@ async def delete_session(
         user_id=user_id,
         session_id=session_id,
     )
+
+
+# ---------- agent skill endpoints ----------
+
+
+@app.post("/agent-skills", response_model=AgentSkill, status_code=201)
+async def create_agent_skill(
+    body: AgentSkillCreate,
+    db: DBSessionDep,
+) -> AgentSkill:
+    skill = AgentSkill.model_validate(body.model_dump())
+    db.add(skill)
+    await db.commit()
+    await db.refresh(skill)
+    return skill
+
+
+@app.get("/agent-skills", response_model=list[AgentSkill])
+async def list_agent_skills(
+    db: DBSessionDep,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[AgentSkill]:
+    result = await db.exec(
+        select(AgentSkill)
+        .order_by(col(AgentSkill.created_at).desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(result.all())
+
+
+@app.get("/agent-skills/{skill_id}", response_model=AgentSkill)
+async def get_agent_skill(skill_id: str, db: DBSessionDep) -> AgentSkill:
+    skill = await db.get(AgentSkill, skill_id)
+    if skill is None:
+        raise HTTPException(status_code=404, detail="Agent skill not found")
+    return skill
+
+
+@app.patch("/agent-skills/{skill_id}", response_model=AgentSkill)
+async def update_agent_skill(
+    skill_id: str,
+    body: AgentSkillUpdate,
+    db: DBSessionDep,
+) -> AgentSkill:
+    skill = await db.get(AgentSkill, skill_id)
+    if skill is None:
+        raise HTTPException(status_code=404, detail="Agent skill not found")
+    skill.sqlmodel_update(body.model_dump(exclude_unset=True))
+    skill.updated_at = datetime.now(UTC)
+    db.add(skill)
+    await db.commit()
+    await db.refresh(skill)
+    return skill
+
+
+@app.delete("/agent-skills/{skill_id}", status_code=204)
+async def delete_agent_skill(skill_id: str, db: DBSessionDep) -> None:
+    skill = await db.get(AgentSkill, skill_id)
+    if skill is None:
+        raise HTTPException(status_code=404, detail="Agent skill not found")
+    await db.delete(skill)
+    await db.commit()
 
 
 # ---------- health ----------

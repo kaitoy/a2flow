@@ -8,7 +8,7 @@ A chat application that connects a [Google ADK](https://google.github.io/adk-doc
 │   @ag-ui/client                  │ ───────────────────────────────► │  Google ADK agent    │
 │   @ag-ui/a2ui-middleware         │   A2UIMiddleware)                 │  AGUIToolset         │
 │   Redux Toolkit                  │                                   │  InMemorySession     │
-│                                  │ ◄─────────────────────────────── │                      │
+│   Admin UI (/admin)              │ ◄─────────────────────────────── │  SQLite (SQLModel)   │
 └──────────────────────────────────┘  AG-UI events (SSE) incl.        └──────────────────────┘
      :3000                            A2UI (TOOL_CALL_*)                    :8000
 ```
@@ -49,6 +49,18 @@ pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+## Agent Skills admin UI
+
+Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/admin/agent-skills) to manage the Agent Skills registry — a catalog of AI agent skills stored in Git repositories.
+
+| Operation | Path |
+|-----------|------|
+| List all skills | `GET /admin/agent-skills` |
+| Register a new skill | `GET /admin/agent-skills/new` |
+| Edit / delete a skill | `GET /admin/agent-skills/{id}` |
+
+Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, and description.
 
 ## How it works
 

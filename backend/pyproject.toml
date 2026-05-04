@@ -11,6 +11,9 @@ dependencies = [
     "litellm>=1.50.0",
     "ag-ui-protocol>=0.1.15",
     "ag-ui-adk>=0.6.0",
+    "sqlmodel>=0.0.22",
+    "aiosqlite>=0.20.0",
+    "uuid-utils>=0.9.0",
 ]
 
 [project.scripts]

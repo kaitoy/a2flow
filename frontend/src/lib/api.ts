@@ -1,10 +1,18 @@
 import { type A2UIInlineCatalogSchema, A2UIMiddleware } from "@ag-ui/a2ui-middleware";
 import { HttpAgent } from "@ag-ui/client";
 import type { Message } from "@ag-ui/core";
+import axios from "axios";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import logger from "./logger";
 
 const API_BASE = process.env.BACKEND_BASE_URL ?? "http://localhost:8000";
+
+const apiClient = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
 export interface SessionInfo {
   session_id: string;
@@ -13,35 +21,81 @@ export interface SessionInfo {
 }
 
 export async function listSessions(userId: string): Promise<SessionInfo[]> {
-  const response = await fetch(`${API_BASE}/sessions?user_id=${encodeURIComponent(userId)}`);
-  if (!response.ok) {
-    throw new Error(`List sessions failed: ${response.status}`);
-  }
-  return response.json() as Promise<SessionInfo[]>;
+  const response = await apiClient.get<SessionInfo[]>("/sessions", {
+    params: { user_id: userId },
+  });
+  return response.data;
 }
 
 export async function getSessionMessages(sessionId: string, userId: string): Promise<Message[]> {
-  const response = await fetch(
-    `${API_BASE}/sessions/${encodeURIComponent(sessionId)}/messages?user_id=${encodeURIComponent(userId)}`
+  const response = await apiClient.get<Message[]>(
+    `/sessions/${encodeURIComponent(sessionId)}/messages`,
+    { params: { user_id: userId } }
   );
-  if (!response.ok) {
-    throw new Error(`Get session messages failed: ${response.status}`);
-  }
-  return response.json() as Promise<Message[]>;
+  return response.data;
 }
 
 export async function createSession(userId: string): Promise<string> {
-  const response = await fetch(`${API_BASE}/sessions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId }),
+  const response = await apiClient.post<{ session_id: string }>("/sessions", {
+    user_id: userId,
   });
-  if (!response.ok) {
-    throw new Error(`Create session failed: ${response.status}`);
-  }
-  const data = (await response.json()) as { session_id: string };
-  logger.info({ sessionId: data.session_id }, "session created");
-  return data.session_id;
+  logger.info({ sessionId: response.data.session_id }, "session created");
+  return response.data.session_id;
+}
+
+export interface AgentSkill {
+  id: string;
+  name: string;
+  repo_url: string;
+  repo_path: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export interface AgentSkillCreate {
+  name: string;
+  repo_url: string;
+  repo_path?: string;
+  description?: string | null;
+}
+
+export interface AgentSkillUpdate {
+  name?: string;
+  repo_url?: string;
+  repo_path?: string;
+  description?: string | null;
+}
+
+export async function listAgentSkills(limit = 20, offset = 0): Promise<AgentSkill[]> {
+  const response = await apiClient.get<AgentSkill[]>("/agent-skills", {
+    params: { limit, offset },
+  });
+  return response.data;
+}
+
+export async function getAgentSkill(id: string): Promise<AgentSkill> {
+  const response = await apiClient.get<AgentSkill>(`/agent-skills/${encodeURIComponent(id)}`);
+  return response.data;
+}
+
+export async function createAgentSkill(body: AgentSkillCreate): Promise<AgentSkill> {
+  const response = await apiClient.post<AgentSkill>("/agent-skills", body);
+  return response.data;
+}
+
+export async function updateAgentSkill(id: string, body: AgentSkillUpdate): Promise<AgentSkill> {
+  const response = await apiClient.patch<AgentSkill>(
+    `/agent-skills/${encodeURIComponent(id)}`,
+    body
+  );
+  return response.data;
+}
+
+export async function deleteAgentSkill(id: string): Promise<void> {
+  await apiClient.delete(`/agent-skills/${encodeURIComponent(id)}`);
 }
 
 export function createChatAgent(sessionId: string): HttpAgent {

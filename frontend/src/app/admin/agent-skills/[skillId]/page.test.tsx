@@ -1,0 +1,85 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
+import { useParams, useRouter } from "next/navigation";
+import { describe, expect, it, vi } from "vitest";
+import { server } from "@/test/msw/server";
+import EditAgentSkillPage from "./page";
+
+function setup() {
+  vi.mocked(useParams).mockReturnValue({ skillId: "skill-1" });
+}
+
+describe("EditAgentSkillPage", () => {
+  it("prefills form with skill data", async () => {
+    setup();
+    render(<EditAgentSkillPage />);
+    await waitFor(() => expect(screen.getByDisplayValue("My Skill")).toBeInTheDocument());
+    expect(screen.getByDisplayValue("https://github.com/example/repo")).toBeInTheDocument();
+  });
+
+  it("submits update api on form submit", async () => {
+    setup();
+    const patchSpy = vi.fn(() => HttpResponse.json({ id: "skill-1", name: "My Skill" }));
+    server.use(http.patch("http://localhost:8000/agent-skills/:skillId", patchSpy));
+
+    render(<EditAgentSkillPage />);
+    await waitFor(() => screen.getByDisplayValue("My Skill"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(patchSpy).toHaveBeenCalled());
+  });
+
+  it("navigates to list after save", async () => {
+    setup();
+    const pushMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+    });
+
+    render(<EditAgentSkillPage />);
+    await waitFor(() => screen.getByDisplayValue("My Skill"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/agent-skills"));
+  });
+
+  it("calls delete api and navigates after confirm", async () => {
+    setup();
+    const pushMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+    });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const deleteSpy = vi.fn(() => new HttpResponse(null, { status: 204 }));
+    server.use(http.delete("http://localhost:8000/agent-skills/:skillId", deleteSpy));
+
+    render(<EditAgentSkillPage />);
+    await waitFor(() => screen.getByDisplayValue("My Skill"));
+    await userEvent.click(screen.getByRole("button", { name: /delete/i }));
+
+    await waitFor(() => expect(deleteSpy).toHaveBeenCalled());
+    expect(pushMock).toHaveBeenCalledWith("/admin/agent-skills");
+  });
+
+  it("shows error on load failure", async () => {
+    setup();
+    server.use(
+      http.get(
+        "http://localhost:8000/agent-skills/:skillId",
+        () => new HttpResponse(null, { status: 404 })
+      )
+    );
+
+    render(<EditAgentSkillPage />);
+    await waitFor(() => expect(screen.getByText(/404/)).toBeInTheDocument());
+  });
+});
