@@ -76,6 +76,7 @@ describe("chatSlice", () => {
       expect(state.messages).toHaveLength(2);
       const activityMsg = state.messages[1];
       expect(activityMsg.role).toBe("activity");
+      if (activityMsg.role !== "activity") throw new Error("expected activity message");
       expect(activityMsg.activityType).toBe(A2UIActivityType);
       expect(activityMsg.id).toBe(`a2ui-surface-${surfaceId}-${toolCallId}`);
       const ops = activityMsg.content[A2UI_OPERATIONS_KEY] as unknown[];

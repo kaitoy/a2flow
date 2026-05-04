@@ -24,6 +24,5 @@ const VARIANT: Record<ButtonVariant, string> = {
 
 export function Button({ variant = "ghost", className, ...rest }: ButtonProps) {
   const cls = [BASE, VARIANT[variant], className].filter(Boolean).join(" ");
-  // biome-ignore lint/a11y/useButtonType: type defaults to "button" via defaultProps pattern below
   return <button type="button" {...rest} className={cls} />;
 }

@@ -32,7 +32,7 @@ describe("UserMessageBubble", () => {
           role: "user",
           content: [
             { type: "text", text: "hi" },
-            { type: "image_url", image_url: { url: "http://example.com/img.png" } },
+            { type: "image", source: { type: "url", value: "http://example.com/img.png" } },
           ],
         }}
       />

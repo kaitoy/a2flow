@@ -1,4 +1,4 @@
-import { configureStore } from "@reduxjs/toolkit";
+import { configureStore, type Reducer, type UnknownAction } from "@reduxjs/toolkit";
 import { type RenderOptions, render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { Provider } from "react-redux";
@@ -7,7 +7,9 @@ import chatReducer from "@/store/chatSlice";
 
 export function makeStore(preloadedState?: Partial<RootState>) {
   return configureStore({
-    reducer: { chat: chatReducer },
+    reducer: {
+      chat: chatReducer as Reducer<RootState["chat"], UnknownAction, RootState["chat"] | undefined>,
+    },
     preloadedState,
   });
 }

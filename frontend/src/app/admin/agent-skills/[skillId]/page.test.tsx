@@ -39,6 +39,7 @@ describe("EditAgentSkillPage", () => {
       back: vi.fn(),
       prefetch: vi.fn(),
       refresh: vi.fn(),
+      forward: vi.fn(),
     });
 
     render(<EditAgentSkillPage />);
@@ -57,6 +58,7 @@ describe("EditAgentSkillPage", () => {
       back: vi.fn(),
       prefetch: vi.fn(),
       refresh: vi.fn(),
+      forward: vi.fn(),
     });
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const deleteSpy = vi.fn(() => new HttpResponse(null, { status: 204 }));

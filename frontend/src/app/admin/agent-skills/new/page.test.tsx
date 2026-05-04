@@ -41,6 +41,7 @@ describe("NewAgentSkillPage", () => {
       back: vi.fn(),
       prefetch: vi.fn(),
       refresh: vi.fn(),
+      forward: vi.fn(),
     });
 
     render(<NewAgentSkillPage />);
