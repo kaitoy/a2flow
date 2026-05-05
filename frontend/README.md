@@ -6,10 +6,10 @@ Chat UI for [A2Flow](../README.md). Streams responses from the backend via SSE a
 
 | | |
 |---|---|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16 (App Router) |
 | Language | TypeScript |
 | State | Redux Toolkit + React Redux |
-| Styling | Tailwind CSS |
+| Styling | Tailwind CSS v4 |
 | HTTP | Fetch API (REST) / @ag-ui/client (SSE streaming) |
 | Logging | pino (browser mode) |
 | AG-UI | @ag-ui/client + @ag-ui/core + @ag-ui/a2ui-middleware |

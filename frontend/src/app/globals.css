@@ -1,3 +1,53 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  /* Surface colors */
+  --color-surface: #f8f9ff;
+  --color-surface-dim: #cbdbf5;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container: #e5eeff;
+  --color-surface-container-high: #dce9ff;
+  --color-surface-container-highest: #d3e4fe;
+
+  /* On-surface colors */
+  --color-on-surface: #0b1c30;
+  --color-on-surface-variant: #3f4948;
+
+  /* Outline colors */
+  --color-outline: #6f7978;
+  --color-outline-variant: #bfc8c7;
+
+  /* Primary colors */
+  --color-primary: #004645;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1a5f5d;
+  --color-on-primary-container: #97d6d3;
+
+  /* Secondary colors */
+  --color-secondary: #006c49;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #6cf8bb;
+  --color-on-secondary-container: #00714d;
+
+  /* Error colors */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* Semantic colors */
+  --color-success: #10b981;
+  --color-alert: #ef4444;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  /* Animations */
+  --animate-blink: blink 1s step-start infinite;
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+}
