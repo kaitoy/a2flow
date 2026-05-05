@@ -27,7 +27,7 @@ export default function NewAgentSkillPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
+  } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { name: "", repoUrl: "", repoPath: "", description: "" },
   });

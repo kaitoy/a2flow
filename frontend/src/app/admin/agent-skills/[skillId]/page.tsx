@@ -31,7 +31,7 @@ export default function EditAgentSkillPage() {
     reset,
     getValues,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
+  } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { name: "", repoUrl: "", repoPath: "", description: "" },
   });

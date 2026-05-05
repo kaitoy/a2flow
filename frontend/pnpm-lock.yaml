@@ -24,8 +24,8 @@ importers:
         specifier: ^0.0.53
         version: 0.0.53
       '@hookform/resolvers':
-        specifier: ^3.9.0
-        version: 3.9.0(react-hook-form@7.75.0(react@19.2.5))
+        specifier: ^5.2.2
+        version: 5.2.2(react-hook-form@7.75.0(react@19.2.5))
       '@reduxjs/toolkit':
         specifier: ^2.5.0
         version: 2.11.2(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.5)(redux@5.0.1))(react@19.2.5)
@@ -92,7 +92,7 @@ importers:
         version: 29.1.1
       msw:
         specifier: ^2.14.2
-        version: 2.14.2(@types/node@24.0.0)(typescript@5.9.3)
+        version: 2.14.2(@types/node@24.0.0)(typescript@6.0.3)
       postcss:
         specifier: ^8.5.13
         version: 8.5.13
@@ -100,11 +100,11 @@ importers:
         specifier: ^4.0.0
         version: 4.2.4
       typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
+        specifier: ^6.0.0
+        version: 6.0.3
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@24.0.0)(@vitest/coverage-v8@4.1.5)(jsdom@29.1.1)(msw@2.14.2(@types/node@24.0.0)(typescript@5.9.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1))
+        version: 4.1.5(@types/node@24.0.0)(@vitest/coverage-v8@4.1.5)(jsdom@29.1.1)(msw@2.14.2(@types/node@24.0.0)(typescript@6.0.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1))
 
 packages:
 
@@ -314,10 +314,10 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@hookform/resolvers@3.9.0':
-    resolution: {integrity: sha512-bU0Gr4EepJ/EQsH/IwEzYLsT/PEj5C0ynLQ4m+GSHS+xKH4TfSelhluTgOaoc4kA5s7eCsQbM4wvZLzELmWzUg==}
+  '@hookform/resolvers@5.2.2':
+    resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
     peerDependencies:
-      react-hook-form: ^7.0.0
+      react-hook-form: ^7.55.0
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -1715,8 +1715,8 @@ packages:
     resolution: {integrity: sha512-8ZiHFm91orbSAe2PSAiSVBVko18pbhbiB3U9GglSzF/zCGkR+rxpHx6sEMCUm4kxY4LjDIUGgCfUMtwfZfjfUA==}
     engines: {node: '>=20'}
 
-  typescript@5.9.3:
-    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -2078,8 +2078,9 @@ snapshots:
 
   '@exodus/bytes@1.15.0': {}
 
-  '@hookform/resolvers@3.9.0(react-hook-form@7.75.0(react@19.2.5))':
+  '@hookform/resolvers@5.2.2(react-hook-form@7.75.0(react@19.2.5))':
     dependencies:
+      '@standard-schema/utils': 0.3.0
       react-hook-form: 7.75.0(react@19.2.5)
 
   '@img/colour@1.1.0':
@@ -2524,7 +2525,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@24.0.0)(@vitest/coverage-v8@4.1.5)(jsdom@29.1.1)(msw@2.14.2(@types/node@24.0.0)(typescript@5.9.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1))
+      vitest: 4.1.5(@types/node@24.0.0)(@vitest/coverage-v8@4.1.5)(jsdom@29.1.1)(msw@2.14.2(@types/node@24.0.0)(typescript@6.0.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1))
 
   '@vitest/expect@4.1.5':
     dependencies:
@@ -2535,13 +2536,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.5(msw@2.14.2(@types/node@24.0.0)(typescript@5.9.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1))':
+  '@vitest/mocker@4.1.5(msw@2.14.2(@types/node@24.0.0)(typescript@6.0.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1))':
     dependencies:
       '@vitest/spy': 4.1.5
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      msw: 2.14.2(@types/node@24.0.0)(typescript@5.9.3)
+      msw: 2.14.2(@types/node@24.0.0)(typescript@6.0.3)
       vite: 8.0.10(@types/node@24.0.0)(jiti@2.6.1)
 
   '@vitest/pretty-format@4.1.5':
@@ -2958,7 +2959,7 @@ snapshots:
 
   min-indent@1.0.1: {}
 
-  msw@2.14.2(@types/node@24.0.0)(typescript@5.9.3):
+  msw@2.14.2(@types/node@24.0.0)(typescript@6.0.3):
     dependencies:
       '@inquirer/confirm': 6.0.12(@types/node@24.0.0)
       '@mswjs/interceptors': 0.41.8
@@ -2979,7 +2980,7 @@ snapshots:
       until-async: 3.0.2
       yargs: 17.7.2
     optionalDependencies:
-      typescript: 5.9.3
+      typescript: 6.0.3
     transitivePeerDependencies:
       - '@types/node'
 
@@ -3275,7 +3276,7 @@ snapshots:
     dependencies:
       tagged-tag: 1.0.0
 
-  typescript@5.9.3: {}
+  typescript@6.0.3: {}
 
   uc.micro@2.1.0: {}
 
@@ -3307,10 +3308,10 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.6.1
 
-  vitest@4.1.5(@types/node@24.0.0)(@vitest/coverage-v8@4.1.5)(jsdom@29.1.1)(msw@2.14.2(@types/node@24.0.0)(typescript@5.9.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1)):
+  vitest@4.1.5(@types/node@24.0.0)(@vitest/coverage-v8@4.1.5)(jsdom@29.1.1)(msw@2.14.2(@types/node@24.0.0)(typescript@6.0.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1)):
     dependencies:
       '@vitest/expect': 4.1.5
-      '@vitest/mocker': 4.1.5(msw@2.14.2(@types/node@24.0.0)(typescript@5.9.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1))
+      '@vitest/mocker': 4.1.5(msw@2.14.2(@types/node@24.0.0)(typescript@6.0.3))(vite@8.0.10(@types/node@24.0.0)(jiti@2.6.1))
       '@vitest/pretty-format': 4.1.5
       '@vitest/runner': 4.1.5
       '@vitest/snapshot': 4.1.5
