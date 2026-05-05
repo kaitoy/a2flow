@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from google.adk.sessions import BaseSessionService
 from google.adk.sessions.sqlite_session_service import SqliteSessionService
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -25,6 +26,9 @@ from database import (
     AgentSkill,
     AgentSkillCreate,
     AgentSkillUpdate,
+    Workflow,
+    WorkflowCreate,
+    WorkflowUpdate,
     get_session,
     init_db,
 )
@@ -264,6 +268,85 @@ async def delete_agent_skill(skill_id: str, db: DBSessionDep) -> None:
     if skill is None:
         raise HTTPException(status_code=404, detail="Agent skill not found")
     await db.delete(skill)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="AgentSkill is referenced by one or more workflows",
+        )
+
+
+# ---------- workflow endpoints ----------
+
+
+@app.post("/workflows", response_model=Workflow, status_code=201)
+async def create_workflow(body: WorkflowCreate, db: DBSessionDep) -> Workflow:
+    if await db.get(AgentSkill, body.agent_skill_id) is None:
+        raise HTTPException(
+            status_code=422, detail=f"AgentSkill {body.agent_skill_id!r} not found"
+        )
+    workflow = Workflow.model_validate(body.model_dump())
+    db.add(workflow)
+    await db.commit()
+    await db.refresh(workflow)
+    return workflow
+
+
+@app.get("/workflows", response_model=list[Workflow])
+async def list_workflows(
+    db: DBSessionDep,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[Workflow]:
+    result = await db.exec(
+        select(Workflow)
+        .order_by(col(Workflow.created_at).desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(result.all())
+
+
+@app.get("/workflows/{workflow_id}", response_model=Workflow)
+async def get_workflow(workflow_id: str, db: DBSessionDep) -> Workflow:
+    workflow = await db.get(Workflow, workflow_id)
+    if workflow is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return workflow
+
+
+@app.patch("/workflows/{workflow_id}", response_model=Workflow)
+async def update_workflow(
+    workflow_id: str,
+    body: WorkflowUpdate,
+    db: DBSessionDep,
+) -> Workflow:
+    workflow = await db.get(Workflow, workflow_id)
+    if workflow is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    update_data = body.model_dump(exclude_unset=True)
+    if "agent_skill_id" in update_data and update_data["agent_skill_id"] is not None:
+        if await db.get(AgentSkill, update_data["agent_skill_id"]) is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"AgentSkill {update_data['agent_skill_id']!r} not found",
+            )
+    workflow.sqlmodel_update(update_data)
+    workflow.updated_at = datetime.now(UTC)
+    db.add(workflow)
+    await db.commit()
+    await db.refresh(workflow)
+    return workflow
+
+
+@app.delete("/workflows/{workflow_id}", status_code=204)
+async def delete_workflow(workflow_id: str, db: DBSessionDep) -> None:
+    workflow = await db.get(Workflow, workflow_id)
+    if workflow is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    await db.delete(workflow)
     await db.commit()
 
 

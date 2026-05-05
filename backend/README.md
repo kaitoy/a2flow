@@ -70,6 +70,14 @@ SESSION_DB_URL=sqlite:///sessions.db
 
 SQLite URL for session persistence via `SqliteSessionService`. Supports SQLAlchemy-style URLs (`sqlite:///relative.db` or `sqlite:////absolute/path.db`). Defaults to `sqlite:///sessions.db` (relative to the working directory).
 
+### Application database
+
+```env
+DB_URL=sqlite+aiosqlite:///a2flow.db
+```
+
+SQLite URL (async, aiosqlite) for agent skills and workflows. Defaults to `sqlite+aiosqlite:///a2flow.db`. The database and tables are created automatically on first run.
+
 The database is created automatically on first run with the following tables:
 
 | Table | Description |
@@ -141,6 +149,108 @@ curl "http://localhost:8000/sessions?user_id=alice"
 
 ```bash
 curl -X DELETE "http://localhost:8000/sessions/my-session?user_id=alice"
+```
+
+---
+
+### Agent skills
+
+Agent skills are reusable skill definitions (name, repository URL, description) that can be attached to workflows.
+
+#### `POST /agent-skills` — Create an agent skill
+
+```bash
+curl -X POST http://localhost:8000/agent-skills \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-skill", "repo_url": "https://github.com/example/skill"}'
+```
+
+**Request body**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Unique skill name |
+| `repo_url` | string | Yes | Git repository URL |
+| `repo_path` | string | No | Path within the repository (default: `""`) |
+| `description` | string | No | Human-readable description |
+
+#### `GET /agent-skills` — List agent skills
+
+```bash
+curl "http://localhost:8000/agent-skills?limit=20&offset=0"
+```
+
+#### `GET /agent-skills/{skill_id}` — Get an agent skill
+
+```bash
+curl http://localhost:8000/agent-skills/<id>
+```
+
+#### `PATCH /agent-skills/{skill_id}` — Update an agent skill
+
+```bash
+curl -X PATCH http://localhost:8000/agent-skills/<id> \
+  -H "Content-Type: application/json" \
+  -d '{"description": "updated description"}'
+```
+
+#### `DELETE /agent-skills/{skill_id}` — Delete an agent skill
+
+Returns `204 No Content`. Returns `409 Conflict` if the skill is referenced by one or more workflows.
+
+```bash
+curl -X DELETE http://localhost:8000/agent-skills/<id>
+```
+
+---
+
+### Workflows
+
+A workflow pairs a prompt with an agent skill. Each workflow references exactly one agent skill; a single agent skill may be used by multiple workflows.
+
+#### `POST /workflows` — Create a workflow
+
+```bash
+curl -X POST http://localhost:8000/workflows \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-workflow", "prompt": "Do the thing", "agent_skill_id": "<skill_id>"}'
+```
+
+**Request body**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Unique workflow name |
+| `prompt` | string | Yes | Prompt text executed by the workflow |
+| `agent_skill_id` | string | Yes | ID of the agent skill to use |
+| `description` | string | No | Human-readable description |
+
+#### `GET /workflows` — List workflows
+
+```bash
+curl "http://localhost:8000/workflows?limit=20&offset=0"
+```
+
+#### `GET /workflows/{workflow_id}` — Get a workflow
+
+```bash
+curl http://localhost:8000/workflows/<id>
+```
+
+#### `PATCH /workflows/{workflow_id}` — Update a workflow
+
+```bash
+curl -X PATCH http://localhost:8000/workflows/<id> \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "new prompt"}'
+```
+
+#### `DELETE /workflows/{workflow_id}` — Delete a workflow
+
+Returns `204 No Content`.
+
+```bash
+curl -X DELETE http://localhost:8000/workflows/<id>
 ```
 
 ---
