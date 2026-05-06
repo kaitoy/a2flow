@@ -23,6 +23,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from agent import create_agent
 from database import (
+    DB_URL,
     AgentSkill,
     AgentSkillCreate,
     AgentSkillUpdate,
@@ -70,8 +71,7 @@ app.add_middleware(
 
 @lru_cache(maxsize=1)
 def get_session_service() -> BaseSessionService:
-    db_path = os.getenv("SESSION_DB_URL", "sqlite:///sessions.db")
-    return SqliteSessionService(db_path)
+    return SqliteSessionService(DB_URL)
 
 
 @lru_cache(maxsize=1)

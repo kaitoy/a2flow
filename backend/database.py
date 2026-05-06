@@ -4,26 +4,31 @@ from datetime import UTC, datetime
 from typing import Any
 
 import uuid_utils
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import ForeignKeyConstraint, Index, UniqueConstraint
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import Field, SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-DB_URL = os.getenv("DB_URL", "sqlite+aiosqlite:///a2flow.db")
+DB_URL = os.getenv("DB_URL", "sqlite:///a2flow.db")
+
+
+def _to_aiosqlite_url(url: str) -> str:
+    return url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
 
 
 def _engine() -> AsyncEngine:
-    return create_async_engine(DB_URL, echo=False)
+    return create_async_engine(_to_aiosqlite_url(DB_URL), echo=False)
 
 
 engine = _engine()
 
 
 @sa_event.listens_for(engine.sync_engine, "connect")
-def _set_sqlite_foreign_keys(dbapi_conn: Any, _: object) -> None:
+def _set_sqlite_pragmas(dbapi_conn: Any, _: object) -> None:
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.execute("PRAGMA journal_mode=WAL")
     cursor.close()
 
 
@@ -41,10 +46,10 @@ class AgentSkillCreate(AgentSkillUpdate):
 
 
 class AgentSkill(AgentSkillCreate, table=True):
-    __tablename__ = "agent_skill"
+    __tablename__ = "agent_skills"
     __table_args__ = (
-        UniqueConstraint("name", name="uq_agent_skill_name"),
-        Index("ix_agent_skill_name", "name"),
+        UniqueConstraint("name", name="uq_agent_skills_name"),
+        Index("ix_agent_skills_name", "name"),
     )
     id: str = Field(
         default_factory=lambda: str(uuid_utils.uuid7()),
@@ -70,20 +75,17 @@ class WorkflowCreate(SQLModel):
     agent_skill_id: str
 
 
-class Workflow(SQLModel, table=True):
-    __tablename__ = "workflow"
+class Workflow(WorkflowCreate, table=True):
+    __tablename__ = "workflows"
     __table_args__ = (
-        UniqueConstraint("name", name="uq_workflow_name"),
-        Index("ix_workflow_name", "name"),
+        UniqueConstraint("name", name="uq_workflows_name"),
+        Index("ix_workflows_name", "name"),
+        ForeignKeyConstraint(["agent_skill_id"], ["agent_skills.id"], ondelete="RESTRICT"),
     )
     id: str = Field(
         default_factory=lambda: str(uuid_utils.uuid7()),
         primary_key=True,
     )
-    name: str
-    prompt: str
-    description: str | None = Field(default=None)
-    agent_skill_id: str = Field(foreign_key="agent_skill.id", ondelete="RESTRICT")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     created_by: str = Field(default="")

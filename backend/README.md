@@ -62,30 +62,22 @@ PORT=8000
 
 Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted.
 
-### Session storage
-
-```env
-SESSION_DB_URL=sqlite:///sessions.db
-```
-
-SQLite URL for session persistence via `SqliteSessionService`. Supports SQLAlchemy-style URLs (`sqlite:///relative.db` or `sqlite:////absolute/path.db`). Defaults to `sqlite:///sessions.db` (relative to the working directory).
-
 ### Application database
 
 ```env
-DB_URL=sqlite+aiosqlite:///a2flow.db
+DB_URL=sqlite:///a2flow.db
 ```
 
-SQLite URL (async, aiosqlite) for agent skills and workflows. Defaults to `sqlite+aiosqlite:///a2flow.db`. The database and tables are created automatically on first run.
-
-The database is created automatically on first run with the following tables:
+SQLite URL for REST API data and ADK session storage. Both the SQLModel async engine and `SqliteSessionService` open the same file. Defaults to `sqlite:///a2flow.db` (relative to the working directory). The database and tables are created automatically on first run.
 
 | Table | Description |
 |---|---|
-| `app_states` | App-level shared state |
-| `user_states` | Per-user state shared across sessions |
+| `agent_skills` | Agent skill definitions |
+| `workflows` | Workflow definitions |
 | `sessions` | Session metadata and session-level state |
 | `events` | Full event history per session (JSON) |
+| `app_states` | App-level shared state |
+| `user_states` | Per-user state shared across sessions |
 
 ### CORS
 
