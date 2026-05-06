@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ErrorBanner } from "@/components/admin/error-banner";
+import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,66 +54,36 @@ export default function NewAgentSkillPage() {
       <h1 className="mb-6 text-2xl font-semibold text-on-surface">New Agent Skill</h1>
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-lg flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="name"
-            className="text-xs font-bold uppercase tracking-[0.04em] text-on-surface-variant"
-          >
-            Name <span className="text-error">*</span>
-          </label>
+        <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
           <Input id="name" placeholder="e.g. code-review" {...register("name")} />
-          {errors.name && <p className="text-xs text-error">{errors.name.message}</p>}
-        </div>
+        </FormField>
 
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="repoUrl"
-            className="text-xs font-bold uppercase tracking-[0.04em] text-on-surface-variant"
-          >
-            Repo URL <span className="text-error">*</span>
-          </label>
+        <FormField htmlFor="repoUrl" label="Repo URL" required error={errors.repoUrl?.message}>
           <Input
             id="repoUrl"
             placeholder="https://github.com/owner/repo"
             {...register("repoUrl")}
           />
-          {errors.repoUrl && <p className="text-xs text-error">{errors.repoUrl.message}</p>}
-        </div>
+        </FormField>
 
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="repoPath"
-            className="text-xs font-bold uppercase tracking-[0.04em] text-on-surface-variant"
-          >
-            Repo Path
-          </label>
+        <FormField htmlFor="repoPath" label="Repo Path">
           <Input
             id="repoPath"
             placeholder="path/within/repo (optional)"
             {...register("repoPath")}
           />
-        </div>
+        </FormField>
 
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="description"
-            className="text-xs font-bold uppercase tracking-[0.04em] text-on-surface-variant"
-          >
-            Description
-          </label>
+        <FormField htmlFor="description" label="Description">
           <Textarea
             id="description"
             rows={4}
             placeholder="What this skill does (optional)"
             {...register("description")}
           />
-        </div>
+        </FormField>
 
-        {apiError && (
-          <div className="rounded bg-error-container p-3 text-sm text-on-error-container">
-            {apiError}
-          </div>
-        )}
+        <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
           <Button type="submit" variant="primary" disabled={isSubmitting}>

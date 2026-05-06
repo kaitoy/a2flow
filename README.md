@@ -50,7 +50,11 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Agent Skills admin UI
+## Admin UI
+
+The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admin).
+
+### Agent Skills
 
 Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/admin/agent-skills) to manage the Agent Skills registry — a catalog of AI agent skills stored in Git repositories.
 
@@ -61,6 +65,18 @@ Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/adm
 | Edit / delete a skill | `GET /admin/agent-skills/{id}` |
 
 Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, and description.
+
+### Workflows
+
+Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/workflows) to manage Workflows — named configurations that pair a prompt with an Agent Skill.
+
+| Operation | Path |
+|-----------|------|
+| List all workflows | `GET /admin/workflows` |
+| Create a new workflow | `GET /admin/workflows/new` |
+| Edit / delete a workflow | `GET /admin/workflows/{id}` |
+
+Each workflow record stores a name, prompt (instructions for the agent), a reference to an Agent Skill, and an optional description. Workflows are also persisted in `a2flow.db`.
 
 ## How it works
 

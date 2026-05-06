@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { ErrorBanner } from "@/components/admin/error-banner";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { type AgentSkill, deleteAgentSkill, listAgentSkills } from "@/lib/api";
 
@@ -91,22 +93,12 @@ export default function AgentSkillsPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-on-surface">Agent Skills</h1>
-        <Link
-          href="/admin/agent-skills/new"
-          className="inline-flex cursor-pointer items-center rounded bg-primary-container px-4 py-2 text-sm font-medium text-on-primary-container transition-colors hover:bg-primary"
-        >
-          + Add skill
-        </Link>
-      </div>
-
-      {error && (
-        <div className="mb-4 rounded bg-error-container p-3 text-sm text-on-error-container">
-          {error}
-        </div>
-      )}
-
+      <AdminPageHeader
+        title="Agent Skills"
+        addHref="/admin/agent-skills/new"
+        addLabel="+ Add skill"
+      />
+      <ErrorBanner error={error} />
       <DataTable
         columns={columns}
         rows={skills}
@@ -114,23 +106,13 @@ export default function AgentSkillsPage() {
         emptyMessage="No agent skills registered yet."
         getRowKey={(skill) => skill.id}
       />
-
-      <div className="mt-4 flex gap-2">
-        <Button
-          variant="ghost"
-          disabled={offset === 0}
-          onClick={() => setOffset((o) => Math.max(0, o - LIMIT))}
-        >
-          ← Previous
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={skills.length < LIMIT}
-          onClick={() => setOffset((o) => o + LIMIT)}
-        >
-          Next →
-        </Button>
-      </div>
+      <PaginationControls
+        offset={offset}
+        limit={LIMIT}
+        count={skills.length}
+        onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
+        onNext={() => setOffset((o) => o + LIMIT)}
+      />
     </div>
   );
 }

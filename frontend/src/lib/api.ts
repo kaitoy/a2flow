@@ -98,6 +98,58 @@ export async function deleteAgentSkill(id: string): Promise<void> {
   await apiClient.delete(`/agent-skills/${encodeURIComponent(id)}`);
 }
 
+export interface Workflow {
+  id: string;
+  name: string;
+  prompt: string;
+  description: string | null;
+  agent_skill_id: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export interface WorkflowCreate {
+  name: string;
+  prompt: string;
+  description?: string | null;
+  agent_skill_id: string;
+}
+
+export interface WorkflowUpdate {
+  name?: string;
+  prompt?: string;
+  description?: string | null;
+  agent_skill_id?: string;
+}
+
+export async function listWorkflows(limit = 20, offset = 0): Promise<Workflow[]> {
+  const response = await apiClient.get<Workflow[]>("/workflows", {
+    params: { limit, offset },
+  });
+  return response.data;
+}
+
+export async function getWorkflow(id: string): Promise<Workflow> {
+  const response = await apiClient.get<Workflow>(`/workflows/${encodeURIComponent(id)}`);
+  return response.data;
+}
+
+export async function createWorkflow(body: WorkflowCreate): Promise<Workflow> {
+  const response = await apiClient.post<Workflow>("/workflows", body);
+  return response.data;
+}
+
+export async function updateWorkflow(id: string, body: WorkflowUpdate): Promise<Workflow> {
+  const response = await apiClient.patch<Workflow>(`/workflows/${encodeURIComponent(id)}`, body);
+  return response.data;
+}
+
+export async function deleteWorkflow(id: string): Promise<void> {
+  await apiClient.delete(`/workflows/${encodeURIComponent(id)}`);
+}
+
 export function createChatAgent(sessionId: string): HttpAgent {
   const agent = new HttpAgent({
     url: `${API_BASE}/agent`,

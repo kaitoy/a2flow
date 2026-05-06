@@ -16,6 +16,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               Agent Skills
             </Link>
           </li>
+          <li>
+            <Link
+              href="/admin/workflows"
+              className="block px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container"
+            >
+              Workflows
+            </Link>
+          </li>
         </ul>
         <div className="mt-auto border-t border-outline-variant px-4 py-4">
           <Link href="/" className="text-xs text-on-surface-variant hover:text-primary">
