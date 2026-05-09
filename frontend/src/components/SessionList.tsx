@@ -47,7 +47,7 @@ export function SessionList({
           <p className="px-3 text-xs text-on-surface-variant">No sessions</p>
         )}
         {sessions.map((s) => {
-          const isActive = s.session_id === currentSessionId;
+          const isActive = s.id === currentSessionId;
           const date = new Date(s.last_update_time * 1000);
           const label = date.toLocaleString(undefined, {
             month: "short",
@@ -58,10 +58,10 @@ export function SessionList({
           return (
             <button
               type="button"
-              key={s.session_id}
-              onClick={() => !isActive && onSelect(s.session_id)}
+              key={s.id}
+              onClick={() => !isActive && onSelect(s.id)}
               disabled={disabled || isActive}
-              title={s.session_id}
+              title={s.id}
               className={`w-full text-left px-3 py-2 text-xs truncate ${
                 isActive
                   ? "bg-primary-container text-on-primary-container font-medium"
@@ -69,7 +69,7 @@ export function SessionList({
               } disabled:cursor-default`}
             >
               <span className="block truncate font-mono text-[10px] text-on-surface-variant/60">
-                {s.session_id.slice(0, 8)}…
+                {s.id.slice(0, 8)}…
               </span>
               <span className="block text-on-surface">{label}</span>
             </button>

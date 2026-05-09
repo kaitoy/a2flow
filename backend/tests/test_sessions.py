@@ -17,7 +17,7 @@ async def test_create_session_response_shape(
         "/sessions", json={"user_id": "alice"}
     )
     body = response.json()
-    assert "session_id" in body
+    assert "id" in body
     assert body["user_id"] == "alice"
     assert isinstance(body["last_update_time"], float)
 
@@ -26,10 +26,10 @@ async def test_create_session_with_explicit_id(
     client_with_real_sessions: AsyncClient,
 ) -> None:
     response = await client_with_real_sessions.post(
-        "/sessions", json={"user_id": "alice", "session_id": "my-session-42"}
+        "/sessions", json={"user_id": "alice", "id": "my-session-42"}
     )
     assert response.status_code == 201
-    assert response.json()["session_id"] == "my-session-42"
+    assert response.json()["id"] == "my-session-42"
 
 
 async def test_create_session_generates_uuid_when_no_id_given(
@@ -38,7 +38,7 @@ async def test_create_session_generates_uuid_when_no_id_given(
     response = await client_with_real_sessions.post(
         "/sessions", json={"user_id": "alice"}
     )
-    session_id = response.json()["session_id"]
+    session_id = response.json()["id"]
     assert len(session_id) == 36
     assert session_id.count("-") == 4
 
@@ -102,7 +102,7 @@ async def test_get_messages_returns_empty_list_for_new_session(
     create_resp = await client_with_real_sessions.post(
         "/sessions", json={"user_id": "eve"}
     )
-    session_id = create_resp.json()["session_id"]
+    session_id = create_resp.json()["id"]
     response = await client_with_real_sessions.get(
         f"/sessions/{session_id}/messages", params={"user_id": "eve"}
     )
@@ -133,7 +133,7 @@ async def test_delete_session_returns_204(
     create_resp = await client_with_real_sessions.post(
         "/sessions", json={"user_id": "frank"}
     )
-    session_id = create_resp.json()["session_id"]
+    session_id = create_resp.json()["id"]
     response = await client_with_real_sessions.delete(
         f"/sessions/{session_id}", params={"user_id": "frank"}
     )
@@ -146,7 +146,7 @@ async def test_delete_session_removes_session_from_list(
     create_resp = await client_with_real_sessions.post(
         "/sessions", json={"user_id": "grace"}
     )
-    session_id = create_resp.json()["session_id"]
+    session_id = create_resp.json()["id"]
     await client_with_real_sessions.delete(
         f"/sessions/{session_id}", params={"user_id": "grace"}
     )

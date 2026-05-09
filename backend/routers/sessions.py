@@ -16,14 +16,14 @@ async def create_session(
     session_service: SessionServiceDep,
 ) -> Session:
     """Create a new session."""
-    session_id = request.session_id or str(uuid.uuid4())
+    session_id = request.id or str(uuid.uuid4())
     session = await session_service.create_session(
         app_name=APP_NAME,
         user_id=request.user_id,
         session_id=session_id,
     )
     return Session(
-        session_id=session.id,
+        id=session.id,
         user_id=session.user_id,
         last_update_time=session.last_update_time,
     )
@@ -41,7 +41,7 @@ async def list_sessions(
     )
     return [
         Session(
-            session_id=s.id,
+            id=s.id,
             user_id=s.user_id,
             last_update_time=s.last_update_time,
         )

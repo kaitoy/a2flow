@@ -82,7 +82,7 @@ src/
 
 ## How it works
 
-1. On mount, `useChat` calls `POST /sessions` to obtain a `session_id`.
+1. On mount, `useChat` calls `POST /sessions` to obtain an `id`.
 2. When the user sends a message, `createChatAgent()` returns an `HttpAgent` (from `@ag-ui/client`) with `A2UIMiddleware` applied. Before each request, the middleware:
    - Injects the `render_a2ui` tool into `RunAgentInput.tools` so the backend LLM can call it.
    - Injects the A2UI Basic Catalog schema (from `src/generated/basic_catalog.json`) into `RunAgentInput.context`.
@@ -95,7 +95,7 @@ src/
    - `onRunErrorEvent` — surfaces an error banner
 4. Messages with an `a2uiPayload` are rendered by `A2uiRenderer` instead of a plain text bubble. `A2uiRenderer` creates a `MessageProcessor` (from `@a2ui/web_core/v0_9`) with `tailwindCatalog`, feeds the operations to `processMessages()`, and renders each resulting surface via `<A2uiSurface>`. For each surface, `A2uiRenderer` also subscribes to `surface.onAction` to capture user-triggered events (see step 5).
 5. When the user triggers a `Button` action on an A2UI surface, `A2uiRenderer` calls `sendA2uiAction`. This drains `pendingRenderToolCallIds` and, for each ID, calls `agent.addMessage()` with a tool result message whose `toolCallId` matches the pending `render_a2ui` call and whose `content` describes the user's action (e.g. `User performed action "submit" on surface "my-form". Context: {...}`). The backend matches the tool result against the pending `render_a2ui` call and passes it to the LLM, which responds to the action. `forwardedProps.a2uiAction` / `A2UIMiddleware.processUserAction` is **not** used.
-6. Reusing the same `session_id` / `threadId` across turns preserves conversation history in the backend.
+6. Reusing the same `id` / `threadId` across turns preserves conversation history in the backend.
 
 For the full end-to-end A2UI flow (build-time schema download → tool injection → LLM call → event conversion → rendering → action feedback loop), see [docs/a2ui-flow.md](../docs/a2ui-flow.md).
 

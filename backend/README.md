@@ -126,13 +126,13 @@ A session must be created before starting a chat.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `user_id` | string | Yes | User ID |
-| `session_id` | string | No | Session ID (auto-generated UUID if omitted) |
+| `id` | string | No | Session ID (auto-generated UUID if omitted) |
 
 ```bash
 curl -X POST http://localhost:8000/sessions \
   -H "Content-Type: application/json" \
   -d '{"user_id": "alice"}'
-# {"session_id": "...", "user_id": "alice", "last_update_time": 0.0}
+# {"id": "...", "user_id": "alice", "last_update_time": 0.0}
 ```
 
 #### `GET /sessions?user_id=<user_id>` — List sessions
@@ -311,7 +311,7 @@ data: {"type":"RUN_ERROR","message":"error description"}
 # 1. Create a session
 SESSION=$(curl -s -X POST http://localhost:8000/sessions \
   -H "Content-Type: application/json" \
-  -d '{"user_id": "alice"}' | python -c "import sys,json; print(json.load(sys.stdin)['session_id'])")
+  -d '{"user_id": "alice"}' | python -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
 # 2. Chat
 curl -N -X POST http://localhost:8000/chat \

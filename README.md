@@ -80,7 +80,7 @@ Each workflow record stores a name, prompt (instructions for the agent), a refer
 
 ## How it works
 
-1. The frontend creates a session via `POST /sessions` on startup, obtaining a `session_id` / `threadId`.
+1. The frontend creates a session via `POST /sessions` on startup, obtaining an `id` / `threadId`.
 2. When the user submits a message, `createChatAgent()` creates an `HttpAgent` (from `@ag-ui/client`) with `A2UIMiddleware` (from `@ag-ui/a2ui-middleware`) applied. Before each request reaches the backend, the middleware injects the `render_a2ui` tool into `RunAgentInput.tools` and the A2UI Basic Catalog schema (downloaded from `https://a2ui.org/specification/v0_9/basic_catalog.json` at build time) into `RunAgentInput.context`.
 3. The backend's `ADKAgent` (from `ag-ui-adk`) bridges the AG-UI protocol to a Google ADK `LlmAgent` — translating events, managing sessions, and streaming AG-UI SSE events back to the client. The agent uses `AGUIToolset`, which the bridge replaces at runtime with a `ClientProxyToolset` built from `RunAgentInput.tools` — making the frontend-injected `render_a2ui` tool callable by the LLM.
 4. When the LLM calls `render_a2ui`, the `ADKAgent` streams `TOOL_CALL_*` events. The `A2UIMiddleware` intercepts these, reconstructs the A2UI operations, and emits `ACTIVITY_SNAPSHOT` events (one per surface, `activityType: "a2ui-surface"`). No tool execution happens on the backend.

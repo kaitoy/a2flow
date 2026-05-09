@@ -28,7 +28,7 @@ apiClient.interceptors.request.use((config) => {
 });
 
 export interface SessionInfo {
-  session_id: string;
+  id: string;
   user_id: string;
   last_update_time: number;
 }
@@ -49,11 +49,11 @@ export async function getSessionMessages(sessionId: string, userId: string): Pro
 }
 
 export async function createSession(userId: string): Promise<string> {
-  const response = await apiClient.post<{ session_id: string }>("/sessions", {
+  const response = await apiClient.post<{ id: string }>("/sessions", {
     user_id: userId,
   });
-  logger.info({ sessionId: response.data.session_id }, "session created");
-  return response.data.session_id;
+  logger.info({ sessionId: response.data.id }, "session created");
+  return response.data.id;
 }
 
 export interface AgentSkill {

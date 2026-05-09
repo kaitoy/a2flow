@@ -10,7 +10,7 @@ describe("listSessions", () => {
   it("returns parsed session list", async () => {
     const result = await listSessions("user");
     expect(result).toHaveLength(2);
-    expect(result[0].session_id).toBe("sess-1");
+    expect(result[0].id).toBe("sess-1");
   });
 
   it("throws on server error", async () => {
@@ -49,7 +49,7 @@ describe("getSessionMessages", () => {
 });
 
 describe("createSession", () => {
-  it("returns session_id string", async () => {
+  it("returns id string", async () => {
     const id = await createSession("user");
     expect(id).toBe("new-session-id");
   });
@@ -59,7 +59,7 @@ describe("createSession", () => {
     server.use(
       http.post(`${BASE}/sessions`, async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ session_id: "x" }, { status: 201 });
+        return HttpResponse.json({ id: "x" }, { status: 201 });
       })
     );
     await createSession("test-user");
