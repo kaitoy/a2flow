@@ -91,6 +91,10 @@ Comma-separated list of origins allowed to call `/chat` and `/sessions`. Default
 CORS_ORIGINS=https://app.example.com,http://localhost:3000
 ```
 
+## Development
+
+For conventions on adding new models, repositories, and routers, see [docs/backend-model-patterns.md](../docs/backend-model-patterns.md).
+
 ## Running
 
 ```bash
