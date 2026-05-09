@@ -14,6 +14,19 @@ const apiClient = axios.create({
   },
 });
 
+let currentUserId = "";
+
+export function setApiUserId(userId: string): void {
+  currentUserId = userId;
+}
+
+apiClient.interceptors.request.use((config) => {
+  if (currentUserId) {
+    config.headers.set("X-User-Id", currentUserId);
+  }
+  return config;
+});
+
 export interface SessionInfo {
   session_id: string;
   user_id: string;

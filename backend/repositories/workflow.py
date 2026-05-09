@@ -13,9 +13,11 @@ class WorkflowRepository(Protocol):
 
     async def list(self, *, limit: int, offset: int) -> list[Workflow]: ...
 
-    async def create(self, data: WorkflowCreate) -> Workflow: ...
+    async def create(self, data: WorkflowCreate, *, user_id: str) -> Workflow: ...
 
-    async def update(self, workflow_id: str, data: WorkflowUpdate) -> Workflow: ...
+    async def update(
+        self, workflow_id: str, data: WorkflowUpdate, *, user_id: str
+    ) -> Workflow: ...
 
     async def delete(self, workflow_id: str) -> None: ...
 
@@ -37,16 +39,20 @@ class SqlWorkflowRepository:
         )
         return list(result.all())
 
-    async def create(self, data: WorkflowCreate) -> Workflow:
+    async def create(self, data: WorkflowCreate, *, user_id: str) -> Workflow:
         if not await self._skills.exists(data.agent_skill_id):
             raise ForeignKeyViolationError("AgentSkill", data.agent_skill_id)
-        workflow = Workflow.model_validate(data.model_dump())
+        workflow = Workflow.model_validate(
+            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+        )
         self._db.add(workflow)
         await self._db.commit()
         await self._db.refresh(workflow)
         return workflow
 
-    async def update(self, workflow_id: str, data: WorkflowUpdate) -> Workflow:
+    async def update(
+        self, workflow_id: str, data: WorkflowUpdate, *, user_id: str
+    ) -> Workflow:
         workflow = await self._db.get(Workflow, workflow_id)
         if workflow is None:
             raise NotFoundError("Workflow", workflow_id)
@@ -55,6 +61,7 @@ class SqlWorkflowRepository:
         if new_skill_id is not None and not await self._skills.exists(new_skill_id):
             raise ForeignKeyViolationError("AgentSkill", new_skill_id)
         workflow.sqlmodel_update(update)
+        workflow.updated_by = user_id
         self._db.add(workflow)
         await self._db.commit()
         await self._db.refresh(workflow)

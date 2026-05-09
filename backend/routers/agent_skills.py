@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from dependencies import AgentSkillRepositoryDep
+from dependencies import AgentSkillRepositoryDep, CurrentUserIdDep
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from repositories.exceptions import NotFoundError, ReferencedError
 
@@ -11,8 +11,9 @@ router = APIRouter(prefix="/agent-skills", tags=["agent-skills"])
 async def create_agent_skill(
     body: AgentSkillCreate,
     repo: AgentSkillRepositoryDep,
+    user_id: CurrentUserIdDep,
 ) -> AgentSkill:
-    return await repo.create(body)
+    return await repo.create(body, user_id=user_id)
 
 
 @router.get("", response_model=list[AgentSkill])
@@ -37,9 +38,10 @@ async def update_agent_skill(
     skill_id: str,
     body: AgentSkillUpdate,
     repo: AgentSkillRepositoryDep,
+    user_id: CurrentUserIdDep,
 ) -> AgentSkill:
     try:
-        return await repo.update(skill_id, body)
+        return await repo.update(skill_id, body, user_id=user_id)
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail="Agent skill not found") from e
 

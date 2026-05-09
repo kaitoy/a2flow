@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Annotated
 
 from ag_ui_adk import ADKAgent
-from fastapi import Depends
+from fastapi import Depends, Header
 from google.adk.sessions import BaseSessionService
 from google.adk.sessions.sqlite_session_service import SqliteSessionService
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -17,6 +17,15 @@ from repositories import (
 )
 
 APP_NAME = "A2Flow"
+
+
+def get_current_user_id(
+    x_user_id: Annotated[str | None, Header()] = None,
+) -> str:
+    return x_user_id or ""
+
+
+CurrentUserIdDep = Annotated[str, Depends(get_current_user_id)]
 
 
 @lru_cache(maxsize=1)

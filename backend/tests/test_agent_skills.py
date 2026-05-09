@@ -178,3 +178,44 @@ async def test_delete_skill_removes_from_list(skill_client: AsyncClient) -> None
 async def test_delete_skill_unknown_id_returns_404(skill_client: AsyncClient) -> None:
     response = await skill_client.delete("/agent-skills/nonexistent")
     assert response.status_code == 404
+
+
+# ---------- created_by / updated_by ----------
+
+
+async def test_create_skill_populates_created_and_updated_by_from_header(
+    skill_client: AsyncClient,
+) -> None:
+    response = await skill_client.post(
+        "/agent-skills", json=_CREATE_BODY, headers={"X-User-Id": "alice"}
+    )
+    body = response.json()
+    assert body["created_by"] == "alice"
+    assert body["updated_by"] == "alice"
+
+
+async def test_create_skill_without_header_defaults_to_empty_string(
+    skill_client: AsyncClient,
+) -> None:
+    response = await skill_client.post("/agent-skills", json=_CREATE_BODY)
+    body = response.json()
+    assert body["created_by"] == ""
+    assert body["updated_by"] == ""
+
+
+async def test_update_skill_preserves_created_by_and_overwrites_updated_by(
+    skill_client: AsyncClient,
+) -> None:
+    created = (
+        await skill_client.post(
+            "/agent-skills", json=_CREATE_BODY, headers={"X-User-Id": "alice"}
+        )
+    ).json()
+    response = await skill_client.patch(
+        f"/agent-skills/{created['id']}",
+        json={"name": "Renamed"},
+        headers={"X-User-Id": "bob"},
+    )
+    body = response.json()
+    assert body["created_by"] == "alice"
+    assert body["updated_by"] == "bob"

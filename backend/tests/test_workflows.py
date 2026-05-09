@@ -270,3 +270,53 @@ async def test_delete_agent_skill_returns_409_when_used_by_workflow(
     await _create_workflow(workflow_client, skill["id"])
     response = await workflow_client.delete(f"/agent-skills/{skill['id']}")
     assert response.status_code == 409
+
+
+# ---------- created_by / updated_by ----------
+
+
+async def test_create_workflow_populates_created_and_updated_by_from_header(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    response = await workflow_client.post(
+        "/workflows",
+        json={**_WF_BODY, "agent_skill_id": skill["id"]},
+        headers={"X-User-Id": "alice"},
+    )
+    body = response.json()
+    assert body["created_by"] == "alice"
+    assert body["updated_by"] == "alice"
+
+
+async def test_create_workflow_without_header_defaults_to_empty_string(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    response = await workflow_client.post(
+        "/workflows", json={**_WF_BODY, "agent_skill_id": skill["id"]}
+    )
+    body = response.json()
+    assert body["created_by"] == ""
+    assert body["updated_by"] == ""
+
+
+async def test_update_workflow_preserves_created_by_and_overwrites_updated_by(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    created = (
+        await workflow_client.post(
+            "/workflows",
+            json={**_WF_BODY, "agent_skill_id": skill["id"]},
+            headers={"X-User-Id": "alice"},
+        )
+    ).json()
+    response = await workflow_client.patch(
+        f"/workflows/{created['id']}",
+        json={"name": "Renamed"},
+        headers={"X-User-Id": "bob"},
+    )
+    body = response.json()
+    assert body["created_by"] == "alice"
+    assert body["updated_by"] == "bob"

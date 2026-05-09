@@ -13,9 +13,11 @@ class AgentSkillRepository(Protocol):
 
     async def list(self, *, limit: int, offset: int) -> list[AgentSkill]: ...
 
-    async def create(self, data: AgentSkillCreate) -> AgentSkill: ...
+    async def create(self, data: AgentSkillCreate, *, user_id: str) -> AgentSkill: ...
 
-    async def update(self, skill_id: str, data: AgentSkillUpdate) -> AgentSkill: ...
+    async def update(
+        self, skill_id: str, data: AgentSkillUpdate, *, user_id: str
+    ) -> AgentSkill: ...
 
     async def delete(self, skill_id: str) -> None: ...
 
@@ -41,18 +43,23 @@ class SqlAgentSkillRepository:
         )
         return list(result.all())
 
-    async def create(self, data: AgentSkillCreate) -> AgentSkill:
-        skill = AgentSkill.model_validate(data.model_dump())
+    async def create(self, data: AgentSkillCreate, *, user_id: str) -> AgentSkill:
+        skill = AgentSkill.model_validate(
+            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+        )
         self._db.add(skill)
         await self._db.commit()
         await self._db.refresh(skill)
         return skill
 
-    async def update(self, skill_id: str, data: AgentSkillUpdate) -> AgentSkill:
+    async def update(
+        self, skill_id: str, data: AgentSkillUpdate, *, user_id: str
+    ) -> AgentSkill:
         skill = await self._db.get(AgentSkill, skill_id)
         if skill is None:
             raise NotFoundError("AgentSkill", skill_id)
         skill.sqlmodel_update(data.model_dump(exclude_unset=True))
+        skill.updated_by = user_id
         self._db.add(skill)
         await self._db.commit()
         await self._db.refresh(skill)
