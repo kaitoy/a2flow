@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Protocol
 
 from sqlalchemy.exc import IntegrityError
@@ -54,7 +53,6 @@ class SqlAgentSkillRepository:
         if skill is None:
             raise NotFoundError("AgentSkill", skill_id)
         skill.sqlmodel_update(data.model_dump(exclude_unset=True))
-        skill.updated_at = datetime.now(UTC)
         self._db.add(skill)
         await self._db.commit()
         await self._db.refresh(skill)

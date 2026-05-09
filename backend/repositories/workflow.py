@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Protocol
 
 from sqlmodel import col, select
@@ -56,7 +55,6 @@ class SqlWorkflowRepository:
         if new_skill_id is not None and not await self._skills.exists(new_skill_id):
             raise ForeignKeyViolationError("AgentSkill", new_skill_id)
         workflow.sqlmodel_update(update)
-        workflow.updated_at = datetime.now(UTC)
         self._db.add(workflow)
         await self._db.commit()
         await self._db.refresh(workflow)
