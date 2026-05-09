@@ -14,10 +14,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 async def workflow_client(
     mock_adk_agent: MagicMock,
 ) -> AsyncGenerator[AsyncClient, None]:
-    from database import AgentSkill as _AgentSkill  # noqa: F401 — registers model
-    from database import Workflow as _Workflow  # noqa: F401 — registers model
     from database import get_session
-    from main import app, get_adk_agent
+    from dependencies import get_adk_agent
+    from main import app
+    from models.agent_skill import (
+        AgentSkill as _AgentSkill,  # noqa: F401 — registers model
+    )
+    from models.workflow import Workflow as _Workflow  # noqa: F401 — registers model
 
     mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
 

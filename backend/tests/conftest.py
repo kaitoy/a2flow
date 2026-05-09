@@ -31,7 +31,8 @@ async def client_with_real_sessions(
     real_session_service: InMemorySessionService,
     mock_adk_agent: MagicMock,
 ) -> AsyncGenerator[AsyncClient, None]:
-    from main import app, get_adk_agent, get_session_service
+    from dependencies import get_adk_agent, get_session_service
+    from main import app
 
     app.dependency_overrides[get_session_service] = lambda: real_session_service
     app.dependency_overrides[get_adk_agent] = lambda: mock_adk_agent
