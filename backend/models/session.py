@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -8,4 +10,4 @@ class SessionCreate(BaseModel):
 
 class Session(SessionCreate):
     id: str
-    last_update_time: float
+    last_update_time: datetime

@@ -26,7 +26,9 @@ export function SessionList({
     setLoading(true);
     listSessions(userId)
       .then((list) =>
-        setSessions([...list].sort((a, b) => b.last_update_time - a.last_update_time))
+        setSessions(
+          [...list].sort((a, b) => Date.parse(b.last_update_time) - Date.parse(a.last_update_time))
+        )
       )
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
@@ -48,7 +50,7 @@ export function SessionList({
         )}
         {sessions.map((s) => {
           const isActive = s.id === currentSessionId;
-          const date = new Date(s.last_update_time * 1000);
+          const date = new Date(s.last_update_time);
           const label = date.toLocaleString(undefined, {
             month: "short",
             day: "numeric",

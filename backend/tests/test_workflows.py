@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from tests._envelope import assert_err, assert_ok
+
 
 @pytest_asyncio.fixture()
 async def workflow_client(
@@ -52,14 +54,14 @@ _WF_BODY = {"name": "My Workflow", "prompt": "Do the thing"}
 
 
 async def _create_skill(client: AsyncClient) -> Any:
-    return (await client.post("/agent-skills", json=_SKILL_BODY)).json()
+    return assert_ok(await client.post("/agent-skills", json=_SKILL_BODY), status=201)
 
 
 async def _create_workflow(
     client: AsyncClient, skill_id: str, **overrides: object
 ) -> Any:
     body = {**_WF_BODY, "agent_skill_id": skill_id, **overrides}
-    return (await client.post("/workflows", json=body)).json()
+    return assert_ok(await client.post("/workflows", json=body), status=201)
 
 
 # ---------- create ----------
@@ -78,7 +80,7 @@ async def test_create_workflow_response_has_id(workflow_client: AsyncClient) -> 
     response = await workflow_client.post(
         "/workflows", json={**_WF_BODY, "agent_skill_id": skill["id"]}
     )
-    assert "id" in response.json()
+    assert "id" in assert_ok(response, status=201)
 
 
 async def test_create_workflow_response_has_correct_name(
@@ -88,7 +90,7 @@ async def test_create_workflow_response_has_correct_name(
     response = await workflow_client.post(
         "/workflows", json={**_WF_BODY, "agent_skill_id": skill["id"]}
     )
-    assert response.json()["name"] == "My Workflow"
+    assert assert_ok(response, status=201)["name"] == "My Workflow"
 
 
 async def test_create_workflow_missing_name_returns_422(
@@ -98,7 +100,7 @@ async def test_create_workflow_missing_name_returns_422(
     response = await workflow_client.post(
         "/workflows", json={"prompt": "p", "agent_skill_id": skill["id"]}
     )
-    assert response.status_code == 422
+    assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
 async def test_create_workflow_missing_prompt_returns_422(
@@ -108,14 +110,14 @@ async def test_create_workflow_missing_prompt_returns_422(
     response = await workflow_client.post(
         "/workflows", json={"name": "wf", "agent_skill_id": skill["id"]}
     )
-    assert response.status_code == 422
+    assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
 async def test_create_workflow_missing_agent_skill_id_returns_422(
     workflow_client: AsyncClient,
 ) -> None:
     response = await workflow_client.post("/workflows", json=_WF_BODY)
-    assert response.status_code == 422
+    assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
 async def test_create_workflow_unknown_agent_skill_id_returns_422(
@@ -124,7 +126,7 @@ async def test_create_workflow_unknown_agent_skill_id_returns_422(
     response = await workflow_client.post(
         "/workflows", json={**_WF_BODY, "agent_skill_id": "nonexistent"}
     )
-    assert response.status_code == 422
+    assert_err(response, code="FOREIGN_KEY_VIOLATION", status=422)
 
 
 # ---------- list ----------
@@ -132,8 +134,7 @@ async def test_create_workflow_unknown_agent_skill_id_returns_422(
 
 async def test_list_workflows_empty_initially(workflow_client: AsyncClient) -> None:
     response = await workflow_client.get("/workflows")
-    assert response.status_code == 200
-    assert response.json() == []
+    assert assert_ok(response) == []
 
 
 async def test_list_workflows_returns_created_workflow(
@@ -142,7 +143,7 @@ async def test_list_workflows_returns_created_workflow(
     skill = await _create_skill(workflow_client)
     await _create_workflow(workflow_client, skill["id"])
     response = await workflow_client.get("/workflows")
-    assert len(response.json()) == 1
+    assert len(assert_ok(response)) == 1
 
 
 async def test_list_workflows_respects_limit_param(
@@ -152,7 +153,7 @@ async def test_list_workflows_respects_limit_param(
     for i in range(3):
         await _create_workflow(workflow_client, skill["id"], name=f"WF {i}")
     response = await workflow_client.get("/workflows", params={"limit": 2})
-    assert len(response.json()) == 2
+    assert len(assert_ok(response)) == 2
 
 
 async def test_list_workflows_respects_offset_param(
@@ -164,7 +165,7 @@ async def test_list_workflows_respects_offset_param(
     response = await workflow_client.get(
         "/workflows", params={"limit": 10, "offset": 2}
     )
-    assert len(response.json()) == 1
+    assert len(assert_ok(response)) == 1
 
 
 # ---------- get ----------
@@ -181,14 +182,14 @@ async def test_get_workflow_returns_correct_data(workflow_client: AsyncClient) -
     skill = await _create_skill(workflow_client)
     created = await _create_workflow(workflow_client, skill["id"])
     response = await workflow_client.get(f"/workflows/{created['id']}")
-    assert response.json()["name"] == "My Workflow"
+    assert assert_ok(response)["name"] == "My Workflow"
 
 
 async def test_get_workflow_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
     response = await workflow_client.get("/workflows/nonexistent")
-    assert response.status_code == 404
+    assert_err(response, code="NOT_FOUND", status=404)
 
 
 # ---------- patch ----------
@@ -211,41 +212,42 @@ async def test_update_workflow_partial_update_leaves_other_fields_unchanged(
     response = await workflow_client.patch(
         f"/workflows/{created['id']}", json={"name": "Renamed"}
     )
-    assert response.json()["prompt"] == _WF_BODY["prompt"]
+    assert assert_ok(response)["prompt"] == _WF_BODY["prompt"]
 
 
 async def test_update_workflow_updates_agent_skill_id(
     workflow_client: AsyncClient,
 ) -> None:
     skill1 = await _create_skill(workflow_client)
-    skill2 = (
+    skill2 = assert_ok(
         await workflow_client.post(
             "/agent-skills",
             json={"name": "Skill B", "repo_url": "https://github.com/x/z"},
-        )
-    ).json()
+        ),
+        status=201,
+    )
     created = await _create_workflow(workflow_client, skill1["id"])
     response = await workflow_client.patch(
         f"/workflows/{created['id']}", json={"agent_skill_id": skill2["id"]}
     )
-    assert response.json()["agent_skill_id"] == skill2["id"]
+    assert assert_ok(response)["agent_skill_id"] == skill2["id"]
 
 
 async def test_update_workflow_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
     response = await workflow_client.patch("/workflows/nonexistent", json={"name": "X"})
-    assert response.status_code == 404
+    assert_err(response, code="NOT_FOUND", status=404)
 
 
 # ---------- delete ----------
 
 
-async def test_delete_workflow_returns_204(workflow_client: AsyncClient) -> None:
+async def test_delete_workflow_returns_200(workflow_client: AsyncClient) -> None:
     skill = await _create_skill(workflow_client)
     created = await _create_workflow(workflow_client, skill["id"])
     response = await workflow_client.delete(f"/workflows/{created['id']}")
-    assert response.status_code == 204
+    assert assert_ok(response, status=200) is None
 
 
 async def test_delete_workflow_removes_from_list(workflow_client: AsyncClient) -> None:
@@ -253,14 +255,14 @@ async def test_delete_workflow_removes_from_list(workflow_client: AsyncClient) -
     created = await _create_workflow(workflow_client, skill["id"])
     await workflow_client.delete(f"/workflows/{created['id']}")
     response = await workflow_client.get("/workflows")
-    assert response.json() == []
+    assert assert_ok(response) == []
 
 
 async def test_delete_workflow_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
     response = await workflow_client.delete("/workflows/nonexistent")
-    assert response.status_code == 404
+    assert_err(response, code="NOT_FOUND", status=404)
 
 
 async def test_delete_agent_skill_returns_409_when_used_by_workflow(
@@ -269,7 +271,7 @@ async def test_delete_agent_skill_returns_409_when_used_by_workflow(
     skill = await _create_skill(workflow_client)
     await _create_workflow(workflow_client, skill["id"])
     response = await workflow_client.delete(f"/agent-skills/{skill['id']}")
-    assert response.status_code == 409
+    assert_err(response, code="CONFLICT_REFERENCED", status=409)
 
 
 # ---------- created_by / updated_by ----------
@@ -284,7 +286,7 @@ async def test_create_workflow_populates_created_and_updated_by_from_header(
         json={**_WF_BODY, "agent_skill_id": skill["id"]},
         headers={"X-User-Id": "alice"},
     )
-    body = response.json()
+    body = assert_ok(response, status=201)
     assert body["created_by"] == "alice"
     assert body["updated_by"] == "alice"
 
@@ -296,7 +298,7 @@ async def test_create_workflow_without_header_defaults_to_empty_string(
     response = await workflow_client.post(
         "/workflows", json={**_WF_BODY, "agent_skill_id": skill["id"]}
     )
-    body = response.json()
+    body = assert_ok(response, status=201)
     assert body["created_by"] == ""
     assert body["updated_by"] == ""
 
@@ -305,18 +307,19 @@ async def test_update_workflow_preserves_created_by_and_overwrites_updated_by(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    created = (
+    created = assert_ok(
         await workflow_client.post(
             "/workflows",
             json={**_WF_BODY, "agent_skill_id": skill["id"]},
             headers={"X-User-Id": "alice"},
-        )
-    ).json()
+        ),
+        status=201,
+    )
     response = await workflow_client.patch(
         f"/workflows/{created['id']}",
         json={"name": "Renamed"},
         headers={"X-User-Id": "bob"},
     )
-    body = response.json()
+    body = assert_ok(response)
     assert body["created_by"] == "alice"
     assert body["updated_by"] == "bob"

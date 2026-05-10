@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from dependencies import AgentSkillRepositoryDep, CurrentUserIdDep, PaginationDep
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
-from repositories.exceptions import NotFoundError, ReferencedError
+from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/agent-skills", tags=["agent-skills"])
 
@@ -28,7 +28,7 @@ async def list_agent_skills(
 async def get_agent_skill(skill_id: str, repo: AgentSkillRepositoryDep) -> AgentSkill:
     skill = await repo.get(skill_id)
     if skill is None:
-        raise HTTPException(status_code=404, detail="Agent skill not found")
+        raise NotFoundError("AgentSkill", skill_id)
     return skill
 
 
@@ -39,17 +39,9 @@ async def update_agent_skill(
     repo: AgentSkillRepositoryDep,
     user_id: CurrentUserIdDep,
 ) -> AgentSkill:
-    try:
-        return await repo.update(skill_id, body, user_id=user_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail="Agent skill not found") from e
+    return await repo.update(skill_id, body, user_id=user_id)
 
 
-@router.delete("/{skill_id}", status_code=204)
+@router.delete("/{skill_id}")
 async def delete_agent_skill(skill_id: str, repo: AgentSkillRepositoryDep) -> None:
-    try:
-        await repo.delete(skill_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail="Agent skill not found") from e
-    except ReferencedError as e:
-        raise HTTPException(status_code=409, detail=str(e)) from e
+    await repo.delete(skill_id)

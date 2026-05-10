@@ -1,7 +1,7 @@
 import { type A2UIInlineCatalogSchema, A2UIMiddleware } from "@ag-ui/a2ui-middleware";
 import { HttpAgent } from "@ag-ui/client";
 import type { Message } from "@ag-ui/core";
-import axios from "axios";
+import axios, { type AxiosResponse } from "axios";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import logger from "./logger";
 
@@ -27,33 +27,80 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+export interface ApiMeta {
+  request_id: string;
+  received_at: string;
+  responded_at: string;
+}
+
+export interface ApiError {
+  code: string;
+  message: string;
+  details?: Record<string, unknown> | null;
+}
+
+export interface ApiResponse<T> {
+  meta: ApiMeta;
+  data: T | null;
+  error: ApiError | null;
+}
+
+export class ApiClientError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public details?: unknown,
+    public requestId?: string
+  ) {
+    super(message);
+    this.name = "ApiClientError";
+  }
+}
+
+async function unwrap<T>(p: Promise<AxiosResponse<ApiResponse<T>>>): Promise<T> {
+  const res = await p;
+  const env = res.data;
+  if (env.error) {
+    throw new ApiClientError(
+      env.error.code,
+      env.error.message,
+      env.error.details,
+      env.meta.request_id
+    );
+  }
+  return env.data as T;
+}
+
 export interface SessionInfo {
   id: string;
   user_id: string;
-  last_update_time: number;
+  last_update_time: string;
 }
 
 export async function listSessions(userId: string): Promise<SessionInfo[]> {
-  const response = await apiClient.get<SessionInfo[]>("/sessions", {
-    params: { user_id: userId },
-  });
-  return response.data;
+  return unwrap(
+    apiClient.get<ApiResponse<SessionInfo[]>>("/sessions", {
+      params: { user_id: userId },
+    })
+  );
 }
 
 export async function getSessionMessages(sessionId: string, userId: string): Promise<Message[]> {
-  const response = await apiClient.get<Message[]>(
-    `/sessions/${encodeURIComponent(sessionId)}/messages`,
-    { params: { user_id: userId } }
+  return unwrap(
+    apiClient.get<ApiResponse<Message[]>>(`/sessions/${encodeURIComponent(sessionId)}/messages`, {
+      params: { user_id: userId },
+    })
   );
-  return response.data;
 }
 
 export async function createSession(userId: string): Promise<string> {
-  const response = await apiClient.post<{ id: string }>("/sessions", {
-    user_id: userId,
-  });
-  logger.info({ sessionId: response.data.id }, "session created");
-  return response.data.id;
+  const session = await unwrap(
+    apiClient.post<ApiResponse<{ id: string }>>("/sessions", {
+      user_id: userId,
+    })
+  );
+  logger.info({ sessionId: session.id }, "session created");
+  return session.id;
 }
 
 export interface AgentSkill {
@@ -83,32 +130,29 @@ export interface AgentSkillUpdate {
 }
 
 export async function listAgentSkills(limit = 20, offset = 0): Promise<AgentSkill[]> {
-  const response = await apiClient.get<AgentSkill[]>("/agent-skills", {
-    params: { limit, offset },
-  });
-  return response.data;
+  return unwrap(
+    apiClient.get<ApiResponse<AgentSkill[]>>("/agent-skills", {
+      params: { limit, offset },
+    })
+  );
 }
 
 export async function getAgentSkill(id: string): Promise<AgentSkill> {
-  const response = await apiClient.get<AgentSkill>(`/agent-skills/${encodeURIComponent(id)}`);
-  return response.data;
+  return unwrap(apiClient.get<ApiResponse<AgentSkill>>(`/agent-skills/${encodeURIComponent(id)}`));
 }
 
 export async function createAgentSkill(body: AgentSkillCreate): Promise<AgentSkill> {
-  const response = await apiClient.post<AgentSkill>("/agent-skills", body);
-  return response.data;
+  return unwrap(apiClient.post<ApiResponse<AgentSkill>>("/agent-skills", body));
 }
 
 export async function updateAgentSkill(id: string, body: AgentSkillUpdate): Promise<AgentSkill> {
-  const response = await apiClient.patch<AgentSkill>(
-    `/agent-skills/${encodeURIComponent(id)}`,
-    body
+  return unwrap(
+    apiClient.patch<ApiResponse<AgentSkill>>(`/agent-skills/${encodeURIComponent(id)}`, body)
   );
-  return response.data;
 }
 
 export async function deleteAgentSkill(id: string): Promise<void> {
-  await apiClient.delete(`/agent-skills/${encodeURIComponent(id)}`);
+  await unwrap(apiClient.delete<ApiResponse<null>>(`/agent-skills/${encodeURIComponent(id)}`));
 }
 
 export interface Workflow {
@@ -138,29 +182,29 @@ export interface WorkflowUpdate {
 }
 
 export async function listWorkflows(limit = 20, offset = 0): Promise<Workflow[]> {
-  const response = await apiClient.get<Workflow[]>("/workflows", {
-    params: { limit, offset },
-  });
-  return response.data;
+  return unwrap(
+    apiClient.get<ApiResponse<Workflow[]>>("/workflows", {
+      params: { limit, offset },
+    })
+  );
 }
 
 export async function getWorkflow(id: string): Promise<Workflow> {
-  const response = await apiClient.get<Workflow>(`/workflows/${encodeURIComponent(id)}`);
-  return response.data;
+  return unwrap(apiClient.get<ApiResponse<Workflow>>(`/workflows/${encodeURIComponent(id)}`));
 }
 
 export async function createWorkflow(body: WorkflowCreate): Promise<Workflow> {
-  const response = await apiClient.post<Workflow>("/workflows", body);
-  return response.data;
+  return unwrap(apiClient.post<ApiResponse<Workflow>>("/workflows", body));
 }
 
 export async function updateWorkflow(id: string, body: WorkflowUpdate): Promise<Workflow> {
-  const response = await apiClient.patch<Workflow>(`/workflows/${encodeURIComponent(id)}`, body);
-  return response.data;
+  return unwrap(
+    apiClient.patch<ApiResponse<Workflow>>(`/workflows/${encodeURIComponent(id)}`, body)
+  );
 }
 
 export async function deleteWorkflow(id: string): Promise<void> {
-  await apiClient.delete(`/workflows/${encodeURIComponent(id)}`);
+  await unwrap(apiClient.delete<ApiResponse<null>>(`/workflows/${encodeURIComponent(id)}`));
 }
 
 export function createChatAgent(sessionId: string): HttpAgent {

@@ -1,4 +1,5 @@
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
+import { envelope } from "./envelope";
 
 const BASE = "http://localhost:8000";
 
@@ -16,25 +17,23 @@ const SKILL_1 = {
 
 export const handlers = [
   http.get(`${BASE}/sessions`, () =>
-    HttpResponse.json([
-      { id: "sess-1", user_id: "user", last_update_time: 1700000100 },
-      { id: "sess-2", user_id: "user", last_update_time: 1700000000 },
+    envelope([
+      { id: "sess-1", user_id: "user", last_update_time: "2026-05-10T12:00:01.000Z" },
+      { id: "sess-2", user_id: "user", last_update_time: "2026-05-10T12:00:00.000Z" },
     ])
   ),
 
-  http.get(`${BASE}/sessions/:sessionId/messages`, () => HttpResponse.json([])),
+  http.get(`${BASE}/sessions/:sessionId/messages`, () => envelope([])),
 
-  http.post(`${BASE}/sessions`, () => HttpResponse.json({ id: "new-session-id" }, { status: 201 })),
+  http.post(`${BASE}/sessions`, () => envelope({ id: "new-session-id" }, 201)),
 
-  http.get(`${BASE}/agent-skills`, () => HttpResponse.json([SKILL_1])),
+  http.get(`${BASE}/agent-skills`, () => envelope([SKILL_1])),
 
-  http.get(`${BASE}/agent-skills/:skillId`, () => HttpResponse.json(SKILL_1)),
+  http.get(`${BASE}/agent-skills/:skillId`, () => envelope(SKILL_1)),
 
-  http.post(`${BASE}/agent-skills`, () =>
-    HttpResponse.json({ ...SKILL_1, id: "new-skill-id" }, { status: 201 })
-  ),
+  http.post(`${BASE}/agent-skills`, () => envelope({ ...SKILL_1, id: "new-skill-id" }, 201)),
 
-  http.patch(`${BASE}/agent-skills/:skillId`, () => HttpResponse.json(SKILL_1)),
+  http.patch(`${BASE}/agent-skills/:skillId`, () => envelope(SKILL_1)),
 
-  http.delete(`${BASE}/agent-skills/:skillId`, () => new HttpResponse(null, { status: 204 })),
+  http.delete(`${BASE}/agent-skills/:skillId`, () => envelope(null)),
 ];

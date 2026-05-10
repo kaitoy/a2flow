@@ -1,11 +1,13 @@
 import uuid
+from datetime import UTC, datetime
 
 from ag_ui_adk import adk_events_to_messages
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from dependencies import APP_NAME, SessionServiceDep
 from models.session import Session, SessionCreate
+from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -25,7 +27,7 @@ async def create_session(
     return Session(
         id=session.id,
         user_id=session.user_id,
-        last_update_time=session.last_update_time,
+        last_update_time=datetime.fromtimestamp(session.last_update_time, tz=UTC),
     )
 
 
@@ -43,7 +45,7 @@ async def list_sessions(
         Session(
             id=s.id,
             user_id=s.user_id,
-            last_update_time=s.last_update_time,
+            last_update_time=datetime.fromtimestamp(s.last_update_time, tz=UTC),
         )
         for s in response.sessions
     ]
@@ -62,12 +64,12 @@ async def get_session_messages(
         session_id=session_id,
     )
     if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise NotFoundError("Session", session_id)
     messages = adk_events_to_messages(session.events)
     return JSONResponse([m.model_dump(mode="json", by_alias=True) for m in messages])
 
 
-@router.delete("/{session_id}", status_code=204)
+@router.delete("/{session_id}")
 async def delete_session(
     session_id: str,
     user_id: str,
@@ -80,7 +82,7 @@ async def delete_session(
         session_id=session_id,
     )
     if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise NotFoundError("Session", session_id)
     await session_service.delete_session(
         app_name=APP_NAME,
         user_id=user_id,

@@ -155,17 +155,20 @@ This produces a friendlier error message than relying solely on the database con
 | `GET` | `/entity` | 200 | List (with `limit` / `offset` query params) |
 | `GET` | `/entity/{id}` | 200 | Get single |
 | `PATCH` | `/entity/{id}` | 200 | Partial update |
-| `DELETE` | `/entity/{id}` | 204 | Delete |
+| `DELETE` | `/entity/{id}` | 200 | Delete (envelope `data: null`) |
 
 ### Error Mapping
 
-Repository exceptions are caught in the router and converted to HTTP responses:
+Repository exceptions propagate to global exception handlers (`backend/exception_handlers.py`) which produce structured `{code, message, details}` error bodies. Routers should not catch and re-raise as `HTTPException`. The middleware then wraps the error body in the response envelope.
 
-| Exception | HTTP status | Notes |
-|---|---|---|
-| `NotFoundError` | 404 | `detail` includes entity name and ID |
-| `ReferencedError` | 409 | Cannot delete a referenced resource |
-| `ForeignKeyViolationError` | 422 | Referenced entity not found |
+| Exception | HTTP status | Error code | Notes |
+|---|---|---|---|
+| `NotFoundError` | 404 | `NOT_FOUND` | `details` carries `entity` and `id` |
+| `ReferencedError` | 409 | `CONFLICT_REFERENCED` | Cannot delete a referenced resource |
+| `ForeignKeyViolationError` | 422 | `FOREIGN_KEY_VIOLATION` | Referenced entity not found; `details` carries `entity` and `id` |
+| `RequestValidationError` | 422 | `VALIDATION_ERROR` | FastAPI body/query validation; `details.errors` from Pydantic |
+| `HTTPException` (any other raise) | passthrough | `HTTP_<status>` | Fallback for callers still raising `HTTPException` |
+| Uncaught `Exception` | 500 | `INTERNAL_ERROR` | Logged with `request_id` |
 
 ### User ID Extraction
 
@@ -175,6 +178,53 @@ The caller's identity is passed via the `X-User-Id` HTTP header. Routers depend 
 
 - Router prefix: kebab-case plural (`/agent-skills`, `/workflows`)
 - OpenAPI tag: same as the prefix (`"agent-skills"`, `"workflows"`)
+
+---
+
+## Response Envelope
+
+All JSON responses are wrapped by `ResponseEnvelopeMiddleware` (`backend/middleware/envelope.py`) into a uniform shape:
+
+```jsonc
+{
+  "meta": {
+    "request_id": "<uuid v4>",
+    "received_at": "2026-05-10T12:34:56.789Z",
+    "responded_at": "2026-05-10T12:34:57.123Z"
+  },
+  "data": <result> | null,
+  "error": null | { "code": "NOT_FOUND", "message": "...", "details": { ... } }
+}
+```
+
+- **`meta.request_id`** is generated per request and also exposed via the `X-Request-Id` response header.
+- **`meta.received_at`** / **`meta.responded_at`** are ISO 8601 UTC strings (`Z` suffix).
+- Successful responses populate `data` and leave `error` as `null`. Error responses do the inverse.
+- `DELETE` endpoints return status 200 with `data: null` (the `status_code=204` decorator should not be used).
+
+### Excluded paths
+
+The middleware skips wrapping for:
+
+- `POST /agent` — SSE stream (must not be buffered)
+- `GET /health` — kept as a minimal `{"status":"ok"}` for liveness probes
+
+Both still log under the same `request_id` filter (the `/health` request has `request_id=-` because the middleware also handles contextvar setup; excluded paths bypass it).
+
+### Request ID logging
+
+`backend/logging_context.py` defines a `ContextVar` plus `RequestIdFilter` that injects the active request's `request_id` into every log record under the format `[req=<uuid>]: ...`. Use the standard `logging.getLogger(__name__)` API in routers/repositories — no extra wiring needed.
+
+---
+
+## Error Codes
+
+Error codes are uppercase `SCREAMING_SNAKE_CASE` strings. The current set is documented in the Error Mapping table above. When introducing a new repository exception:
+
+1. Add it to `backend/repositories/exceptions.py`.
+2. Add a handler in `backend/exception_handlers.py` returning the inner JSON `{code, message, details}` (the middleware wraps it).
+3. Register the handler in `backend/main.py` via `app.add_exception_handler(...)`.
+4. Append a row to the Error Mapping table above with the new HTTP status and `code`.
 
 ---
 
@@ -218,4 +268,5 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 5. **Router file** (`routers/<entity>.py`):
    - Follow RESTful conventions and error mapping table above.
    - Register in `main.py` with the correct prefix and tag.
-6. **Tests**: cover create, list, get, update, delete, not-found, and any FK constraints.
+   - Do not catch repository exceptions; let global handlers map them. If a new repository exception is introduced, add a corresponding handler in `backend/exception_handlers.py` and document the error code in the Error Codes table.
+6. **Tests**: cover create, list, get, update, delete, not-found, and any FK constraints. Use the `assert_ok` / `assert_err` helpers in `tests/_envelope.py` to unwrap the response envelope.

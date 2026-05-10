@@ -1,6 +1,7 @@
 import { HttpAgent } from "@ag-ui/client";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { createChatAgent, createSession, getSessionMessages, listSessions } from "./api";
 
@@ -30,7 +31,7 @@ describe("getSessionMessages", () => {
     server.use(
       http.get(`${BASE}/sessions/:sessionId/messages`, ({ request }) => {
         calledUrl = request.url;
-        return HttpResponse.json([]);
+        return envelope([]);
       })
     );
     await getSessionMessages("my-session", "user");
@@ -59,7 +60,7 @@ describe("createSession", () => {
     server.use(
       http.post(`${BASE}/sessions`, async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ id: "x" }, { status: 201 });
+        return envelope({ id: "x" }, 201);
       })
     );
     await createSession("test-user");

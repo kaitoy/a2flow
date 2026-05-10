@@ -132,7 +132,7 @@ A session must be created before starting a chat.
 curl -X POST http://localhost:8000/sessions \
   -H "Content-Type: application/json" \
   -d '{"user_id": "alice"}'
-# {"id": "...", "user_id": "alice", "last_update_time": 0.0}
+# {"id": "...", "user_id": "alice", "last_update_time": "2026-05-10T12:34:56.789Z"}
 ```
 
 #### `GET /sessions?user_id=<user_id>` — List sessions

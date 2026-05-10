@@ -1,23 +1,34 @@
-import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
 from dependencies import APP_NAME
+from exception_handlers import (
+    foreign_key_violation_exception_handler,
+    http_exception_handler,
+    not_found_exception_handler,
+    referenced_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
+from logging_context import setup_logging
+from middleware.envelope import ResponseEnvelopeMiddleware
+from repositories.exceptions import (
+    ForeignKeyViolationError,
+    NotFoundError,
+    ReferencedError,
+)
 from routers import agent, agent_skills, health, sessions, workflows
 
 load_dotenv()
 
-logging.basicConfig(
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-    level=logging.INFO,
-)
+setup_logging()
 
 
 @asynccontextmanager
@@ -39,6 +50,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(ResponseEnvelopeMiddleware)
+
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(NotFoundError, not_found_exception_handler)
+app.add_exception_handler(
+    ForeignKeyViolationError, foreign_key_violation_exception_handler
+)
+app.add_exception_handler(ReferencedError, referenced_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.include_router(agent.router)
 app.include_router(agent_skills.router)

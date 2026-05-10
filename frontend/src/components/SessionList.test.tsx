@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { SessionList } from "./SessionList";
 
@@ -27,7 +28,7 @@ describe("SessionList", () => {
   });
 
   it("shows No sessions when API returns empty array", async () => {
-    server.use(http.get("http://localhost:8000/sessions", () => HttpResponse.json([])));
+    server.use(http.get("http://localhost:8000/sessions", () => envelope([])));
     render(<SessionList {...defaultProps} />);
     await waitFor(() => expect(screen.getByText("No sessions")).toBeInTheDocument());
   });
@@ -60,7 +61,9 @@ describe("SessionList", () => {
 
   it("shows No sessions on API error", async () => {
     server.use(
-      http.get("http://localhost:8000/sessions", () => HttpResponse.json(null, { status: 500 }))
+      http.get("http://localhost:8000/sessions", () =>
+        envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
+      )
     );
     render(<SessionList {...defaultProps} />);
     await waitFor(() => expect(screen.getByText("No sessions")).toBeInTheDocument());

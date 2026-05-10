@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import AgentSkillsPage from "./page";
 
@@ -23,7 +24,7 @@ describe("AgentSkillsPage", () => {
   });
 
   it("shows empty state when no skills", async () => {
-    server.use(http.get("http://localhost:8000/agent-skills", () => HttpResponse.json([])));
+    server.use(http.get("http://localhost:8000/agent-skills", () => envelope([])));
     render(<AgentSkillsPage />);
     await waitFor(() =>
       expect(screen.getByText("No agent skills registered yet.")).toBeInTheDocument()
@@ -50,7 +51,7 @@ describe("AgentSkillsPage", () => {
   it("calls delete api after confirm", async () => {
     const user = userEvent.setup();
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    const deleteSpy = vi.fn(() => new HttpResponse(null, { status: 204 }));
+    const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/agent-skills/:id", deleteSpy));
 
     render(<AgentSkillsPage />);

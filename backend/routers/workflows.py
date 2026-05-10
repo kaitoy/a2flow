@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from dependencies import CurrentUserIdDep, PaginationDep, WorkflowRepositoryDep
 from models.workflow import Workflow, WorkflowCreate, WorkflowUpdate
-from repositories.exceptions import ForeignKeyViolationError, NotFoundError
+from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -13,12 +13,7 @@ async def create_workflow(
     repo: WorkflowRepositoryDep,
     user_id: CurrentUserIdDep,
 ) -> Workflow:
-    try:
-        return await repo.create(body, user_id=user_id)
-    except ForeignKeyViolationError as e:
-        raise HTTPException(
-            status_code=422, detail=f"AgentSkill {e.id!r} not found"
-        ) from e
+    return await repo.create(body, user_id=user_id)
 
 
 @router.get("", response_model=list[Workflow])
@@ -33,7 +28,7 @@ async def list_workflows(
 async def get_workflow(workflow_id: str, repo: WorkflowRepositoryDep) -> Workflow:
     workflow = await repo.get(workflow_id)
     if workflow is None:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+        raise NotFoundError("Workflow", workflow_id)
     return workflow
 
 
@@ -44,19 +39,9 @@ async def update_workflow(
     repo: WorkflowRepositoryDep,
     user_id: CurrentUserIdDep,
 ) -> Workflow:
-    try:
-        return await repo.update(workflow_id, body, user_id=user_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail="Workflow not found") from e
-    except ForeignKeyViolationError as e:
-        raise HTTPException(
-            status_code=422, detail=f"AgentSkill {e.id!r} not found"
-        ) from e
+    return await repo.update(workflow_id, body, user_id=user_id)
 
 
-@router.delete("/{workflow_id}", status_code=204)
+@router.delete("/{workflow_id}")
 async def delete_workflow(workflow_id: str, repo: WorkflowRepositoryDep) -> None:
-    try:
-        await repo.delete(workflow_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=404, detail="Workflow not found") from e
+    await repo.delete(workflow_id)
