@@ -160,7 +160,7 @@ async def test_update_skill_partial_update_leaves_other_fields_unchanged(
     response = await skill_client.patch(
         f"/agent-skills/{created['id']}", json={"name": "Renamed"}
     )
-    assert assert_ok(response)["repo_url"] == _CREATE_BODY["repo_url"]
+    assert assert_ok(response)["repoUrl"] == _CREATE_BODY["repo_url"]
 
 
 async def test_update_skill_unknown_id_returns_404(skill_client: AsyncClient) -> None:
@@ -203,8 +203,8 @@ async def test_create_skill_populates_created_and_updated_by_from_header(
         "/agent-skills", json=_CREATE_BODY, headers={"X-User-Id": "alice"}
     )
     body = assert_ok(response, status=201)
-    assert body["created_by"] == "alice"
-    assert body["updated_by"] == "alice"
+    assert body["createdBy"] == "alice"
+    assert body["updatedBy"] == "alice"
 
 
 async def test_create_skill_without_header_defaults_to_empty_string(
@@ -212,8 +212,8 @@ async def test_create_skill_without_header_defaults_to_empty_string(
 ) -> None:
     response = await skill_client.post("/agent-skills", json=_CREATE_BODY)
     body = assert_ok(response, status=201)
-    assert body["created_by"] == ""
-    assert body["updated_by"] == ""
+    assert body["createdBy"] == ""
+    assert body["updatedBy"] == ""
 
 
 async def test_update_skill_preserves_created_by_and_overwrites_updated_by(
@@ -231,5 +231,5 @@ async def test_update_skill_preserves_created_by_and_overwrites_updated_by(
         headers={"X-User-Id": "bob"},
     )
     body = assert_ok(response)
-    assert body["created_by"] == "alice"
-    assert body["updated_by"] == "bob"
+    assert body["createdBy"] == "alice"
+    assert body["updatedBy"] == "bob"

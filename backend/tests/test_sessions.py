@@ -22,9 +22,9 @@ async def test_create_session_response_shape(
     )
     body = assert_ok(response, status=201)
     assert "id" in body
-    assert body["user_id"] == "alice"
-    assert isinstance(body["last_update_time"], str)
-    datetime.fromisoformat(body["last_update_time"])
+    assert body["userId"] == "alice"
+    assert isinstance(body["lastUpdateTime"], str)
+    datetime.fromisoformat(body["lastUpdateTime"])
 
 
 async def test_create_session_with_explicit_id(
@@ -88,8 +88,8 @@ async def test_list_sessions_does_not_mix_users(
     )
     assert len(carol_sessions) == 1
     assert len(dave_sessions) == 1
-    assert carol_sessions[0]["user_id"] == "carol"
-    assert dave_sessions[0]["user_id"] == "dave"
+    assert carol_sessions[0]["userId"] == "carol"
+    assert dave_sessions[0]["userId"] == "dave"
 
 
 async def test_list_sessions_missing_user_id_returns_422(

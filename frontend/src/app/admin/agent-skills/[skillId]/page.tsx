@@ -43,8 +43,8 @@ export default function EditAgentSkillPage() {
       .then((skill) => {
         reset({
           name: skill.name,
-          repoUrl: skill.repo_url,
-          repoPath: skill.repo_path,
+          repoUrl: skill.repoUrl,
+          repoPath: skill.repoPath,
           description: skill.description ?? "",
         });
       })

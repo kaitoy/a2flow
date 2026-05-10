@@ -50,9 +50,9 @@ class ResponseEnvelopeMiddleware(BaseHTTPMiddleware):
         inner = json.loads(body_bytes) if body_bytes else None
 
         meta = {
-            "request_id": request_id,
-            "received_at": _format_iso_z(received_at),
-            "responded_at": _format_iso_z(datetime.now(UTC)),
+            "requestId": request_id,
+            "receivedAt": _format_iso_z(received_at),
+            "respondedAt": _format_iso_z(datetime.now(UTC)),
         }
 
         if 200 <= response.status_code < 300:

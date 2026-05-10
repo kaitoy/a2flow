@@ -73,8 +73,8 @@ async function unwrap<T>(p: Promise<AxiosResponse<ApiResponse<T>>>): Promise<T> 
 
 export interface SessionInfo {
   id: string;
-  user_id: string;
-  last_update_time: string;
+  userId: string;
+  lastUpdateTime: string;
 }
 
 export async function listSessions(userId: string): Promise<SessionInfo[]> {
@@ -106,13 +106,13 @@ export async function createSession(userId: string): Promise<string> {
 export interface AgentSkill {
   id: string;
   name: string;
-  repo_url: string;
-  repo_path: string;
+  repoUrl: string;
+  repoPath: string;
   description: string | null;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  updated_by: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
 }
 
 export interface AgentSkillCreate {
@@ -160,11 +160,11 @@ export interface Workflow {
   name: string;
   prompt: string;
   description: string | null;
-  agent_skill_id: string;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  updated_by: string;
+  agentSkillId: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
 }
 
 export interface WorkflowCreate {

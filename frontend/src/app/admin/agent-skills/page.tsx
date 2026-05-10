@@ -18,11 +18,11 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
   {
     header: "Repo URL",
     className: "max-w-[200px] truncate",
-    cell: (s) => s.repo_url,
+    cell: (s) => s.repoUrl,
   },
   {
     header: "Repo Path",
-    cell: (s) => s.repo_path || "—",
+    cell: (s) => s.repoPath || "—",
   },
   {
     header: "Description",
@@ -32,7 +32,7 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
   {
     header: "Created At",
     cell: (s) => (
-      <span className="text-on-surface-variant">{new Date(s.created_at).toLocaleDateString()}</span>
+      <span className="text-on-surface-variant">{new Date(s.createdAt).toLocaleDateString()}</span>
     ),
   },
 ];

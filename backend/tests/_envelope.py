@@ -7,7 +7,7 @@ def assert_ok(response: Response, status: int = 200) -> Any:
     assert response.status_code == status, response.text
     body = response.json()
     assert body["error"] is None, body
-    assert body["meta"]["request_id"]
+    assert body["meta"]["requestId"]
     return body["data"]
 
 

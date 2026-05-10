@@ -53,7 +53,7 @@ export default function EditWorkflowPage() {
         reset({
           name: workflow.name,
           prompt: workflow.prompt,
-          agentSkillId: workflow.agent_skill_id,
+          agentSkillId: workflow.agentSkillId,
           description: workflow.description ?? "",
         });
       })

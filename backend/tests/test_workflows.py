@@ -230,7 +230,7 @@ async def test_update_workflow_updates_agent_skill_id(
     response = await workflow_client.patch(
         f"/workflows/{created['id']}", json={"agent_skill_id": skill2["id"]}
     )
-    assert assert_ok(response)["agent_skill_id"] == skill2["id"]
+    assert assert_ok(response)["agentSkillId"] == skill2["id"]
 
 
 async def test_update_workflow_unknown_id_returns_404(
@@ -287,8 +287,8 @@ async def test_create_workflow_populates_created_and_updated_by_from_header(
         headers={"X-User-Id": "alice"},
     )
     body = assert_ok(response, status=201)
-    assert body["created_by"] == "alice"
-    assert body["updated_by"] == "alice"
+    assert body["createdBy"] == "alice"
+    assert body["updatedBy"] == "alice"
 
 
 async def test_create_workflow_without_header_defaults_to_empty_string(
@@ -299,8 +299,8 @@ async def test_create_workflow_without_header_defaults_to_empty_string(
         "/workflows", json={**_WF_BODY, "agent_skill_id": skill["id"]}
     )
     body = assert_ok(response, status=201)
-    assert body["created_by"] == ""
-    assert body["updated_by"] == ""
+    assert body["createdBy"] == ""
+    assert body["updatedBy"] == ""
 
 
 async def test_update_workflow_preserves_created_by_and_overwrites_updated_by(
@@ -321,5 +321,5 @@ async def test_update_workflow_preserves_created_by_and_overwrites_updated_by(
         headers={"X-User-Id": "bob"},
     )
     body = assert_ok(response)
-    assert body["created_by"] == "alice"
-    assert body["updated_by"] == "bob"
+    assert body["createdBy"] == "alice"
+    assert body["updatedBy"] == "bob"

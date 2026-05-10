@@ -1,12 +1,14 @@
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 
 T = TypeVar("T")
 
 
 class Meta(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     request_id: str
     received_at: datetime
     responded_at: datetime

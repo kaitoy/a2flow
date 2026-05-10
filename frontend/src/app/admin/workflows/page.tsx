@@ -8,17 +8,17 @@ import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import {
   type AgentSkill,
-  type Workflow,
   deleteWorkflow,
   listAgentSkills,
   listWorkflows,
+  type Workflow,
 } from "@/lib/api";
 
 const LIMIT = 20;
 
 function buildColumns(
   skillMap: Map<string, string>,
-  onDelete: (id: string, name: string) => void,
+  onDelete: (id: string, name: string) => void
 ): ColumnDef<Workflow>[] {
   return [
     {
@@ -32,7 +32,7 @@ function buildColumns(
     },
     {
       header: "Agent Skill",
-      cell: (w) => skillMap.get(w.agent_skill_id) ?? w.agent_skill_id,
+      cell: (w) => skillMap.get(w.agentSkillId) ?? w.agentSkillId,
     },
     {
       header: "Description",
@@ -43,7 +43,7 @@ function buildColumns(
       header: "Created At",
       cell: (w) => (
         <span className="text-on-surface-variant">
-          {new Date(w.created_at).toLocaleDateString()}
+          {new Date(w.createdAt).toLocaleDateString()}
         </span>
       ),
     },

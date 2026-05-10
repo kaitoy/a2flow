@@ -10,12 +10,12 @@ The backend uses **SQLModel**, which unifies SQLAlchemy (ORM) and Pydantic (vali
 
 ## Model Layer
 
-### Base Class: `AuditedBase`
+### Base Class: `BaseEntity`
 
-All persistent entities inherit from `AuditedBase` (`models/base.py`):
+All persistent entities inherit from `BaseEntity` (`models/base.py`):
 
 ```python
-class AuditedBase(SQLModel):
+class BaseEntity(SQLModel):
     id: str          # UUID7, auto-generated primary key
     created_at: datetime   # UTC, set at insert time
     updated_at: datetime   # UTC, updated automatically on every UPDATE
@@ -35,7 +35,7 @@ Each entity defines three classes in order of inheritance:
 |---|---|---|
 | `EntityUpdate` | Pydantic schema for PATCH; all fields optional | `AgentSkillUpdate` |
 | `EntityCreate` | Pydantic schema for POST; required fields made mandatory | `AgentSkillCreate` |
-| `Entity` | ORM model with `table=True`; inherits `AuditedBase` | `AgentSkill` |
+| `Entity` | ORM model with `table=True`; inherits `BaseEntity` | `AgentSkill` |
 
 ```python
 class AgentSkillUpdate(SQLModel):
@@ -47,7 +47,7 @@ class AgentSkillCreate(AgentSkillUpdate):
     name: str          # required
     repo_url: str      # required
 
-class AgentSkill(AgentSkillCreate, AuditedBase, table=True):
+class AgentSkill(AgentSkillCreate, BaseEntity, table=True):
     __tablename__ = "agent_skills"
     ...
 ```
@@ -62,6 +62,30 @@ This hierarchy lets `repo.update()` call `sqlmodel_update(data, exclude_unset=Tr
 | Unique constraint | `uq_<table>_<field>` | `uq_agent_skills_name` |
 | Index | `ix_<table>_<field>` | `ix_agent_skills_name` |
 | Foreign key constraint | `fk_<table>_<field>` | `fk_workflows_agent_skill_id` |
+
+### JSON Field Naming: camelCase
+
+All models use `alias_generator=to_camel` and `populate_by_name=True` in their `model_config`. This means:
+
+- **Python attribute names** remain snake_case (`agent_skill_id`, `created_at`).
+- **JSON wire format** (requests and responses) uses camelCase (`agentSkillId`, `createdAt`).
+- Requests may send either snake_case or camelCase; both are accepted (`populate_by_name=True`).
+
+For SQLModel subclasses use `SQLModelConfig`; for pure Pydantic `BaseModel` subclasses use `ConfigDict`:
+
+```python
+# SQLModel (non-table)
+from sqlmodel._compat import SQLModelConfig
+class WorkflowUpdate(SQLModel):
+    model_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
+
+# Pydantic BaseModel
+from pydantic import ConfigDict
+class SessionCreate(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+```
+
+`BaseEntity` already sets this config, so table models (`Entity`) inherit it automatically.
 
 ### Optional Fields
 
@@ -188,17 +212,17 @@ All JSON responses are wrapped by `ResponseEnvelopeMiddleware` (`backend/middlew
 ```jsonc
 {
   "meta": {
-    "request_id": "<uuid v4>",
-    "received_at": "2026-05-10T12:34:56.789Z",
-    "responded_at": "2026-05-10T12:34:57.123Z"
+    "requestId": "<uuid v4>",
+    "receivedAt": "2026-05-10T12:34:56.789Z",
+    "respondedAt": "2026-05-10T12:34:57.123Z"
   },
   "data": <result> | null,
   "error": null | { "code": "NOT_FOUND", "message": "...", "details": { ... } }
 }
 ```
 
-- **`meta.request_id`** is generated per request and also exposed via the `X-Request-Id` response header.
-- **`meta.received_at`** / **`meta.responded_at`** are ISO 8601 UTC strings (`Z` suffix).
+- **`meta.requestId`** is generated per request and also exposed via the `X-Request-Id` response header.
+- **`meta.receivedAt`** / **`meta.respondedAt`** are ISO 8601 UTC strings (`Z` suffix).
 - Successful responses populate `data` and leave `error` as `null`. Error responses do the inverse.
 - `DELETE` endpoints return status 200 with `data: null` (the `status_code=204` decorator should not be used).
 
@@ -257,7 +281,7 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 ## Adding a New Entity — Checklist
 
 1. **Model file** (`models/<entity>.py`):
-   - Define `EntityUpdate` (all optional), `EntityCreate` (required fields), `Entity` (table=True, inherits `AuditedBase`).
+   - Define `EntityUpdate` (all optional), `EntityCreate` (required fields), `Entity` (table=True, inherits `BaseEntity`).
    - Follow constraint naming conventions.
 2. **Repository file** (`repositories/<entity>.py`):
    - Define a `Protocol` with the standard five methods plus `exists()`.

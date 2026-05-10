@@ -19,7 +19,7 @@ describe("SessionList", () => {
     expect(screen.getByText(/Loading/)).toBeInTheDocument();
   });
 
-  it("renders sessions after fetch sorted by last_update_time desc", async () => {
+  it("renders sessions after fetch sorted by lastUpdateTime desc", async () => {
     render(<SessionList {...defaultProps} />);
     await waitFor(() => expect(screen.queryByText(/Loading/)).not.toBeInTheDocument());
     const buttons = screen.getAllByTitle(/sess-/);
