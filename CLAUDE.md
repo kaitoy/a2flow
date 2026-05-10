@@ -34,6 +34,19 @@ Ruff removes unused imports automatically. When adding a new import to a Python 
 
 Colors, typography, spacing, and component styles are defined in [DESIGN.md](DESIGN.md). Consult it whenever adding or modifying UI components.
 
+## Keeping tests in sync
+
+When modifying CSS class names or markup structure of a UI component, update every
+`.test.tsx` that asserts those class names or that structure **in the same task**.
+
+Before marking any frontend UI change done, run:
+
+```bash
+cd frontend && pnpm test --run
+```
+
+All tests must pass. A change is not complete while tests are failing.
+
 ## Keeping README.md up to date
 
 Whenever a change falls into any of the following categories, update [README.md](README.md) to reflect it before considering the change done:
