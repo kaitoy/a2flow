@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { ChatInput } from "./ChatInput";
 import { MessageList } from "./MessageList";
 import { SessionList } from "./SessionList";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Chat({ sessionId: initialSessionId }: { sessionId: string }) {
   const dispatch = useAppDispatch();
@@ -23,7 +24,7 @@ export function Chat({ sessionId: initialSessionId }: { sessionId: string }) {
   } = useChat(initialSessionId);
 
   return (
-    <div className="flex h-screen bg-surface">
+    <div className="flex h-screen overflow-hidden">
       <SessionList
         userId={userId}
         currentSessionId={sessionId}
@@ -33,19 +34,26 @@ export function Chat({ sessionId: initialSessionId }: { sessionId: string }) {
       />
 
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="shrink-0 border-b border-outline-variant px-6 py-3">
-          <h1 className="text-[18px] leading-[28px] font-semibold text-on-surface tracking-[-0.01em]">
-            A2Flow
-          </h1>
+        <header className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-glass-border bg-glass backdrop-blur-xl">
+          <div className="flex items-center gap-3">
+            <span className="inline-block h-2 w-2 rounded-full bg-accent shadow-glow animate-pulse" />
+            <h1 className="text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">
+              A2Flow
+            </h1>
+          </div>
+          <ThemeToggle />
         </header>
 
         {error && (
-          <div className="shrink-0 flex items-center justify-between bg-error-container border-b border-2 border-error px-6 py-2 text-sm text-on-error-container">
-            <span>{error}</span>
+          <div className="shrink-0 mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-error/40 bg-error-container px-4 py-2 text-sm text-on-error-container backdrop-blur-md">
+            <span className="flex items-center gap-2">
+              <span aria-hidden="true">⚠</span>
+              {error}
+            </span>
             <button
               type="button"
               onClick={() => dispatch(clearError())}
-              className="ml-4 text-on-error-container/60 hover:text-on-error-container"
+              className="cursor-pointer rounded-full px-2 leading-none text-on-error-container/70 transition-colors hover:bg-error/15 hover:text-on-error-container"
               aria-label="Dismiss error"
             >
               ✕

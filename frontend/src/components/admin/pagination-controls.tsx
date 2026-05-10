@@ -17,10 +17,10 @@ export function PaginationControls({
 }: PaginationControlsProps) {
   return (
     <div className="mt-4 flex gap-2">
-      <Button variant="ghost" disabled={offset === 0} onClick={onPrev}>
+      <Button variant="secondary" disabled={offset === 0} onClick={onPrev}>
         ← Previous
       </Button>
-      <Button variant="ghost" disabled={count < limit} onClick={onNext}>
+      <Button variant="secondary" disabled={count < limit} onClick={onNext}>
         Next →
       </Button>
     </div>

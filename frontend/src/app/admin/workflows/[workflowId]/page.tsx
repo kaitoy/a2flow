@@ -93,10 +93,15 @@ export default function EditWorkflowPage() {
   }
 
   return (
-    <div className="p-8">
-      <h1 className="mb-6 text-2xl font-semibold text-on-surface">Edit Workflow</h1>
+    <div className="mx-auto max-w-2xl p-8">
+      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
+        Edit Workflow
+      </h1>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-lg flex-col gap-4">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
+      >
         <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
           <Input id="name" {...register("name")} />
         </FormField>

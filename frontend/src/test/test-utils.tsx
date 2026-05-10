@@ -2,6 +2,7 @@ import { configureStore, type Reducer, type UnknownAction } from "@reduxjs/toolk
 import { type RenderOptions, render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { Provider } from "react-redux";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import type { RootState } from "@/store";
 import chatReducer from "@/store/chatSlice";
 
@@ -27,7 +28,11 @@ function renderWithStore(
 ) {
   const testStore = store ?? makeStore(preloadedState);
   function Wrapper({ children }: { children: React.ReactNode }) {
-    return <Provider store={testStore}>{children}</Provider>;
+    return (
+      <ThemeProvider>
+        <Provider store={testStore}>{children}</Provider>
+      </ThemeProvider>
+    );
   }
   return { store: testStore, ...render(ui, { wrapper: Wrapper, ...renderOptions }) };
 }

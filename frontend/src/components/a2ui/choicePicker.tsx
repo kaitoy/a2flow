@@ -33,7 +33,7 @@ export const customChoicePicker = createComponentImplementation(
     return (
       <div className="flex flex-col gap-2 w-full">
         {props.label && (
-          <strong className="text-[12px] leading-[16px] font-bold text-on-surface-variant uppercase tracking-[0.04em]">
+          <strong className="text-[11px] leading-[16px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
             {String(props.label)}
           </strong>
         )}
@@ -43,7 +43,7 @@ export const customChoicePicker = createComponentImplementation(
             placeholder="Filter options..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="rounded border border-outline px-3 py-1.5 text-sm focus:border-primary-container focus:outline-none"
+            className="rounded-xl glass-panel px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
         )}
         <div className={isChips ? "flex flex-row flex-wrap gap-2" : "flex flex-col gap-2"}>
@@ -55,11 +55,12 @@ export const customChoicePicker = createComponentImplementation(
                   type="button"
                   key={String(opt.value)}
                   onClick={() => onToggle(String(opt.value))}
-                  className={
+                  className={[
+                    "cursor-pointer rounded-full px-3.5 py-1.5 text-sm tracking-tight transition-all duration-150",
                     isSelected
-                      ? "px-3 py-1 rounded text-sm bg-primary-container text-on-primary-container border border-primary-container cursor-pointer"
-                      : "px-3 py-1 rounded text-sm bg-surface-container-high text-on-surface border border-outline-variant hover:bg-surface-container cursor-pointer"
-                  }
+                      ? "bg-gradient-to-br from-accent to-secondary text-on-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                      : "glass-panel text-on-surface hover:text-accent",
+                  ].join(" ")}
                 >
                   {String(opt.label)}
                 </button>
@@ -72,7 +73,7 @@ export const customChoicePicker = createComponentImplementation(
                   checked={isSelected}
                   onChange={() => onToggle(String(opt.value))}
                   name={isMutuallyExclusive ? name : undefined}
-                  className="h-4 w-4 accent-primary-container"
+                  className="h-4 w-4 accent-accent"
                 />
                 <span className="text-sm text-on-surface">{String(opt.label)}</span>
               </label>

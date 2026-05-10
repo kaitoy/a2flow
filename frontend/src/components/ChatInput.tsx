@@ -38,24 +38,24 @@ export function ChatInput({ onSend, disabled }: Props) {
   };
 
   return (
-    <div className="border-t border-outline-variant px-4 py-3 bg-surface-container-lowest">
-      <div className="flex items-end gap-2 max-w-3xl mx-auto">
+    <div className="shrink-0 px-4 pb-6 pt-2">
+      <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl glass-panel-strong p-2 shadow-glass-lg">
         <Textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
-          placeholder="Message… (Enter to send, Shift+Enter for newline)"
+          placeholder="Message…  (Enter to send · Shift+Enter for newline)"
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none max-h-40 overflow-y-auto"
+          className="flex-1 resize-none max-h-40 overflow-y-auto !border-transparent !bg-transparent !shadow-none focus:!ring-0"
         />
         <Button
           variant="primary"
           onClick={handleSend}
           disabled={disabled || !value.trim()}
-          className="shrink-0"
+          className="shrink-0 self-end"
         >
           Send
         </Button>

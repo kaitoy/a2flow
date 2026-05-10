@@ -12,11 +12,11 @@ export const customTextField = createComponentImplementation(TextFieldApi, ({ pr
   const hasError = props.validationErrors && props.validationErrors.length > 0;
 
   return (
-    <div className="flex flex-col gap-1 w-full">
+    <div className="flex w-full flex-col gap-1.5">
       {props.label && (
         <label
           htmlFor={id}
-          className="text-[12px] leading-[16px] font-bold text-on-surface-variant uppercase tracking-[0.04em]"
+          className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant"
         >
           {props.label}
         </label>

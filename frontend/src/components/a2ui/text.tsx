@@ -3,14 +3,14 @@ import { TextApi } from "@a2ui/web_core/v0_9/basic_catalog";
 import { useEffect, useState } from "react";
 
 const VARIANT_CLASS: Record<string, string> = {
-  h1: "text-[24px] leading-[32px] font-semibold text-on-surface tracking-[-0.02em] mt-1",
-  h2: "text-[18px] leading-[28px] font-semibold text-on-surface tracking-[-0.01em] mt-1",
-  h3: "text-[14px] leading-[20px] font-semibold text-on-surface tracking-[0.05em]",
+  h1: "text-[24px] leading-[32px] font-semibold tracking-tight text-on-surface mt-1",
+  h2: "text-[18px] leading-[28px] font-semibold tracking-tight text-on-surface mt-1",
+  h3: "text-[14px] leading-[20px] font-semibold tracking-[0.04em] text-on-surface",
   h4: "text-[14px] leading-[22px] font-semibold text-on-surface",
   h5: "text-[13px] leading-[20px] font-semibold text-on-surface",
   body: "text-[14px] leading-[22px] font-normal text-on-surface",
   caption:
-    "text-[12px] leading-[16px] font-bold text-on-surface-variant uppercase tracking-[0.04em]",
+    "text-[11px] leading-[16px] font-bold uppercase tracking-[0.08em] text-on-surface-variant",
 };
 
 export const customText = createComponentImplementation(TextApi, ({ props }) => {

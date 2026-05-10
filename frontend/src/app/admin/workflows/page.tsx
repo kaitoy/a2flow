@@ -51,13 +51,16 @@ function buildColumns(
       header: "Actions",
       cell: (w) => (
         <div className="flex gap-2">
-          <Link href={`/admin/workflows/${w.id}`} className="text-primary hover:underline">
+          <Link
+            href={`/admin/workflows/${w.id}`}
+            className="text-accent transition-colors hover:underline"
+          >
             Edit
           </Link>
           <button
             type="button"
             onClick={() => onDelete(w.id, w.name)}
-            className="text-error hover:underline"
+            className="cursor-pointer text-error transition-colors hover:underline"
           >
             Delete
           </button>
@@ -106,7 +109,7 @@ export default function WorkflowsPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader title="Workflows" addHref="/admin/workflows/new" addLabel="+ Add workflow" />
       <ErrorBanner error={error} />
       <DataTable

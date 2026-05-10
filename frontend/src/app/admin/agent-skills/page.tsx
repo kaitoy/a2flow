@@ -76,13 +76,16 @@ export default function AgentSkillsPage() {
       header: "Actions",
       cell: (skill) => (
         <div className="flex gap-2">
-          <Link href={`/admin/agent-skills/${skill.id}`} className="text-primary hover:underline">
+          <Link
+            href={`/admin/agent-skills/${skill.id}`}
+            className="text-accent transition-colors hover:underline"
+          >
             Edit
           </Link>
           <button
             type="button"
             onClick={() => handleDelete(skill.id, skill.name)}
-            className="text-error hover:underline"
+            className="cursor-pointer text-error transition-colors hover:underline"
           >
             Delete
           </button>
@@ -92,7 +95,7 @@ export default function AgentSkillsPage() {
   ];
 
   return (
-    <div className="p-8">
+    <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader
         title="Agent Skills"
         addHref="/admin/agent-skills/new"

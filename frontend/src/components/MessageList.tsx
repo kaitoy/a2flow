@@ -23,20 +23,30 @@ export function MessageList({
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6">
-      {messages.length === 0 && (
-        <div className="flex items-center justify-center h-full text-on-surface-variant text-sm select-none">
-          Start a conversation
-        </div>
-      )}
-      {messages.map((msg, i) => (
-        <MessageBubble
-          key={msg.id}
-          message={msg}
-          isStreaming={isStreaming && i === messages.length - 1}
-          onAction={onAction}
-        />
-      ))}
-      <div ref={bottomRef} />
+      <div className="mx-auto flex max-w-3xl flex-col">
+        {messages.length === 0 && (
+          <div className="flex h-full flex-col items-center justify-center py-20 text-center select-none">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl glass-panel-strong shadow-glow">
+              <span className="text-2xl">✦</span>
+            </div>
+            <h2 className="mb-1 text-2xl font-semibold tracking-tight text-gradient-accent">
+              Start a conversation
+            </h2>
+            <p className="text-sm text-on-surface-variant">
+              Ask anything, build an A2UI surface, or kick off a workflow.
+            </p>
+          </div>
+        )}
+        {messages.map((msg, i) => (
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            isStreaming={isStreaming && i === messages.length - 1}
+            onAction={onAction}
+          />
+        ))}
+        <div ref={bottomRef} />
+      </div>
     </div>
   );
 }

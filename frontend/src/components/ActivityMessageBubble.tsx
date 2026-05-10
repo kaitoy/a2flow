@@ -13,8 +13,8 @@ export function ActivityMessageBubble({
 }) {
   if (message.activityType !== A2UIActivityType) return null;
   return (
-    <div className="flex justify-start mb-3">
-      <div className="max-w-[85%]">
+    <div className="mb-3 flex justify-start">
+      <div className="max-w-[85%] w-full">
         <A2uiRenderer payload={message.content[A2UI_OPERATIONS_KEY]} onAction={onAction} />
       </div>
     </div>

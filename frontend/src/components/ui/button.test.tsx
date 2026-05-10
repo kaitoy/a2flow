@@ -14,16 +14,15 @@ describe("Button", () => {
     expect(screen.getByRole("button")).toHaveAttribute("type", "button");
   });
 
-  it("primary variant applies primary-container background", () => {
+  it("primary variant applies gradient background", () => {
     render(<Button variant="primary">x</Button>);
-    expect(screen.getByRole("button").className).toContain("bg-primary-container");
+    expect(screen.getByRole("button").className).toContain("from-accent");
   });
 
-  it("secondary variant applies border and uppercase", () => {
+  it("secondary variant applies glass-panel", () => {
     render(<Button variant="secondary">x</Button>);
     const cls = screen.getByRole("button").className;
-    expect(cls).toContain("border-primary");
-    expect(cls).toContain("uppercase");
+    expect(cls).toContain("glass-panel");
   });
 
   it("ghost variant (default) has transparent background", () => {
@@ -55,7 +54,7 @@ describe("Button", () => {
       </Button>
     );
     const cls = screen.getByRole("button").className;
-    expect(cls).toContain("bg-primary-container");
+    expect(cls).toContain("from-accent");
     expect(cls).toContain("w-full");
   });
 });

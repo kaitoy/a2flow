@@ -1,53 +1,59 @@
 ---
 name: A2Flow
+themes: [light, dark]
 colors:
-  surface: '#f8f9ff'
-  surface-dim: '#cbdbf5'
-  surface-bright: '#f8f9ff'
-  surface-container-lowest: '#ffffff'
-  surface-container-low: '#eff4ff'
-  surface-container: '#e5eeff'
-  surface-container-high: '#dce9ff'
-  surface-container-highest: '#d3e4fe'
-  on-surface: '#0b1c30'
-  on-surface-variant: '#3f4948'
-  inverse-surface: '#213145'
-  inverse-on-surface: '#eaf1ff'
-  outline: '#6f7978'
-  outline-variant: '#bfc8c7'
-  surface-tint: '#266866'
-  primary: '#004645'
-  on-primary: '#ffffff'
-  primary-container: '#1a5f5d'
-  on-primary-container: '#97d6d3'
-  inverse-primary: '#92d2cf'
-  secondary: '#006c49'
-  on-secondary: '#ffffff'
-  secondary-container: '#6cf8bb'
-  on-secondary-container: '#00714d'
-  tertiary: '#840010'
-  on-tertiary: '#ffffff'
-  tertiary-container: '#ad0d1c'
-  on-tertiary-container: '#ffbab5'
-  error: '#ba1a1a'
-  on-error: '#ffffff'
-  error-container: '#ffdad6'
-  on-error-container: '#93000a'
-  primary-fixed: '#aeeeeb'
-  primary-fixed-dim: '#92d2cf'
-  on-primary-fixed: '#00201f'
-  on-primary-fixed-variant: '#00504e'
-  secondary-fixed: '#6ffbbe'
-  secondary-fixed-dim: '#4edea3'
-  on-secondary-fixed: '#002113'
-  on-secondary-fixed-variant: '#005236'
-  tertiary-fixed: '#ffdad7'
-  tertiary-fixed-dim: '#ffb3ad'
-  on-tertiary-fixed: '#410004'
-  on-tertiary-fixed-variant: '#930013'
-  background: '#f8f9ff'
-  on-background: '#0b1c30'
-  surface-variant: '#d3e4fe'
+  light:
+    surface: '#f4f7ff'
+    surface-dim: '#d8e2f4'
+    glass: 'rgba(255, 255, 255, 0.55)'
+    glass-strong: 'rgba(255, 255, 255, 0.72)'
+    glass-border: 'rgba(255, 255, 255, 0.65)'
+    glass-highlight: 'rgba(255, 255, 255, 0.85)'
+    on-surface: '#0b1c30'
+    on-surface-variant: '#475569'
+    outline: 'rgba(15, 23, 42, 0.18)'
+    outline-variant: 'rgba(15, 23, 42, 0.10)'
+    primary: '#0e7c7b'
+    on-primary: '#ffffff'
+    primary-container: '#14b8a6'
+    on-primary-container: '#ffffff'
+    secondary: '#6366f1'
+    on-secondary: '#ffffff'
+    accent: '#0e7c7b'
+    accent-soft: 'rgba(20, 184, 166, 0.18)'
+    error: '#dc2626'
+    on-error-container: '#7f1d1d'
+    success: '#10b981'
+    bg-blob-1: 'rgba(94, 234, 212, 0.50)'
+    bg-blob-2: 'rgba(165, 180, 252, 0.55)'
+    bg-blob-3: 'rgba(252, 211, 170, 0.48)'
+    bg-blob-4: 'rgba(186, 230, 253, 0.45)'
+  dark:
+    surface: '#050912'
+    surface-dim: '#0a1224'
+    glass: 'rgba(15, 23, 42, 0.45)'
+    glass-strong: 'rgba(15, 23, 42, 0.65)'
+    glass-border: 'rgba(148, 163, 184, 0.20)'
+    glass-highlight: 'rgba(148, 163, 184, 0.35)'
+    on-surface: '#e2e8f0'
+    on-surface-variant: '#94a3b8'
+    outline: 'rgba(148, 163, 184, 0.28)'
+    outline-variant: 'rgba(148, 163, 184, 0.14)'
+    primary: '#5eead4'
+    on-primary: '#022c22'
+    primary-container: 'rgba(94, 234, 212, 0.18)'
+    on-primary-container: '#99f6e4'
+    secondary: '#a78bfa'
+    on-secondary: '#1e1b4b'
+    accent: '#5eead4'
+    accent-soft: 'rgba(94, 234, 212, 0.18)'
+    error: '#fb7185'
+    on-error-container: '#fecdd3'
+    success: '#34d399'
+    bg-blob-1: 'rgba(45, 212, 191, 0.32)'
+    bg-blob-2: 'rgba(167, 139, 250, 0.32)'
+    bg-blob-3: 'rgba(244, 114, 182, 0.26)'
+    bg-blob-4: 'rgba(56, 189, 248, 0.24)'
 typography:
   h1:
     fontFamily: Inter
@@ -66,7 +72,7 @@ typography:
     fontSize: 14px
     fontWeight: '600'
     lineHeight: 20px
-    letterSpacing: 0.05em
+    letterSpacing: 0.04em
   body-md:
     fontFamily: Inter
     fontSize: 14px
@@ -84,84 +90,97 @@ typography:
     lineHeight: 18px
   label-caps:
     fontFamily: Inter
-    fontSize: 12px
+    fontSize: 11px
     fontWeight: '700'
     lineHeight: 16px
-    letterSpacing: 0.04em
+    letterSpacing: 0.08em
   badge:
     fontFamily: Inter
     fontSize: 11px
     fontWeight: '700'
     lineHeight: 12px
 rounded:
-  sm: 0.125rem
-  DEFAULT: 0.25rem
-  md: 0.375rem
-  lg: 0.5rem
-  xl: 0.75rem
+  sm: 0.375rem
+  DEFAULT: 0.5rem
+  md: 0.5rem
+  lg: 0.75rem
+  xl: 1rem
+  2xl: 1.25rem
   full: 9999px
 spacing:
   container-padding: 2rem
-  sidebar-width: 240px
+  sidebar-width: 256px
   gutter: 1.5rem
-  card-padding: 1.25rem
+  card-padding: 1.5rem
   stack-sm: 0.5rem
   stack-md: 1rem
+glass:
+  blur: 20px
+  blur-strong: 24px
+  saturate: 150%
+  border: 1px solid var(--color-glass-border)
+  inner-highlight: 'inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+  shadow-sm: '0 10px 32px rgba(15, 23, 42, 0.08)'
+  shadow-lg: '0 28px 60px -16px rgba(15, 23, 42, 0.18)'
+  shadow-glow: '0 0 36px rgba(20, 184, 166, 0.32)'
 ---
 
 ## Brand & Style
-The design system is engineered for high-stakes AI automation and enterprise data management. It evokes a sense of **Stability, Precision, and Intelligence**. The visual language is rooted in **Modern Corporate** aesthetics, utilizing a structured information architecture that prioritizes clarity and operational efficiency.
 
-The personality is authoritative yet transparent, ensuring complex backend workflows are presented through a lens of extreme legibility. The aesthetic avoids unnecessary ornamentation, focusing instead on crisp boundaries, intentional whitespace, and a sophisticated color palette that signals a mature SaaS environment.
+A2Flow's interface is engineered for AI-driven workflow automation. The visual language pairs **frosted-glass surfaces** with a vibrant, gently-animated mesh-gradient canvas — evoking **Depth, Clarity, and Forward Motion**.
+
+The personality is futuristic-yet-trustworthy: glassmorphism gives the UI a sense of layered transparency without sacrificing legibility. Bright accent gradients (teal → indigo) signal interactivity and AI presence, while neutral text and high-contrast type keep the experience grounded for power users.
+
+The system supports **light** and **dark** themes via a `data-theme` attribute on `<html>`, with all tokens cascading via CSS variables. The user's preference is persisted in `localStorage` (`a2flow.theme`) and falls back to `prefers-color-scheme`.
 
 ## Colors
-The palette is led by a deep, authoritative teal that anchors the brand in reliability.
 
-- **Primary Teal (#1a5f5d):** Used for primary actions, active sidebar states, and key brand elements.
-- **Success Green (#10b981):** Specifically reserved for 'Completed' status badges and positive performance trends.
-- **Alert Red (#ef4444):** High-visibility indicator for 'Failed' executions and critical system errors.
-- **Cool Grays:** A systematic range of slates and blues are used for text hierarchy, borders, and UI backgrounds to maintain a "cool" professional temperature.
-- **Data Visualization:** Use stepped opacities of the Primary Teal for bar charts to indicate progression or volume without introducing conflicting hues.
+The palette has two roles: a saturated **accent** (teal in light, neon mint in dark) for actions and highlights, and a **glass** family (translucent whites in light, translucent slates in dark) for surfaces.
+
+- **Accent (`--color-accent`)** — Used for primary buttons, links, focus rings, active states, and the streaming caret. Pairs with the secondary indigo/violet for gradient fills (`from-accent to-secondary`).
+- **Glass surfaces** — Three tiers (`glass`, `glass-strong`, plus `glass-highlight` for inner edges). Always rendered with `backdrop-filter: blur(20px) saturate(150%)`.
+- **Background blobs** — Four soft radial gradients painted on `body::before` provide the colored "light" that the glass refracts. Blob colors differ between light and dark to match each theme's mood.
+- **Semantic** — `error`, `success`, `alert` retained for status indication. `error-container` is rendered as translucent red.
 
 ## Typography
-This design system utilizes **Inter** exclusively to ensure maximum readability across dense data tables and technical logs.
 
-- **Hierarchy:** Strong contrast between uppercase section labels and mixed-case body text helps users scan complex pages.
-- **Data Density:** Tight line heights are used for data tables to maximize information visible above the fold, while larger headings provide "breathing room" in dashboard views.
-- **Monospaced Content:** A dedicated mono-type style is used for "Live Execution Logs" to maintain character alignment in technical output.
+**Inter** continues to be the sole typeface. Heading sizes are unchanged from earlier MD3 baselines, but **letter-spacing tightens** (`tracking-tight`) for headings to lean into the futuristic feel. Label-caps now use `0.08em` tracking and 11px size for a sharper, more compressed look.
 
 ## Layout & Spacing
-The layout follows a **Fixed Sidebar + Fluid Content** model. The sidebar remains pinned to the left at 240px, while the main dashboard area expands to fill the viewport.
 
-- **Grid:** A 12-column grid system is used within the content area.
-- **Card Strategy:** Complex data is broken into discrete cards. Key metrics occupy 3 or 4 columns, while the primary "Execution Registry" table spans the full 12-column width.
-- **Rhythm:** An 8px base unit governs all spacing, ensuring consistent vertical rhythm between headers, descriptions, and data visualizations.
+The app keeps the **Fixed Sidebar + Fluid Content** model. Sidebars are 256px wide and rendered as glass panels. Main content panels are centered with a max-width (`max-w-3xl` for chat, `max-w-6xl` for admin lists, `max-w-2xl` for forms) so glass panels feel like floating cards over the gradient canvas.
+
+The 8px base spacing unit is preserved. Padding inside glass cards is 24px (`p-6`).
 
 ## Elevation & Depth
-Depth is achieved through **Low-contrast outlines** and **Tonal layering** rather than aggressive shadows.
 
-- **Level 0 (Background):** The lightest cool gray (#f8fafc) creates a foundation for all elements.
-- **Level 1 (Cards):** Pure white surfaces with a 1px solid border (#e2e8f0) and a very subtle, diffused shadow (y: 1px, blur: 3px, opacity: 0.05).
-- **Level 2 (Active States/Modals):** Increased shadow depth to indicate interactivity or temporary overlay.
-- **Navigation:** The sidebar uses a subtle tonal shift (#f1f5f9) to distinguish it from the workspace without requiring a hard border.
+Depth is achieved through **layered translucency** rather than hard borders or heavy shadows.
+
+- **Layer 0 (Canvas)** — `body::before` paints a fixed mesh of four radial gradients, slowly drifting via `float-slow` keyframes. `body::after` overlays a subtle SVG film-grain to break up banding.
+- **Layer 1 (Glass)** — `.glass-panel`: 55–65% translucent fill, 20px blur + 150% saturate, 1px white-tinted border, soft drop shadow + inner-top highlight.
+- **Layer 2 (Glass-Strong)** — `.glass-panel-strong`: 72% translucent fill, 24px blur, larger drop shadow. Used for floating chat input and admin form cards.
+- **Glow** — Active/hover states emit a 36px accent glow (`shadow-glow`).
 
 ## Shapes
-The shape language is "Soft Professional."
 
-- **Cards & Primary Containers:** Use a 0.25rem (4px) or 0.5rem (8px) radius to maintain a modern feel without appearing overly playful or consumer-grade.
-- **Buttons:** Match the 4px radius for a crisp, technical look.
-- **Status Badges:** Utilize a more rounded "pill" shape (1rem+) to visually separate status indicators from structural UI elements like buttons or cards.
-- **Progress Bars/Charts:** Rounded corners on bar chart tops (2px) soften the data visualization.
+The shape language is **Soft Modern**.
+
+- **Glass panels & cards:** `1.25rem` (20px) radius (`rounded-2xl`).
+- **Buttons & inputs:** `1rem` (16px) radius (`rounded-xl`).
+- **Chips & status badges:** `rounded-full` for pill shapes.
+- **Active sidebar item indicator:** A 3px accent vertical bar on the left edge, with a soft glow.
 
 ## Components
+
 - **Buttons:**
-  - *Primary:* Solid Teal background with white text.
-  - *Secondary:* White background with 1px border and Teal text.
-  - *Ghost:* No border, used for utility actions like "Support" or "Account."
-- **Data Tables:** High-density rows with light border-bottoms. Header rows use `label-caps` typography with a subtle background tint.
-- **Status Badges:** Small, pill-shaped components.
-  - *Success:* Green background, white text.
-  - *Failed:* Red background, white text.
-- **Data Visualizations:** Bar charts should use the Primary Teal at varying opacities (e.g., 40%, 60%, 80%) to show historical data, with 100% teal for the current or most significant data point.
-- **Execution Logs:** A dark-themed container (Deep Charcoal) for code/log output, providing a high-contrast "developer-friendly" zone within the light UI.
-- **Search Bar:** A prominent top-level input with a light gray fill and magnifying glass icon, serving as the primary navigation tool for records.
+  - *Primary:* Gradient fill `from-accent to-secondary`, white text, inner-top highlight + soft accent shadow. Lifts 2px on hover with an accent glow.
+  - *Secondary:* `glass-panel` background, on-surface text, accent text + glow on hover.
+  - *Ghost:* Transparent, on-surface-variant text, mild glass tint on hover.
+- **Inputs / Textareas / Selects:** `glass-panel` background with accent ring on focus (`ring-accent/50`). 16px radius.
+- **Data Tables:** Wrapped in a 20px-radius `glass-panel`. Header uses a slightly stronger glass tint. Rows hover with an `accent-soft` wash.
+- **Status Badges:** Pill-shaped, gradient or glass per state.
+- **Chat bubbles:**
+  - *User:* Accent gradient fill, asymmetric corner (`rounded-tr-md`), inner-top highlight.
+  - *Assistant:* `glass-panel`, asymmetric corner (`rounded-tl-md`), accent-colored streaming caret.
+- **A2UI surfaces:** `customCard` is rendered as `glass-panel-strong`. `customChoicePicker` chips use the same primary-gradient when selected and `glass-panel` when not.
+- **Theme Toggle:** A 36×36 round glass button in the chat header / admin sidebar bottom. Sun/Moon SVG icons; emits accent glow on hover.

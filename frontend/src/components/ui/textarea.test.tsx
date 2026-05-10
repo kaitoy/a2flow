@@ -24,7 +24,7 @@ describe("Textarea", () => {
   it("className prop is applied alongside base classes", () => {
     render(<Textarea className="my-class" />);
     const cls = screen.getByRole("textbox").className;
-    expect(cls).toContain("border-outline");
+    expect(cls).toContain("glass-panel");
     expect(cls).toContain("my-class");
   });
 

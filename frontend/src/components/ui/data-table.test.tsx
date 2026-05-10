@@ -99,17 +99,17 @@ describe("DataTable", () => {
     expect(cell?.className).toContain("truncate");
   });
 
-  it("td always has base px-4 py-2 padding class", () => {
+  it("td always has base px-5 py-3 padding class", () => {
     render(<DataTable columns={COLUMNS} rows={[ROWS[0]]} getRowKey={(r) => r.id} />);
     const cell = screen.getByText("Alpha").closest("td");
-    expect(cell?.className).toContain("px-4");
-    expect(cell?.className).toContain("py-2");
+    expect(cell?.className).toContain("px-5");
+    expect(cell?.className).toContain("py-3");
   });
 
-  it("wrapper div has border-outline-variant class", () => {
+  it("wrapper div has glass-panel class", () => {
     const { container } = render(
       <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} />
     );
-    expect(container.firstChild).toHaveClass("border-outline-variant");
+    expect(container.firstChild).toHaveClass("glass-panel");
   });
 });

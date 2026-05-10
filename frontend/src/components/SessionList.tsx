@@ -35,8 +35,8 @@ export function SessionList({
   }, [userId]);
 
   return (
-    <div className="flex flex-col w-60 shrink-0 border-r border-outline-variant bg-surface-container-low h-full">
-      <div className="shrink-0 px-3 py-3 border-b border-outline-variant">
+    <aside className="relative flex h-full w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl">
+      <div className="shrink-0 px-3 py-4 border-b border-glass-border">
         <Button variant="primary" onClick={onNew} disabled={disabled} className="w-full">
           + New session
         </Button>
@@ -64,20 +64,30 @@ export function SessionList({
               onClick={() => !isActive && onSelect(s.id)}
               disabled={disabled || isActive}
               title={s.id}
-              className={`w-full text-left px-3 py-2 text-xs truncate ${
+              className={[
+                "group relative mx-2 my-0.5 flex w-[calc(100%-1rem)] flex-col gap-0.5 rounded-xl px-3 py-2 text-left text-xs",
+                "transition-all duration-150 disabled:cursor-default",
                 isActive
-                  ? "bg-primary-container text-on-primary-container font-medium"
-                  : "text-on-surface-variant hover:bg-surface-container"
-              } disabled:cursor-default`}
+                  ? "bg-accent-soft text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                  : "text-on-surface-variant hover:bg-glass hover:text-on-surface",
+              ].join(" ")}
             >
-              <span className="block truncate font-mono text-[10px] text-on-surface-variant/60">
+              {isActive && (
+                <span
+                  aria-hidden="true"
+                  className="absolute left-0 top-1/2 h-2/3 w-[3px] -translate-y-1/2 rounded-r-full bg-accent shadow-glow"
+                />
+              )}
+              <span className="block truncate font-mono text-[10px] uppercase tracking-wider opacity-60">
                 {s.id.slice(0, 8)}…
               </span>
-              <span className="block text-on-surface">{label}</span>
+              <span className="block truncate text-[12px] font-medium text-on-surface">
+                {label}
+              </span>
             </button>
           );
         })}
       </div>
-    </div>
+    </aside>
   );
 }

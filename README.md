@@ -2,6 +2,8 @@
 
 A chat application that connects a [Google ADK](https://google.github.io/adk-docs/) agent to a Next.js UI using the [AG-UI protocol](https://docs.ag-ui.com/concepts/events). The agent supports [A2UI](https://a2ui.org/) — it can generate structured UI JSON payloads alongside plain text responses.
 
+The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference.
+
 ```
 ┌──────────────────────────────────┐    AG-UI RunAgentInput (JSON)    ┌──────────────────────┐
 │   Next.js frontend               │  (render_a2ui tool injected by   │  FastAPI backend     │
