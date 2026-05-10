@@ -28,6 +28,8 @@ A `PostToolUse` hook fires after every `Write` or `Edit` tool call and runs the 
 
 Hook scripts live in `scripts/hooks/`. Errors reported by these tools must be fixed before considering a change done.
 
+Ruff removes unused imports automatically. When adding a new import to a Python file, always add the import and the code that uses it in the same `Edit` call. Otherwise the hook will strip the import before the next edit can reference it.
+
 ## Design system
 
 Colors, typography, spacing, and component styles are defined in [DESIGN.md](DESIGN.md). Consult it whenever adding or modifying UI components.
