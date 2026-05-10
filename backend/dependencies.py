@@ -1,8 +1,9 @@
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Annotated
 
 from ag_ui_adk import ADKAgent
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Query
 from google.adk.sessions import BaseSessionService
 from google.adk.sessions.sqlite_session_service import SqliteSessionService
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -17,6 +18,15 @@ from repositories import (
 )
 
 APP_NAME = "A2Flow"
+
+
+@dataclass
+class PaginationParams:
+    limit: int = Query(default=20, ge=1, le=1000)
+    offset: int = Query(default=0, ge=0)
+
+
+PaginationDep = Annotated[PaginationParams, Depends(PaginationParams)]
 
 
 def get_current_user_id(

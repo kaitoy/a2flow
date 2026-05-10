@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from dependencies import AgentSkillRepositoryDep, CurrentUserIdDep
+from dependencies import AgentSkillRepositoryDep, CurrentUserIdDep, PaginationDep
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from repositories.exceptions import NotFoundError, ReferencedError
 
@@ -19,10 +19,9 @@ async def create_agent_skill(
 @router.get("", response_model=list[AgentSkill])
 async def list_agent_skills(
     repo: AgentSkillRepositoryDep,
-    limit: int = 20,
-    offset: int = 0,
+    pagination: PaginationDep,
 ) -> list[AgentSkill]:
-    return await repo.list(limit=limit, offset=offset)
+    return await repo.list(limit=pagination.limit, offset=pagination.offset)
 
 
 @router.get("/{skill_id}", response_model=AgentSkill)

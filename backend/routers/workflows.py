@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from dependencies import CurrentUserIdDep, WorkflowRepositoryDep
+from dependencies import CurrentUserIdDep, PaginationDep, WorkflowRepositoryDep
 from models.workflow import Workflow, WorkflowCreate, WorkflowUpdate
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 
@@ -24,10 +24,9 @@ async def create_workflow(
 @router.get("", response_model=list[Workflow])
 async def list_workflows(
     repo: WorkflowRepositoryDep,
-    limit: int = 20,
-    offset: int = 0,
+    pagination: PaginationDep,
 ) -> list[Workflow]:
-    return await repo.list(limit=limit, offset=offset)
+    return await repo.list(limit=pagination.limit, offset=pagination.offset)
 
 
 @router.get("/{workflow_id}", response_model=Workflow)
