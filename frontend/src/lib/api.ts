@@ -2,6 +2,27 @@ import { type A2UIInlineCatalogSchema, A2UIMiddleware } from "@ag-ui/a2ui-middle
 import { HttpAgent } from "@ag-ui/client";
 import type { Message } from "@ag-ui/core";
 import axios, { type AxiosResponse } from "axios";
+import type {
+  AgentSkillCreate,
+  AgentSkill as AgentSkillModel,
+  AgentSkillUpdate,
+  Session as SessionModel,
+  WorkflowCreate,
+  Workflow as WorkflowModel,
+  WorkflowUpdate,
+} from "@/generated/api/types.gen";
+import {
+  zCreateAgentSkillAgentSkillsPostResponse,
+  zCreateSessionSessionsPostResponse,
+  zCreateWorkflowWorkflowsPostResponse,
+  zGetAgentSkillAgentSkillsSkillIdGetResponse,
+  zGetWorkflowWorkflowsWorkflowIdGetResponse,
+  zListAgentSkillsAgentSkillsGetResponse,
+  zListSessionsSessionsGetResponse,
+  zListWorkflowsWorkflowsGetResponse,
+  zUpdateAgentSkillAgentSkillsSkillIdPatchResponse,
+  zUpdateWorkflowWorkflowsWorkflowIdPatchResponse,
+} from "@/generated/api/zod.gen";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import logger from "./logger";
 
@@ -71,18 +92,22 @@ async function unwrap<T>(p: Promise<AxiosResponse<ApiResponse<T>>>): Promise<T> 
   return env.data as T;
 }
 
-export interface SessionInfo {
-  id: string;
-  userId: string;
-  lastUpdateTime: string;
-}
+type AuditedKeys = "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy";
+type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
+  Required<Pick<T, AuditedKeys>>;
 
-export async function listSessions(userId: string): Promise<SessionInfo[]> {
-  return unwrap(
-    apiClient.get<ApiResponse<SessionInfo[]>>("/sessions", {
+export type AgentSkill = WithAudit<AgentSkillModel>;
+export type Workflow = WithAudit<WorkflowModel>;
+export type Session = SessionModel;
+export type { AgentSkillCreate, AgentSkillUpdate, WorkflowCreate, WorkflowUpdate };
+
+export async function listSessions(userId: string): Promise<Session[]> {
+  const data = await unwrap(
+    apiClient.get<ApiResponse<Session[]>>("/sessions", {
       params: { user_id: userId },
     })
   );
+  return zListSessionsSessionsGetResponse.parse(data) as Session[];
 }
 
 export async function getSessionMessages(sessionId: string, userId: string): Promise<Message[]> {
@@ -94,113 +119,70 @@ export async function getSessionMessages(sessionId: string, userId: string): Pro
 }
 
 export async function createSession(userId: string): Promise<string> {
-  const session = await unwrap(
-    apiClient.post<ApiResponse<{ id: string }>>("/sessions", {
-      user_id: userId,
-    })
-  );
+  const data = await unwrap(apiClient.post<ApiResponse<Session>>("/sessions", { userId }));
+  const session = zCreateSessionSessionsPostResponse.parse(data) as Session;
   logger.info({ sessionId: session.id }, "session created");
   return session.id;
 }
 
-export interface AgentSkill {
-  id: string;
-  name: string;
-  repoUrl: string;
-  repoPath: string;
-  description: string | null;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  updatedBy: string;
-}
-
-export interface AgentSkillCreate {
-  name: string;
-  repo_url: string;
-  repo_path?: string;
-  description?: string | null;
-}
-
-export interface AgentSkillUpdate {
-  name?: string;
-  repo_url?: string;
-  repo_path?: string;
-  description?: string | null;
-}
-
 export async function listAgentSkills(limit = 20, offset = 0): Promise<AgentSkill[]> {
-  return unwrap(
+  const data = await unwrap(
     apiClient.get<ApiResponse<AgentSkill[]>>("/agent-skills", {
       params: { limit, offset },
     })
   );
+  return zListAgentSkillsAgentSkillsGetResponse.parse(data) as AgentSkill[];
 }
 
 export async function getAgentSkill(id: string): Promise<AgentSkill> {
-  return unwrap(apiClient.get<ApiResponse<AgentSkill>>(`/agent-skills/${encodeURIComponent(id)}`));
+  const data = await unwrap(
+    apiClient.get<ApiResponse<AgentSkill>>(`/agent-skills/${encodeURIComponent(id)}`)
+  );
+  return zGetAgentSkillAgentSkillsSkillIdGetResponse.parse(data) as AgentSkill;
 }
 
 export async function createAgentSkill(body: AgentSkillCreate): Promise<AgentSkill> {
-  return unwrap(apiClient.post<ApiResponse<AgentSkill>>("/agent-skills", body));
+  const data = await unwrap(apiClient.post<ApiResponse<AgentSkill>>("/agent-skills", body));
+  return zCreateAgentSkillAgentSkillsPostResponse.parse(data) as AgentSkill;
 }
 
 export async function updateAgentSkill(id: string, body: AgentSkillUpdate): Promise<AgentSkill> {
-  return unwrap(
+  const data = await unwrap(
     apiClient.patch<ApiResponse<AgentSkill>>(`/agent-skills/${encodeURIComponent(id)}`, body)
   );
+  return zUpdateAgentSkillAgentSkillsSkillIdPatchResponse.parse(data) as AgentSkill;
 }
 
 export async function deleteAgentSkill(id: string): Promise<void> {
   await unwrap(apiClient.delete<ApiResponse<null>>(`/agent-skills/${encodeURIComponent(id)}`));
 }
 
-export interface Workflow {
-  id: string;
-  name: string;
-  prompt: string;
-  description: string | null;
-  agentSkillId: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  updatedBy: string;
-}
-
-export interface WorkflowCreate {
-  name: string;
-  prompt: string;
-  description?: string | null;
-  agent_skill_id: string;
-}
-
-export interface WorkflowUpdate {
-  name?: string;
-  prompt?: string;
-  description?: string | null;
-  agent_skill_id?: string;
-}
-
 export async function listWorkflows(limit = 20, offset = 0): Promise<Workflow[]> {
-  return unwrap(
+  const data = await unwrap(
     apiClient.get<ApiResponse<Workflow[]>>("/workflows", {
       params: { limit, offset },
     })
   );
+  return zListWorkflowsWorkflowsGetResponse.parse(data) as Workflow[];
 }
 
 export async function getWorkflow(id: string): Promise<Workflow> {
-  return unwrap(apiClient.get<ApiResponse<Workflow>>(`/workflows/${encodeURIComponent(id)}`));
+  const data = await unwrap(
+    apiClient.get<ApiResponse<Workflow>>(`/workflows/${encodeURIComponent(id)}`)
+  );
+  return zGetWorkflowWorkflowsWorkflowIdGetResponse.parse(data) as Workflow;
 }
 
 export async function createWorkflow(body: WorkflowCreate): Promise<Workflow> {
-  return unwrap(apiClient.post<ApiResponse<Workflow>>("/workflows", body));
+  const data = await unwrap(apiClient.post<ApiResponse<Workflow>>("/workflows", body));
+  return zCreateWorkflowWorkflowsPostResponse.parse(data) as Workflow;
 }
 
 export async function updateWorkflow(id: string, body: WorkflowUpdate): Promise<Workflow> {
-  return unwrap(
+  const data = await unwrap(
     apiClient.patch<ApiResponse<Workflow>>(`/workflows/${encodeURIComponent(id)}`, body)
   );
+  return zUpdateWorkflowWorkflowsWorkflowIdPatchResponse.parse(data) as Workflow;
 }
 
 export async function deleteWorkflow(id: string): Promise<void> {

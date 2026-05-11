@@ -39,8 +39,8 @@ export default function NewAgentSkillPage() {
     try {
       await createAgentSkill({
         name: values.name,
-        repo_url: values.repoUrl,
-        repo_path: values.repoPath || undefined,
+        repoUrl: values.repoUrl,
+        repoPath: values.repoPath || undefined,
         description: values.description || null,
       });
       router.push("/admin/agent-skills");

@@ -3,8 +3,21 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
+import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import EditAgentSkillPage from "./page";
+
+const FULL_SKILL = {
+  id: "skill-1",
+  name: "My Skill",
+  repoUrl: "https://github.com/example/repo",
+  repoPath: "",
+  description: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
 
 function setup() {
   vi.mocked(useParams).mockReturnValue({ skillId: "skill-1" });
@@ -20,7 +33,7 @@ describe("EditAgentSkillPage", () => {
 
   it("submits update api on form submit", async () => {
     setup();
-    const patchSpy = vi.fn(() => HttpResponse.json({ id: "skill-1", name: "My Skill" }));
+    const patchSpy = vi.fn(() => envelope(FULL_SKILL));
     server.use(http.patch("http://localhost:8000/agent-skills/:skillId", patchSpy));
 
     render(<EditAgentSkillPage />);

@@ -6,13 +6,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
-import {
-  type AgentSkill,
-  deleteWorkflow,
-  listAgentSkills,
-  listWorkflows,
-  type Workflow,
-} from "@/lib/api";
+import { deleteWorkflow, listAgentSkills, listWorkflows, type Workflow } from "@/lib/api";
 
 const LIMIT = 20;
 
@@ -86,7 +80,7 @@ export default function WorkflowsPage() {
         listAgentSkills(1000, 0),
       ]);
       setWorkflows(data);
-      setSkillMap(new Map((skills as AgentSkill[]).map((s) => [s.id, s.name])));
+      setSkillMap(new Map(skills.map((s) => [s.id, s.name])));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load workflows");
     } finally {

@@ -46,3 +46,4 @@ tsconfig.tsbuildinfo
 
 # Generated at build time
 frontend/src/generated/
+backend/openapi.yaml

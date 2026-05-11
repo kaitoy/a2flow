@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
+import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import NewAgentSkillPage from "./page";
 
@@ -20,7 +21,20 @@ describe("NewAgentSkillPage", () => {
   it("submits create api on form submit", async () => {
     const user = userEvent.setup();
     const createSpy = vi.fn(() =>
-      HttpResponse.json({ id: "new-id", name: "Test", repo_url: "https://x.com" }, { status: 201 })
+      envelope(
+        {
+          id: "new-id",
+          name: "Test",
+          repoUrl: "https://x.com",
+          repoPath: "",
+          description: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        },
+        201
+      )
     );
     server.use(http.post("http://localhost:8000/agent-skills", createSpy));
 

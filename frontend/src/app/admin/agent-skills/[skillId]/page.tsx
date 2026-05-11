@@ -59,8 +59,8 @@ export default function EditAgentSkillPage() {
     try {
       await updateAgentSkill(skillId, {
         name: values.name,
-        repo_url: values.repoUrl,
-        repo_path: values.repoPath,
+        repoUrl: values.repoUrl,
+        repoPath: values.repoPath,
         description: values.description || null,
       });
       router.push("/admin/agent-skills");

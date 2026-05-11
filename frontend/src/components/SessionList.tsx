@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listSessions, type SessionInfo } from "@/lib/api";
+import { listSessions, type Session } from "@/lib/api";
 import { Button } from "./ui/button";
 
 interface SessionListProps {
@@ -19,7 +19,7 @@ export function SessionList({
   onNew,
   disabled,
 }: SessionListProps) {
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {

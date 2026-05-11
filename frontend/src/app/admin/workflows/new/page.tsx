@@ -50,7 +50,7 @@ export default function NewWorkflowPage() {
       await createWorkflow({
         name: values.name,
         prompt: values.prompt,
-        agent_skill_id: values.agentSkillId,
+        agentSkillId: values.agentSkillId,
         description: values.description || null,
       });
       router.push("/admin/workflows");

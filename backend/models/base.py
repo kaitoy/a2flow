@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 import uuid_utils
+from pydantic import field_serializer
 from pydantic.alias_generators import to_camel
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
@@ -24,3 +25,9 @@ class BaseEntity(SQLModel):
     )
     created_by: str = Field(default="")
     updated_by: str = Field(default="")
+
+    @field_serializer("created_at", "updated_at", when_used="json")
+    def _serialize_audit_datetime(self, dt: datetime) -> str:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")

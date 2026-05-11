@@ -25,7 +25,16 @@ export const handlers = [
 
   http.get(`${BASE}/sessions/:sessionId/messages`, () => envelope([])),
 
-  http.post(`${BASE}/sessions`, () => envelope({ id: "new-session-id" }, 201)),
+  http.post(`${BASE}/sessions`, () =>
+    envelope(
+      {
+        id: "new-session-id",
+        userId: "user",
+        lastUpdateTime: "2026-05-10T12:00:00.000Z",
+      },
+      201
+    )
+  ),
 
   http.get(`${BASE}/agent-skills`, () => envelope([SKILL_1])),
 

@@ -60,11 +60,14 @@ describe("createSession", () => {
     server.use(
       http.post(`${BASE}/sessions`, async ({ request }) => {
         body = await request.json();
-        return envelope({ id: "x" }, 201);
+        return envelope(
+          { id: "x", userId: "test-user", lastUpdateTime: "2026-05-10T00:00:00.000Z" },
+          201
+        );
       })
     );
     await createSession("test-user");
-    expect(body).toEqual({ user_id: "test-user" });
+    expect(body).toEqual({ userId: "test-user" });
   });
 
   it("throws on 400", async () => {

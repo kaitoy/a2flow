@@ -90,6 +90,26 @@ Each workflow record stores a name, prompt (instructions for the agent), a refer
 6. When the LLM calls `render_a2ui`, `useChat` captures the tool call ID via `onToolCallEndEvent` and stores it in a ref. When the user triggers an action on the rendered surface (e.g. clicking a `Button`), `sendA2uiAction` sends a tool result message for that `render_a2ui` call — with the action description as the content — directly to `POST /agent`. This lets the backend match the result against the pending `render_a2ui` tool call and forward it to the LLM, which then responds to the user's action. `forwardedProps.a2uiAction` / `A2UIMiddleware.processUserAction` is not used.
 7. Session state is preserved in memory on the backend; `threadId` is used directly as the ADK session ID (`use_thread_id_as_session_id=True`), so reusing the same `threadId` continues the conversation efficiently.
 
+## API contract (OpenAPI → Zod)
+
+The REST endpoints are described by the FastAPI app and exported as OpenAPI 3.1. The frontend consumes that spec to generate Zod schemas and TypeScript types, which are then used for runtime response validation.
+
+```
+backend/main.py (FastAPI app)
+   │
+   │  uv run python -m scripts.export_openapi
+   ▼
+backend/openapi.yaml ◄─── gitignored (regenerated locally / in CI)
+   │
+   │  pnpm generate:api  (frontend)
+   ▼
+frontend/src/generated/api/{types.gen.ts, zod.gen.ts}  ◄─── gitignored
+```
+
+The AG-UI streaming endpoint (`POST /agent`) is marked `include_in_schema=False` and is intentionally excluded from the spec — its events are typed by `@ag-ui/core`. The `{meta, data, error}` response envelope is applied by middleware and is not part of the spec; the frontend's `unwrap()` helper handles it, and the generated Zod schemas validate the inner `data` payload.
+
+`pnpm generate:api` (frontend) runs the backend export step via `uv` first, then the Zod codegen — so a single command keeps both layers in sync. The frontend's `predev` and `prebuild` hooks invoke it automatically, so `pnpm dev` and `pnpm build` regenerate the spec and schemas on every run. `uv` must be available on `PATH`.
+
 ## LLM configuration
 
 Set `LLM_MODEL` in `backend/.env`:

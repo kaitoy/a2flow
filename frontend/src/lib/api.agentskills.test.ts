@@ -42,14 +42,14 @@ describe("createAgentSkill", () => {
   it("returns created skill with id", async () => {
     const skill = await createAgentSkill({
       name: "My Skill",
-      repo_url: "https://github.com/example/repo",
+      repoUrl: "https://github.com/example/repo",
     });
     expect(skill.id).toBe("new-skill-id");
   });
 
   it("throws on 422", async () => {
     server.use(http.post(`${BASE}/agent-skills`, () => new HttpResponse(null, { status: 422 })));
-    await expect(createAgentSkill({ name: "", repo_url: "" })).rejects.toThrow("422");
+    await expect(createAgentSkill({ name: "", repoUrl: "" })).rejects.toThrow("422");
   });
 });
 

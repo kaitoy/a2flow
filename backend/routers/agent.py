@@ -10,7 +10,7 @@ from dependencies import ADKAgentDep
 router = APIRouter()
 
 
-@router.post("/agent")
+@router.post("/agent", include_in_schema=False)
 async def agent_endpoint(
     input_data: RunAgentInput,
     request: Request,
