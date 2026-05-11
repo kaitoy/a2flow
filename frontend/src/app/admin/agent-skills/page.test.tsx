@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -50,13 +50,14 @@ describe("AgentSkillsPage", () => {
 
   it("calls delete api after confirm", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/agent-skills/:id", deleteSpy));
 
     render(<AgentSkillsPage />);
     await waitFor(() => screen.getByText("My Skill"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /delete/i }));
     expect(deleteSpy).toHaveBeenCalled();
   });
 });

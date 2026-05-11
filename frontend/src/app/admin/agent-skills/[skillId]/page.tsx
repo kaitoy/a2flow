@@ -8,6 +8,7 @@ import { z } from "zod";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteAgentSkill, getAgentSkill, updateAgentSkill } from "@/lib/api";
@@ -26,6 +27,7 @@ export default function EditAgentSkillPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const {
     register,
@@ -70,8 +72,12 @@ export default function EditAgentSkillPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!window.confirm(`Delete "${getValues("name")}"?`)) return;
+  function handleDelete() {
+    setConfirmOpen(true);
+  }
+
+  async function executeDelete() {
+    setConfirmOpen(false);
     try {
       await deleteAgentSkill(skillId);
       router.push("/admin/agent-skills");
@@ -129,6 +135,13 @@ export default function EditAgentSkillPage() {
           </Button>
         </div>
       </form>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete Agent Skill"
+        description={`Delete "${getValues("name")}"?`}
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

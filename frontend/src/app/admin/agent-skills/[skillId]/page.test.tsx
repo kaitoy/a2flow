@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { useParams, useRouter } from "next/navigation";
@@ -73,13 +73,14 @@ describe("EditAgentSkillPage", () => {
       refresh: vi.fn(),
       forward: vi.fn(),
     });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const deleteSpy = vi.fn(() => new HttpResponse(null, { status: 204 }));
     server.use(http.delete("http://localhost:8000/agent-skills/:skillId", deleteSpy));
 
     render(<EditAgentSkillPage />);
     await waitFor(() => screen.getByDisplayValue("My Skill"));
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
+    const dialog = screen.getByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /delete/i }));
 
     await waitFor(() => expect(deleteSpy).toHaveBeenCalled());
     expect(pushMock).toHaveBeenCalledWith("/admin/agent-skills");

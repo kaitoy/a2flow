@@ -8,6 +8,7 @@ import { z } from "zod";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,6 +35,7 @@ export default function EditWorkflowPage() {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [skills, setSkills] = useState<AgentSkill[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const {
     register,
@@ -79,8 +81,12 @@ export default function EditWorkflowPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!window.confirm(`Delete "${getValues("name")}"?`)) return;
+  function handleDelete() {
+    setConfirmOpen(true);
+  }
+
+  async function executeDelete() {
+    setConfirmOpen(false);
     try {
       await deleteWorkflow(workflowId);
       router.push("/admin/workflows");
@@ -150,6 +156,13 @@ export default function EditWorkflowPage() {
           </Button>
         </div>
       </form>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete Workflow"
+        description={`Delete "${getValues("name")}"?`}
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

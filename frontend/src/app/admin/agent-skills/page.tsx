@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { type AgentSkill, deleteAgentSkill, listAgentSkills } from "@/lib/api";
 
@@ -42,6 +43,7 @@ export default function AgentSkillsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,13 +62,19 @@ export default function AgentSkillsPage() {
     load();
   }, [load]);
 
-  async function handleDelete(id: string, name: string) {
-    if (!window.confirm(`Delete "${name}"?`)) return;
+  function handleDelete(id: string, name: string) {
+    setConfirmTarget({ id, name });
+  }
+
+  async function executeDelete() {
+    if (!confirmTarget) return;
     try {
-      await deleteAgentSkill(id);
+      await deleteAgentSkill(confirmTarget.id);
+      setConfirmTarget(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete agent skill");
+      setConfirmTarget(null);
     }
   }
 
@@ -115,6 +123,13 @@ export default function AgentSkillsPage() {
         count={skills.length}
         onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
         onNext={() => setOffset((o) => o + LIMIT)}
+      />
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        title="Delete Agent Skill"
+        description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmTarget(null)}
       />
     </div>
   );
