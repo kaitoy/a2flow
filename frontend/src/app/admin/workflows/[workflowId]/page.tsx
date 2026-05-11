@@ -43,6 +43,7 @@ export default function EditWorkflowPage() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
+    mode: "onBlur",
     defaultValues: { name: "", prompt: "", agentSkillId: "", description: "" },
   });
 

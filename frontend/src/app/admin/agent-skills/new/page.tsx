@@ -31,6 +31,7 @@ export default function NewAgentSkillPage() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
+    mode: "onBlur",
     defaultValues: { name: "", repoUrl: "", repoPath: "", description: "" },
   });
 

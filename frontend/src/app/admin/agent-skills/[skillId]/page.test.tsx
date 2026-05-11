@@ -85,6 +85,17 @@ describe("EditAgentSkillPage", () => {
     expect(pushMock).toHaveBeenCalledWith("/admin/agent-skills");
   });
 
+  it("shows validation error on blur when required field is cleared", async () => {
+    setup();
+    const user = userEvent.setup();
+    render(<EditAgentSkillPage />);
+    await waitFor(() => screen.getByDisplayValue("My Skill"));
+    const nameInput = screen.getByLabelText(/name/i);
+    await user.clear(nameInput);
+    await user.tab();
+    await waitFor(() => expect(screen.getByText(/name is required/i)).toBeInTheDocument());
+  });
+
   it("shows error on load failure", async () => {
     setup();
     server.use(

@@ -66,6 +66,24 @@ describe("NewAgentSkillPage", () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/agent-skills"));
   });
 
+  it("shows validation error on blur when required field is empty", async () => {
+    const user = userEvent.setup();
+    render(<NewAgentSkillPage />);
+    const nameInput = screen.getByLabelText(/name/i);
+    await user.click(nameInput);
+    await user.tab();
+    await waitFor(() => expect(screen.getByText(/name is required/i)).toBeInTheDocument());
+  });
+
+  it("shows validation error on blur when repo url is invalid", async () => {
+    const user = userEvent.setup();
+    render(<NewAgentSkillPage />);
+    const repoUrlInput = screen.getByLabelText(/repo url/i);
+    await user.type(repoUrlInput, "not-a-url");
+    await user.tab();
+    await waitFor(() => expect(screen.getByText(/must be a valid url/i)).toBeInTheDocument());
+  });
+
   it("shows error on api failure", async () => {
     const user = userEvent.setup();
     server.use(
