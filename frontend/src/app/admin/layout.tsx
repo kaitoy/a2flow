@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import logo from "@/../assets/logo.png";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV = [
@@ -16,9 +18,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex h-screen overflow-hidden">
       <nav className="relative flex w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl">
         <div className="flex items-center gap-3 border-b border-glass-border px-5 py-4">
-          <span className="inline-block h-2 w-2 rounded-full bg-accent shadow-glow" />
-          <span className="text-sm font-semibold tracking-tight text-gradient-accent">
-            A2Flow Admin
+          <Image
+            src={logo}
+            alt="A2Flow logo"
+            width={logo.width}
+            height={logo.height}
+            className="h-9 w-auto"
+            priority
+          />
+          <span
+            className="text-base font-semibold tracking-tight text-gradient-accent"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
+          >
+            A2Flow
           </span>
         </div>
         <ul className="flex flex-col gap-1 px-3 py-3">

@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Space_Grotesk } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { StoreProvider } from "@/store/provider";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+  weight: ["400", "500", "600", "700"],
+});
 
 export const metadata: Metadata = {
   title: "A2Flow",
@@ -24,7 +29,7 @@ const NO_FLASH_SCRIPT = `(() => {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={spaceGrotesk.variable}>
       <head>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline script for FOUC prevention */}
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }} />

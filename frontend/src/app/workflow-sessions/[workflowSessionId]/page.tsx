@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import logo from "@/../assets/logo.png";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -23,6 +25,14 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
       <div className="flex flex-col flex-1 min-w-0">
         <header className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-glass-border bg-glass backdrop-blur-xl">
           <div className="flex items-center gap-3">
+            <Image
+              src={logo}
+              alt="A2Flow logo"
+              width={logo.width}
+              height={logo.height}
+              className="h-10 w-auto"
+              priority
+            />
             <span className="inline-block h-2 w-2 rounded-full bg-accent shadow-glow animate-pulse" />
             <h1 className="text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">
               {ws.workflowName}
