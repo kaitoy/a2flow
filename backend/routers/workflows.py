@@ -1,7 +1,17 @@
+import uuid
+
 from fastapi import APIRouter
 
-from dependencies import CurrentUserIdDep, PaginationDep, WorkflowRepositoryDep
+from dependencies import (
+    AgentSkillRepositoryDep,
+    CurrentUserIdDep,
+    PaginationDep,
+    SkillManagerDep,
+    WorkflowRepositoryDep,
+    WorkflowSessionRepositoryDep,
+)
 from models.workflow import Workflow, WorkflowCreate, WorkflowUpdate
+from models.workflow_session import WorkflowSession, WorkflowSessionCreate
 from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
@@ -45,3 +55,39 @@ async def update_workflow(
 @router.delete("/{workflow_id}")
 async def delete_workflow(workflow_id: str, repo: WorkflowRepositoryDep) -> None:
     await repo.delete(workflow_id)
+
+
+@router.post("/{workflow_id}/execute", response_model=WorkflowSession, status_code=201)
+async def execute_workflow(
+    workflow_id: str,
+    workflows: WorkflowRepositoryDep,
+    skills: AgentSkillRepositoryDep,
+    skill_manager: SkillManagerDep,
+    ws_repo: WorkflowSessionRepositoryDep,
+    user_id: CurrentUserIdDep,
+) -> WorkflowSession:
+    """Create a WorkflowSession; the ADK session is created lazily on first agent call."""
+    workflow = await workflows.get(workflow_id)
+    if workflow is None:
+        raise NotFoundError("Workflow", workflow_id)
+    skill = await skills.get(workflow.agent_skill_id)
+    if skill is None:
+        raise NotFoundError("AgentSkill", workflow.agent_skill_id)
+
+    skill_dir = await skill_manager.ensure_cloned(skill)
+    user = user_id or "user"
+    session_id = str(uuid.uuid4())
+
+    ws_create = WorkflowSessionCreate(
+        session_id=session_id,
+        workflow_name=workflow.name,
+        workflow_prompt=workflow.prompt,
+        workflow_description=workflow.description,
+        agent_skill_id=skill.id,
+        agent_skill_name=skill.name,
+        agent_skill_repo_url=skill.repo_url,
+        agent_skill_repo_path=skill.repo_path,
+        skill_dir=str(skill_dir),
+        user_id=user,
+    )
+    return await ws_repo.create(ws_create, workflow_id=workflow.id, user_id=user)

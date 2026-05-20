@@ -24,7 +24,7 @@ from repositories.exceptions import (
     NotFoundError,
     ReferencedError,
 )
-from routers import agent, agent_skills, health, sessions, workflows
+from routers import agent, agent_skills, health, sessions, workflow_sessions, workflows
 
 load_dotenv()
 
@@ -64,6 +64,7 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 app.include_router(agent.router)
 app.include_router(agent_skills.router)
 app.include_router(sessions.router)
+app.include_router(workflow_sessions.router)
 app.include_router(workflows.router)
 app.include_router(health.router)
 

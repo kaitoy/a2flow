@@ -77,8 +77,22 @@ Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/
 | List all workflows | `GET /admin/workflows` |
 | Create a new workflow | `GET /admin/workflows/new` |
 | Edit / delete a workflow | `GET /admin/workflows/{id}` |
+| Run a workflow | "Run" button in the list (calls `POST /workflows/{id}/execute`) |
 
 Each workflow record stores a name, prompt (instructions for the agent), a reference to an Agent Skill, and an optional description. Workflows are also persisted in `a2flow.db`.
+
+#### Running a workflow
+
+Clicking **Run** on a workflow creates a **WorkflowSession** — an independent entity that captures a snapshot of the workflow configuration at execution time:
+
+1. The backend shallow-clones the linked Agent Skill's repository into `backend/.skills_cache/<agent_skill_id>/` (only on first run) using [Dulwich](https://www.dulwich.io/) — no external `git` CLI required.
+2. A new ADK session is created with the skill binding stored in its state. A `WorkflowSession` record is persisted to the database, capturing the workflow name, prompt, skill details, and the ADK session ID.
+3. The backend returns the `WorkflowSession` (HTTP 201). The frontend redirects to `/workflow-sessions/{workflowSession.id}`.
+4. On mount, the `/workflow-sessions/{id}` page fetches the `WorkflowSession`, and if no prior messages exist for the session, it automatically sends `workflow.prompt` as the first user message via `POST /workflow-sessions/{id}/agent`.
+5. The `/workflow-sessions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id`) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under a workflow-specific instruction: *"use the provided skill to produce an actionable task list for the user's request"*.
+6. Subsequent user messages continue to flow through `POST /workflow-sessions/{id}/agent`, so A2UI rendering and the full chat experience work normally.
+
+Workflow sessions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowSession` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains).
 
 ## How it works
 

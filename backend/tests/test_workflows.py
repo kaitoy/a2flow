@@ -1,53 +1,10 @@
-from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel
-from sqlmodel.ext.asyncio.session import AsyncSession
+from httpx import AsyncClient
 
 from tests._envelope import assert_err, assert_ok
-
-
-@pytest_asyncio.fixture()
-async def workflow_client(
-    mock_adk_agent: MagicMock,
-) -> AsyncGenerator[AsyncClient, None]:
-    from database import get_session
-    from dependencies import get_adk_agent
-    from main import app
-    from models.agent_skill import (
-        AgentSkill as _AgentSkill,  # noqa: F401 — registers model
-    )
-    from models.workflow import Workflow as _Workflow  # noqa: F401 — registers model
-
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-
-    async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
-        async with AsyncSession(mem_engine) as session:
-            yield session
-
-    app.dependency_overrides[get_session] = override_get_session
-    app.dependency_overrides[get_adk_agent] = lambda: mock_adk_agent
-    try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
-            yield ac
-    finally:
-        app.dependency_overrides.clear()
-        await mem_engine.dispose()
-
 
 _SKILL_BODY = {"name": "Skill A", "repo_url": "https://github.com/x/y"}
 _WF_BODY = {"name": "My Workflow", "prompt": "Do the thing"}
@@ -323,3 +280,70 @@ async def test_update_workflow_preserves_created_by_and_overwrites_updated_by(
     body = assert_ok(response)
     assert body["createdBy"] == "alice"
     assert body["updatedBy"] == "bob"
+
+
+# ---------- execute ----------
+
+
+async def test_execute_workflow_returns_201_with_workflow_session(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    wf = await _create_workflow(workflow_client, skill["id"])
+    response = await workflow_client.post(f"/workflows/{wf['id']}/execute")
+    body = assert_ok(response, status=201)
+    assert "id" in body
+    assert "sessionId" in body
+    assert body["workflowName"] == "My Workflow"
+
+
+async def test_execute_workflow_unknown_id_returns_404(
+    workflow_client: AsyncClient,
+) -> None:
+    response = await workflow_client.post("/workflows/nonexistent/execute")
+    assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_execute_workflow_clones_skill_repo(
+    workflow_client: AsyncClient,
+    mock_skill_manager: MagicMock,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    wf = await _create_workflow(workflow_client, skill["id"])
+
+    captured_ids: list[str] = []
+
+    async def _capture(s: Any) -> Any:
+        captured_ids.append(s.id)
+        return Path("/tmp/skill")
+
+    mock_skill_manager.ensure_cloned.side_effect = _capture
+
+    await workflow_client.post(f"/workflows/{wf['id']}/execute")
+    mock_skill_manager.ensure_cloned.assert_awaited_once()
+    assert captured_ids[0] == skill["id"]
+
+
+async def test_execute_workflow_snapshot_contains_skill_info(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    wf = await _create_workflow(workflow_client, skill["id"])
+    response = await workflow_client.post(f"/workflows/{wf['id']}/execute")
+    body = assert_ok(response, status=201)
+    assert body["agentSkillId"] == skill["id"]
+    assert body["agentSkillName"] == skill["name"]
+    assert body["workflowPrompt"] == _WF_BODY["prompt"]
+
+
+async def test_execute_workflow_uses_user_header(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    wf = await _create_workflow(workflow_client, skill["id"])
+    response = await workflow_client.post(
+        f"/workflows/{wf['id']}/execute",
+        headers={"X-User-Id": "alice"},
+    )
+    body = assert_ok(response, status=201)
+    assert body["userId"] == "alice"

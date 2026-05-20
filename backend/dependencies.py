@@ -1,21 +1,25 @@
+import os
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
-from ag_ui_adk import ADKAgent
 from fastapi import Depends, Header, Query
 from google.adk.sessions import BaseSessionService
-from google.adk.sessions.sqlite_session_service import SqliteSessionService
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from agent import create_agent
+from agent import AgentRegistry
 from database import DB_URL, get_session
 from repositories import (
     AgentSkillRepository,
     SqlAgentSkillRepository,
     SqlWorkflowRepository,
+    SqlWorkflowSessionRepository,
     WorkflowRepository,
+    WorkflowSessionRepository,
 )
+from services import SkillManager
+from session_service import StaleTolerantSqliteSessionService
 
 APP_NAME = "A2Flow"
 
@@ -40,23 +44,31 @@ CurrentUserIdDep = Annotated[str, Depends(get_current_user_id)]
 
 @lru_cache(maxsize=1)
 def get_session_service() -> BaseSessionService:
-    return SqliteSessionService(DB_URL)
+    return StaleTolerantSqliteSessionService(DB_URL)
 
 
 @lru_cache(maxsize=1)
-def get_adk_agent() -> ADKAgent:
-    return ADKAgent(
-        adk_agent=create_agent(),
-        app_name=APP_NAME,
-        user_id_extractor=lambda input: input.forwarded_props.get("userId", "user"),
+def get_agent_registry() -> AgentRegistry:
+    return AgentRegistry(
         session_service=get_session_service(),
-        use_thread_id_as_session_id=True,
-        emit_messages_snapshot=True,
+        app_name=APP_NAME,
     )
 
 
+@lru_cache(maxsize=1)
+def get_skill_manager() -> SkillManager:
+    cache_dir = Path(
+        os.getenv(
+            "SKILLS_CACHE_DIR",
+            str(Path(__file__).parent / ".skills_cache"),
+        )
+    )
+    return SkillManager(cache_dir=cache_dir)
+
+
 SessionServiceDep = Annotated[BaseSessionService, Depends(get_session_service)]
-ADKAgentDep = Annotated[ADKAgent, Depends(get_adk_agent)]
+AgentRegistryDep = Annotated[AgentRegistry, Depends(get_agent_registry)]
+SkillManagerDep = Annotated[SkillManager, Depends(get_skill_manager)]
 DBSessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
@@ -77,3 +89,12 @@ def get_workflow_repository(
 
 
 WorkflowRepositoryDep = Annotated[WorkflowRepository, Depends(get_workflow_repository)]
+
+
+def get_workflow_session_repository(db: DBSessionDep) -> WorkflowSessionRepository:
+    return SqlWorkflowSessionRepository(db)
+
+
+WorkflowSessionRepositoryDep = Annotated[
+    WorkflowSessionRepository, Depends(get_workflow_session_repository)
+]

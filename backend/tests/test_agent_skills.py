@@ -12,10 +12,10 @@ from tests._envelope import assert_err, assert_ok
 
 @pytest_asyncio.fixture()
 async def skill_client(
-    mock_adk_agent: MagicMock,
+    mock_agent_registry: MagicMock,
 ) -> AsyncGenerator[AsyncClient, None]:
     from database import get_session
-    from dependencies import get_adk_agent
+    from dependencies import get_agent_registry
     from main import app
     from models.agent_skill import (
         AgentSkill as _AgentSkill,  # noqa: F401 — registers model
@@ -30,7 +30,7 @@ async def skill_client(
             yield session
 
     app.dependency_overrides[get_session] = override_get_session
-    app.dependency_overrides[get_adk_agent] = lambda: mock_adk_agent
+    app.dependency_overrides[get_agent_registry] = lambda: mock_agent_registry
     try:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"

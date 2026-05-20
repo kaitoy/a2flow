@@ -29,6 +29,9 @@ Thumbs.db
 *.db-shm
 *.db-wal
 
+# Skill repos cloned at runtime
+backend/.skills_cache/
+
 # Next.js
 frontend/.next/
 frontend/out/

@@ -35,14 +35,16 @@ def _async_gen_factory(
 
 @pytest_asyncio.fixture()
 async def agent_client() -> AsyncGenerator[tuple[AsyncClient, MagicMock], None]:
-    from dependencies import get_adk_agent, get_session_service
+    from dependencies import get_agent_registry, get_session_service
     from main import app
 
     mock_agent = MagicMock()
     mock_agent.run = _async_gen_factory([])
+    mock_registry = MagicMock()
+    mock_registry.get.return_value = mock_agent
 
     app.dependency_overrides[get_session_service] = lambda: InMemorySessionService()  # type: ignore[no-untyped-call]
-    app.dependency_overrides[get_adk_agent] = lambda: mock_agent
+    app.dependency_overrides[get_agent_registry] = lambda: mock_registry
     try:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
@@ -165,3 +167,67 @@ async def test_agent_endpoint_invalid_body_returns_422(
     client, _ = agent_client
     response = await client.post("/agent", json={"garbage": True})
     assert response.status_code == 422
+
+
+def test_create_agent_without_skill_has_only_agui_toolset() -> None:
+    from ag_ui_adk import AGUIToolset
+
+    from agent import create_agent
+
+    agent = create_agent()
+    assert any(isinstance(t, AGUIToolset) for t in agent.tools)
+    assert len(agent.tools) == 1
+
+
+def test_create_agent_with_skill_dir_loads_skill_toolset(tmp_path: Any) -> None:
+    from ag_ui_adk import AGUIToolset
+    from google.adk.tools.skill_toolset import SkillToolset
+
+    from agent import create_agent
+
+    skill_dir = tmp_path / "test-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: test-skill\ndescription: A test skill\n---\n\nTest instructions.\n",
+        encoding="utf-8",
+    )
+
+    agent = create_agent(skill_dir=skill_dir)
+    assert any(isinstance(t, AGUIToolset) for t in agent.tools)
+    assert any(isinstance(t, SkillToolset) for t in agent.tools)
+
+
+def test_agent_registry_caches_by_skill_id() -> None:
+    from google.adk.sessions import InMemorySessionService
+
+    from agent import AgentRegistry
+
+    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    registry = AgentRegistry(session_service=service, app_name="A2Flow")
+    first = registry.get(None, None)
+    second = registry.get(None, None)
+    assert first is second
+
+
+def test_create_agent_with_skill_uses_workflow_instruction(tmp_path: Any) -> None:
+    from unittest.mock import MagicMock
+
+    from agent import A2UIInstructionProvider, create_agent
+
+    skill_dir = tmp_path / "test-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: test-skill\ndescription: A test skill\n---\n\nTest instructions.\n",
+        encoding="utf-8",
+    )
+
+    agent = create_agent(skill_dir=skill_dir)
+    provider = agent.instruction
+    assert isinstance(provider, A2UIInstructionProvider)
+
+    ctx = MagicMock()
+    ctx.state.get.return_value = []
+    rendered = provider(ctx)
+    assert "task list" in rendered.lower()
+    assert "A2UI Rules" in rendered
+    assert "render_a2ui" in rendered

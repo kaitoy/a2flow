@@ -101,6 +101,25 @@ export type Workflow = WithAudit<WorkflowModel>;
 export type Session = SessionModel;
 export type { AgentSkillCreate, AgentSkillUpdate, WorkflowCreate, WorkflowUpdate };
 
+export interface WorkflowSession {
+  id: string;
+  sessionId: string;
+  workflowId: string | null;
+  workflowName: string;
+  workflowPrompt: string;
+  workflowDescription: string | null;
+  agentSkillId: string;
+  agentSkillName: string;
+  agentSkillRepoUrl: string;
+  agentSkillRepoPath: string;
+  skillDir: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+}
+
 export async function listSessions(userId: string): Promise<Session[]> {
   const data = await unwrap(
     apiClient.get<ApiResponse<Session[]>>("/sessions", {
@@ -189,9 +208,43 @@ export async function deleteWorkflow(id: string): Promise<void> {
   await unwrap(apiClient.delete<ApiResponse<null>>(`/workflows/${encodeURIComponent(id)}`));
 }
 
+export async function executeWorkflow(id: string): Promise<WorkflowSession> {
+  const data = await unwrap(
+    apiClient.post<ApiResponse<WorkflowSession>>(`/workflows/${encodeURIComponent(id)}/execute`)
+  );
+  logger.info(
+    { workflowSessionId: (data as WorkflowSession).id, workflowId: id },
+    "workflow executed"
+  );
+  return data as WorkflowSession;
+}
+
+export async function getWorkflowSession(id: string): Promise<WorkflowSession> {
+  return unwrap(
+    apiClient.get<ApiResponse<WorkflowSession>>(`/workflow-sessions/${encodeURIComponent(id)}`)
+  );
+}
+
 export function createChatAgent(sessionId: string): HttpAgent {
   const agent = new HttpAgent({
     url: `${API_BASE}/agent`,
+    threadId: sessionId,
+  });
+  agent.use(
+    new A2UIMiddleware({
+      injectA2UITool: true,
+      schema: basicCatalogJson as unknown as A2UIInlineCatalogSchema,
+    })
+  );
+  return agent;
+}
+
+export function createWorkflowSessionAgent(
+  workflowSessionId: string,
+  sessionId: string
+): HttpAgent {
+  const agent = new HttpAgent({
+    url: `${API_BASE}/workflow-sessions/${encodeURIComponent(workflowSessionId)}/agent`,
     threadId: sessionId,
   });
   agent.use(

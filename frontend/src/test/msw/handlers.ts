@@ -15,6 +15,18 @@ const SKILL_1 = {
   updatedBy: "",
 };
 
+const WORKFLOW_1 = {
+  id: "wf-1",
+  name: "My Workflow",
+  prompt: "Do the thing",
+  description: null,
+  agentSkillId: "skill-1",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 export const handlers = [
   http.get(`${BASE}/sessions`, () =>
     envelope([
@@ -45,4 +57,59 @@ export const handlers = [
   http.patch(`${BASE}/agent-skills/:skillId`, () => envelope(SKILL_1)),
 
   http.delete(`${BASE}/agent-skills/:skillId`, () => envelope(null)),
+
+  http.get(`${BASE}/workflows`, () => envelope([WORKFLOW_1])),
+
+  http.get(`${BASE}/workflows/:id`, () => envelope(WORKFLOW_1)),
+
+  http.post(`${BASE}/workflows`, () => envelope({ ...WORKFLOW_1, id: "new-wf-id" }, 201)),
+
+  http.patch(`${BASE}/workflows/:id`, () => envelope(WORKFLOW_1)),
+
+  http.delete(`${BASE}/workflows/:id`, () => envelope(null)),
+
+  http.post(`${BASE}/workflows/:id/execute`, () =>
+    envelope(
+      {
+        id: "ws-1",
+        sessionId: "executed-session-id",
+        workflowId: "wf-1",
+        workflowName: "My Workflow",
+        workflowPrompt: "Do the thing",
+        workflowDescription: null,
+        agentSkillId: "skill-1",
+        agentSkillName: "My Skill",
+        agentSkillRepoUrl: "https://github.com/example/repo",
+        agentSkillRepoPath: "",
+        skillDir: "/tmp/skill",
+        userId: "user",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        createdBy: "",
+        updatedBy: "",
+      },
+      201
+    )
+  ),
+
+  http.get(`${BASE}/workflow-sessions/:id`, () =>
+    envelope({
+      id: "ws-1",
+      sessionId: "executed-session-id",
+      workflowId: "wf-1",
+      workflowName: "My Workflow",
+      workflowPrompt: "Do the thing",
+      workflowDescription: null,
+      agentSkillId: "skill-1",
+      agentSkillName: "My Skill",
+      agentSkillRepoUrl: "https://github.com/example/repo",
+      agentSkillRepoPath: "",
+      skillDir: "/tmp/skill",
+      userId: "user",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      createdBy: "",
+      updatedBy: "",
+    })
+  ),
 ];

@@ -1,18 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
-import { deleteWorkflow, listAgentSkills, listWorkflows, type Workflow } from "@/lib/api";
+import {
+  deleteWorkflow,
+  executeWorkflow,
+  listAgentSkills,
+  listWorkflows,
+  type Workflow,
+} from "@/lib/api";
 
 const LIMIT = 20;
 
 function buildColumns(
   skillMap: Map<string, string>,
+  onRun: (id: string) => void,
+  runningId: string | null,
   onDelete: (id: string, name: string) => void
 ): ColumnDef<Workflow>[] {
   return [
@@ -46,6 +55,14 @@ function buildColumns(
       header: "Actions",
       cell: (w) => (
         <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => onRun(w.id)}
+            disabled={runningId !== null}
+            className="cursor-pointer text-accent transition-colors hover:underline disabled:cursor-wait disabled:opacity-50"
+          >
+            {runningId === w.id ? "Running…" : "Run"}
+          </button>
           <Link
             href={`/admin/workflows/${w.id}`}
             className="text-accent transition-colors hover:underline"
@@ -66,12 +83,14 @@ function buildColumns(
 }
 
 export default function WorkflowsPage() {
+  const router = useRouter();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [skillMap, setSkillMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
+  const [runningId, setRunningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,12 +129,24 @@ export default function WorkflowsPage() {
     }
   }
 
+  async function handleRun(id: string) {
+    setError(null);
+    setRunningId(id);
+    try {
+      const workflowSession = await executeWorkflow(id);
+      router.push(`/workflow-sessions/${workflowSession.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to run workflow");
+      setRunningId(null);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader title="Workflows" addHref="/admin/workflows/new" addLabel="+ Add workflow" />
       <ErrorBanner error={error} />
       <DataTable
-        columns={buildColumns(skillMap, handleDelete)}
+        columns={buildColumns(skillMap, handleRun, runningId, handleDelete)}
         rows={workflows}
         loading={loading}
         emptyMessage="No workflows registered yet."

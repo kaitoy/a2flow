@@ -26,7 +26,6 @@ function makeWrapper(store: ReturnType<typeof makeStore>) {
 }
 
 async function waitForInit(store: ReturnType<typeof makeStore>) {
-  // Wait for getSessionMessages to resolve so resumeSession has been dispatched
   await waitFor(() => expect(api.getSessionMessages).toHaveBeenCalled());
   await waitFor(() => expect(store.getState().chat.sessionId).toBe("sess-abc"));
 }

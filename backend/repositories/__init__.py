@@ -6,6 +6,7 @@ from .exceptions import (
     RepositoryError,
 )
 from .workflow import SqlWorkflowRepository, WorkflowRepository
+from .workflow_session import SqlWorkflowSessionRepository, WorkflowSessionRepository
 
 __all__ = [
     "AgentSkillRepository",
@@ -15,5 +16,7 @@ __all__ = [
     "RepositoryError",
     "SqlAgentSkillRepository",
     "SqlWorkflowRepository",
+    "SqlWorkflowSessionRepository",
     "WorkflowRepository",
+    "WorkflowSessionRepository",
 ]
