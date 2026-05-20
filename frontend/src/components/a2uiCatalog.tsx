@@ -25,7 +25,7 @@ const remainingComponents = Array.from(basicCatalog.components.values()).filter(
 );
 
 export const tailwindCatalog = new Catalog<ReactComponentImplementation>(
-  "https://a2ui.org/specification/v0_9/basic_catalog.json",
+  "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
   [
     customText,
     customButton,

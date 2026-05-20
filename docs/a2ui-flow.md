@@ -15,7 +15,7 @@ Before `pnpm dev` or `pnpm build` starts, a prebuild script downloads the A2UI B
 ```
 pnpm dev / pnpm build
   └─ scripts/download-a2ui-schema.mjs (predev / prebuild hook)
-       └─ GET https://a2ui.org/specification/v0_9/basic_catalog.json
+       └─ GET https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json
             → src/generated/basic_catalog.json  (gitignored)
 ```
 
@@ -48,7 +48,7 @@ When the LLM decides to render rich UI, it calls `render_a2ui` with structured a
 ```json
 {
   "surfaceId": "result",
-  "catalogId": "https://a2ui.org/specification/v0_9/basic_catalog.json",
+  "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
   "components": [
     { "id": "root", "component": "Card", "child": "col" },
     { "id": "col",  "component": "Column", "children": ["title", "btn"] },
