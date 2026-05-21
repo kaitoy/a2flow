@@ -8,7 +8,7 @@ import { MessageList } from "./MessageList";
 import { SessionList } from "./SessionList";
 import { ThemeToggle } from "./ThemeToggle";
 
-export function Chat({ sessionId: initialSessionId }: { sessionId: string }) {
+export function Chat({ sessionId: initialSessionId }: { sessionId: string | null }) {
   const dispatch = useAppDispatch();
   const userId = useAppSelector((s) => s.chat.userId);
   const {

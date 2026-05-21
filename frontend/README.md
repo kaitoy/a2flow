@@ -76,13 +76,13 @@ src/
 │   ├── hooks.ts          # Typed useAppDispatch / useAppSelector
 │   └── provider.tsx      # Client-side Redux Provider
 └── lib/
-    ├── api.ts            # createSession(), createChatAgent() with A2UIMiddleware
+    ├── api.ts            # listSessions(), createChatAgent() with A2UIMiddleware
     └── logger.ts         # pino logger instance
 ```
 
 ## How it works
 
-1. On mount, `useChat` calls `POST /sessions` to obtain an `id`.
+1. Clicking "+ New session" navigates the frontend to `/newSession` without any backend call. The session is materialized lazily: when the user submits the first message, `useChat.sendMessage` generates a UUID with `crypto.randomUUID()`, sets it in Redux, calls `router.replace('/sessions/{id}')` to update the URL, and uses that UUID as the `threadId` for the agent run. The backend creates the ADK session implicitly on the first `POST /agent` it receives. The `/sessions/[sessionId]` page detects that the Redux `sessionId` already matches the URL parameter and skips the initial `getSessionMessages` fetch so the in-flight stream is preserved across the navigation.
 2. When the user sends a message, `createChatAgent()` returns an `HttpAgent` (from `@ag-ui/client`) with `A2UIMiddleware` applied. Before each request, the middleware:
    - Injects the `render_a2ui` tool into `RunAgentInput.tools` so the backend LLM can call it.
    - Injects the A2UI Basic Catalog schema (from `src/generated/basic_catalog.json`) into `RunAgentInput.context`.

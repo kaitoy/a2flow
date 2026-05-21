@@ -1,58 +1,17 @@
-from datetime import datetime
-
+from google.adk.sessions import InMemorySessionService
 from httpx import AsyncClient
 
+from dependencies import APP_NAME
 from tests._envelope import assert_err, assert_ok
 
 
-async def test_create_session_returns_201(
-    client_with_real_sessions: AsyncClient,
-) -> None:
-    response = await client_with_real_sessions.post(
-        "/sessions", json={"user_id": "alice"}
+async def _create_session(
+    service: InMemorySessionService, user_id: str, session_id: str | None = None
+) -> str:
+    session = await service.create_session(
+        app_name=APP_NAME, user_id=user_id, session_id=session_id
     )
-    assert response.status_code == 201
-
-
-async def test_create_session_response_shape(
-    client_with_real_sessions: AsyncClient,
-) -> None:
-    response = await client_with_real_sessions.post(
-        "/sessions", json={"user_id": "alice"}
-    )
-    body = assert_ok(response, status=201)
-    assert "id" in body
-    assert body["userId"] == "alice"
-    assert isinstance(body["lastUpdateTime"], str)
-    datetime.fromisoformat(body["lastUpdateTime"])
-
-
-async def test_create_session_with_explicit_id(
-    client_with_real_sessions: AsyncClient,
-) -> None:
-    response = await client_with_real_sessions.post(
-        "/sessions", json={"user_id": "alice", "id": "my-session-42"}
-    )
-    body = assert_ok(response, status=201)
-    assert body["id"] == "my-session-42"
-
-
-async def test_create_session_generates_uuid_when_no_id_given(
-    client_with_real_sessions: AsyncClient,
-) -> None:
-    response = await client_with_real_sessions.post(
-        "/sessions", json={"user_id": "alice"}
-    )
-    session_id = assert_ok(response, status=201)["id"]
-    assert len(session_id) == 36
-    assert session_id.count("-") == 4
-
-
-async def test_create_session_missing_user_id_returns_422(
-    client_with_real_sessions: AsyncClient,
-) -> None:
-    response = await client_with_real_sessions.post("/sessions", json={})
-    assert_err(response, code="VALIDATION_ERROR", status=422)
+    return session.id
 
 
 async def test_list_sessions_empty_for_new_user(
@@ -66,9 +25,10 @@ async def test_list_sessions_empty_for_new_user(
 
 async def test_list_sessions_returns_created_sessions(
     client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
 ) -> None:
-    await client_with_real_sessions.post("/sessions", json={"user_id": "bob"})
-    await client_with_real_sessions.post("/sessions", json={"user_id": "bob"})
+    await _create_session(real_session_service, "bob")
+    await _create_session(real_session_service, "bob")
     response = await client_with_real_sessions.get(
         "/sessions", params={"user_id": "bob"}
     )
@@ -77,9 +37,10 @@ async def test_list_sessions_returns_created_sessions(
 
 async def test_list_sessions_does_not_mix_users(
     client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
 ) -> None:
-    await client_with_real_sessions.post("/sessions", json={"user_id": "carol"})
-    await client_with_real_sessions.post("/sessions", json={"user_id": "dave"})
+    await _create_session(real_session_service, "carol")
+    await _create_session(real_session_service, "dave")
     carol_sessions = assert_ok(
         await client_with_real_sessions.get("/sessions", params={"user_id": "carol"})
     )
@@ -101,11 +62,9 @@ async def test_list_sessions_missing_user_id_returns_422(
 
 async def test_get_messages_returns_empty_list_for_new_session(
     client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
 ) -> None:
-    create_resp = await client_with_real_sessions.post(
-        "/sessions", json={"user_id": "eve"}
-    )
-    session_id = assert_ok(create_resp, status=201)["id"]
+    session_id = await _create_session(real_session_service, "eve")
     response = await client_with_real_sessions.get(
         f"/sessions/{session_id}/messages", params={"user_id": "eve"}
     )
@@ -131,11 +90,9 @@ async def test_get_messages_missing_user_id_returns_422(
 
 async def test_delete_session_returns_200(
     client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
 ) -> None:
-    create_resp = await client_with_real_sessions.post(
-        "/sessions", json={"user_id": "frank"}
-    )
-    session_id = assert_ok(create_resp, status=201)["id"]
+    session_id = await _create_session(real_session_service, "frank")
     response = await client_with_real_sessions.delete(
         f"/sessions/{session_id}", params={"user_id": "frank"}
     )
@@ -144,11 +101,9 @@ async def test_delete_session_returns_200(
 
 async def test_delete_session_removes_session_from_list(
     client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
 ) -> None:
-    create_resp = await client_with_real_sessions.post(
-        "/sessions", json={"user_id": "grace"}
-    )
-    session_id = assert_ok(create_resp, status=201)["id"]
+    session_id = await _create_session(real_session_service, "grace")
     await client_with_real_sessions.delete(
         f"/sessions/{session_id}", params={"user_id": "grace"}
     )

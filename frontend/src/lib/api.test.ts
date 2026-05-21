@@ -3,7 +3,7 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { createChatAgent, createSession, getSessionMessages, listSessions } from "./api";
+import { createChatAgent, getSessionMessages, listSessions } from "./api";
 
 const BASE = "http://localhost:8000";
 
@@ -46,33 +46,6 @@ describe("getSessionMessages", () => {
       )
     );
     await expect(getSessionMessages("missing", "user")).rejects.toThrow("404");
-  });
-});
-
-describe("createSession", () => {
-  it("returns id string", async () => {
-    const id = await createSession("user");
-    expect(id).toBe("new-session-id");
-  });
-
-  it("POSTs with correct JSON body", async () => {
-    let body: unknown;
-    server.use(
-      http.post(`${BASE}/sessions`, async ({ request }) => {
-        body = await request.json();
-        return envelope(
-          { id: "x", userId: "test-user", lastUpdateTime: "2026-05-10T00:00:00.000Z" },
-          201
-        );
-      })
-    );
-    await createSession("test-user");
-    expect(body).toEqual({ userId: "test-user" });
-  });
-
-  it("throws on 400", async () => {
-    server.use(http.post(`${BASE}/sessions`, () => HttpResponse.json(null, { status: 400 })));
-    await expect(createSession("user")).rejects.toThrow("400");
   });
 });
 

@@ -1,4 +1,3 @@
-import uuid
 from datetime import UTC, datetime
 
 from ag_ui_adk import adk_events_to_messages
@@ -6,29 +5,10 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from dependencies import APP_NAME, SessionServiceDep
-from models.session import Session, SessionCreate
+from models.session import Session
 from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
-
-
-@router.post("", response_model=Session, status_code=201)
-async def create_session(
-    request: SessionCreate,
-    session_service: SessionServiceDep,
-) -> Session:
-    """Create a new session."""
-    session_id = request.id or str(uuid.uuid4())
-    session = await session_service.create_session(
-        app_name=APP_NAME,
-        user_id=request.user_id,
-        session_id=session_id,
-    )
-    return Session(
-        id=session.id,
-        user_id=session.user_id,
-        last_update_time=datetime.fromtimestamp(session.last_update_time, tz=UTC),
-    )
 
 
 @router.get("", response_model=list[Session])

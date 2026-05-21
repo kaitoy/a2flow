@@ -72,7 +72,7 @@ const chatSlice = createSlice({
   name: "chat",
   initialState,
   reducers: {
-    setSession(state, action: PayloadAction<string>) {
+    setSession(state, action: PayloadAction<string | null>) {
       state.sessionId = action.payload;
       state.messages = [];
       state.isRunning = false;

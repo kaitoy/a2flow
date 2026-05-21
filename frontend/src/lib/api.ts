@@ -13,7 +13,6 @@ import type {
 } from "@/generated/api/types.gen";
 import {
   zCreateAgentSkillAgentSkillsPostResponse,
-  zCreateSessionSessionsPostResponse,
   zCreateWorkflowWorkflowsPostResponse,
   zGetAgentSkillAgentSkillsSkillIdGetResponse,
   zGetWorkflowWorkflowsWorkflowIdGetResponse,
@@ -135,13 +134,6 @@ export async function getSessionMessages(sessionId: string, userId: string): Pro
       params: { user_id: userId },
     })
   );
-}
-
-export async function createSession(userId: string): Promise<string> {
-  const data = await unwrap(apiClient.post<ApiResponse<Session>>("/sessions", { userId }));
-  const session = zCreateSessionSessionsPostResponse.parse(data) as Session;
-  logger.info({ sessionId: session.id }, "session created");
-  return session.id;
 }
 
 export async function listAgentSkills(limit = 20, offset = 0): Promise<AgentSkill[]> {

@@ -4,10 +4,11 @@ import { type A2UIUserAction, RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middlewa
 import type { AgentSubscriber } from "@ag-ui/client";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
-import { createChatAgent, createSession, getSessionMessages } from "@/lib/api";
+import { useStore } from "react-redux";
+import { createChatAgent, getSessionMessages } from "@/lib/api";
 import { logAgUiEvent } from "@/lib/devEventLogger";
 import logger from "@/lib/logger";
-import type { AppDispatch } from "@/store";
+import type { AppDispatch, RootState } from "@/store";
 import {
   addActivityMessage,
   addUserMessage,
@@ -68,15 +69,25 @@ function formatActionContent(action: A2UIUserAction): string {
   return text;
 }
 
-export function useChat(initialSessionId: string) {
+export function useChat(initialSessionId: string | null) {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const store = useStore<RootState>();
   const { messages, sessionId, userId, isRunning, isStreaming, error } = useAppSelector(
     (s) => s.chat
   );
   const pendingRenderToolCallIds = useRef<string[]>([]);
 
   useEffect(() => {
+    if (initialSessionId === null) {
+      // /newSession route — clear any leftover state from a previous session
+      // so the chat panel renders empty and sendMessage sees a null sessionId.
+      dispatch(setSession(null));
+      return;
+    }
+    // After router.replace from /newSession, the page remounts with the same id
+    // already in Redux from the optimistic sendMessage path — preserve the in-flight stream.
+    if (store.getState().chat.sessionId === initialSessionId) return;
     dispatch(setSession(initialSessionId));
     getSessionMessages(initialSessionId, userId)
       .then((messages) => dispatch(resumeSession({ sessionId: initialSessionId, messages })))
@@ -92,25 +103,26 @@ export function useChat(initialSessionId: string) {
     [isRunning, router]
   );
 
-  const newSession = useCallback(async () => {
+  const newSession = useCallback(() => {
     if (isRunning) return;
-    try {
-      const id = await createSession(userId);
-      router.push(`/sessions/${id}`);
-    } catch (err) {
-      logger.error(err, "failed to create session");
-      dispatch(setError("Failed to connect to the server."));
-    }
-  }, [userId, isRunning, router, dispatch]);
+    router.push("/newSession");
+  }, [isRunning, router]);
 
   const sendMessage = useCallback(
     async (prompt: string) => {
-      if (!sessionId || isRunning) return;
+      if (isRunning) return;
+
+      let activeSessionId = sessionId;
+      if (!activeSessionId) {
+        activeSessionId = crypto.randomUUID();
+        dispatch(setSession(activeSessionId));
+        router.replace(`/sessions/${activeSessionId}`);
+      }
 
       const msgId = crypto.randomUUID();
       dispatch(addUserMessage({ id: msgId, content: prompt }));
 
-      const agent = createChatAgent(sessionId);
+      const agent = createChatAgent(activeSessionId);
 
       for (const tcId of pendingRenderToolCallIds.current) {
         agent.addMessage({
@@ -139,7 +151,7 @@ export function useChat(initialSessionId: string) {
 
       dispatch(finishRun());
     },
-    [sessionId, userId, isRunning, dispatch]
+    [sessionId, userId, isRunning, dispatch, router]
   );
 
   const sendA2uiAction = useCallback(

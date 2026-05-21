@@ -9,7 +9,6 @@ import { useChat } from "./useChat";
 
 vi.mock("@/lib/api", () => ({
   createChatAgent: vi.fn(),
-  createSession: vi.fn(),
   getSessionMessages: vi.fn(),
 }));
 
@@ -31,9 +30,10 @@ async function waitForInit(store: ReturnType<typeof makeStore>) {
 }
 
 beforeEach(() => {
+  vi.mocked(api.createChatAgent).mockClear();
   vi.mocked(api.createChatAgent).mockReturnValue(mockAgent as never);
+  vi.mocked(api.getSessionMessages).mockClear();
   vi.mocked(api.getSessionMessages).mockResolvedValue([]);
-  vi.mocked(api.createSession).mockResolvedValue("new-session-id");
   mockAgent.addMessage.mockClear();
   mockAgent.runAgent.mockClear();
 });
@@ -118,24 +118,74 @@ describe("useChat", () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it("newSession calls createSession and router.push", async () => {
+  it("newSession navigates to /newSession (no backend call)", async () => {
     const { useRouter } = await import("next/navigation");
     const pushMock = vi.fn();
     vi.mocked(useRouter).mockReturnValue({ push: pushMock } as never);
     const store = makeStore();
     const { result } = renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
     await waitForInit(store);
-    await result.current.newSession();
-    expect(api.createSession).toHaveBeenCalledWith("user");
-    expect(pushMock).toHaveBeenCalledWith("/sessions/new-session-id");
+    result.current.newSession();
+    expect(pushMock).toHaveBeenCalledWith("/newSession");
   });
 
-  it("newSession dispatches setError when createSession fails", async () => {
-    vi.mocked(api.createSession).mockRejectedValueOnce(new Error("network error"));
+  it("init effect skips fetch when initialSessionId is null (/newSession route)", async () => {
     const store = makeStore();
-    const { result } = renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
-    await waitForInit(store);
-    await result.current.newSession();
-    await waitFor(() => expect(store.getState().chat.error).not.toBeNull());
+    renderHook(() => useChat(null), { wrapper: makeWrapper(store) });
+    // give the effect a tick — should not fetch and should not set sessionId
+    await new Promise((r) => setTimeout(r, 0));
+    expect(api.getSessionMessages).not.toHaveBeenCalled();
+    expect(store.getState().chat.sessionId).toBeNull();
+  });
+
+  it("init effect clears leftover sessionId and messages when entering /newSession", async () => {
+    const store = makeStore({
+      chat: {
+        messages: [{ id: "stale", role: "user", content: "previous" }],
+        sessionId: "sess-prev",
+        userId: "user",
+        isRunning: false,
+        isStreaming: false,
+        error: null,
+      },
+    });
+    renderHook(() => useChat(null), { wrapper: makeWrapper(store) });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(store.getState().chat.sessionId).toBeNull();
+    expect(store.getState().chat.messages).toEqual([]);
+  });
+
+  it("init effect skips fetch when Redux sessionId already matches initialSessionId", async () => {
+    const store = makeStore({
+      chat: {
+        messages: [],
+        sessionId: "sess-abc",
+        userId: "user",
+        isRunning: false,
+        isStreaming: false,
+        error: null,
+      },
+    });
+    renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(api.getSessionMessages).not.toHaveBeenCalled();
+  });
+
+  it("sendMessage on /newSession generates uuid, sets sessionId, replaces URL, runs agent", async () => {
+    const { useRouter } = await import("next/navigation");
+    const replaceMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({ push: vi.fn(), replace: replaceMock } as never);
+    const uuidSpy = vi.spyOn(crypto, "randomUUID");
+    uuidSpy.mockReturnValueOnce("00000000-0000-4000-8000-000000000001"); // session uuid
+    uuidSpy.mockReturnValueOnce("00000000-0000-4000-8000-000000000002"); // message uuid
+    const store = makeStore();
+    const { result } = renderHook(() => useChat(null), { wrapper: makeWrapper(store) });
+    await new Promise((r) => setTimeout(r, 0));
+    await result.current.sendMessage("hello");
+    expect(replaceMock).toHaveBeenCalledWith("/sessions/00000000-0000-4000-8000-000000000001");
+    expect(store.getState().chat.sessionId).toBe("00000000-0000-4000-8000-000000000001");
+    expect(api.createChatAgent).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000001");
+    expect(mockAgent.runAgent).toHaveBeenCalled();
+    uuidSpy.mockRestore();
   });
 });
