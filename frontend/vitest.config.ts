@@ -32,6 +32,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
       "next/navigation": path.resolve(__dirname, "./src/test/mocks/next-navigation.ts"),
       "next/font/google": path.resolve(__dirname, "./src/test/mocks/next-font.ts"),
+      "next/image": path.resolve(__dirname, "./src/test/mocks/next-image.tsx"),
     },
   },
   define: {
