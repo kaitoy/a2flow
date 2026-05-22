@@ -37,6 +37,8 @@ export const handlers = [
 
   http.get(`${BASE}/sessions/:sessionId/messages`, () => envelope([])),
 
+  http.delete(`${BASE}/sessions/:sessionId`, () => envelope(null)),
+
   http.post(`${BASE}/sessions`, () =>
     envelope(
       {

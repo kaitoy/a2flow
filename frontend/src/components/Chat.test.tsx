@@ -15,6 +15,7 @@ vi.mock("@/hooks/useChat", () => ({
     sendA2uiAction: vi.fn(),
     switchSession: vi.fn(),
     newSession: vi.fn(),
+    onSessionDeleted: vi.fn(),
   })),
 }));
 
@@ -60,6 +61,7 @@ describe("Chat", () => {
       sendA2uiAction: vi.fn(),
       switchSession: vi.fn(),
       newSession: vi.fn(),
+      onSessionDeleted: vi.fn(),
     });
     render(<Chat sessionId="sess-1" />);
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
@@ -81,6 +83,7 @@ describe("Chat", () => {
       sendA2uiAction: vi.fn(),
       switchSession: vi.fn(),
       newSession: vi.fn(),
+      onSessionDeleted: vi.fn(),
     });
     const { store } = render(<Chat sessionId="sess-1" />, {
       preloadedState: {
@@ -109,6 +112,7 @@ describe("Chat", () => {
       sendA2uiAction: vi.fn(),
       switchSession: vi.fn(),
       newSession: vi.fn(),
+      onSessionDeleted: vi.fn(),
     });
     render(<Chat sessionId="sess-1" />);
     expect(screen.getByTestId("chat-input-mock")).toBeDisabled();

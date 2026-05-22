@@ -136,6 +136,14 @@ export async function getSessionMessages(sessionId: string, userId: string): Pro
   );
 }
 
+export async function deleteSession(sessionId: string, userId: string): Promise<void> {
+  await unwrap(
+    apiClient.delete<ApiResponse<null>>(`/sessions/${encodeURIComponent(sessionId)}`, {
+      params: { user_id: userId },
+    })
+  );
+}
+
 export async function listAgentSkills(limit = 20, offset = 0): Promise<AgentSkill[]> {
   const data = await unwrap(
     apiClient.get<ApiResponse<AgentSkill[]>>("/agent-skills", {

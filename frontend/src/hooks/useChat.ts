@@ -108,6 +108,15 @@ export function useChat(initialSessionId: string | null) {
     router.push("/new-session");
   }, [isRunning, router]);
 
+  const onSessionDeleted = useCallback(
+    (deletedId: string) => {
+      if (deletedId === sessionId) {
+        router.push("/new-session");
+      }
+    },
+    [sessionId, router]
+  );
+
   const sendMessage = useCallback(
     async (prompt: string) => {
       if (isRunning) return;
@@ -196,5 +205,6 @@ export function useChat(initialSessionId: string | null) {
     sendA2uiAction,
     switchSession,
     newSession,
+    onSessionDeleted,
   };
 }

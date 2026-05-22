@@ -23,6 +23,7 @@ export function Chat({ sessionId: initialSessionId }: { sessionId: string | null
     sendA2uiAction,
     switchSession,
     newSession,
+    onSessionDeleted,
   } = useChat(initialSessionId);
 
   return (
@@ -32,6 +33,7 @@ export function Chat({ sessionId: initialSessionId }: { sessionId: string | null
         currentSessionId={sessionId}
         onSelect={switchSession}
         onNew={newSession}
+        onDeleted={onSessionDeleted}
         disabled={isRunning}
       />
 
