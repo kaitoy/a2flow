@@ -118,7 +118,7 @@ describe("useChat", () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it("newSession navigates to /newSession (no backend call)", async () => {
+  it("newSession navigates to /new-session (no backend call)", async () => {
     const { useRouter } = await import("next/navigation");
     const pushMock = vi.fn();
     vi.mocked(useRouter).mockReturnValue({ push: pushMock } as never);
@@ -126,10 +126,10 @@ describe("useChat", () => {
     const { result } = renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
     await waitForInit(store);
     result.current.newSession();
-    expect(pushMock).toHaveBeenCalledWith("/newSession");
+    expect(pushMock).toHaveBeenCalledWith("/new-session");
   });
 
-  it("init effect skips fetch when initialSessionId is null (/newSession route)", async () => {
+  it("init effect skips fetch when initialSessionId is null (/new-session route)", async () => {
     const store = makeStore();
     renderHook(() => useChat(null), { wrapper: makeWrapper(store) });
     // give the effect a tick — should not fetch and should not set sessionId
@@ -138,7 +138,7 @@ describe("useChat", () => {
     expect(store.getState().chat.sessionId).toBeNull();
   });
 
-  it("init effect clears leftover sessionId and messages when entering /newSession", async () => {
+  it("init effect clears leftover sessionId and messages when entering /new-session", async () => {
     const store = makeStore({
       chat: {
         messages: [{ id: "stale", role: "user", content: "previous" }],
@@ -171,7 +171,7 @@ describe("useChat", () => {
     expect(api.getSessionMessages).not.toHaveBeenCalled();
   });
 
-  it("sendMessage on /newSession generates uuid, sets sessionId, replaces URL, runs agent", async () => {
+  it("sendMessage on /new-session generates uuid, sets sessionId, replaces URL, runs agent", async () => {
     const { useRouter } = await import("next/navigation");
     const replaceMock = vi.fn();
     vi.mocked(useRouter).mockReturnValue({ push: vi.fn(), replace: replaceMock } as never);

@@ -80,12 +80,12 @@ export function useChat(initialSessionId: string | null) {
 
   useEffect(() => {
     if (initialSessionId === null) {
-      // /newSession route — clear any leftover state from a previous session
+      // /new-session route — clear any leftover state from a previous session
       // so the chat panel renders empty and sendMessage sees a null sessionId.
       dispatch(setSession(null));
       return;
     }
-    // After router.replace from /newSession, the page remounts with the same id
+    // After router.replace from /new-session, the page remounts with the same id
     // already in Redux from the optimistic sendMessage path — preserve the in-flight stream.
     if (store.getState().chat.sessionId === initialSessionId) return;
     dispatch(setSession(initialSessionId));
@@ -105,7 +105,7 @@ export function useChat(initialSessionId: string | null) {
 
   const newSession = useCallback(() => {
     if (isRunning) return;
-    router.push("/newSession");
+    router.push("/new-session");
   }, [isRunning, router]);
 
   const sendMessage = useCallback(

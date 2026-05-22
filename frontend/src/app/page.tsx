@@ -7,7 +7,7 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/newSession");
+    router.replace("/new-session");
   }, [router]);
 
   return null;
