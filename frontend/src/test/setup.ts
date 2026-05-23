@@ -23,6 +23,16 @@ if (!window.matchMedia) {
   }));
 }
 
+// jsdom doesn't implement ResizeObserver. SlidingIndicator uses it to track
+// layout changes for the active-item bar, so stub it with no-ops.
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
 vi.mock("@/lib/logger", () => ({
   default: {
     info: vi.fn(),

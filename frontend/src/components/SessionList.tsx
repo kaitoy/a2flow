@@ -1,11 +1,12 @@
 "use client";
 
 import { animated, useTransition } from "@react-spring/web";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { deleteSession, listSessions, type Session } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
+import { SlidingIndicator } from "./ui/sliding-indicator";
 
 interface SessionListProps {
   userId: string;
@@ -28,6 +29,8 @@ export function SessionList({
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string } | null>(null);
+
+  const itemMap = useRef<Map<string, HTMLElement | null>>(new Map());
 
   const config = useMotionConfig("gentle");
   const transitions = useTransition(sessions, {
@@ -74,7 +77,7 @@ export function SessionList({
           + New session
         </Button>
       </div>
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="relative flex-1 overflow-y-auto py-2">
         {loading && sessions.length === 0 && (
           <p className="px-3 text-xs text-on-surface-variant">Loading…</p>
         )}
@@ -92,6 +95,10 @@ export function SessionList({
           });
           return (
             <animated.div
+              ref={(el: HTMLDivElement | null) => {
+                if (el) itemMap.current.set(s.id, el);
+                else itemMap.current.delete(s.id);
+              }}
               style={style}
               className={[
                 "group relative mx-2 my-0.5 flex w-[calc(100%-1rem)] items-stretch rounded-xl",
@@ -101,12 +108,6 @@ export function SessionList({
                   : "text-on-surface-variant hover:bg-glass hover:text-on-surface",
               ].join(" ")}
             >
-              {isActive && (
-                <span
-                  aria-hidden="true"
-                  className="absolute left-0 top-1/2 h-2/3 w-[3px] -translate-y-1/2 rounded-r-full bg-accent shadow-glow animate-fade-in motion-safe:origin-center motion-safe:[animation:fade-in_var(--motion-duration-base)_var(--motion-ease-emphasized)_both]"
-                />
-              )}
               <button
                 type="button"
                 onClick={() => !isActive && onSelect(s.id)}
@@ -141,6 +142,11 @@ export function SessionList({
             </animated.div>
           );
         })}
+        <SlidingIndicator
+          itemMap={itemMap}
+          activeKey={currentSessionId}
+          deps={[sessions, currentSessionId]}
+        />
       </div>
       <ConfirmDialog
         open={confirmTarget !== null}

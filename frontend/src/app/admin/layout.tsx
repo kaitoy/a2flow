@@ -4,8 +4,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRef } from "react";
 import logo from "@/../assets/logo.png";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 
 const NAV = [
   { href: "/admin/agent-skills", label: "Agent Skills" },
@@ -14,6 +16,8 @@ const NAV = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const itemMap = useRef<Map<string, HTMLElement | null>>(new Map());
+  const activeKey = NAV.find((n) => pathname?.startsWith(n.href))?.href ?? null;
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -34,11 +38,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             A2Flow
           </span>
         </div>
-        <ul className="flex flex-col gap-1 px-3 py-3">
+        <ul className="relative flex flex-col gap-1 px-3 py-3">
           {NAV.map((item) => {
             const isActive = pathname?.startsWith(item.href);
             return (
-              <li key={item.href}>
+              <li
+                key={item.href}
+                ref={(el) => {
+                  if (el) itemMap.current.set(item.href, el);
+                  else itemMap.current.delete(item.href);
+                }}
+              >
                 <Link
                   href={item.href}
                   className={[
@@ -48,17 +58,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       : "text-on-surface-variant hover:bg-glass hover:text-on-surface",
                   ].join(" ")}
                 >
-                  {isActive && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute left-0 top-1/2 h-1/2 w-[3px] -translate-y-1/2 rounded-r-full bg-accent shadow-glow"
-                    />
-                  )}
                   {item.label}
                 </Link>
               </li>
             );
           })}
+          <SlidingIndicator itemMap={itemMap} activeKey={activeKey} deps={[pathname]} />
         </ul>
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-glass-border px-4 py-4">
           <Link
