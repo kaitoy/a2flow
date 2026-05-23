@@ -1,3 +1,4 @@
+/** @module AgentSkillDetailPage — Admin edit/view form for an existing agent skill. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";

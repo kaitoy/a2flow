@@ -14,6 +14,7 @@ interface SessionListProps {
   disabled?: boolean;
 }
 
+/** Sidebar listing past sessions with controls to create a new session or delete an existing one. */
 export function SessionList({
   userId,
   currentSessionId,

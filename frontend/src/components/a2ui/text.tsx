@@ -13,6 +13,7 @@ const VARIANT_CLASS: Record<string, string> = {
     "text-[11px] leading-[16px] font-bold uppercase tracking-[0.08em] text-on-surface-variant",
 };
 
+/** A2UI Text implementation that renders markdown and applies typography variant classes. */
 export const customText = createComponentImplementation(TextApi, ({ props }) => {
   const renderer = useMarkdownRenderer();
   const [html, setHtml] = useState<string | null>(null);

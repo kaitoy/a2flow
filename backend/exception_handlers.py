@@ -1,3 +1,5 @@
+"""FastAPI exception handlers that map domain exceptions to structured JSON error responses."""
+
 import logging
 
 from fastapi import HTTPException, Request
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 async def validation_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
+    """Return HTTP 422 with VALIDATION_ERROR code for request validation failures."""
     assert isinstance(exc, RequestValidationError)
     return JSONResponse(
         {
@@ -28,6 +31,7 @@ async def validation_exception_handler(
 
 
 async def not_found_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Return HTTP 404 with NOT_FOUND code when a requested entity does not exist."""
     assert isinstance(exc, NotFoundError)
     return JSONResponse(
         {
@@ -42,6 +46,7 @@ async def not_found_exception_handler(request: Request, exc: Exception) -> JSONR
 async def foreign_key_violation_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
+    """Return HTTP 422 with FOREIGN_KEY_VIOLATION code when a referenced entity is missing."""
     assert isinstance(exc, ForeignKeyViolationError)
     return JSONResponse(
         {
@@ -56,6 +61,7 @@ async def foreign_key_violation_exception_handler(
 async def referenced_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
+    """Return HTTP 409 with CONFLICT_REFERENCED code when an entity is still referenced by others."""
     assert isinstance(exc, ReferencedError)
     return JSONResponse(
         {"code": "CONFLICT_REFERENCED", "message": str(exc)},
@@ -64,6 +70,7 @@ async def referenced_exception_handler(
 
 
 async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Return the original HTTP status code with an HTTP_{code} error code."""
     assert isinstance(exc, HTTPException)
     return JSONResponse(
         {"code": f"HTTP_{exc.status_code}", "message": str(exc.detail)},
@@ -72,6 +79,7 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Return HTTP 500 with INTERNAL_ERROR code and log the full exception traceback."""
     logger.exception("Unhandled exception", exc_info=exc)
     return JSONResponse(
         {"code": "INTERNAL_ERROR", "message": "Internal server error"},

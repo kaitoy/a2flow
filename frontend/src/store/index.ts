@@ -1,3 +1,4 @@
+/** Redux store configuration; also wires ``setApiUserId`` so every API call carries the current user ID. */
 import { configureStore } from "@reduxjs/toolkit";
 import { setApiUserId } from "@/lib/api";
 import chatReducer from "./chatSlice";

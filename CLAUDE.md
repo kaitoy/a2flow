@@ -16,6 +16,15 @@ See each directory's README.md for details.
 
 All documentation (docs, comments, commit messages) must be written in English.
 
+## Documentation comments
+
+When adding or modifying any module, class, or function, write and maintain a documentation comment for it:
+
+- **Python** — use docstrings (`"""..."""`) on every module, class, and public function. Follow Google style.
+- **TypeScript** — use JSDoc (`/** ... */`) on every exported component, function, type, and interface.
+
+A change that adds or modifies a symbol without updating its doc comment is not considered done.
+
 ## Claude Code hooks
 
 A `PostToolUse` hook fires after every `Write` or `Edit` tool call and runs the following tools automatically:

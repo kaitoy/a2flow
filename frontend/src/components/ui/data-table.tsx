@@ -14,6 +14,7 @@ interface DataTableProps<T> {
   getRowKey: (row: T) => string;
 }
 
+/** Generic data table with configurable columns, loading state, and empty message. */
 export function DataTable<T>({
   columns,
   rows,

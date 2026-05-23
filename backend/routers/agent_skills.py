@@ -1,3 +1,5 @@
+"""CRUD endpoints for AgentSkill resources."""
+
 from fastapi import APIRouter
 
 from dependencies import AgentSkillRepositoryDep, CurrentUserIdDep, PaginationDep

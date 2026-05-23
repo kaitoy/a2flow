@@ -14,12 +14,14 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "a2flow.theme";
 
+/** Read the theme already set by the inline script in the document root (avoids flash of wrong theme). */
 function readInitialTheme(): Theme {
   if (typeof document === "undefined") return "light";
   const attr = document.documentElement.dataset.theme;
   return attr === "dark" ? "dark" : "light";
 }
 
+/** Provide theme context and keep the ``data-theme`` attribute and localStorage in sync. */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(readInitialTheme);
 
@@ -45,6 +47,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Access the current theme and theme-toggle helpers. Must be used inside ThemeProvider. */
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) {

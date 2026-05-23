@@ -5,6 +5,7 @@ import type { Message } from "@ag-ui/core";
 import { useEffect, useRef } from "react";
 import { MessageBubble } from "./MessageBubble";
 
+/** Scrollable list of chat messages that auto-scrolls to the bottom when new messages arrive. */
 export function MessageList({
   messages,
   isStreaming = false,

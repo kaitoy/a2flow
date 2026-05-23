@@ -21,6 +21,7 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost: "px-3 py-2 text-on-surface-variant bg-transparent hover:bg-glass hover:text-accent",
 };
 
+/** Base button with ``primary``, ``secondary``, and ``ghost`` style variants. */
 export function Button({ variant = "ghost", className, ...rest }: ButtonProps) {
   const cls = [BASE, VARIANT[variant], className].filter(Boolean).join(" ");
   return <button type="button" {...rest} className={cls} />;

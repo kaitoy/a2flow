@@ -1,8 +1,13 @@
+"""Domain exceptions raised by repository implementations."""
+
+
 class RepositoryError(Exception):
-    pass
+    """Base class for all repository errors."""
 
 
 class NotFoundError(RepositoryError):
+    """Raised when a requested entity does not exist in the database."""
+
     def __init__(self, entity: str, id_: str) -> None:
         self.entity = entity
         self.id = id_
@@ -10,6 +15,8 @@ class NotFoundError(RepositoryError):
 
 
 class ForeignKeyViolationError(RepositoryError):
+    """Raised when a required related entity (foreign key) does not exist."""
+
     def __init__(self, entity: str, id_: str) -> None:
         self.entity = entity
         self.id = id_
@@ -17,4 +24,4 @@ class ForeignKeyViolationError(RepositoryError):
 
 
 class ReferencedError(RepositoryError):
-    pass
+    """Raised when deleting an entity that is still referenced by other records."""

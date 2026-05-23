@@ -1,3 +1,5 @@
+"""WorkflowSession data models representing a running instance of a workflow."""
+
 from sqlalchemy import ForeignKeyConstraint, Index
 from sqlmodel import SQLModel
 
@@ -5,6 +7,8 @@ from models.base import BaseEntity
 
 
 class WorkflowSessionCreate(SQLModel):
+    """Snapshot of workflow and skill metadata recorded when a workflow is executed."""
+
     session_id: str
     workflow_name: str
     workflow_prompt: str
@@ -18,6 +22,8 @@ class WorkflowSessionCreate(SQLModel):
 
 
 class WorkflowSession(WorkflowSessionCreate, BaseEntity, table=True):
+    """Database-persisted record linking an ADK session to the workflow that created it."""
+
     __tablename__ = "workflow_sessions"
     workflow_id: str | None = None
     __table_args__ = (

@@ -2,6 +2,7 @@ import { createComponentImplementation } from "@a2ui/react/v0_9";
 import { ChoicePickerApi } from "@a2ui/web_core/v0_9/basic_catalog";
 import { useState } from "react";
 
+/** A2UI ChoicePicker implementation with chips and radio/checkbox display styles and optional filtering. */
 export const customChoicePicker = createComponentImplementation(
   ChoicePickerApi,
   ({ props, context }) => {

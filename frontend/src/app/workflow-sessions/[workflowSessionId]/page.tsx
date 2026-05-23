@@ -1,3 +1,4 @@
+/** @module WorkflowSessionPage — Loads a WorkflowSession record and renders the workflow chat view. */
 "use client";
 
 import Image from "next/image";

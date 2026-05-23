@@ -10,6 +10,7 @@ import { MessageList } from "./MessageList";
 import { SessionList } from "./SessionList";
 import { ThemeToggle } from "./ThemeToggle";
 
+/** Top-level chat layout: sidebar, header with logo, error banner, message list, and input. */
 export function Chat({ sessionId: initialSessionId }: { sessionId: string | null }) {
   const dispatch = useAppDispatch();
   const userId = useAppSelector((s) => s.chat.userId);

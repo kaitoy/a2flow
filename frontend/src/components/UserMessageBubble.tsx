@@ -2,6 +2,7 @@
 
 import type { TextInputContent, UserMessage } from "@ag-ui/core";
 
+/** Extract the plain text from a user message, handling both string and content-part array forms. */
 function getUserTextContent(content: UserMessage["content"]): string {
   return typeof content === "string"
     ? content
@@ -11,6 +12,7 @@ function getUserTextContent(content: UserMessage["content"]): string {
         .join("");
 }
 
+/** Render a user message as a right-aligned gradient bubble. */
 export function UserMessageBubble({ message }: { message: UserMessage }) {
   const textContent = getUserTextContent(message.content);
   return (

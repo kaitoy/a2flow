@@ -6,6 +6,7 @@ interface AdminPageHeaderProps {
   addLabel: string;
 }
 
+/** Admin list-page header with a title and an "Add" link button. */
 export function AdminPageHeader({ title, addHref, addLabel }: AdminPageHeaderProps) {
   return (
     <div className="mb-6 flex items-center justify-between">

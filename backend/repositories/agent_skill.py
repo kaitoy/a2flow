@@ -1,3 +1,5 @@
+"""AgentSkill repository: Protocol interface and SQLModel-backed implementation."""
+
 from typing import Protocol
 
 from sqlalchemy.exc import IntegrityError
@@ -9,6 +11,8 @@ from repositories.exceptions import NotFoundError, ReferencedError
 
 
 class AgentSkillRepository(Protocol):
+    """Interface for AgentSkill persistence operations."""
+
     async def get(self, skill_id: str) -> AgentSkill | None: ...
 
     async def list(self, *, limit: int, offset: int) -> list[AgentSkill]: ...
@@ -25,6 +29,12 @@ class AgentSkillRepository(Protocol):
 
 
 class SqlAgentSkillRepository:
+    """SQLModel-backed implementation of AgentSkillRepository.
+
+    ``delete`` catches IntegrityError and re-raises it as ReferencedError when
+    a skill is still referenced by one or more workflows.
+    """
+
     def __init__(self, session: AsyncSession) -> None:
         self._db = session
 

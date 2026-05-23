@@ -4,6 +4,7 @@ import { useId } from "react";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 
+/** A2UI TextField implementation that renders a single-line Input or multi-line Textarea based on variant. */
 export const customTextField = createComponentImplementation(TextFieldApi, ({ props }) => {
   const id = useId();
   const isLong = props.variant === "longText";

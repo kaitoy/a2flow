@@ -8,6 +8,7 @@ interface PaginationControlsProps {
   onNext: () => void;
 }
 
+/** Previous/Next pagination controls; disables Previous at offset 0 and Next when the page is not full. */
 export function PaginationControls({
   offset,
   limit,

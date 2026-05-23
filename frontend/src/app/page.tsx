@@ -1,3 +1,4 @@
+/** @module Home — Root page: immediately redirects to /new-session. */
 "use client";
 
 import { useRouter } from "next/navigation";

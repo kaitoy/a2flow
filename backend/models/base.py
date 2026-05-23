@@ -1,3 +1,5 @@
+"""Base SQLModel entity with audit fields and camelCase JSON serialization."""
+
 from datetime import UTC, datetime
 
 import uuid_utils
@@ -8,6 +10,8 @@ from sqlmodel._compat import SQLModelConfig
 
 
 class BaseEntity(SQLModel):
+    """Abstract SQLModel base providing a UUID7 primary key, audit timestamps, and camelCase aliases."""
+
     model_config = SQLModelConfig(
         from_attributes=True,
         alias_generator=to_camel,
@@ -28,6 +32,7 @@ class BaseEntity(SQLModel):
 
     @field_serializer("created_at", "updated_at", when_used="json")
     def _serialize_audit_datetime(self, dt: datetime) -> str:
+        """Serialize audit datetimes as ISO-8601 with a Z suffix, normalizing naive values to UTC."""
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC)
         return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")

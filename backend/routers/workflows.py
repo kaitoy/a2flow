@@ -1,3 +1,5 @@
+"""CRUD endpoints for Workflow resources and the workflow execution action."""
+
 import uuid
 
 from fastapi import APIRouter

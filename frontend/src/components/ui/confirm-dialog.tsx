@@ -10,6 +10,7 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
+/** Modal confirmation dialog with focus trap, keyboard navigation, and backdrop. */
 export function ConfirmDialog({
   open,
   title,

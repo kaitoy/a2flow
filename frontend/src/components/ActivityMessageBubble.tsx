@@ -4,6 +4,7 @@ import { A2UI_OPERATIONS_KEY, A2UIActivityType, type A2UIUserAction } from "@ag-
 import type { ActivityMessage } from "@ag-ui/core";
 import { A2uiRenderer } from "./A2uiRenderer";
 
+/** Render an A2UI activity message by delegating to A2uiRenderer. Ignores non-A2UI activity types. */
 export function ActivityMessageBubble({
   message,
   onAction,

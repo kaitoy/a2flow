@@ -17,6 +17,7 @@ const ALIGN: Record<string, string> = {
   stretch: "items-stretch",
 };
 
+/** A2UI Row implementation that lays children out horizontally with configurable justify/align. */
 export const customRow = createComponentImplementation(RowApi, ({ props, buildChild }) => {
   const justify = JUSTIFY[props.justify ?? ""] ?? "";
   const align = ALIGN[props.align ?? ""] ?? "";

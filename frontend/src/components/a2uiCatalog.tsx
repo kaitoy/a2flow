@@ -1,3 +1,7 @@
+/**
+ * A2UI catalog that overrides the standard basic catalog components with custom
+ * Tailwind-styled implementations, keeping any unoverridden components from the base catalog.
+ */
 import type { ReactComponentImplementation } from "@a2ui/react/v0_9";
 import { basicCatalog } from "@a2ui/react/v0_9";
 import { Catalog } from "@a2ui/web_core/v0_9";

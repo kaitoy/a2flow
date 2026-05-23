@@ -1,3 +1,5 @@
+"""General-purpose agent streaming endpoint that serves AG-UI events over SSE."""
+
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -19,6 +21,13 @@ async def agent_endpoint(
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
 ) -> StreamingResponse:
+    """Stream AG-UI events from the ADK agent for the given thread.
+
+    SystemMessages are stripped from the input to prevent prompt injection
+    (ag_ui_adk appends their content directly to agent instructions).
+    The agent and skill are resolved from the ADK session state, falling back
+    to the default skill-less agent when no session exists.
+    """
     # Exclude SystemMessage to prevent prompt injection: ag_ui_adk appends its content directly to agent instructions
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})

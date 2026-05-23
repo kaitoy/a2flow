@@ -1,3 +1,5 @@
+"""WorkflowSession repository: Protocol interface and SQLModel-backed implementation."""
+
 from typing import Protocol
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -7,6 +9,8 @@ from repositories.exceptions import NotFoundError
 
 
 class WorkflowSessionRepository(Protocol):
+    """Interface for WorkflowSession persistence operations."""
+
     async def get(self, ws_id: str) -> WorkflowSession | None: ...
 
     async def create(
@@ -17,6 +21,8 @@ class WorkflowSessionRepository(Protocol):
 
 
 class SqlWorkflowSessionRepository:
+    """SQLModel-backed implementation of WorkflowSessionRepository."""
+
     def __init__(self, session: AsyncSession) -> None:
         self._db = session
 

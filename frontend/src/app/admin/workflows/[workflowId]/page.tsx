@@ -1,3 +1,4 @@
+/** @module WorkflowDetailPage — Admin edit/view form for an existing workflow. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";

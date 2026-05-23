@@ -1,3 +1,9 @@
+"""FastAPI application entry point for A2Flow.
+
+Configures middleware, exception handlers, and the API router,
+then starts the application with Uvicorn when run directly.
+"""
+
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -33,6 +39,7 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Initialize the database schema on application startup."""
     await init_db()
     yield
 

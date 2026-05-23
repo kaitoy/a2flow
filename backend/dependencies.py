@@ -1,3 +1,5 @@
+"""FastAPI dependency factories for singletons, database sessions, and repositories."""
+
 import os
 from dataclasses import dataclass
 from functools import lru_cache
@@ -26,6 +28,8 @@ APP_NAME = "A2Flow"
 
 @dataclass
 class PaginationParams:
+    """Query parameters for paginated list endpoints."""
+
     limit: int = Query(default=20, ge=1, le=1000)
     offset: int = Query(default=0, ge=0)
 
@@ -36,6 +40,7 @@ PaginationDep = Annotated[PaginationParams, Depends(PaginationParams)]
 def get_current_user_id(
     x_user_id: Annotated[str | None, Header()] = None,
 ) -> str:
+    """Return the user ID from the ``X-User-Id`` header, or an empty string if absent."""
     return x_user_id or ""
 
 
@@ -44,11 +49,13 @@ CurrentUserIdDep = Annotated[str, Depends(get_current_user_id)]
 
 @lru_cache(maxsize=1)
 def get_session_service() -> BaseSessionService:
+    """Return the LRU-cached ADK session service singleton."""
     return StaleTolerantSqliteSessionService(DB_URL)
 
 
 @lru_cache(maxsize=1)
 def get_agent_registry() -> AgentRegistry:
+    """Return the LRU-cached agent registry singleton."""
     return AgentRegistry(
         session_service=get_session_service(),
         app_name=APP_NAME,
@@ -57,6 +64,7 @@ def get_agent_registry() -> AgentRegistry:
 
 @lru_cache(maxsize=1)
 def get_skill_manager() -> SkillManager:
+    """Return the LRU-cached SkillManager singleton, reading SKILLS_CACHE_DIR from env."""
     cache_dir = Path(
         os.getenv(
             "SKILLS_CACHE_DIR",
@@ -73,6 +81,7 @@ DBSessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 def get_agent_skill_repository(db: DBSessionDep) -> AgentSkillRepository:
+    """Create an AgentSkillRepository backed by the current database session."""
     return SqlAgentSkillRepository(db)
 
 
@@ -85,6 +94,7 @@ def get_workflow_repository(
     db: DBSessionDep,
     skills: AgentSkillRepositoryDep,
 ) -> WorkflowRepository:
+    """Create a WorkflowRepository backed by the current database session."""
     return SqlWorkflowRepository(db, skills)
 
 
@@ -92,6 +102,7 @@ WorkflowRepositoryDep = Annotated[WorkflowRepository, Depends(get_workflow_repos
 
 
 def get_workflow_session_repository(db: DBSessionDep) -> WorkflowSessionRepository:
+    """Create a WorkflowSessionRepository backed by the current database session."""
     return SqlWorkflowSessionRepository(db)
 
 

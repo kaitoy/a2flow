@@ -20,6 +20,12 @@ import {
 } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
+/**
+ * Build the AG-UI subscriber object that maps incoming events to Redux actions.
+ *
+ * @param onRenderA2uiEnd - Called with the tool call ID whenever a RENDER_A2UI tool call ends,
+ *   so the next agent run can acknowledge the render as a tool result.
+ */
 function makeEventHandlers(
   dispatch: AppDispatch,
   onRenderA2uiEnd: (toolCallId: string) => void
@@ -57,6 +63,12 @@ function makeEventHandlers(
   };
 }
 
+/**
+ * Manage the agent interaction for a workflow session.
+ *
+ * On mount, loads prior message history and auto-sends the workflow prompt if the session is new.
+ * Subsequent user messages are routed to the workflow session's dedicated agent endpoint.
+ */
 export function useWorkflowSessionChat(
   workflowSessionId: string,
   sessionId: string,

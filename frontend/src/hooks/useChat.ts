@@ -23,6 +23,12 @@ import {
 } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
+/**
+ * Build the AG-UI subscriber object that maps incoming events to Redux actions.
+ *
+ * @param onRenderA2uiEnd - Called with the tool call ID whenever a RENDER_A2UI tool call ends,
+ *   so the next agent run can acknowledge the render as a tool result.
+ */
 function makeEventHandlers(
   dispatch: AppDispatch,
   onRenderA2uiEnd: (toolCallId: string) => void
@@ -60,6 +66,7 @@ function makeEventHandlers(
   };
 }
 
+/** Serialize an A2UIUserAction into a human-readable string sent as a user message to the agent. */
 function formatActionContent(action: A2UIUserAction): string {
   const name = action.name ?? "unknown_action";
   const surfaceId = action.surfaceId ?? "unknown_surface";
@@ -69,6 +76,12 @@ function formatActionContent(action: A2UIUserAction): string {
   return text;
 }
 
+/**
+ * Manage the active chat session and agent invocation for the general chat UI.
+ *
+ * Handles session initialization, message history loading on resume, sending user
+ * messages, forwarding A2UI user actions, and session navigation.
+ */
 export function useChat(initialSessionId: string | null) {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -78,6 +91,7 @@ export function useChat(initialSessionId: string | null) {
   );
   const pendingRenderToolCallIds = useRef<string[]>([]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   useEffect(() => {
     if (initialSessionId === null) {
       // /new-session route — clear any leftover state from a previous session

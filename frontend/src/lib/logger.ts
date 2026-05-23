@@ -1,3 +1,4 @@
+/** Pino logger instance configured for browser environments with ISO timestamps. */
 import pino from "pino";
 
 const logger = pino({

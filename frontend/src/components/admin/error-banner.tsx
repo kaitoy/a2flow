@@ -2,6 +2,7 @@ interface ErrorBannerProps {
   error: string | null;
 }
 
+/** Dismissible error alert banner. Renders nothing when ``error`` is null. */
 export function ErrorBanner({ error }: ErrorBannerProps) {
   if (!error) return null;
   return (

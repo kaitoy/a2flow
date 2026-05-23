@@ -1,3 +1,4 @@
+/** @module AgentSkillsPage — Admin list page for managing agent skills. */
 "use client";
 
 import Link from "next/link";

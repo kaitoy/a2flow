@@ -2,6 +2,7 @@
 
 import type { AssistantMessage } from "@ag-ui/core";
 
+/** Render an assistant message as a left-aligned glass bubble with an optional streaming cursor. */
 export function AssistantMessageBubble({
   message,
   isStreaming = false,

@@ -10,6 +10,10 @@ import { tailwindCatalog } from "./a2uiCatalog";
 
 const markdownRenderer = (text: string) => Promise.resolve(marked(text) as string);
 
+/**
+ * Process a raw A2UI payload and render the resulting surfaces using the tailwind catalog.
+ * Surfaces are re-processed from scratch whenever the payload reference changes.
+ */
 export function A2uiRenderer({
   payload,
   onAction,

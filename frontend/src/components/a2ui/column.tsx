@@ -17,6 +17,7 @@ const ALIGN: Record<string, string> = {
   stretch: "items-stretch",
 };
 
+/** A2UI Column implementation that lays children out vertically with configurable justify/align. */
 export const customColumn = createComponentImplementation(ColumnApi, ({ props, buildChild }) => {
   const justify = JUSTIFY[props.justify ?? ""] ?? "";
   const align = ALIGN[props.align ?? ""] ?? "";

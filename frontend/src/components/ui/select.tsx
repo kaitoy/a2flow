@@ -9,6 +9,7 @@ const BASE =
   "focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
+/** Styled native select with glass-panel surface and focus ring. */
 export function Select({ className, children, ...rest }: SelectProps) {
   const cls = className ? `${BASE} ${className}` : BASE;
   return (

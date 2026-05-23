@@ -1,3 +1,4 @@
+/** @module NewWorkflowPage — Admin form for creating a new workflow. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";

@@ -1,3 +1,4 @@
+/** @module WorkflowsPage — Admin list page for managing workflows. */
 "use client";
 
 import Link from "next/link";

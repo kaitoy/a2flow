@@ -1,3 +1,4 @@
+/** @module AdminLayout — Admin section shell with sidebar navigation and theme toggle. */
 "use client";
 
 import Image from "next/image";

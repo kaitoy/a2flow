@@ -1,3 +1,4 @@
+/** @module RootLayout — Applies fonts, theme flash-prevention script, and global providers. */
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";

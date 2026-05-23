@@ -1,3 +1,5 @@
+"""Endpoints for retrieving WorkflowSession details and streaming the workflow agent."""
+
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -18,6 +20,7 @@ async def get_workflow_session(
     ws_id: str,
     ws_repo: WorkflowSessionRepositoryDep,
 ) -> WorkflowSession:
+    """Return the WorkflowSession record for the given ID."""
     ws = await ws_repo.get(ws_id)
     if ws is None:
         raise NotFoundError("WorkflowSession", ws_id)
@@ -32,6 +35,12 @@ async def workflow_session_agent(
     ws_repo: WorkflowSessionRepositoryDep,
     registry: AgentRegistryDep,
 ) -> StreamingResponse:
+    """Stream AG-UI events from the agent bound to a specific workflow session.
+
+    The skill and skill directory are resolved from the WorkflowSession record so
+    the correct ADK tools are loaded regardless of the global agent state.
+    SystemMessages are stripped to prevent prompt injection.
+    """
     ws = await ws_repo.get(ws_id)
     if ws is None:
         raise NotFoundError("WorkflowSession", ws_id)

@@ -1,3 +1,5 @@
+"""Workflow repository: Protocol interface and SQLModel-backed implementation."""
+
 from typing import Protocol
 
 from sqlmodel import col, select
@@ -9,6 +11,8 @@ from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 
 
 class WorkflowRepository(Protocol):
+    """Interface for Workflow persistence operations."""
+
     async def get(self, workflow_id: str) -> Workflow | None: ...
 
     async def list(self, *, limit: int, offset: int) -> list[Workflow]: ...
@@ -23,6 +27,12 @@ class WorkflowRepository(Protocol):
 
 
 class SqlWorkflowRepository:
+    """SQLModel-backed implementation of WorkflowRepository.
+
+    Validates that the referenced ``agent_skill_id`` exists before creating or
+    updating a workflow, raising ForeignKeyViolationError if it does not.
+    """
+
     def __init__(self, session: AsyncSession, skills: AgentSkillRepository) -> None:
         self._db = session
         self._skills = skills

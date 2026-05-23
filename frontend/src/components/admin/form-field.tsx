@@ -8,6 +8,7 @@ interface FormFieldProps {
   children: React.ReactNode;
 }
 
+/** Labeled form field wrapper with optional required marker and inline error text. */
 export function FormField({ htmlFor, label, required, error, children }: FormFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">

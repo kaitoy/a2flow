@@ -9,6 +9,7 @@ interface Props {
   disabled: boolean;
 }
 
+/** Auto-resizing textarea input that sends on Enter and inserts a newline on Shift+Enter. */
 export function ChatInput({ onSend, disabled }: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);

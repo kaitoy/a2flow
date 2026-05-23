@@ -8,6 +8,15 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 export type { Message };
 
+/**
+ * Reconstruct A2UI activity messages from RENDER_A2UI tool calls embedded in assistant messages.
+ *
+ * When resuming a session, the backend returns raw AG-UI messages. Tool calls are stored on
+ * assistant messages, not as standalone activity messages. This generator re-synthesizes the
+ * activity messages so resumed sessions display A2UI surfaces identically to live sessions.
+ * The synthesized message IDs mirror the format used by A2UIMiddleware during live streaming
+ * so the upsert logic in ``addActivityMessage`` works correctly if a surface is later updated.
+ */
 function* synthesizeA2UIActivityMessages(messages: Message[]): Generator<Message> {
   for (const msg of messages) {
     yield msg;
@@ -50,12 +59,19 @@ function* synthesizeA2UIActivityMessages(messages: Message[]): Generator<Message
   }
 }
 
+/** Redux state shape for the active chat session. */
 interface ChatState {
+  /** All messages in the current session (user, assistant, and activity). */
   messages: Message[];
+  /** The active ADK session ID, or null when no session is open. */
   sessionId: string | null;
+  /** The current user's identifier, sent as forwarded props to the agent. */
   userId: string;
+  /** True while an agent run is in progress (blocks sending new messages). */
   isRunning: boolean;
+  /** True while the assistant is actively streaming text tokens. */
   isStreaming: boolean;
+  /** Non-null when the last agent run produced an error. */
   error: string | null;
 }
 

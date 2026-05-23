@@ -36,6 +36,7 @@ const apiClient = axios.create({
 
 let currentUserId = "";
 
+/** Set the user ID injected into every outgoing request as the ``X-User-Id`` header. */
 export function setApiUserId(userId: string): void {
   currentUserId = userId;
 }
@@ -47,24 +48,28 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+/** Request metadata returned in every API response envelope. */
 export interface ApiMeta {
   request_id: string;
   received_at: string;
   responded_at: string;
 }
 
+/** Structured error payload returned in the ``error`` field of an API response. */
 export interface ApiError {
   code: string;
   message: string;
   details?: Record<string, unknown> | null;
 }
 
+/** Generic API response envelope wrapping typed data or an error body. */
 export interface ApiResponse<T> {
   meta: ApiMeta;
   data: T | null;
   error: ApiError | null;
 }
 
+/** Error thrown when the API returns an error envelope instead of data. */
 export class ApiClientError extends Error {
   constructor(
     public code: string,
@@ -77,6 +82,7 @@ export class ApiClientError extends Error {
   }
 }
 
+/** Unwrap the API response envelope, throwing ``ApiClientError`` if the response contains an error. */
 async function unwrap<T>(p: Promise<AxiosResponse<ApiResponse<T>>>): Promise<T> {
   const res = await p;
   const env = res.data;
@@ -100,6 +106,7 @@ export type Workflow = WithAudit<WorkflowModel>;
 export type Session = SessionModel;
 export type { AgentSkillCreate, AgentSkillUpdate, WorkflowCreate, WorkflowUpdate };
 
+/** Snapshot of workflow and skill metadata recorded when a workflow is executed. */
 export interface WorkflowSession {
   id: string;
   sessionId: string;
@@ -119,6 +126,7 @@ export interface WorkflowSession {
   updatedBy: string;
 }
 
+/** Fetch all sessions for the given user, sorted by most recent activity. */
 export async function listSessions(userId: string): Promise<Session[]> {
   const data = await unwrap(
     apiClient.get<ApiResponse<Session[]>>("/api/v1/sessions", {
@@ -128,6 +136,7 @@ export async function listSessions(userId: string): Promise<Session[]> {
   return zListSessionsApiV1SessionsGetResponse.parse(data) as Session[];
 }
 
+/** Fetch the full message history for a session (used to restore conversation state). */
 export async function getSessionMessages(sessionId: string, userId: string): Promise<Message[]> {
   return unwrap(
     apiClient.get<ApiResponse<Message[]>>(
@@ -139,6 +148,7 @@ export async function getSessionMessages(sessionId: string, userId: string): Pro
   );
 }
 
+/** Delete a session and its associated message history. */
 export async function deleteSession(sessionId: string, userId: string): Promise<void> {
   await unwrap(
     apiClient.delete<ApiResponse<null>>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, {
@@ -147,6 +157,7 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
   );
 }
 
+/** List agent skills with optional pagination. */
 export async function listAgentSkills(limit = 20, offset = 0): Promise<AgentSkill[]> {
   const data = await unwrap(
     apiClient.get<ApiResponse<AgentSkill[]>>("/api/v1/agent-skills", {
@@ -156,6 +167,7 @@ export async function listAgentSkills(limit = 20, offset = 0): Promise<AgentSkil
   return zListAgentSkillsApiV1AgentSkillsGetResponse.parse(data) as AgentSkill[];
 }
 
+/** Fetch a single agent skill by ID. */
 export async function getAgentSkill(id: string): Promise<AgentSkill> {
   const data = await unwrap(
     apiClient.get<ApiResponse<AgentSkill>>(`/api/v1/agent-skills/${encodeURIComponent(id)}`)
@@ -163,11 +175,13 @@ export async function getAgentSkill(id: string): Promise<AgentSkill> {
   return zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse.parse(data) as AgentSkill;
 }
 
+/** Create a new agent skill. */
 export async function createAgentSkill(body: AgentSkillCreate): Promise<AgentSkill> {
   const data = await unwrap(apiClient.post<ApiResponse<AgentSkill>>("/api/v1/agent-skills", body));
   return zCreateAgentSkillApiV1AgentSkillsPostResponse.parse(data) as AgentSkill;
 }
 
+/** Apply a partial update to an agent skill. */
 export async function updateAgentSkill(id: string, body: AgentSkillUpdate): Promise<AgentSkill> {
   const data = await unwrap(
     apiClient.patch<ApiResponse<AgentSkill>>(`/api/v1/agent-skills/${encodeURIComponent(id)}`, body)
@@ -175,12 +189,14 @@ export async function updateAgentSkill(id: string, body: AgentSkillUpdate): Prom
   return zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse.parse(data) as AgentSkill;
 }
 
+/** Delete an agent skill by ID. */
 export async function deleteAgentSkill(id: string): Promise<void> {
   await unwrap(
     apiClient.delete<ApiResponse<null>>(`/api/v1/agent-skills/${encodeURIComponent(id)}`)
   );
 }
 
+/** List workflows with optional pagination. */
 export async function listWorkflows(limit = 20, offset = 0): Promise<Workflow[]> {
   const data = await unwrap(
     apiClient.get<ApiResponse<Workflow[]>>("/api/v1/workflows", {
@@ -190,6 +206,7 @@ export async function listWorkflows(limit = 20, offset = 0): Promise<Workflow[]>
   return zListWorkflowsApiV1WorkflowsGetResponse.parse(data) as Workflow[];
 }
 
+/** Fetch a single workflow by ID. */
 export async function getWorkflow(id: string): Promise<Workflow> {
   const data = await unwrap(
     apiClient.get<ApiResponse<Workflow>>(`/api/v1/workflows/${encodeURIComponent(id)}`)
@@ -197,11 +214,13 @@ export async function getWorkflow(id: string): Promise<Workflow> {
   return zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse.parse(data) as Workflow;
 }
 
+/** Create a new workflow. */
 export async function createWorkflow(body: WorkflowCreate): Promise<Workflow> {
   const data = await unwrap(apiClient.post<ApiResponse<Workflow>>("/api/v1/workflows", body));
   return zCreateWorkflowApiV1WorkflowsPostResponse.parse(data) as Workflow;
 }
 
+/** Apply a partial update to a workflow. */
 export async function updateWorkflow(id: string, body: WorkflowUpdate): Promise<Workflow> {
   const data = await unwrap(
     apiClient.patch<ApiResponse<Workflow>>(`/api/v1/workflows/${encodeURIComponent(id)}`, body)
@@ -209,10 +228,12 @@ export async function updateWorkflow(id: string, body: WorkflowUpdate): Promise<
   return zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse.parse(data) as Workflow;
 }
 
+/** Delete a workflow by ID. */
 export async function deleteWorkflow(id: string): Promise<void> {
   await unwrap(apiClient.delete<ApiResponse<null>>(`/api/v1/workflows/${encodeURIComponent(id)}`));
 }
 
+/** Execute a workflow, creating a WorkflowSession that links the ADK session to the workflow. */
 export async function executeWorkflow(id: string): Promise<WorkflowSession> {
   const data = await unwrap(
     apiClient.post<ApiResponse<WorkflowSession>>(
@@ -226,6 +247,7 @@ export async function executeWorkflow(id: string): Promise<WorkflowSession> {
   return data as WorkflowSession;
 }
 
+/** Fetch a WorkflowSession record by ID. */
 export async function getWorkflowSession(id: string): Promise<WorkflowSession> {
   return unwrap(
     apiClient.get<ApiResponse<WorkflowSession>>(
@@ -234,6 +256,10 @@ export async function getWorkflowSession(id: string): Promise<WorkflowSession> {
   );
 }
 
+/**
+ * Create an HttpAgent for the general chat endpoint, pre-configured with the A2UI middleware
+ * so the agent can render interactive surfaces via the RENDER_A2UI tool.
+ */
 export function createChatAgent(sessionId: string): HttpAgent {
   const agent = new HttpAgent({
     url: `${API_BASE}/api/v1/agent`,
@@ -248,6 +274,10 @@ export function createChatAgent(sessionId: string): HttpAgent {
   return agent;
 }
 
+/**
+ * Create an HttpAgent scoped to a specific workflow session endpoint, pre-configured
+ * with the A2UI middleware so the agent can render interactive surfaces.
+ */
 export function createWorkflowSessionAgent(
   workflowSessionId: string,
   sessionId: string

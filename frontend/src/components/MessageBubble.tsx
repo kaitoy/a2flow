@@ -6,6 +6,7 @@ import { ActivityMessageBubble } from "./ActivityMessageBubble";
 import { AssistantMessageBubble } from "./AssistantMessageBubble";
 import { UserMessageBubble } from "./UserMessageBubble";
 
+/** Dispatch a message to the appropriate role-specific bubble component. */
 export function MessageBubble({
   message,
   isStreaming = false,

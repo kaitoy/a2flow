@@ -1,3 +1,5 @@
+"""Response envelope middleware that wraps JSON responses in a ``{meta, data, error}`` structure."""
+
 import json
 import uuid
 from datetime import UTC, datetime
@@ -14,10 +16,17 @@ EXCLUDED_PATHS = frozenset({"/api/v1/agent", "/api/v1/health"})
 
 
 def _format_iso_z(dt: datetime) -> str:
+    """Format a UTC datetime as an ISO-8601 string with a ``Z`` suffix."""
     return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 class ResponseEnvelopeMiddleware(BaseHTTPMiddleware):
+    """Wrap every JSON response in a ``{meta, data, error}`` envelope.
+
+    SSE streaming endpoints and the health endpoint are excluded from wrapping.
+    HTTP 204 responses are converted to 200 with ``data: null``.
+    """
+
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
