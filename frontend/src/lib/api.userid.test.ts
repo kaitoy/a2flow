@@ -38,7 +38,7 @@ describe("X-User-Id header", () => {
   it("sends X-User-Id when set", async () => {
     let captured: string | null = null;
     server.use(
-      http.post(`${BASE}/agent-skills`, ({ request }) => {
+      http.post(`${BASE}/api/v1/agent-skills`, ({ request }) => {
         captured = request.headers.get("x-user-id");
         return envelope(SKILL, 201);
       })
@@ -51,7 +51,7 @@ describe("X-User-Id header", () => {
   it("omits X-User-Id when unset", async () => {
     let captured: string | null = "preset";
     server.use(
-      http.post(`${BASE}/workflows`, ({ request }) => {
+      http.post(`${BASE}/api/v1/workflows`, ({ request }) => {
         captured = request.headers.get("x-user-id");
         return envelope(WORKFLOW, 201);
       })
@@ -64,7 +64,7 @@ describe("X-User-Id header", () => {
   it("uses the latest userId after reassignment", async () => {
     let captured: string | null = null;
     server.use(
-      http.patch(`${BASE}/agent-skills/:id`, ({ request }) => {
+      http.patch(`${BASE}/api/v1/agent-skills/:id`, ({ request }) => {
         captured = request.headers.get("x-user-id");
         return envelope(SKILL);
       })

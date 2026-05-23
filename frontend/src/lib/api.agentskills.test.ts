@@ -19,7 +19,9 @@ describe("listAgentSkills", () => {
   });
 
   it("throws on server error", async () => {
-    server.use(http.get(`${BASE}/agent-skills`, () => new HttpResponse(null, { status: 500 })));
+    server.use(
+      http.get(`${BASE}/api/v1/agent-skills`, () => new HttpResponse(null, { status: 500 }))
+    );
     await expect(listAgentSkills()).rejects.toThrow("500");
   });
 });
@@ -32,7 +34,10 @@ describe("getAgentSkill", () => {
 
   it("throws on 404", async () => {
     server.use(
-      http.get(`${BASE}/agent-skills/:skillId`, () => new HttpResponse(null, { status: 404 }))
+      http.get(
+        `${BASE}/api/v1/agent-skills/:skillId`,
+        () => new HttpResponse(null, { status: 404 })
+      )
     );
     await expect(getAgentSkill("missing")).rejects.toThrow("404");
   });
@@ -48,7 +53,9 @@ describe("createAgentSkill", () => {
   });
 
   it("throws on 422", async () => {
-    server.use(http.post(`${BASE}/agent-skills`, () => new HttpResponse(null, { status: 422 })));
+    server.use(
+      http.post(`${BASE}/api/v1/agent-skills`, () => new HttpResponse(null, { status: 422 }))
+    );
     await expect(createAgentSkill({ name: "", repoUrl: "" })).rejects.toThrow("422");
   });
 });
@@ -67,7 +74,10 @@ describe("deleteAgentSkill", () => {
 
   it("throws on 404", async () => {
     server.use(
-      http.delete(`${BASE}/agent-skills/:skillId`, () => new HttpResponse(null, { status: 404 }))
+      http.delete(
+        `${BASE}/api/v1/agent-skills/:skillId`,
+        () => new HttpResponse(null, { status: 404 })
+      )
     );
     await expect(deleteAgentSkill("missing")).rejects.toThrow("404");
   });

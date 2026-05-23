@@ -18,7 +18,7 @@ async def test_list_sessions_empty_for_new_user(
     client_with_real_sessions: AsyncClient,
 ) -> None:
     response = await client_with_real_sessions.get(
-        "/sessions", params={"user_id": "nobody"}
+        "/api/v1/sessions", params={"user_id": "nobody"}
     )
     assert assert_ok(response) == []
 
@@ -30,7 +30,7 @@ async def test_list_sessions_returns_created_sessions(
     await _create_session(real_session_service, "bob")
     await _create_session(real_session_service, "bob")
     response = await client_with_real_sessions.get(
-        "/sessions", params={"user_id": "bob"}
+        "/api/v1/sessions", params={"user_id": "bob"}
     )
     assert len(assert_ok(response)) == 2
 
@@ -42,10 +42,14 @@ async def test_list_sessions_does_not_mix_users(
     await _create_session(real_session_service, "carol")
     await _create_session(real_session_service, "dave")
     carol_sessions = assert_ok(
-        await client_with_real_sessions.get("/sessions", params={"user_id": "carol"})
+        await client_with_real_sessions.get(
+            "/api/v1/sessions", params={"user_id": "carol"}
+        )
     )
     dave_sessions = assert_ok(
-        await client_with_real_sessions.get("/sessions", params={"user_id": "dave"})
+        await client_with_real_sessions.get(
+            "/api/v1/sessions", params={"user_id": "dave"}
+        )
     )
     assert len(carol_sessions) == 1
     assert len(dave_sessions) == 1
@@ -56,7 +60,7 @@ async def test_list_sessions_does_not_mix_users(
 async def test_list_sessions_missing_user_id_returns_422(
     client_with_real_sessions: AsyncClient,
 ) -> None:
-    response = await client_with_real_sessions.get("/sessions")
+    response = await client_with_real_sessions.get("/api/v1/sessions")
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
@@ -66,7 +70,7 @@ async def test_get_messages_returns_empty_list_for_new_session(
 ) -> None:
     session_id = await _create_session(real_session_service, "eve")
     response = await client_with_real_sessions.get(
-        f"/sessions/{session_id}/messages", params={"user_id": "eve"}
+        f"/api/v1/sessions/{session_id}/messages", params={"user_id": "eve"}
     )
     assert assert_ok(response) == []
 
@@ -75,7 +79,7 @@ async def test_get_messages_returns_404_for_unknown_session(
     client_with_real_sessions: AsyncClient,
 ) -> None:
     response = await client_with_real_sessions.get(
-        "/sessions/nonexistent-id/messages", params={"user_id": "eve"}
+        "/api/v1/sessions/nonexistent-id/messages", params={"user_id": "eve"}
     )
     err = assert_err(response, code="NOT_FOUND", status=404)
     assert err["details"]["entity"] == "Session"
@@ -84,7 +88,7 @@ async def test_get_messages_returns_404_for_unknown_session(
 async def test_get_messages_missing_user_id_returns_422(
     client_with_real_sessions: AsyncClient,
 ) -> None:
-    response = await client_with_real_sessions.get("/sessions/some-id/messages")
+    response = await client_with_real_sessions.get("/api/v1/sessions/some-id/messages")
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
@@ -94,7 +98,7 @@ async def test_delete_session_returns_200(
 ) -> None:
     session_id = await _create_session(real_session_service, "frank")
     response = await client_with_real_sessions.delete(
-        f"/sessions/{session_id}", params={"user_id": "frank"}
+        f"/api/v1/sessions/{session_id}", params={"user_id": "frank"}
     )
     assert assert_ok(response, status=200) is None
 
@@ -105,10 +109,10 @@ async def test_delete_session_removes_session_from_list(
 ) -> None:
     session_id = await _create_session(real_session_service, "grace")
     await client_with_real_sessions.delete(
-        f"/sessions/{session_id}", params={"user_id": "grace"}
+        f"/api/v1/sessions/{session_id}", params={"user_id": "grace"}
     )
     list_resp = await client_with_real_sessions.get(
-        "/sessions", params={"user_id": "grace"}
+        "/api/v1/sessions", params={"user_id": "grace"}
     )
     assert assert_ok(list_resp) == []
 
@@ -117,7 +121,7 @@ async def test_delete_session_returns_404_for_unknown_session(
     client_with_real_sessions: AsyncClient,
 ) -> None:
     response = await client_with_real_sessions.delete(
-        "/sessions/nonexistent-id", params={"user_id": "grace"}
+        "/api/v1/sessions/nonexistent-id", params={"user_id": "grace"}
     )
     assert_err(response, code="NOT_FOUND", status=404)
 
@@ -125,5 +129,5 @@ async def test_delete_session_returns_404_for_unknown_session(
 async def test_delete_session_missing_user_id_returns_422(
     client_with_real_sessions: AsyncClient,
 ) -> None:
-    response = await client_with_real_sessions.delete("/sessions/some-id")
+    response = await client_with_real_sessions.delete("/api/v1/sessions/some-id")
     assert_err(response, code="VALIDATION_ERROR", status=422)

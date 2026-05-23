@@ -54,3 +54,21 @@ Whenever a change falls into any of the following categories, update [README.md]
 - **New feature** — any user-visible capability added to the backend or frontend
 - **Architecture change** — modifications to how components interact (e.g. adding a new service, changing the AG-UI message flow)
 - **Technology stack change** — swapping or adding a framework, runtime, language, or major library
+
+## Keeping generated API types in sync
+
+`frontend/src/generated/api/` is auto-generated from `backend/openapi.yaml` by running:
+
+```bash
+cd frontend && pnpm openapi-ts
+```
+
+Whenever `backend/openapi.yaml` changes (e.g. route path prefixes, operation IDs) or types are regenerated, the Zod schema export names in `zod.gen.ts` can change — they embed the full URL path segments. For example, adding an `/api/v1/` prefix changes `zListAgentSkillsAgentSkillsGetResponse` to `zListAgentSkillsApiV1AgentSkillsGetResponse`.
+
+After any regeneration, verify that all imports in `frontend/src/lib/api.ts` still match the current export names in `zod.gen.ts`. A quick check:
+
+```bash
+cd frontend && pnpm build
+```
+
+Module-not-found errors on `zod.gen` imports indicate a name mismatch that must be fixed before the change is done.

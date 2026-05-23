@@ -11,13 +11,17 @@ _WF_BODY = {"name": "My Workflow", "prompt": "Do the thing"}
 
 
 async def _create_skill(client: AsyncClient) -> Any:
-    return assert_ok(await client.post("/agent-skills", json=_SKILL_BODY), status=201)
+    return assert_ok(
+        await client.post("/api/v1/agent-skills", json=_SKILL_BODY), status=201
+    )
 
 
 async def _execute_workflow(client: AsyncClient, skill_id: str) -> Any:
     body = {**_WF_BODY, "agent_skill_id": skill_id}
-    wf = assert_ok(await client.post("/workflows", json=body), status=201)
-    return assert_ok(await client.post(f"/workflows/{wf['id']}/execute"), status=201)
+    wf = assert_ok(await client.post("/api/v1/workflows", json=body), status=201)
+    return assert_ok(
+        await client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
+    )
 
 
 def _make_run_agent_input() -> dict[str, Any]:
@@ -38,7 +42,7 @@ def _make_run_agent_input() -> dict[str, Any]:
 async def test_get_workflow_session_returns_200(workflow_client: AsyncClient) -> None:
     skill = await _create_skill(workflow_client)
     ws = await _execute_workflow(workflow_client, skill["id"])
-    response = await workflow_client.get(f"/workflow-sessions/{ws['id']}")
+    response = await workflow_client.get(f"/api/v1/workflow-sessions/{ws['id']}")
     assert response.status_code == 200
 
 
@@ -47,7 +51,7 @@ async def test_get_workflow_session_returns_correct_data(
 ) -> None:
     skill = await _create_skill(workflow_client)
     ws = await _execute_workflow(workflow_client, skill["id"])
-    body = assert_ok(await workflow_client.get(f"/workflow-sessions/{ws['id']}"))
+    body = assert_ok(await workflow_client.get(f"/api/v1/workflow-sessions/{ws['id']}"))
     assert body["id"] == ws["id"]
     assert body["workflowName"] == _WF_BODY["name"]
     assert body["workflowPrompt"] == _WF_BODY["prompt"]
@@ -58,7 +62,7 @@ async def test_get_workflow_session_returns_correct_data(
 async def test_get_workflow_session_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
-    response = await workflow_client.get("/workflow-sessions/nonexistent")
+    response = await workflow_client.get("/api/v1/workflow-sessions/nonexistent")
     assert_err(response, code="NOT_FOUND", status=404)
 
 
@@ -72,7 +76,7 @@ async def test_workflow_session_agent_returns_200(
     skill = await _create_skill(workflow_client)
     ws = await _execute_workflow(workflow_client, skill["id"])
     response = await workflow_client.post(
-        f"/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-sessions/{ws['id']}/agent",
         json=_make_run_agent_input(),
     )
     assert response.status_code == 200
@@ -82,7 +86,7 @@ async def test_workflow_session_agent_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
     response = await workflow_client.post(
-        "/workflow-sessions/nonexistent/agent",
+        "/api/v1/workflow-sessions/nonexistent/agent",
         json=_make_run_agent_input(),
     )
     assert response.status_code == 404
@@ -104,7 +108,7 @@ async def test_workflow_session_agent_delegates_to_agent_registry(
 
     mock_adk_agent.run = _capturing_run
     await workflow_client.post(
-        f"/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-sessions/{ws['id']}/agent",
         json=_make_run_agent_input(),
     )
     mock_agent_registry.get.assert_called_with(
@@ -138,7 +142,7 @@ async def test_workflow_session_agent_strips_system_messages(
         ],
     }
     await workflow_client.post(
-        f"/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-sessions/{ws['id']}/agent",
         json=input_with_system,
     )
     assert len(received_inputs) == 1

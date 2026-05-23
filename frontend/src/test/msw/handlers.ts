@@ -28,18 +28,18 @@ const WORKFLOW_1 = {
 };
 
 export const handlers = [
-  http.get(`${BASE}/sessions`, () =>
+  http.get(`${BASE}/api/v1/sessions`, () =>
     envelope([
       { id: "sess-1", userId: "user", lastUpdateTime: "2026-05-10T12:00:01.000Z" },
       { id: "sess-2", userId: "user", lastUpdateTime: "2026-05-10T12:00:00.000Z" },
     ])
   ),
 
-  http.get(`${BASE}/sessions/:sessionId/messages`, () => envelope([])),
+  http.get(`${BASE}/api/v1/sessions/:sessionId/messages`, () => envelope([])),
 
-  http.delete(`${BASE}/sessions/:sessionId`, () => envelope(null)),
+  http.delete(`${BASE}/api/v1/sessions/:sessionId`, () => envelope(null)),
 
-  http.post(`${BASE}/sessions`, () =>
+  http.post(`${BASE}/api/v1/sessions`, () =>
     envelope(
       {
         id: "new-session-id",
@@ -50,27 +50,27 @@ export const handlers = [
     )
   ),
 
-  http.get(`${BASE}/agent-skills`, () => envelope([SKILL_1])),
+  http.get(`${BASE}/api/v1/agent-skills`, () => envelope([SKILL_1])),
 
-  http.get(`${BASE}/agent-skills/:skillId`, () => envelope(SKILL_1)),
+  http.get(`${BASE}/api/v1/agent-skills/:skillId`, () => envelope(SKILL_1)),
 
-  http.post(`${BASE}/agent-skills`, () => envelope({ ...SKILL_1, id: "new-skill-id" }, 201)),
+  http.post(`${BASE}/api/v1/agent-skills`, () => envelope({ ...SKILL_1, id: "new-skill-id" }, 201)),
 
-  http.patch(`${BASE}/agent-skills/:skillId`, () => envelope(SKILL_1)),
+  http.patch(`${BASE}/api/v1/agent-skills/:skillId`, () => envelope(SKILL_1)),
 
-  http.delete(`${BASE}/agent-skills/:skillId`, () => envelope(null)),
+  http.delete(`${BASE}/api/v1/agent-skills/:skillId`, () => envelope(null)),
 
-  http.get(`${BASE}/workflows`, () => envelope([WORKFLOW_1])),
+  http.get(`${BASE}/api/v1/workflows`, () => envelope([WORKFLOW_1])),
 
-  http.get(`${BASE}/workflows/:id`, () => envelope(WORKFLOW_1)),
+  http.get(`${BASE}/api/v1/workflows/:id`, () => envelope(WORKFLOW_1)),
 
-  http.post(`${BASE}/workflows`, () => envelope({ ...WORKFLOW_1, id: "new-wf-id" }, 201)),
+  http.post(`${BASE}/api/v1/workflows`, () => envelope({ ...WORKFLOW_1, id: "new-wf-id" }, 201)),
 
-  http.patch(`${BASE}/workflows/:id`, () => envelope(WORKFLOW_1)),
+  http.patch(`${BASE}/api/v1/workflows/:id`, () => envelope(WORKFLOW_1)),
 
-  http.delete(`${BASE}/workflows/:id`, () => envelope(null)),
+  http.delete(`${BASE}/api/v1/workflows/:id`, () => envelope(null)),
 
-  http.post(`${BASE}/workflows/:id/execute`, () =>
+  http.post(`${BASE}/api/v1/workflows/:id/execute`, () =>
     envelope(
       {
         id: "ws-1",
@@ -94,7 +94,7 @@ export const handlers = [
     )
   ),
 
-  http.get(`${BASE}/workflow-sessions/:id`, () =>
+  http.get(`${BASE}/api/v1/workflow-sessions/:id`, () =>
     envelope({
       id: "ws-1",
       sessionId: "executed-session-id",

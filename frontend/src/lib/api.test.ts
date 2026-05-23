@@ -15,7 +15,7 @@ describe("listSessions", () => {
   });
 
   it("throws on server error", async () => {
-    server.use(http.get(`${BASE}/sessions`, () => HttpResponse.json(null, { status: 500 })));
+    server.use(http.get(`${BASE}/api/v1/sessions`, () => HttpResponse.json(null, { status: 500 })));
     await expect(listSessions("user")).rejects.toThrow("500");
   });
 });
@@ -29,7 +29,7 @@ describe("getSessionMessages", () => {
   it("calls the correct URL", async () => {
     let calledUrl = "";
     server.use(
-      http.get(`${BASE}/sessions/:sessionId/messages`, ({ request }) => {
+      http.get(`${BASE}/api/v1/sessions/:sessionId/messages`, ({ request }) => {
         calledUrl = request.url;
         return envelope([]);
       })
@@ -41,7 +41,7 @@ describe("getSessionMessages", () => {
 
   it("throws on 404", async () => {
     server.use(
-      http.get(`${BASE}/sessions/:sessionId/messages`, () =>
+      http.get(`${BASE}/api/v1/sessions/:sessionId/messages`, () =>
         HttpResponse.json(null, { status: 404 })
       )
     );
@@ -53,7 +53,7 @@ describe("createChatAgent", () => {
   it("returns an HttpAgent with correct url and threadId", () => {
     const agent = createChatAgent("my-session");
     expect(agent).toBeInstanceOf(HttpAgent);
-    expect((agent as unknown as { url: string }).url).toBe(`${BASE}/agent`);
+    expect((agent as unknown as { url: string }).url).toBe(`${BASE}/api/v1/agent`);
     expect((agent as unknown as { threadId: string }).threadId).toBe("my-session");
   });
 });

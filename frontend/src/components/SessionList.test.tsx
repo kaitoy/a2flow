@@ -34,7 +34,7 @@ describe("SessionList", () => {
   });
 
   it("shows No sessions when API returns empty array", async () => {
-    server.use(http.get("http://localhost:8000/sessions", () => envelope([])));
+    server.use(http.get("http://localhost:8000/api/v1/sessions", () => envelope([])));
     render(<SessionList {...defaultProps} />);
     await waitFor(() => expect(screen.getByText("No sessions")).toBeInTheDocument());
   });
@@ -67,7 +67,7 @@ describe("SessionList", () => {
 
   it("shows No sessions on API error", async () => {
     server.use(
-      http.get("http://localhost:8000/sessions", () =>
+      http.get("http://localhost:8000/api/v1/sessions", () =>
         envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
       )
     );
@@ -92,7 +92,7 @@ describe("SessionList", () => {
 
   it("calls delete API and removes session from list after confirm", async () => {
     const deleteSpy = vi.fn(() => envelope(null));
-    server.use(http.delete("http://localhost:8000/sessions/:id", deleteSpy));
+    server.use(http.delete("http://localhost:8000/api/v1/sessions/:id", deleteSpy));
     const user = userEvent.setup();
     render(<SessionList {...defaultProps} />);
     await waitFor(() => screen.getAllByTitle(/sess-/));
@@ -106,7 +106,7 @@ describe("SessionList", () => {
 
   it("does not call delete API when Cancel is clicked", async () => {
     const deleteSpy = vi.fn(() => envelope(null));
-    server.use(http.delete("http://localhost:8000/sessions/:id", deleteSpy));
+    server.use(http.delete("http://localhost:8000/api/v1/sessions/:id", deleteSpy));
     const user = userEvent.setup();
     render(<SessionList {...defaultProps} />);
     await waitFor(() => screen.getAllByTitle(/sess-/));

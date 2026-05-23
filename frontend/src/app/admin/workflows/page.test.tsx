@@ -42,7 +42,7 @@ describe("WorkflowsPage", () => {
   it("shows an error banner when Run fails", async () => {
     server.use(
       http.post(
-        "http://localhost:8000/workflows/:id/execute",
+        "http://localhost:8000/api/v1/workflows/:id/execute",
         () => new HttpResponse(null, { status: 500 })
       )
     );
@@ -56,7 +56,7 @@ describe("WorkflowsPage", () => {
   it("calls delete api after confirm", async () => {
     const user = userEvent.setup();
     const deleteSpy = vi.fn(() => envelope(null));
-    server.use(http.delete("http://localhost:8000/workflows/:id", deleteSpy));
+    server.use(http.delete("http://localhost:8000/api/v1/workflows/:id", deleteSpy));
 
     render(<WorkflowsPage />);
     await waitFor(() => screen.getByText("My Workflow"));

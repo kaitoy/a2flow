@@ -12,15 +12,15 @@ import type {
   WorkflowUpdate,
 } from "@/generated/api/types.gen";
 import {
-  zCreateAgentSkillAgentSkillsPostResponse,
-  zCreateWorkflowWorkflowsPostResponse,
-  zGetAgentSkillAgentSkillsSkillIdGetResponse,
-  zGetWorkflowWorkflowsWorkflowIdGetResponse,
-  zListAgentSkillsAgentSkillsGetResponse,
-  zListSessionsSessionsGetResponse,
-  zListWorkflowsWorkflowsGetResponse,
-  zUpdateAgentSkillAgentSkillsSkillIdPatchResponse,
-  zUpdateWorkflowWorkflowsWorkflowIdPatchResponse,
+  zCreateAgentSkillApiV1AgentSkillsPostResponse,
+  zCreateWorkflowApiV1WorkflowsPostResponse,
+  zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
+  zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
+  zListAgentSkillsApiV1AgentSkillsGetResponse,
+  zListSessionsApiV1SessionsGetResponse,
+  zListWorkflowsApiV1WorkflowsGetResponse,
+  zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
+  zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
 } from "@/generated/api/zod.gen";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import logger from "./logger";
@@ -121,24 +121,27 @@ export interface WorkflowSession {
 
 export async function listSessions(userId: string): Promise<Session[]> {
   const data = await unwrap(
-    apiClient.get<ApiResponse<Session[]>>("/sessions", {
+    apiClient.get<ApiResponse<Session[]>>("/api/v1/sessions", {
       params: { user_id: userId },
     })
   );
-  return zListSessionsSessionsGetResponse.parse(data) as Session[];
+  return zListSessionsApiV1SessionsGetResponse.parse(data) as Session[];
 }
 
 export async function getSessionMessages(sessionId: string, userId: string): Promise<Message[]> {
   return unwrap(
-    apiClient.get<ApiResponse<Message[]>>(`/sessions/${encodeURIComponent(sessionId)}/messages`, {
-      params: { user_id: userId },
-    })
+    apiClient.get<ApiResponse<Message[]>>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/messages`,
+      {
+        params: { user_id: userId },
+      }
+    )
   );
 }
 
 export async function deleteSession(sessionId: string, userId: string): Promise<void> {
   await unwrap(
-    apiClient.delete<ApiResponse<null>>(`/sessions/${encodeURIComponent(sessionId)}`, {
+    apiClient.delete<ApiResponse<null>>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, {
       params: { user_id: userId },
     })
   );
@@ -146,71 +149,75 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
 
 export async function listAgentSkills(limit = 20, offset = 0): Promise<AgentSkill[]> {
   const data = await unwrap(
-    apiClient.get<ApiResponse<AgentSkill[]>>("/agent-skills", {
+    apiClient.get<ApiResponse<AgentSkill[]>>("/api/v1/agent-skills", {
       params: { limit, offset },
     })
   );
-  return zListAgentSkillsAgentSkillsGetResponse.parse(data) as AgentSkill[];
+  return zListAgentSkillsApiV1AgentSkillsGetResponse.parse(data) as AgentSkill[];
 }
 
 export async function getAgentSkill(id: string): Promise<AgentSkill> {
   const data = await unwrap(
-    apiClient.get<ApiResponse<AgentSkill>>(`/agent-skills/${encodeURIComponent(id)}`)
+    apiClient.get<ApiResponse<AgentSkill>>(`/api/v1/agent-skills/${encodeURIComponent(id)}`)
   );
-  return zGetAgentSkillAgentSkillsSkillIdGetResponse.parse(data) as AgentSkill;
+  return zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse.parse(data) as AgentSkill;
 }
 
 export async function createAgentSkill(body: AgentSkillCreate): Promise<AgentSkill> {
-  const data = await unwrap(apiClient.post<ApiResponse<AgentSkill>>("/agent-skills", body));
-  return zCreateAgentSkillAgentSkillsPostResponse.parse(data) as AgentSkill;
+  const data = await unwrap(apiClient.post<ApiResponse<AgentSkill>>("/api/v1/agent-skills", body));
+  return zCreateAgentSkillApiV1AgentSkillsPostResponse.parse(data) as AgentSkill;
 }
 
 export async function updateAgentSkill(id: string, body: AgentSkillUpdate): Promise<AgentSkill> {
   const data = await unwrap(
-    apiClient.patch<ApiResponse<AgentSkill>>(`/agent-skills/${encodeURIComponent(id)}`, body)
+    apiClient.patch<ApiResponse<AgentSkill>>(`/api/v1/agent-skills/${encodeURIComponent(id)}`, body)
   );
-  return zUpdateAgentSkillAgentSkillsSkillIdPatchResponse.parse(data) as AgentSkill;
+  return zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse.parse(data) as AgentSkill;
 }
 
 export async function deleteAgentSkill(id: string): Promise<void> {
-  await unwrap(apiClient.delete<ApiResponse<null>>(`/agent-skills/${encodeURIComponent(id)}`));
+  await unwrap(
+    apiClient.delete<ApiResponse<null>>(`/api/v1/agent-skills/${encodeURIComponent(id)}`)
+  );
 }
 
 export async function listWorkflows(limit = 20, offset = 0): Promise<Workflow[]> {
   const data = await unwrap(
-    apiClient.get<ApiResponse<Workflow[]>>("/workflows", {
+    apiClient.get<ApiResponse<Workflow[]>>("/api/v1/workflows", {
       params: { limit, offset },
     })
   );
-  return zListWorkflowsWorkflowsGetResponse.parse(data) as Workflow[];
+  return zListWorkflowsApiV1WorkflowsGetResponse.parse(data) as Workflow[];
 }
 
 export async function getWorkflow(id: string): Promise<Workflow> {
   const data = await unwrap(
-    apiClient.get<ApiResponse<Workflow>>(`/workflows/${encodeURIComponent(id)}`)
+    apiClient.get<ApiResponse<Workflow>>(`/api/v1/workflows/${encodeURIComponent(id)}`)
   );
-  return zGetWorkflowWorkflowsWorkflowIdGetResponse.parse(data) as Workflow;
+  return zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse.parse(data) as Workflow;
 }
 
 export async function createWorkflow(body: WorkflowCreate): Promise<Workflow> {
-  const data = await unwrap(apiClient.post<ApiResponse<Workflow>>("/workflows", body));
-  return zCreateWorkflowWorkflowsPostResponse.parse(data) as Workflow;
+  const data = await unwrap(apiClient.post<ApiResponse<Workflow>>("/api/v1/workflows", body));
+  return zCreateWorkflowApiV1WorkflowsPostResponse.parse(data) as Workflow;
 }
 
 export async function updateWorkflow(id: string, body: WorkflowUpdate): Promise<Workflow> {
   const data = await unwrap(
-    apiClient.patch<ApiResponse<Workflow>>(`/workflows/${encodeURIComponent(id)}`, body)
+    apiClient.patch<ApiResponse<Workflow>>(`/api/v1/workflows/${encodeURIComponent(id)}`, body)
   );
-  return zUpdateWorkflowWorkflowsWorkflowIdPatchResponse.parse(data) as Workflow;
+  return zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse.parse(data) as Workflow;
 }
 
 export async function deleteWorkflow(id: string): Promise<void> {
-  await unwrap(apiClient.delete<ApiResponse<null>>(`/workflows/${encodeURIComponent(id)}`));
+  await unwrap(apiClient.delete<ApiResponse<null>>(`/api/v1/workflows/${encodeURIComponent(id)}`));
 }
 
 export async function executeWorkflow(id: string): Promise<WorkflowSession> {
   const data = await unwrap(
-    apiClient.post<ApiResponse<WorkflowSession>>(`/workflows/${encodeURIComponent(id)}/execute`)
+    apiClient.post<ApiResponse<WorkflowSession>>(
+      `/api/v1/workflows/${encodeURIComponent(id)}/execute`
+    )
   );
   logger.info(
     { workflowSessionId: (data as WorkflowSession).id, workflowId: id },
@@ -221,13 +228,15 @@ export async function executeWorkflow(id: string): Promise<WorkflowSession> {
 
 export async function getWorkflowSession(id: string): Promise<WorkflowSession> {
   return unwrap(
-    apiClient.get<ApiResponse<WorkflowSession>>(`/workflow-sessions/${encodeURIComponent(id)}`)
+    apiClient.get<ApiResponse<WorkflowSession>>(
+      `/api/v1/workflow-sessions/${encodeURIComponent(id)}`
+    )
   );
 }
 
 export function createChatAgent(sessionId: string): HttpAgent {
   const agent = new HttpAgent({
-    url: `${API_BASE}/agent`,
+    url: `${API_BASE}/api/v1/agent`,
     threadId: sessionId,
   });
   agent.use(
@@ -244,7 +253,7 @@ export function createWorkflowSessionAgent(
   sessionId: string
 ): HttpAgent {
   const agent = new HttpAgent({
-    url: `${API_BASE}/workflow-sessions/${encodeURIComponent(workflowSessionId)}/agent`,
+    url: `${API_BASE}/api/v1/workflow-sessions/${encodeURIComponent(workflowSessionId)}/agent`,
     threadId: sessionId,
   });
   agent.use(

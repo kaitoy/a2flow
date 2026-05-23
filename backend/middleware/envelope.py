@@ -10,7 +10,7 @@ from starlette.responses import StreamingResponse
 
 from logging_context import request_id_var
 
-EXCLUDED_PATHS = frozenset({"/agent", "/health"})
+EXCLUDED_PATHS = frozenset({"/api/v1/agent", "/api/v1/health"})
 
 
 def _format_iso_z(dt: datetime) -> str:

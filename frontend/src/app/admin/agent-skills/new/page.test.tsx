@@ -36,7 +36,7 @@ describe("NewAgentSkillPage", () => {
         201
       )
     );
-    server.use(http.post("http://localhost:8000/agent-skills", createSpy));
+    server.use(http.post("http://localhost:8000/api/v1/agent-skills", createSpy));
 
     render(<NewAgentSkillPage />);
     await user.type(screen.getByLabelText(/name/i), "Test");
@@ -87,7 +87,10 @@ describe("NewAgentSkillPage", () => {
   it("shows error on api failure", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post("http://localhost:8000/agent-skills", () => new HttpResponse(null, { status: 422 }))
+      http.post(
+        "http://localhost:8000/api/v1/agent-skills",
+        () => new HttpResponse(null, { status: 422 })
+      )
     );
 
     render(<NewAgentSkillPage />);

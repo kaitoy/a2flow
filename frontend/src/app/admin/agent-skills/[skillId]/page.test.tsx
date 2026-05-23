@@ -34,7 +34,7 @@ describe("EditAgentSkillPage", () => {
   it("submits update api on form submit", async () => {
     setup();
     const patchSpy = vi.fn(() => envelope(FULL_SKILL));
-    server.use(http.patch("http://localhost:8000/agent-skills/:skillId", patchSpy));
+    server.use(http.patch("http://localhost:8000/api/v1/agent-skills/:skillId", patchSpy));
 
     render(<EditAgentSkillPage />);
     await waitFor(() => screen.getByDisplayValue("My Skill"));
@@ -74,7 +74,7 @@ describe("EditAgentSkillPage", () => {
       forward: vi.fn(),
     });
     const deleteSpy = vi.fn(() => new HttpResponse(null, { status: 204 }));
-    server.use(http.delete("http://localhost:8000/agent-skills/:skillId", deleteSpy));
+    server.use(http.delete("http://localhost:8000/api/v1/agent-skills/:skillId", deleteSpy));
 
     render(<EditAgentSkillPage />);
     await waitFor(() => screen.getByDisplayValue("My Skill"));
@@ -101,7 +101,7 @@ describe("EditAgentSkillPage", () => {
     setup();
     server.use(
       http.get(
-        "http://localhost:8000/agent-skills/:skillId",
+        "http://localhost:8000/api/v1/agent-skills/:skillId",
         () => new HttpResponse(null, { status: 404 })
       )
     );

@@ -48,25 +48,25 @@ _CREATE_BODY = {"name": "My Skill", "repo_url": "https://github.com/example/repo
 
 
 async def test_create_skill_returns_201(skill_client: AsyncClient) -> None:
-    response = await skill_client.post("/agent-skills", json=_CREATE_BODY)
+    response = await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY)
     assert response.status_code == 201
 
 
 async def test_create_skill_response_has_id(skill_client: AsyncClient) -> None:
-    response = await skill_client.post("/agent-skills", json=_CREATE_BODY)
+    response = await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY)
     assert "id" in assert_ok(response, status=201)
 
 
 async def test_create_skill_response_has_correct_name(
     skill_client: AsyncClient,
 ) -> None:
-    response = await skill_client.post("/agent-skills", json=_CREATE_BODY)
+    response = await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY)
     assert assert_ok(response, status=201)["name"] == "My Skill"
 
 
 async def test_create_skill_missing_name_returns_422(skill_client: AsyncClient) -> None:
     response = await skill_client.post(
-        "/agent-skills", json={"repo_url": "https://github.com/example/repo"}
+        "/api/v1/agent-skills", json={"repo_url": "https://github.com/example/repo"}
     )
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
@@ -74,7 +74,9 @@ async def test_create_skill_missing_name_returns_422(skill_client: AsyncClient) 
 async def test_create_skill_missing_repo_url_returns_422(
     skill_client: AsyncClient,
 ) -> None:
-    response = await skill_client.post("/agent-skills", json={"name": "My Skill"})
+    response = await skill_client.post(
+        "/api/v1/agent-skills", json={"name": "My Skill"}
+    )
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
@@ -82,34 +84,34 @@ async def test_create_skill_missing_repo_url_returns_422(
 
 
 async def test_list_skills_empty_initially(skill_client: AsyncClient) -> None:
-    response = await skill_client.get("/agent-skills")
+    response = await skill_client.get("/api/v1/agent-skills")
     assert assert_ok(response) == []
 
 
 async def test_list_skills_returns_created_skill(skill_client: AsyncClient) -> None:
-    await skill_client.post("/agent-skills", json=_CREATE_BODY)
-    response = await skill_client.get("/agent-skills")
+    await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY)
+    response = await skill_client.get("/api/v1/agent-skills")
     assert len(assert_ok(response)) == 1
 
 
 async def test_list_skills_respects_limit_param(skill_client: AsyncClient) -> None:
     for i in range(3):
         await skill_client.post(
-            "/agent-skills",
+            "/api/v1/agent-skills",
             json={"name": f"Skill {i}", "repo_url": "https://github.com/x/y"},
         )
-    response = await skill_client.get("/agent-skills", params={"limit": 2})
+    response = await skill_client.get("/api/v1/agent-skills", params={"limit": 2})
     assert len(assert_ok(response)) == 2
 
 
 async def test_list_skills_respects_offset_param(skill_client: AsyncClient) -> None:
     for i in range(3):
         await skill_client.post(
-            "/agent-skills",
+            "/api/v1/agent-skills",
             json={"name": f"Skill {i}", "repo_url": "https://github.com/x/y"},
         )
     response = await skill_client.get(
-        "/agent-skills", params={"limit": 10, "offset": 2}
+        "/api/v1/agent-skills", params={"limit": 10, "offset": 2}
     )
     assert len(assert_ok(response)) == 1
 
@@ -119,22 +121,22 @@ async def test_list_skills_respects_offset_param(skill_client: AsyncClient) -> N
 
 async def test_get_skill_returns_200(skill_client: AsyncClient) -> None:
     created = assert_ok(
-        await skill_client.post("/agent-skills", json=_CREATE_BODY), status=201
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
     )
-    response = await skill_client.get(f"/agent-skills/{created['id']}")
+    response = await skill_client.get(f"/api/v1/agent-skills/{created['id']}")
     assert response.status_code == 200
 
 
 async def test_get_skill_returns_correct_data(skill_client: AsyncClient) -> None:
     created = assert_ok(
-        await skill_client.post("/agent-skills", json=_CREATE_BODY), status=201
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
     )
-    response = await skill_client.get(f"/agent-skills/{created['id']}")
+    response = await skill_client.get(f"/api/v1/agent-skills/{created['id']}")
     assert assert_ok(response)["name"] == "My Skill"
 
 
 async def test_get_skill_unknown_id_returns_404(skill_client: AsyncClient) -> None:
-    response = await skill_client.get("/agent-skills/nonexistent")
+    response = await skill_client.get("/api/v1/agent-skills/nonexistent")
     assert_err(response, code="NOT_FOUND", status=404)
 
 
@@ -143,10 +145,10 @@ async def test_get_skill_unknown_id_returns_404(skill_client: AsyncClient) -> No
 
 async def test_update_skill_returns_200(skill_client: AsyncClient) -> None:
     created = assert_ok(
-        await skill_client.post("/agent-skills", json=_CREATE_BODY), status=201
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
     )
     response = await skill_client.patch(
-        f"/agent-skills/{created['id']}", json={"name": "Renamed"}
+        f"/api/v1/agent-skills/{created['id']}", json={"name": "Renamed"}
     )
     assert response.status_code == 200
 
@@ -155,16 +157,18 @@ async def test_update_skill_partial_update_leaves_other_fields_unchanged(
     skill_client: AsyncClient,
 ) -> None:
     created = assert_ok(
-        await skill_client.post("/agent-skills", json=_CREATE_BODY), status=201
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
     )
     response = await skill_client.patch(
-        f"/agent-skills/{created['id']}", json={"name": "Renamed"}
+        f"/api/v1/agent-skills/{created['id']}", json={"name": "Renamed"}
     )
     assert assert_ok(response)["repoUrl"] == _CREATE_BODY["repo_url"]
 
 
 async def test_update_skill_unknown_id_returns_404(skill_client: AsyncClient) -> None:
-    response = await skill_client.patch("/agent-skills/nonexistent", json={"name": "X"})
+    response = await skill_client.patch(
+        "/api/v1/agent-skills/nonexistent", json={"name": "X"}
+    )
     assert_err(response, code="NOT_FOUND", status=404)
 
 
@@ -173,23 +177,23 @@ async def test_update_skill_unknown_id_returns_404(skill_client: AsyncClient) ->
 
 async def test_delete_skill_returns_200(skill_client: AsyncClient) -> None:
     created = assert_ok(
-        await skill_client.post("/agent-skills", json=_CREATE_BODY), status=201
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
     )
-    response = await skill_client.delete(f"/agent-skills/{created['id']}")
+    response = await skill_client.delete(f"/api/v1/agent-skills/{created['id']}")
     assert assert_ok(response, status=200) is None
 
 
 async def test_delete_skill_removes_from_list(skill_client: AsyncClient) -> None:
     created = assert_ok(
-        await skill_client.post("/agent-skills", json=_CREATE_BODY), status=201
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
     )
-    await skill_client.delete(f"/agent-skills/{created['id']}")
-    response = await skill_client.get("/agent-skills")
+    await skill_client.delete(f"/api/v1/agent-skills/{created['id']}")
+    response = await skill_client.get("/api/v1/agent-skills")
     assert assert_ok(response) == []
 
 
 async def test_delete_skill_unknown_id_returns_404(skill_client: AsyncClient) -> None:
-    response = await skill_client.delete("/agent-skills/nonexistent")
+    response = await skill_client.delete("/api/v1/agent-skills/nonexistent")
     assert_err(response, code="NOT_FOUND", status=404)
 
 
@@ -200,7 +204,7 @@ async def test_create_skill_populates_created_and_updated_by_from_header(
     skill_client: AsyncClient,
 ) -> None:
     response = await skill_client.post(
-        "/agent-skills", json=_CREATE_BODY, headers={"X-User-Id": "alice"}
+        "/api/v1/agent-skills", json=_CREATE_BODY, headers={"X-User-Id": "alice"}
     )
     body = assert_ok(response, status=201)
     assert body["createdBy"] == "alice"
@@ -210,7 +214,7 @@ async def test_create_skill_populates_created_and_updated_by_from_header(
 async def test_create_skill_without_header_defaults_to_empty_string(
     skill_client: AsyncClient,
 ) -> None:
-    response = await skill_client.post("/agent-skills", json=_CREATE_BODY)
+    response = await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY)
     body = assert_ok(response, status=201)
     assert body["createdBy"] == ""
     assert body["updatedBy"] == ""
@@ -221,12 +225,12 @@ async def test_update_skill_preserves_created_by_and_overwrites_updated_by(
 ) -> None:
     created = assert_ok(
         await skill_client.post(
-            "/agent-skills", json=_CREATE_BODY, headers={"X-User-Id": "alice"}
+            "/api/v1/agent-skills", json=_CREATE_BODY, headers={"X-User-Id": "alice"}
         ),
         status=201,
     )
     response = await skill_client.patch(
-        f"/agent-skills/{created['id']}",
+        f"/api/v1/agent-skills/{created['id']}",
         json={"name": "Renamed"},
         headers={"X-User-Id": "bob"},
     )

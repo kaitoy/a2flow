@@ -24,7 +24,7 @@ describe("AgentSkillsPage", () => {
   });
 
   it("shows empty state when no skills", async () => {
-    server.use(http.get("http://localhost:8000/agent-skills", () => envelope([])));
+    server.use(http.get("http://localhost:8000/api/v1/agent-skills", () => envelope([])));
     render(<AgentSkillsPage />);
     await waitFor(() =>
       expect(screen.getByText("No agent skills registered yet.")).toBeInTheDocument()
@@ -33,7 +33,10 @@ describe("AgentSkillsPage", () => {
 
   it("shows error banner on api failure", async () => {
     server.use(
-      http.get("http://localhost:8000/agent-skills", () => new HttpResponse(null, { status: 500 }))
+      http.get(
+        "http://localhost:8000/api/v1/agent-skills",
+        () => new HttpResponse(null, { status: 500 })
+      )
     );
     render(<AgentSkillsPage />);
     await waitFor(() => expect(screen.getByText(/500/)).toBeInTheDocument());
@@ -51,7 +54,7 @@ describe("AgentSkillsPage", () => {
   it("calls delete api after confirm", async () => {
     const user = userEvent.setup();
     const deleteSpy = vi.fn(() => envelope(null));
-    server.use(http.delete("http://localhost:8000/agent-skills/:id", deleteSpy));
+    server.use(http.delete("http://localhost:8000/api/v1/agent-skills/:id", deleteSpy));
 
     render(<AgentSkillsPage />);
     await waitFor(() => screen.getByText("My Skill"));
