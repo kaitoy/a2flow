@@ -2,7 +2,7 @@
   "name": "a2flow-frontend",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@11.2.2",
   "scripts": {
     "predev": "node scripts/download-a2ui-schema.mjs && pnpm generate:api",
     "prebuild": "node scripts/download-a2ui-schema.mjs && pnpm generate:api",
