@@ -1,84 +1,22 @@
 "use client";
 
-import Image from "next/image";
-import logo from "@/../assets/logo.png";
 import { useChat } from "@/hooks/useChat";
-import { clearError } from "@/store/chatSlice";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { ChatInput } from "./ChatInput";
 import { MessageList } from "./MessageList";
-import { SessionList } from "./SessionList";
-import { ThemeToggle } from "./ThemeToggle";
 
-/** Top-level chat layout: sidebar, header with logo, error banner, message list, and input. */
+/**
+ * Conversation panel for a single session: message list and input. The persistent
+ * shell (sidebar, header, error banner) lives in the route layout, so this component
+ * is the only part that re-mounts when navigating between sessions.
+ */
 export function Chat({ sessionId: initialSessionId }: { sessionId: string | null }) {
-  const dispatch = useAppDispatch();
-  const userId = useAppSelector((s) => s.chat.userId);
-  const {
-    messages,
-    sessionId,
-    isRunning,
-    isStreaming,
-    error,
-    sendMessage,
-    sendA2uiAction,
-    switchSession,
-    newSession,
-    onSessionDeleted,
-  } = useChat(initialSessionId);
+  const { messages, isRunning, isStreaming, sendMessage, sendA2uiAction } =
+    useChat(initialSessionId);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <SessionList
-        userId={userId}
-        currentSessionId={sessionId}
-        onSelect={switchSession}
-        onNew={newSession}
-        onDeleted={onSessionDeleted}
-        disabled={isRunning}
-      />
-
-      <div className="flex flex-col flex-1 min-w-0">
-        <header className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-glass-border bg-glass backdrop-blur-xl">
-          <div className="flex items-center gap-3">
-            <Image
-              src={logo}
-              alt="A2Flow logo"
-              width={logo.width}
-              height={logo.height}
-              className="h-10 w-auto"
-              priority
-            />
-            <h1
-              className="text-[22px] leading-[32px] font-semibold tracking-tight text-gradient-accent"
-              style={{ fontFamily: "var(--font-space-grotesk)" }}
-            >
-              A2Flow
-            </h1>
-          </div>
-          <ThemeToggle />
-        </header>
-
-        {error && (
-          <div className="shrink-0 mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-error/40 bg-error-container px-4 py-2 text-sm text-on-error-container backdrop-blur-md">
-            <span className="flex items-center gap-2">
-              <span aria-hidden="true">⚠</span>
-              {error}
-            </span>
-            <button
-              type="button"
-              onClick={() => dispatch(clearError())}
-              className="cursor-pointer rounded-full px-2 leading-none text-on-error-container/70 transition-colors hover:bg-error/15 hover:text-on-error-container"
-              aria-label="Dismiss error"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        <MessageList messages={messages} isStreaming={isStreaming} onAction={sendA2uiAction} />
-        <ChatInput onSend={sendMessage} disabled={isRunning} />
-      </div>
-    </div>
+    <>
+      <MessageList messages={messages} isStreaming={isStreaming} onAction={sendA2uiAction} />
+      <ChatInput onSend={sendMessage} disabled={isRunning} />
+    </>
   );
 }
