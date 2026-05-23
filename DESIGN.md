@@ -123,6 +123,16 @@ glass:
   shadow-sm: '0 10px 32px rgba(15, 23, 42, 0.08)'
   shadow-lg: '0 28px 60px -16px rgba(15, 23, 42, 0.18)'
   shadow-glow: '0 0 36px rgba(20, 184, 166, 0.32)'
+motion:
+  duration-fast: 150ms
+  duration-base: 240ms
+  duration-slow: 360ms
+  ease-standard: 'cubic-bezier(0.2, 0, 0, 1)'
+  ease-emphasized: 'cubic-bezier(0.3, 0, 0, 1)'
+  ease-exit: 'cubic-bezier(0.3, 0, 0.8, 0.15)'
+  spring-gentle: '{ tension: 220, friction: 28 }'
+  spring-snappy: '{ tension: 320, friction: 26 }'
+  spring-bouncy: '{ tension: 260, friction: 18 }'
 ---
 
 ## Brand & Style
@@ -183,4 +193,42 @@ The shape language is **Soft Modern**.
   - *User:* Accent gradient fill, asymmetric corner (`rounded-tr-md`), inner-top highlight.
   - *Assistant:* `glass-panel`, asymmetric corner (`rounded-tl-md`), accent-colored streaming caret.
 - **A2UI surfaces:** `customCard` is rendered as `glass-panel-strong`. `customChoicePicker` chips use the same primary-gradient when selected and `glass-panel` when not.
-- **Theme Toggle:** A 36×36 round glass button in the chat header / admin sidebar bottom. Sun/Moon SVG icons; emits accent glow on hover.
+- **Theme Toggle:** A 36×36 round glass button in the chat header / admin sidebar bottom. Sun/Moon SVG icons; emits accent glow on hover. Icons cross-fade with a 90° rotation on toggle.
+
+## Motion
+
+Motion follows a **Material You — "emphasized, gentle"** model: short durations, an emphasized easing curve for entrances, and React Spring physics for anything that mounts or unmounts. The intent is responsive without being chatty — every user action gets a small acknowledgement, never a long ceremony.
+
+### Tokens (exposed as Tailwind v4 vars on `:root`)
+
+| Token | Value | Use |
+|-------|-------|-----|
+| `--motion-duration-fast` | 150ms | Micro-interactions (icon hover, ✕ reveal) |
+| `--motion-duration-base` | 240ms | Default for state transitions, button hovers |
+| `--motion-duration-slow` | 360ms | Larger surface changes (modals, banners) |
+| `--motion-ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` | Default ease-out for transitions |
+| `--motion-ease-emphasized` | `cubic-bezier(0.3, 0, 0, 1)` | Entrance choreography (message bubbles, lists) |
+| `--motion-ease-exit` | `cubic-bezier(0.3, 0, 0.8, 0.15)` | Exit / dismiss animations |
+
+### Spring presets (`@/lib/motion.ts`)
+
+| Preset | Config | Use |
+|--------|--------|-----|
+| `gentle` | `{ tension: 220, friction: 28 }` | Default for entrance/exit, dialogs, list items |
+| `snappy` | `{ tension: 320, friction: 26 }` | Brief feedback — theme toggle, send-button glow |
+| `bouncy` | `{ tension: 260, friction: 18 }` | Reserved for playful confirmations |
+
+Choose presets by intent (`useMotionConfig("gentle")`) rather than tuning tension/friction at call sites.
+
+### Patterns
+
+- **Entrance** — Message bubbles, error banners use the `animate-message-in` keyframe (`opacity 0→1` + `translateY(8px)→0` + slight `scale(0.985)→1`).
+- **List staggering** — Session list rows use React Spring `useTransition` with `trail: 40` to ripple in horizontally on first load.
+- **Modal** — `ConfirmDialog` cross-fades the backdrop and `scale(0.94)→1` the body with a gentle spring.
+- **Buttons** — All variants share `active:scale-[0.97]` for tactile press feedback; the primary additionally lifts 2px on hover (`motion-safe`-guarded).
+- **Streaming caret** — Assistant bubble caret uses both `animate-blink` (the original step-start blink, preserved for tests) and `motion-safe:animate-pulse-cursor` (a softer opacity + scaleY pulse) so motion-safe users get the richer effect.
+- **Theme toggle** — Sun/Moon icons cross-fade with a 90° rotation via `useTransition`.
+
+### Reduced motion
+
+`@media (prefers-reduced-motion: reduce)` collapses every animation/transition to ~0ms in `globals.css`. React Spring code paths also call `useMotionConfig`, which detects the same preference and returns `{ duration: 0 }` so lifecycle callbacks still fire. Never assume animations will run — code defensively around their completion.

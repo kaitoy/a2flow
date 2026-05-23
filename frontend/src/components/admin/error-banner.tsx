@@ -10,6 +10,7 @@ export function ErrorBanner({ error }: ErrorBannerProps) {
       className={[
         "mb-4 flex items-start gap-2 rounded-xl border border-error/40",
         "bg-error-container px-4 py-3 text-sm text-on-error-container backdrop-blur-md",
+        "animate-message-in",
       ].join(" ")}
       role="alert"
     >

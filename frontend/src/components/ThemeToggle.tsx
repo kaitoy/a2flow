@@ -1,5 +1,7 @@
 "use client";
 
+import { animated, useTransition } from "@react-spring/web";
+import { useMotionConfig } from "@/lib/motion";
 import { useTheme } from "./ThemeProvider";
 
 interface ThemeToggleProps {
@@ -10,10 +12,18 @@ interface ThemeToggleProps {
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
+  const config = useMotionConfig("snappy");
+  const iconTransitions = useTransition(isDark, {
+    from: { opacity: 0, rotate: -90 },
+    enter: { opacity: 1, rotate: 0 },
+    leave: { opacity: 0, rotate: 90 },
+    config,
+  });
   const cls = [
-    "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full",
-    "glass-panel text-on-surface transition-all",
-    "hover:shadow-glow hover:text-accent",
+    "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full relative overflow-hidden",
+    "glass-panel text-on-surface",
+    "transition-[box-shadow,color,background-color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
+    "hover:shadow-glow hover:text-accent motion-safe:active:scale-95",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
     className,
   ]
@@ -28,7 +38,18 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
       title={isDark ? "Switch to light theme" : "Switch to dark theme"}
     >
-      {isDark ? <SunIcon /> : <MoonIcon />}
+      {iconTransitions((style, dark) => (
+        <animated.span
+          style={{
+            opacity: style.opacity,
+            transform: style.rotate.to((r) => `rotate(${r}deg)`),
+          }}
+          className="absolute inset-0 flex items-center justify-center"
+          aria-hidden="true"
+        >
+          {dark ? <SunIcon /> : <MoonIcon />}
+        </animated.span>
+      ))}
     </button>
   );
 }

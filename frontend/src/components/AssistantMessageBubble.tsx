@@ -13,7 +13,7 @@ export function AssistantMessageBubble({
   const textContent = message.content ?? "";
   if (!textContent && !isStreaming) return null;
   return (
-    <div className="flex justify-start mb-3">
+    <div className="flex justify-start mb-3 animate-message-in">
       <div
         className={[
           "max-w-[75%] rounded-2xl rounded-tl-md px-4 py-2.5",
@@ -23,7 +23,13 @@ export function AssistantMessageBubble({
       >
         {textContent || (isStreaming ? null : " ")}
         {isStreaming && (
-          <span className="inline-block w-[2px] h-[1em] ml-0.5 bg-accent align-middle animate-blink" />
+          <span
+            className={[
+              "inline-block w-[2px] h-[1em] ml-0.5 align-middle origin-center rounded-full",
+              "bg-gradient-to-b from-accent to-secondary shadow-[0_0_8px_var(--color-accent-soft)]",
+              "animate-blink motion-safe:animate-pulse-cursor",
+            ].join(" ")}
+          />
         )}
       </div>
     </div>

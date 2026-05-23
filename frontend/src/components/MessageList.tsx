@@ -2,7 +2,9 @@
 
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
+import { animated, useSpring } from "@react-spring/web";
 import { useEffect, useRef } from "react";
+import { useMotionConfig } from "@/lib/motion";
 import { MessageBubble } from "./MessageBubble";
 
 /** Scrollable list of chat messages that auto-scrolls to the bottom when new messages arrive. */
@@ -16,6 +18,12 @@ export function MessageList({
   onAction?: (action: A2UIUserAction) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const emptyConfig = useMotionConfig("gentle");
+  const emptyStateSpring = useSpring({
+    from: { opacity: 0, transform: "scale(0.92)" },
+    to: { opacity: 1, transform: "scale(1)" },
+    config: emptyConfig,
+  });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to bottom whenever messages change
   useEffect(() => {
@@ -26,7 +34,10 @@ export function MessageList({
     <div className="flex-1 overflow-y-auto px-4 py-6">
       <div className="mx-auto flex max-w-3xl flex-col">
         {messages.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center py-20 text-center select-none">
+          <animated.div
+            style={emptyStateSpring}
+            className="flex h-full flex-col items-center justify-center py-20 text-center select-none"
+          >
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl glass-panel-strong shadow-glow">
               <span className="text-2xl">✦</span>
             </div>
@@ -36,7 +47,7 @@ export function MessageList({
             <p className="text-sm text-on-surface-variant">
               Ask anything, build an A2UI surface, or kick off a workflow.
             </p>
-          </div>
+          </animated.div>
         )}
         {messages.map((msg, i) => (
           <MessageBubble

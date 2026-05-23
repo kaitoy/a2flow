@@ -1,7 +1,9 @@
 "use client";
 
+import { animated, useTransition } from "@react-spring/web";
 import { useEffect, useState } from "react";
 import { deleteSession, listSessions, type Session } from "@/lib/api";
+import { useMotionConfig } from "@/lib/motion";
 import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 
@@ -26,6 +28,16 @@ export function SessionList({
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string } | null>(null);
+
+  const config = useMotionConfig("gentle");
+  const transitions = useTransition(sessions, {
+    keys: (s) => s.id,
+    from: { opacity: 0, transform: "translateX(-12px)" },
+    enter: { opacity: 1, transform: "translateX(0px)" },
+    leave: { opacity: 0, transform: "translateX(-24px)" },
+    trail: 40,
+    config,
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -69,7 +81,7 @@ export function SessionList({
         {!loading && sessions.length === 0 && (
           <p className="px-3 text-xs text-on-surface-variant">No sessions</p>
         )}
-        {sessions.map((s) => {
+        {transitions((style, s) => {
           const isActive = s.id === currentSessionId;
           const date = new Date(s.lastUpdateTime);
           const label = date.toLocaleString(undefined, {
@@ -79,11 +91,11 @@ export function SessionList({
             minute: "2-digit",
           });
           return (
-            <div
-              key={s.id}
+            <animated.div
+              style={style}
               className={[
                 "group relative mx-2 my-0.5 flex w-[calc(100%-1rem)] items-stretch rounded-xl",
-                "transition-all duration-150",
+                "transition-[background-color,color,box-shadow] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
                 isActive
                   ? "bg-accent-soft text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   : "text-on-surface-variant hover:bg-glass hover:text-on-surface",
@@ -92,7 +104,7 @@ export function SessionList({
               {isActive && (
                 <span
                   aria-hidden="true"
-                  className="absolute left-0 top-1/2 h-2/3 w-[3px] -translate-y-1/2 rounded-r-full bg-accent shadow-glow"
+                  className="absolute left-0 top-1/2 h-2/3 w-[3px] -translate-y-1/2 rounded-r-full bg-accent shadow-glow animate-fade-in motion-safe:origin-center motion-safe:[animation:fade-in_var(--motion-duration-base)_var(--motion-ease-emphasized)_both]"
                 />
               )}
               <button
@@ -116,8 +128,9 @@ export function SessionList({
                 disabled={disabled}
                 className={[
                   "mr-1 my-1 flex w-7 shrink-0 items-center justify-center rounded-lg",
-                  "text-on-surface-variant opacity-0 transition-all duration-150",
-                  "group-hover:opacity-100 hover:bg-error/10 hover:text-error",
+                  "text-on-surface-variant opacity-0",
+                  "transition-[opacity,background-color,color,transform] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
+                  "group-hover:opacity-100 hover:bg-error/10 hover:text-error motion-safe:hover:scale-110",
                   "focus-visible:opacity-100 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",
                 ].join(" ")}
               >
@@ -125,7 +138,7 @@ export function SessionList({
                   ✕
                 </span>
               </button>
-            </div>
+            </animated.div>
           );
         })}
       </div>

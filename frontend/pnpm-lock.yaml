@@ -26,6 +26,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.75.0(react@19.2.5))
+      '@react-spring/web':
+        specifier: ^10.0.4
+        version: 10.0.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@reduxjs/toolkit':
         specifier: ^2.5.0
         version: 2.11.2(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.5)(redux@5.0.1))(react@19.2.5)
@@ -647,6 +650,33 @@ packages:
   '@protobuf-ts/protoc@2.11.1':
     resolution: {integrity: sha512-mUZJaV0daGO6HUX90o/atzQ6A7bbN2RSuHtdwo8SSF2Qoe3zHwa4IHyCN1evftTeHfLmdz+45qo47sL+5P8nyg==}
     hasBin: true
+
+  '@react-spring/animated@10.0.4':
+    resolution: {integrity: sha512-AgKkI4q8YO1vgpcdWzRNQ2+6UrvYlpVRKm86RXj/gYpWJ0yR8vM+EY4BFAsqJgrs9e+33KkBDJpjYpNXuQ/FOQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@react-spring/core@10.0.4':
+    resolution: {integrity: sha512-Gf4xRLo1WA34We8H51DPMAPTzcm4ccfFdFiIoL/Qh5s5JkanDcNYbBJAdacnH8KO1+42TMeTtNm8HMFCASHE7g==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@react-spring/rafz@10.0.4':
+    resolution: {integrity: sha512-QK/vnFUpgVE1Wm4cvb1vDbhY6Xz4Ywfgkbr30hlXM3XAaMBWv08TWMorZhYb9T+gphHP45t7dUbUtp3r6k2nxA==}
+
+  '@react-spring/shared@10.0.4':
+    resolution: {integrity: sha512-OddJdzRNlQBX7vp9C4ow7OIcRbDXtic6PPqdUPHx89xwBH0u89Jm9h4B2HZQJnw+KiupGLXLGrUKSkZQfKlG0w==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@react-spring/types@10.0.4':
+    resolution: {integrity: sha512-E0KekCFXut0IB8+msh1g4oXz4AXwyfDz9Sqz+tfabnKbI1AkyoFs1tPJB8ViN0Ckq7Da6jYGU8TVNVkirsXBjQ==}
+
+  '@react-spring/web@10.0.4':
+    resolution: {integrity: sha512-6uYPLfuTlxR/t/s9xoliU1NObETm7Yad5PFLc0OFCqyF62BWZ8m73wTn6R091lvMyvddrl7NP2v95ueX3HAjmw==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   '@reduxjs/toolkit@2.11.2':
     resolution: {integrity: sha512-Kd6kAHTA6/nUpp8mySPqj3en3dm0tdMIgbttnQ1xFMVpufoj+ADi8pXLBsd4xzTRHQa7t/Jv8W5UnCuW4kuWMQ==}
@@ -2522,6 +2552,39 @@ snapshots:
   '@preact/signals-core@1.14.1': {}
 
   '@protobuf-ts/protoc@2.11.1': {}
+
+  '@react-spring/animated@10.0.4(react@19.2.5)':
+    dependencies:
+      '@react-spring/shared': 10.0.4(react@19.2.5)
+      '@react-spring/types': 10.0.4
+      react: 19.2.5
+
+  '@react-spring/core@10.0.4(react@19.2.5)':
+    dependencies:
+      '@react-spring/animated': 10.0.4(react@19.2.5)
+      '@react-spring/shared': 10.0.4(react@19.2.5)
+      '@react-spring/types': 10.0.4
+      react: 19.2.5
+
+  '@react-spring/rafz@10.0.4': {}
+
+  '@react-spring/shared@10.0.4(react@19.2.5)':
+    dependencies:
+      '@react-spring/rafz': 10.0.4
+      '@react-spring/types': 10.0.4
+      react: 19.2.5
+
+  '@react-spring/types@10.0.4': {}
+
+  '@react-spring/web@10.0.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+    dependencies:
+      '@react-spring/animated': 10.0.4(react@19.2.5)
+      '@react-spring/core': 10.0.4(react@19.2.5)
+      '@react-spring/shared': 10.0.4(react@19.2.5)
+      '@react-spring/types': 10.0.4
+      csstype: 3.2.3
+      react: 19.2.5
+      react-dom: 19.2.5(react@19.2.5)
 
   '@reduxjs/toolkit@2.11.2(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.5)(redux@5.0.1))(react@19.2.5)':
     dependencies:

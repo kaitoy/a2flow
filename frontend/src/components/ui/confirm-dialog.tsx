@@ -1,6 +1,8 @@
+import { animated, useTransition } from "@react-spring/web";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { useMotionConfig } from "@/lib/motion";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -19,6 +21,13 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const config = useMotionConfig("gentle");
+  const transitions = useTransition(open, {
+    from: { opacity: 0, scale: 0.94 },
+    enter: { opacity: 1, scale: 1 },
+    leave: { opacity: 0, scale: 0.96 },
+    config,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -56,40 +65,55 @@ export function ConfirmDialog({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open, onCancel]);
 
-  if (!open) return null;
+  // Guard against SSR — createPortal needs document.body, which is not
+  // available during Next.js prerendering.
+  if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm cursor-default"
-        onClick={onCancel}
-        tabIndex={-1}
-        aria-hidden="true"
-      />
-      <div className="relative flex items-center justify-center min-h-full p-4 pointer-events-none">
-        <div
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-dialog-title"
-          className="glass-panel-strong rounded-2xl p-6 max-w-sm w-full pointer-events-auto"
-        >
-          <h2 id="confirm-dialog-title" className="mb-2 text-lg font-semibold text-on-surface">
-            {title}
-          </h2>
-          <p className="mb-6 text-sm text-on-surface-variant">{description}</p>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button variant="secondary" onClick={onConfirm} className="text-error">
-              Delete
-            </Button>
+    transitions(
+      (style, item) =>
+        item && (
+          <div className="fixed inset-0 z-50">
+            <animated.button
+              type="button"
+              style={{ opacity: style.opacity }}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm cursor-default"
+              onClick={onCancel}
+              tabIndex={-1}
+              aria-hidden="true"
+            />
+            <div className="relative flex items-center justify-center min-h-full p-4 pointer-events-none">
+              <animated.div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="confirm-dialog-title"
+                style={{
+                  opacity: style.opacity,
+                  transform: style.scale.to((s) => `scale(${s})`),
+                }}
+                className="glass-panel-strong rounded-2xl p-6 max-w-sm w-full pointer-events-auto"
+              >
+                <h2
+                  id="confirm-dialog-title"
+                  className="mb-2 text-lg font-semibold text-on-surface"
+                >
+                  {title}
+                </h2>
+                <p className="mb-6 text-sm text-on-surface-variant">{description}</p>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={onCancel}>
+                    Cancel
+                  </Button>
+                  <Button variant="secondary" onClick={onConfirm} className="text-error">
+                    Delete
+                  </Button>
+                </div>
+              </animated.div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>,
+        )
+    ),
     document.body
   );
 }

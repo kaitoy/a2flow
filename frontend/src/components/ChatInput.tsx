@@ -1,6 +1,8 @@
 "use client";
 
+import { animated, useSpring } from "@react-spring/web";
 import { type KeyboardEvent, useRef, useState } from "react";
+import { useMotionConfig } from "@/lib/motion";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
@@ -13,6 +15,11 @@ interface Props {
 export function ChatInput({ onSend, disabled }: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const config = useMotionConfig("snappy");
+  const [glow, glowApi] = useSpring(() => ({
+    glow: 0,
+    config,
+  }));
 
   const handleSend = () => {
     const trimmed = value.trim();
@@ -22,6 +29,11 @@ export function ChatInput({ onSend, disabled }: Props) {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+    glowApi.start({
+      from: { glow: 1 },
+      to: { glow: 0 },
+      reset: true,
+    });
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -40,7 +52,17 @@ export function ChatInput({ onSend, disabled }: Props) {
 
   return (
     <div className="shrink-0 px-4 pb-6 pt-2">
-      <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl glass-panel-strong p-2 shadow-glass-lg">
+      <animated.div
+        style={{
+          boxShadow: glow.glow.to(
+            (g) =>
+              `0 28px 60px -16px rgba(15, 23, 42, 0.18), ` +
+              `inset 0 1px 0 rgba(255, 255, 255, 0.6), ` +
+              `0 0 ${36 + g * 32}px rgba(20, 184, 166, ${0.0 + g * 0.55})`
+          ),
+        }}
+        className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl glass-panel-strong p-2"
+      >
         <Textarea
           ref={textareaRef}
           value={value}
@@ -60,7 +82,7 @@ export function ChatInput({ onSend, disabled }: Props) {
         >
           Send
         </Button>
-      </div>
+      </animated.div>
     </div>
   );
 }
