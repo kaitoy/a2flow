@@ -115,5 +115,6 @@ class AgentRegistry:
                 session_service=self._session_service,
                 use_thread_id_as_session_id=True,
                 emit_messages_snapshot=True,
+                session_timeout_seconds=None,
             )
         return self._cache[agent_skill_id]
