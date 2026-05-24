@@ -43,6 +43,10 @@ Ruff removes unused imports automatically. When adding a new import to a Python 
 
 Colors, typography, spacing, and component styles are defined in [DESIGN.md](DESIGN.md). Consult it whenever adding or modifying UI components.
 
+## UI consistency
+
+Pages that share the same structural element (header, footer, form layout, etc.) must use the same shared component — never duplicate markup with hand-written classes. If no suitable shared component exists yet, extract one before writing the new page. Inline styles or one-off class combinations that duplicate an existing component are not acceptable; extend the existing component instead.
+
 ## Keeping tests in sync
 
 When modifying CSS class names or markup structure of a UI component, update every
