@@ -128,6 +128,14 @@ The caller's identity is read from the `X-User-Id` request header (set by all fr
 curl -H "X-User-Id: alice" "http://localhost:8000/api/v1/sessions"
 ```
 
+#### `GET /sessions/{session_id}` — Get a session
+
+```bash
+curl -H "X-User-Id: alice" "http://localhost:8000/api/v1/sessions/my-session"
+```
+
+Returns `404` if the session does not exist or belongs to a different user.
+
 #### `GET /sessions/{session_id}/messages` — Get session messages
 
 ```bash

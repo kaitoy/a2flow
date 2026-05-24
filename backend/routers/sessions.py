@@ -31,6 +31,27 @@ async def list_sessions(
     ]
 
 
+@router.get("/{session_id}", response_model=Session)
+async def get_session(
+    session_id: str,
+    user_id: CurrentUserIdDep,
+    session_service: SessionServiceDep,
+) -> Session:
+    """Get a single session by ID."""
+    session = await session_service.get_session(
+        app_name=APP_NAME,
+        user_id=user_id,
+        session_id=session_id,
+    )
+    if session is None:
+        raise NotFoundError("Session", session_id)
+    return Session(
+        id=session.id,
+        user_id=session.user_id,
+        last_update_time=datetime.fromtimestamp(session.last_update_time, tz=UTC),
+    )
+
+
 @router.get("/{session_id}/messages")
 async def get_session_messages(
     session_id: str,

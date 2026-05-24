@@ -20,6 +20,7 @@ import {
   zCreateWorkflowApiV1WorkflowsPostResponse,
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
+  zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
@@ -148,6 +149,14 @@ export interface WorkflowSession {
 export async function listSessions(): Promise<Session[]> {
   const data = await unwrap(apiClient.get<ApiResponse<Session[]>>("/api/v1/sessions"));
   return zListSessionsApiV1SessionsGetResponse.parse(data) as Session[];
+}
+
+/** Fetch a single session by ID. */
+export async function getSession(sessionId: string): Promise<Session> {
+  const data = await unwrap(
+    apiClient.get<ApiResponse<Session>>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`)
+  );
+  return zGetSessionApiV1SessionsSessionIdGetResponse.parse(data) as Session;
 }
 
 /** Fetch the full message history for a session (used to restore conversation state). */

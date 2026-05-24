@@ -2,8 +2,9 @@
 
 import { animated, useTransition } from "@react-spring/web";
 import { useEffect, useRef, useState } from "react";
-import { deleteSession, listSessions, type Session } from "@/lib/api";
+import { deleteSession, getSession, listSessions, type Session } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
+import { useAppSelector } from "@/store/hooks";
 import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { SlidingIndicator } from "./ui/sliding-indicator";
@@ -30,6 +31,8 @@ export function SessionList({
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string } | null>(null);
+  const reduxSessionId = useAppSelector((s) => s.chat.sessionId);
+  const isStreaming = useAppSelector((s) => s.chat.isStreaming);
 
   const itemMap = useRef<Map<string, HTMLElement | null>>(new Map());
 
@@ -43,6 +46,7 @@ export function SessionList({
     config,
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-fetch when the active user changes
   useEffect(() => {
     setLoading(true);
     listSessions()
@@ -54,6 +58,20 @@ export function SessionList({
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
   }, [userId]);
+
+  useEffect(() => {
+    if (!reduxSessionId || !isStreaming) return;
+    getSession(reduxSessionId)
+      .then((session) =>
+        setSessions((prev) => {
+          if (prev.some((s) => s.id === session.id)) return prev;
+          return [session, ...prev].sort(
+            (a, b) => Date.parse(b.lastUpdateTime) - Date.parse(a.lastUpdateTime)
+          );
+        })
+      )
+      .catch(() => {});
+  }, [reduxSessionId, isStreaming]);
 
   async function executeDelete() {
     if (!confirmTarget) return;

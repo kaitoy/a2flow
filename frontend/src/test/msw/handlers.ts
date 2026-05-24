@@ -69,6 +69,14 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/sessions/:sessionId/messages`, () => envelope([])),
 
+  http.get(`${BASE}/api/v1/sessions/:sessionId`, ({ params }) =>
+    envelope({
+      id: params.sessionId as string,
+      userId: "user",
+      lastUpdateTime: "2026-05-10T12:00:02.000Z",
+    })
+  ),
+
   http.delete(`${BASE}/api/v1/sessions/:sessionId`, () => envelope(null)),
 
   http.post(`${BASE}/api/v1/sessions`, () =>

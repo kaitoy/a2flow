@@ -1,9 +1,9 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import { SessionList } from "./SessionList";
 
 const defaultProps = {
