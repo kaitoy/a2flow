@@ -1,6 +1,7 @@
 "use client";
 
 import { animated, useTransition } from "@react-spring/web";
+import { useEffect, useState } from "react";
 import { useMotionConfig } from "@/lib/motion";
 import { useTheme } from "./ThemeProvider";
 
@@ -11,7 +12,13 @@ interface ThemeToggleProps {
 /** Icon button that toggles between light and dark themes. */
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
+  // Defer theme-dependent rendering until after hydration to avoid SSR mismatch.
+  // The server always renders as "light"; the client corrects itself after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const isDark = mounted && theme === "dark";
   const config = useMotionConfig("snappy");
   const iconTransitions = useTransition(isDark, {
     from: { opacity: 0, rotate: -90 },
