@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
@@ -80,9 +81,7 @@ export default function WorkflowSessionsPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-8">
-      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-        Workflow Sessions
-      </h1>
+      <AdminPageHeader title="Workflow Sessions" />
       <ErrorBanner error={error} />
       <DataTable
         columns={buildColumns()}
