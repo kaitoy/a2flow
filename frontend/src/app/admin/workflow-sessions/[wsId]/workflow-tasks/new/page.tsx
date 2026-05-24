@@ -1,0 +1,117 @@
+/** @module NewWorkflowTaskPage — Admin form for creating a new WorkflowTask under a session. */
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { ErrorBanner } from "@/components/admin/error-banner";
+import { FormField } from "@/components/admin/form-field";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { createWorkflowTask } from "@/lib/api";
+
+const schema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string(),
+  status: z.enum(["pending", "in_progress", "completed", "failed", "skipped"]),
+  position: z.coerce.number().int().min(0, "Position must be 0 or greater"),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+/** Form page that creates a new WorkflowTask belonging to the session in the URL. */
+export default function NewWorkflowTaskPage() {
+  const { wsId } = useParams<{ wsId: string }>();
+  const router = useRouter();
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(schema),
+    mode: "onBlur",
+    defaultValues: {
+      title: "",
+      description: "",
+      status: "pending" as const,
+      position: 0,
+    },
+  });
+
+  async function onSubmit(values: FormValues) {
+    setApiError(null);
+    try {
+      await createWorkflowTask({
+        workflowSessionId: wsId,
+        title: values.title,
+        description: values.description || null,
+        status: values.status,
+        position: values.position,
+      });
+      router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Failed to create task");
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl p-8">
+      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
+        New Workflow Task
+      </h1>
+
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
+      >
+        <FormField htmlFor="title" label="Title" required error={errors.title?.message}>
+          <Input id="title" placeholder="Short, actionable title" {...register("title")} />
+        </FormField>
+
+        <FormField htmlFor="description" label="Description">
+          <Textarea
+            id="description"
+            rows={4}
+            placeholder="Longer-form details (optional)"
+            {...register("description")}
+          />
+        </FormField>
+
+        <FormField htmlFor="status" label="Status" required error={errors.status?.message}>
+          <Select id="status" {...register("status")}>
+            <option value="pending">pending</option>
+            <option value="in_progress">in progress</option>
+            <option value="completed">completed</option>
+            <option value="failed">failed</option>
+            <option value="skipped">skipped</option>
+          </Select>
+        </FormField>
+
+        <FormField htmlFor="position" label="Position" required error={errors.position?.message}>
+          <Input id="position" type="number" min={0} step={1} {...register("position")} />
+        </FormField>
+
+        <ErrorBanner error={apiError} />
+
+        <div className="flex gap-2">
+          <Button type="submit" variant="primary" disabled={isSubmitting}>
+            {isSubmitting ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`)}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}

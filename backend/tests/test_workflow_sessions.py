@@ -36,6 +36,48 @@ def _make_run_agent_input() -> dict[str, Any]:
     }
 
 
+# ---------- GET /workflow-sessions (list) ----------
+
+
+async def test_list_workflow_sessions_empty_initially(
+    workflow_client: AsyncClient,
+) -> None:
+    response = await workflow_client.get("/api/v1/workflow-sessions")
+    assert assert_ok(response) == []
+
+
+async def test_list_workflow_sessions_returns_executed_sessions(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    await _execute_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get("/api/v1/workflow-sessions")
+    assert len(assert_ok(response)) == 1
+
+
+async def test_list_workflow_sessions_respects_limit_param(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    body = {
+        "name": "My Workflow",
+        "prompt": "Do the thing",
+        "agent_skill_id": skill["id"],
+    }
+    wf = assert_ok(
+        await workflow_client.post("/api/v1/workflows", json=body), status=201
+    )
+    for _ in range(3):
+        assert_ok(
+            await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"),
+            status=201,
+        )
+    response = await workflow_client.get(
+        "/api/v1/workflow-sessions", params={"limit": 2}
+    )
+    assert len(assert_ok(response)) == 2
+
+
 # ---------- GET /workflow-sessions/{id} ----------
 
 

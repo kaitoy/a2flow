@@ -8,11 +8,26 @@ from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from dependencies import AgentRegistryDep, WorkflowSessionRepositoryDep
+from dependencies import (
+    AgentRegistryDep,
+    PaginationDep,
+    WorkflowSessionRepositoryDep,
+    WorkflowTaskRepositoryDep,
+)
 from models.workflow_session import WorkflowSession
+from models.workflow_task import WorkflowTask
 from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/workflow-sessions", tags=["workflow-sessions"])
+
+
+@router.get("", response_model=list[WorkflowSession])
+async def list_workflow_sessions(
+    ws_repo: WorkflowSessionRepositoryDep,
+    pagination: PaginationDep,
+) -> list[WorkflowSession]:
+    """Return WorkflowSession records ordered by ``created_at`` descending."""
+    return await ws_repo.list(limit=pagination.limit, offset=pagination.offset)
 
 
 @router.get("/{ws_id}", response_model=WorkflowSession)
@@ -25,6 +40,28 @@ async def get_workflow_session(
     if ws is None:
         raise NotFoundError("WorkflowSession", ws_id)
     return ws
+
+
+@router.get("/{ws_id}/workflow-tasks", response_model=list[WorkflowTask])
+async def list_workflow_session_tasks(
+    ws_id: str,
+    ws_repo: WorkflowSessionRepositoryDep,
+    tasks: WorkflowTaskRepositoryDep,
+    pagination: PaginationDep,
+) -> list[WorkflowTask]:
+    """Return the WorkflowTasks belonging to the given WorkflowSession.
+
+    Raises HTTP 404 (``NotFoundError``) if the parent session does not exist,
+    so callers can distinguish "no such session" from "session exists but has
+    no tasks".
+    """
+    if await ws_repo.get(ws_id) is None:
+        raise NotFoundError("WorkflowSession", ws_id)
+    return await tasks.list(
+        limit=pagination.limit,
+        offset=pagination.offset,
+        workflow_session_id=ws_id,
+    )
 
 
 @router.post("/{ws_id}/agent", include_in_schema=False)

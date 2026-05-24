@@ -9,18 +9,27 @@ import type {
   Session as SessionModel,
   WorkflowCreate,
   Workflow as WorkflowModel,
+  WorkflowTaskCreate,
+  WorkflowTask as WorkflowTaskModel,
+  WorkflowTaskStatus,
+  WorkflowTaskUpdate,
   WorkflowUpdate,
 } from "@/generated/api/types.gen";
 import {
   zCreateAgentSkillApiV1AgentSkillsPostResponse,
   zCreateWorkflowApiV1WorkflowsPostResponse,
+  zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
+  zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
+  zListWorkflowSessionsApiV1WorkflowSessionsGetResponse,
+  zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse,
   zListWorkflowsApiV1WorkflowsGetResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
+  zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
 } from "@/generated/api/zod.gen";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import logger from "./logger";
@@ -103,8 +112,17 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
 
 export type AgentSkill = WithAudit<AgentSkillModel>;
 export type Workflow = WithAudit<WorkflowModel>;
+export type WorkflowTask = WithAudit<WorkflowTaskModel>;
 export type Session = SessionModel;
-export type { AgentSkillCreate, AgentSkillUpdate, WorkflowCreate, WorkflowUpdate };
+export type {
+  AgentSkillCreate,
+  AgentSkillUpdate,
+  WorkflowCreate,
+  WorkflowTaskCreate,
+  WorkflowTaskStatus,
+  WorkflowTaskUpdate,
+  WorkflowUpdate,
+};
 
 /** Snapshot of workflow and skill metadata recorded when a workflow is executed. */
 export interface WorkflowSession {
@@ -253,6 +271,70 @@ export async function getWorkflowSession(id: string): Promise<WorkflowSession> {
     apiClient.get<ApiResponse<WorkflowSession>>(
       `/api/v1/workflow-sessions/${encodeURIComponent(id)}`
     )
+  );
+}
+
+/** List WorkflowSession records (newest first) with optional pagination. */
+export async function listWorkflowSessions(limit = 20, offset = 0): Promise<WorkflowSession[]> {
+  const data = await unwrap(
+    apiClient.get<ApiResponse<WorkflowSession[]>>("/api/v1/workflow-sessions", {
+      params: { limit, offset },
+    })
+  );
+  return zListWorkflowSessionsApiV1WorkflowSessionsGetResponse.parse(data) as WorkflowSession[];
+}
+
+/** List the WorkflowTasks belonging to the given WorkflowSession (position ASC). */
+export async function listWorkflowTasks(
+  workflowSessionId: string,
+  limit = 20,
+  offset = 0
+): Promise<WorkflowTask[]> {
+  const data = await unwrap(
+    apiClient.get<ApiResponse<WorkflowTask[]>>(
+      `/api/v1/workflow-sessions/${encodeURIComponent(workflowSessionId)}/workflow-tasks`,
+      { params: { limit, offset } }
+    )
+  );
+  return zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse.parse(
+    data
+  ) as WorkflowTask[];
+}
+
+/** Fetch a single WorkflowTask by ID. */
+export async function getWorkflowTask(taskId: string): Promise<WorkflowTask> {
+  const data = await unwrap(
+    apiClient.get<ApiResponse<WorkflowTask>>(`/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`)
+  );
+  return zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse.parse(data) as WorkflowTask;
+}
+
+/** Create a new WorkflowTask under the workflow session given in ``body.workflowSessionId``. */
+export async function createWorkflowTask(body: WorkflowTaskCreate): Promise<WorkflowTask> {
+  const data = await unwrap(
+    apiClient.post<ApiResponse<WorkflowTask>>("/api/v1/workflow-tasks", body)
+  );
+  return zCreateWorkflowTaskApiV1WorkflowTasksPostResponse.parse(data) as WorkflowTask;
+}
+
+/** Apply a partial update to a WorkflowTask. ``workflowSessionId`` is not updatable. */
+export async function updateWorkflowTask(
+  taskId: string,
+  body: WorkflowTaskUpdate
+): Promise<WorkflowTask> {
+  const data = await unwrap(
+    apiClient.patch<ApiResponse<WorkflowTask>>(
+      `/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`,
+      body
+    )
+  );
+  return zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse.parse(data) as WorkflowTask;
+}
+
+/** Delete a WorkflowTask by ID. */
+export async function deleteWorkflowTask(taskId: string): Promise<void> {
+  await unwrap(
+    apiClient.delete<ApiResponse<null>>(`/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`)
   );
 }
 

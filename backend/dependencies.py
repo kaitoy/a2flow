@@ -17,8 +17,10 @@ from repositories import (
     SqlAgentSkillRepository,
     SqlWorkflowRepository,
     SqlWorkflowSessionRepository,
+    SqlWorkflowTaskRepository,
     WorkflowRepository,
     WorkflowSessionRepository,
+    WorkflowTaskRepository,
 )
 from services import SkillManager
 from session_service import StaleTolerantSqliteSessionService
@@ -108,4 +110,21 @@ def get_workflow_session_repository(db: DBSessionDep) -> WorkflowSessionReposito
 
 WorkflowSessionRepositoryDep = Annotated[
     WorkflowSessionRepository, Depends(get_workflow_session_repository)
+]
+
+
+def get_workflow_task_repository(
+    db: DBSessionDep,
+    ws_repo: WorkflowSessionRepositoryDep,
+) -> WorkflowTaskRepository:
+    """Create a WorkflowTaskRepository backed by the current database session.
+
+    The injected WorkflowSessionRepository is used to validate that the parent
+    session exists when creating tasks.
+    """
+    return SqlWorkflowTaskRepository(db, ws_repo)
+
+
+WorkflowTaskRepositoryDep = Annotated[
+    WorkflowTaskRepository, Depends(get_workflow_task_repository)
 ]

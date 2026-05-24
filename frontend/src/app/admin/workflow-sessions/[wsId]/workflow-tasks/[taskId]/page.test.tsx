@@ -1,0 +1,124 @@
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
+import { describe, expect, it, vi } from "vitest";
+import { envelope } from "@/test/msw/envelope";
+import { server } from "@/test/msw/server";
+import EditWorkflowTaskPage from "./page";
+
+const pushMock = vi.fn();
+
+vi.mock("next/link", () => ({
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
+
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ wsId: "ws-1", taskId: "task-1" }),
+  useRouter: () => ({ push: pushMock }),
+}));
+
+describe("EditWorkflowTaskPage", () => {
+  it("prefills the form with the loaded task", async () => {
+    render(<EditWorkflowTaskPage />);
+    const titleInput = await screen.findByLabelText<HTMLInputElement>(/Title/);
+    expect(titleInput.value).toBe("Step 1");
+  });
+
+  it("submits PATCH and navigates back to the tasks list", async () => {
+    pushMock.mockClear();
+    const user = userEvent.setup();
+    let receivedBody: unknown = null;
+    server.use(
+      http.patch("http://localhost:8000/api/v1/workflow-tasks/:taskId", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope({
+          id: "task-1",
+          workflowSessionId: "ws-1",
+          title: "Renamed",
+          description: null,
+          status: "in_progress",
+          position: 2,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        });
+      })
+    );
+
+    render(<EditWorkflowTaskPage />);
+    const title = await screen.findByLabelText<HTMLInputElement>(/Title/);
+    await user.clear(title);
+    await user.type(title, "Renamed");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/admin/workflow-sessions/ws-1/workflow-tasks")
+    );
+    expect(receivedBody).toMatchObject({ title: "Renamed" });
+  });
+
+  it("does not include workflowSessionId in PATCH body (parent is immutable)", async () => {
+    const user = userEvent.setup();
+    let receivedBody: Record<string, unknown> = {};
+    server.use(
+      http.patch("http://localhost:8000/api/v1/workflow-tasks/:taskId", async ({ request }) => {
+        receivedBody = (await request.json()) as Record<string, unknown>;
+        return envelope({
+          id: "task-1",
+          workflowSessionId: "ws-1",
+          title: "Step 1",
+          description: null,
+          status: "pending",
+          position: 0,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        });
+      })
+    );
+
+    render(<EditWorkflowTaskPage />);
+    await screen.findByLabelText(/Title/);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(Object.keys(receivedBody).length).toBeGreaterThan(0));
+    expect(receivedBody).not.toHaveProperty("workflowSessionId");
+  });
+
+  it("opens the confirm dialog and calls DELETE", async () => {
+    pushMock.mockClear();
+    const user = userEvent.setup();
+    const deleteSpy = vi.fn(() => envelope(null));
+    server.use(http.delete("http://localhost:8000/api/v1/workflow-tasks/:taskId", deleteSpy));
+
+    render(<EditWorkflowTaskPage />);
+    await screen.findByLabelText(/Title/);
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /delete/i }));
+
+    expect(deleteSpy).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/admin/workflow-sessions/ws-1/workflow-tasks")
+    );
+  });
+
+  it("shows an error banner when the update fails", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.patch(
+        "http://localhost:8000/api/v1/workflow-tasks/:taskId",
+        () => new HttpResponse(null, { status: 500 })
+      )
+    );
+
+    render(<EditWorkflowTaskPage />);
+    await screen.findByLabelText(/Title/);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByText(/500/)).toBeInTheDocument());
+  });
+});

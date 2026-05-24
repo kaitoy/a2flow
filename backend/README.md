@@ -74,6 +74,7 @@ SQLite URL for REST API data and ADK session storage. Both the SQLModel async en
 |---|---|
 | `agent_skills` | Agent skill definitions |
 | `workflows` | Workflow definitions |
+| `workflow_tasks` | Individual tasks belonging to a `WorkflowSession` (`workflow_session_id` FK with `ON DELETE CASCADE`) |
 | `sessions` | Session metadata and session-level state |
 | `events` | Full event history per session (JSON) |
 | `app_states` | App-level shared state |
@@ -231,6 +232,80 @@ Returns `204 No Content`.
 
 ```bash
 curl -X DELETE http://localhost:8000/workflows/<id>
+```
+
+---
+
+### Workflow sessions
+
+A `WorkflowSession` is the snapshot record created when a workflow is executed via `POST /workflows/{id}/execute`. The chat experience is exposed at `POST /workflow-sessions/{id}/agent` (streaming) and the session metadata is fetched via `GET /workflow-sessions/{id}`. A list endpoint enables the admin UI to browse all executed sessions ordered by most recent first.
+
+#### `GET /api/v1/workflow-sessions` — List workflow sessions
+
+```bash
+curl "http://localhost:8000/api/v1/workflow-sessions?limit=20&offset=0"
+```
+
+#### `GET /api/v1/workflow-sessions/{id}` — Get a workflow session
+
+```bash
+curl http://localhost:8000/api/v1/workflow-sessions/<id>
+```
+
+---
+
+### Workflow tasks
+
+A workflow task is a single actionable item belonging to a `WorkflowSession`. Tasks are intended to capture the steps produced by the agent under the workflow instruction *"use the provided skill to produce an actionable task list"*. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`) and an integer `position` used for stable ordering within a session. Deleting the parent `WorkflowSession` cascades to its tasks.
+
+#### `POST /api/v1/workflow-tasks` — Create a workflow task
+
+```bash
+curl -X POST http://localhost:8000/api/v1/workflow-tasks \
+  -H "Content-Type: application/json" \
+  -d '{"workflowSessionId": "<ws_id>", "title": "Draft outline", "position": 0}'
+```
+
+**Request body**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `workflowSessionId` | string | Yes | ID of the parent `WorkflowSession` |
+| `title` | string | Yes | Short, human-readable task title |
+| `description` | string | No | Longer-form details about the task |
+| `status` | string | No | One of `pending`, `in_progress`, `completed`, `failed`, `skipped` (default: `pending`) |
+| `position` | integer | No | Sort order within the session (default: `0`) |
+
+Returns `422 FOREIGN_KEY_VIOLATION` if `workflowSessionId` does not match an existing session.
+
+#### `GET /api/v1/workflow-sessions/{session_id}/workflow-tasks` — List tasks for a session
+
+Returns the tasks belonging to a `WorkflowSession`, ordered by `position` ASC then `created_at` ASC. Returns `404` if the session does not exist.
+
+```bash
+curl "http://localhost:8000/api/v1/workflow-sessions/<ws_id>/workflow-tasks?limit=20&offset=0"
+```
+
+#### `GET /api/v1/workflow-tasks/{task_id}` — Get a workflow task
+
+```bash
+curl http://localhost:8000/api/v1/workflow-tasks/<id>
+```
+
+#### `PATCH /api/v1/workflow-tasks/{task_id}` — Update a workflow task
+
+`workflowSessionId` is not updatable; once a task is created it cannot be re-parented.
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/workflow-tasks/<id> \
+  -H "Content-Type: application/json" \
+  -d '{"status": "in_progress"}'
+```
+
+#### `DELETE /api/v1/workflow-tasks/{task_id}` — Delete a workflow task
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/workflow-tasks/<id>
 ```
 
 ---

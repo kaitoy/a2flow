@@ -12,6 +12,7 @@ import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 const NAV = [
   { href: "/admin/agent-skills", label: "Agent Skills" },
   { href: "/admin/workflows", label: "Workflows" },
+  { href: "/admin/workflow-sessions", label: "Workflow Sessions" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -7,6 +7,7 @@ from .exceptions import (
 )
 from .workflow import SqlWorkflowRepository, WorkflowRepository
 from .workflow_session import SqlWorkflowSessionRepository, WorkflowSessionRepository
+from .workflow_task import SqlWorkflowTaskRepository, WorkflowTaskRepository
 
 __all__ = [
     "AgentSkillRepository",
@@ -17,6 +18,8 @@ __all__ = [
     "SqlAgentSkillRepository",
     "SqlWorkflowRepository",
     "SqlWorkflowSessionRepository",
+    "SqlWorkflowTaskRepository",
     "WorkflowRepository",
     "WorkflowSessionRepository",
+    "WorkflowTaskRepository",
 ]

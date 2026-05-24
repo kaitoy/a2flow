@@ -27,6 +27,38 @@ const WORKFLOW_1 = {
   updatedBy: "",
 };
 
+const WORKFLOW_SESSION_1 = {
+  id: "ws-1",
+  sessionId: "executed-session-id",
+  workflowId: "wf-1",
+  workflowName: "My Workflow",
+  workflowPrompt: "Do the thing",
+  workflowDescription: null,
+  agentSkillId: "skill-1",
+  agentSkillName: "My Skill",
+  agentSkillRepoUrl: "https://github.com/example/repo",
+  agentSkillRepoPath: "",
+  skillDir: "/tmp/skill",
+  userId: "user",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+const WORKFLOW_TASK_1 = {
+  id: "task-1",
+  workflowSessionId: "ws-1",
+  title: "Step 1",
+  description: null,
+  status: "pending",
+  position: 0,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 export const handlers = [
   http.get(`${BASE}/api/v1/sessions`, () =>
     envelope([
@@ -94,24 +126,21 @@ export const handlers = [
     )
   ),
 
-  http.get(`${BASE}/api/v1/workflow-sessions/:id`, () =>
-    envelope({
-      id: "ws-1",
-      sessionId: "executed-session-id",
-      workflowId: "wf-1",
-      workflowName: "My Workflow",
-      workflowPrompt: "Do the thing",
-      workflowDescription: null,
-      agentSkillId: "skill-1",
-      agentSkillName: "My Skill",
-      agentSkillRepoUrl: "https://github.com/example/repo",
-      agentSkillRepoPath: "",
-      skillDir: "/tmp/skill",
-      userId: "user",
-      createdAt: "2026-01-01T00:00:00Z",
-      updatedAt: "2026-01-01T00:00:00Z",
-      createdBy: "",
-      updatedBy: "",
-    })
+  http.get(`${BASE}/api/v1/workflow-sessions`, () => envelope([WORKFLOW_SESSION_1])),
+
+  http.get(`${BASE}/api/v1/workflow-sessions/:id`, () => envelope(WORKFLOW_SESSION_1)),
+
+  http.get(`${BASE}/api/v1/workflow-sessions/:wsId/workflow-tasks`, () =>
+    envelope([WORKFLOW_TASK_1])
   ),
+
+  http.post(`${BASE}/api/v1/workflow-tasks`, () =>
+    envelope({ ...WORKFLOW_TASK_1, id: "new-task-id" }, 201)
+  ),
+
+  http.get(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(WORKFLOW_TASK_1)),
+
+  http.patch(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(WORKFLOW_TASK_1)),
+
+  http.delete(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(null)),
 ];

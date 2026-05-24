@@ -88,6 +88,9 @@ async def workflow_client(
     from models.workflow_session import (
         WorkflowSession as _WorkflowSession,  # noqa: F401 — registers model
     )
+    from models.workflow_task import (
+        WorkflowTask as _WorkflowTask,  # noqa: F401 — registers model
+    )
 
     mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
 
