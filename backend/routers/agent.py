@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from agent import AGENT_SKILL_ID_KEY, SKILL_DIR_KEY
-from dependencies import APP_NAME, AgentRegistryDep, SessionServiceDep
+from dependencies import APP_NAME, AgentRegistryDep, CurrentUserIdDep, SessionServiceDep
 
 router = APIRouter()
 
@@ -20,6 +20,7 @@ async def agent_endpoint(
     request: Request,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
+    user_id: CurrentUserIdDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the ADK agent for the given thread.
 
@@ -33,7 +34,7 @@ async def agent_endpoint(
     input_data = input_data.model_copy(update={"messages": filtered})
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
-    user_id = input_data.forwarded_props.get("userId", "user")
+    user_id = user_id or "user"
     session = await session_service.get_session(
         app_name=APP_NAME,
         user_id=user_id,

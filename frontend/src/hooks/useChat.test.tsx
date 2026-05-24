@@ -48,7 +48,7 @@ describe("useChat", () => {
   it("calls getSessionMessages on mount", async () => {
     const store = makeStore();
     renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
-    await waitFor(() => expect(api.getSessionMessages).toHaveBeenCalledWith("sess-abc", "user"));
+    await waitFor(() => expect(api.getSessionMessages).toHaveBeenCalledWith("sess-abc"));
   });
 
   it("dispatches resumeSession after getSessionMessages resolves", async () => {

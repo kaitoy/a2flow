@@ -45,7 +45,7 @@ export function SessionList({
 
   useEffect(() => {
     setLoading(true);
-    listSessions(userId)
+    listSessions()
       .then((list) =>
         setSessions(
           [...list].sort((a, b) => Date.parse(b.lastUpdateTime) - Date.parse(a.lastUpdateTime))
@@ -59,7 +59,7 @@ export function SessionList({
     if (!confirmTarget) return;
     const targetId = confirmTarget.id;
     try {
-      await deleteSession(targetId, userId);
+      await deleteSession(targetId);
       setSessions((prev) => prev.filter((s) => s.id !== targetId));
       if (targetId === currentSessionId) {
         onDeleted?.(targetId);

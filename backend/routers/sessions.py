@@ -4,7 +4,7 @@ from ag_ui_adk import adk_events_to_messages
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from dependencies import APP_NAME, SessionServiceDep
+from dependencies import APP_NAME, CurrentUserIdDep, SessionServiceDep
 from models.session import Session
 from repositories.exceptions import NotFoundError
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 @router.get("", response_model=list[Session])
 async def list_sessions(
-    user_id: str,
+    user_id: CurrentUserIdDep,
     session_service: SessionServiceDep,
 ) -> list[Session]:
     """List all sessions for a user."""
@@ -34,7 +34,7 @@ async def list_sessions(
 @router.get("/{session_id}/messages")
 async def get_session_messages(
     session_id: str,
-    user_id: str,
+    user_id: CurrentUserIdDep,
     session_service: SessionServiceDep,
 ) -> JSONResponse:
     """Get message history for a session."""
@@ -52,7 +52,7 @@ async def get_session_messages(
 @router.delete("/{session_id}")
 async def delete_session(
     session_id: str,
-    user_id: str,
+    user_id: CurrentUserIdDep,
     session_service: SessionServiceDep,
 ) -> None:
     """Delete a session."""

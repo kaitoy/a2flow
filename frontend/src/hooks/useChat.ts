@@ -103,7 +103,7 @@ export function useChat(initialSessionId: string | null) {
     // already in Redux from the optimistic sendMessage path — preserve the in-flight stream.
     if (store.getState().chat.sessionId === initialSessionId) return;
     dispatch(setSession(initialSessionId));
-    getSessionMessages(initialSessionId, userId)
+    getSessionMessages(initialSessionId)
       .then((messages) => dispatch(resumeSession({ sessionId: initialSessionId, messages })))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,7 +161,7 @@ export function useChat(initialSessionId: string | null) {
 
       try {
         await agent.runAgent(
-          { forwardedProps: { userId } },
+          undefined,
           makeEventHandlers(dispatch, (tcId) => {
             pendingRenderToolCallIds.current.push(tcId);
           })
@@ -174,7 +174,7 @@ export function useChat(initialSessionId: string | null) {
 
       dispatch(finishRun());
     },
-    [sessionId, userId, isRunning, dispatch, router]
+    [sessionId, isRunning, dispatch, router]
   );
 
   const sendA2uiAction = useCallback(
@@ -193,7 +193,7 @@ export function useChat(initialSessionId: string | null) {
 
       try {
         await agent.runAgent(
-          { forwardedProps: { userId } },
+          undefined,
           makeEventHandlers(dispatch, (tcId) => {
             pendingRenderToolCallIds.current.push(tcId);
           })
@@ -206,7 +206,7 @@ export function useChat(initialSessionId: string | null) {
 
       dispatch(finishRun());
     },
-    [sessionId, userId, isRunning, dispatch]
+    [sessionId, isRunning, dispatch]
   );
 
   return {

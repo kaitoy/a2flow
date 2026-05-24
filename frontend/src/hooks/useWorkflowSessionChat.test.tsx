@@ -37,7 +37,7 @@ describe("useWorkflowSessionChat", () => {
     renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"), {
       wrapper: makeWrapper(store),
     });
-    await waitFor(() => expect(api.getSessionMessages).toHaveBeenCalledWith("sess-abc", "user"));
+    await waitFor(() => expect(api.getSessionMessages).toHaveBeenCalledWith("sess-abc"));
   });
 
   it("auto-sends workflowPrompt when messages are empty on mount", async () => {

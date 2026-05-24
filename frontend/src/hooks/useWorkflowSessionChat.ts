@@ -102,7 +102,7 @@ export function useWorkflowSessionChat(
 
       try {
         await agent.runAgent(
-          { forwardedProps: { userId } },
+          undefined,
           makeEventHandlers(dispatch, (tcId) => {
             pendingRenderToolCallIds.current.push(tcId);
           })
@@ -115,13 +115,13 @@ export function useWorkflowSessionChat(
 
       dispatch(finishRun());
     },
-    [workflowSessionId, sessionId, userId, isRunning, dispatch]
+    [workflowSessionId, sessionId, isRunning, dispatch]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and autoSentRef guards against double-sends
   useEffect(() => {
     dispatch(setSession(sessionId));
-    getSessionMessages(sessionId, userId)
+    getSessionMessages(sessionId)
       .then((loadedMessages) => {
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
         if (loadedMessages.length === 0 && !autoSentRef.current) {

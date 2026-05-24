@@ -144,34 +144,25 @@ export interface WorkflowSession {
   updatedBy: string;
 }
 
-/** Fetch all sessions for the given user, sorted by most recent activity. */
-export async function listSessions(userId: string): Promise<Session[]> {
-  const data = await unwrap(
-    apiClient.get<ApiResponse<Session[]>>("/api/v1/sessions", {
-      params: { user_id: userId },
-    })
-  );
+/** Fetch all sessions for the current user (identified by the X-User-Id header). */
+export async function listSessions(): Promise<Session[]> {
+  const data = await unwrap(apiClient.get<ApiResponse<Session[]>>("/api/v1/sessions"));
   return zListSessionsApiV1SessionsGetResponse.parse(data) as Session[];
 }
 
 /** Fetch the full message history for a session (used to restore conversation state). */
-export async function getSessionMessages(sessionId: string, userId: string): Promise<Message[]> {
+export async function getSessionMessages(sessionId: string): Promise<Message[]> {
   return unwrap(
     apiClient.get<ApiResponse<Message[]>>(
-      `/api/v1/sessions/${encodeURIComponent(sessionId)}/messages`,
-      {
-        params: { user_id: userId },
-      }
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/messages`
     )
   );
 }
 
 /** Delete a session and its associated message history. */
-export async function deleteSession(sessionId: string, userId: string): Promise<void> {
+export async function deleteSession(sessionId: string): Promise<void> {
   await unwrap(
-    apiClient.delete<ApiResponse<null>>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, {
-      params: { user_id: userId },
-    })
+    apiClient.delete<ApiResponse<null>>(`/api/v1/sessions/${encodeURIComponent(sessionId)}`)
   );
 }
 
@@ -346,6 +337,7 @@ export function createChatAgent(sessionId: string): HttpAgent {
   const agent = new HttpAgent({
     url: `${API_BASE}/api/v1/agent`,
     threadId: sessionId,
+    headers: currentUserId ? { "X-User-Id": currentUserId } : {},
   });
   agent.use(
     new A2UIMiddleware({
@@ -367,6 +359,7 @@ export function createWorkflowSessionAgent(
   const agent = new HttpAgent({
     url: `${API_BASE}/api/v1/workflow-sessions/${encodeURIComponent(workflowSessionId)}/agent`,
     threadId: sessionId,
+    headers: currentUserId ? { "X-User-Id": currentUserId } : {},
   });
   agent.use(
     new A2UIMiddleware({

@@ -9,20 +9,20 @@ const BASE = "http://localhost:8000";
 
 describe("listSessions", () => {
   it("returns parsed session list", async () => {
-    const result = await listSessions("user");
+    const result = await listSessions();
     expect(result).toHaveLength(2);
     expect(result[0].id).toBe("sess-1");
   });
 
   it("throws on server error", async () => {
     server.use(http.get(`${BASE}/api/v1/sessions`, () => HttpResponse.json(null, { status: 500 })));
-    await expect(listSessions("user")).rejects.toThrow("500");
+    await expect(listSessions()).rejects.toThrow("500");
   });
 });
 
 describe("getSessionMessages", () => {
   it("returns messages array", async () => {
-    const result = await getSessionMessages("sess-1", "user");
+    const result = await getSessionMessages("sess-1");
     expect(Array.isArray(result)).toBe(true);
   });
 
@@ -34,9 +34,8 @@ describe("getSessionMessages", () => {
         return envelope([]);
       })
     );
-    await getSessionMessages("my-session", "user");
+    await getSessionMessages("my-session");
     expect(calledUrl).toContain("/sessions/my-session/messages");
-    expect(calledUrl).toContain("user_id=user");
   });
 
   it("throws on 404", async () => {
@@ -45,7 +44,7 @@ describe("getSessionMessages", () => {
         HttpResponse.json(null, { status: 404 })
       )
     );
-    await expect(getSessionMessages("missing", "user")).rejects.toThrow("404");
+    await expect(getSessionMessages("missing")).rejects.toThrow("404");
   });
 });
 
