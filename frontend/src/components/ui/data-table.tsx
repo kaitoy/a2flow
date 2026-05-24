@@ -1,4 +1,5 @@
 import type React from "react";
+import { Spinner } from "./spinner";
 
 export interface ColumnDef<T> {
   header: string;
@@ -42,8 +43,10 @@ export function DataTable<T>({
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={colSpan} className="px-5 py-6 text-on-surface-variant">
-                Loading…
+              <td colSpan={colSpan} className="px-5 py-6">
+                <div className="flex items-center justify-center">
+                  <Spinner size="md" />
+                </div>
               </td>
             </tr>
           ) : rows.length === 0 ? (

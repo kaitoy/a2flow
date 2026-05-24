@@ -46,9 +46,9 @@ describe("DataTable", () => {
     expect(screen.getByTestId("bold").textContent).toBe("Alpha");
   });
 
-  it("shows 'Loading…' when loading is true", () => {
+  it("shows loading spinner when loading is true", () => {
     render(<DataTable columns={COLUMNS} rows={[]} loading getRowKey={(r) => r.id} />);
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("does not render data rows when loading", () => {
@@ -58,7 +58,7 @@ describe("DataTable", () => {
 
   it("loading cell spans all columns", () => {
     render(<DataTable columns={COLUMNS} rows={[]} loading getRowKey={(r) => r.id} />);
-    const cell = screen.getByText("Loading…").closest("td");
+    const cell = screen.getByRole("status").closest("td");
     expect(cell).toHaveAttribute("colspan", "2");
   });
 

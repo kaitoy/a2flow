@@ -15,7 +15,7 @@ vi.mock("next/link", () => ({
 describe("AgentSkillsPage", () => {
   it("shows loading state initially", () => {
     render(<AgentSkillsPage />);
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("renders skill row after load", async () => {

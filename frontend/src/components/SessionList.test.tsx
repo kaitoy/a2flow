@@ -22,12 +22,12 @@ async function clickDeleteForSession(user: ReturnType<typeof userEvent.setup>, s
 describe("SessionList", () => {
   it("shows loading state initially", () => {
     render(<SessionList {...defaultProps} />);
-    expect(screen.getByText(/Loading/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("renders sessions after fetch sorted by lastUpdateTime desc", async () => {
     render(<SessionList {...defaultProps} />);
-    await waitFor(() => expect(screen.queryByText(/Loading/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
     const buttons = screen.getAllByTitle(/sess-/);
     expect(buttons[0]).toHaveAttribute("title", "sess-1");
     expect(buttons[1]).toHaveAttribute("title", "sess-2");

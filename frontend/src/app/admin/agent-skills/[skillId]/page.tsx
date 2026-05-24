@@ -11,6 +11,7 @@ import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteAgentSkill, getAgentSkill, updateAgentSkill } from "@/lib/api";
 
@@ -88,7 +89,11 @@ export default function EditAgentSkillPage() {
   }
 
   if (loading) {
-    return <div className="p-8 text-on-surface-variant">Loading…</div>;
+    return (
+      <div className="flex items-center justify-center p-16">
+        <Spinner size="lg" />
+      </div>
+    );
   }
 
   return (

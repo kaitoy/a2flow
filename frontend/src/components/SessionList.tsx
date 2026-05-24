@@ -7,6 +7,7 @@ import { useMotionConfig } from "@/lib/motion";
 import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { SlidingIndicator } from "./ui/sliding-indicator";
+import { Spinner } from "./ui/spinner";
 
 interface SessionListProps {
   userId: string;
@@ -79,7 +80,9 @@ export function SessionList({
       </div>
       <div className="relative flex-1 overflow-y-auto py-2">
         {loading && sessions.length === 0 && (
-          <p className="px-3 text-xs text-on-surface-variant">Loading…</p>
+          <div className="flex items-center justify-center py-4">
+            <Spinner size="sm" />
+          </div>
         )}
         {!loading && sessions.length === 0 && (
           <p className="px-3 text-xs text-on-surface-variant">No sessions</p>
