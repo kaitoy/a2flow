@@ -70,7 +70,15 @@ Whenever a change falls into any of the following categories, update [README.md]
 
 ## Keeping generated API types in sync
 
-`frontend/src/generated/api/` is auto-generated from `backend/openapi.yaml` by running:
+`frontend/src/generated/api/` is auto-generated from `backend/openapi.yaml`. `backend/openapi.yaml` itself is regenerated from the FastAPI app by:
+
+```bash
+cd backend && uv run python -m scripts.export_openapi
+```
+
+Routes declare `response_model=ApiResponse[T]` and return `ApiResponse(meta=meta, data=...)`, so the spec produced by `app.openapi()` already contains the `{meta, data, error}` envelope shape — the export script does no post-processing. `ApiMeta` and `ApiError` are real Pydantic models in `backend/models/response.py`, and they appear in the spec because `ApiResponse[T]` references them.
+
+After the YAML is regenerated, refresh the frontend bindings:
 
 ```bash
 cd frontend && pnpm openapi-ts

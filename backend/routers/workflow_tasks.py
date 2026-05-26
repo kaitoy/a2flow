@@ -8,46 +8,58 @@ focuses on the create-and-act-on-a-single-task operations.
 
 from fastapi import APIRouter
 
-from dependencies import CurrentUserIdDep, WorkflowTaskRepositoryDep
+from dependencies import ApiMetaDep, CurrentUserIdDep, WorkflowTaskRepositoryDep
+from models.response import ApiResponse
 from models.workflow_task import WorkflowTask, WorkflowTaskCreate, WorkflowTaskUpdate
 from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/workflow-tasks", tags=["workflow-tasks"])
 
 
-@router.post("", response_model=WorkflowTask, status_code=201)
+@router.post("", response_model=ApiResponse[WorkflowTask], status_code=201)
 async def create_workflow_task(
     body: WorkflowTaskCreate,
     repo: WorkflowTaskRepositoryDep,
     user_id: CurrentUserIdDep,
-) -> WorkflowTask:
+    meta: ApiMetaDep,
+) -> ApiResponse[WorkflowTask]:
     """Create a new WorkflowTask belonging to the session named in ``body``."""
-    return await repo.create(body, user_id=user_id)
+    task = await repo.create(body, user_id=user_id)
+    return ApiResponse(meta=meta, data=task)
 
 
-@router.get("/{task_id}", response_model=WorkflowTask)
+@router.get("/{task_id}", response_model=ApiResponse[WorkflowTask])
 async def get_workflow_task(
-    task_id: str, repo: WorkflowTaskRepositoryDep
-) -> WorkflowTask:
+    task_id: str,
+    repo: WorkflowTaskRepositoryDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[WorkflowTask]:
     """Return the WorkflowTask with the given ID, or HTTP 404 if missing."""
     task = await repo.get(task_id)
     if task is None:
         raise NotFoundError("WorkflowTask", task_id)
-    return task
+    return ApiResponse(meta=meta, data=task)
 
 
-@router.patch("/{task_id}", response_model=WorkflowTask)
+@router.patch("/{task_id}", response_model=ApiResponse[WorkflowTask])
 async def update_workflow_task(
     task_id: str,
     body: WorkflowTaskUpdate,
     repo: WorkflowTaskRepositoryDep,
     user_id: CurrentUserIdDep,
-) -> WorkflowTask:
+    meta: ApiMetaDep,
+) -> ApiResponse[WorkflowTask]:
     """Apply a partial update to the WorkflowTask with the given ID."""
-    return await repo.update(task_id, body, user_id=user_id)
+    task = await repo.update(task_id, body, user_id=user_id)
+    return ApiResponse(meta=meta, data=task)
 
 
-@router.delete("/{task_id}")
-async def delete_workflow_task(task_id: str, repo: WorkflowTaskRepositoryDep) -> None:
+@router.delete("/{task_id}", response_model=ApiResponse[None])
+async def delete_workflow_task(
+    task_id: str,
+    repo: WorkflowTaskRepositoryDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[None]:
     """Delete the WorkflowTask with the given ID, raising 404 if it does not exist."""
     await repo.delete(task_id)
+    return ApiResponse(meta=meta, data=None)

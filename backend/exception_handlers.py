@@ -1,11 +1,18 @@
-"""FastAPI exception handlers that map domain exceptions to structured JSON error responses."""
+"""FastAPI exception handlers that map domain exceptions to envelope error responses.
+
+Each handler builds an :class:`ApiResponse` with ``data=None`` and ``error``
+populated, mirroring the wire format produced by router success responses.
+"""
 
 import logging
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from models.response import ApiError, ApiMeta, ApiResponse
 from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
@@ -15,31 +22,54 @@ from repositories.exceptions import (
 logger = logging.getLogger(__name__)
 
 
+def _envelope_error(
+    request: Request,
+    *,
+    code: str,
+    message: str,
+    status_code: int,
+    details: dict[str, Any] | None = None,
+) -> JSONResponse:
+    """Wrap an error in an :class:`ApiResponse` envelope and return a ``JSONResponse``."""
+    meta = ApiMeta(
+        request_id=request.state.request_id,
+        received_at=request.state.received_at,
+        responded_at=datetime.now(UTC),
+    )
+    env = ApiResponse[None](
+        meta=meta,
+        data=None,
+        error=ApiError(code=code, message=message, details=details),
+    )
+    return JSONResponse(
+        env.model_dump(by_alias=True, mode="json"),
+        status_code=status_code,
+    )
+
+
 async def validation_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
     """Return HTTP 422 with VALIDATION_ERROR code for request validation failures."""
     assert isinstance(exc, RequestValidationError)
-    return JSONResponse(
-        {
-            "code": "VALIDATION_ERROR",
-            "message": "Invalid request",
-            "details": {"errors": exc.errors()},
-        },
+    return _envelope_error(
+        request,
+        code="VALIDATION_ERROR",
+        message="Invalid request",
         status_code=422,
+        details={"errors": exc.errors()},
     )
 
 
 async def not_found_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Return HTTP 404 with NOT_FOUND code when a requested entity does not exist."""
     assert isinstance(exc, NotFoundError)
-    return JSONResponse(
-        {
-            "code": "NOT_FOUND",
-            "message": str(exc),
-            "details": {"entity": exc.entity, "id": exc.id},
-        },
+    return _envelope_error(
+        request,
+        code="NOT_FOUND",
+        message=str(exc),
         status_code=404,
+        details={"entity": exc.entity, "id": exc.id},
     )
 
 
@@ -48,13 +78,12 @@ async def foreign_key_violation_exception_handler(
 ) -> JSONResponse:
     """Return HTTP 422 with FOREIGN_KEY_VIOLATION code when a referenced entity is missing."""
     assert isinstance(exc, ForeignKeyViolationError)
-    return JSONResponse(
-        {
-            "code": "FOREIGN_KEY_VIOLATION",
-            "message": str(exc),
-            "details": {"entity": exc.entity, "id": exc.id},
-        },
+    return _envelope_error(
+        request,
+        code="FOREIGN_KEY_VIOLATION",
+        message=str(exc),
         status_code=422,
+        details={"entity": exc.entity, "id": exc.id},
     )
 
 
@@ -63,8 +92,10 @@ async def referenced_exception_handler(
 ) -> JSONResponse:
     """Return HTTP 409 with CONFLICT_REFERENCED code when an entity is still referenced by others."""
     assert isinstance(exc, ReferencedError)
-    return JSONResponse(
-        {"code": "CONFLICT_REFERENCED", "message": str(exc)},
+    return _envelope_error(
+        request,
+        code="CONFLICT_REFERENCED",
+        message=str(exc),
         status_code=409,
     )
 
@@ -72,8 +103,10 @@ async def referenced_exception_handler(
 async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Return the original HTTP status code with an HTTP_{code} error code."""
     assert isinstance(exc, HTTPException)
-    return JSONResponse(
-        {"code": f"HTTP_{exc.status_code}", "message": str(exc.detail)},
+    return _envelope_error(
+        request,
+        code=f"HTTP_{exc.status_code}",
+        message=str(exc.detail),
         status_code=exc.status_code,
     )
 
@@ -81,7 +114,9 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Return HTTP 500 with INTERNAL_ERROR code and log the full exception traceback."""
     logger.exception("Unhandled exception", exc_info=exc)
-    return JSONResponse(
-        {"code": "INTERNAL_ERROR", "message": "Internal server error"},
+    return _envelope_error(
+        request,
+        code="INTERNAL_ERROR",
+        message="Internal server error",
         status_code=500,
     )

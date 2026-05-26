@@ -10,10 +10,12 @@ from fastapi.responses import StreamingResponse
 
 from dependencies import (
     AgentRegistryDep,
+    ApiMetaDep,
     PaginationDep,
     WorkflowSessionRepositoryDep,
     WorkflowTaskRepositoryDep,
 )
+from models.response import ApiResponse
 from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTask
 from repositories.exceptions import NotFoundError
@@ -21,34 +23,38 @@ from repositories.exceptions import NotFoundError
 router = APIRouter(prefix="/workflow-sessions", tags=["workflow-sessions"])
 
 
-@router.get("", response_model=list[WorkflowSession])
+@router.get("", response_model=ApiResponse[list[WorkflowSession]])
 async def list_workflow_sessions(
     ws_repo: WorkflowSessionRepositoryDep,
     pagination: PaginationDep,
-) -> list[WorkflowSession]:
+    meta: ApiMetaDep,
+) -> ApiResponse[list[WorkflowSession]]:
     """Return WorkflowSession records ordered by ``created_at`` descending."""
-    return await ws_repo.list(limit=pagination.limit, offset=pagination.offset)
+    items = await ws_repo.list(limit=pagination.limit, offset=pagination.offset)
+    return ApiResponse(meta=meta, data=items)
 
 
-@router.get("/{ws_id}", response_model=WorkflowSession)
+@router.get("/{ws_id}", response_model=ApiResponse[WorkflowSession])
 async def get_workflow_session(
     ws_id: str,
     ws_repo: WorkflowSessionRepositoryDep,
-) -> WorkflowSession:
+    meta: ApiMetaDep,
+) -> ApiResponse[WorkflowSession]:
     """Return the WorkflowSession record for the given ID."""
     ws = await ws_repo.get(ws_id)
     if ws is None:
         raise NotFoundError("WorkflowSession", ws_id)
-    return ws
+    return ApiResponse(meta=meta, data=ws)
 
 
-@router.get("/{ws_id}/workflow-tasks", response_model=list[WorkflowTask])
+@router.get("/{ws_id}/workflow-tasks", response_model=ApiResponse[list[WorkflowTask]])
 async def list_workflow_session_tasks(
     ws_id: str,
     ws_repo: WorkflowSessionRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     pagination: PaginationDep,
-) -> list[WorkflowTask]:
+    meta: ApiMetaDep,
+) -> ApiResponse[list[WorkflowTask]]:
     """Return the WorkflowTasks belonging to the given WorkflowSession.
 
     Raises HTTP 404 (``NotFoundError``) if the parent session does not exist,
@@ -57,11 +63,12 @@ async def list_workflow_session_tasks(
     """
     if await ws_repo.get(ws_id) is None:
         raise NotFoundError("WorkflowSession", ws_id)
-    return await tasks.list(
+    items = await tasks.list(
         limit=pagination.limit,
         offset=pagination.offset,
         workflow_session_id=ws_id,
     )
+    return ApiResponse(meta=meta, data=items)
 
 
 @router.post("/{ws_id}/agent", include_in_schema=False)

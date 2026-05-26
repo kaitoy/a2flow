@@ -6,6 +6,10 @@ Usage:
 The output path defaults to ``backend/openapi.yaml`` (relative to this file),
 and can be overridden by the first CLI argument or the
 ``OPENAPI_OUTPUT`` environment variable.
+
+The application itself declares ``response_model=ApiResponse[T]`` on every
+envelope-returning route, so the spec produced by ``app.openapi()`` already
+contains the ``{meta, data, error}`` shape. No post-processing is needed.
 """
 
 from __future__ import annotations

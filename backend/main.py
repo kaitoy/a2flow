@@ -24,7 +24,7 @@ from exception_handlers import (
     validation_exception_handler,
 )
 from logging_context import setup_logging
-from middleware.envelope import ResponseEnvelopeMiddleware
+from middleware.envelope import RequestContextMiddleware
 from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
@@ -58,7 +58,7 @@ app.add_middleware(
     allow_headers=["*"],
     max_age=3600,
 )
-app.add_middleware(ResponseEnvelopeMiddleware)
+app.add_middleware(RequestContextMiddleware)
 
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(NotFoundError, not_found_exception_handler)

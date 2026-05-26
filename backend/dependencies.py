@@ -2,16 +2,18 @@
 
 import os
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, Header, Query
+from fastapi import Depends, Header, Query, Request
 from google.adk.sessions import BaseSessionService
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from agent import AgentRegistry
 from database import DB_URL, get_session
+from models.response import ApiMeta
 from repositories import (
     AgentSkillRepository,
     SqlAgentSkillRepository,
@@ -26,6 +28,23 @@ from services import SkillManager
 from session_service import StaleTolerantSqliteSessionService
 
 APP_NAME = "A2Flow"
+
+
+def build_api_meta(request: Request) -> ApiMeta:
+    """Construct the ``ApiMeta`` block for the current request.
+
+    Reads ``request_id`` and ``received_at`` from ``request.state`` (populated
+    by ``RequestContextMiddleware``) and stamps ``responded_at`` with the
+    current UTC time at the moment the dependency is resolved.
+    """
+    return ApiMeta(
+        request_id=request.state.request_id,
+        received_at=request.state.received_at,
+        responded_at=datetime.now(UTC),
+    )
+
+
+ApiMetaDep = Annotated[ApiMeta, Depends(build_api_meta)]
 
 
 @dataclass

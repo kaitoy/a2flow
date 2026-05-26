@@ -73,7 +73,7 @@ describe("EditAgentSkillPage", () => {
       refresh: vi.fn(),
       forward: vi.fn(),
     });
-    const deleteSpy = vi.fn(() => new HttpResponse(null, { status: 204 }));
+    const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/agent-skills/:skillId", deleteSpy));
 
     render(<EditAgentSkillPage />);

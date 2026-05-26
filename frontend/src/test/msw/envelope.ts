@@ -1,9 +1,9 @@
 import { HttpResponse } from "msw";
 
 const META = {
-  request_id: "test-request-id",
-  received_at: "2026-05-10T00:00:00.000Z",
-  responded_at: "2026-05-10T00:00:00.000Z",
+  requestId: "test-request-id",
+  receivedAt: "2026-05-10T00:00:00.000Z",
+  respondedAt: "2026-05-10T00:00:00.000Z",
 };
 
 export function envelope<T>(data: T, status = 200) {
