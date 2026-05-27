@@ -1,0 +1,39 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: backend-ruff-lint
+      root: backend/
+      glob: "*.py"
+      run: uv run ruff check .
+
+    - name: backend-ruff-format
+      root: backend/
+      glob: "*.py"
+      run: uv run ruff format --check .
+
+    - name: backend-mypy
+      root: backend/
+      glob: "*.py"
+      run: uv run mypy .
+
+    - name: backend-pytest
+      root: backend/
+      glob: "*.py"
+      run: uv run pytest
+
+    - name: frontend-biome
+      root: frontend/
+      glob: "src/**/*.{ts,tsx,js,jsx,json}"
+      run: pnpm exec biome ci ./src
+
+    - name: frontend-vitest
+      root: frontend/
+      glob: "src/**/*.{ts,tsx}"
+      run: pnpm exec vitest run
+
+pre-push:
+  jobs:
+    - name: frontend-build
+      root: frontend/
+      glob: "**/*.{ts,tsx,js,jsx,json,css,mjs}"
+      run: pnpm run build

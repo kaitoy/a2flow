@@ -4,8 +4,8 @@
   "private": true,
   "packageManager": "pnpm@11.2.2",
   "scripts": {
-    "predev": "node scripts/download-a2ui-schema.mjs && pnpm generate:api",
-    "prebuild": "node scripts/download-a2ui-schema.mjs && pnpm generate:api",
+    "predev": "node --use-system-ca scripts/download-a2ui-schema.mjs && pnpm generate:api",
+    "prebuild": "node --use-system-ca scripts/download-a2ui-schema.mjs && pnpm generate:api",
     "generate:openapi": "node scripts/export-backend-openapi.mjs",
     "generate:api": "pnpm generate:openapi && openapi-ts",
     "dev": "next dev",

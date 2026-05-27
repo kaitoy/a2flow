@@ -28,9 +28,7 @@ function buildColumns(): ColumnDef<WorkflowSession>[] {
     {
       header: "Created At",
       cell: (s) => (
-        <span className="text-on-surface-variant">
-          {new Date(s.createdAt).toLocaleString()}
-        </span>
+        <span className="text-on-surface-variant">{new Date(s.createdAt).toLocaleString()}</span>
       ),
     },
     {

@@ -38,12 +38,7 @@ const STATUS_DOT: Record<WorkflowTaskStatus, string> = {
 
 /** Small colored dot used next to the status select for quick visual scanning. */
 function StatusDot({ status }: { status: WorkflowTaskStatus }) {
-  return (
-    <span
-      className={`inline-block size-2 rounded-full ${STATUS_DOT[status]}`}
-      aria-hidden
-    />
-  );
+  return <span className={`inline-block size-2 rounded-full ${STATUS_DOT[status]}`} aria-hidden />;
 }
 
 function buildColumns(
@@ -73,9 +68,7 @@ function buildColumns(
           <StatusDot status={t.status ?? "pending"} />
           <Select
             value={t.status ?? "pending"}
-            onChange={(e) =>
-              onStatusChange(t.id, e.target.value as WorkflowTaskStatus)
-            }
+            onChange={(e) => onStatusChange(t.id, e.target.value as WorkflowTaskStatus)}
             aria-label={`Status for ${t.title}`}
           >
             {STATUS_OPTIONS.map((s) => (
@@ -117,9 +110,7 @@ export default function WorkflowTasksPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
-  const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(
-    null
-  );
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);

@@ -142,8 +142,6 @@ async def test_workflow_session_agent_delegates_to_agent_registry(
     skill = await _create_skill(workflow_client)
     ws = await _execute_workflow(workflow_client, skill["id"])
 
-    events_yielded: list[Any] = []
-
     async def _capturing_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
         return
         yield
