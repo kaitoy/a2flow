@@ -4,6 +4,7 @@ import { animated, useTransition } from "@react-spring/web";
 import { useEffect, useState } from "react";
 import { useMotionConfig } from "@/lib/motion";
 import { useTheme } from "./ThemeProvider";
+import { Tooltip } from "./ui/tooltip";
 
 interface ThemeToggleProps {
   className?: string;
@@ -37,27 +38,24 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     .filter(Boolean)
     .join(" ");
 
+  const label = isDark ? "Switch to light theme" : "Switch to dark theme";
   return (
-    <button
-      type="button"
-      onClick={toggleTheme}
-      className={cls}
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      title={isDark ? "Switch to light theme" : "Switch to dark theme"}
-    >
-      {iconTransitions((style, dark) => (
-        <animated.span
-          style={{
-            opacity: style.opacity,
-            transform: style.rotate.to((r) => `rotate(${r}deg)`),
-          }}
-          className="absolute inset-0 flex items-center justify-center"
-          aria-hidden="true"
-        >
-          {dark ? <SunIcon /> : <MoonIcon />}
-        </animated.span>
-      ))}
-    </button>
+    <Tooltip label={label} placement="bottom">
+      <button type="button" onClick={toggleTheme} className={cls} aria-label={label}>
+        {iconTransitions((style, dark) => (
+          <animated.span
+            style={{
+              opacity: style.opacity,
+              transform: style.rotate.to((r) => `rotate(${r}deg)`),
+            }}
+            className="absolute inset-0 flex items-center justify-center"
+            aria-hidden="true"
+          >
+            {dark ? <SunIcon /> : <MoonIcon />}
+          </animated.span>
+        ))}
+      </button>
+    </Tooltip>
   );
 }
 

@@ -9,6 +9,7 @@ import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { SlidingIndicator } from "./ui/sliding-indicator";
 import { Spinner } from "./ui/spinner";
+import { Tooltip } from "./ui/tooltip";
 
 interface SessionListProps {
   userId: string;
@@ -129,20 +130,21 @@ export function SessionList({
                   : "text-on-surface-variant hover:bg-glass hover:text-on-surface",
               ].join(" ")}
             >
-              <button
-                type="button"
-                onClick={() => !isActive && onSelect(s.id)}
-                disabled={disabled || isActive}
-                title={s.id}
-                className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-3 py-2 text-left text-xs disabled:cursor-default"
-              >
-                <span className="block truncate font-mono text-[10px] uppercase tracking-wider opacity-60">
-                  {s.id.slice(0, 8)}…
-                </span>
-                <span className="block truncate text-[12px] font-medium text-on-surface">
-                  {label}
-                </span>
-              </button>
+              <Tooltip label={s.id} placement="right">
+                <button
+                  type="button"
+                  onClick={() => !isActive && onSelect(s.id)}
+                  disabled={disabled || isActive}
+                  className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-3 py-2 text-left text-xs disabled:cursor-default"
+                >
+                  <span className="block truncate font-mono text-[10px] uppercase tracking-wider opacity-60">
+                    {s.id.slice(0, 8)}…
+                  </span>
+                  <span className="block truncate text-[12px] font-medium text-on-surface">
+                    {label}
+                  </span>
+                </button>
+              </Tooltip>
               <button
                 type="button"
                 aria-label="Delete session"

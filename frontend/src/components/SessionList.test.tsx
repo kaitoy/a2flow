@@ -14,7 +14,7 @@ const defaultProps = {
 };
 
 async function clickDeleteForSession(user: ReturnType<typeof userEvent.setup>, sessionId: string) {
-  const row = screen.getByTitle(sessionId).closest("div");
+  const row = screen.getByRole("button", { name: new RegExp(sessionId) }).closest("div");
   if (!row) throw new Error(`row for ${sessionId} not found`);
   await user.click(within(row as HTMLElement).getByRole("button", { name: "Delete session" }));
 }
@@ -28,9 +28,9 @@ describe("SessionList", () => {
   it("renders sessions after fetch sorted by lastUpdateTime desc", async () => {
     render(<SessionList {...defaultProps} />);
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
-    const buttons = screen.getAllByTitle(/sess-/);
-    expect(buttons[0]).toHaveAttribute("title", "sess-1");
-    expect(buttons[1]).toHaveAttribute("title", "sess-2");
+    const buttons = screen.getAllByRole("button", { name: /sess-/ });
+    expect(buttons[0]).toHaveTextContent("sess-1");
+    expect(buttons[1]).toHaveTextContent("sess-2");
   });
 
   it("shows No sessions when API returns empty array", async () => {
@@ -42,15 +42,15 @@ describe("SessionList", () => {
   it("calls onSelect with sessionId when clicking non-active session", async () => {
     const onSelect = vi.fn();
     render(<SessionList {...defaultProps} onSelect={onSelect} />);
-    await waitFor(() => screen.getAllByTitle(/sess-/));
-    await userEvent.click(screen.getAllByTitle(/sess-/)[0]);
+    await waitFor(() => screen.getAllByRole("button", { name: /sess-/ }));
+    await userEvent.click(screen.getAllByRole("button", { name: /sess-/ })[0]);
     expect(onSelect).toHaveBeenCalledWith("sess-1");
   });
 
   it("active session button is disabled", async () => {
     render(<SessionList {...defaultProps} currentSessionId="sess-1" />);
-    await waitFor(() => screen.getAllByTitle(/sess-/));
-    expect(screen.getByTitle("sess-1")).toBeDisabled();
+    await waitFor(() => screen.getAllByRole("button", { name: /sess-/ }));
+    expect(screen.getByRole("button", { name: /sess-1/ })).toBeDisabled();
   });
 
   it("New session button calls onNew", async () => {
@@ -77,14 +77,14 @@ describe("SessionList", () => {
 
   it("renders a Delete session button per session", async () => {
     render(<SessionList {...defaultProps} />);
-    await waitFor(() => screen.getAllByTitle(/sess-/));
+    await waitFor(() => screen.getAllByRole("button", { name: /sess-/ }));
     expect(screen.getAllByRole("button", { name: "Delete session" })).toHaveLength(2);
   });
 
   it("opens ConfirmDialog when delete button is clicked", async () => {
     const user = userEvent.setup();
     render(<SessionList {...defaultProps} />);
-    await waitFor(() => screen.getAllByTitle(/sess-/));
+    await waitFor(() => screen.getAllByRole("button", { name: /sess-/ }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await clickDeleteForSession(user, "sess-1");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -95,13 +95,15 @@ describe("SessionList", () => {
     server.use(http.delete("http://localhost:8000/api/v1/sessions/:id", deleteSpy));
     const user = userEvent.setup();
     render(<SessionList {...defaultProps} />);
-    await waitFor(() => screen.getAllByTitle(/sess-/));
+    await waitFor(() => screen.getAllByRole("button", { name: /sess-/ }));
     await clickDeleteForSession(user, "sess-1");
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));
     await waitFor(() => expect(deleteSpy).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByTitle("sess-1")).not.toBeInTheDocument());
-    expect(screen.getByTitle("sess-2")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /sess-1/ })).not.toBeInTheDocument()
+    );
+    expect(screen.getByRole("button", { name: /sess-2/ })).toBeInTheDocument();
   });
 
   it("does not call delete API when Cancel is clicked", async () => {
@@ -109,19 +111,19 @@ describe("SessionList", () => {
     server.use(http.delete("http://localhost:8000/api/v1/sessions/:id", deleteSpy));
     const user = userEvent.setup();
     render(<SessionList {...defaultProps} />);
-    await waitFor(() => screen.getAllByTitle(/sess-/));
+    await waitFor(() => screen.getAllByRole("button", { name: /sess-/ }));
     await clickDeleteForSession(user, "sess-1");
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
     expect(deleteSpy).not.toHaveBeenCalled();
-    expect(screen.getByTitle("sess-1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sess-1/ })).toBeInTheDocument();
   });
 
   it("calls onDeleted with the active session id when active session is deleted", async () => {
     const onDeleted = vi.fn();
     const user = userEvent.setup();
     render(<SessionList {...defaultProps} currentSessionId="sess-1" onDeleted={onDeleted} />);
-    await waitFor(() => screen.getAllByTitle(/sess-/));
+    await waitFor(() => screen.getAllByRole("button", { name: /sess-/ }));
     await clickDeleteForSession(user, "sess-1");
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));
@@ -132,17 +134,19 @@ describe("SessionList", () => {
     const onDeleted = vi.fn();
     const user = userEvent.setup();
     render(<SessionList {...defaultProps} currentSessionId="sess-1" onDeleted={onDeleted} />);
-    await waitFor(() => screen.getAllByTitle(/sess-/));
+    await waitFor(() => screen.getAllByRole("button", { name: /sess-/ }));
     await clickDeleteForSession(user, "sess-2");
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));
-    await waitFor(() => expect(screen.queryByTitle("sess-2")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /sess-2/ })).not.toBeInTheDocument()
+    );
     expect(onDeleted).not.toHaveBeenCalled();
   });
 
   it("delete buttons are disabled when disabled prop is true", async () => {
     render(<SessionList {...defaultProps} disabled={true} />);
-    await waitFor(() => screen.getAllByTitle(/sess-/));
+    await waitFor(() => screen.getAllByRole("button", { name: /sess-/ }));
     for (const btn of screen.getAllByRole("button", { name: "Delete session" })) {
       expect(btn).toBeDisabled();
     }
