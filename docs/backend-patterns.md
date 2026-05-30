@@ -1,6 +1,6 @@
-# Backend Model Implementation Patterns
+# Backend Implementation Patterns
 
-This document describes the conventions and design decisions for implementing data models, repositories, and routers in the backend.
+This document describes the conventions and design decisions for implementing the backend's layers: data models, repositories, services (use cases), infrastructure adapters, and routers.
 
 ## Stack
 
@@ -169,6 +169,46 @@ This produces a friendlier error message than relying solely on the database con
 
 ---
 
+## Service Layer (Use Cases)
+
+The service layer (`services/`) sits between routers and repositories and holds
+the application's business rules. **Routers depend on services, services depend on
+repositories — repositories are never injected into a router directly.**
+
+### One concrete service per resource
+
+Each resource has a single concrete service class (no Protocol). It receives its
+repository collaborators via `__init__` and exposes the use case operations the
+router needs. Methods that fetch a single entity raise `NotFoundError` instead of
+returning `None`, so the router never repeats the null check.
+
+```python
+class AgentSkillService:
+    def __init__(self, repo: AgentSkillRepository) -> None:
+        self._repo = repo
+
+    async def get(self, skill_id: str) -> AgentSkill:
+        skill = await self._repo.get(skill_id)
+        if skill is None:
+            raise NotFoundError("AgentSkill", skill_id)
+        return skill
+```
+
+Services also host multi-collaborator orchestration. For example,
+`WorkflowService.execute` resolves a workflow and its skill, clones the skill
+repository via `SkillManager`, and records a new `WorkflowSession`.
+
+---
+
+## Infrastructure Layer
+
+`infrastructure/` holds concrete adapters for external systems and persistence
+that the service layer depends on but that contain no business rules — for
+example `StaleTolerantSqliteSessionService` (ADK session storage) and
+`SkillManager` (git-backed skill cloning).
+
+---
+
 ## Router Layer
 
 ### RESTful Conventions
@@ -183,7 +223,20 @@ This produces a friendlier error message than relying solely on the database con
 
 ### Error Mapping
 
-Repository exceptions propagate to global exception handlers (`backend/exception_handlers.py`) which produce structured `{code, message, details}` error bodies. Routers should not catch and re-raise as `HTTPException`. The middleware then wraps the error body in the response envelope.
+Routers are thin: they declare the HTTP shape, depend on a **service** via `Depends`, call the service method, and wrap the result in `ApiResponse`. The "raise `NotFoundError` when missing" rule lives in the service, so the router does not repeat the null check:
+
+```python
+@router.get("/{skill_id}", response_model=ApiResponse[AgentSkill])
+async def get_agent_skill(
+    skill_id: str,
+    service: AgentSkillServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[AgentSkill]:
+    skill = await service.get(skill_id)  # raises NotFoundError if missing
+    return ApiResponse(meta=meta, data=skill)
+```
+
+Repository (and service) exceptions propagate to global exception handlers (`backend/exception_handlers.py`) which produce structured `{code, message, details}` error bodies. Routers should not catch and re-raise as `HTTPException`. The middleware then wraps the error body in the response envelope.
 
 | Exception | HTTP status | Error code | Notes |
 |---|---|---|---|
@@ -261,9 +314,14 @@ CurrentUserIdDep    # str, from X-User-Id header
 DBSessionDep        # AsyncSession, per-request
 AgentSkillRepositoryDep   # SqlAgentSkillRepository, per-request
 WorkflowRepositoryDep     # SqlWorkflowRepository, per-request (injects AgentSkillRepository)
+AgentSkillServiceDep      # AgentSkillService, per-request (injects AgentSkillRepository)
+WorkflowServiceDep        # WorkflowService, per-request (injects repos + SkillManager)
 SessionServiceDep   # ADK SqliteSessionService, singleton
 ADKAgentDep         # ADKAgent, singleton
 ```
+
+Routers inject the `*ServiceDep` aliases; the repository aliases exist so the
+service factories can compose them.
 
 Singletons are created once using `@lru_cache` on the factory function. Per-request dependencies use `Depends()` with `async def` generators that yield and then commit/rollback.
 
@@ -288,9 +346,10 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
    - Implement `SqlEntityRepository`.
    - Raise `NotFoundError` / `ReferencedError` / `ForeignKeyViolationError` as appropriate.
 3. **Exceptions**: reuse existing exception types; add new ones to `repositories/exceptions.py` only if needed.
-4. **Dependencies** (`dependencies.py`): add `EntityRepositoryDep` annotated alias.
-5. **Router file** (`routers/<entity>.py`):
-   - Follow RESTful conventions and error mapping table above.
+4. **Service file** (`services/<entity>.py`): define `EntityService` as a concrete class wrapping the repository. Raise `NotFoundError` on missing single-entity fetches and host any multi-collaborator orchestration here.
+5. **Dependencies** (`dependencies.py`): add the `EntityRepositoryDep` alias **and** the `EntityServiceDep` alias (the service factory composes the repository deps).
+6. **Router file** (`routers/<entity>.py`):
+   - Inject the `EntityServiceDep` (not the repository) and follow RESTful conventions and the error mapping table above.
    - Register in `main.py` with the correct prefix and tag.
-   - Do not catch repository exceptions; let global handlers map them. If a new repository exception is introduced, add a corresponding handler in `backend/exception_handlers.py` and document the error code in the Error Codes table.
+   - Do not catch repository/service exceptions; let global handlers map them. If a new repository exception is introduced, add a corresponding handler in `backend/exception_handlers.py` and document the error code in the Error Codes table.
 6. **Tests**: cover create, list, get, update, delete, not-found, and any FK constraints. Use the `assert_ok` / `assert_err` helpers in `tests/_envelope.py` to unwrap the response envelope.

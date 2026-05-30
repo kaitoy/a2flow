@@ -3,14 +3,13 @@
 from fastapi import APIRouter
 
 from dependencies import (
-    AgentSkillRepositoryDep,
+    AgentSkillServiceDep,
     ApiMetaDep,
     CurrentUserIdDep,
     PaginationDep,
 )
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from models.response import ApiResponse
-from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/agent-skills", tags=["agent-skills"])
 
@@ -18,33 +17,31 @@ router = APIRouter(prefix="/agent-skills", tags=["agent-skills"])
 @router.post("", response_model=ApiResponse[AgentSkill], status_code=201)
 async def create_agent_skill(
     body: AgentSkillCreate,
-    repo: AgentSkillRepositoryDep,
+    service: AgentSkillServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[AgentSkill]:
-    skill = await repo.create(body, user_id=user_id)
+    skill = await service.create(body, user_id=user_id)
     return ApiResponse(meta=meta, data=skill)
 
 
 @router.get("", response_model=ApiResponse[list[AgentSkill]])
 async def list_agent_skills(
-    repo: AgentSkillRepositoryDep,
+    service: AgentSkillServiceDep,
     pagination: PaginationDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[AgentSkill]]:
-    items = await repo.list(limit=pagination.limit, offset=pagination.offset)
+    items = await service.list(limit=pagination.limit, offset=pagination.offset)
     return ApiResponse(meta=meta, data=items)
 
 
 @router.get("/{skill_id}", response_model=ApiResponse[AgentSkill])
 async def get_agent_skill(
     skill_id: str,
-    repo: AgentSkillRepositoryDep,
+    service: AgentSkillServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[AgentSkill]:
-    skill = await repo.get(skill_id)
-    if skill is None:
-        raise NotFoundError("AgentSkill", skill_id)
+    skill = await service.get(skill_id)
     return ApiResponse(meta=meta, data=skill)
 
 
@@ -52,19 +49,19 @@ async def get_agent_skill(
 async def update_agent_skill(
     skill_id: str,
     body: AgentSkillUpdate,
-    repo: AgentSkillRepositoryDep,
+    service: AgentSkillServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[AgentSkill]:
-    skill = await repo.update(skill_id, body, user_id=user_id)
+    skill = await service.update(skill_id, body, user_id=user_id)
     return ApiResponse(meta=meta, data=skill)
 
 
 @router.delete("/{skill_id}", response_model=ApiResponse[None])
 async def delete_agent_skill(
     skill_id: str,
-    repo: AgentSkillRepositoryDep,
+    service: AgentSkillServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
-    await repo.delete(skill_id)
+    await service.delete(skill_id)
     return ApiResponse(meta=meta, data=None)

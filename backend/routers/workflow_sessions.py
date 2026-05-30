@@ -1,7 +1,6 @@
 """Endpoints for retrieving WorkflowSession details and streaming the workflow agent."""
 
 from collections.abc import AsyncGenerator
-from pathlib import Path
 
 from ag_ui.core import RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
@@ -9,49 +8,43 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from dependencies import (
-    AgentRegistryDep,
     ApiMetaDep,
     PaginationDep,
-    WorkflowSessionRepositoryDep,
-    WorkflowTaskRepositoryDep,
+    WorkflowSessionServiceDep,
 )
 from models.response import ApiResponse
 from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTask
-from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/workflow-sessions", tags=["workflow-sessions"])
 
 
 @router.get("", response_model=ApiResponse[list[WorkflowSession]])
 async def list_workflow_sessions(
-    ws_repo: WorkflowSessionRepositoryDep,
+    service: WorkflowSessionServiceDep,
     pagination: PaginationDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[WorkflowSession]]:
     """Return WorkflowSession records ordered by ``created_at`` descending."""
-    items = await ws_repo.list(limit=pagination.limit, offset=pagination.offset)
+    items = await service.list(limit=pagination.limit, offset=pagination.offset)
     return ApiResponse(meta=meta, data=items)
 
 
 @router.get("/{ws_id}", response_model=ApiResponse[WorkflowSession])
 async def get_workflow_session(
     ws_id: str,
-    ws_repo: WorkflowSessionRepositoryDep,
+    service: WorkflowSessionServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowSession]:
     """Return the WorkflowSession record for the given ID."""
-    ws = await ws_repo.get(ws_id)
-    if ws is None:
-        raise NotFoundError("WorkflowSession", ws_id)
+    ws = await service.get(ws_id)
     return ApiResponse(meta=meta, data=ws)
 
 
 @router.get("/{ws_id}/workflow-tasks", response_model=ApiResponse[list[WorkflowTask]])
 async def list_workflow_session_tasks(
     ws_id: str,
-    ws_repo: WorkflowSessionRepositoryDep,
-    tasks: WorkflowTaskRepositoryDep,
+    service: WorkflowSessionServiceDep,
     pagination: PaginationDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[WorkflowTask]]:
@@ -61,12 +54,8 @@ async def list_workflow_session_tasks(
     so callers can distinguish "no such session" from "session exists but has
     no tasks".
     """
-    if await ws_repo.get(ws_id) is None:
-        raise NotFoundError("WorkflowSession", ws_id)
-    items = await tasks.list(
-        limit=pagination.limit,
-        offset=pagination.offset,
-        workflow_session_id=ws_id,
+    items = await service.list_tasks(
+        ws_id, limit=pagination.limit, offset=pagination.offset
     )
     return ApiResponse(meta=meta, data=items)
 
@@ -76,8 +65,7 @@ async def workflow_session_agent(
     ws_id: str,
     input_data: RunAgentInput,
     request: Request,
-    ws_repo: WorkflowSessionRepositoryDep,
-    registry: AgentRegistryDep,
+    service: WorkflowSessionServiceDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent bound to a specific workflow session.
 
@@ -85,16 +73,11 @@ async def workflow_session_agent(
     the correct ADK tools are loaded regardless of the global agent state.
     SystemMessages are stripped to prevent prompt injection.
     """
-    ws = await ws_repo.get(ws_id)
-    if ws is None:
-        raise NotFoundError("WorkflowSession", ws_id)
+    adk_agent = await service.resolve_agent(ws_id)
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
-
-    skill_dir = Path(ws.skill_dir)
-    adk_agent = registry.get(ws.agent_skill_id, skill_dir)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         async for event in adk_agent.run(input_data):

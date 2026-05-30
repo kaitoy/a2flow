@@ -13,6 +13,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from agent import AgentRegistry
 from database import DB_URL, get_session
+from infrastructure.session_service import StaleTolerantSqliteSessionService
+from infrastructure.skill_manager import SkillManager
 from models.response import ApiMeta
 from repositories import (
     AgentSkillRepository,
@@ -24,8 +26,12 @@ from repositories import (
     WorkflowSessionRepository,
     WorkflowTaskRepository,
 )
-from services import SkillManager
-from session_service import StaleTolerantSqliteSessionService
+from services import (
+    AgentSkillService,
+    WorkflowService,
+    WorkflowSessionService,
+    WorkflowTaskService,
+)
 
 APP_NAME = "A2Flow"
 
@@ -146,4 +152,49 @@ def get_workflow_task_repository(
 
 WorkflowTaskRepositoryDep = Annotated[
     WorkflowTaskRepository, Depends(get_workflow_task_repository)
+]
+
+
+def get_agent_skill_service(repo: AgentSkillRepositoryDep) -> AgentSkillService:
+    """Create an AgentSkillService backed by the request's repository."""
+    return AgentSkillService(repo)
+
+
+AgentSkillServiceDep = Annotated[AgentSkillService, Depends(get_agent_skill_service)]
+
+
+def get_workflow_service(
+    workflows: WorkflowRepositoryDep,
+    skills: AgentSkillRepositoryDep,
+    skill_manager: SkillManagerDep,
+    ws_repo: WorkflowSessionRepositoryDep,
+) -> WorkflowService:
+    """Create a WorkflowService wiring the repositories and SkillManager."""
+    return WorkflowService(workflows, skills, skill_manager, ws_repo)
+
+
+WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
+
+
+def get_workflow_session_service(
+    ws_repo: WorkflowSessionRepositoryDep,
+    tasks: WorkflowTaskRepositoryDep,
+    registry: AgentRegistryDep,
+) -> WorkflowSessionService:
+    """Create a WorkflowSessionService wiring the repositories and agent registry."""
+    return WorkflowSessionService(ws_repo, tasks, registry)
+
+
+WorkflowSessionServiceDep = Annotated[
+    WorkflowSessionService, Depends(get_workflow_session_service)
+]
+
+
+def get_workflow_task_service(repo: WorkflowTaskRepositoryDep) -> WorkflowTaskService:
+    """Create a WorkflowTaskService backed by the request's repository."""
+    return WorkflowTaskService(repo)
+
+
+WorkflowTaskServiceDep = Annotated[
+    WorkflowTaskService, Depends(get_workflow_task_service)
 ]
