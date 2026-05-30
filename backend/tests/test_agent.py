@@ -172,7 +172,7 @@ async def test_agent_endpoint_invalid_body_returns_422(
 def test_create_agent_without_skill_has_only_agui_toolset() -> None:
     from ag_ui_adk import AGUIToolset
 
-    from agent import create_agent
+    from infrastructure.agent import create_agent
 
     agent = create_agent()
     assert any(isinstance(t, AGUIToolset) for t in agent.tools)
@@ -183,7 +183,7 @@ def test_create_agent_with_skill_dir_loads_skill_toolset(tmp_path: Any) -> None:
     from ag_ui_adk import AGUIToolset
     from google.adk.tools.skill_toolset import SkillToolset
 
-    from agent import create_agent
+    from infrastructure.agent import create_agent
 
     skill_dir = tmp_path / "test-skill"
     skill_dir.mkdir()
@@ -200,7 +200,7 @@ def test_create_agent_with_skill_dir_loads_skill_toolset(tmp_path: Any) -> None:
 def test_agent_registry_caches_by_skill_id() -> None:
     from google.adk.sessions import InMemorySessionService
 
-    from agent import AgentRegistry
+    from infrastructure.agent import AgentRegistry
 
     service = InMemorySessionService()  # type: ignore[no-untyped-call]
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
@@ -212,7 +212,7 @@ def test_agent_registry_caches_by_skill_id() -> None:
 def test_create_agent_with_skill_uses_workflow_instruction(tmp_path: Any) -> None:
     from unittest.mock import MagicMock
 
-    from agent import A2UIInstructionProvider, create_agent
+    from infrastructure.agent import A2UIInstructionProvider, create_agent
 
     skill_dir = tmp_path / "test-skill"
     skill_dir.mkdir()

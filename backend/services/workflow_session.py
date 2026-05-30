@@ -11,7 +11,7 @@ from pathlib import Path
 
 from ag_ui_adk import ADKAgent
 
-from agent import AgentRegistry
+from infrastructure.agent import AgentRegistry
 from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTask
 from repositories import WorkflowSessionRepository, WorkflowTaskRepository

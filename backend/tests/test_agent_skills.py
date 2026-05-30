@@ -14,8 +14,8 @@ from tests._envelope import assert_err, assert_ok
 async def skill_client(
     mock_agent_registry: MagicMock,
 ) -> AsyncGenerator[AsyncClient, None]:
-    from database import get_session
     from dependencies import get_agent_registry
+    from infrastructure.database import get_session
     from main import app
     from models.agent_skill import (
         AgentSkill as _AgentSkill,  # noqa: F401 — registers model

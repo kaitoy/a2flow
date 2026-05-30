@@ -3,7 +3,7 @@
 Each request gets a fresh UUID4 ``request_id`` and the moment it was received
 stamped onto ``request.state`` so route dependencies (``ApiMetaDep``) and
 exception handlers can build the response envelope's ``ApiMeta`` block. The
-request ID is also propagated to ``logging_context.request_id_var`` for log
+request ID is also propagated to ``infrastructure.logging_context.request_id_var`` for log
 correlation and echoed back to the client via the ``X-Request-Id`` header.
 
 This file used to wrap every JSON response in the ``{meta, data, error}``
@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
-from logging_context import request_id_var
+from infrastructure.logging_context import request_id_var
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):

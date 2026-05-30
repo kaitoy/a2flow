@@ -11,8 +11,8 @@ from fastapi import Depends, Header, Query, Request
 from google.adk.sessions import BaseSessionService
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from agent import AgentRegistry
-from database import DB_URL, get_session
+from infrastructure.agent import AgentRegistry
+from infrastructure.database import DB_URL, get_session
 from infrastructure.session_service import StaleTolerantSqliteSessionService
 from infrastructure.skill_manager import SkillManager
 from models.response import ApiMeta

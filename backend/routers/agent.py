@@ -8,8 +8,8 @@ from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from agent import AGENT_SKILL_ID_KEY, SKILL_DIR_KEY
 from dependencies import APP_NAME, AgentRegistryDep, CurrentUserIdDep, SessionServiceDep
+from infrastructure.agent import AGENT_SKILL_ID_KEY, SKILL_DIR_KEY
 
 router = APIRouter()
 

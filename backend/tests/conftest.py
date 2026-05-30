@@ -74,12 +74,12 @@ async def workflow_client(
     mock_skill_manager: MagicMock,
     real_session_service: InMemorySessionService,
 ) -> AsyncGenerator[AsyncClient, None]:
-    from database import get_session
     from dependencies import (
         get_agent_registry,
         get_session_service,
         get_skill_manager,
     )
+    from infrastructure.database import get_session
     from main import app
     from models.agent_skill import (
         AgentSkill as _AgentSkill,  # noqa: F401 — registers model

@@ -13,17 +13,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db
 from dependencies import APP_NAME
-from exception_handlers import (
-    foreign_key_violation_exception_handler,
-    http_exception_handler,
-    not_found_exception_handler,
-    referenced_exception_handler,
-    unhandled_exception_handler,
-    validation_exception_handler,
-)
-from logging_context import setup_logging
+from infrastructure.database import init_db
+from infrastructure.logging_context import setup_logging
 from middleware.envelope import RequestContextMiddleware
 from repositories.exceptions import (
     ForeignKeyViolationError,
@@ -31,6 +23,14 @@ from repositories.exceptions import (
     ReferencedError,
 )
 from routers import api_router
+from routers.exception_handlers import (
+    foreign_key_violation_exception_handler,
+    http_exception_handler,
+    not_found_exception_handler,
+    referenced_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
 
 load_dotenv()
 
