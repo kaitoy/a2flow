@@ -153,7 +153,7 @@ export function SessionList({
                 className={[
                   "mr-1 my-1 flex w-7 shrink-0 items-center justify-center rounded-lg",
                   "text-on-surface-variant opacity-0",
-                  "transition-[opacity,background-color,color,transform] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
+                  "transition-[opacity,background-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
                   "group-hover:opacity-100 hover:bg-error/10 hover:text-error motion-safe:hover:scale-110",
                   "focus-visible:opacity-100 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",
                 ].join(" ")}

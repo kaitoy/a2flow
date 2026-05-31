@@ -3,6 +3,13 @@
 /* Enable explicit light/dark theme switching via [data-theme] on <html>. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* Apply hover styles on any pointer type. Tailwind v4 defaults the `hover`
+   variant to `@media (hover: hover)`, which Chrome evaluates as false on
+   touchscreen Windows laptops (touch is treated as the primary pointer) — that
+   silently drops every hover style even with a mouse attached, while Firefox
+   still shows them. Redefining the variant restores hover on hybrid devices. */
+@custom-variant hover (&:hover);
+
 @theme inline {
   /* Surfaces — translucent in both themes so the body's mesh gradient shows through. */
   --color-surface: var(--c-surface);
