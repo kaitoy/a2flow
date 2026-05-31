@@ -1,5 +1,6 @@
 """WorkflowTask repository: Protocol interface and SQLModel-backed implementation."""
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from sqlmodel import col, select
@@ -7,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.workflow_task import WorkflowTask, WorkflowTaskCreate, WorkflowTaskUpdate
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
+from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 from repositories.workflow_session import WorkflowSessionRepository
 
 
@@ -21,6 +23,8 @@ class WorkflowTaskRepository(Protocol):
         limit: int,
         offset: int,
         workflow_session_id: str | None = None,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
     ) -> list[WorkflowTask]: ...
 
     async def create(
@@ -60,8 +64,10 @@ class SqlWorkflowTaskRepository:
         limit: int,
         offset: int,
         workflow_session_id: str | None = None,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
     ) -> list[WorkflowTask]:
-        """Return WorkflowTasks ordered by ``position`` then ``created_at``.
+        """Return WorkflowTasks, defaulting to ``position`` then ``created_at`` order.
 
         When ``workflow_session_id`` is supplied, only tasks belonging to that
         session are returned.
@@ -69,15 +75,17 @@ class SqlWorkflowTaskRepository:
         stmt = select(WorkflowTask)
         if workflow_session_id is not None:
             stmt = stmt.where(WorkflowTask.workflow_session_id == workflow_session_id)
-        stmt = (
-            stmt.order_by(
+        stmt = apply_filters(stmt, WorkflowTask, filters)
+        stmt = apply_sort(
+            stmt,
+            WorkflowTask,
+            sort,
+            default=[
                 col(WorkflowTask.position).asc(),
                 col(WorkflowTask.created_at).asc(),
-            )
-            .limit(limit)
-            .offset(offset)
+            ],
         )
-        result = await self._db.exec(stmt)
+        result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 
     async def create(self, data: WorkflowTaskCreate, *, user_id: str) -> WorkflowTask:

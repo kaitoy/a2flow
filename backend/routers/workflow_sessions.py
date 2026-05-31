@@ -9,7 +9,9 @@ from fastapi.responses import StreamingResponse
 
 from dependencies import (
     ApiMetaDep,
+    FilterDep,
     PaginationDep,
+    SortDep,
     WorkflowSessionServiceDep,
 )
 from models.response import ApiResponse
@@ -23,10 +25,17 @@ router = APIRouter(prefix="/workflow-sessions", tags=["workflow-sessions"])
 async def list_workflow_sessions(
     service: WorkflowSessionServiceDep,
     pagination: PaginationDep,
+    sort: SortDep,
+    filters: FilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[WorkflowSession]]:
-    """Return WorkflowSession records ordered by ``created_at`` descending."""
-    items = await service.list(limit=pagination.limit, offset=pagination.offset)
+    """Return WorkflowSession records, defaulting to ``created_at`` descending."""
+    items = await service.list(
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort=sort.sort,
+        filters=filters.filters,
+    )
     return ApiResponse(meta=meta, data=items)
 
 
@@ -46,6 +55,8 @@ async def list_workflow_session_tasks(
     ws_id: str,
     service: WorkflowSessionServiceDep,
     pagination: PaginationDep,
+    sort: SortDep,
+    filters: FilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[WorkflowTask]]:
     """Return the WorkflowTasks belonging to the given WorkflowSession.
@@ -55,7 +66,11 @@ async def list_workflow_session_tasks(
     no tasks".
     """
     items = await service.list_tasks(
-        ws_id, limit=pagination.limit, offset=pagination.offset
+        ws_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort=sort.sort,
+        filters=filters.filters,
     )
     return ApiResponse(meta=meta, data=items)
 

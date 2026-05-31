@@ -6,6 +6,7 @@ WorkflowSession) that previously lived inline in the router.
 """
 
 import uuid
+from collections.abc import Sequence
 
 from infrastructure.skill_manager import SkillManager
 from models.workflow import Workflow, WorkflowCreate, WorkflowUpdate
@@ -16,6 +17,7 @@ from repositories import (
     WorkflowSessionRepository,
 )
 from repositories.exceptions import NotFoundError
+from repositories.query import FilterSpec, SortSpec
 
 
 class WorkflowService:
@@ -58,17 +60,28 @@ class WorkflowService:
             raise NotFoundError("Workflow", workflow_id)
         return workflow
 
-    async def list(self, *, limit: int, offset: int) -> list[Workflow]:
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[Workflow]:
         """Return a page of Workflow records.
 
         Args:
             limit: Maximum number of records to return.
             offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
 
         Returns:
             The requested page of workflows.
         """
-        return await self._workflows.list(limit=limit, offset=offset)
+        return await self._workflows.list(
+            limit=limit, offset=offset, sort=sort, filters=filters
+        )
 
     async def create(self, data: WorkflowCreate, *, user_id: str) -> Workflow:
         """Create a new Workflow.

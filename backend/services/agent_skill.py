@@ -5,9 +5,12 @@ need (notably raising :class:`NotFoundError` when a skill is missing) so the
 router layer never touches the repository directly.
 """
 
+from collections.abc import Sequence
+
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from repositories import AgentSkillRepository
 from repositories.exceptions import NotFoundError
+from repositories.query import FilterSpec, SortSpec
 
 
 class AgentSkillService:
@@ -38,17 +41,28 @@ class AgentSkillService:
             raise NotFoundError("AgentSkill", skill_id)
         return skill
 
-    async def list(self, *, limit: int, offset: int) -> list[AgentSkill]:
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[AgentSkill]:
         """Return a page of AgentSkill records.
 
         Args:
             limit: Maximum number of records to return.
             offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
 
         Returns:
             The requested page of skills.
         """
-        return await self._repo.list(limit=limit, offset=offset)
+        return await self._repo.list(
+            limit=limit, offset=offset, sort=sort, filters=filters
+        )
 
     async def create(self, data: AgentSkillCreate, *, user_id: str) -> AgentSkill:
         """Create a new AgentSkill.

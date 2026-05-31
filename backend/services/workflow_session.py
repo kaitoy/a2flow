@@ -7,6 +7,7 @@ and agent-resolution business rules.
 """
 
 import builtins
+from collections.abc import Sequence
 from pathlib import Path
 
 from ag_ui_adk import ADKAgent
@@ -16,6 +17,7 @@ from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTask
 from repositories import WorkflowSessionRepository, WorkflowTaskRepository
 from repositories.exceptions import NotFoundError
+from repositories.query import FilterSpec, SortSpec
 
 
 class WorkflowSessionService:
@@ -55,20 +57,37 @@ class WorkflowSessionService:
             raise NotFoundError("WorkflowSession", ws_id)
         return ws
 
-    async def list(self, *, limit: int, offset: int) -> builtins.list[WorkflowSession]:
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> builtins.list[WorkflowSession]:
         """Return a page of WorkflowSession records.
 
         Args:
             limit: Maximum number of records to return.
             offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
 
         Returns:
-            The requested page of sessions, newest first.
+            The requested page of sessions, newest first by default.
         """
-        return await self._ws_repo.list(limit=limit, offset=offset)
+        return await self._ws_repo.list(
+            limit=limit, offset=offset, sort=sort, filters=filters
+        )
 
     async def list_tasks(
-        self, ws_id: str, *, limit: int, offset: int
+        self,
+        ws_id: str,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
     ) -> builtins.list[WorkflowTask]:
         """Return the WorkflowTasks belonging to a session.
 
@@ -76,6 +95,8 @@ class WorkflowSessionService:
             ws_id: Identifier of the parent session.
             limit: Maximum number of records to return.
             offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
 
         Returns:
             The requested page of tasks for the session.
@@ -86,7 +107,11 @@ class WorkflowSessionService:
         """
         await self.get(ws_id)
         return await self._tasks.list(
-            limit=limit, offset=offset, workflow_session_id=ws_id
+            limit=limit,
+            offset=offset,
+            workflow_session_id=ws_id,
+            sort=sort,
+            filters=filters,
         )
 
     async def resolve_agent(self, ws_id: str) -> ADKAgent:

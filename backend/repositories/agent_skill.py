@@ -1,5 +1,6 @@
 """AgentSkill repository: Protocol interface and SQLModel-backed implementation."""
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from repositories.exceptions import NotFoundError, ReferencedError
+from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
 
 class AgentSkillRepository(Protocol):
@@ -15,7 +17,14 @@ class AgentSkillRepository(Protocol):
 
     async def get(self, skill_id: str) -> AgentSkill | None: ...
 
-    async def list(self, *, limit: int, offset: int) -> list[AgentSkill]: ...
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[AgentSkill]: ...
 
     async def create(self, data: AgentSkillCreate, *, user_id: str) -> AgentSkill: ...
 
@@ -44,13 +53,19 @@ class SqlAgentSkillRepository:
     async def exists(self, skill_id: str) -> bool:
         return (await self._db.get(AgentSkill, skill_id)) is not None
 
-    async def list(self, *, limit: int, offset: int) -> list[AgentSkill]:
-        result = await self._db.exec(
-            select(AgentSkill)
-            .order_by(col(AgentSkill.created_at).desc())
-            .limit(limit)
-            .offset(offset)
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[AgentSkill]:
+        stmt = apply_filters(select(AgentSkill), AgentSkill, filters)
+        stmt = apply_sort(
+            stmt, AgentSkill, sort, default=[col(AgentSkill.created_at).desc()]
         )
+        result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 
     async def create(self, data: AgentSkillCreate, *, user_id: str) -> AgentSkill:
