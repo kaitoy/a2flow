@@ -6,7 +6,9 @@ from dependencies import (
     AgentSkillServiceDep,
     ApiMetaDep,
     CurrentUserIdDep,
+    FilterDep,
     PaginationDep,
+    SortDep,
 )
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from models.response import ApiResponse
@@ -29,9 +31,16 @@ async def create_agent_skill(
 async def list_agent_skills(
     service: AgentSkillServiceDep,
     pagination: PaginationDep,
+    sort: SortDep,
+    filters: FilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[AgentSkill]]:
-    items = await service.list(limit=pagination.limit, offset=pagination.offset)
+    items = await service.list(
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort=sort.sort,
+        filters=filters.filters,
+    )
     return ApiResponse(meta=meta, data=items)
 
 

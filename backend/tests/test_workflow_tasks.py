@@ -228,6 +228,64 @@ async def test_list_session_tasks_unknown_session_returns_404(
     assert_err(response, code="NOT_FOUND", status=404)
 
 
+# ---------- list sort & filter ----------
+
+
+async def test_list_session_tasks_filter_by_status(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    await _create_task(workflow_client, ws["id"], title="done", status="completed")
+    await _create_task(workflow_client, ws["id"], title="todo", status="pending")
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks",
+        params={"q": "status:eq:completed"},
+    )
+    titles = [t["title"] for t in assert_ok(response)]
+    assert titles == ["done"]
+
+
+async def test_list_session_tasks_filter_status_in(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    await _create_task(workflow_client, ws["id"], title="a", status="completed")
+    await _create_task(workflow_client, ws["id"], title="b", status="pending")
+    await _create_task(workflow_client, ws["id"], title="c", status="failed")
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks",
+        params={"q": "status:in:completed,pending"},
+    )
+    assert len(assert_ok(response)) == 2
+
+
+async def test_list_session_tasks_sort_multi_field(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    # Same position so the tie is broken by the second sort field (title).
+    await _create_task(workflow_client, ws["id"], title="b", position=1)
+    await _create_task(workflow_client, ws["id"], title="a", position=1)
+    await _create_task(workflow_client, ws["id"], title="c", position=2)
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks",
+        params={"s": "position,title"},
+    )
+    titles = [t["title"] for t in assert_ok(response)]
+    assert titles == ["a", "b", "c"]
+
+
+async def test_list_session_tasks_invalid_filter_value_returns_400(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks",
+        params={"q": "position:eq:notanumber"},
+    )
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
 # ---------- get ----------
 
 

@@ -25,3 +25,15 @@ class ForeignKeyViolationError(RepositoryError):
 
 class ReferencedError(RepositoryError):
     """Raised when deleting an entity that is still referenced by other records."""
+
+
+class QueryValidationError(RepositoryError):
+    """Raised when a sort or filter query parameter is malformed or references an unknown field.
+
+    Carries a human-readable ``reason`` so the HTTP layer can surface it in the
+    error envelope's ``details`` block when returning HTTP 400.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)

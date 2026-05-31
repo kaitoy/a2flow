@@ -5,7 +5,9 @@ from fastapi import APIRouter
 from dependencies import (
     ApiMetaDep,
     CurrentUserIdDep,
+    FilterDep,
     PaginationDep,
+    SortDep,
     WorkflowServiceDep,
 )
 from models.response import ApiResponse
@@ -30,9 +32,16 @@ async def create_workflow(
 async def list_workflows(
     service: WorkflowServiceDep,
     pagination: PaginationDep,
+    sort: SortDep,
+    filters: FilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[Workflow]]:
-    items = await service.list(limit=pagination.limit, offset=pagination.offset)
+    items = await service.list(
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort=sort.sort,
+        filters=filters.filters,
+    )
     return ApiResponse(meta=meta, data=items)
 
 

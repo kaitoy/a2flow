@@ -116,6 +116,75 @@ async def test_list_skills_respects_offset_param(skill_client: AsyncClient) -> N
     assert len(assert_ok(response)) == 1
 
 
+# ---------- sort & filter ----------
+
+
+async def _create_named_skills(skill_client: AsyncClient) -> None:
+    for i in range(3):
+        await skill_client.post(
+            "/api/v1/agent-skills",
+            json={"name": f"Skill {i}", "repo_url": "https://github.com/x/y"},
+        )
+
+
+async def test_list_skills_sort_by_name_asc(skill_client: AsyncClient) -> None:
+    await _create_named_skills(skill_client)
+    response = await skill_client.get("/api/v1/agent-skills", params={"s": "name"})
+    names = [s["name"] for s in assert_ok(response)]
+    assert names == ["Skill 0", "Skill 1", "Skill 2"]
+
+
+async def test_list_skills_sort_by_name_desc(skill_client: AsyncClient) -> None:
+    await _create_named_skills(skill_client)
+    response = await skill_client.get("/api/v1/agent-skills", params={"s": "-name"})
+    names = [s["name"] for s in assert_ok(response)]
+    assert names == ["Skill 2", "Skill 1", "Skill 0"]
+
+
+async def test_list_skills_filter_eq(skill_client: AsyncClient) -> None:
+    await _create_named_skills(skill_client)
+    response = await skill_client.get(
+        "/api/v1/agent-skills", params={"q": "name:eq:Skill 1"}
+    )
+    data = assert_ok(response)
+    assert [s["name"] for s in data] == ["Skill 1"]
+
+
+async def test_list_skills_filter_like_is_case_insensitive(
+    skill_client: AsyncClient,
+) -> None:
+    await _create_named_skills(skill_client)
+    response = await skill_client.get(
+        "/api/v1/agent-skills", params={"q": "name:like:skill"}
+    )
+    assert len(assert_ok(response)) == 3
+
+
+async def test_list_skills_invalid_sort_field_returns_400(
+    skill_client: AsyncClient,
+) -> None:
+    response = await skill_client.get(
+        "/api/v1/agent-skills", params={"s": "bogusField"}
+    )
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_list_skills_invalid_filter_operator_returns_400(
+    skill_client: AsyncClient,
+) -> None:
+    response = await skill_client.get(
+        "/api/v1/agent-skills", params={"q": "name:bogus:foo"}
+    )
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_list_skills_malformed_filter_returns_400(
+    skill_client: AsyncClient,
+) -> None:
+    response = await skill_client.get("/api/v1/agent-skills", params={"q": "name=foo"})
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
 # ---------- get ----------
 
 

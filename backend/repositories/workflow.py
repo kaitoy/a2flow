@@ -1,5 +1,6 @@
 """Workflow repository: Protocol interface and SQLModel-backed implementation."""
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from sqlmodel import col, select
@@ -8,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.workflow import Workflow, WorkflowCreate, WorkflowUpdate
 from repositories.agent_skill import AgentSkillRepository
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
+from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
 
 class WorkflowRepository(Protocol):
@@ -15,7 +17,14 @@ class WorkflowRepository(Protocol):
 
     async def get(self, workflow_id: str) -> Workflow | None: ...
 
-    async def list(self, *, limit: int, offset: int) -> list[Workflow]: ...
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[Workflow]: ...
 
     async def create(self, data: WorkflowCreate, *, user_id: str) -> Workflow: ...
 
@@ -40,13 +49,19 @@ class SqlWorkflowRepository:
     async def get(self, workflow_id: str) -> Workflow | None:
         return await self._db.get(Workflow, workflow_id)
 
-    async def list(self, *, limit: int, offset: int) -> list[Workflow]:
-        result = await self._db.exec(
-            select(Workflow)
-            .order_by(col(Workflow.created_at).desc())
-            .limit(limit)
-            .offset(offset)
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[Workflow]:
+        stmt = apply_filters(select(Workflow), Workflow, filters)
+        stmt = apply_sort(
+            stmt, Workflow, sort, default=[col(Workflow.created_at).desc()]
         )
+        result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 
     async def create(self, data: WorkflowCreate, *, user_id: str) -> Workflow:

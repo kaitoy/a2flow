@@ -161,6 +161,28 @@ The AG-UI streaming endpoint (`POST /agent`) is marked `include_in_schema=False`
 
 `pnpm generate:api` (frontend) runs the backend export step via `uv` first, then the Zod codegen — so a single command keeps both layers in sync. The frontend's `predev` and `prebuild` hooks invoke it automatically, so `pnpm dev` and `pnpm build` regenerate the spec and schemas on every run. `uv` must be available on `PATH`.
 
+## List query parameters
+
+Every collection endpoint (`GET /agent-skills`, `GET /workflows`, `GET /workflow-sessions`, `GET /workflow-sessions/{id}/workflow-tasks`) accepts the same set of optional query parameters. Field names are written in **camelCase** (matching the JSON response), and an unknown field, operator, or uncoercible value returns HTTP 400 with the `INVALID_QUERY` error code.
+
+| Param | Purpose | Syntax | Example |
+|---|---|---|---|
+| `limit` | Page size (1–1000, default 20) | integer | `?limit=50` |
+| `offset` | Records to skip (default 0) | integer | `?offset=100` |
+| `s` | Sort | Comma-separated fields; prefix `-` for descending | `?s=-createdAt,name` |
+| `q` | Filter (repeatable) | `field:op:value` | `?q=name:like:foo&q=status:eq:pending` |
+
+Filter operators (`op`):
+
+| Operator | Meaning |
+|---|---|
+| `eq` / `ne` | Equal / not equal |
+| `lt` / `lte` / `gt` / `gte` | Less / less-or-equal / greater / greater-or-equal |
+| `like` | Case-insensitive substring match (string fields) |
+| `in` | Matches any of a comma-separated list, e.g. `status:in:pending,completed` |
+
+When `s` is omitted, each endpoint falls back to its default ordering (`createdAt` descending; workflow tasks order by `position` then `createdAt` ascending).
+
 ## LLM configuration
 
 Set `LLM_MODEL` in `backend/.env`:

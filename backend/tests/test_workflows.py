@@ -127,6 +127,60 @@ async def test_list_workflows_respects_offset_param(
     assert len(assert_ok(response)) == 1
 
 
+# ---------- sort & filter ----------
+
+
+async def test_list_workflows_sort_by_name_asc(workflow_client: AsyncClient) -> None:
+    skill = await _create_skill(workflow_client)
+    for name in ("Charlie", "Alpha", "Bravo"):
+        await _create_workflow(workflow_client, skill["id"], name=name)
+    response = await workflow_client.get("/api/v1/workflows", params={"s": "name"})
+    names = [w["name"] for w in assert_ok(response)]
+    assert names == ["Alpha", "Bravo", "Charlie"]
+
+
+async def test_list_workflows_filter_eq_by_name(workflow_client: AsyncClient) -> None:
+    skill = await _create_skill(workflow_client)
+    for name in ("Alpha", "Bravo"):
+        await _create_workflow(workflow_client, skill["id"], name=name)
+    response = await workflow_client.get(
+        "/api/v1/workflows", params={"q": "name:eq:Bravo"}
+    )
+    assert [w["name"] for w in assert_ok(response)] == ["Bravo"]
+
+
+async def test_list_workflows_filter_createdat_gte_returns_all(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    for name in ("Alpha", "Bravo"):
+        await _create_workflow(workflow_client, skill["id"], name=name)
+    response = await workflow_client.get(
+        "/api/v1/workflows", params={"q": "createdAt:gte:2000-01-01T00:00:00Z"}
+    )
+    assert len(assert_ok(response)) == 2
+
+
+async def test_list_workflows_filter_createdat_gt_future_returns_none(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    await _create_workflow(workflow_client, skill["id"], name="Alpha")
+    response = await workflow_client.get(
+        "/api/v1/workflows", params={"q": "createdAt:gt:2999-01-01T00:00:00Z"}
+    )
+    assert assert_ok(response) == []
+
+
+async def test_list_workflows_invalid_filter_field_returns_400(
+    workflow_client: AsyncClient,
+) -> None:
+    response = await workflow_client.get(
+        "/api/v1/workflows", params={"q": "bogus:eq:x"}
+    )
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
 # ---------- get ----------
 
 

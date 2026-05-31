@@ -16,6 +16,7 @@ from models.response import ApiError, ApiMeta, ApiResponse
 from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
+    QueryValidationError,
     ReferencedError,
 )
 
@@ -84,6 +85,20 @@ async def foreign_key_violation_exception_handler(
         message=str(exc),
         status_code=422,
         details={"entity": exc.entity, "id": exc.id},
+    )
+
+
+async def query_validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 400 with INVALID_QUERY code for malformed sort/filter parameters."""
+    assert isinstance(exc, QueryValidationError)
+    return _envelope_error(
+        request,
+        code="INVALID_QUERY",
+        message=str(exc),
+        status_code=400,
+        details={"reason": exc.reason},
     )
 
 

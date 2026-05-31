@@ -20,6 +20,7 @@ from middleware.envelope import RequestContextMiddleware
 from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
+    QueryValidationError,
     ReferencedError,
 )
 from routers import api_router
@@ -27,6 +28,7 @@ from routers.exception_handlers import (
     foreign_key_violation_exception_handler,
     http_exception_handler,
     not_found_exception_handler,
+    query_validation_exception_handler,
     referenced_exception_handler,
     unhandled_exception_handler,
     validation_exception_handler,
@@ -66,6 +68,7 @@ app.add_exception_handler(
     ForeignKeyViolationError, foreign_key_violation_exception_handler
 )
 app.add_exception_handler(ReferencedError, referenced_exception_handler)
+app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
