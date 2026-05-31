@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import logo from "@/../assets/logo.png";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { ChatErrorBanner } from "./ChatErrorBanner";
 import { SessionList } from "./SessionList";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -77,22 +78,7 @@ export function ChatShell({ children }: { children: React.ReactNode }) {
           <ThemeToggle />
         </header>
 
-        {error && (
-          <div className="shrink-0 mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-error/40 bg-error-container px-4 py-2 text-sm text-on-error-container backdrop-blur-md">
-            <span className="flex items-center gap-2">
-              <span aria-hidden="true">⚠</span>
-              {error}
-            </span>
-            <button
-              type="button"
-              onClick={() => dispatch(clearError())}
-              className="cursor-pointer rounded-full px-2 leading-none text-on-error-container/70 transition-colors hover:bg-error/15 hover:text-on-error-container"
-              aria-label="Dismiss error"
-            >
-              ✕
-            </button>
-          </div>
-        )}
+        <ChatErrorBanner error={error} onDismiss={() => dispatch(clearError())} />
 
         {children}
       </div>

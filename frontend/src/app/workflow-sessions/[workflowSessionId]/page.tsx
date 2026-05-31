@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import logo from "@/../assets/logo.png";
+import { ChatErrorBanner } from "@/components/ChatErrorBanner";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -42,22 +43,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           <ThemeToggle />
         </header>
 
-        {error && (
-          <div className="shrink-0 mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl border border-error/40 bg-error-container px-4 py-2 text-sm text-on-error-container backdrop-blur-md">
-            <span className="flex items-center gap-2">
-              <span aria-hidden="true">⚠</span>
-              {error}
-            </span>
-            <button
-              type="button"
-              onClick={() => dispatch(clearError())}
-              className="cursor-pointer rounded-full px-2 leading-none text-on-error-container/70 transition-colors hover:bg-error/15 hover:text-on-error-container"
-              aria-label="Dismiss error"
-            >
-              ✕
-            </button>
-          </div>
-        )}
+        <ChatErrorBanner error={error} onDismiss={() => dispatch(clearError())} />
 
         <MessageList messages={messages} isStreaming={isStreaming} />
         <ChatInput onSend={sendMessage} disabled={isRunning} />

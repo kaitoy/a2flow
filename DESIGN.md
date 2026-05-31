@@ -184,16 +184,16 @@ The shape language is **Soft Modern**.
 
 - **Buttons:**
   - *Primary:* Gradient fill `from-accent to-secondary`, white text, inner-top highlight + soft accent shadow. Lifts 2px on hover with an accent glow.
-  - *Secondary:* `glass-panel` background, on-surface text, accent text + glow on hover.
-  - *Ghost:* Transparent, on-surface-variant text, mild glass tint on hover.
+  - *Secondary:* `glass-panel` background, on-surface text, accent text + glow on hover; lifts 2px (motion-safe).
+  - *Ghost:* Transparent, on-surface-variant text, mild glass tint on hover; lifts 2px (motion-safe).
 - **Inputs / Textareas / Selects:** `glass-panel` background with accent ring on focus (`ring-accent/50`). 16px radius.
 - **Data Tables:** Wrapped in a 20px-radius `glass-panel`. Header uses a slightly stronger glass tint. Rows hover with an `accent-soft` wash.
 - **Status Badges:** Pill-shaped, gradient or glass per state.
 - **Chat bubbles:**
   - *User:* Accent gradient fill, asymmetric corner (`rounded-tr-md`), inner-top highlight.
   - *Assistant:* `glass-panel`, asymmetric corner (`rounded-tl-md`), accent-colored streaming caret.
-- **A2UI surfaces:** `customCard` is rendered as `glass-panel-strong`. `customChoicePicker` chips use the same primary-gradient when selected and `glass-panel` when not.
-- **Theme Toggle:** A 36×36 round glass button in the chat header / admin sidebar bottom. Sun/Moon SVG icons; emits accent glow on hover. Icons cross-fade with a 90° rotation on toggle.
+- **A2UI surfaces:** `customCard` is rendered as `glass-panel-strong`. `customChoicePicker` chips use the same primary-gradient when selected and `glass-panel` when not, and scale up slightly (~1.03) on hover (motion-safe).
+- **Theme Toggle:** A 36×36 round glass button in the chat header / admin sidebar bottom. Sun/Moon SVG icons; scales up slightly (~1.05) and emits accent glow on hover. Icons cross-fade with a 90° rotation on toggle.
 
 ## Motion
 
@@ -225,9 +225,9 @@ Choose presets by intent (`useMotionConfig("gentle")`) rather than tuning tensio
 - **Entrance** — Message bubbles, error banners use the `animate-message-in` keyframe (`opacity 0→1` + `translateY(8px)→0` + slight `scale(0.985)→1`).
 - **List staggering** — Session list rows use React Spring `useTransition` with `trail: 40` to ripple in horizontally on first load.
 - **Modal** — `ConfirmDialog` cross-fades the backdrop and `scale(0.94)→1` the body with a gentle spring.
-- **Buttons** — All variants share `active:scale-[0.97]` for tactile press feedback; the primary additionally lifts 2px on hover (`motion-safe`-guarded).
+- **Buttons** — All variants share `active:scale-[0.97]` for tactile press feedback and lift 2px on hover (`motion-safe`-guarded).
 - **Streaming caret** — Assistant bubble caret uses both `animate-blink` (the original step-start blink, preserved for tests) and `motion-safe:animate-pulse-cursor` (a softer opacity + scaleY pulse) so motion-safe users get the richer effect.
-- **Theme toggle** — Sun/Moon icons cross-fade with a 90° rotation via `useTransition`.
+- **Theme toggle** — Scales up slightly on hover (motion-safe); Sun/Moon icons cross-fade with a 90° rotation via `useTransition`.
 
 ### Reduced motion
 

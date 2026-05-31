@@ -30,8 +30,8 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
   const cls = [
     "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full relative overflow-hidden",
     "glass-panel text-on-surface",
-    "transition-[box-shadow,color,background-color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
-    "hover:shadow-glow hover:text-accent motion-safe:active:scale-95",
+    "transition-[transform,translate,scale,box-shadow,color,background-color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
+    "hover:shadow-glow hover:text-accent motion-safe:hover:scale-105 motion-safe:active:scale-95",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
     className,
   ]
