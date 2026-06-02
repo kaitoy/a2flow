@@ -16,7 +16,7 @@ from dependencies import (
 )
 from models.response import ApiResponse
 from models.workflow_session import WorkflowSession
-from models.workflow_task import WorkflowTask
+from models.workflow_task import WorkflowTaskRead
 
 router = APIRouter(prefix="/workflow-sessions", tags=["workflow-sessions"])
 
@@ -50,7 +50,9 @@ async def get_workflow_session(
     return ApiResponse(meta=meta, data=ws)
 
 
-@router.get("/{ws_id}/workflow-tasks", response_model=ApiResponse[list[WorkflowTask]])
+@router.get(
+    "/{ws_id}/workflow-tasks", response_model=ApiResponse[list[WorkflowTaskRead]]
+)
 async def list_workflow_session_tasks(
     ws_id: str,
     service: WorkflowSessionServiceDep,
@@ -58,7 +60,7 @@ async def list_workflow_session_tasks(
     sort: SortDep,
     filters: FilterDep,
     meta: ApiMetaDep,
-) -> ApiResponse[list[WorkflowTask]]:
+) -> ApiResponse[list[WorkflowTaskRead]]:
     """Return the WorkflowTasks belonging to the given WorkflowSession.
 
     Raises HTTP 404 (``NotFoundError``) if the parent session does not exist,

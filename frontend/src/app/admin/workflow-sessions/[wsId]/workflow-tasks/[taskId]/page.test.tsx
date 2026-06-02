@@ -89,6 +89,85 @@ describe("EditWorkflowTaskPage", () => {
     expect(receivedBody).not.toHaveProperty("workflowSessionId");
   });
 
+  it("prefills selected dependencies, excludes self, and PATCHes dependsOnIds", async () => {
+    pushMock.mockClear();
+    const user = userEvent.setup();
+    let receivedBody: Record<string, unknown> = {};
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-tasks/:taskId", () =>
+        envelope({
+          id: "task-1",
+          workflowSessionId: "ws-1",
+          title: "Step 1",
+          description: null,
+          status: "pending",
+          position: 0,
+          dependsOnIds: ["task-2"],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      ),
+      http.get("http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks", () =>
+        envelope([
+          {
+            id: "task-1",
+            workflowSessionId: "ws-1",
+            title: "Step 1",
+            description: null,
+            status: "pending",
+            position: 0,
+            dependsOnIds: ["task-2"],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+          {
+            id: "task-2",
+            workflowSessionId: "ws-1",
+            title: "Step 2",
+            description: null,
+            status: "pending",
+            position: 1,
+            dependsOnIds: [],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      ),
+      http.patch("http://localhost:8000/api/v1/workflow-tasks/:taskId", async ({ request }) => {
+        receivedBody = (await request.json()) as Record<string, unknown>;
+        return envelope({
+          id: "task-1",
+          workflowSessionId: "ws-1",
+          title: "Step 1",
+          description: null,
+          status: "pending",
+          position: 0,
+          dependsOnIds: ["task-2"],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        });
+      })
+    );
+
+    render(<EditWorkflowTaskPage />);
+    // The task depends on task-2, so its checkbox is pre-checked.
+    expect(await screen.findByRole("checkbox", { name: "Step 2" })).toBeChecked();
+    // The task itself (Step 1) must not be a candidate dependency.
+    expect(screen.queryByRole("checkbox", { name: "Step 1" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(pushMock).toHaveBeenCalled());
+    expect(receivedBody.dependsOnIds).toEqual(["task-2"]);
+  });
+
   it("opens the confirm dialog and calls DELETE", async () => {
     pushMock.mockClear();
     const user = userEvent.setup();

@@ -4,7 +4,11 @@ Wraps the :class:`WorkflowTaskRepository` with the business rules the router
 needs (notably raising :class:`NotFoundError` when a task is missing).
 """
 
-from models.workflow_task import WorkflowTask, WorkflowTaskCreate, WorkflowTaskUpdate
+from models.workflow_task import (
+    WorkflowTaskCreate,
+    WorkflowTaskRead,
+    WorkflowTaskUpdate,
+)
 from repositories import WorkflowTaskRepository
 from repositories.exceptions import NotFoundError
 
@@ -20,7 +24,7 @@ class WorkflowTaskService:
         """
         self._repo = repo
 
-    async def get(self, task_id: str) -> WorkflowTask:
+    async def get(self, task_id: str) -> WorkflowTaskRead:
         """Return the WorkflowTask with the given ID.
 
         Args:
@@ -37,7 +41,9 @@ class WorkflowTaskService:
             raise NotFoundError("WorkflowTask", task_id)
         return task
 
-    async def create(self, data: WorkflowTaskCreate, *, user_id: str) -> WorkflowTask:
+    async def create(
+        self, data: WorkflowTaskCreate, *, user_id: str
+    ) -> WorkflowTaskRead:
         """Create a new WorkflowTask.
 
         Args:
@@ -51,7 +57,7 @@ class WorkflowTaskService:
 
     async def update(
         self, task_id: str, data: WorkflowTaskUpdate, *, user_id: str
-    ) -> WorkflowTask:
+    ) -> WorkflowTaskRead:
         """Apply a partial update to a WorkflowTask.
 
         Args:

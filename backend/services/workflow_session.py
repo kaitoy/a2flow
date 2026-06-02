@@ -14,7 +14,7 @@ from ag_ui_adk import ADKAgent
 
 from infrastructure.agent import AgentRegistry
 from models.workflow_session import WorkflowSession
-from models.workflow_task import WorkflowTask
+from models.workflow_task import WorkflowTaskRead
 from repositories import WorkflowSessionRepository, WorkflowTaskRepository
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec
@@ -88,7 +88,7 @@ class WorkflowSessionService:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
-    ) -> builtins.list[WorkflowTask]:
+    ) -> builtins.list[WorkflowTaskRead]:
         """Return the WorkflowTasks belonging to a session.
 
         Args:

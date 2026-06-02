@@ -3,22 +3,24 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createWorkflowTask } from "@/lib/api";
+import { createWorkflowTask, listWorkflowTasks, type WorkflowTask } from "@/lib/api";
 
 const schema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string(),
   status: z.enum(["pending", "in_progress", "completed", "failed", "skipped"]),
   position: z.coerce.number().int().min(0, "Position must be 0 or greater"),
+  dependsOnIds: z.array(z.string()),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -28,10 +30,12 @@ export default function NewWorkflowTaskPage() {
   const { wsId } = useParams<{ wsId: string }>();
   const router = useRouter();
   const [apiError, setApiError] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<WorkflowTask[]>([]);
 
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
@@ -41,8 +45,17 @@ export default function NewWorkflowTaskPage() {
       description: "",
       status: "pending" as const,
       position: 0,
+      dependsOnIds: [] as string[],
     },
   });
+
+  useEffect(() => {
+    listWorkflowTasks(wsId, 100)
+      .then(setCandidates)
+      .catch(() => {
+        // Candidate list is non-essential; the picker simply renders empty.
+      });
+  }, [wsId]);
 
   async function onSubmit(values: FormValues) {
     setApiError(null);
@@ -53,6 +66,7 @@ export default function NewWorkflowTaskPage() {
         description: values.description || null,
         status: values.status,
         position: values.position,
+        dependsOnIds: values.dependsOnIds,
       });
       router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
     } catch (err) {
@@ -95,6 +109,22 @@ export default function NewWorkflowTaskPage() {
 
         <FormField htmlFor="position" label="Position" required error={errors.position?.message}>
           <Input id="position" type="number" min={0} step={1} {...register("position")} />
+        </FormField>
+
+        <FormField htmlFor="dependsOnIds" label="Depends on">
+          <Controller
+            control={control}
+            name="dependsOnIds"
+            render={({ field }) => (
+              <CheckboxGroup
+                name="dependsOnIds"
+                options={candidates.map((t) => ({ value: t.id, label: t.title }))}
+                value={field.value}
+                onChange={field.onChange}
+                emptyMessage="No other tasks in this session yet."
+              />
+            )}
+          />
         </FormField>
 
         <ErrorBanner error={apiError} />
