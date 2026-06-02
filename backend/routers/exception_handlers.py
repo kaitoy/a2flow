@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from models.response import ApiError, ApiMeta, ApiResponse
 from repositories.exceptions import (
+    DependencyCycleError,
     ForeignKeyViolationError,
     NotFoundError,
     QueryValidationError,
@@ -99,6 +100,20 @@ async def query_validation_exception_handler(
         message=str(exc),
         status_code=400,
         details={"reason": exc.reason},
+    )
+
+
+async def dependency_cycle_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with DEPENDENCY_CYCLE code when edges would form a cycle."""
+    assert isinstance(exc, DependencyCycleError)
+    return _envelope_error(
+        request,
+        code="DEPENDENCY_CYCLE",
+        message=str(exc),
+        status_code=409,
+        details={"taskId": exc.task_id, "dependsOnId": exc.depends_on_id},
     )
 
 

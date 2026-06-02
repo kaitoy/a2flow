@@ -41,8 +41,18 @@ function StatusDot({ status }: { status: WorkflowTaskStatus }) {
   return <span className={`inline-block size-2 rounded-full ${STATUS_DOT[status]}`} aria-hidden />;
 }
 
+/** Pill showing a single dependency, resolved to its task title when known. */
+function DependencyChip({ label }: { label: string }) {
+  return (
+    <span className="inline-block rounded-full glass-panel px-2 py-0.5 text-xs text-on-surface-variant">
+      {label}
+    </span>
+  );
+}
+
 function buildColumns(
   wsId: string,
+  titleById: Map<string, string>,
   onStatusChange: (taskId: string, status: WorkflowTaskStatus) => void,
   onDelete: (id: string, title: string) => void
 ): ColumnDef<WorkflowTask>[] {
@@ -60,6 +70,20 @@ function buildColumns(
       header: "Description",
       className: "max-w-[280px] truncate",
       cell: (t) => t.description || "—",
+    },
+    {
+      header: "Depends on",
+      cell: (t) => {
+        const deps = t.dependsOnIds ?? [];
+        if (deps.length === 0) return <span className="text-on-surface-variant">—</span>;
+        return (
+          <div className="flex flex-wrap gap-1">
+            {deps.map((id) => (
+              <DependencyChip key={id} label={titleById.get(id) ?? `${id.slice(0, 8)}…`} />
+            ))}
+          </div>
+        );
+      },
     },
     {
       header: "Status",
@@ -170,7 +194,12 @@ export default function WorkflowTasksPage() {
       />
       <ErrorBanner error={error} />
       <DataTable
-        columns={buildColumns(wsId, handleStatusChange, handleDelete)}
+        columns={buildColumns(
+          wsId,
+          new Map(tasks.map((t) => [t.id, t.title])),
+          handleStatusChange,
+          handleDelete
+        )}
         rows={tasks}
         loading={loading}
         emptyMessage="No tasks for this session yet."

@@ -10,42 +10,46 @@ from fastapi import APIRouter
 
 from dependencies import ApiMetaDep, CurrentUserIdDep, WorkflowTaskServiceDep
 from models.response import ApiResponse
-from models.workflow_task import WorkflowTask, WorkflowTaskCreate, WorkflowTaskUpdate
+from models.workflow_task import (
+    WorkflowTaskCreate,
+    WorkflowTaskRead,
+    WorkflowTaskUpdate,
+)
 
 router = APIRouter(prefix="/workflow-tasks", tags=["workflow-tasks"])
 
 
-@router.post("", response_model=ApiResponse[WorkflowTask], status_code=201)
+@router.post("", response_model=ApiResponse[WorkflowTaskRead], status_code=201)
 async def create_workflow_task(
     body: WorkflowTaskCreate,
     service: WorkflowTaskServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[WorkflowTask]:
+) -> ApiResponse[WorkflowTaskRead]:
     """Create a new WorkflowTask belonging to the session named in ``body``."""
     task = await service.create(body, user_id=user_id)
     return ApiResponse(meta=meta, data=task)
 
 
-@router.get("/{task_id}", response_model=ApiResponse[WorkflowTask])
+@router.get("/{task_id}", response_model=ApiResponse[WorkflowTaskRead])
 async def get_workflow_task(
     task_id: str,
     service: WorkflowTaskServiceDep,
     meta: ApiMetaDep,
-) -> ApiResponse[WorkflowTask]:
+) -> ApiResponse[WorkflowTaskRead]:
     """Return the WorkflowTask with the given ID, or HTTP 404 if missing."""
     task = await service.get(task_id)
     return ApiResponse(meta=meta, data=task)
 
 
-@router.patch("/{task_id}", response_model=ApiResponse[WorkflowTask])
+@router.patch("/{task_id}", response_model=ApiResponse[WorkflowTaskRead])
 async def update_workflow_task(
     task_id: str,
     body: WorkflowTaskUpdate,
     service: WorkflowTaskServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[WorkflowTask]:
+) -> ApiResponse[WorkflowTaskRead]:
     """Apply a partial update to the WorkflowTask with the given ID."""
     task = await service.update(task_id, body, user_id=user_id)
     return ApiResponse(meta=meta, data=task)

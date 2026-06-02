@@ -5,6 +5,8 @@ from .workflow_session import WorkflowSession, WorkflowSessionCreate
 from .workflow_task import (
     WorkflowTask,
     WorkflowTaskCreate,
+    WorkflowTaskDependency,
+    WorkflowTaskRead,
     WorkflowTaskStatus,
     WorkflowTaskUpdate,
 )
@@ -21,6 +23,8 @@ __all__ = [
     "WorkflowSessionCreate",
     "WorkflowTask",
     "WorkflowTaskCreate",
+    "WorkflowTaskDependency",
+    "WorkflowTaskRead",
     "WorkflowTaskStatus",
     "WorkflowTaskUpdate",
 ]

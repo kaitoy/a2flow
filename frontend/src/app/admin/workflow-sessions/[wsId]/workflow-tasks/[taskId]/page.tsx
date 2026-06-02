@@ -4,23 +4,31 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { deleteWorkflowTask, getWorkflowTask, updateWorkflowTask } from "@/lib/api";
+import {
+  deleteWorkflowTask,
+  getWorkflowTask,
+  listWorkflowTasks,
+  updateWorkflowTask,
+  type WorkflowTask,
+} from "@/lib/api";
 
 const schema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string(),
   status: z.enum(["pending", "in_progress", "completed", "failed", "skipped"]),
   position: z.coerce.number().int().min(0, "Position must be 0 or greater"),
+  dependsOnIds: z.array(z.string()),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -32,11 +40,13 @@ export default function EditWorkflowTaskPage() {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [candidates, setCandidates] = useState<WorkflowTask[]>([]);
 
   const {
     register,
     handleSubmit,
     reset,
+    control,
     getValues,
     formState: { errors, isSubmitting },
   } = useForm({
@@ -47,6 +57,7 @@ export default function EditWorkflowTaskPage() {
       description: "",
       status: "pending" as const,
       position: 0,
+      dependsOnIds: [] as string[],
     },
   });
 
@@ -58,6 +69,7 @@ export default function EditWorkflowTaskPage() {
           description: task.description ?? "",
           status: task.status ?? "pending",
           position: task.position ?? 0,
+          dependsOnIds: task.dependsOnIds ?? [],
         });
       })
       .catch((e: unknown) => {
@@ -65,6 +77,14 @@ export default function EditWorkflowTaskPage() {
       })
       .finally(() => setLoading(false));
   }, [taskId, reset]);
+
+  useEffect(() => {
+    listWorkflowTasks(wsId, 100)
+      .then(setCandidates)
+      .catch(() => {
+        // Candidate list is non-essential; the picker simply renders empty.
+      });
+  }, [wsId]);
 
   async function onSubmit(values: FormValues) {
     setApiError(null);
@@ -74,6 +94,7 @@ export default function EditWorkflowTaskPage() {
         description: values.description || null,
         status: values.status,
         position: values.position,
+        dependsOnIds: values.dependsOnIds,
       });
       router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
     } catch (err) {
@@ -137,6 +158,24 @@ export default function EditWorkflowTaskPage() {
 
         <FormField htmlFor="position" label="Position" required error={errors.position?.message}>
           <Input id="position" type="number" min={0} step={1} {...register("position")} />
+        </FormField>
+
+        <FormField htmlFor="dependsOnIds" label="Depends on">
+          <Controller
+            control={control}
+            name="dependsOnIds"
+            render={({ field }) => (
+              <CheckboxGroup
+                name="dependsOnIds"
+                options={candidates
+                  .filter((t) => t.id !== taskId)
+                  .map((t) => ({ value: t.id, label: t.title }))}
+                value={field.value}
+                onChange={field.onChange}
+                emptyMessage="No other tasks in this session to depend on."
+              />
+            )}
+          />
         </FormField>
 
         <ErrorBanner error={apiError} />

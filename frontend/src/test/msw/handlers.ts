@@ -53,6 +53,7 @@ const WORKFLOW_TASK_1 = {
   description: null,
   status: "pending",
   position: 0,
+  dependsOnIds: [],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",

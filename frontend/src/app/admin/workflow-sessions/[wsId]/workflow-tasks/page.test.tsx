@@ -30,6 +30,48 @@ describe("WorkflowTasksPage", () => {
     expect(link).toHaveAttribute("href", "/admin/workflow-sessions/ws-1/workflow-tasks/task-1");
   });
 
+  it("renders a Depends on column resolving dependency ids to titles", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks", () =>
+        envelope([
+          {
+            id: "task-1",
+            workflowSessionId: "ws-1",
+            title: "Step 1",
+            description: null,
+            status: "pending",
+            position: 0,
+            dependsOnIds: [],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+          {
+            id: "task-2",
+            workflowSessionId: "ws-1",
+            title: "Step 2",
+            description: null,
+            status: "pending",
+            position: 1,
+            dependsOnIds: ["task-1"],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+
+    render(<WorkflowTasksPage />);
+    expect(await screen.findByText("Depends on")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Step 2")).toBeInTheDocument());
+    // "Step 1" appears twice: once as task-1's own title, once as task-2's
+    // resolved dependency chip.
+    expect(screen.getAllByText("Step 1")).toHaveLength(2);
+  });
+
   it("calls PATCH when the inline status select changes", async () => {
     const user = userEvent.setup();
     const patchSpy = vi.fn(({ request }: { request: Request }) =>

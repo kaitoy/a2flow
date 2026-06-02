@@ -68,6 +68,47 @@ describe("NewWorkflowTaskPage", () => {
     });
   });
 
+  it("renders a dependency picker listing the session's other tasks", async () => {
+    render(<NewWorkflowTaskPage />);
+    expect(screen.getByText("Depends on")).toBeInTheDocument();
+    expect(await screen.findByRole("checkbox", { name: "Step 1" })).toBeInTheDocument();
+  });
+
+  it("includes selected dependencies in the POST body", async () => {
+    pushMock.mockClear();
+    const user = userEvent.setup();
+    let receivedBody: Record<string, unknown> = {};
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflow-tasks", async ({ request }) => {
+        receivedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(
+          {
+            id: "new-task-id",
+            workflowSessionId: "ws-1",
+            title: "Step 2",
+            description: null,
+            status: "pending",
+            position: 0,
+            dependsOnIds: ["task-1"],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+          201
+        );
+      })
+    );
+
+    render(<NewWorkflowTaskPage />);
+    await user.type(screen.getByLabelText(/Title/), "Step 2");
+    await user.click(await screen.findByRole("checkbox", { name: "Step 1" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalled());
+    expect(receivedBody.dependsOnIds).toEqual(["task-1"]);
+  });
+
   it("shows an error banner when the create call fails", async () => {
     const user = userEvent.setup();
     server.use(

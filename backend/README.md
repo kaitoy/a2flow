@@ -272,7 +272,9 @@ curl http://localhost:8000/api/v1/workflow-sessions/<id>
 
 ### Workflow tasks
 
-A workflow task is a single actionable item belonging to a `WorkflowSession`. Tasks are intended to capture the steps produced by the agent under the workflow instruction *"use the provided skill to produce an actionable task list"*. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`) and an integer `position` used for stable ordering within a session. Deleting the parent `WorkflowSession` cascades to its tasks.
+A workflow task is a single actionable item belonging to a `WorkflowSession`. Tasks are intended to capture the steps produced by the agent under the workflow instruction *"use the provided skill to produce an actionable task list"*. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`) and an integer `position` used for stable layout ordering within a session. Deleting the parent `WorkflowSession` cascades to its tasks.
+
+Tasks form a **directed acyclic graph (DAG)**: each task may depend on other tasks in the same session through its `dependsOnIds` list (persisted as `(task_id, depends_on_id)` rows in the `workflow_task_dependencies` join table, where `depends_on_id` must precede `task_id`). Read responses include the resolved `dependsOnIds`. Dependency targets must exist and belong to the same session, otherwise the write fails with `422 FOREIGN_KEY_VIOLATION`; edges that would introduce a cycle — including a self-dependency — fail with `409 DEPENDENCY_CYCLE`. Deleting a task cascade-deletes the edges that reference it in either direction.
 
 #### `POST /api/v1/workflow-tasks` — Create a workflow task
 
@@ -290,9 +292,10 @@ curl -X POST http://localhost:8000/api/v1/workflow-tasks \
 | `title` | string | Yes | Short, human-readable task title |
 | `description` | string | No | Longer-form details about the task |
 | `status` | string | No | One of `pending`, `in_progress`, `completed`, `failed`, `skipped` (default: `pending`) |
-| `position` | integer | No | Sort order within the session (default: `0`) |
+| `position` | integer | No | Layout order within the session (default: `0`) |
+| `dependsOnIds` | string[] | No | IDs of tasks in the same session that must precede this one (default: `[]`) |
 
-Returns `422 FOREIGN_KEY_VIOLATION` if `workflowSessionId` does not match an existing session.
+Returns `422 FOREIGN_KEY_VIOLATION` if `workflowSessionId` does not match an existing session, or if any `dependsOnIds` entry does not exist or belongs to another session. Returns `409 DEPENDENCY_CYCLE` if the dependencies would create a cycle.
 
 #### `GET /api/v1/workflow-sessions/{session_id}/workflow-tasks` — List tasks for a session
 
@@ -310,12 +313,12 @@ curl http://localhost:8000/api/v1/workflow-tasks/<id>
 
 #### `PATCH /api/v1/workflow-tasks/{task_id}` — Update a workflow task
 
-`workflowSessionId` is not updatable; once a task is created it cannot be re-parented.
+`workflowSessionId` is not updatable; once a task is created it cannot be re-parented. Sending `dependsOnIds` replaces the task's full set of dependency edges; omitting it leaves the edges unchanged. The same `422 FOREIGN_KEY_VIOLATION` / `409 DEPENDENCY_CYCLE` validation as create applies.
 
 ```bash
 curl -X PATCH http://localhost:8000/api/v1/workflow-tasks/<id> \
   -H "Content-Type: application/json" \
-  -d '{"status": "in_progress"}'
+  -d '{"status": "in_progress", "dependsOnIds": ["<other_task_id>"]}'
 ```
 
 #### `DELETE /api/v1/workflow-tasks/{task_id}` — Delete a workflow task

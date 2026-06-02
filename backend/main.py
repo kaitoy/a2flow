@@ -18,6 +18,7 @@ from infrastructure.database import init_db
 from infrastructure.logging_context import setup_logging
 from middleware.envelope import RequestContextMiddleware
 from repositories.exceptions import (
+    DependencyCycleError,
     ForeignKeyViolationError,
     NotFoundError,
     QueryValidationError,
@@ -25,6 +26,7 @@ from repositories.exceptions import (
 )
 from routers import api_router
 from routers.exception_handlers import (
+    dependency_cycle_exception_handler,
     foreign_key_violation_exception_handler,
     http_exception_handler,
     not_found_exception_handler,
@@ -68,6 +70,7 @@ app.add_exception_handler(
     ForeignKeyViolationError, foreign_key_violation_exception_handler
 )
 app.add_exception_handler(ReferencedError, referenced_exception_handler)
+app.add_exception_handler(DependencyCycleError, dependency_cycle_exception_handler)
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)

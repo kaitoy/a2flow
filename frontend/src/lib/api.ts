@@ -14,7 +14,7 @@ import type {
   Workflow as WorkflowModel,
   WorkflowSession as WorkflowSessionModel,
   WorkflowTaskCreate,
-  WorkflowTask as WorkflowTaskModel,
+  WorkflowTaskRead as WorkflowTaskModel,
   WorkflowTaskStatus,
   WorkflowTaskUpdate,
   WorkflowUpdate,

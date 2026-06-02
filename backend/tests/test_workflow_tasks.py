@@ -397,6 +397,158 @@ async def test_delete_task_unknown_id_returns_404(
     assert_err(response, code="NOT_FOUND", status=404)
 
 
+# ---------- dependencies (DAG) ----------
+
+
+async def test_create_task_defaults_to_no_dependencies(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    body = await _create_task(workflow_client, ws["id"])
+    assert body["dependsOnIds"] == []
+
+
+async def test_create_task_with_dependencies_returns_them(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    a = await _create_task(workflow_client, ws["id"], title="a")
+    b = await _create_task(workflow_client, ws["id"], title="b")
+    body = await _create_task(
+        workflow_client, ws["id"], title="c", dependsOnIds=[a["id"], b["id"]]
+    )
+    assert sorted(body["dependsOnIds"]) == sorted([a["id"], b["id"]])
+
+
+async def test_get_task_includes_resolved_dependencies(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    a = await _create_task(workflow_client, ws["id"], title="a")
+    b = await _create_task(workflow_client, ws["id"], title="b", dependsOnIds=[a["id"]])
+    response = await workflow_client.get(f"/api/v1/workflow-tasks/{b['id']}")
+    assert assert_ok(response)["dependsOnIds"] == [a["id"]]
+
+
+async def test_list_session_tasks_include_dependencies(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    a = await _create_task(workflow_client, ws["id"], title="a", position=0)
+    await _create_task(
+        workflow_client, ws["id"], title="b", position=1, dependsOnIds=[a["id"]]
+    )
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks"
+    )
+    tasks = {t["title"]: t for t in assert_ok(response)}
+    assert tasks["a"]["dependsOnIds"] == []
+    assert tasks["b"]["dependsOnIds"] == [a["id"]]
+
+
+async def test_update_task_replaces_dependencies(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    a = await _create_task(workflow_client, ws["id"], title="a")
+    b = await _create_task(workflow_client, ws["id"], title="b")
+    c = await _create_task(workflow_client, ws["id"], title="c", dependsOnIds=[a["id"]])
+    response = await workflow_client.patch(
+        f"/api/v1/workflow-tasks/{c['id']}", json={"dependsOnIds": [b["id"]]}
+    )
+    assert assert_ok(response)["dependsOnIds"] == [b["id"]]
+
+
+async def test_update_task_without_depends_on_ids_leaves_edges_unchanged(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    a = await _create_task(workflow_client, ws["id"], title="a")
+    b = await _create_task(workflow_client, ws["id"], title="b", dependsOnIds=[a["id"]])
+    response = await workflow_client.patch(
+        f"/api/v1/workflow-tasks/{b['id']}", json={"status": "completed"}
+    )
+    body = assert_ok(response)
+    assert body["status"] == "completed"
+    assert body["dependsOnIds"] == [a["id"]]
+
+
+async def test_update_task_clears_dependencies_with_empty_list(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    a = await _create_task(workflow_client, ws["id"], title="a")
+    b = await _create_task(workflow_client, ws["id"], title="b", dependsOnIds=[a["id"]])
+    response = await workflow_client.patch(
+        f"/api/v1/workflow-tasks/{b['id']}", json={"dependsOnIds": []}
+    )
+    assert assert_ok(response)["dependsOnIds"] == []
+
+
+async def test_dependency_on_unknown_task_returns_422(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    response = await workflow_client.post(
+        "/api/v1/workflow-tasks",
+        json={
+            "workflowSessionId": ws["id"],
+            "title": "t",
+            "dependsOnIds": ["nonexistent"],
+        },
+    )
+    assert_err(response, code="FOREIGN_KEY_VIOLATION", status=422)
+
+
+async def test_dependency_on_task_in_other_session_returns_422(
+    workflow_client: AsyncClient,
+) -> None:
+    ws1 = await _create_workflow_session(workflow_client)
+    ws2 = await _create_workflow_session(workflow_client)
+    other = await _create_task(workflow_client, ws2["id"], title="other")
+    response = await workflow_client.post(
+        "/api/v1/workflow-tasks",
+        json={
+            "workflowSessionId": ws1["id"],
+            "title": "t",
+            "dependsOnIds": [other["id"]],
+        },
+    )
+    assert_err(response, code="FOREIGN_KEY_VIOLATION", status=422)
+
+
+async def test_self_dependency_returns_409(workflow_client: AsyncClient) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    a = await _create_task(workflow_client, ws["id"], title="a")
+    response = await workflow_client.patch(
+        f"/api/v1/workflow-tasks/{a['id']}", json={"dependsOnIds": [a["id"]]}
+    )
+    assert_err(response, code="DEPENDENCY_CYCLE", status=409)
+
+
+async def test_cyclic_dependency_returns_409(workflow_client: AsyncClient) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    a = await _create_task(workflow_client, ws["id"], title="a")
+    b = await _create_task(workflow_client, ws["id"], title="b", dependsOnIds=[a["id"]])
+    c = await _create_task(workflow_client, ws["id"], title="c", dependsOnIds=[b["id"]])
+    # a -> c would close the loop a -> c -> b -> a.
+    response = await workflow_client.patch(
+        f"/api/v1/workflow-tasks/{a['id']}", json={"dependsOnIds": [c["id"]]}
+    )
+    assert_err(response, code="DEPENDENCY_CYCLE", status=409)
+
+
+async def test_deleting_task_cascades_dependency_edges(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    a = await _create_task(workflow_client, ws["id"], title="a")
+    b = await _create_task(workflow_client, ws["id"], title="b", dependsOnIds=[a["id"]])
+    await workflow_client.delete(f"/api/v1/workflow-tasks/{a['id']}")
+    response = await workflow_client.get(f"/api/v1/workflow-tasks/{b['id']}")
+    assert assert_ok(response)["dependsOnIds"] == []
+
+
 # ---------- created_by / updated_by ----------
 
 
