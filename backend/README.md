@@ -94,7 +94,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 
 ## Development
 
-For conventions on adding new models, repositories, services, and routers, see [docs/backend-patterns.md](../docs/backend-patterns.md).
+For conventions on adding new models, repositories, services, and routers, see [.claude/rules/backend-patterns.md](../.claude/rules/backend-patterns.md).
 
 ## Running
 

@@ -1,3 +1,8 @@
+---
+paths:
+  - "backend/**/*.py"
+---
+
 # Backend Implementation Patterns
 
 This document describes the conventions and design decisions for implementing the backend's layers: data models, repositories, services (use cases), infrastructure adapters, and routers.

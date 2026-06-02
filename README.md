@@ -56,25 +56,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### 3. Git hooks (lefthook)
 
-Pre-commit / pre-push hooks run linters, formatters, type checkers, and tests automatically. Configuration lives in [lefthook.yml](lefthook.yml). Install [lefthook](https://lefthook.dev/) once per machine using your preferred package manager:
-
-| OS | Command |
-|---|---|
-| Windows | `winget install Evilmartians.Lefthook` (or `scoop install lefthook`) |
-| macOS | `brew install lefthook` |
-| Linux | See [installation docs](https://lefthook.dev/installation/) |
-
-Then wire the hooks into `.git/hooks/` from the repository root:
-
-```bash
-lefthook install
-```
-
-**pre-commit** (parallel, ~25s on a clean repo): `ruff check` / `ruff format --check` / `mypy` / `pytest` on the backend, `biome ci` / `vitest run` on the frontend. Each job is gated by a `glob` so backend-only or frontend-only commits skip the other side's jobs.
-
-**pre-push** (sequential): `next build` to catch type errors and missing `zod.gen` exports before the change reaches the remote.
-
-To skip the hooks for an emergency commit, set `LEFTHOOK=0` (e.g. `LEFTHOOK=0 git commit ...`).
+Pre-commit / pre-push hooks (lefthook) run linters, formatters, type checkers, and tests. See [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md) for installation and details.
 
 ## Admin UI
 
@@ -165,25 +147,7 @@ The AG-UI streaming endpoint (`POST /agent`) is marked `include_in_schema=False`
 
 ## List query parameters
 
-Every collection endpoint (`GET /agent-skills`, `GET /workflows`, `GET /workflow-sessions`, `GET /workflow-sessions/{id}/workflow-tasks`) accepts the same set of optional query parameters. Field names are written in **camelCase** (matching the JSON response), and an unknown field, operator, or uncoercible value returns HTTP 400 with the `INVALID_QUERY` error code.
-
-| Param | Purpose | Syntax | Example |
-|---|---|---|---|
-| `limit` | Page size (1–1000, default 20) | integer | `?limit=50` |
-| `offset` | Records to skip (default 0) | integer | `?offset=100` |
-| `s` | Sort | Comma-separated fields; prefix `-` for descending | `?s=-createdAt,name` |
-| `q` | Filter (repeatable) | `field:op:value` | `?q=name:like:foo&q=status:eq:pending` |
-
-Filter operators (`op`):
-
-| Operator | Meaning |
-|---|---|
-| `eq` / `ne` | Equal / not equal |
-| `lt` / `lte` / `gt` / `gte` | Less / less-or-equal / greater / greater-or-equal |
-| `like` | Case-insensitive substring match (string fields) |
-| `in` | Matches any of a comma-separated list, e.g. `status:in:pending,completed` |
-
-When `s` is omitted, each endpoint falls back to its default ordering (`createdAt` descending; workflow tasks order by `position` then `createdAt` ascending).
+Every collection endpoint accepts a shared set of `limit` / `offset` / sort (`s`) / filter (`q`) query parameters, with camelCase field names. See [.claude/rules/api-conventions.md](.claude/rules/api-conventions.md) for the full reference.
 
 ## LLM configuration
 
