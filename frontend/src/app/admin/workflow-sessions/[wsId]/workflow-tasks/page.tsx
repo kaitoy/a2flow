@@ -9,7 +9,9 @@ import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
+import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import {
   deleteWorkflowTask,
   listWorkflowTasks,
@@ -17,28 +19,30 @@ import {
   type WorkflowTask,
   type WorkflowTaskStatus,
 } from "@/lib/api";
+import {
+  formatStatusLabel,
+  STATUS_DOT_CLASS,
+  WORKFLOW_TASK_STATUSES,
+} from "@/lib/workflow-task-status";
 
+/** Page size for the paginated table view. */
 const LIMIT = 20;
+/** Upper bound (backend maximum) used to fetch the whole DAG for the graph view. */
+const GRAPH_LIMIT = 1000;
 
-const STATUS_OPTIONS: WorkflowTaskStatus[] = [
-  "pending",
-  "in_progress",
-  "completed",
-  "failed",
-  "skipped",
+/** Which representation of the tasks is currently shown. */
+type View = "table" | "graph";
+
+const VIEW_OPTIONS = [
+  { value: "table" as const, label: "Table" },
+  { value: "graph" as const, label: "Graph" },
 ];
-
-const STATUS_DOT: Record<WorkflowTaskStatus, string> = {
-  pending: "bg-on-surface-variant",
-  in_progress: "bg-accent",
-  completed: "bg-green-500/80",
-  failed: "bg-error",
-  skipped: "bg-on-surface-variant/50",
-};
 
 /** Small colored dot used next to the status select for quick visual scanning. */
 function StatusDot({ status }: { status: WorkflowTaskStatus }) {
-  return <span className={`inline-block size-2 rounded-full ${STATUS_DOT[status]}`} aria-hidden />;
+  return (
+    <span className={`inline-block size-2 rounded-full ${STATUS_DOT_CLASS[status]}`} aria-hidden />
+  );
 }
 
 /** Pill showing a single dependency, resolved to its task title when known. */
@@ -95,9 +99,9 @@ function buildColumns(
             onChange={(e) => onStatusChange(t.id, e.target.value as WorkflowTaskStatus)}
             aria-label={`Status for ${t.title}`}
           >
-            {STATUS_OPTIONS.map((s) => (
+            {WORKFLOW_TASK_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s.replace("_", " ")}
+                {formatStatusLabel(s)}
               </option>
             ))}
           </Select>
@@ -134,20 +138,25 @@ export default function WorkflowTasksPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
+  const [view, setView] = useState<View>("table");
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await listWorkflowTasks(wsId, LIMIT, offset);
+      // The graph needs every task so dependency edges are not cut across pages.
+      const data =
+        view === "graph"
+          ? await listWorkflowTasks(wsId, GRAPH_LIMIT, 0)
+          : await listWorkflowTasks(wsId, LIMIT, offset);
       setTasks(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load workflow tasks");
     } finally {
       setLoading(false);
     }
-  }, [wsId, offset]);
+  }, [wsId, offset, view]);
 
   useEffect(() => {
     load();
@@ -192,26 +201,40 @@ export default function WorkflowTasksPage() {
         addHref={`/admin/workflow-sessions/${wsId}/workflow-tasks/new`}
         addLabel="+ Add task"
       />
+      <div className="mb-4">
+        <SegmentedControl
+          options={VIEW_OPTIONS}
+          value={view}
+          onChange={setView}
+          aria-label="Task view"
+        />
+      </div>
       <ErrorBanner error={error} />
-      <DataTable
-        columns={buildColumns(
-          wsId,
-          new Map(tasks.map((t) => [t.id, t.title])),
-          handleStatusChange,
-          handleDelete
-        )}
-        rows={tasks}
-        loading={loading}
-        emptyMessage="No tasks for this session yet."
-        getRowKey={(t) => t.id}
-      />
-      <PaginationControls
-        offset={offset}
-        limit={LIMIT}
-        count={tasks.length}
-        onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
-        onNext={() => setOffset((o) => o + LIMIT)}
-      />
+      {view === "graph" ? (
+        <WorkflowTaskGraph tasks={tasks} />
+      ) : (
+        <>
+          <DataTable
+            columns={buildColumns(
+              wsId,
+              new Map(tasks.map((t) => [t.id, t.title])),
+              handleStatusChange,
+              handleDelete
+            )}
+            rows={tasks}
+            loading={loading}
+            emptyMessage="No tasks for this session yet."
+            getRowKey={(t) => t.id}
+          />
+          <PaginationControls
+            offset={offset}
+            limit={LIMIT}
+            count={tasks.length}
+            onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
+            onNext={() => setOffset((o) => o + LIMIT)}
+          />
+        </>
+      )}
       <ConfirmDialog
         open={confirmTarget !== null}
         title="Delete Workflow Task"
