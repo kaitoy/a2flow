@@ -272,9 +272,24 @@ curl http://localhost:8000/api/v1/workflow-sessions/<id>
 
 ### Workflow tasks
 
-A workflow task is a single actionable item belonging to a `WorkflowSession`. Tasks are intended to capture the steps produced by the agent under the workflow instruction *"use the provided skill to produce an actionable task list"*. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`) and an integer `position` used for stable layout ordering within a session. Deleting the parent `WorkflowSession` cascades to its tasks.
+A workflow task is a single actionable item belonging to a `WorkflowSession`. The skill-driven workflow agent registers and drives these tasks itself via [agent tools](#agent-task-tools); they are also exposed through the REST endpoints below. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`) and an integer `position` used for stable layout ordering within a session. Deleting the parent `WorkflowSession` cascades to its tasks.
 
 Tasks form a **directed acyclic graph (DAG)**: each task may depend on other tasks in the same session through its `dependsOnIds` list (persisted as `(task_id, depends_on_id)` rows in the `workflow_task_dependencies` join table, where `depends_on_id` must precede `task_id`). Read responses include the resolved `dependsOnIds`. Dependency targets must exist and belong to the same session, otherwise the write fails with `422 FOREIGN_KEY_VIOLATION`; edges that would introduce a cycle — including a self-dependency — fail with `409 DEPENDENCY_CYCLE`. Deleting a task cascade-deletes the edges that reference it in either direction.
+
+#### Agent task tools
+
+When a workflow runs, the skill-bound agent is given six function tools so it can plan and drive the task DAG itself, in addition to the REST endpoints below. The agent runs a **plan-then-execute** flow: it registers the plan, waits for the user's approval, then iterates the tasks updating their status.
+
+| Tool | Purpose |
+|---|---|
+| `register_workflow_tasks` | Register a whole plan as a DAG in one call (each entry has a `key`, `title`, optional `depends_on` referencing other keys) |
+| `create_workflow_task` | Add a single task, optionally referencing existing task ids as dependencies |
+| `list_workflow_tasks` | List the current session's tasks (id, title, status, `dependsOnIds`, position) |
+| `get_workflow_task` | Fetch one task in the current session |
+| `update_workflow_task` | Change a task's title / description / status / position / dependencies |
+| `delete_workflow_task` | Delete a task |
+
+The tools resolve the current session by mapping the ADK session id (the AG-UI thread id, stored on `WorkflowSession.session_id`) back to the `WorkflowSession` primary key, and they reject access to tasks belonging to other sessions. They live in `infrastructure/workflow_task_tools.py` and are attached to the agent in `infrastructure/agent.py` only when a skill is bound.
 
 #### `POST /api/v1/workflow-tasks` — Create a workflow task
 

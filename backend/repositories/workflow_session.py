@@ -16,6 +16,8 @@ class WorkflowSessionRepository(Protocol):
 
     async def get(self, ws_id: str) -> WorkflowSession | None: ...
 
+    async def get_by_session_id(self, session_id: str) -> WorkflowSession | None: ...
+
     async def list(
         self,
         *,
@@ -42,6 +44,29 @@ class SqlWorkflowSessionRepository:
     async def get(self, ws_id: str) -> WorkflowSession | None:
         """Return the WorkflowSession with the given ID, or ``None`` if missing."""
         return await self._db.get(WorkflowSession, ws_id)
+
+    async def get_by_session_id(self, session_id: str) -> WorkflowSession | None:
+        """Return the WorkflowSession for the given ADK session id, or ``None``.
+
+        The ADK session id (the AG-UI thread id) is stored on
+        :attr:`WorkflowSession.session_id`, which is distinct from the primary
+        key. WorkflowTask records reference the primary key, so agent tools use
+        this lookup to map the session they are running in back to its
+        WorkflowSession PK.
+
+        Args:
+            session_id: The ADK session id to look up.
+
+        Returns:
+            The matching WorkflowSession, or ``None`` if no session has that id.
+        """
+        stmt = (
+            select(WorkflowSession)
+            .where(col(WorkflowSession.session_id) == session_id)
+            .limit(1)
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def list(
         self,

@@ -293,6 +293,46 @@ def test_create_agent_with_skill_uses_workflow_instruction(tmp_path: Any) -> Non
     ctx = MagicMock()
     ctx.state.get.return_value = []
     rendered = provider(ctx)
-    assert "task list" in rendered.lower()
+    assert "register_workflow_tasks" in rendered
+    assert "runnable" in rendered
     assert "A2UI Rules" in rendered
     assert "render_a2ui" in rendered
+
+
+def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
+    from infrastructure.agent import create_agent
+    from infrastructure.workflow_task_tools import (
+        create_workflow_task,
+        delete_workflow_task,
+        get_workflow_task,
+        list_workflow_tasks,
+        register_workflow_tasks,
+        update_workflow_task,
+    )
+
+    skill_dir = tmp_path / "test-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: test-skill\ndescription: A test skill\n---\n\nTest instructions.\n",
+        encoding="utf-8",
+    )
+
+    agent = create_agent(skill_dir=skill_dir)
+    for tool in (
+        register_workflow_tasks,
+        create_workflow_task,
+        list_workflow_tasks,
+        get_workflow_task,
+        update_workflow_task,
+        delete_workflow_task,
+    ):
+        assert tool in agent.tools
+
+
+def test_register_tool_excludes_tool_context_from_declaration() -> None:
+    from google.adk.tools.function_tool import FunctionTool
+
+    from infrastructure.workflow_task_tools import register_workflow_tasks
+
+    tool = FunctionTool(func=register_workflow_tasks)
+    assert tool._context_param_name == "tool_context"
