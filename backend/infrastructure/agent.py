@@ -14,6 +14,15 @@ from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.base_toolset import BaseToolset
 from google.adk.tools.skill_toolset import SkillToolset
 
+from infrastructure.workflow_task_tools import (
+    create_workflow_task,
+    delete_workflow_task,
+    get_workflow_task,
+    list_workflow_tasks,
+    register_workflow_tasks,
+    update_workflow_task,
+)
+
 ToolUnion = Callable[..., Any] | BaseTool | BaseToolset
 
 LITELLM_PREFIX = "litellm:"
@@ -62,9 +71,28 @@ def with_user_id(input_data: RunAgentInput, user_id: str) -> RunAgentInput:
 
 
 WORKFLOW_AGENT_INSTRUCTION = (
-    "You are an assistant that uses the provided skill to fulfill the user's request. "
-    "Follow the skill's instructions to produce a clear, actionable task list that breaks "
-    "the request into concrete steps."
+    "You are a workflow execution agent. You have a Skill that defines how to do "
+    "the work, plus tools to manage a list of WorkflowTasks for this run.\n\n"
+    "Phase 1 - Plan: Follow the Skill's instructions to break the user's request "
+    "into concrete steps. Express the steps as a DAG and register them in ONE call "
+    "to `register_workflow_tasks`, using each task's `key` and `depends_on` to "
+    "encode ordering. Every task starts as `pending`. Then present the registered "
+    "plan to the user and ask for approval. Do NOT start executing until the user "
+    "approves.\n\n"
+    "Phase 2 - Execute (only after the user approves): loop until no `pending` "
+    "tasks remain:\n"
+    "1. Call `list_workflow_tasks` to see the current tasks and their statuses.\n"
+    "2. Pick the next runnable task: a `pending` task whose `depends_on_ids` are "
+    "all `completed`. If several are runnable, pick the lowest `position`.\n"
+    "3. Call `update_workflow_task` to set its status to `in_progress`.\n"
+    "4. Do that task's work according to the Skill.\n"
+    "5. Call `update_workflow_task` to set `completed` (or `failed` if it cannot "
+    "be done; use `skipped` only when the Skill says to skip).\n"
+    "6. Repeat from step 1.\n\n"
+    "Never start a task before its dependencies are completed. When every task is "
+    "completed, failed, or skipped, summarize the outcome. Use "
+    "`create_workflow_task`, `get_workflow_task`, and `delete_workflow_task` to "
+    "adjust the plan when needed."
 )
 
 
@@ -103,7 +131,9 @@ def create_agent(skill_dir: Path | None = None) -> LlmAgent:
            litellm:anthropic/claude-3-5-sonnet-20241022
 
     When `skill_dir` is provided, the directory is loaded as an ADK Skill and
-    exposed to the agent via SkillToolset alongside the A2UI tools.
+    exposed to the agent via SkillToolset alongside the A2UI tools and the
+    WorkflowTask management tools (register/create/list/get/update/delete), and
+    the agent runs under the plan-then-execute workflow instruction.
     """
     model_env = os.getenv("LLM_MODEL", "gemini-2.0-flash")
     role_description = os.getenv("ROLE_DESCRIPTION", "You are a helpful assistant.")
@@ -119,6 +149,16 @@ def create_agent(skill_dir: Path | None = None) -> LlmAgent:
     if skill_dir is not None:
         skill = load_skill_from_dir(skill_dir)
         tools.append(SkillToolset(skills=[skill]))
+        tools.extend(
+            [
+                register_workflow_tasks,
+                create_workflow_task,
+                list_workflow_tasks,
+                get_workflow_task,
+                update_workflow_task,
+                delete_workflow_task,
+            ]
+        )
         instruction = A2UIInstructionProvider(WORKFLOW_AGENT_INSTRUCTION)
     else:
         instruction = A2UIInstructionProvider(role_description)
