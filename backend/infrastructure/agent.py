@@ -3,6 +3,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ag_ui.core import RunAgentInput
 from ag_ui_adk import CONTEXT_STATE_KEY, ADKAgent, AGUIToolset
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
@@ -19,6 +20,46 @@ LITELLM_PREFIX = "litellm:"
 
 AGENT_SKILL_ID_KEY = "agent_skill_id"
 SKILL_DIR_KEY = "skill_dir"
+
+USER_ID_PROP_KEY = "userId"
+DEFAULT_USER_ID = "user"
+
+
+def extract_user_id(input_data: RunAgentInput) -> str:
+    """Read the user id that the router placed into ``forwarded_props``.
+
+    Used as the ``ADKAgent.user_id_extractor`` so the agent's session is keyed by
+    the value the router injected from the trusted ``X-User-Id`` header.
+
+    Args:
+        input_data: The incoming AG-UI run input.
+
+    Returns:
+        The user id from ``forwarded_props['userId']``, or :data:`DEFAULT_USER_ID`
+        when absent.
+    """
+    props = input_data.forwarded_props or {}
+    return str(props.get(USER_ID_PROP_KEY, DEFAULT_USER_ID))
+
+
+def with_user_id(input_data: RunAgentInput, user_id: str) -> RunAgentInput:
+    """Return a copy of ``input_data`` with the trusted user id in ``forwarded_props``.
+
+    Overrides any client-supplied ``userId`` so the agent's session is keyed by
+    the server-validated identity rather than untrusted client props.
+
+    Args:
+        input_data: The incoming AG-UI run input.
+        user_id: The user id derived from the ``X-User-Id`` header; falls back to
+            :data:`DEFAULT_USER_ID` when empty.
+
+    Returns:
+        A copy of ``input_data`` whose ``forwarded_props['userId']`` is set.
+    """
+    props = dict(input_data.forwarded_props or {})
+    props[USER_ID_PROP_KEY] = user_id or DEFAULT_USER_ID
+    return input_data.model_copy(update={"forwarded_props": props})
+
 
 WORKFLOW_AGENT_INSTRUCTION = (
     "You are an assistant that uses the provided skill to fulfill the user's request. "
@@ -109,9 +150,7 @@ class AgentRegistry:
             self._cache[agent_skill_id] = ADKAgent(
                 adk_agent=llm_agent,
                 app_name=self._app_name,
-                user_id_extractor=lambda input: input.forwarded_props.get(
-                    "userId", "user"
-                ),
+                user_id_extractor=extract_user_id,
                 session_service=self._session_service,
                 use_thread_id_as_session_id=True,
                 emit_messages_snapshot=True,

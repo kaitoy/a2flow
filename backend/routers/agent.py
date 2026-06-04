@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from dependencies import APP_NAME, AgentRegistryDep, CurrentUserIdDep, SessionServiceDep
-from infrastructure.agent import AGENT_SKILL_ID_KEY, SKILL_DIR_KEY
+from infrastructure.agent import AGENT_SKILL_ID_KEY, SKILL_DIR_KEY, with_user_id
 
 router = APIRouter()
 
@@ -51,6 +51,10 @@ async def agent_endpoint(
         if raw_skill_dir:
             skill_dir = Path(str(raw_skill_dir))
     adk_agent = registry.get(skill_id, skill_dir)
+
+    # Override forwarded_props.userId with the trusted X-User-Id header so the
+    # agent run is keyed by the same user the skill lookup above resolved.
+    input_data = with_user_id(input_data, user_id)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         async for event in adk_agent.run(input_data):

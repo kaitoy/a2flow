@@ -187,3 +187,29 @@ async def test_workflow_session_agent_strips_system_messages(
     )
     assert len(received_inputs) == 1
     assert all(m.role != "system" for m in received_inputs[0].messages)
+
+
+async def test_workflow_session_agent_injects_user_id_from_header(
+    workflow_client: AsyncClient,
+    mock_adk_agent: MagicMock,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+
+    received_inputs: list[Any] = []
+
+    async def _capturing_run(
+        input_data: Any, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        received_inputs.append(input_data)
+        return
+        yield
+
+    mock_adk_agent.run = _capturing_run
+
+    await workflow_client.post(
+        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Id": "alice"},
+    )
+    assert received_inputs[0].forwarded_props["userId"] == "alice"
