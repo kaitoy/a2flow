@@ -9,11 +9,13 @@ from fastapi.responses import StreamingResponse
 
 from dependencies import (
     ApiMetaDep,
+    CurrentUserIdDep,
     FilterDep,
     PaginationDep,
     SortDep,
     WorkflowSessionServiceDep,
 )
+from infrastructure.agent import with_user_id
 from models.response import ApiResponse
 from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTaskRead
@@ -83,6 +85,7 @@ async def workflow_session_agent(
     input_data: RunAgentInput,
     request: Request,
     service: WorkflowSessionServiceDep,
+    user_id: CurrentUserIdDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent bound to a specific workflow session.
 
@@ -94,6 +97,9 @@ async def workflow_session_agent(
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
+    # Override forwarded_props.userId with the trusted X-User-Id header so the
+    # agent run is keyed by the server-validated user rather than client props.
+    input_data = with_user_id(input_data, user_id)
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
     async def event_generator() -> AsyncGenerator[str, None]:

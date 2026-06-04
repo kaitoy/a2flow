@@ -130,6 +130,71 @@ async def test_agent_endpoint_forwards_non_system_messages(
     assert len(captured[0].messages) == 2
 
 
+async def test_agent_endpoint_injects_user_id_from_header(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    client, mock_agent = agent_client
+    captured: list[RunAgentInput] = []
+
+    async def _capturing_run(
+        input_data: RunAgentInput, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        captured.append(input_data)
+        return
+        yield
+
+    mock_agent.run = _capturing_run
+
+    await client.post(
+        "/api/v1/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Id": "alice"},
+    )
+
+    assert captured[0].forwarded_props["userId"] == "alice"
+
+
+async def test_agent_endpoint_defaults_user_id_when_header_absent(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    client, mock_agent = agent_client
+    captured: list[RunAgentInput] = []
+
+    async def _capturing_run(
+        input_data: RunAgentInput, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        captured.append(input_data)
+        return
+        yield
+
+    mock_agent.run = _capturing_run
+
+    await client.post("/api/v1/agent", json=_make_run_agent_input())
+
+    assert captured[0].forwarded_props["userId"] == "user"
+
+
+async def test_agent_endpoint_header_overrides_client_user_id(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    client, mock_agent = agent_client
+    captured: list[RunAgentInput] = []
+
+    async def _capturing_run(
+        input_data: RunAgentInput, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        captured.append(input_data)
+        return
+        yield
+
+    mock_agent.run = _capturing_run
+
+    body = {**_make_run_agent_input(), "forwardedProps": {"userId": "spoofed"}}
+    await client.post("/api/v1/agent", json=body, headers={"X-User-Id": "alice"})
+
+    assert captured[0].forwarded_props["userId"] == "alice"
+
+
 async def test_agent_endpoint_encodes_events_as_sse(
     agent_client: tuple[AsyncClient, MagicMock],
 ) -> None:
