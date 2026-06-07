@@ -12,9 +12,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from dependencies import APP_NAME
-from infrastructure.database import init_db
+from infrastructure.bootstrap import seed_system_user
+from infrastructure.database import engine, init_db
 from infrastructure.logging_context import setup_logging
 from middleware.envelope import RequestContextMiddleware
 from repositories.exceptions import (
@@ -23,6 +25,7 @@ from repositories.exceptions import (
     NotFoundError,
     QueryValidationError,
     ReferencedError,
+    UniqueViolationError,
 )
 from routers import api_router
 from routers.exception_handlers import (
@@ -33,6 +36,7 @@ from routers.exception_handlers import (
     query_validation_exception_handler,
     referenced_exception_handler,
     unhandled_exception_handler,
+    unique_violation_exception_handler,
     validation_exception_handler,
 )
 
@@ -43,8 +47,10 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Initialize the database schema on application startup."""
+    """Initialize the database schema and seed the system user on application startup."""
     await init_db()
+    async with AsyncSession(engine) as session:
+        await seed_system_user(session)
     yield
 
 
@@ -70,6 +76,7 @@ app.add_exception_handler(
     ForeignKeyViolationError, foreign_key_violation_exception_handler
 )
 app.add_exception_handler(ReferencedError, referenced_exception_handler)
+app.add_exception_handler(UniqueViolationError, unique_violation_exception_handler)
 app.add_exception_handler(DependencyCycleError, dependency_cycle_exception_handler)
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)

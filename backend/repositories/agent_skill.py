@@ -8,6 +8,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
+from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import NotFoundError, ReferencedError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
@@ -73,7 +74,7 @@ class SqlAgentSkillRepository:
             {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
         )
         self._db.add(skill)
-        await self._db.commit()
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(skill)
         return skill
 
@@ -86,7 +87,7 @@ class SqlAgentSkillRepository:
         skill.sqlmodel_update(data.model_dump(exclude_unset=True))
         skill.updated_by = user_id
         self._db.add(skill)
-        await self._db.commit()
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(skill)
         return skill
 

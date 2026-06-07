@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ export default function EditAgentSkillPage() {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
   const {
     register,
@@ -51,6 +53,12 @@ export default function EditAgentSkillPage() {
           repoUrl: skill.repoUrl,
           repoPath: skill.repoPath,
           description: skill.description ?? "",
+        });
+        setAudit({
+          createdBy: skill.createdBy,
+          updatedBy: skill.updatedBy,
+          createdAt: skill.createdAt,
+          updatedAt: skill.updatedAt,
         });
       })
       .catch((e: unknown) => {
@@ -141,6 +149,11 @@ export default function EditAgentSkillPage() {
           </Button>
         </div>
       </form>
+      {audit && (
+        <div className="mt-4">
+          <AuditMeta {...audit} />
+        </div>
+      )}
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Agent Skill"

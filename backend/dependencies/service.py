@@ -11,6 +11,7 @@ from fastapi import Depends
 
 from services import (
     AgentSkillService,
+    UserService,
     WorkflowService,
     WorkflowSessionService,
     WorkflowTaskService,
@@ -18,6 +19,7 @@ from services import (
 
 from .repository import (
     AgentSkillRepositoryDep,
+    UserRepositoryDep,
     WorkflowRepositoryDep,
     WorkflowSessionRepositoryDep,
     WorkflowTaskRepositoryDep,
@@ -31,6 +33,14 @@ def get_agent_skill_service(repo: AgentSkillRepositoryDep) -> AgentSkillService:
 
 
 AgentSkillServiceDep = Annotated[AgentSkillService, Depends(get_agent_skill_service)]
+
+
+def get_user_service(repo: UserRepositoryDep) -> UserService:
+    """Create a UserService backed by the request's repository."""
+    return UserService(repo)
+
+
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 
 
 def get_workflow_service(

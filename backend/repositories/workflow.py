@@ -7,6 +7,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.workflow import Workflow, WorkflowCreate, WorkflowUpdate
+from repositories._integrity import commit_or_translate_user_fk
 from repositories.agent_skill import AgentSkillRepository
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
@@ -71,7 +72,7 @@ class SqlWorkflowRepository:
             {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
         )
         self._db.add(workflow)
-        await self._db.commit()
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(workflow)
         return workflow
 
@@ -88,7 +89,7 @@ class SqlWorkflowRepository:
         workflow.sqlmodel_update(update)
         workflow.updated_by = user_id
         self._db.add(workflow)
-        await self._db.commit()
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(workflow)
         return workflow
 

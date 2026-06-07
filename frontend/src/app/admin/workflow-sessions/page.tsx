@@ -7,11 +7,11 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
-import { listWorkflowSessions, type WorkflowSession } from "@/lib/api";
+import { getUserNames, listWorkflowSessions, type WorkflowSession } from "@/lib/api";
 
 const LIMIT = 20;
 
-function buildColumns(): ColumnDef<WorkflowSession>[] {
+function buildColumns(userMap: Map<string, string>): ColumnDef<WorkflowSession>[] {
   return [
     {
       header: "Workflow",
@@ -23,7 +23,7 @@ function buildColumns(): ColumnDef<WorkflowSession>[] {
     },
     {
       header: "User",
-      cell: (s) => s.userId || "—",
+      cell: (s) => (s.userId ? (userMap.get(s.userId) ?? s.userId) : "—"),
     },
     {
       header: "Created At",
@@ -56,6 +56,7 @@ function buildColumns(): ColumnDef<WorkflowSession>[] {
 /** Admin list of WorkflowSessions ordered by most recent first. */
 export default function WorkflowSessionsPage() {
   const [sessions, setSessions] = useState<WorkflowSession[]>([]);
+  const [userMap, setUserMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
@@ -66,6 +67,7 @@ export default function WorkflowSessionsPage() {
     try {
       const data = await listWorkflowSessions(LIMIT, offset);
       setSessions(data);
+      setUserMap(await getUserNames(data.map((s) => s.userId).filter((id): id is string => !!id)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load workflow sessions");
     } finally {
@@ -82,7 +84,7 @@ export default function WorkflowSessionsPage() {
       <AdminPageHeader title="Workflow Sessions" />
       <ErrorBanner error={error} />
       <DataTable
-        columns={buildColumns()}
+        columns={buildColumns(userMap)}
         rows={sessions}
         loading={loading}
         emptyMessage="No workflow sessions yet. Run a workflow to create one."

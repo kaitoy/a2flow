@@ -62,6 +62,22 @@ Pre-commit / pre-push hooks (lefthook) run linters, formatters, type checkers, a
 
 The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admin).
 
+### Users
+
+Navigate to [http://localhost:3000/admin/users](http://localhost:3000/admin/users) to manage application users.
+
+| Operation | Path |
+|-----------|------|
+| List all users | `GET /admin/users` |
+| Create a new user | `GET /admin/users/new` |
+| Edit / delete a user | `GET /admin/users/{id}` |
+
+Each user record stores a username (unique), first name, last name, email, an `enabled` flag, and an `emailVerified` flag. Passwords are hashed with [bcrypt](https://pypi.org/project/bcrypt/) before persistence and are never returned by the API. On edit, leaving the password field blank keeps the existing password. Users are persisted in `a2flow.db`.
+
+**Audit ownership.** Every persistent record stores `createdBy` / `updatedBy` as a foreign key to `users.id`, populated from the `X-User-Id` header. A write whose acting user does not exist is rejected with HTTP 422 (`FOREIGN_KEY_VIOLATION`). To resolve the bootstrap "who creates the first user" problem, a hidden, login-disabled **system user** is seeded on startup when the `users` table is empty; create the first real user with `X-User-Id` set to the system user's id. In the admin UI the raw IDs are never shown — each detail page resolves `createdBy` / `updatedBy` to the user's `first last` name, and list views resolve user IDs the same way.
+
+**Deleting a user.** If no other record references the user, it is hard-deleted from the database. If it is still referenced (via any `createdBy` / `updatedBy`), it is instead **soft-deleted**: `deletedAt` is set and the account is disabled, so existing references stay valid and the name still resolves. Soft-deleted users (and the system user) are hidden from the user list but remain fetchable by id.
+
 ### Agent Skills
 
 Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/admin/agent-skills) to manage the Agent Skills registry — a catalog of AI agent skills stored in Git repositories.

@@ -306,16 +306,16 @@ async def test_create_workflow_populates_created_and_updated_by_from_header(
     assert body["updatedBy"] == "alice"
 
 
-async def test_create_workflow_without_header_defaults_to_empty_string(
+async def test_create_workflow_with_unknown_user_returns_422(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
     response = await workflow_client.post(
-        "/api/v1/workflows", json={**_WF_BODY, "agent_skill_id": skill["id"]}
+        "/api/v1/workflows",
+        json={**_WF_BODY, "agent_skill_id": skill["id"]},
+        headers={"X-User-Id": "ghost-user"},
     )
-    body = assert_ok(response, status=201)
-    assert body["createdBy"] == ""
-    assert body["updatedBy"] == ""
+    assert_err(response, code="FOREIGN_KEY_VIOLATION", status=422)
 
 
 async def test_update_workflow_preserves_created_by_and_overwrites_updated_by(

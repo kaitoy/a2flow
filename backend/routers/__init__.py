@@ -5,6 +5,7 @@ from routers import (
     agent_skills,
     health,
     sessions,
+    user,
     workflow_sessions,
     workflow_tasks,
     workflows,
@@ -15,6 +16,7 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(agent.router)
 api_router.include_router(agent_skills.router)
 api_router.include_router(sessions.router)
+api_router.include_router(user.router)
 api_router.include_router(workflow_sessions.router)
 api_router.include_router(workflow_tasks.router)
 api_router.include_router(workflows.router)

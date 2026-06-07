@@ -27,6 +27,21 @@ class ReferencedError(RepositoryError):
     """Raised when deleting an entity that is still referenced by other records."""
 
 
+class UniqueViolationError(RepositoryError):
+    """Raised when creating or updating a record would violate a unique constraint.
+
+    Carries the ``entity`` name, the offending unique ``field``, and the duplicate
+    ``value`` so the HTTP layer can surface them in the error envelope's
+    ``details`` block when returning HTTP 409.
+    """
+
+    def __init__(self, entity: str, field: str, value: str) -> None:
+        self.entity = entity
+        self.field = field
+        self.value = value
+        super().__init__(f"{entity} with {field} {value!r} already exists")
+
+
 class DependencyCycleError(RepositoryError):
     """Raised when adding WorkflowTask dependency edges would create a cycle.
 

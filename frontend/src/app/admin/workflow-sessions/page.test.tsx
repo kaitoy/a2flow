@@ -21,6 +21,11 @@ describe("WorkflowSessionsPage", () => {
     await waitFor(() => expect(screen.getByText("My Workflow")).toBeInTheDocument());
   });
 
+  it("resolves the session user ID to the user's name", async () => {
+    render(<WorkflowSessionsPage />);
+    await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
+  });
+
   it("renders View tasks link to nested admin route", async () => {
     render(<WorkflowSessionsPage />);
     await waitFor(() => screen.getByText("My Workflow"));
