@@ -41,7 +41,6 @@ export function SegmentedControl<T extends string>({
     .join(" ");
 
   return (
-    // biome-ignore lint/a11y/useFocusableInteractive: tablist role is correct for a segmented control
     <div role="tablist" aria-label={ariaLabel} className={containerClass}>
       {options.map((option) => {
         const selected = option.value === value;
