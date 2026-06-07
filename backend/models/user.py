@@ -42,10 +42,13 @@ def _serialize_deleted_at(dt: datetime | None) -> str | None:
 
 
 class UserUpdate(SQLModel):
-    """Partial update payload for a User — all fields are optional."""
+    """Partial update payload for a User — all fields are optional.
+
+    ``username`` is intentionally absent: a user's username is immutable after
+    creation, so it cannot be changed through the update endpoint.
+    """
 
     model_config = _alias_config
-    username: str | None = None
     first_name: str | None = None
     last_name: str | None = None
     password: str | None = None

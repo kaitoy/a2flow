@@ -17,7 +17,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
 
 const schema = z.object({
-  username: z.string().min(1, "Username is required"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   // Optional on edit: a blank value leaves the stored password unchanged.
@@ -38,18 +37,19 @@ export default function EditUserPage() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
+  // Username is immutable after creation, so it lives outside the form state and
+  // is rendered read-only.
+  const [username, setUsername] = useState("");
 
   const {
     register,
     handleSubmit,
     reset,
-    getValues,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
     defaultValues: {
-      username: "",
       firstName: "",
       lastName: "",
       password: "",
@@ -62,8 +62,8 @@ export default function EditUserPage() {
   useEffect(() => {
     getUser(userId)
       .then((user) => {
+        setUsername(user.username);
         reset({
-          username: user.username,
           firstName: user.firstName,
           lastName: user.lastName,
           password: "",
@@ -87,7 +87,6 @@ export default function EditUserPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     const body: UserUpdate = {
-      username: values.username,
       firstName: values.firstName,
       lastName: values.lastName,
       email: values.email,
@@ -135,8 +134,8 @@ export default function EditUserPage() {
         onSubmit={handleSubmit(onSubmit)}
         className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
       >
-        <FormField htmlFor="username" label="Username" required error={errors.username?.message}>
-          <Input id="username" {...register("username")} />
+        <FormField htmlFor="username" label="Username">
+          <Input id="username" value={username} readOnly disabled />
         </FormField>
 
         <FormField
@@ -195,7 +194,7 @@ export default function EditUserPage() {
       <ConfirmDialog
         open={confirmOpen}
         title="Delete User"
-        description={`Delete "${getValues("username")}"?`}
+        description={`Delete "${username}"?`}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

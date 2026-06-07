@@ -126,15 +126,40 @@ describe("EditUserPage", () => {
     expect(pushMock).toHaveBeenCalledWith("/admin/users");
   });
 
+  it("renders username as a read-only field", async () => {
+    setup();
+    render(<EditUserPage />);
+    await waitFor(() => screen.getByDisplayValue("alice"));
+    expect(screen.getByRole("textbox", { name: /username/i })).toBeDisabled();
+  });
+
+  it("omits username from the request body", async () => {
+    setup();
+    let capturedBody: Record<string, unknown> | null = null;
+    server.use(
+      http.patch("http://localhost:8000/api/v1/users/:userId", async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(FULL_USER);
+      })
+    );
+
+    render(<EditUserPage />);
+    await waitFor(() => screen.getByDisplayValue("alice"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(capturedBody).not.toBeNull());
+    expect(capturedBody).not.toHaveProperty("username");
+  });
+
   it("shows validation error on blur when required field is cleared", async () => {
     setup();
     const user = userEvent.setup();
     render(<EditUserPage />);
     await waitFor(() => screen.getByDisplayValue("alice"));
-    const usernameInput = screen.getByRole("textbox", { name: /username/i });
-    await user.clear(usernameInput);
+    const firstNameInput = screen.getByRole("textbox", { name: /first name/i });
+    await user.clear(firstNameInput);
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/username is required/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/first name is required/i)).toBeInTheDocument());
   });
 
   it("shows error on load failure", async () => {

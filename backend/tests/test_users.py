@@ -224,21 +224,20 @@ async def test_update_user_with_password_succeeds(user_client: AsyncClient) -> N
     assert assert_ok(response)["username"] == "alice"
 
 
-async def test_update_user_duplicate_username_returns_409(
+async def test_update_user_ignores_username_change(
     user_client: AsyncClient,
 ) -> None:
-    await user_client.post("/api/v1/users", json=_CREATE_BODY)
-    other = assert_ok(
-        await user_client.post(
-            "/api/v1/users",
-            json={**_CREATE_BODY, "username": "bob", "email": "bob@x.com"},
-        ),
-        status=201,
+    created = assert_ok(
+        await user_client.post("/api/v1/users", json=_CREATE_BODY), status=201
     )
     response = await user_client.patch(
-        f"/api/v1/users/{other['id']}", json={"username": "alice"}
+        f"/api/v1/users/{created['id']}",
+        json={"username": "renamed", "firstName": "Alicia"},
     )
-    assert_err(response, code="CONFLICT_UNIQUE", status=409)
+    body = assert_ok(response)
+    # username is immutable: the change is dropped, other fields still apply.
+    assert body["username"] == "alice"
+    assert body["firstName"] == "Alicia"
 
 
 async def test_update_user_unknown_id_returns_404(user_client: AsyncClient) -> None:
