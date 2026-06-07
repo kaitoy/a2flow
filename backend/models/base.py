@@ -10,7 +10,12 @@ from sqlmodel._compat import SQLModelConfig
 
 
 class BaseEntity(SQLModel):
-    """Abstract SQLModel base providing a UUID7 primary key, audit timestamps, and camelCase aliases."""
+    """Abstract SQLModel base providing a UUID7 primary key, audit timestamps, and camelCase aliases.
+
+    ``created_by`` / ``updated_by`` are required foreign keys to ``users.id``
+    (``ondelete=RESTRICT``); every persistent entity therefore records the user
+    who created and last updated it, and a referenced user cannot be hard-deleted.
+    """
 
     model_config = SQLModelConfig(
         from_attributes=True,
@@ -27,8 +32,8 @@ class BaseEntity(SQLModel):
         default_factory=lambda: datetime.now(UTC),
         sa_column_kwargs={"onupdate": lambda: datetime.now(UTC)},
     )
-    created_by: str = Field(default="")
-    updated_by: str = Field(default="")
+    created_by: str = Field(foreign_key="users.id", ondelete="RESTRICT")
+    updated_by: str = Field(foreign_key="users.id", ondelete="RESTRICT")
 
     @field_serializer("created_at", "updated_at", when_used="json")
     def _serialize_audit_datetime(self, dt: datetime) -> str:

@@ -12,6 +12,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.user import SYSTEM_USER_ID
+from tests._seed import seed_users
+
 
 @pytest.fixture()
 def real_session_service() -> InMemorySessionService:
@@ -100,6 +103,7 @@ async def workflow_client(
 
     async with mem_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+    await seed_users(mem_engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine) as session:
@@ -111,7 +115,9 @@ async def workflow_client(
     app.dependency_overrides[get_skill_manager] = lambda: mock_skill_manager
     try:
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            headers={"X-User-Id": SYSTEM_USER_ID},
         ) as ac:
             yield ac
     finally:

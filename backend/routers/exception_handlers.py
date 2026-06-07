@@ -19,6 +19,7 @@ from repositories.exceptions import (
     NotFoundError,
     QueryValidationError,
     ReferencedError,
+    UniqueViolationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,20 @@ async def referenced_exception_handler(
         code="CONFLICT_REFERENCED",
         message=str(exc),
         status_code=409,
+    )
+
+
+async def unique_violation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with CONFLICT_UNIQUE code when a unique constraint is violated."""
+    assert isinstance(exc, UniqueViolationError)
+    return _envelope_error(
+        request,
+        code="CONFLICT_UNIQUE",
+        message=str(exc),
+        status_code=409,
+        details={"field": exc.field, "value": exc.value},
     )
 
 

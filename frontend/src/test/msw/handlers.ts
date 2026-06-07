@@ -15,6 +15,20 @@ const SKILL_1 = {
   updatedBy: "",
 };
 
+const USER_1 = {
+  id: "user-1",
+  username: "alice",
+  firstName: "Alice",
+  lastName: "Smith",
+  email: "alice@example.com",
+  enabled: true,
+  emailVerified: false,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 const WORKFLOW_1 = {
   id: "wf-1",
   name: "My Workflow",
@@ -100,6 +114,16 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/agent-skills/:skillId`, () => envelope(SKILL_1)),
 
   http.delete(`${BASE}/api/v1/agent-skills/:skillId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/users`, () => envelope([USER_1])),
+
+  http.get(`${BASE}/api/v1/users/:userId`, () => envelope(USER_1)),
+
+  http.post(`${BASE}/api/v1/users`, () => envelope({ ...USER_1, id: "new-user-id" }, 201)),
+
+  http.patch(`${BASE}/api/v1/users/:userId`, () => envelope(USER_1)),
+
+  http.delete(`${BASE}/api/v1/users/:userId`, () => envelope(null)),
 
   http.get(`${BASE}/api/v1/workflows`, () => envelope([WORKFLOW_1])),
 

@@ -1,13 +1,17 @@
 from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
+from tests._seed import seed_users
 
 
 @pytest_asyncio.fixture()
@@ -22,8 +26,14 @@ async def skill_client(
     )
 
     mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+
+    @sa_event.listens_for(mem_engine.sync_engine, "connect")
+    def _set_fk(dbapi_conn: Any, _: object) -> None:
+        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+
     async with mem_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+    await seed_users(mem_engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine) as session:
@@ -33,7 +43,9 @@ async def skill_client(
     app.dependency_overrides[get_agent_registry] = lambda: mock_agent_registry
     try:
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            headers={"X-User-Id": SYSTEM_USER_ID},
         ) as ac:
             yield ac
     finally:
@@ -280,13 +292,15 @@ async def test_create_skill_populates_created_and_updated_by_from_header(
     assert body["updatedBy"] == "alice"
 
 
-async def test_create_skill_without_header_defaults_to_empty_string(
+async def test_create_skill_with_unknown_user_returns_422(
     skill_client: AsyncClient,
 ) -> None:
-    response = await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY)
-    body = assert_ok(response, status=201)
-    assert body["createdBy"] == ""
-    assert body["updatedBy"] == ""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json=_CREATE_BODY,
+        headers={"X-User-Id": "ghost-user"},
+    )
+    assert_err(response, code="FOREIGN_KEY_VIOLATION", status=422)
 
 
 async def test_update_skill_preserves_created_by_and_overwrites_updated_by(

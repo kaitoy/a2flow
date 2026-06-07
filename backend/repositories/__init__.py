@@ -4,7 +4,9 @@ from .exceptions import (
     NotFoundError,
     ReferencedError,
     RepositoryError,
+    UniqueViolationError,
 )
+from .user import SqlUserRepository, UserRepository
 from .workflow import SqlWorkflowRepository, WorkflowRepository
 from .workflow_session import SqlWorkflowSessionRepository, WorkflowSessionRepository
 from .workflow_task import SqlWorkflowTaskRepository, WorkflowTaskRepository
@@ -16,9 +18,12 @@ __all__ = [
     "ReferencedError",
     "RepositoryError",
     "SqlAgentSkillRepository",
+    "SqlUserRepository",
     "SqlWorkflowRepository",
     "SqlWorkflowSessionRepository",
     "SqlWorkflowTaskRepository",
+    "UniqueViolationError",
+    "UserRepository",
     "WorkflowRepository",
     "WorkflowSessionRepository",
     "WorkflowTaskRepository",

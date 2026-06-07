@@ -10,6 +10,9 @@ import type {
   ApiError,
   ApiMeta,
   Session as SessionModel,
+  UserCreate,
+  UserRead as UserReadModel,
+  UserUpdate,
   WorkflowCreate,
   Workflow as WorkflowModel,
   WorkflowSession as WorkflowSessionModel,
@@ -21,25 +24,30 @@ import type {
 } from "@/generated/api/types.gen";
 import {
   zCreateAgentSkillApiV1AgentSkillsPostResponse,
+  zCreateUserApiV1UsersPostResponse,
   zCreateWorkflowApiV1WorkflowsPostResponse,
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse,
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
+  zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
   zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
   zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
+  zGetUserApiV1UsersUserIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
   zGetWorkflowSessionApiV1WorkflowSessionsWsIdGetResponse,
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
+  zListUsersApiV1UsersGetResponse,
   zListWorkflowSessionsApiV1WorkflowSessionsGetResponse,
   zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse,
   zListWorkflowsApiV1WorkflowsGetResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
+  zUpdateUserApiV1UsersUserIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
   zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
 } from "@/generated/api/zod.gen";
@@ -47,6 +55,9 @@ import basicCatalogJson from "../generated/basic_catalog.json";
 import logger from "./logger";
 
 const API_BASE = process.env.BACKEND_BASE_URL ?? "http://localhost:8000";
+
+/** Re-export so callers can import the system user ID alongside the API helpers. */
+export { SYSTEM_USER_ID } from "./constants";
 
 const apiClient = axios.create({
   baseURL: API_BASE,
@@ -133,6 +144,7 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
   Required<Pick<T, AuditedKeys>>;
 
 export type AgentSkill = WithAudit<AgentSkillModel>;
+export type User = WithAudit<UserReadModel>;
 export type Workflow = WithAudit<WorkflowModel>;
 export type WorkflowSession = WithAudit<WorkflowSessionModel>;
 export type WorkflowTask = WithAudit<WorkflowTaskModel>;
@@ -140,6 +152,8 @@ export type Session = SessionModel;
 export type {
   AgentSkillCreate,
   AgentSkillUpdate,
+  UserCreate,
+  UserUpdate,
   WorkflowCreate,
   WorkflowTaskCreate,
   WorkflowTaskStatus,
@@ -217,6 +231,73 @@ export async function deleteAgentSkill(id: string): Promise<void> {
     apiClient.delete(`/api/v1/agent-skills/${encodeURIComponent(id)}`),
     zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse
   );
+}
+
+/** List users with optional pagination. */
+export async function listUsers(limit = 20, offset = 0): Promise<User[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/users", { params: { limit, offset } }),
+    zListUsersApiV1UsersGetResponse
+  ) as Promise<User[]>;
+}
+
+/** Fetch a single user by ID. */
+export async function getUser(id: string): Promise<User> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/users/${encodeURIComponent(id)}`),
+    zGetUserApiV1UsersUserIdGetResponse
+  ) as Promise<User>;
+}
+
+/** Create a new user. */
+export async function createUser(body: UserCreate): Promise<User> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/users", body),
+    zCreateUserApiV1UsersPostResponse
+  ) as Promise<User>;
+}
+
+/** Apply a partial update to a user. A blank password leaves it unchanged. */
+export async function updateUser(id: string, body: UserUpdate): Promise<User> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/users/${encodeURIComponent(id)}`, body),
+    zUpdateUserApiV1UsersUserIdPatchResponse
+  ) as Promise<User>;
+}
+
+/** Delete a user by ID. */
+export async function deleteUser(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/users/${encodeURIComponent(id)}`),
+    zDeleteUserApiV1UsersUserIdDeleteResponse
+  );
+}
+
+/** Join a user's first and last name into a single display string. */
+export function formatUserName(user: Pick<User, "firstName" | "lastName">): string {
+  return `${user.firstName} ${user.lastName}`.trim();
+}
+
+/**
+ * Resolve a set of user IDs to their display names ("First Last").
+ *
+ * Each unique ID is fetched individually via {@link getUser} (which resolves
+ * soft-deleted users too), so names still render for users that have been
+ * soft-deleted. IDs that cannot be fetched are omitted, letting callers fall
+ * back to the raw ID.
+ */
+export async function getUserNames(ids: Iterable<string>): Promise<Map<string, string>> {
+  const unique = [...new Set([...ids].filter(Boolean))];
+  const entries = await Promise.all(
+    unique.map(async (id): Promise<[string, string] | null> => {
+      try {
+        return [id, formatUserName(await getUser(id))];
+      } catch {
+        return null;
+      }
+    })
+  );
+  return new Map(entries.filter((e): e is [string, string] => e !== null));
 }
 
 /** List workflows with optional pagination. */

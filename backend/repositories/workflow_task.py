@@ -22,6 +22,7 @@ from models.workflow_task import (
     WorkflowTaskRead,
     WorkflowTaskUpdate,
 )
+from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import (
     DependencyCycleError,
     ForeignKeyViolationError,
@@ -138,7 +139,7 @@ class SqlWorkflowTaskRepository:
         self._db.add(task)
         for dep_id in dep_ids:
             self._db.add(WorkflowTaskDependency(task_id=task.id, depends_on_id=dep_id))
-        await self._db.commit()
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(task)
         return self._to_read(task, sorted(dep_ids))
 
@@ -166,7 +167,7 @@ class SqlWorkflowTaskRepository:
                 task_id, task.workflow_session_id, dep_ids
             )
             await self._replace_edges(task_id, dep_ids)
-        await self._db.commit()
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(task)
         return self._to_read(task, await self._deps_for(task_id))
 

@@ -7,6 +7,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.workflow_session import WorkflowSession, WorkflowSessionCreate
+from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
@@ -100,7 +101,7 @@ class SqlWorkflowSessionRepository:
             }
         )
         self._db.add(ws)
-        await self._db.commit()
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(ws)
         return ws
 

@@ -5,6 +5,7 @@ import {
 } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { SYSTEM_USER_ID } from "@/lib/constants";
 
 export type { Message };
 
@@ -78,7 +79,7 @@ interface ChatState {
 const initialState: ChatState = {
   messages: [],
   sessionId: null,
-  userId: "user",
+  userId: SYSTEM_USER_ID,
   isRunning: false,
   isStreaming: false,
   error: null,

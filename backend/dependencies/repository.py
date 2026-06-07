@@ -14,9 +14,11 @@ from infrastructure.database import get_session
 from repositories import (
     AgentSkillRepository,
     SqlAgentSkillRepository,
+    SqlUserRepository,
     SqlWorkflowRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
+    UserRepository,
     WorkflowRepository,
     WorkflowSessionRepository,
     WorkflowTaskRepository,
@@ -33,6 +35,14 @@ def get_agent_skill_repository(db: DBSessionDep) -> AgentSkillRepository:
 AgentSkillRepositoryDep = Annotated[
     AgentSkillRepository, Depends(get_agent_skill_repository)
 ]
+
+
+def get_user_repository(db: DBSessionDep) -> UserRepository:
+    """Create a UserRepository backed by the current database session."""
+    return SqlUserRepository(db)
+
+
+UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
 
 
 def get_workflow_repository(

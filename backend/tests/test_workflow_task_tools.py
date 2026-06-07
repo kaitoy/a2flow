@@ -29,6 +29,7 @@ from infrastructure.workflow_task_tools import (
 )
 from models.workflow_session import WorkflowSession
 from repositories import SqlWorkflowSessionRepository
+from tests._seed import seed_users
 
 
 @pytest_asyncio.fixture()
@@ -44,6 +45,7 @@ async def engine(
 
     async with eng.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+    await seed_users(eng)
 
     monkeypatch.setattr("infrastructure.database.engine", eng)
     yield eng
