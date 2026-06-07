@@ -8,6 +8,8 @@ from ag_ui.core import EventType, RunAgentInput, RunFinishedEvent, RunStartedEve
 from google.adk.sessions import InMemorySessionService
 from httpx import ASGITransport, AsyncClient
 
+from tests.conftest import _install_auth_overrides
+
 
 def _make_run_agent_input(
     messages: list[dict[str, Any]] | None = None,
@@ -45,6 +47,7 @@ async def agent_client() -> AsyncGenerator[tuple[AsyncClient, MagicMock], None]:
 
     app.dependency_overrides[get_session_service] = lambda: InMemorySessionService()  # type: ignore[no-untyped-call]
     app.dependency_overrides[get_agent_registry] = lambda: mock_registry
+    _install_auth_overrides(app)
     try:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"

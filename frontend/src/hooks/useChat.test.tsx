@@ -143,7 +143,6 @@ describe("useChat", () => {
       chat: {
         messages: [{ id: "stale", role: "user", content: "previous" }],
         sessionId: "sess-prev",
-        userId: "user",
         isRunning: false,
         isStreaming: false,
         error: null,
@@ -160,7 +159,6 @@ describe("useChat", () => {
       chat: {
         messages: [],
         sessionId: "sess-abc",
-        userId: "user",
         isRunning: false,
         isStreaming: false,
         error: null,

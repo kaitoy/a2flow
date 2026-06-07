@@ -34,7 +34,6 @@ async def agent_endpoint(
     input_data = input_data.model_copy(update={"messages": filtered})
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
-    user_id = user_id or "user"
     session = await session_service.get_session(
         app_name=APP_NAME,
         user_id=user_id,

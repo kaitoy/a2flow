@@ -75,7 +75,7 @@ export function useWorkflowSessionChat(
   workflowPrompt: string
 ) {
   const dispatch = useAppDispatch();
-  const { messages, userId, isRunning, isStreaming, error } = useAppSelector((s) => s.chat);
+  const { messages, isRunning, isStreaming, error } = useAppSelector((s) => s.chat);
   const pendingRenderToolCallIds = useRef<string[]>([]);
   const autoSentRef = useRef(false);
 
@@ -137,7 +137,7 @@ export function useWorkflowSessionChat(
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, userId, dispatch]);
+  }, [sessionId, dispatch]);
 
   return {
     messages,

@@ -37,6 +37,10 @@ export default defineConfig({
   },
   define: {
     "process.env.BACKEND_BASE_URL": JSON.stringify("http://localhost:8000"),
+    // The app talks to the same-origin proxy by default (empty base); tests use
+    // an absolute base so the MSW handlers (registered against localhost:8000)
+    // intercept the requests.
+    "process.env.NEXT_PUBLIC_API_BASE": JSON.stringify("http://localhost:8000"),
     "process.env.NODE_ENV": JSON.stringify("test"),
   },
 });

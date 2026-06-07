@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import logo from "@/../assets/logo.png";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { ChatErrorBanner } from "./ChatErrorBanner";
@@ -21,7 +22,7 @@ import { ThemeToggle } from "./ThemeToggle";
 export function ChatShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const userId = useAppSelector((s) => s.chat.userId);
+  const userId = useAppSelector((s) => s.auth.user?.id ?? "");
   const sessionId = useAppSelector((s) => s.chat.sessionId);
   const isRunning = useAppSelector((s) => s.chat.isRunning);
   const error = useAppSelector((s) => s.chat.error);
@@ -75,7 +76,10 @@ export function ChatShell({ children }: { children: React.ReactNode }) {
               A2Flow
             </h1>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <LogoutButton />
+            <ThemeToggle />
+          </div>
         </header>
 
         <ChatErrorBanner error={error} onDismiss={() => dispatch(clearError())} />

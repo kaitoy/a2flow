@@ -13,7 +13,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.database import get_session
 from repositories import (
     AgentSkillRepository,
+    AuthSessionRepository,
     SqlAgentSkillRepository,
+    SqlAuthSessionRepository,
     SqlUserRepository,
     SqlWorkflowRepository,
     SqlWorkflowSessionRepository,
@@ -34,6 +36,16 @@ def get_agent_skill_repository(db: DBSessionDep) -> AgentSkillRepository:
 
 AgentSkillRepositoryDep = Annotated[
     AgentSkillRepository, Depends(get_agent_skill_repository)
+]
+
+
+def get_auth_session_repository(db: DBSessionDep) -> AuthSessionRepository:
+    """Create an AuthSessionRepository backed by the current database session."""
+    return SqlAuthSessionRepository(db)
+
+
+AuthSessionRepositoryDep = Annotated[
+    AuthSessionRepository, Depends(get_auth_session_repository)
 ]
 
 

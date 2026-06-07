@@ -9,6 +9,7 @@ import type {
   AgentSkillUpdate,
   ApiError,
   ApiMeta,
+  LoginRequest,
   Session as SessionModel,
   UserCreate,
   UserRead as UserReadModel,
@@ -46,6 +47,9 @@ import {
   zListWorkflowSessionsApiV1WorkflowSessionsGetResponse,
   zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse,
   zListWorkflowsApiV1WorkflowsGetResponse,
+  zLoginApiV1AuthLoginPostResponse,
+  zLogoutApiV1AuthLogoutPostResponse,
+  zMeApiV1AuthMeGetResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
@@ -54,31 +58,61 @@ import {
 import basicCatalogJson from "../generated/basic_catalog.json";
 import logger from "./logger";
 
-const API_BASE = process.env.BACKEND_BASE_URL ?? "http://localhost:8000";
+/**
+ * API base URL. Empty by default so the browser talks to the frontend origin
+ * and Next.js rewrites proxy `/api/*` to the backend — this keeps the auth
+ * cookies same-origin. Override with `NEXT_PUBLIC_API_BASE` only for setups
+ * that bypass the proxy.
+ */
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
-/** Re-export so callers can import the system user ID alongside the API helpers. */
-export { SYSTEM_USER_ID } from "./constants";
+/** Name of the readable CSRF cookie set by the backend at login. */
+const CSRF_COOKIE_NAME = "a2flow_csrf";
+/** Header the backend expects the CSRF cookie value echoed in on unsafe requests. */
+const CSRF_HEADER_NAME = "X-CSRF-Token";
+/** HTTP methods that mutate state and therefore require a CSRF token. */
+const UNSAFE_METHODS = new Set(["post", "put", "patch", "delete"]);
+
+/** Read a cookie value by name from `document.cookie`, or `null` when absent. */
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.split("; ").find((row) => row.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+}
 
 const apiClient = axios.create({
   baseURL: API_BASE,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-let currentUserId = "";
-
-/** Set the user ID injected into every outgoing request as the ``X-User-Id`` header. */
-export function setApiUserId(userId: string): void {
-  currentUserId = userId;
-}
-
 apiClient.interceptors.request.use((config) => {
-  if (currentUserId) {
-    config.headers.set("X-User-Id", currentUserId);
+  if (UNSAFE_METHODS.has((config.method ?? "get").toLowerCase())) {
+    const token = readCookie(CSRF_COOKIE_NAME);
+    if (token) config.headers.set(CSRF_HEADER_NAME, token);
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Redirect to the login page when a request is rejected for lack of a valid
+    // session — except the login request itself, which surfaces 401 inline.
+    const url: string = error?.config?.url ?? "";
+    if (
+      typeof window !== "undefined" &&
+      error?.response?.status === 401 &&
+      !url.endsWith("/auth/login") &&
+      window.location.pathname !== "/login"
+    ) {
+      window.location.assign("/login");
+    }
+    return Promise.reject(error);
+  }
+);
 
 /** Re-export the generated envelope types so call sites do not import from ``@/generated``. */
 export type { ApiError, ApiMeta };
@@ -152,6 +186,7 @@ export type Session = SessionModel;
 export type {
   AgentSkillCreate,
   AgentSkillUpdate,
+  LoginRequest,
   UserCreate,
   UserUpdate,
   WorkflowCreate,
@@ -161,7 +196,31 @@ export type {
   WorkflowUpdate,
 };
 
-/** Fetch all sessions for the current user (identified by the X-User-Id header). */
+/**
+ * Authenticate with username and password. On success the backend sets the
+ * session and CSRF cookies and returns the logged-in user.
+ */
+export async function login(username: string, password: string): Promise<User> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/auth/login", { username, password }),
+    zLoginApiV1AuthLoginPostResponse
+  ) as Promise<User>;
+}
+
+/** Revoke the current session and clear the auth cookies. */
+export async function logout(): Promise<void> {
+  await fetchEnvelope(apiClient.post("/api/v1/auth/logout"), zLogoutApiV1AuthLogoutPostResponse);
+}
+
+/** Fetch the currently authenticated user, or throw if the session is invalid. */
+export async function getMe(): Promise<User> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/auth/me"),
+    zMeApiV1AuthMeGetResponse
+  ) as Promise<User>;
+}
+
+/** Fetch all sessions for the current user (resolved from the session cookie). */
 export async function listSessions(): Promise<Session[]> {
   return fetchEnvelope(
     apiClient.get("/api/v1/sessions"),
@@ -417,14 +476,34 @@ export async function deleteWorkflowTask(taskId: string): Promise<void> {
 }
 
 /**
+ * HttpAgent variant that sends the auth session cookie and the CSRF token with
+ * each streaming request. The agent endpoints are POSTs, so they need both the
+ * cookie (`credentials: "include"`) and the double-submit `X-CSRF-Token` header.
+ */
+class CredentialedHttpAgent extends HttpAgent {
+  /** Augment the base fetch config with credentials and the CSRF header. */
+  protected requestInit(input: Parameters<HttpAgent["requestInit"]>[0]): RequestInit {
+    const init = super.requestInit(input);
+    const csrf = readCookie(CSRF_COOKIE_NAME);
+    return {
+      ...init,
+      credentials: "include",
+      headers: {
+        ...(init.headers as Record<string, string> | undefined),
+        ...(csrf ? { [CSRF_HEADER_NAME]: csrf } : {}),
+      },
+    };
+  }
+}
+
+/**
  * Create an HttpAgent for the general chat endpoint, pre-configured with the A2UI middleware
  * so the agent can render interactive surfaces via the RENDER_A2UI tool.
  */
 export function createChatAgent(sessionId: string): HttpAgent {
-  const agent = new HttpAgent({
+  const agent = new CredentialedHttpAgent({
     url: `${API_BASE}/api/v1/agent`,
     threadId: sessionId,
-    headers: currentUserId ? { "X-User-Id": currentUserId } : {},
   });
   agent.use(
     new A2UIMiddleware({
@@ -443,10 +522,9 @@ export function createWorkflowSessionAgent(
   workflowSessionId: string,
   sessionId: string
 ): HttpAgent {
-  const agent = new HttpAgent({
+  const agent = new CredentialedHttpAgent({
     url: `${API_BASE}/api/v1/workflow-sessions/${encodeURIComponent(workflowSessionId)}/agent`,
     threadId: sessionId,
-    headers: currentUserId ? { "X-User-Id": currentUserId } : {},
   });
   agent.use(
     new A2UIMiddleware({

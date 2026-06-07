@@ -1,34 +1,41 @@
 pre-commit:
   parallel: true
   jobs:
+    # NOTE: lefthook matches `glob` against repo-root-relative paths (it does NOT
+    # strip `root`), and its `*` crosses `/`. So the glob must include the
+    # `backend/` prefix; `backend/*.py` already covers nested files too.
     - name: backend-ruff-lint
       root: backend/
-      glob: "*.py"
+      glob: "backend/*.py"
       run: uv run ruff check .
 
     - name: backend-ruff-format
       root: backend/
-      glob: "*.py"
+      glob: "backend/*.py"
       run: uv run ruff format --check .
 
     - name: backend-mypy
       root: backend/
-      glob: "*.py"
+      glob: "backend/*.py"
       run: uv run mypy .
 
     - name: backend-pytest
       root: backend/
-      glob: "*.py"
+      glob: "backend/*.py"
       run: uv run pytest
 
+    # NOTE: lefthook matches `glob` against repo-root-relative paths (it does NOT
+    # strip `root`), and its `*` crosses `/`. So the glob must include the
+    # `frontend/` prefix, and `frontend/src/*.…` already covers nested files —
+    # a `src/**/…` form would skip files directly under src (e.g. middleware.ts).
     - name: frontend-biome
       root: frontend/
-      glob: "src/**/*.{ts,tsx,js,jsx,json}"
+      glob: "frontend/src/*.{ts,tsx,js,jsx,json}"
       run: pnpm exec biome ci ./src
 
     - name: frontend-vitest
       root: frontend/
-      glob: "src/**/*.{ts,tsx}"
+      glob: "frontend/src/*.{ts,tsx}"
       run: pnpm exec vitest run
 
 pre-push:

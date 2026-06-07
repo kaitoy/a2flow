@@ -3,8 +3,13 @@
  * and `/new-session`) with the shared shell so the sidebar and header are not
  * remounted on session switches.
  */
+import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatShell } from "@/components/ChatShell";
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
-  return <ChatShell>{children}</ChatShell>;
+  return (
+    <AuthProvider>
+      <ChatShell>{children}</ChatShell>
+    </AuthProvider>
+  );
 }

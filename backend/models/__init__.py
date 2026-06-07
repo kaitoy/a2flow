@@ -1,4 +1,5 @@
 from .agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
+from .auth_session import AuthSession
 from .session import Session
 from .workflow import Workflow, WorkflowCreate, WorkflowUpdate
 from .workflow_session import WorkflowSession, WorkflowSessionCreate
@@ -15,6 +16,7 @@ __all__ = [
     "AgentSkill",
     "AgentSkillCreate",
     "AgentSkillUpdate",
+    "AuthSession",
     "Session",
     "Workflow",
     "WorkflowCreate",

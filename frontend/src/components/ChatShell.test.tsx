@@ -70,7 +70,6 @@ describe("ChatShell", () => {
           chat: {
             messages: [],
             sessionId: "sess-abc",
-            userId: "user",
             isRunning: true,
             isStreaming: false,
             error: null,
@@ -92,7 +91,6 @@ describe("ChatShell", () => {
           chat: {
             messages: [],
             sessionId: null,
-            userId: "user",
             isRunning: false,
             isStreaming: false,
             error: "Something went wrong",
@@ -122,7 +120,6 @@ describe("ChatShell", () => {
           chat: {
             messages: [],
             sessionId: null,
-            userId: "user",
             isRunning: false,
             isStreaming: false,
             error: "Oops",
@@ -167,7 +164,6 @@ describe("ChatShell", () => {
           chat: {
             messages: [],
             sessionId: "sess-abc",
-            userId: "user",
             isRunning: true,
             isStreaming: false,
             error: null,
@@ -190,7 +186,6 @@ describe("ChatShell", () => {
           chat: {
             messages: [],
             sessionId: "sess-abc",
-            userId: "user",
             isRunning: false,
             isStreaming: false,
             error: null,
@@ -213,7 +208,6 @@ describe("ChatShell", () => {
           chat: {
             messages: [],
             sessionId: "sess-abc",
-            userId: "user",
             isRunning: false,
             isStreaming: false,
             error: null,
