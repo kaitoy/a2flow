@@ -4,12 +4,14 @@ import type { ReactElement } from "react";
 import { Provider } from "react-redux";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import type { RootState } from "@/store";
+import authReducer from "@/store/authSlice";
 import chatReducer from "@/store/chatSlice";
 
 export function makeStore(preloadedState?: Partial<RootState>) {
   return configureStore({
     reducer: {
       chat: chatReducer as Reducer<RootState["chat"], UnknownAction, RootState["chat"] | undefined>,
+      auth: authReducer as Reducer<RootState["auth"], UnknownAction, RootState["auth"] | undefined>,
     },
     preloadedState,
   });

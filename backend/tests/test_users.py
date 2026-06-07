@@ -11,6 +11,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.bootstrap import seed_system_user
 from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
+from tests.conftest import _install_auth_overrides
 
 
 @pytest_asyncio.fixture()
@@ -35,6 +36,7 @@ async def user_client() -> AsyncGenerator[AsyncClient, None]:
             yield session
 
     app.dependency_overrides[get_session] = override_get_session
+    _install_auth_overrides(app)
     try:
         async with AsyncClient(
             transport=ASGITransport(app=app),

@@ -12,6 +12,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
 from tests._seed import seed_users
+from tests.conftest import _install_auth_overrides
 
 
 @pytest_asyncio.fixture()
@@ -41,6 +42,7 @@ async def skill_client(
 
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_agent_registry] = lambda: mock_agent_registry
+    _install_auth_overrides(app)
     try:
         async with AsyncClient(
             transport=ASGITransport(app=app),

@@ -1,15 +1,15 @@
 """Request-scoped FastAPI dependencies and the application name constant.
 
-Holds the lightweight, per-request dependencies that do not touch persistence or
-singletons: the response metadata block, pagination/sort/filter query
-parameters, and the current user id derived from request headers.
+Holds the lightweight, per-request dependencies: the response metadata block,
+pagination/sort/filter query parameters, and the current user id resolved from
+the authenticated session (via :func:`dependencies.auth.get_current_user`).
 """
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import Depends, Header, Query, Request
+from fastapi import Depends, Query, Request
 
 from models.response import ApiMeta
 from repositories.exceptions import QueryValidationError
@@ -140,13 +140,3 @@ def parse_filters(
 
 
 FilterDep = Annotated[FilterParams, Depends(parse_filters)]
-
-
-def get_current_user_id(
-    x_user_id: Annotated[str | None, Header()] = None,
-) -> str:
-    """Return the user ID from the ``X-User-Id`` header, or an empty string if absent."""
-    return x_user_id or ""
-
-
-CurrentUserIdDep = Annotated[str, Depends(get_current_user_id)]

@@ -73,6 +73,7 @@ SQLite URL for REST API data and ADK session storage. Both the SQLModel async en
 | Table | Description |
 |---|---|
 | `users` | Application users (soft-deleted via `deleted_at`); see [Admin user](#admin-user) |
+| `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](#authentication) |
 | `agent_skills` | Agent skill definitions |
 | `workflows` | Workflow definitions |
 | `workflow_tasks` | Individual tasks belonging to a `WorkflowSession` (`workflow_session_id` FK with `ON DELETE CASCADE`) |
@@ -95,6 +96,33 @@ ADMIN_PASSWORD=change-me-now-123
 ```
 
 The username is fixed to `admin`. Set `ADMIN_PASSWORD` before the first run, or change the password through the user API afterwards.
+
+### Authentication
+
+All API routes except `POST /api/v1/auth/login` and `GET /api/v1/health` require an authenticated session. Authentication is cookie-based and backed by the `auth_sessions` table.
+
+**Flow**
+
+1. `POST /api/v1/auth/login` with `{ "username", "password" }`. On success the response sets two cookies and returns the current user (without the password hash):
+   - `a2flow_session` — HttpOnly, `SameSite=Lax` opaque session token. Only its SHA-256 hash is stored server-side.
+   - `a2flow_csrf` — readable (non-HttpOnly), `SameSite=Lax` CSRF token.
+2. The browser sends both cookies automatically on subsequent requests. For state-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) the client must echo the CSRF cookie value in the `X-CSRF-Token` header (double-submit cookie defense). A mismatch or missing header returns `403 CSRF_FAILED`.
+3. `GET /api/v1/auth/me` returns the current user; `POST /api/v1/auth/logout` revokes the session and clears the cookies.
+
+A missing or invalid session returns `401 UNAUTHENTICATED`.
+
+**Session lifetime**
+
+Sessions use a sliding idle timeout: each authenticated request refreshes the session's last-active time, and a session left idle longer than `SESSION_IDLE_TIMEOUT_SECONDS` (default `28800`, 8 hours) is rejected and deleted. The cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes.
+
+```env
+# Sliding idle timeout in seconds (default 28800 = 8 hours)
+SESSION_IDLE_TIMEOUT_SECONDS=28800
+# Mark cookies Secure (HTTPS only); leave false for local HTTP dev (default false)
+SESSION_COOKIE_SECURE=false
+```
+
+The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `admin` user (see [Admin user](#admin-user)) on first run.
 
 ### CORS
 
@@ -136,18 +164,18 @@ cd backend && uv run pytest -v
 
 Sessions are created lazily: the backend ADK session is materialized on the first `POST /agent` request that supplies a fresh `threadId`. The client picks the UUID, and that same UUID is reused on subsequent requests to preserve conversation history. There is no explicit "create session" endpoint.
 
+The caller's identity is resolved from the authenticated session cookie (see [Authentication](#authentication)); the examples below assume a logged-in cookie jar saved with `curl -c`/`-b`.
+
 #### `GET /sessions` — List sessions
 
-The caller's identity is read from the `X-User-Id` request header (set by all frontend requests via the axios interceptor).
-
 ```bash
-curl -H "X-User-Id: alice" "http://localhost:8000/api/v1/sessions"
+curl -b cookies.txt "http://localhost:8000/api/v1/sessions"
 ```
 
 #### `GET /sessions/{session_id}` — Get a session
 
 ```bash
-curl -H "X-User-Id: alice" "http://localhost:8000/api/v1/sessions/my-session"
+curl -b cookies.txt "http://localhost:8000/api/v1/sessions/my-session"
 ```
 
 Returns `404` if the session does not exist or belongs to a different user.
@@ -155,13 +183,15 @@ Returns `404` if the session does not exist or belongs to a different user.
 #### `GET /sessions/{session_id}/messages` — Get session messages
 
 ```bash
-curl -H "X-User-Id: alice" "http://localhost:8000/api/v1/sessions/my-session/messages"
+curl -b cookies.txt "http://localhost:8000/api/v1/sessions/my-session/messages"
 ```
 
 #### `DELETE /sessions/{session_id}` — Delete a session
 
+Requires the `X-CSRF-Token` header (see [Authentication](#authentication)).
+
 ```bash
-curl -X DELETE -H "X-User-Id: alice" "http://localhost:8000/api/v1/sessions/my-session"
+curl -X DELETE -b cookies.txt -H "X-CSRF-Token: $CSRF" "http://localhost:8000/api/v1/sessions/my-session"
 ```
 
 ---
@@ -375,7 +405,7 @@ Send an [AG-UI `RunAgentInput`](https://docs.ag-ui.com/concepts/events) to a ses
 | `context` | array | No | Context items (currently unused) |
 | `state` | any | No | Agent state (currently unused) |
 
-The caller's identity is read from the `X-User-Id` request header (same convention as the REST endpoints).
+The caller's identity is resolved from the authenticated session cookie (same convention as the REST endpoints). As a `POST`, this endpoint also requires the `X-CSRF-Token` header.
 
 Reusing the same `threadId` preserves conversation history.
 
@@ -423,7 +453,7 @@ SESSION=$(python -c 'import uuid; print(uuid.uuid4())')
 
 curl -N -X POST http://localhost:8000/api/v1/agent \
   -H "Content-Type: application/json" \
-  -H "X-User-Id: alice" \
+  -b cookies.txt -H "X-CSRF-Token: $CSRF" \
   -d "{\"threadId\": \"$SESSION\", \"runId\": \"$(python -c 'import uuid; print(uuid.uuid4())')\", \"state\": {}, \"tools\": [], \"context\": [], \"messages\": [{\"id\": \"m1\", \"role\": \"user\", \"content\": \"What is Python?\"}], \"forwardedProps\": {}}"
 ```
 

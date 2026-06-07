@@ -1,9 +1,12 @@
 from .agent_skill import AgentSkillRepository, SqlAgentSkillRepository
+from .auth_session import AuthSessionRepository, SqlAuthSessionRepository
 from .exceptions import (
+    CsrfError,
     ForeignKeyViolationError,
     NotFoundError,
     ReferencedError,
     RepositoryError,
+    UnauthorizedError,
     UniqueViolationError,
 )
 from .user import SqlUserRepository, UserRepository
@@ -13,15 +16,19 @@ from .workflow_task import SqlWorkflowTaskRepository, WorkflowTaskRepository
 
 __all__ = [
     "AgentSkillRepository",
+    "AuthSessionRepository",
+    "CsrfError",
     "ForeignKeyViolationError",
     "NotFoundError",
     "ReferencedError",
     "RepositoryError",
     "SqlAgentSkillRepository",
+    "SqlAuthSessionRepository",
     "SqlUserRepository",
     "SqlWorkflowRepository",
     "SqlWorkflowSessionRepository",
     "SqlWorkflowTaskRepository",
+    "UnauthorizedError",
     "UniqueViolationError",
     "UserRepository",
     "WorkflowRepository",

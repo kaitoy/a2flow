@@ -41,6 +41,13 @@ async def init_db() -> None:
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """Yield an async database session for use as a FastAPI dependency."""
-    async with AsyncSession(engine) as session:
+    """Yield an async database session for use as a FastAPI dependency.
+
+    ``expire_on_commit`` is disabled so ORM objects keep their loaded attributes
+    after a commit. Without this, an entity loaded before a later commit in the
+    same request (e.g. the user whose login also inserts a session row) is
+    expired, and reading its attributes during response serialization triggers
+    lazy IO outside the async greenlet (``MissingGreenlet``).
+    """
+    async with AsyncSession(engine, expire_on_commit=False) as session:
         yield session

@@ -1,18 +1,14 @@
-/** Redux store configuration; also wires ``setApiUserId`` so every API call carries the current user ID. */
+/** Redux store configuration combining the chat and auth slices. */
 import { configureStore } from "@reduxjs/toolkit";
-import { setApiUserId } from "@/lib/api";
+import authReducer from "./authSlice";
 import chatReducer from "./chatSlice";
 
 export const store = configureStore({
   reducer: {
     chat: chatReducer,
+    auth: authReducer,
   },
 });
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
-
-setApiUserId(store.getState().chat.userId);
-store.subscribe(() => {
-  setApiUserId(store.getState().chat.userId);
-});

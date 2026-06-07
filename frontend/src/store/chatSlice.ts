@@ -5,7 +5,6 @@ import {
 } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import { SYSTEM_USER_ID } from "@/lib/constants";
 
 export type { Message };
 
@@ -66,8 +65,6 @@ interface ChatState {
   messages: Message[];
   /** The active ADK session ID, or null when no session is open. */
   sessionId: string | null;
-  /** The current user's identifier, sent as forwarded props to the agent. */
-  userId: string;
   /** True while an agent run is in progress (blocks sending new messages). */
   isRunning: boolean;
   /** True while the assistant is actively streaming text tokens. */
@@ -79,7 +76,6 @@ interface ChatState {
 const initialState: ChatState = {
   messages: [],
   sessionId: null,
-  userId: SYSTEM_USER_ID,
   isRunning: false,
   isStreaming: false,
   error: null,

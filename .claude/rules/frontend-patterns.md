@@ -33,7 +33,7 @@ src/
 │   ├── hooks.ts          # Typed useAppDispatch / useAppSelector
 │   └── provider.tsx      # Client-side Redux Provider
 └── lib/
-    ├── api.ts            # listSessions(), createChatAgent() with A2UIMiddleware; X-User-Id header injected globally via axios interceptor
+    ├── api.ts            # listSessions(), createChatAgent() with A2UIMiddleware; withCredentials + X-CSRF-Token via axios interceptor; 401 → /login
     └── logger.ts         # pino logger instance
 ```
 

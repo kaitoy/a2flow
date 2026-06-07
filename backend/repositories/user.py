@@ -23,6 +23,8 @@ class UserRepository(Protocol):
 
     async def get(self, user_id: str) -> User | None: ...
 
+    async def get_by_username(self, username: str) -> User | None: ...
+
     async def list(
         self,
         *,
@@ -56,6 +58,21 @@ class SqlUserRepository:
 
     async def get(self, user_id: str) -> User | None:
         return await self._db.get(User, user_id)
+
+    async def get_by_username(self, username: str) -> User | None:
+        """Return the user with the given username, or ``None`` if no match exists.
+
+        Soft-deleted users are included so the auth layer can reject a login
+        with an explicit "disabled" decision rather than silently missing them.
+
+        Args:
+            username: The unique username to look up.
+
+        Returns:
+            The matching ``User`` or ``None``.
+        """
+        stmt = select(User).where(col(User.username) == username)
+        return (await self._db.exec(stmt)).first()
 
     async def exists(self, user_id: str) -> bool:
         return (await self._db.get(User, user_id)) is not None

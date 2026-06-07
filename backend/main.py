@@ -20,21 +20,25 @@ from infrastructure.database import engine, init_db
 from infrastructure.logging_context import setup_logging
 from middleware.envelope import RequestContextMiddleware
 from repositories.exceptions import (
+    CsrfError,
     DependencyCycleError,
     ForeignKeyViolationError,
     NotFoundError,
     QueryValidationError,
     ReferencedError,
+    UnauthorizedError,
     UniqueViolationError,
 )
 from routers import api_router
 from routers.exception_handlers import (
+    csrf_exception_handler,
     dependency_cycle_exception_handler,
     foreign_key_violation_exception_handler,
     http_exception_handler,
     not_found_exception_handler,
     query_validation_exception_handler,
     referenced_exception_handler,
+    unauthorized_exception_handler,
     unhandled_exception_handler,
     unique_violation_exception_handler,
     validation_exception_handler,
@@ -80,6 +84,8 @@ app.add_exception_handler(ReferencedError, referenced_exception_handler)
 app.add_exception_handler(UniqueViolationError, unique_violation_exception_handler)
 app.add_exception_handler(DependencyCycleError, dependency_cycle_exception_handler)
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
+app.add_exception_handler(UnauthorizedError, unauthorized_exception_handler)
+app.add_exception_handler(CsrfError, csrf_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 

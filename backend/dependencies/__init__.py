@@ -11,10 +11,19 @@ All public ``*Dep`` aliases, factory functions, and ``APP_NAME`` are re-exported
 here so callers can keep importing from ``dependencies`` directly.
 """
 
+from .auth import (
+    CSRF_COOKIE_NAME,
+    CSRF_HEADER_NAME,
+    SESSION_COOKIE_NAME,
+    CurrentUserDep,
+    CurrentUserIdDep,
+    get_current_user,
+    get_current_user_id,
+    verify_csrf,
+)
 from .context import (
     APP_NAME,
     ApiMetaDep,
-    CurrentUserIdDep,
     FilterDep,
     FilterParams,
     PaginationDep,
@@ -22,18 +31,19 @@ from .context import (
     SortDep,
     SortParams,
     build_api_meta,
-    get_current_user_id,
     parse_filters,
     parse_sort,
 )
 from .repository import (
     AgentSkillRepositoryDep,
+    AuthSessionRepositoryDep,
     DBSessionDep,
     UserRepositoryDep,
     WorkflowRepositoryDep,
     WorkflowSessionRepositoryDep,
     WorkflowTaskRepositoryDep,
     get_agent_skill_repository,
+    get_auth_session_repository,
     get_user_repository,
     get_workflow_repository,
     get_workflow_session_repository,
@@ -41,11 +51,13 @@ from .repository import (
 )
 from .service import (
     AgentSkillServiceDep,
+    AuthServiceDep,
     UserServiceDep,
     WorkflowServiceDep,
     WorkflowSessionServiceDep,
     WorkflowTaskServiceDep,
     get_agent_skill_service,
+    get_auth_service,
     get_user_service,
     get_workflow_service,
     get_workflow_session_service,
@@ -62,10 +74,16 @@ from .singletons import (
 
 __all__ = [
     "APP_NAME",
+    "CSRF_COOKIE_NAME",
+    "CSRF_HEADER_NAME",
+    "SESSION_COOKIE_NAME",
     "AgentRegistryDep",
     "AgentSkillRepositoryDep",
     "AgentSkillServiceDep",
     "ApiMetaDep",
+    "AuthServiceDep",
+    "AuthSessionRepositoryDep",
+    "CurrentUserDep",
     "CurrentUserIdDep",
     "DBSessionDep",
     "FilterDep",
@@ -88,6 +106,9 @@ __all__ = [
     "get_agent_registry",
     "get_agent_skill_repository",
     "get_agent_skill_service",
+    "get_auth_service",
+    "get_auth_session_repository",
+    "get_current_user",
     "get_current_user_id",
     "get_session_service",
     "get_skill_manager",
@@ -101,4 +122,5 @@ __all__ = [
     "get_workflow_task_service",
     "parse_filters",
     "parse_sort",
+    "verify_csrf",
 ]

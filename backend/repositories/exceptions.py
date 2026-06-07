@@ -5,6 +5,27 @@ class RepositoryError(Exception):
     """Base class for all repository errors."""
 
 
+class UnauthorizedError(Exception):
+    """Raised when a request lacks a valid authenticated session.
+
+    Mapped to HTTP 401 with the ``UNAUTHENTICATED`` error code. The message is
+    intentionally generic to avoid leaking whether a username exists.
+    """
+
+    def __init__(self, message: str = "Authentication required") -> None:
+        super().__init__(message)
+
+
+class CsrfError(Exception):
+    """Raised when a state-changing request fails CSRF validation.
+
+    Mapped to HTTP 403 with the ``CSRF_FAILED`` error code.
+    """
+
+    def __init__(self, message: str = "CSRF validation failed") -> None:
+        super().__init__(message)
+
+
 class NotFoundError(RepositoryError):
     """Raised when a requested entity does not exist in the database."""
 

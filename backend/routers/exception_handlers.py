@@ -14,11 +14,13 @@ from fastapi.responses import JSONResponse
 
 from models.response import ApiError, ApiMeta, ApiResponse
 from repositories.exceptions import (
+    CsrfError,
     DependencyCycleError,
     ForeignKeyViolationError,
     NotFoundError,
     QueryValidationError,
     ReferencedError,
+    UnauthorizedError,
     UniqueViolationError,
 )
 
@@ -142,6 +144,30 @@ async def unique_violation_exception_handler(
         message=str(exc),
         status_code=409,
         details={"field": exc.field, "value": exc.value},
+    )
+
+
+async def unauthorized_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 401 with UNAUTHENTICATED code when no valid session is present."""
+    assert isinstance(exc, UnauthorizedError)
+    return _envelope_error(
+        request,
+        code="UNAUTHENTICATED",
+        message=str(exc),
+        status_code=401,
+    )
+
+
+async def csrf_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Return HTTP 403 with CSRF_FAILED code when CSRF validation fails."""
+    assert isinstance(exc, CsrfError)
+    return _envelope_error(
+        request,
+        code="CSRF_FAILED",
+        message=str(exc),
+        status_code=403,
     )
 
 

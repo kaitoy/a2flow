@@ -176,4 +176,10 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(WORKFLOW_TASK_1)),
 
   http.delete(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(null)),
+
+  http.post(`${BASE}/api/v1/auth/login`, () => envelope(USER_1)),
+
+  http.post(`${BASE}/api/v1/auth/logout`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/auth/me`, () => envelope(USER_1)),
 ];

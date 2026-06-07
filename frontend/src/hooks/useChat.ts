@@ -86,9 +86,7 @@ export function useChat(initialSessionId: string | null) {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
-  const { messages, sessionId, userId, isRunning, isStreaming, error } = useAppSelector(
-    (s) => s.chat
-  );
+  const { messages, sessionId, isRunning, isStreaming, error } = useAppSelector((s) => s.chat);
   const pendingRenderToolCallIds = useRef<string[]>([]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -107,7 +105,7 @@ export function useChat(initialSessionId: string | null) {
       .then((messages) => dispatch(resumeSession({ sessionId: initialSessionId, messages })))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, initialSessionId, dispatch]);
+  }, [initialSessionId, dispatch]);
 
   const switchSession = useCallback(
     (targetSessionId: string) => {
