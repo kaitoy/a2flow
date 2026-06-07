@@ -72,6 +72,7 @@ SQLite URL for REST API data and ADK session storage. Both the SQLModel async en
 
 | Table | Description |
 |---|---|
+| `users` | Application users (soft-deleted via `deleted_at`); see [Admin user](#admin-user) |
 | `agent_skills` | Agent skill definitions |
 | `workflows` | Workflow definitions |
 | `workflow_tasks` | Individual tasks belonging to a `WorkflowSession` (`workflow_session_id` FK with `ON DELETE CASCADE`) |
@@ -79,6 +80,21 @@ SQLite URL for REST API data and ADK session storage. Both the SQLModel async en
 | `events` | Full event history per session (JSON) |
 | `app_states` | App-level shared state |
 | `user_states` | Per-user state shared across sessions |
+
+### Admin user
+
+On startup the backend seeds two users:
+
+- A hidden **system user** that owns the bootstrap records (it cannot log in and is excluded from the user list).
+- An initial **`admin`** user, created only on the very first startup — that is, while the database has no real (non-system) user yet. Once any real user exists it is never re-created.
+
+The `admin` user's password is read from the `ADMIN_PASSWORD` environment variable, falling back to `admin12345678` when unset:
+
+```env
+ADMIN_PASSWORD=change-me-now-123
+```
+
+The username is fixed to `admin`. Set `ADMIN_PASSWORD` before the first run, or change the password through the user API afterwards.
 
 ### CORS
 
