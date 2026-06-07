@@ -8,7 +8,7 @@ import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
-import { type User, deleteUser, listUsers } from "@/lib/api";
+import { deleteUser, listUsers, type User } from "@/lib/api";
 
 const LIMIT = 20;
 

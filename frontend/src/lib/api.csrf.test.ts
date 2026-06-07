@@ -19,11 +19,13 @@ const SKILL = {
 };
 
 afterEach(() => {
+  // biome-ignore lint/suspicious/noDocumentCookie: the test sets the CSRF cookie the interceptor reads
   document.cookie = "a2flow_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
 });
 
 describe("CSRF token header", () => {
   it("sends X-CSRF-Token from the cookie on unsafe requests", async () => {
+    // biome-ignore lint/suspicious/noDocumentCookie: the test sets the CSRF cookie the interceptor reads
     document.cookie = "a2flow_csrf=tok-123; path=/";
     let captured: string | null = null;
     server.use(
@@ -37,6 +39,7 @@ describe("CSRF token header", () => {
   });
 
   it("does not send X-CSRF-Token on safe requests", async () => {
+    // biome-ignore lint/suspicious/noDocumentCookie: the test sets the CSRF cookie the interceptor reads
     document.cookie = "a2flow_csrf=tok-123; path=/";
     let captured: string | null = "preset";
     server.use(

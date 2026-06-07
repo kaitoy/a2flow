@@ -21,14 +21,18 @@ pre-commit:
       glob: "*.py"
       run: uv run pytest
 
+    # NOTE: lefthook matches `glob` against repo-root-relative paths (it does NOT
+    # strip `root`), and its `*` crosses `/`. So the glob must include the
+    # `frontend/` prefix, and `frontend/src/*.…` already covers nested files —
+    # a `src/**/…` form would skip files directly under src (e.g. middleware.ts).
     - name: frontend-biome
       root: frontend/
-      glob: "src/**/*.{ts,tsx,js,jsx,json}"
+      glob: "frontend/src/*.{ts,tsx,js,jsx,json}"
       run: pnpm exec biome ci ./src
 
     - name: frontend-vitest
       root: frontend/
-      glob: "src/**/*.{ts,tsx}"
+      glob: "frontend/src/*.{ts,tsx}"
       run: pnpm exec vitest run
 
 pre-push:
