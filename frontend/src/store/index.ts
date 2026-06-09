@@ -1,12 +1,14 @@
-/** Redux store configuration combining the chat and auth slices. */
+/** Redux store configuration combining the chat, auth, and notifications slices. */
 import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./authSlice";
 import chatReducer from "./chatSlice";
+import notificationsReducer from "./notificationsSlice";
 
 export const store = configureStore({
   reducer: {
     chat: chatReducer,
     auth: authReducer,
+    notifications: notificationsReducer,
   },
 });
 

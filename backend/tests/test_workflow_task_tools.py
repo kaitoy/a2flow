@@ -27,8 +27,9 @@ from infrastructure.workflow_task_tools import (
     register_workflow_tasks,
     update_workflow_task,
 )
+from models.notification import Notification, NotificationType
 from models.workflow_session import WorkflowSession
-from repositories import SqlWorkflowSessionRepository
+from repositories import SqlNotificationRepository, SqlWorkflowSessionRepository
 from tests._seed import seed_users
 
 
@@ -256,3 +257,60 @@ async def test_get_by_session_id(engine: AsyncEngine) -> None:
         assert found is not None
         assert found.id == ws_id
         assert await repo.get_by_session_id("absent") is None
+
+
+async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notification]:
+    """Return all notifications addressed to ``user_id`` via the repository."""
+    async with AsyncSession(eng) as db:
+        repo = SqlNotificationRepository(db)
+        return await repo.list(user_id=user_id, limit=100, offset=0)
+
+
+async def test_register_creates_approval_notification(engine: AsyncEngine) -> None:
+    await _seed_session(engine, user_id="owner")
+    await register_workflow_tasks(
+        [{"key": "t0", "title": "First"}, {"key": "t1", "title": "Second"}],
+        _ctx(),
+    )
+    notifs = await _notifications_for(engine, "owner")
+    assert len(notifs) == 1
+    assert notifs[0].type is NotificationType.approval_request
+    assert notifs[0].read is False
+    # The notification is addressed to the session owner, not the tool's user_id.
+    assert notifs[0].user_id == "owner"
+    assert "2 tasks" in (notifs[0].body or "")
+
+
+async def test_session_completed_notification_emitted_once(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine, user_id="owner")
+    a = await create_workflow_task("A", _ctx())
+    b = await create_workflow_task("B", _ctx())
+
+    # Not every task is terminal yet: no completion notification.
+    await update_workflow_task(a["id"], _ctx(), status="completed")
+    completed = [
+        n
+        for n in await _notifications_for(engine, "owner")
+        if n.type is NotificationType.session_completed
+    ]
+    assert completed == []
+
+    # Final task reaches a terminal state: exactly one completion notification.
+    await update_workflow_task(b["id"], _ctx(), status="failed")
+    completed = [
+        n
+        for n in await _notifications_for(engine, "owner")
+        if n.type is NotificationType.session_completed
+    ]
+    assert len(completed) == 1
+
+    # A further terminal-state update must not create a duplicate.
+    await update_workflow_task(a["id"], _ctx(), status="skipped")
+    completed = [
+        n
+        for n in await _notifications_for(engine, "owner")
+        if n.type is NotificationType.session_completed
+    ]
+    assert len(completed) == 1

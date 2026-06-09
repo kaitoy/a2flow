@@ -6,6 +6,7 @@ from routers import (
     agent_skills,
     auth,
     health,
+    notifications,
     sessions,
     user,
     workflow_sessions,
@@ -28,6 +29,7 @@ api_router.include_router(health.router)
 # Protected resource routers.
 api_router.include_router(agent.router, dependencies=_protected)
 api_router.include_router(agent_skills.router, dependencies=_protected)
+api_router.include_router(notifications.router, dependencies=_protected)
 api_router.include_router(sessions.router, dependencies=_protected)
 api_router.include_router(user.router, dependencies=_protected)
 api_router.include_router(workflow_sessions.router, dependencies=_protected)

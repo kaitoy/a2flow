@@ -14,8 +14,10 @@ from infrastructure.database import get_session
 from repositories import (
     AgentSkillRepository,
     AuthSessionRepository,
+    NotificationRepository,
     SqlAgentSkillRepository,
     SqlAuthSessionRepository,
+    SqlNotificationRepository,
     SqlUserRepository,
     SqlWorkflowRepository,
     SqlWorkflowSessionRepository,
@@ -46,6 +48,16 @@ def get_auth_session_repository(db: DBSessionDep) -> AuthSessionRepository:
 
 AuthSessionRepositoryDep = Annotated[
     AuthSessionRepository, Depends(get_auth_session_repository)
+]
+
+
+def get_notification_repository(db: DBSessionDep) -> NotificationRepository:
+    """Create a NotificationRepository backed by the current database session."""
+    return SqlNotificationRepository(db)
+
+
+NotificationRepositoryDep = Annotated[
+    NotificationRepository, Depends(get_notification_repository)
 ]
 
 

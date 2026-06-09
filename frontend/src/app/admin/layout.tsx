@@ -8,6 +8,7 @@ import { useRef } from "react";
 import logo from "@/../assets/logo.png";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 
@@ -77,6 +78,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               ← Back to chat
             </Link>
+            <NotificationBell />
             <LogoutButton className="text-xs" />
             <ThemeToggle />
           </div>

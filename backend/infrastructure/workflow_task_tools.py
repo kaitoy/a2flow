@@ -21,6 +21,7 @@ can consume them, mapping repository errors to an ``{"error": ...}`` payload the
 agent can react to instead of raising.
 """
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -29,6 +30,7 @@ from google.adk.tools.tool_context import ToolContext
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database
+from models.notification import NotificationCreate, NotificationType
 from models.workflow_task import (
     WorkflowTaskCreate,
     WorkflowTaskRead,
@@ -36,6 +38,8 @@ from models.workflow_task import (
     WorkflowTaskUpdate,
 )
 from repositories import (
+    NotificationRepository,
+    SqlNotificationRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
     WorkflowSessionRepository,
@@ -47,27 +51,34 @@ from repositories.exceptions import (
     NotFoundError,
 )
 
+logger = logging.getLogger(__name__)
+
 _NO_SESSION = "no workflow session is bound to the current run; cannot manage tasks"
 
 
 @asynccontextmanager
 async def _repos() -> AsyncIterator[
-    tuple[WorkflowSessionRepository, WorkflowTaskRepository]
+    tuple[WorkflowSessionRepository, WorkflowTaskRepository, NotificationRepository]
 ]:
-    """Open a database session and yield the session and task repositories.
+    """Open a database session and yield the session, task, and notification repos.
 
     Opens a fresh ``AsyncSession`` on the module-level engine (the tools run
-    outside FastAPI's request scope) and wires a WorkflowSession repository and a
-    WorkflowTask repository to it. The engine is referenced through the
-    ``database`` module so tests can monkeypatch ``database.engine``.
+    outside FastAPI's request scope) and wires a WorkflowSession repository, a
+    WorkflowTask repository, and a Notification repository to it. The engine is
+    referenced through the ``database`` module so tests can monkeypatch
+    ``database.engine``.
 
     Yields:
-        A ``(workflow_session_repository, workflow_task_repository)`` tuple bound
-        to the same session.
+        A ``(workflow_session_repository, workflow_task_repository,
+        notification_repository)`` tuple bound to the same session.
     """
     async with AsyncSession(database.engine) as db:
         ws_repo = SqlWorkflowSessionRepository(db)
-        yield ws_repo, SqlWorkflowTaskRepository(db, ws_repo)
+        yield (
+            ws_repo,
+            SqlWorkflowTaskRepository(db, ws_repo),
+            SqlNotificationRepository(db),
+        )
 
 
 async def _resolve_ws_id(
@@ -98,6 +109,101 @@ async def _resolve_ws_id(
 def _user_id(tool_context: ToolContext) -> str:
     """Return the caller's user id for audit fields, defaulting to ``"user"``."""
     return getattr(tool_context, "user_id", None) or "user"
+
+
+#: WorkflowTask statuses that count as "done" for session-completion detection.
+_TERMINAL_STATUSES = frozenset(
+    {
+        WorkflowTaskStatus.completed,
+        WorkflowTaskStatus.failed,
+        WorkflowTaskStatus.skipped,
+    }
+)
+
+
+async def _notify(
+    ws_repo: WorkflowSessionRepository,
+    notif_repo: NotificationRepository,
+    ws_id: str,
+    notification_type: NotificationType,
+    title: str,
+    body: str | None = None,
+) -> None:
+    """Create a notification addressed to the workflow session's owner.
+
+    The recipient and audit user are both the session's ``created_by`` (the real
+    user who started the session), which keeps the ``created_by`` foreign key
+    valid even though the tool's own ``tool_context`` user id may be a placeholder.
+    Notification creation is best-effort: any failure is logged and swallowed so a
+    notification problem never breaks the task operation that triggered it.
+
+    Args:
+        ws_repo: Repository used to resolve the session and its owner.
+        notif_repo: Repository used to persist the notification.
+        ws_id: Primary key of the workflow session the notification concerns.
+        notification_type: The kind of event being announced.
+        title: Short headline shown in the notification panel.
+        body: Optional longer description.
+    """
+    try:
+        ws = await ws_repo.get(ws_id)
+        if ws is None:
+            return
+        data = NotificationCreate(
+            user_id=ws.created_by,
+            type=notification_type,
+            title=title,
+            body=body,
+            workflow_session_id=ws_id,
+        )
+        await notif_repo.create(data, user_id=ws.created_by)
+    except Exception:
+        logger.exception(
+            "failed to create %s notification for workflow session %s",
+            notification_type,
+            ws_id,
+        )
+
+
+async def _maybe_notify_session_completed(
+    ws_repo: WorkflowSessionRepository,
+    task_repo: WorkflowTaskRepository,
+    notif_repo: NotificationRepository,
+    ws_id: str,
+) -> None:
+    """Emit a ``session_completed`` notification once every task is terminal.
+
+    The notification is created at most once per session: if every task in the
+    session is in a terminal state (and there is at least one task) and no
+    ``session_completed`` notification exists yet for the session, one is created.
+    Like :func:`_notify`, this is best-effort and never raises.
+
+    Args:
+        ws_repo: Repository used to resolve the session owner.
+        task_repo: Repository used to read the session's tasks.
+        notif_repo: Repository used to check for and persist the notification.
+        ws_id: Primary key of the workflow session to evaluate.
+    """
+    try:
+        tasks = await task_repo.list(limit=1000, offset=0, workflow_session_id=ws_id)
+        if not tasks or any(t.status not in _TERMINAL_STATUSES for t in tasks):
+            return
+        if await notif_repo.exists_for_session(
+            ws_id, NotificationType.session_completed
+        ):
+            return
+    except Exception:
+        logger.exception("failed to evaluate completion for workflow session %s", ws_id)
+        return
+    await _notify(
+        ws_repo,
+        notif_repo,
+        ws_id,
+        NotificationType.session_completed,
+        "Workflow session completed",
+        f"All {len(tasks)} task{'s' if len(tasks) != 1 else ''} "
+        "in this workflow session have finished.",
+    )
 
 
 def _task_to_dict(task: WorkflowTaskRead) -> dict[str, Any]:
@@ -232,7 +338,7 @@ async def register_workflow_tasks(
     if order is None:
         return {"error": "tasks contain a dependency cycle"}
 
-    async with _repos() as (ws_repo, task_repo):
+    async with _repos() as (ws_repo, task_repo, notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
             return {"error": _NO_SESSION}
@@ -261,6 +367,16 @@ async def register_workflow_tasks(
                 }
             key_to_id[key] = task.id
             created.append({"key": key, "id": task.id, "title": task.title})
+        count = len(created)
+        await _notify(
+            ws_repo,
+            notif_repo,
+            ws_id,
+            NotificationType.approval_request,
+            "Plan ready for approval",
+            f"The agent registered a plan of {count} "
+            f"task{'s' if count != 1 else ''} and is waiting for your approval.",
+        )
         return {"created": created}
 
 
@@ -294,7 +410,7 @@ async def create_workflow_task(
     status_enum = _parse_status(status)
     if status is not None and status_enum is None:
         return _invalid_status_error(status)
-    async with _repos() as (ws_repo, task_repo):
+    async with _repos() as (ws_repo, task_repo, _notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
             return {"error": _NO_SESSION}
@@ -327,7 +443,7 @@ async def list_workflow_tasks(tool_context: ToolContext) -> dict[str, Any]:
         "position"}, ...]}`` ordered by position then creation time, or
         ``{"error": <message>}`` if the session cannot be resolved.
     """
-    async with _repos() as (ws_repo, task_repo):
+    async with _repos() as (ws_repo, task_repo, _notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
             return {"error": _NO_SESSION}
@@ -347,7 +463,7 @@ async def get_workflow_task(task_id: str, tool_context: ToolContext) -> dict[str
         The task dict, or ``{"error": <message>}`` if the session cannot be
         resolved or the task does not belong to it.
     """
-    async with _repos() as (ws_repo, task_repo):
+    async with _repos() as (ws_repo, task_repo, _notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
             return {"error": _NO_SESSION}
@@ -394,7 +510,7 @@ async def update_workflow_task(
     status_enum = _parse_status(status)
     if status is not None and status_enum is None:
         return _invalid_status_error(status)
-    async with _repos() as (ws_repo, task_repo):
+    async with _repos() as (ws_repo, task_repo, notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
             return {"error": _NO_SESSION}
@@ -420,6 +536,7 @@ async def update_workflow_task(
             return _not_in_session_error(task_id)
         except (ForeignKeyViolationError, DependencyCycleError) as exc:
             return {"error": str(exc)}
+        await _maybe_notify_session_completed(ws_repo, task_repo, notif_repo, ws_id)
         return _task_to_dict(task)
 
 
@@ -437,7 +554,7 @@ async def delete_workflow_task(
         ``{"deleted": <task_id>}`` on success, or ``{"error": <message>}`` if the
         session cannot be resolved or the task does not belong to it.
     """
-    async with _repos() as (ws_repo, task_repo):
+    async with _repos() as (ws_repo, task_repo, _notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
             return {"error": _NO_SESSION}

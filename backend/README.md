@@ -390,6 +390,30 @@ curl -X DELETE http://localhost:8000/api/v1/workflow-tasks/<id>
 
 ---
 
+### Notifications
+
+Per-user notifications surfaced in the frontend's toolbar bell. Notifications are generated as a side effect of the agent's task tools — `register_workflow_tasks` raises an `approval_request`, and the final `update_workflow_task` that drives every task to a terminal state raises a one-shot `session_completed` — and are addressed to the user who started the workflow session. Both endpoints below are scoped to the authenticated user; the list never accepts a `user_id`, and reading or marking another user's notification returns `404 NOT_FOUND`.
+
+Each notification stores a `type` (`approval_request` / `session_completed`), `title`, optional `body`, the linked `workflowSessionId`, and a `read` flag. Rows cascade-delete with their recipient user and their linked `WorkflowSession`.
+
+#### `GET /api/v1/notifications` — List the current user's notifications
+
+Returns the caller's notifications ordered by `created_at` DESC. Pass `unreadOnly=true` to return only unread notifications (used by the bell's unread badge).
+
+```bash
+curl "http://localhost:8000/api/v1/notifications?unreadOnly=true&limit=20&offset=0"
+```
+
+#### `PATCH /api/v1/notifications/{notification_id}` — Mark a notification read
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/notifications/<id>
+```
+
+Returns `404 NOT_FOUND` if the notification does not exist or is addressed to another user.
+
+---
+
 ### `POST /chat`
 
 Send an [AG-UI `RunAgentInput`](https://docs.ag-ui.com/concepts/events) to a session and receive the agent's response as an SSE stream. If no ADK session exists for the provided `threadId`, one is created implicitly.

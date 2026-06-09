@@ -177,6 +177,24 @@ export const handlers = [
 
   http.delete(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(null)),
 
+  http.get(`${BASE}/api/v1/notifications`, () => envelope([])),
+
+  http.patch(`${BASE}/api/v1/notifications/:notificationId`, ({ params }) =>
+    envelope({
+      id: params.notificationId as string,
+      userId: "user",
+      type: "approval_request",
+      title: "Plan ready for approval",
+      body: null,
+      workflowSessionId: "ws-1",
+      read: true,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      createdBy: "",
+      updatedBy: "",
+    })
+  ),
+
   http.post(`${BASE}/api/v1/auth/login`, () => envelope(USER_1)),
 
   http.post(`${BASE}/api/v1/auth/logout`, () => envelope(null)),

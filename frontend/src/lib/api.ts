@@ -10,6 +10,8 @@ import type {
   ApiError,
   ApiMeta,
   LoginRequest,
+  Notification as NotificationModel,
+  NotificationType,
   Session as SessionModel,
   UserCreate,
   UserRead as UserReadModel,
@@ -42,6 +44,7 @@ import {
   zGetWorkflowSessionApiV1WorkflowSessionsWsIdGetResponse,
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
+  zListNotificationsApiV1NotificationsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
   zListUsersApiV1UsersGetResponse,
   zListWorkflowSessionsApiV1WorkflowSessionsGetResponse,
@@ -49,6 +52,7 @@ import {
   zListWorkflowsApiV1WorkflowsGetResponse,
   zLoginApiV1AuthLoginPostResponse,
   zLogoutApiV1AuthLogoutPostResponse,
+  zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse,
   zMeApiV1AuthMeGetResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
@@ -178,6 +182,7 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
   Required<Pick<T, AuditedKeys>>;
 
 export type AgentSkill = WithAudit<AgentSkillModel>;
+export type Notification = WithAudit<NotificationModel>;
 export type User = WithAudit<UserReadModel>;
 export type Workflow = WithAudit<WorkflowModel>;
 export type WorkflowSession = WithAudit<WorkflowSessionModel>;
@@ -187,6 +192,7 @@ export type {
   AgentSkillCreate,
   AgentSkillUpdate,
   LoginRequest,
+  NotificationType,
   UserCreate,
   UserUpdate,
   WorkflowCreate,
@@ -473,6 +479,32 @@ export async function deleteWorkflowTask(taskId: string): Promise<void> {
     apiClient.delete(`/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`),
     zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse
   );
+}
+
+/**
+ * Fetch the current user's notifications (newest first). When ``unreadOnly`` is
+ * true only unread notifications are returned, which the toolbar bell uses to
+ * compute its unread badge.
+ */
+export async function listNotifications(
+  unreadOnly = false,
+  limit = 20,
+  offset = 0
+): Promise<Notification[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/notifications", {
+      params: { unread_only: unreadOnly, limit, offset },
+    }),
+    zListNotificationsApiV1NotificationsGetResponse
+  ) as Promise<Notification[]>;
+}
+
+/** Mark a single notification as read and return the updated record. */
+export async function markNotificationRead(id: string): Promise<Notification> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/notifications/${encodeURIComponent(id)}`),
+    zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse
+  ) as Promise<Notification>;
 }
 
 /**

@@ -4,7 +4,7 @@
 
 A chat application that connects a [Google ADK](https://google.github.io/adk-docs/) agent to a Next.js UI using the [AG-UI protocol](https://docs.ag-ui.com/concepts/events). The agent supports [A2UI](https://a2ui.org/) — it can generate structured UI JSON payloads alongside plain text responses.
 
-The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference.
+The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference. A **notification center** in the top toolbar surfaces workflow events such as plan approval requests (see [Notifications](#notifications)).
 
 ```
 ┌──────────────────────────────────┐    AG-UI RunAgentInput (JSON)    ┌──────────────────────┐
@@ -128,8 +128,8 @@ Clicking **Run** on a workflow creates a **WorkflowSession** — an independent 
 
 The skill-driven agent does not just *suggest* steps — it **manages the WorkflowTasks itself** through dedicated agent tools, in two phases:
 
-1. **Plan** — following the skill's instructions, the agent breaks the request into concrete steps and registers them as a DAG in a single `register_workflow_tasks` call (each step declares a `key` and its `depends_on` predecessors). It then presents the plan and **waits for your approval** before doing any work.
-2. **Execute** — once approved, the agent loops: it lists the tasks, picks the next runnable one (a `pending` task whose dependencies are all `completed`), marks it `in_progress`, does the work per the skill, and marks it `completed` (or `failed` / `skipped`).
+1. **Plan** — following the skill's instructions, the agent breaks the request into concrete steps and registers them as a DAG in a single `register_workflow_tasks` call (each step declares a `key` and its `depends_on` predecessors). It then presents the plan and **waits for your approval** before doing any work. Registering the plan also raises an **approval-request notification** (see [Notifications](#notifications)).
+2. **Execute** — once approved, the agent loops: it lists the tasks, picks the next runnable one (a `pending` task whose dependencies are all `completed`), marks it `in_progress`, does the work per the skill, and marks it `completed` (or `failed` / `skipped`). When every task reaches a terminal state, a **session-completed notification** is raised.
 
 Six tools back this — `register_workflow_tasks`, `create_workflow_task`, `list_workflow_tasks`, `get_workflow_task`, `update_workflow_task`, and `delete_workflow_task` — which resolve the current session from the ADK session id and operate on the same `WorkflowTask` records exposed by the REST API. You can watch the statuses update live in the **Workflow Tasks** admin view (Table or Graph). See [backend/README.md](backend/README.md#agent-task-tools) for the tool reference.
 
@@ -149,6 +149,26 @@ Navigate to [http://localhost:3000/admin/workflow-sessions](http://localhost:300
 | List a session's tasks | `GET /admin/workflow-sessions/{id}/workflow-tasks` |
 | Create a task | `GET /admin/workflow-sessions/{id}/workflow-tasks/new` |
 | Edit / delete a task | `GET /admin/workflow-sessions/{id}/workflow-tasks/{taskId}` |
+
+## Notifications
+
+A **bell icon** in the top toolbar (present on both the chat header and the admin sidebar) opens a notification center with an unread-count badge. Notifications are **per-user**, persisted in `a2flow.db`, and delivered by **polling** (the frontend refreshes every 30 seconds).
+
+Two workflow events generate a notification, both raised by the agent's task tools and addressed to the user who started the session:
+
+| Type | Raised when |
+|---|---|
+| `approval_request` | The agent registers a plan (`register_workflow_tasks`) and is waiting for human approval. |
+| `session_completed` | Every `WorkflowTask` in the session has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per session. |
+
+Clicking a notification marks it read and deep-links to the relevant `/workflow-sessions/{id}` chat.
+
+| Operation | Path |
+|-----------|------|
+| List the current user's notifications (`?unreadOnly=true` for unread) | `GET /api/v1/notifications` |
+| Mark a notification read | `PATCH /api/v1/notifications/{id}` |
+
+The list and mark-read endpoints are scoped to the authenticated user; reading or updating another user's notification returns HTTP 404. Notifications cascade-delete with their recipient user and their linked `WorkflowSession`.
 
 ## How it works
 

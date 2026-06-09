@@ -149,11 +149,11 @@ export function Tooltip({ label, placement = "top", delay = 300, children }: Too
     config,
   });
 
-  const child = Children.only(children) as ReactElement<Record<string, unknown>> & {
-    ref?: Ref<HTMLElement>;
-  };
+  const child = Children.only(children) as ReactElement<
+    Record<string, unknown> & { ref?: Ref<HTMLElement> }
+  >;
   const childProps = child.props;
-  const childRef = child.ref;
+  const childRef = childProps.ref;
 
   function attachRef(node: HTMLElement | null) {
     triggerRef.current = node;

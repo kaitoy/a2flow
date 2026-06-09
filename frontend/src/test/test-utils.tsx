@@ -6,12 +6,18 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import type { RootState } from "@/store";
 import authReducer from "@/store/authSlice";
 import chatReducer from "@/store/chatSlice";
+import notificationsReducer from "@/store/notificationsSlice";
 
 export function makeStore(preloadedState?: Partial<RootState>) {
   return configureStore({
     reducer: {
       chat: chatReducer as Reducer<RootState["chat"], UnknownAction, RootState["chat"] | undefined>,
       auth: authReducer as Reducer<RootState["auth"], UnknownAction, RootState["auth"] | undefined>,
+      notifications: notificationsReducer as Reducer<
+        RootState["notifications"],
+        UnknownAction,
+        RootState["notifications"] | undefined
+      >,
     },
     preloadedState,
   });

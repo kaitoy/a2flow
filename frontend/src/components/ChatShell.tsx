@@ -8,6 +8,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { ChatErrorBanner } from "./ChatErrorBanner";
+import { NotificationBell } from "./NotificationBell";
 import { SessionList } from "./SessionList";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -77,6 +78,7 @@ export function ChatShell({ children }: { children: React.ReactNode }) {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <LogoutButton />
             <ThemeToggle />
           </div>
