@@ -12,11 +12,11 @@ vi.mock("./ThemeToggle", () => ({
 }));
 
 describe("AppHeader", () => {
-  it("renders the logo, notification bell, logout button, and theme toggle", () => {
+  it("renders the logo, notification bell, profile button, and theme toggle", () => {
     render(<AppHeader />);
     expect(screen.getByAltText("A2Flow logo")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /account/i })).toBeInTheDocument();
     expect(screen.getByTestId("theme-toggle-mock")).toBeInTheDocument();
   });
 });

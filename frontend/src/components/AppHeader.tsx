@@ -3,14 +3,14 @@
 
 import Image from "next/image";
 import logo from "@/../assets/logo.png";
-import { LogoutButton } from "@/components/auth/logout-button";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserProfileButton } from "@/components/UserProfileButton";
 
 /**
  * Application top bar shared by the chat and admin shells. Renders the A2Flow
- * logo and title on the left and the notification, logout, and theme controls
- * on the right.
+ * logo and title on the left and the notification, theme, and account profile
+ * controls on the right.
  */
 export function AppHeader() {
   return (
@@ -33,8 +33,8 @@ export function AppHeader() {
       </div>
       <div className="flex items-center gap-2">
         <NotificationBell />
-        <LogoutButton />
         <ThemeToggle />
+        <UserProfileButton />
       </div>
     </header>
   );
