@@ -7,8 +7,8 @@ import { useMotionConfig } from "@/lib/motion";
 import { useAppSelector } from "@/store/hooks";
 import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
+import { Skeleton } from "./ui/skeleton";
 import { SlidingIndicator } from "./ui/sliding-indicator";
-import { Spinner } from "./ui/spinner";
 import { Tooltip } from "./ui/tooltip";
 
 interface SessionListProps {
@@ -99,8 +99,17 @@ export function SessionList({
       </div>
       <div className="relative flex-1 overflow-y-auto py-2">
         {loading && sessions.length === 0 && (
-          <div className="flex items-center justify-center py-4">
-            <Spinner size="sm" />
+          <div role="status" aria-label="Loading" className="flex flex-col">
+            {Array.from({ length: 5 }, (_, i) => (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholder list with no identity
+                key={i}
+                className="mx-2 my-0.5 flex w-[calc(100%-1rem)] flex-col gap-1 rounded-xl px-3 py-2"
+              >
+                <Skeleton className="h-2 w-16" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+            ))}
           </div>
         )}
         {!loading && sessions.length === 0 && (

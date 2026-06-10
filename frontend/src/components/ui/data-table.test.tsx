@@ -46,20 +46,23 @@ describe("DataTable", () => {
     expect(screen.getByTestId("bold").textContent).toBe("Alpha");
   });
 
-  it("shows loading spinner when loading is true", () => {
+  it("exposes role=status on the wrapper when loading", () => {
     render(<DataTable columns={COLUMNS} rows={[]} loading getRowKey={(r) => r.id} />);
     expect(screen.getByRole("status")).toBeInTheDocument();
+  });
+
+  it("renders skeletonRows placeholder rows while loading", () => {
+    const { container } = render(
+      <DataTable columns={COLUMNS} rows={[]} loading skeletonRows={3} getRowKey={(r) => r.id} />
+    );
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(3);
+    // Each placeholder row has a skeleton cell per column.
+    expect(container.querySelectorAll("tbody .skeleton")).toHaveLength(3 * COLUMNS.length);
   });
 
   it("does not render data rows when loading", () => {
     render(<DataTable columns={COLUMNS} rows={ROWS} loading getRowKey={(r) => r.id} />);
     expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
-  });
-
-  it("loading cell spans all columns", () => {
-    render(<DataTable columns={COLUMNS} rows={[]} loading getRowKey={(r) => r.id} />);
-    const cell = screen.getByRole("status").closest("td");
-    expect(cell).toHaveAttribute("colspan", "2");
   });
 
   it("shows default empty message when rows is empty and not loading", () => {

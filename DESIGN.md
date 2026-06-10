@@ -187,7 +187,8 @@ The shape language is **Soft Modern**.
   - *Secondary:* `glass-panel` background, on-surface text, accent text + glow on hover; lifts 2px (motion-safe).
   - *Ghost:* Transparent, on-surface-variant text, mild glass tint on hover; lifts 2px (motion-safe).
 - **Inputs / Textareas / Selects:** `glass-panel` background with accent ring on focus (`ring-accent/50`). 16px radius.
-- **Data Tables:** Wrapped in a 20px-radius `glass-panel`. Header uses a slightly stronger glass tint. Rows hover with an `accent-soft` wash.
+- **Data Tables:** Wrapped in a 20px-radius `glass-panel`. Header uses a slightly stronger glass tint. Rows hover with an `accent-soft` wash. While loading, the body shows shimmering **skeleton** rows that mirror the column layout (no spinner) so the table never reflows on data arrival.
+- **Skeleton:** Shimmering placeholder surface (`@utility skeleton`: a tinted `--skeleton-base` block with a brighter `--skeleton-sheen` band swept across by `--animate-shimmer`). Both tokens are theme-tuned so the shimmer reads clearly against light and dark glass panels. Used to reserve layout during data fetches — list rows, edit-form fields, and the workflow chat view — so content swaps in without jump or blank flash. Reduced-motion collapses it to a static block.
 - **Status Badges:** Pill-shaped, gradient or glass per state.
 - **Chat bubbles:**
   - *User:* Accent gradient fill, asymmetric corner (`rounded-tr-md`), inner-top highlight.

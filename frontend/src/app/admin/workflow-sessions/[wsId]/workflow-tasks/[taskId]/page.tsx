@@ -9,12 +9,12 @@ import { z } from "zod";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
+import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
   deleteWorkflowTask,
@@ -126,8 +126,11 @@ export default function EditWorkflowTaskPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-16">
-        <Spinner size="lg" />
+      <div className="mx-auto max-w-2xl p-8">
+        <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
+          Edit Workflow Task
+        </h1>
+        <FormSkeleton fields={6} />
       </div>
     );
   }

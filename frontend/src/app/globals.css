@@ -130,6 +130,11 @@
   --c-accent: #0e7c7b;
   --c-accent-soft: rgba(20, 184, 166, 0.18);
 
+  /* Skeleton placeholder: a soft gray tint with a white sweeping sheen so the
+     shimmer reads clearly against the light glass panels. */
+  --skeleton-base: rgba(15, 23, 42, 0.1);
+  --skeleton-sheen: rgba(255, 255, 255, 0.7);
+
   --s-card: 0 1px 3px rgba(15, 23, 42, 0.08);
   --s-glass: 0 10px 32px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   --s-glass-lg: 0 28px 60px -16px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6);
@@ -184,6 +189,11 @@
 
   --c-accent: #5eead4;
   --c-accent-soft: rgba(94, 234, 212, 0.18);
+
+  /* Skeleton placeholder: a light slate tint with a brighter sweeping sheen
+     against the dark glass panels. */
+  --skeleton-base: rgba(148, 163, 184, 0.18);
+  --skeleton-sheen: rgba(226, 232, 240, 0.22);
 
   --s-card: 0 1px 3px rgba(0, 0, 0, 0.45);
   --s-glass: 0 12px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -355,4 +365,18 @@ body::after {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* Shimmering placeholder surface for skeleton loading states. A tinted base
+   block (--skeleton-base) gives the placeholder visible body against the glass
+   panel in both themes, while a brighter band (--skeleton-sheen) sweeps across
+   via --animate-shimmer. The prefers-reduced-motion block above collapses the
+   animation to a static block, so reduced-motion users still get a stable
+   placeholder. */
+@utility skeleton {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: var(--animate-shimmer);
 }
