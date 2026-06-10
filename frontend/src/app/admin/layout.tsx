@@ -1,15 +1,11 @@
 /** @module AdminLayout — Admin section shell with sidebar navigation and theme toggle. */
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef } from "react";
-import logo from "@/../assets/logo.png";
+import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/components/auth/auth-provider";
-import { LogoutButton } from "@/components/auth/logout-button";
-import { NotificationBell } from "@/components/NotificationBell";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 
 const NAV = [
@@ -28,22 +24,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <AuthProvider>
       <div className="flex h-screen overflow-hidden">
         <nav className="relative flex w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl">
-          <div className="flex items-center gap-3 border-b border-glass-border px-5 py-4">
-            <Image
-              src={logo}
-              alt="A2Flow logo"
-              width={logo.width}
-              height={logo.height}
-              className="h-9 w-auto"
-              priority
-            />
-            <span
-              className="text-base font-semibold tracking-tight text-gradient-accent"
-              style={{ fontFamily: "var(--font-space-grotesk)" }}
-            >
-              A2Flow
-            </span>
-          </div>
           <ul className="relative flex flex-col gap-1 px-3 py-3">
             {NAV.map((item) => {
               const isActive = pathname?.startsWith(item.href);
@@ -71,19 +51,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             })}
             <SlidingIndicator itemMap={itemMap} activeKey={activeKey} deps={[pathname]} />
           </ul>
-          <div className="mt-auto flex items-center justify-between gap-2 border-t border-glass-border px-4 py-4">
-            <Link
-              href="/"
-              className="text-xs text-on-surface-variant transition-colors hover:text-accent"
-            >
-              ← Back to chat
-            </Link>
-            <NotificationBell />
-            <LogoutButton className="text-xs" />
-            <ThemeToggle />
-          </div>
         </nav>
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <AppHeader />
+          <main className="flex-1 overflow-y-auto">{children}</main>
+        </div>
       </div>
     </AuthProvider>
   );
