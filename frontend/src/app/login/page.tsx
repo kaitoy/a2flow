@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import logo from "@/../assets/logo.png";
 import { FormField } from "@/components/admin/form-field";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { login } from "@/lib/api";
@@ -47,7 +48,10 @@ export default function LoginPage() {
   );
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="relative flex min-h-screen items-center justify-center px-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
       <form
         onSubmit={onSubmit}
         className="glass-panel flex w-full max-w-sm flex-col gap-5 rounded-2xl p-8"
