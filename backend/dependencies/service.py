@@ -12,6 +12,7 @@ from fastapi import Depends
 from services import (
     AgentSkillService,
     AuthService,
+    MCPServerService,
     NotificationService,
     UserService,
     WorkflowService,
@@ -22,6 +23,7 @@ from services import (
 from .repository import (
     AgentSkillRepositoryDep,
     AuthSessionRepositoryDep,
+    MCPServerRepositoryDep,
     NotificationRepositoryDep,
     UserRepositoryDep,
     WorkflowRepositoryDep,
@@ -48,6 +50,14 @@ def get_auth_service(
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+
+
+def get_mcp_server_service(repo: MCPServerRepositoryDep) -> MCPServerService:
+    """Create an MCPServerService backed by the request's repository."""
+    return MCPServerService(repo)
+
+
+MCPServerServiceDep = Annotated[MCPServerService, Depends(get_mcp_server_service)]
 
 
 def get_notification_service(repo: NotificationRepositoryDep) -> NotificationService:

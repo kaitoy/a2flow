@@ -100,6 +100,20 @@ Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/adm
 
 Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, and description.
 
+### MCP Servers
+
+Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admin/mcp-servers) to manage the registry of remote [MCP](https://modelcontextprotocol.io/) servers whose tools the workflow agent can bind to WorkflowTasks (see [MCP tools for tasks](#mcp-tools-for-tasks)).
+
+| Operation | Path |
+|-----------|------|
+| List all servers | `GET /admin/mcp-servers` |
+| Register a new server | `GET /admin/mcp-servers/new` |
+| Edit / delete a server | `GET /admin/mcp-servers/{id}` |
+
+Each record stores a unique name, the server's **streamable HTTP** endpoint URL (SSE-only servers are not supported), and an optional set of HTTP headers sent with every request — typically `Authorization: Bearer …` for servers that require auth. ⚠️ Header values are stored **in plaintext** in `a2flow.db` and returned by the API; this is acceptable for the app's local single-operator deployment model, but don't store credentials you can't afford to expose to other users of the same instance.
+
+`GET /api/v1/mcp-servers/{id}/tools` queries the live server and returns the tools it advertises (name, description, input schema); the admin task forms use it to populate the tool picker. An unreachable server yields HTTP 502 (`MCP_UNREACHABLE`). A server cannot be deleted while WorkflowTask tool bindings still reference it (HTTP 409 `CONFLICT_REFERENCED`).
+
 ### Workflows
 
 Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/workflows) to manage Workflows — named configurations that pair a prompt with an Agent Skill.
@@ -132,6 +146,15 @@ The skill-driven agent does not just *suggest* steps — it **manages the Workfl
 2. **Execute** — once approved, the agent loops: it lists the tasks, picks the next runnable one (a `pending` task whose dependencies are all `completed`), marks it `in_progress`, does the work per the skill, and marks it `completed` (or `failed` / `skipped`). When every task reaches a terminal state, a **session-completed notification** is raised.
 
 Six tools back this — `register_workflow_tasks`, `create_workflow_task`, `list_workflow_tasks`, `get_workflow_task`, `update_workflow_task`, and `delete_workflow_task` — which resolve the current session from the ADK session id and operate on the same `WorkflowTask` records exposed by the REST API. You can watch the statuses update live in the **Workflow Tasks** admin view (Table or Graph). See [backend/README.md](backend/README.md#agent-task-tools) for the tool reference.
+
+##### MCP tools for tasks
+
+WorkflowTasks can use tools from remote MCP servers registered in the [MCP Servers](#mcp-servers) admin page:
+
+1. **Bind at plan time** — during the Plan phase the agent calls `list_mcp_tools`, which queries every registered server concurrently and returns each server's advertised tools (unreachable servers are reported per-server without failing the listing). Steps that need an external tool get a `tools` entry (`[{"server_id": …, "tool_name": …}]`) in `register_workflow_tasks`; bindings are persisted in the `workflow_task_tool_bindings` join table and surfaced as `toolBindings` on the REST read model.
+2. **Enforce at execution time** — the agent invokes bound tools through the `call_mcp_tool(server_id, tool_name, arguments)` proxy. The backend validates that the pair is bound to a task currently `in_progress` in the session (the union of bindings when several are in progress) before opening a per-call streamable HTTP connection to the server and forwarding the call. Calls to unbound tools are rejected with an error listing the allowed tools, so a shared, skill-cached agent can never use tools a task wasn't granted.
+
+Bound tools appear as chips in the **Tools** column of the Workflow Tasks list, and the task create/edit forms include an **MCP Tools** picker populated live from the registered servers (already-bound tools stay visible even if their server is unreachable).
 
 Workflow sessions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowSession` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains).
 

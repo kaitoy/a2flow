@@ -9,6 +9,13 @@ may depend on zero or more other tasks in the same session. Dependency edges are
 stored in the :class:`WorkflowTaskDependency` join table and surfaced on read
 models as ``depends_on_ids``. The ``position`` field is retained purely for
 layout/ordering and no longer implies execution order.
+
+A task may also have MCP tools bound to it: each binding names a registered
+:class:`models.mcp_server.MCPServer` and one tool on that server. Bindings are
+stored in the :class:`WorkflowTaskToolBinding` join table and surfaced on read
+models as ``tool_bindings``; at execution time the agent may only invoke MCP
+tools bound to the task currently in progress (enforced by ``call_mcp_tool`` in
+:mod:`infrastructure.mcp_tools`).
 """
 
 from enum import StrEnum
@@ -33,13 +40,22 @@ class WorkflowTaskStatus(StrEnum):
     skipped = "skipped"
 
 
+class ToolBinding(SQLModel):
+    """One MCP tool bound to a WorkflowTask: which server and which tool name."""
+
+    model_config = _alias_config
+    mcp_server_id: str
+    tool_name: str
+
+
 class WorkflowTaskUpdate(SQLModel):
     """Partial update payload for a WorkflowTask — every field is optional.
 
     Does not include ``workflow_session_id``: tasks cannot be re-parented to a
     different session after creation. When ``depends_on_ids`` is ``None`` the
     task's dependency edges are left unchanged; when it is an explicit list the
-    full set of edges is replaced with that list.
+    full set of edges is replaced with that list. ``tool_bindings`` follows the
+    same semantics for the task's bound MCP tools.
     """
 
     model_config = _alias_config
@@ -48,6 +64,7 @@ class WorkflowTaskUpdate(SQLModel):
     status: WorkflowTaskStatus | None = None
     position: int | None = None
     depends_on_ids: list[str] | None = None
+    tool_bindings: list[ToolBinding] | None = None
 
 
 class WorkflowTaskCreate(WorkflowTaskUpdate):
@@ -56,7 +73,7 @@ class WorkflowTaskCreate(WorkflowTaskUpdate):
     Inherits the optional fields from :class:`WorkflowTaskUpdate` and tightens
     ``title`` to required, supplies defaults for ``status`` and ``position``,
     adds the required parent ``workflow_session_id`` foreign key, and defaults
-    ``depends_on_ids`` to an empty list (no dependencies).
+    ``depends_on_ids`` and ``tool_bindings`` to empty lists.
     """
 
     workflow_session_id: str
@@ -64,6 +81,7 @@ class WorkflowTaskCreate(WorkflowTaskUpdate):
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
     position: int = 0
     depends_on_ids: list[str] = []
+    tool_bindings: list[ToolBinding] = []
 
 
 class WorkflowTask(BaseEntity, table=True):
@@ -95,7 +113,8 @@ class WorkflowTaskRead(BaseEntity):
 
     Mirrors the persisted scalar fields of :class:`WorkflowTask` and adds
     ``depends_on_ids``, the list of task IDs this task depends on (each of which
-    must precede this task in the DAG).
+    must precede this task in the DAG), and ``tool_bindings``, the MCP tools
+    bound to this task.
     """
 
     workflow_session_id: str
@@ -104,6 +123,7 @@ class WorkflowTaskRead(BaseEntity):
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
     position: int = 0
     depends_on_ids: list[str] = []
+    tool_bindings: list[ToolBinding] = []
 
 
 class WorkflowTaskDependency(SQLModel, table=True):
@@ -136,3 +156,32 @@ class WorkflowTaskDependency(SQLModel, table=True):
 
     task_id: str = Field(primary_key=True)
     depends_on_id: str = Field(primary_key=True)
+
+
+class WorkflowTaskToolBinding(SQLModel, table=True):
+    """Join row binding one MCP tool to a WorkflowTask.
+
+    A row ``(task_id=T, mcp_server_id=S, tool_name=N)`` means task ``T`` may
+    invoke tool ``N`` on registered server ``S`` while it is in progress.
+    Bindings cascade-delete with their task; the server side is ``RESTRICT`` so
+    a registered server cannot be deleted while tasks still bind its tools.
+    """
+
+    __tablename__ = "workflow_task_tool_bindings"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["task_id"],
+            ["workflow_tasks.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["mcp_server_id"],
+            ["mcp_servers.id"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_workflow_task_tool_bindings_mcp_server_id", "mcp_server_id"),
+    )
+
+    task_id: str = Field(primary_key=True)
+    mcp_server_id: str = Field(primary_key=True)
+    tool_name: str = Field(primary_key=True)

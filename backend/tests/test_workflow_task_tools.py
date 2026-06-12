@@ -314,3 +314,122 @@ async def test_session_completed_notification_emitted_once(
         if n.type is NotificationType.session_completed
     ]
     assert len(completed) == 1
+
+
+# ---------- tool bindings ----------
+
+
+async def _seed_mcp_server(eng: AsyncEngine, *, name: str = "srv") -> str:
+    """Insert an MCPServer owned by the seeded system user and return its id."""
+    from models.mcp_server import MCPServer
+    from models.user import SYSTEM_USER_ID
+
+    async with AsyncSession(eng) as db:
+        server = MCPServer(
+            name=name,
+            url="https://mcp.example.com/mcp",
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        db.add(server)
+        await db.commit()
+        await db.refresh(server)
+        return server.id
+
+
+async def test_register_with_tools_binds_them(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    result = await register_workflow_tasks(
+        [
+            {
+                "key": "t0",
+                "title": "Search",
+                "tools": [{"server_id": server_id, "tool_name": "search"}],
+            }
+        ],
+        _ctx(),
+    )
+    assert "error" not in result
+    listed = await list_workflow_tasks(_ctx())
+    assert listed["tasks"][0]["tool_bindings"] == [
+        {"server_id": server_id, "tool_name": "search"}
+    ]
+
+
+async def test_register_with_malformed_tools_errors(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    result = await register_workflow_tasks(
+        [{"key": "t0", "title": "Bad", "tools": [{"server_id": "only"}]}], _ctx()
+    )
+    assert "error" in result
+    listed = await list_workflow_tasks(_ctx())
+    assert listed["tasks"] == []
+
+
+async def test_register_with_unknown_server_errors(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    result = await register_workflow_tasks(
+        [
+            {
+                "key": "t0",
+                "title": "Bad",
+                "tools": [{"server_id": "ghost", "tool_name": "search"}],
+            }
+        ],
+        _ctx(),
+    )
+    assert "error" in result
+
+
+async def test_create_workflow_task_with_tool_bindings(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    result = await create_workflow_task(
+        "Solo",
+        _ctx(),
+        tool_bindings=[{"server_id": server_id, "tool_name": "search"}],
+    )
+    assert result["tool_bindings"] == [{"server_id": server_id, "tool_name": "search"}]
+
+
+async def test_create_workflow_task_with_malformed_bindings_errors(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine)
+    result = await create_workflow_task(
+        "Solo", _ctx(), tool_bindings=[{"tool_name": "search"}]
+    )
+    assert "error" in result
+
+
+async def test_update_workflow_task_replaces_tool_bindings(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    created = await create_workflow_task(
+        "Solo",
+        _ctx(),
+        tool_bindings=[{"server_id": server_id, "tool_name": "search"}],
+    )
+    result = await update_workflow_task(
+        created["id"],
+        _ctx(),
+        tool_bindings=[{"server_id": server_id, "tool_name": "fetch"}],
+    )
+    assert result["tool_bindings"] == [{"server_id": server_id, "tool_name": "fetch"}]
+
+
+async def test_update_workflow_task_keeps_bindings_when_omitted(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    created = await create_workflow_task(
+        "Solo",
+        _ctx(),
+        tool_bindings=[{"server_id": server_id, "tool_name": "search"}],
+    )
+    result = await update_workflow_task(created["id"], _ctx(), title="Renamed")
+    assert result["tool_bindings"] == [{"server_id": server_id, "tool_name": "search"}]

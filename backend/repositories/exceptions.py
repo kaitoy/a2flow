@@ -63,6 +63,20 @@ class UniqueViolationError(RepositoryError):
         super().__init__(f"{entity} with {field} {value!r} already exists")
 
 
+class McpConnectionError(Exception):
+    """Raised when a registered remote MCP server cannot be reached or errors out.
+
+    Carries the ``server`` (name or URL) and a human-readable ``reason`` so the
+    HTTP layer can surface them in the error envelope's ``details`` block when
+    returning HTTP 502.
+    """
+
+    def __init__(self, server: str, reason: str) -> None:
+        self.server = server
+        self.reason = reason
+        super().__init__(f"MCP server {server!r} unreachable: {reason}")
+
+
 class DependencyCycleError(RepositoryError):
     """Raised when adding WorkflowTask dependency edges would create a cycle.
 

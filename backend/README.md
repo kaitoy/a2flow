@@ -75,8 +75,10 @@ SQLite URL for REST API data and ADK session storage. Both the SQLModel async en
 | `users` | Application users (soft-deleted via `deleted_at`); see [Admin user](#admin-user) |
 | `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](#authentication) |
 | `agent_skills` | Agent skill definitions |
+| `mcp_servers` | Registered remote MCP servers (name, streamable HTTP URL, plaintext request headers) |
 | `workflows` | Workflow definitions |
 | `workflow_tasks` | Individual tasks belonging to a `WorkflowSession` (`workflow_session_id` FK with `ON DELETE CASCADE`) |
+| `workflow_task_tool_bindings` | MCP tools bound to a task (`task_id` FK `ON DELETE CASCADE`, `mcp_server_id` FK `ON DELETE RESTRICT`) |
 | `sessions` | Session metadata and session-level state |
 | `events` | Full event history per session (JSON) |
 | `app_states` | App-level shared state |
@@ -247,6 +249,68 @@ curl -X DELETE http://localhost:8000/agent-skills/<id>
 
 ---
 
+### MCP servers
+
+A registry of remote [MCP](https://modelcontextprotocol.io/) servers whose tools the workflow agent can bind to WorkflowTasks. Connections use **streamable HTTP** only (SSE-transport servers are not supported). The optional `headers` map (e.g. `{"Authorization": "Bearer …"}`) is sent verbatim with every request to the server and is stored **in plaintext**.
+
+#### `POST /api/v1/mcp-servers` — Register an MCP server
+
+```bash
+curl -X POST http://localhost:8000/api/v1/mcp-servers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "web-search", "url": "https://mcp.example.com/mcp", "headers": {"Authorization": "Bearer token"}}'
+```
+
+**Request body**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Unique server name |
+| `url` | string | Yes | Streamable HTTP endpoint URL |
+| `headers` | object | No | HTTP headers sent with every request (default: `{}`) |
+
+Returns `409 CONFLICT_UNIQUE` on a duplicate name.
+
+#### `GET /api/v1/mcp-servers` — List MCP servers
+
+```bash
+curl "http://localhost:8000/api/v1/mcp-servers?limit=20&offset=0"
+```
+
+#### `GET /api/v1/mcp-servers/{server_id}` — Get an MCP server
+
+```bash
+curl http://localhost:8000/api/v1/mcp-servers/<id>
+```
+
+#### `GET /api/v1/mcp-servers/{server_id}/tools` — List the server's advertised tools
+
+Connects to the remote server and returns the tools it advertises (`name`, `description`, `inputSchema`). Returns `502 MCP_UNREACHABLE` when the server cannot be reached within the 30-second timeout.
+
+```bash
+curl http://localhost:8000/api/v1/mcp-servers/<id>/tools
+```
+
+#### `PATCH /api/v1/mcp-servers/{server_id}` — Update an MCP server
+
+Sending `headers` replaces the full header map; omitting it leaves the headers unchanged.
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/mcp-servers/<id> \
+  -H "Content-Type: application/json" \
+  -d '{"headers": {"Authorization": "Bearer new-token"}}'
+```
+
+#### `DELETE /api/v1/mcp-servers/{server_id}` — Delete an MCP server
+
+Returns `409 CONFLICT_REFERENCED` while WorkflowTask tool bindings still reference the server.
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/mcp-servers/<id>
+```
+
+---
+
 ### Workflows
 
 A workflow pairs a prompt with an agent skill. Each workflow references exactly one agent skill; a single agent skill may be used by multiple workflows.
@@ -322,20 +386,24 @@ A workflow task is a single actionable item belonging to a `WorkflowSession`. Th
 
 Tasks form a **directed acyclic graph (DAG)**: each task may depend on other tasks in the same session through its `dependsOnIds` list (persisted as `(task_id, depends_on_id)` rows in the `workflow_task_dependencies` join table, where `depends_on_id` must precede `task_id`). Read responses include the resolved `dependsOnIds`. Dependency targets must exist and belong to the same session, otherwise the write fails with `422 FOREIGN_KEY_VIOLATION`; edges that would introduce a cycle — including a self-dependency — fail with `409 DEPENDENCY_CYCLE`. Deleting a task cascade-deletes the edges that reference it in either direction.
 
+Tasks may additionally bind **MCP tools** from [registered MCP servers](#mcp-servers) through their `toolBindings` list (`[{"mcpServerId": …, "toolName": …}]`, persisted in the `workflow_task_tool_bindings` join table). Read responses include the resolved `toolBindings`. Every bound `mcpServerId` must reference a registered server, otherwise the write fails with `422 FOREIGN_KEY_VIOLATION`; duplicates are deduplicated. Bindings cascade-delete with their task, while a referenced MCP server cannot be deleted (`409 CONFLICT_REFERENCED`). At execution time the agent may only invoke bound tools via the `call_mcp_tool` proxy (see [Agent task tools](#agent-task-tools)).
+
 #### Agent task tools
 
 When a workflow runs, the skill-bound agent is given six function tools so it can plan and drive the task DAG itself, in addition to the REST endpoints below. The agent runs a **plan-then-execute** flow: it registers the plan, waits for the user's approval, then iterates the tasks updating their status.
 
 | Tool | Purpose |
 |---|---|
-| `register_workflow_tasks` | Register a whole plan as a DAG in one call (each entry has a `key`, `title`, optional `depends_on` referencing other keys) |
-| `create_workflow_task` | Add a single task, optionally referencing existing task ids as dependencies |
-| `list_workflow_tasks` | List the current session's tasks (id, title, status, `dependsOnIds`, position) |
+| `register_workflow_tasks` | Register a whole plan as a DAG in one call (each entry has a `key`, `title`, optional `depends_on` referencing other keys, optional `tools` binding MCP tools) |
+| `create_workflow_task` | Add a single task, optionally referencing existing task ids as dependencies and binding MCP tools |
+| `list_workflow_tasks` | List the current session's tasks (id, title, status, `dependsOnIds`, position, `tool_bindings`) |
 | `get_workflow_task` | Fetch one task in the current session |
-| `update_workflow_task` | Change a task's title / description / status / position / dependencies |
+| `update_workflow_task` | Change a task's title / description / status / position / dependencies / tool bindings |
 | `delete_workflow_task` | Delete a task |
+| `list_mcp_tools` | Discover the tools advertised by every [registered MCP server](#mcp-servers) (queried live and concurrently; per-server failures are isolated) |
+| `call_mcp_tool` | Invoke an MCP tool bound to the task currently `in_progress`; calls to unbound tools are rejected with an error listing the allowed tools |
 
-The tools resolve the current session by mapping the ADK session id (the AG-UI thread id, stored on `WorkflowSession.session_id`) back to the `WorkflowSession` primary key, and they reject access to tasks belonging to other sessions. They live in `infrastructure/workflow_task_tools.py` and are attached to the agent in `infrastructure/agent.py` only when a skill is bound.
+The tools resolve the current session by mapping the ADK session id (the AG-UI thread id, stored on `WorkflowSession.session_id`) back to the `WorkflowSession` primary key, and they reject access to tasks belonging to other sessions. They live in `infrastructure/workflow_task_tools.py` and `infrastructure/mcp_tools.py` and are attached to the agent in `infrastructure/agent.py` only when a skill is bound. `call_mcp_tool` opens one streamable HTTP connection per call (30-second timeout) through the shared adapter in `infrastructure/mcp_client.py`.
 
 #### `POST /api/v1/workflow-tasks` — Create a workflow task
 
@@ -355,8 +423,9 @@ curl -X POST http://localhost:8000/api/v1/workflow-tasks \
 | `status` | string | No | One of `pending`, `in_progress`, `completed`, `failed`, `skipped` (default: `pending`) |
 | `position` | integer | No | Layout order within the session (default: `0`) |
 | `dependsOnIds` | string[] | No | IDs of tasks in the same session that must precede this one (default: `[]`) |
+| `toolBindings` | object[] | No | MCP tools the task may use: `[{"mcpServerId": …, "toolName": …}]` (default: `[]`) |
 
-Returns `422 FOREIGN_KEY_VIOLATION` if `workflowSessionId` does not match an existing session, or if any `dependsOnIds` entry does not exist or belongs to another session. Returns `409 DEPENDENCY_CYCLE` if the dependencies would create a cycle.
+Returns `422 FOREIGN_KEY_VIOLATION` if `workflowSessionId` does not match an existing session, if any `dependsOnIds` entry does not exist or belongs to another session, or if any `toolBindings` entry references an unregistered MCP server. Returns `409 DEPENDENCY_CYCLE` if the dependencies would create a cycle.
 
 #### `GET /api/v1/workflow-sessions/{session_id}/workflow-tasks` — List tasks for a session
 
@@ -374,7 +443,7 @@ curl http://localhost:8000/api/v1/workflow-tasks/<id>
 
 #### `PATCH /api/v1/workflow-tasks/{task_id}` — Update a workflow task
 
-`workflowSessionId` is not updatable; once a task is created it cannot be re-parented. Sending `dependsOnIds` replaces the task's full set of dependency edges; omitting it leaves the edges unchanged. The same `422 FOREIGN_KEY_VIOLATION` / `409 DEPENDENCY_CYCLE` validation as create applies.
+`workflowSessionId` is not updatable; once a task is created it cannot be re-parented. Sending `dependsOnIds` replaces the task's full set of dependency edges, and sending `toolBindings` replaces its full set of bound MCP tools; omitting either leaves it unchanged. The same `422 FOREIGN_KEY_VIOLATION` / `409 DEPENDENCY_CYCLE` validation as create applies.
 
 ```bash
 curl -X PATCH http://localhost:8000/api/v1/workflow-tasks/<id> \

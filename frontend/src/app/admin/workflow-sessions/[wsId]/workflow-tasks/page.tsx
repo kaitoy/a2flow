@@ -14,6 +14,7 @@ import { Select } from "@/components/ui/select";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import {
   deleteWorkflowTask,
+  listMcpServers,
   listWorkflowTasks,
   updateWorkflowTask,
   type WorkflowTask,
@@ -29,6 +30,8 @@ import {
 const LIMIT = 20;
 /** Upper bound (backend maximum) used to fetch the whole DAG for the graph view. */
 const GRAPH_LIMIT = 1000;
+/** Upper bound used to fetch the MCP server registry for tool-chip labels. */
+const SERVER_LIMIT = 1000;
 
 /** Which representation of the tasks is currently shown. */
 type View = "table" | "graph";
@@ -45,8 +48,8 @@ function StatusDot({ status }: { status: WorkflowTaskStatus }) {
   );
 }
 
-/** Pill showing a single dependency, resolved to its task title when known. */
-function DependencyChip({ label }: { label: string }) {
+/** Pill showing a single related item (dependency or bound tool) by label. */
+function Chip({ label }: { label: string }) {
   return (
     <span className="inline-block rounded-full glass-panel px-2 py-0.5 text-xs text-on-surface-variant">
       {label}
@@ -57,6 +60,7 @@ function DependencyChip({ label }: { label: string }) {
 function buildColumns(
   wsId: string,
   titleById: Map<string, string>,
+  serverNameById: Map<string, string>,
   onStatusChange: (taskId: string, status: WorkflowTaskStatus) => void,
   onDelete: (id: string, title: string) => void
 ): ColumnDef<WorkflowTask>[] {
@@ -83,7 +87,26 @@ function buildColumns(
         return (
           <div className="flex flex-wrap gap-1">
             {deps.map((id) => (
-              <DependencyChip key={id} label={titleById.get(id) ?? `${id.slice(0, 8)}…`} />
+              <Chip key={id} label={titleById.get(id) ?? `${id.slice(0, 8)}…`} />
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      header: "Tools",
+      cell: (t) => {
+        const bindings = t.toolBindings ?? [];
+        if (bindings.length === 0) return <span className="text-on-surface-variant">—</span>;
+        return (
+          <div className="flex flex-wrap gap-1">
+            {bindings.map((b) => (
+              <Chip
+                key={`${b.mcpServerId}:${b.toolName}`}
+                label={`${
+                  serverNameById.get(b.mcpServerId) ?? `${b.mcpServerId.slice(0, 8)}…`
+                }: ${b.toolName}`}
+              />
             ))}
           </div>
         );
@@ -140,6 +163,7 @@ export default function WorkflowTasksPage() {
   const [offset, setOffset] = useState(0);
   const [view, setView] = useState<View>("table");
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
+  const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,6 +185,14 @@ export default function WorkflowTasksPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    listMcpServers(SERVER_LIMIT, 0)
+      .then((servers) => setServerNameById(new Map(servers.map((s) => [s.id, s.name]))))
+      .catch(() => {
+        // Server names are cosmetic; tool chips fall back to truncated ids.
+      });
+  }, []);
 
   async function handleStatusChange(taskId: string, status: WorkflowTaskStatus) {
     setError(null);
@@ -218,6 +250,7 @@ export default function WorkflowTasksPage() {
             columns={buildColumns(
               wsId,
               new Map(tasks.map((t) => [t.id, t.title])),
+              serverNameById,
               handleStatusChange,
               handleDelete
             )}

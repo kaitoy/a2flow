@@ -32,6 +32,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure import database
 from models.notification import NotificationCreate, NotificationType
 from models.workflow_task import (
+    ToolBinding,
     WorkflowTaskCreate,
     WorkflowTaskRead,
     WorkflowTaskStatus,
@@ -39,6 +40,7 @@ from models.workflow_task import (
 )
 from repositories import (
     NotificationRepository,
+    SqlMCPServerRepository,
     SqlNotificationRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
@@ -76,7 +78,7 @@ async def _repos() -> AsyncIterator[
         ws_repo = SqlWorkflowSessionRepository(db)
         yield (
             ws_repo,
-            SqlWorkflowTaskRepository(db, ws_repo),
+            SqlWorkflowTaskRepository(db, ws_repo, SqlMCPServerRepository(db)),
             SqlNotificationRepository(db),
         )
 
@@ -215,6 +217,47 @@ def _task_to_dict(task: WorkflowTaskRead) -> dict[str, Any]:
         "status": task.status.value,
         "depends_on_ids": list(task.depends_on_ids),
         "position": task.position,
+        "tool_bindings": [
+            {"server_id": b.mcp_server_id, "tool_name": b.tool_name}
+            for b in task.tool_bindings
+        ],
+    }
+
+
+def _parse_tool_bindings(raw: object) -> list[ToolBinding] | None:
+    """Coerce ``[{"server_id", "tool_name"}, ...]`` into ToolBindings, or ``None``.
+
+    Args:
+        raw: The model-supplied tool list to validate.
+
+    Returns:
+        The parsed bindings, or ``None`` when ``raw`` is not a list of objects
+        with non-empty string ``server_id`` and ``tool_name`` fields.
+    """
+    if not isinstance(raw, list):
+        return None
+    bindings: list[ToolBinding] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            return None
+        server_id = entry.get("server_id")
+        tool_name = entry.get("tool_name")
+        if (
+            not isinstance(server_id, str)
+            or not server_id
+            or not isinstance(tool_name, str)
+            or not tool_name
+        ):
+            return None
+        bindings.append(ToolBinding(mcp_server_id=server_id, tool_name=tool_name))
+    return bindings
+
+
+def _invalid_tools_error(label: str) -> dict[str, Any]:
+    """Build the error payload for a malformed tools/tool_bindings argument."""
+    return {
+        "error": f"{label} must be a list of "
+        '{"server_id": <registered MCP server id>, "tool_name": <tool name>} objects'
     }
 
 
@@ -286,12 +329,19 @@ async def register_workflow_tasks(
           "title": "Gather sources",   # required
           "description": "...",        # optional
           "position": 0,               # optional layout/order hint
-          "depends_on": ["t0"]         # optional, other entries' "key" values
+          "depends_on": ["t0"],        # optional, other entries' "key" values
+          "tools": [                   # optional MCP tools this task will use
+            {"server_id": "<registered MCP server id>", "tool_name": "<tool>"}
+          ]
         }
 
     Tasks are created in dependency order; ``depends_on`` keys are resolved to the
     real task ids before edges are written, and every task starts as ``pending``.
     When ``position`` is omitted a task is positioned by its dependency order.
+    ``tools`` binds MCP tools to the task: while the task is in progress those
+    tools (and only those) can be invoked via ``call_mcp_tool``. Discover the
+    available servers and tools with ``list_mcp_tools`` first, and only bind
+    tools the task actually needs.
 
     Args:
         tasks: The plan entries described above.
@@ -324,6 +374,7 @@ async def register_workflow_tasks(
         by_key[key] = entry
         keys.append(key)
 
+    bindings_by_key: dict[str, list[ToolBinding]] = {}
     for key in keys:
         deps = by_key[key].get("depends_on") or []
         if not isinstance(deps, list):
@@ -333,6 +384,10 @@ async def register_workflow_tasks(
                 return {"error": f"task {key!r} cannot depend on itself"}
             if dep not in by_key:
                 return {"error": f"task {key!r} depends on unknown key {dep!r}"}
+        bindings = _parse_tool_bindings(by_key[key].get("tools") or [])
+        if bindings is None:
+            return _invalid_tools_error(f"task {key!r} 'tools'")
+        bindings_by_key[key] = bindings
 
     order = _topo_sort(keys, by_key)
     if order is None:
@@ -357,6 +412,7 @@ async def register_workflow_tasks(
                 if declared_position is not None
                 else position,
                 depends_on_ids=dep_ids,
+                tool_bindings=bindings_by_key[key],
             )
             try:
                 task = await task_repo.create(data, user_id=user_id)
@@ -386,6 +442,7 @@ async def create_workflow_task(
     description: str | None = None,
     depends_on_ids: list[str] | None = None,
     status: str | None = None,
+    tool_bindings: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Create a single WorkflowTask in the current session.
 
@@ -402,14 +459,21 @@ async def create_workflow_task(
             depends on.
         status: Optional initial status; defaults to ``pending``. One of
             "pending", "in_progress", "completed", "failed", "skipped".
+        tool_bindings: Optional MCP tools to bind to the task, each
+            ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``.
+            Bound tools are the only MCP tools the task may invoke via
+            ``call_mcp_tool`` while in progress.
 
     Returns:
         The created task dict, or ``{"error": <message>}`` on an invalid status,
-        unknown dependency, cycle, or unresolved session.
+        unknown dependency, unknown MCP server, cycle, or unresolved session.
     """
     status_enum = _parse_status(status)
     if status is not None and status_enum is None:
         return _invalid_status_error(status)
+    bindings = _parse_tool_bindings(tool_bindings or [])
+    if bindings is None:
+        return _invalid_tools_error("tool_bindings")
     async with _repos() as (ws_repo, task_repo, _notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
@@ -420,6 +484,7 @@ async def create_workflow_task(
             description=description,
             depends_on_ids=depends_on_ids or [],
             status=status_enum or WorkflowTaskStatus.pending,
+            tool_bindings=bindings,
         )
         try:
             task = await task_repo.create(data, user_id=_user_id(tool_context))
@@ -481,6 +546,7 @@ async def update_workflow_task(
     status: str | None = None,
     position: int | None = None,
     depends_on_ids: list[str] | None = None,
+    tool_bindings: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Update fields of a WorkflowTask in the current session.
 
@@ -488,7 +554,8 @@ async def update_workflow_task(
     lifecycle (``pending`` -> ``in_progress`` -> ``completed``/``failed``/
     ``skipped``): mark a task ``in_progress`` before working on it and
     ``completed``/``failed`` afterwards. Passing ``depends_on_ids`` replaces the
-    task's full dependency set, letting you edit the DAG after creation.
+    task's full dependency set, letting you edit the DAG after creation;
+    ``tool_bindings`` likewise replaces the task's full set of bound MCP tools.
 
     Args:
         task_id: Id of the task to update.
@@ -501,15 +568,23 @@ async def update_workflow_task(
         position: New layout position, if changing.
         depends_on_ids: Replacement dependency ids (existing same-session tasks),
             if changing.
+        tool_bindings: Replacement MCP tool bindings, each
+            ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``,
+            if changing.
 
     Returns:
         The updated task dict, or ``{"error": <message>}`` on an invalid status,
-        unknown task, cross-session task, unknown dependency, cycle, or
-        unresolved session.
+        unknown task, cross-session task, unknown dependency, unknown MCP
+        server, cycle, or unresolved session.
     """
     status_enum = _parse_status(status)
     if status is not None and status_enum is None:
         return _invalid_status_error(status)
+    bindings = (
+        _parse_tool_bindings(tool_bindings) if tool_bindings is not None else None
+    )
+    if tool_bindings is not None and bindings is None:
+        return _invalid_tools_error("tool_bindings")
     async with _repos() as (ws_repo, task_repo, notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
@@ -528,6 +603,8 @@ async def update_workflow_task(
             fields["position"] = position
         if depends_on_ids is not None:
             fields["depends_on_ids"] = depends_on_ids
+        if bindings is not None:
+            fields["tool_bindings"] = bindings
         try:
             task = await task_repo.update(
                 task_id, WorkflowTaskUpdate(**fields), user_id=_user_id(tool_context)

@@ -23,6 +23,7 @@ from repositories.exceptions import (
     CsrfError,
     DependencyCycleError,
     ForeignKeyViolationError,
+    McpConnectionError,
     NotFoundError,
     QueryValidationError,
     ReferencedError,
@@ -35,6 +36,7 @@ from routers.exception_handlers import (
     dependency_cycle_exception_handler,
     foreign_key_violation_exception_handler,
     http_exception_handler,
+    mcp_connection_exception_handler,
     not_found_exception_handler,
     query_validation_exception_handler,
     referenced_exception_handler,
@@ -83,6 +85,7 @@ app.add_exception_handler(
 app.add_exception_handler(ReferencedError, referenced_exception_handler)
 app.add_exception_handler(UniqueViolationError, unique_violation_exception_handler)
 app.add_exception_handler(DependencyCycleError, dependency_cycle_exception_handler)
+app.add_exception_handler(McpConnectionError, mcp_connection_exception_handler)
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
 app.add_exception_handler(UnauthorizedError, unauthorized_exception_handler)
 app.add_exception_handler(CsrfError, csrf_exception_handler)

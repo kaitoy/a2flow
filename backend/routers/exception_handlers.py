@@ -17,6 +17,7 @@ from repositories.exceptions import (
     CsrfError,
     DependencyCycleError,
     ForeignKeyViolationError,
+    McpConnectionError,
     NotFoundError,
     QueryValidationError,
     ReferencedError,
@@ -117,6 +118,20 @@ async def dependency_cycle_exception_handler(
         message=str(exc),
         status_code=409,
         details={"taskId": exc.task_id, "dependsOnId": exc.depends_on_id},
+    )
+
+
+async def mcp_connection_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 502 with MCP_UNREACHABLE code when a remote MCP server cannot be reached."""
+    assert isinstance(exc, McpConnectionError)
+    return _envelope_error(
+        request,
+        code="MCP_UNREACHABLE",
+        message=str(exc),
+        status_code=502,
+        details={"server": exc.server, "reason": exc.reason},
     )
 
 

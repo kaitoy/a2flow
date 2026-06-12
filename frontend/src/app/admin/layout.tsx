@@ -11,6 +11,7 @@ import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 const NAV = [
   { href: "/admin/users", label: "Users" },
   { href: "/admin/agent-skills", label: "Agent Skills" },
+  { href: "/admin/mcp-servers", label: "MCP Servers" },
   { href: "/admin/workflows", label: "Workflows" },
   { href: "/admin/workflow-sessions", label: "Workflow Sessions" },
 ];

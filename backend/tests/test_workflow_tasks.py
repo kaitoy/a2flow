@@ -586,3 +586,141 @@ async def test_update_task_preserves_created_by_and_overwrites_updated_by(
     body = assert_ok(response)
     assert body["createdBy"] == "alice"
     assert body["updatedBy"] == "bob"
+
+
+# ---------- tool bindings ----------
+
+
+async def _create_mcp_server(client: AsyncClient) -> Any:
+    """Create an MCPServer with a unique name and return its body."""
+    n = _next_suffix()
+    return assert_ok(
+        await client.post(
+            "/api/v1/mcp-servers",
+            json={"name": f"MCP {n}", "url": f"https://mcp{n}.example.com/mcp"},
+        ),
+        status=201,
+    )
+
+
+async def test_create_task_with_tool_bindings_round_trips(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    server = await _create_mcp_server(workflow_client)
+    body = await _create_task(
+        workflow_client,
+        ws["id"],
+        toolBindings=[{"mcpServerId": server["id"], "toolName": "search"}],
+    )
+    assert body["toolBindings"] == [{"mcpServerId": server["id"], "toolName": "search"}]
+    fetched = assert_ok(
+        await workflow_client.get(f"/api/v1/workflow-tasks/{body['id']}")
+    )
+    assert fetched["toolBindings"] == [
+        {"mcpServerId": server["id"], "toolName": "search"}
+    ]
+
+
+async def test_create_task_defaults_tool_bindings_to_empty(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    body = await _create_task(workflow_client, ws["id"])
+    assert body["toolBindings"] == []
+
+
+async def test_create_task_with_unknown_server_returns_422(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    response = await workflow_client.post(
+        "/api/v1/workflow-tasks",
+        json={
+            "workflowSessionId": ws["id"],
+            "title": "t",
+            "toolBindings": [{"mcpServerId": "ghost", "toolName": "search"}],
+        },
+    )
+    assert_err(response, code="FOREIGN_KEY_VIOLATION", status=422)
+
+
+async def test_create_task_dedupes_tool_bindings(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    server = await _create_mcp_server(workflow_client)
+    binding = {"mcpServerId": server["id"], "toolName": "search"}
+    body = await _create_task(
+        workflow_client, ws["id"], toolBindings=[binding, binding]
+    )
+    assert body["toolBindings"] == [binding]
+
+
+async def test_update_task_replaces_tool_bindings(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    server = await _create_mcp_server(workflow_client)
+    created = await _create_task(
+        workflow_client,
+        ws["id"],
+        toolBindings=[{"mcpServerId": server["id"], "toolName": "search"}],
+    )
+    response = await workflow_client.patch(
+        f"/api/v1/workflow-tasks/{created['id']}",
+        json={"toolBindings": [{"mcpServerId": server["id"], "toolName": "fetch"}]},
+    )
+    assert assert_ok(response)["toolBindings"] == [
+        {"mcpServerId": server["id"], "toolName": "fetch"}
+    ]
+
+
+async def test_update_task_without_tool_bindings_leaves_them_unchanged(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    server = await _create_mcp_server(workflow_client)
+    created = await _create_task(
+        workflow_client,
+        ws["id"],
+        toolBindings=[{"mcpServerId": server["id"], "toolName": "search"}],
+    )
+    response = await workflow_client.patch(
+        f"/api/v1/workflow-tasks/{created['id']}", json={"title": "Renamed"}
+    )
+    assert assert_ok(response)["toolBindings"] == [
+        {"mcpServerId": server["id"], "toolName": "search"}
+    ]
+
+
+async def test_update_task_can_clear_tool_bindings(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    server = await _create_mcp_server(workflow_client)
+    created = await _create_task(
+        workflow_client,
+        ws["id"],
+        toolBindings=[{"mcpServerId": server["id"], "toolName": "search"}],
+    )
+    response = await workflow_client.patch(
+        f"/api/v1/workflow-tasks/{created['id']}", json={"toolBindings": []}
+    )
+    assert assert_ok(response)["toolBindings"] == []
+
+
+async def test_delete_task_cascades_tool_bindings(
+    workflow_client: AsyncClient,
+) -> None:
+    ws = await _create_workflow_session(workflow_client)
+    server = await _create_mcp_server(workflow_client)
+    created = await _create_task(
+        workflow_client,
+        ws["id"],
+        toolBindings=[{"mcpServerId": server["id"], "toolName": "search"}],
+    )
+    await workflow_client.delete(f"/api/v1/workflow-tasks/{created['id']}")
+    # With the binding gone, the server is deletable (no CONFLICT_REFERENCED).
+    response = await workflow_client.delete(f"/api/v1/mcp-servers/{server['id']}")
+    assert assert_ok(response, status=200) is None

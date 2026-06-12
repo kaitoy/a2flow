@@ -14,9 +14,11 @@ from infrastructure.database import get_session
 from repositories import (
     AgentSkillRepository,
     AuthSessionRepository,
+    MCPServerRepository,
     NotificationRepository,
     SqlAgentSkillRepository,
     SqlAuthSessionRepository,
+    SqlMCPServerRepository,
     SqlNotificationRepository,
     SqlUserRepository,
     SqlWorkflowRepository,
@@ -48,6 +50,16 @@ def get_auth_session_repository(db: DBSessionDep) -> AuthSessionRepository:
 
 AuthSessionRepositoryDep = Annotated[
     AuthSessionRepository, Depends(get_auth_session_repository)
+]
+
+
+def get_mcp_server_repository(db: DBSessionDep) -> MCPServerRepository:
+    """Create an MCPServerRepository backed by the current database session."""
+    return SqlMCPServerRepository(db)
+
+
+MCPServerRepositoryDep = Annotated[
+    MCPServerRepository, Depends(get_mcp_server_repository)
 ]
 
 
@@ -93,13 +105,15 @@ WorkflowSessionRepositoryDep = Annotated[
 def get_workflow_task_repository(
     db: DBSessionDep,
     ws_repo: WorkflowSessionRepositoryDep,
+    mcp_repo: MCPServerRepositoryDep,
 ) -> WorkflowTaskRepository:
     """Create a WorkflowTaskRepository backed by the current database session.
 
     The injected WorkflowSessionRepository is used to validate that the parent
-    session exists when creating tasks.
+    session exists when creating tasks; the MCPServerRepository validates the
+    servers referenced by tool bindings.
     """
-    return SqlWorkflowTaskRepository(db, ws_repo)
+    return SqlWorkflowTaskRepository(db, ws_repo, mcp_repo)
 
 
 WorkflowTaskRepositoryDep = Annotated[

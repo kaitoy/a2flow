@@ -168,6 +168,85 @@ describe("EditWorkflowTaskPage", () => {
     expect(receivedBody.dependsOnIds).toEqual(["task-2"]);
   });
 
+  it("prefills bound MCP tools and PATCHes toolBindings", async () => {
+    pushMock.mockClear();
+    const user = userEvent.setup();
+    let receivedBody: Record<string, unknown> = {};
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-tasks/:taskId", () =>
+        envelope({
+          id: "task-1",
+          workflowSessionId: "ws-1",
+          title: "Step 1",
+          description: null,
+          status: "pending",
+          position: 0,
+          dependsOnIds: [],
+          toolBindings: [{ mcpServerId: "mcp-1", toolName: "search" }],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      ),
+      http.patch("http://localhost:8000/api/v1/workflow-tasks/:taskId", async ({ request }) => {
+        receivedBody = (await request.json()) as Record<string, unknown>;
+        return envelope({
+          id: "task-1",
+          workflowSessionId: "ws-1",
+          title: "Step 1",
+          description: null,
+          status: "pending",
+          position: 0,
+          dependsOnIds: [],
+          toolBindings: [{ mcpServerId: "mcp-1", toolName: "search" }],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        });
+      })
+    );
+
+    render(<EditWorkflowTaskPage />);
+    // The task binds MCP_SERVER_1's "search" tool, so its checkbox is pre-checked.
+    expect(await screen.findByRole("checkbox", { name: "My MCP Server: search" })).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(pushMock).toHaveBeenCalled());
+    expect(receivedBody.toolBindings).toEqual([{ mcpServerId: "mcp-1", toolName: "search" }]);
+  });
+
+  it("keeps a bound tool selectable when its server is unreachable", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-tasks/:taskId", () =>
+        envelope({
+          id: "task-1",
+          workflowSessionId: "ws-1",
+          title: "Step 1",
+          description: null,
+          status: "pending",
+          position: 0,
+          dependsOnIds: [],
+          toolBindings: [{ mcpServerId: "mcp-1", toolName: "search" }],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      ),
+      http.get(
+        "http://localhost:8000/api/v1/mcp-servers/:serverId/tools",
+        () => new HttpResponse(null, { status: 502 })
+      )
+    );
+
+    render(<EditWorkflowTaskPage />);
+    // The catalog fetch fails, but the existing binding is merged in (labeled
+    // with the registered server name) so it stays visible and deselectable.
+    expect(await screen.findByRole("checkbox", { name: "My MCP Server: search" })).toBeChecked();
+  });
+
   it("opens the confirm dialog and calls DELETE", async () => {
     pushMock.mockClear();
     const user = userEvent.setup();

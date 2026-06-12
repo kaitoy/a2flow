@@ -1,5 +1,6 @@
 from .agent_skill import AgentSkillService
 from .auth import AuthService
+from .mcp_server import MCPServerService
 from .notification import NotificationService
 from .user import UserService
 from .workflow import WorkflowService
@@ -9,6 +10,7 @@ from .workflow_task import WorkflowTaskService
 __all__ = [
     "AgentSkillService",
     "AuthService",
+    "MCPServerService",
     "NotificationService",
     "UserService",
     "WorkflowService",

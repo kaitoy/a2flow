@@ -10,9 +10,14 @@ import type {
   ApiError,
   ApiMeta,
   LoginRequest,
+  McpServerCreate,
+  McpServer as McpServerModel,
+  McpServerUpdate,
+  McpToolInfo,
   Notification as NotificationModel,
   NotificationType,
   Session as SessionModel,
+  ToolBinding,
   UserCreate,
   UserRead as UserReadModel,
   UserUpdate,
@@ -27,16 +32,19 @@ import type {
 } from "@/generated/api/types.gen";
 import {
   zCreateAgentSkillApiV1AgentSkillsPostResponse,
+  zCreateMcpServerApiV1McpServersPostResponse,
   zCreateUserApiV1UsersPostResponse,
   zCreateWorkflowApiV1WorkflowsPostResponse,
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse,
+  zDeleteMcpServerApiV1McpServersServerIdDeleteResponse,
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
   zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
   zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
   zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
+  zGetMcpServerApiV1McpServersServerIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
   zGetUserApiV1UsersUserIdGetResponse,
@@ -44,6 +52,8 @@ import {
   zGetWorkflowSessionApiV1WorkflowSessionsWsIdGetResponse,
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
+  zListMcpServersApiV1McpServersGetResponse,
+  zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse,
   zListNotificationsApiV1NotificationsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
   zListUsersApiV1UsersGetResponse,
@@ -55,6 +65,7 @@ import {
   zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse,
   zMeApiV1AuthMeGetResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
+  zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
   zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
@@ -182,6 +193,7 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
   Required<Pick<T, AuditedKeys>>;
 
 export type AgentSkill = WithAudit<AgentSkillModel>;
+export type McpServer = WithAudit<McpServerModel>;
 export type Notification = WithAudit<NotificationModel>;
 export type User = WithAudit<UserReadModel>;
 export type Workflow = WithAudit<WorkflowModel>;
@@ -192,7 +204,11 @@ export type {
   AgentSkillCreate,
   AgentSkillUpdate,
   LoginRequest,
+  McpServerCreate,
+  McpServerUpdate,
+  McpToolInfo,
   NotificationType,
+  ToolBinding,
   UserCreate,
   UserUpdate,
   WorkflowCreate,
@@ -296,6 +312,54 @@ export async function deleteAgentSkill(id: string): Promise<void> {
     apiClient.delete(`/api/v1/agent-skills/${encodeURIComponent(id)}`),
     zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse
   );
+}
+
+/** List registered MCP servers with optional pagination. */
+export async function listMcpServers(limit = 20, offset = 0): Promise<McpServer[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/mcp-servers", { params: { limit, offset } }),
+    zListMcpServersApiV1McpServersGetResponse
+  ) as Promise<McpServer[]>;
+}
+
+/** Fetch a single registered MCP server by ID. */
+export async function getMcpServer(id: string): Promise<McpServer> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/mcp-servers/${encodeURIComponent(id)}`),
+    zGetMcpServerApiV1McpServersServerIdGetResponse
+  ) as Promise<McpServer>;
+}
+
+/** Register a new remote MCP server. */
+export async function createMcpServer(body: McpServerCreate): Promise<McpServer> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/mcp-servers", body),
+    zCreateMcpServerApiV1McpServersPostResponse
+  ) as Promise<McpServer>;
+}
+
+/** Apply a partial update to a registered MCP server. ``headers`` replaces the full set. */
+export async function updateMcpServer(id: string, body: McpServerUpdate): Promise<McpServer> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/mcp-servers/${encodeURIComponent(id)}`, body),
+    zUpdateMcpServerApiV1McpServersServerIdPatchResponse
+  ) as Promise<McpServer>;
+}
+
+/** Delete a registered MCP server. Fails while WorkflowTask tool bindings still reference it. */
+export async function deleteMcpServer(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/mcp-servers/${encodeURIComponent(id)}`),
+    zDeleteMcpServerApiV1McpServersServerIdDeleteResponse
+  );
+}
+
+/** Fetch the tools advertised by a registered MCP server (live query to the server). */
+export async function listMcpServerTools(id: string): Promise<McpToolInfo[]> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/mcp-servers/${encodeURIComponent(id)}/tools`),
+    zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse
+  ) as Promise<McpToolInfo[]>;
 }
 
 /** List users with optional pagination. */

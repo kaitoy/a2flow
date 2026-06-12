@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createWorkflowTask, listWorkflowTasks, type WorkflowTask } from "@/lib/api";
+import { loadMcpToolOptions, type McpToolOption, valueToBinding } from "@/lib/mcp-tool-options";
 
 const schema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -21,6 +22,7 @@ const schema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "failed", "skipped"]),
   position: z.coerce.number().int().min(0, "Position must be 0 or greater"),
   dependsOnIds: z.array(z.string()),
+  toolBindings: z.array(z.string()),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -31,6 +33,7 @@ export default function NewWorkflowTaskPage() {
   const router = useRouter();
   const [apiError, setApiError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<WorkflowTask[]>([]);
+  const [toolOptions, setToolOptions] = useState<McpToolOption[]>([]);
 
   const {
     register,
@@ -46,6 +49,7 @@ export default function NewWorkflowTaskPage() {
       status: "pending" as const,
       position: 0,
       dependsOnIds: [] as string[],
+      toolBindings: [] as string[],
     },
   });
 
@@ -57,6 +61,14 @@ export default function NewWorkflowTaskPage() {
       });
   }, [wsId]);
 
+  useEffect(() => {
+    loadMcpToolOptions()
+      .then((catalog) => setToolOptions(catalog.options))
+      .catch(() => {
+        // Tool catalog is non-essential; the picker simply renders empty.
+      });
+  }, []);
+
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
@@ -67,6 +79,7 @@ export default function NewWorkflowTaskPage() {
         status: values.status,
         position: values.position,
         dependsOnIds: values.dependsOnIds,
+        toolBindings: values.toolBindings.map(valueToBinding),
       });
       router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
     } catch (err) {
@@ -122,6 +135,22 @@ export default function NewWorkflowTaskPage() {
                 value={field.value}
                 onChange={field.onChange}
                 emptyMessage="No other tasks in this session yet."
+              />
+            )}
+          />
+        </FormField>
+
+        <FormField htmlFor="toolBindings" label="MCP Tools">
+          <Controller
+            control={control}
+            name="toolBindings"
+            render={({ field }) => (
+              <CheckboxGroup
+                name="toolBindings"
+                options={toolOptions}
+                value={field.value}
+                onChange={field.onChange}
+                emptyMessage="No MCP tools available. Register MCP servers first."
               />
             )}
           />

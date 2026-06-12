@@ -9,6 +9,7 @@ from .exceptions import (
     UnauthorizedError,
     UniqueViolationError,
 )
+from .mcp_server import MCPServerRepository, SqlMCPServerRepository
 from .notification import NotificationRepository, SqlNotificationRepository
 from .user import SqlUserRepository, UserRepository
 from .workflow import SqlWorkflowRepository, WorkflowRepository
@@ -20,12 +21,14 @@ __all__ = [
     "AuthSessionRepository",
     "CsrfError",
     "ForeignKeyViolationError",
+    "MCPServerRepository",
     "NotFoundError",
     "NotificationRepository",
     "ReferencedError",
     "RepositoryError",
     "SqlAgentSkillRepository",
     "SqlAuthSessionRepository",
+    "SqlMCPServerRepository",
     "SqlNotificationRepository",
     "SqlUserRepository",
     "SqlWorkflowRepository",

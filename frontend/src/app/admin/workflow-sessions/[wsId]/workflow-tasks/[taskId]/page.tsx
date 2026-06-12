@@ -3,7 +3,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
@@ -20,9 +20,17 @@ import {
   deleteWorkflowTask,
   getWorkflowTask,
   listWorkflowTasks,
+  type ToolBinding,
   updateWorkflowTask,
   type WorkflowTask,
 } from "@/lib/api";
+import {
+  bindingToValue,
+  loadMcpToolOptions,
+  type McpToolCatalog,
+  mergeBindingOptions,
+  valueToBinding,
+} from "@/lib/mcp-tool-options";
 
 const schema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -30,6 +38,7 @@ const schema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "failed", "skipped"]),
   position: z.coerce.number().int().min(0, "Position must be 0 or greater"),
   dependsOnIds: z.array(z.string()),
+  toolBindings: z.array(z.string()),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -43,6 +52,16 @@ export default function EditWorkflowTaskPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [candidates, setCandidates] = useState<WorkflowTask[]>([]);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
+  const [taskBindings, setTaskBindings] = useState<ToolBinding[]>([]);
+  const [toolCatalog, setToolCatalog] = useState<McpToolCatalog>({
+    options: [],
+    serverNames: new Map(),
+  });
+
+  const toolOptions = useMemo(
+    () => mergeBindingOptions(toolCatalog.options, taskBindings, toolCatalog.serverNames),
+    [toolCatalog, taskBindings]
+  );
 
   const {
     register,
@@ -60,6 +79,7 @@ export default function EditWorkflowTaskPage() {
       status: "pending" as const,
       position: 0,
       dependsOnIds: [] as string[],
+      toolBindings: [] as string[],
     },
   });
 
@@ -72,7 +92,9 @@ export default function EditWorkflowTaskPage() {
           status: task.status ?? "pending",
           position: task.position ?? 0,
           dependsOnIds: task.dependsOnIds ?? [],
+          toolBindings: (task.toolBindings ?? []).map(bindingToValue),
         });
+        setTaskBindings(task.toolBindings ?? []);
         setAudit({
           createdBy: task.createdBy,
           updatedBy: task.updatedBy,
@@ -94,6 +116,14 @@ export default function EditWorkflowTaskPage() {
       });
   }, [wsId]);
 
+  useEffect(() => {
+    loadMcpToolOptions()
+      .then(setToolCatalog)
+      .catch(() => {
+        // Tool catalog is non-essential; already-bound tools still render.
+      });
+  }, []);
+
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
@@ -103,6 +133,7 @@ export default function EditWorkflowTaskPage() {
         status: values.status,
         position: values.position,
         dependsOnIds: values.dependsOnIds,
+        toolBindings: values.toolBindings.map(valueToBinding),
       });
       router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
     } catch (err) {
@@ -184,6 +215,22 @@ export default function EditWorkflowTaskPage() {
                 value={field.value}
                 onChange={field.onChange}
                 emptyMessage="No other tasks in this session to depend on."
+              />
+            )}
+          />
+        </FormField>
+
+        <FormField htmlFor="toolBindings" label="MCP Tools">
+          <Controller
+            control={control}
+            name="toolBindings"
+            render={({ field }) => (
+              <CheckboxGroup
+                name="toolBindings"
+                options={toolOptions}
+                value={field.value}
+                onChange={field.onChange}
+                emptyMessage="No MCP tools available. Register MCP servers first."
               />
             )}
           />

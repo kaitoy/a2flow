@@ -14,6 +14,7 @@ from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.base_toolset import BaseToolset
 from google.adk.tools.skill_toolset import SkillToolset
 
+from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.workflow_task_tools import (
     create_workflow_task,
     delete_workflow_task,
@@ -74,8 +75,13 @@ WORKFLOW_AGENT_INSTRUCTION = (
     "You are a workflow execution agent. You have a Skill that defines how to do "
     "the work, plus tools to manage a list of WorkflowTasks for this run.\n\n"
     "Phase 1 - Plan: Follow the Skill's instructions to break the user's request "
-    "into concrete steps. Express the steps as a DAG and register them in ONE call "
-    "to `register_workflow_tasks`, using each task's `key` and `depends_on` to "
+    "into concrete steps. Before registering the plan, call `list_mcp_tools` to "
+    "see the MCP tools available on the registered MCP servers. If a step needs "
+    "an external tool, bind it by adding a `tools` entry "
+    '(`[{"server_id": ..., "tool_name": ...}]`) to that task in '
+    "`register_workflow_tasks`. Only bind tools a task actually needs. Express "
+    "the steps as a DAG and register them in ONE call to "
+    "`register_workflow_tasks`, using each task's `key` and `depends_on` to "
     "encode ordering. Every task starts as `pending`. Then present the registered "
     "plan to the user and ask for approval. Do NOT start executing until the user "
     "approves.\n\n"
@@ -85,7 +91,11 @@ WORKFLOW_AGENT_INSTRUCTION = (
     "2. Pick the next runnable task: a `pending` task whose `depends_on_ids` are "
     "all `completed`. If several are runnable, pick the lowest `position`.\n"
     "3. Call `update_workflow_task` to set its status to `in_progress`.\n"
-    "4. Do that task's work according to the Skill.\n"
+    "4. Do that task's work according to the Skill. When the task has bound MCP "
+    "tools (its `tool_bindings`), invoke them with "
+    "`call_mcp_tool(server_id, tool_name, arguments)`; only tools bound to the "
+    "current `in_progress` task are allowed, and calls to unbound tools are "
+    "rejected.\n"
     "5. Call `update_workflow_task` to set `completed` (or `failed` if it cannot "
     "be done; use `skipped` only when the Skill says to skip).\n"
     "6. Repeat from step 1.\n\n"
@@ -131,9 +141,10 @@ def create_agent(skill_dir: Path | None = None) -> LlmAgent:
            litellm:anthropic/claude-3-5-sonnet-20241022
 
     When `skill_dir` is provided, the directory is loaded as an ADK Skill and
-    exposed to the agent via SkillToolset alongside the A2UI tools and the
+    exposed to the agent via SkillToolset alongside the A2UI tools, the
     WorkflowTask management tools (register/create/list/get/update/delete), and
-    the agent runs under the plan-then-execute workflow instruction.
+    the MCP proxy tools (`list_mcp_tools` / `call_mcp_tool`), and the agent runs
+    under the plan-then-execute workflow instruction.
     """
     model_env = os.getenv("LLM_MODEL", "gemini-2.0-flash")
     role_description = os.getenv("ROLE_DESCRIPTION", "You are a helpful assistant.")
@@ -157,6 +168,8 @@ def create_agent(skill_dir: Path | None = None) -> LlmAgent:
                 get_workflow_task,
                 update_workflow_task,
                 delete_workflow_task,
+                list_mcp_tools,
+                call_mcp_tool,
             ]
         )
         instruction = A2UIInstructionProvider(WORKFLOW_AGENT_INSTRUCTION)

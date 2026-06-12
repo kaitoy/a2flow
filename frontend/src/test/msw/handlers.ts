@@ -68,10 +68,28 @@ const WORKFLOW_TASK_1 = {
   status: "pending",
   position: 0,
   dependsOnIds: [],
+  toolBindings: [],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
   updatedBy: "",
+};
+
+export const MCP_SERVER_1 = {
+  id: "mcp-1",
+  name: "My MCP Server",
+  url: "https://mcp.example.com/mcp",
+  headers: { Authorization: "Bearer secret" },
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+export const MCP_TOOL_1 = {
+  name: "search",
+  description: "Search the web",
+  inputSchema: { type: "object" },
 };
 
 export const handlers = [
@@ -176,6 +194,20 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(WORKFLOW_TASK_1)),
 
   http.delete(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/mcp-servers`, () => envelope([MCP_SERVER_1])),
+
+  http.get(`${BASE}/api/v1/mcp-servers/:serverId/tools`, () => envelope([MCP_TOOL_1])),
+
+  http.get(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(MCP_SERVER_1)),
+
+  http.post(`${BASE}/api/v1/mcp-servers`, () =>
+    envelope({ ...MCP_SERVER_1, id: "new-mcp-id" }, 201)
+  ),
+
+  http.patch(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(MCP_SERVER_1)),
+
+  http.delete(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(null)),
 
   http.get(`${BASE}/api/v1/notifications`, () => envelope([])),
 

@@ -72,6 +72,40 @@ describe("WorkflowTasksPage", () => {
     expect(screen.getAllByText("Step 1")).toHaveLength(2);
   });
 
+  it("renders a Tools column resolving server ids to names", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks", () =>
+        envelope([
+          {
+            id: "task-1",
+            workflowSessionId: "ws-1",
+            title: "Step 1",
+            description: null,
+            status: "pending",
+            position: 0,
+            dependsOnIds: [],
+            toolBindings: [{ mcpServerId: "mcp-1", toolName: "search" }],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+
+    render(<WorkflowTasksPage />);
+    expect(await screen.findByText("Tools")).toBeInTheDocument();
+    // The global handlers register MCP_SERVER_1 (id "mcp-1", name "My MCP Server").
+    await waitFor(() => expect(screen.getByText("My MCP Server: search")).toBeInTheDocument());
+  });
+
+  it("shows a placeholder in the Tools column when a task has no bindings", async () => {
+    render(<WorkflowTasksPage />);
+    await waitFor(() => screen.getByText("Step 1"));
+    expect(screen.getByText("Tools")).toBeInTheDocument();
+  });
+
   it("calls PATCH when the inline status select changes", async () => {
     const user = userEvent.setup();
     const patchSpy = vi.fn(({ request }: { request: Request }) =>

@@ -109,6 +109,51 @@ describe("NewWorkflowTaskPage", () => {
     expect(receivedBody.dependsOnIds).toEqual(["task-1"]);
   });
 
+  it("renders an MCP tool picker listing tools from registered servers", async () => {
+    render(<NewWorkflowTaskPage />);
+    expect(screen.getByText("MCP Tools")).toBeInTheDocument();
+    // The global handlers register MCP_SERVER_1 advertising the "search" tool.
+    expect(
+      await screen.findByRole("checkbox", { name: "My MCP Server: search" })
+    ).toBeInTheDocument();
+  });
+
+  it("includes selected tool bindings in the POST body", async () => {
+    pushMock.mockClear();
+    const user = userEvent.setup();
+    let receivedBody: Record<string, unknown> = {};
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflow-tasks", async ({ request }) => {
+        receivedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(
+          {
+            id: "new-task-id",
+            workflowSessionId: "ws-1",
+            title: "Step 2",
+            description: null,
+            status: "pending",
+            position: 0,
+            dependsOnIds: [],
+            toolBindings: [{ mcpServerId: "mcp-1", toolName: "search" }],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+          201
+        );
+      })
+    );
+
+    render(<NewWorkflowTaskPage />);
+    await user.type(screen.getByLabelText(/Title/), "Step 2");
+    await user.click(await screen.findByRole("checkbox", { name: "My MCP Server: search" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalled());
+    expect(receivedBody.toolBindings).toEqual([{ mcpServerId: "mcp-1", toolName: "search" }]);
+  });
+
   it("shows an error banner when the create call fails", async () => {
     const user = userEvent.setup();
     server.use(
