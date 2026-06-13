@@ -8,6 +8,7 @@ import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { DateTime } from "@/components/ui/date-time";
 import { type AgentSkill, deleteAgentSkill, listAgentSkills } from "@/lib/api";
 
 const LIMIT = 20;
@@ -33,9 +34,7 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
   },
   {
     header: "Created At",
-    cell: (s) => (
-      <span className="text-on-surface-variant">{new Date(s.createdAt).toLocaleDateString()}</span>
-    ),
+    cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
   },
 ];
 

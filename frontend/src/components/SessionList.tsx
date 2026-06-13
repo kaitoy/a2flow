@@ -7,6 +7,7 @@ import { useMotionConfig } from "@/lib/motion";
 import { useAppSelector } from "@/store/hooks";
 import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
+import { formatFullTimestamp } from "./ui/date-time";
 import { Skeleton } from "./ui/skeleton";
 import { SlidingIndicator } from "./ui/sliding-indicator";
 import { Tooltip } from "./ui/tooltip";
@@ -139,7 +140,10 @@ export function SessionList({
                   : "text-on-surface-variant hover:bg-glass hover:text-on-surface",
               ].join(" ")}
             >
-              <Tooltip label={s.id} placement="right">
+              <Tooltip
+                label={`${s.id} — ${formatFullTimestamp(s.lastUpdateTime)}`}
+                placement="right"
+              >
                 <button
                   type="button"
                   onClick={() => !isActive && onSelect(s.id)}

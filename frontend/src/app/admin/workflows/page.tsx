@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { DateTime } from "@/components/ui/date-time";
 import {
   deleteWorkflow,
   executeWorkflow,
@@ -46,11 +47,7 @@ function buildColumns(
     },
     {
       header: "Created At",
-      cell: (w) => (
-        <span className="text-on-surface-variant">
-          {new Date(w.createdAt).toLocaleDateString()}
-        </span>
-      ),
+      cell: (w) => <DateTime value={w.createdAt} className="text-on-surface-variant" />,
     },
     {
       header: "Actions",

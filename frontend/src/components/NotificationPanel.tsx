@@ -9,6 +9,8 @@ import logger from "@/lib/logger";
 import { useMotionConfig } from "@/lib/motion";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { markReadLocal } from "@/store/notificationsSlice";
+import { formatFullTimestamp } from "./ui/date-time";
+import { Tooltip } from "./ui/tooltip";
 
 /** Props for {@link NotificationPanel}. */
 interface NotificationPanelProps {
@@ -179,9 +181,11 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                             {n.body}
                           </span>
                         )}
-                        <span className="text-[11px] text-on-surface-variant">
-                          {formatRelativeTime(n.createdAt)}
-                        </span>
+                        <Tooltip label={formatFullTimestamp(n.createdAt)} placement="bottom">
+                          <span className="w-fit text-[11px] text-on-surface-variant">
+                            {formatRelativeTime(n.createdAt)}
+                          </span>
+                        </Tooltip>
                       </span>
                     </button>
                   </li>

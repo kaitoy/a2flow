@@ -1,7 +1,8 @@
 /** @module AuditMeta — Read-only audit footer resolving created/updated user IDs to names. */
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
+import { DateTime } from "@/components/ui/date-time";
 import { getUserNames } from "@/lib/api";
 
 /** Props for {@link AuditMeta}: the audit fields shared by every persistent entity. */
@@ -16,8 +17,8 @@ export interface AuditMetaProps {
   updatedAt?: string;
 }
 
-/** Render a single labelled metadata cell. */
-function MetaItem({ label, value }: { label: string; value: string }) {
+/** Render a single labelled metadata cell. The value may be text or a node (e.g. a {@link DateTime}). */
+function MetaItem({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs uppercase tracking-wide text-on-surface-variant">{label}</dt>
@@ -54,8 +55,8 @@ export function AuditMeta({ createdBy, updatedBy, createdAt, updatedAt }: AuditM
     <dl className="grid grid-cols-2 gap-4 rounded-xl glass-panel p-4 text-on-surface-variant">
       <MetaItem label="Created by" value={nameOf(createdBy)} />
       <MetaItem label="Updated by" value={nameOf(updatedBy)} />
-      {createdAt && <MetaItem label="Created at" value={new Date(createdAt).toLocaleString()} />}
-      {updatedAt && <MetaItem label="Updated at" value={new Date(updatedAt).toLocaleString()} />}
+      {createdAt && <MetaItem label="Created at" value={<DateTime value={createdAt} />} />}
+      {updatedAt && <MetaItem label="Updated at" value={<DateTime value={updatedAt} />} />}
     </dl>
   );
 }

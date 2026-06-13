@@ -7,6 +7,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { DateTime } from "@/components/ui/date-time";
 import { getUserNames, listWorkflowSessions, type WorkflowSession } from "@/lib/api";
 
 const LIMIT = 20;
@@ -27,9 +28,7 @@ function buildColumns(userMap: Map<string, string>): ColumnDef<WorkflowSession>[
     },
     {
       header: "Created At",
-      cell: (s) => (
-        <span className="text-on-surface-variant">{new Date(s.createdAt).toLocaleString()}</span>
-      ),
+      cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
     {
       header: "Actions",
