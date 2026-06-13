@@ -18,6 +18,8 @@ import uuid_utils
 from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from models.base import TZDateTime
+
 
 class AuthSession(SQLModel, table=True):
     """Database-persisted login session keyed by a hashed cookie token."""
@@ -35,5 +37,11 @@ class AuthSession(SQLModel, table=True):
     token_hash: str
     csrf_token: str
     user_id: str = Field(foreign_key="users.id", ondelete="CASCADE")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    last_active_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_type=TZDateTime,
+    )
+    last_active_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_type=TZDateTime,
+    )

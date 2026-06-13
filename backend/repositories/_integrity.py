@@ -1,15 +1,25 @@
-"""Helpers for classifying and translating SQLite ``IntegrityError`` causes.
+"""Helpers for classifying and translating database ``IntegrityError`` causes.
 
-SQLite reports constraint failures through a single ``IntegrityError`` whose
-message text identifies the kind of constraint that failed. These helpers inspect
-that text so repositories can translate low-level database errors into the
-domain exceptions in :mod:`repositories.exceptions`.
+Both SQLite and PostgreSQL report constraint failures through a single
+``IntegrityError`` whose message text identifies the kind of constraint that
+failed (each dialect with its own wording). These helpers inspect that text so
+repositories can translate low-level database errors into the domain
+exceptions in :mod:`repositories.exceptions`.
 """
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from repositories.exceptions import ForeignKeyViolationError
+
+_FK_MARKERS = (
+    "FOREIGN KEY constraint failed",  # SQLite
+    "violates foreign key constraint",  # PostgreSQL
+)
+_UNIQUE_MARKERS = (
+    "UNIQUE constraint failed",  # SQLite
+    "duplicate key value violates unique constraint",  # PostgreSQL
+)
 
 
 def is_foreign_key_error(error: IntegrityError) -> bool:
@@ -19,9 +29,11 @@ def is_foreign_key_error(error: IntegrityError) -> bool:
         error: The IntegrityError raised on commit.
 
     Returns:
-        ``True`` when the underlying SQLite message reports a failed foreign key.
+        ``True`` when the underlying SQLite or PostgreSQL message reports a
+        failed foreign key.
     """
-    return "FOREIGN KEY constraint failed" in str(error.orig)
+    message = str(error.orig)
+    return any(marker in message for marker in _FK_MARKERS)
 
 
 def is_unique_error(error: IntegrityError) -> bool:
@@ -31,9 +43,11 @@ def is_unique_error(error: IntegrityError) -> bool:
         error: The IntegrityError raised on commit.
 
     Returns:
-        ``True`` when the underlying SQLite message reports a failed unique constraint.
+        ``True`` when the underlying SQLite or PostgreSQL message reports a
+        failed unique constraint.
     """
-    return "UNIQUE constraint failed" in str(error.orig)
+    message = str(error.orig)
+    return any(marker in message for marker in _UNIQUE_MARKERS)
 
 
 async def commit_or_translate_user_fk(session: AsyncSession, *, user_id: str) -> None:

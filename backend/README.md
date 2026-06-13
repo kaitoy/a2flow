@@ -66,9 +66,10 @@ Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted.
 
 ```env
 DB_URL=sqlite:///a2flow.db
+# DB_URL=postgresql://user:password@localhost:5432/a2flow
 ```
 
-SQLite URL for REST API data and ADK session storage. Both the SQLModel async engine and `SqliteSessionService` open the same file. Defaults to `sqlite:///a2flow.db` (relative to the working directory). The database and tables are created automatically on first run.
+Database URL for REST API data and ADK session storage — both live in the same database. SQLite (the default, relative to the working directory) and PostgreSQL are supported; the async driver suffix (`sqlite+aiosqlite` / `postgresql+asyncpg`) is added automatically, so the plain scheme is enough. With SQLite the ADK session store uses `SqliteSessionService`; any other URL switches it to the SQLAlchemy-based `DatabaseSessionService`. Tables are created automatically on first run.
 
 | Table | Description |
 |---|---|

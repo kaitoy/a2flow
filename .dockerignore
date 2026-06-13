@@ -1,0 +1,24 @@
+# Excluded from the repo-root build context (used by frontend/Dockerfile).
+.git/
+.claude/
+.idea/
+
+# Backend artifacts
+backend/.venv/
+**/__pycache__/
+backend/.ruff_cache/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.env
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+backend/.skills_cache/
+backend/openapi.yaml
+
+# Frontend artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/src/generated/
+frontend/.env.local

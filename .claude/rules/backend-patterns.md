@@ -343,10 +343,13 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 
 ## Database Configuration
 
-- URL is read from the `DB_URL` environment variable (default: `sqlite:///a2flow.db`).
-- Async SQLAlchemy engine with `aiosqlite`.
-- SQLite pragmas set at connection time: `PRAGMA foreign_keys=ON` and `PRAGMA journal_mode=WAL`.
-- Tables are created at application startup via `SQLModel.metadata.create_all()`.
+- URL is read from the `DB_URL` environment variable (default: `sqlite:///a2flow.db`). PostgreSQL is selected by pointing it at a `postgresql://` URL — no code change needed.
+- `infrastructure/database.py` normalizes the URL to its async-driver variant via `to_async_url()` (`sqlite` → `aiosqlite`, `postgresql`/`postgres` → `asyncpg`; explicit drivers pass through) and exposes it as `ASYNC_DB_URL`.
+- SQLite pragmas (`PRAGMA foreign_keys=ON`, `PRAGMA journal_mode=WAL`) are registered only when the engine dialect is SQLite. Non-SQLite engines get `pool_pre_ping=True`.
+- The ADK session service factory (`dependencies/singletons.py`) branches on `is_sqlite_url(DB_URL)`: SQLite keeps `StaleTolerantSqliteSessionService`; anything else uses `StaleTolerantDatabaseSessionService` (SQLAlchemy-based, same database).
+- `repositories/_integrity.py` classifies `IntegrityError`s by message markers for **both** dialects (`FOREIGN KEY constraint failed` / `violates foreign key constraint`, `UNIQUE constraint failed` / `duplicate key value violates unique constraint`). When adding constraint-translation logic, cover both.
+- Datetime table columns must use `sa_type=TZDateTime` (`models/base.py`) — asyncpg rejects tz-aware values on naive `TIMESTAMP` columns; `TZDateTime` maps to `timestamptz` on PostgreSQL and is a no-op on SQLite.
+- Tables are created at application startup via `SQLModel.metadata.create_all()` (works on both backends; no migrations).
 
 ---
 

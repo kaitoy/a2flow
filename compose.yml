@@ -1,0 +1,58 @@
+# Full A2Flow stack: PostgreSQL 17 + backend (FastAPI/ADK) + frontend (Next.js).
+#
+# Usage (Google AI Studio — default):
+#   echo GOOGLE_API_KEY=<your-key> > .env
+#   docker compose up --build
+#
+# Usage (OpenAI):
+#   printf 'LLM_MODEL=litellm:openai/gpt-4o\nOPENAI_API_KEY=<your-key>\n' > .env
+#   docker compose up --build
+#
+# Usage (Anthropic):
+#   printf 'LLM_MODEL=litellm:anthropic/claude-3-5-sonnet-20241022\nANTHROPIC_API_KEY=<your-key>\n' > .env
+#   docker compose up --build
+#
+# The app is served at http://localhost:3000. The browser talks only to the
+# frontend; Next.js rewrites proxy /api/* server-side to the backend, keeping
+# the auth cookies same-origin.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: a2flow
+      POSTGRES_PASSWORD: a2flow
+      POSTGRES_DB: a2flow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U a2flow -d a2flow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    environment:
+      DB_URL: postgresql://a2flow:a2flow@db:5432/a2flow
+      LLM_MODEL: ${LLM_MODEL:-gemini-2.0-flash}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CORS_ORIGINS: http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        BACKEND_BASE_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

@@ -13,7 +13,7 @@ from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity
+from models.base import BaseEntity, TZDateTime
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -104,7 +104,7 @@ class User(UserCreate, BaseEntity, table=True):
         Index("ix_users_username", "username"),
     )
 
-    deleted_at: datetime | None = Field(default=None)
+    deleted_at: datetime | None = Field(default=None, sa_type=TZDateTime)
 
     @field_serializer("deleted_at", when_used="json")
     def _serialize_deleted_at(self, dt: datetime | None) -> str | None:

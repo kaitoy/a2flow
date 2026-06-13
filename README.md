@@ -12,7 +12,7 @@ The frontend uses a **glassmorphism** visual style with a **light/dark theme tog
 │   @ag-ui/client                  │ ───────────────────────────────► │  Google ADK agent    │
 │   @ag-ui/a2ui-middleware         │   A2UIMiddleware)                 │  AGUIToolset         │
 │   Redux Toolkit                  │                                   │  InMemorySession     │
-│   Admin UI (/admin)              │ ◄─────────────────────────────── │  SQLite (SQLModel)   │
+│   Admin UI (/admin)              │ ◄─────────────────────────────── │  SQLite/PostgreSQL   │
 └──────────────────────────────────┘  AG-UI events (SSE) incl.        └──────────────────────┘
      :3000                            A2UI (TOOL_CALL_*)                    :8000
 ```
@@ -57,6 +57,28 @@ Open [http://localhost:3000](http://localhost:3000).
 ### 3. Git hooks (lefthook)
 
 Pre-commit / pre-push hooks (lefthook) run linters, formatters, type checkers, and tests. See [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md) for installation and details.
+
+## Run with Docker Compose
+
+Alternatively, the whole stack — PostgreSQL 17, the backend, and the frontend — can be built and started with Docker Compose ([compose.yml](compose.yml)):
+
+```bash
+echo GOOGLE_API_KEY=your_google_api_key_here > .env
+docker compose up --build
+```
+
+Open [http://localhost:3000](http://localhost:3000). Database data persists in the `pgdata` volume across restarts.
+
+## Database
+
+All persistent data — REST API records and ADK session storage — lives in one relational database selected by `DB_URL` in `backend/.env`:
+
+| Backend | `DB_URL` | Notes |
+|---|---|---|
+| SQLite (default) | `sqlite:///a2flow.db` | Zero-config local file |
+| PostgreSQL | `postgresql://user:password@host:5432/a2flow` | Used by the Docker Compose stack |
+
+The async driver suffix (`aiosqlite` / `asyncpg`) is added automatically. Tables are created on startup; no migration step is needed.
 
 ## Authentication
 

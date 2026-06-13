@@ -1,0 +1,16 @@
+# Excluded from the backend image build context.
+.venv/
+__pycache__/
+*.py[oc]
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+tests/
+.env
+*.db
+*.db-shm
+*.db-wal
+.skills_cache/
+openapi.yaml
+Dockerfile
+.dockerignore

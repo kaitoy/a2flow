@@ -15,8 +15,11 @@ from fastapi import Depends
 from google.adk.sessions import BaseSessionService
 
 from infrastructure.agent import AgentRegistry
-from infrastructure.database import DB_URL
-from infrastructure.session_service import StaleTolerantSqliteSessionService
+from infrastructure.database import ASYNC_DB_URL, DB_URL, is_sqlite_url
+from infrastructure.session_service import (
+    StaleTolerantDatabaseSessionService,
+    StaleTolerantSqliteSessionService,
+)
 from infrastructure.skill_manager import SkillManager
 
 from .context import APP_NAME
@@ -24,8 +27,16 @@ from .context import APP_NAME
 
 @lru_cache(maxsize=1)
 def get_session_service() -> BaseSessionService:
-    """Return the LRU-cached ADK session service singleton."""
-    return StaleTolerantSqliteSessionService(DB_URL)
+    """Return the LRU-cached ADK session service singleton.
+
+    SQLite ``DB_URL``s keep the aiosqlite-based service; any other database
+    (e.g. PostgreSQL) uses the SQLAlchemy-based service with the async-driver
+    URL, so the ADK session store always lives in the same database as the
+    REST API data.
+    """
+    if is_sqlite_url(DB_URL):
+        return StaleTolerantSqliteSessionService(DB_URL)
+    return StaleTolerantDatabaseSessionService(ASYNC_DB_URL)
 
 
 @lru_cache(maxsize=1)

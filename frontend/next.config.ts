@@ -9,6 +9,8 @@ import type { NextConfig } from 'next';
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL ?? 'http://localhost:8000';
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle consumed by frontend/Dockerfile.
+  output: 'standalone',
   outputFileTracingRoot: __dirname,
   async rewrites() {
     return [
