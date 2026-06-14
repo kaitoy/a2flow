@@ -1,7 +1,7 @@
 /**
- * @module middleware — Edge route guard based on the presence of the session cookie.
+ * @module proxy — Edge route guard based on the presence of the session cookie.
  *
- * Next.js middleware runs on the server and can read the HttpOnly session
+ * Next.js proxy runs on the server and can read the HttpOnly session
  * cookie. It only checks for the cookie's presence (not validity); the
  * `AuthProvider` then confirms the session with `/auth/me` and the axios 401
  * interceptor handles sessions that turn out to be invalid.
@@ -18,7 +18,7 @@ const SESSION_COOKIE_NAME = "a2flow_session";
  * @param request - The incoming request.
  * @returns A redirect response, or `NextResponse.next()` to continue.
  */
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const hasSession = request.cookies.has(SESSION_COOKIE_NAME);
   const { pathname } = request.nextUrl;
   const isLogin = pathname === "/login";
