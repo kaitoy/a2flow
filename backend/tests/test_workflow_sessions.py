@@ -6,8 +6,8 @@ from httpx import AsyncClient
 
 from tests._envelope import assert_err, assert_ok
 
-_SKILL_BODY = {"name": "Skill A", "repo_url": "https://github.com/x/y"}
-_WF_BODY = {"name": "My Workflow", "prompt": "Do the thing"}
+_SKILL_BODY = {"name": "skill-a", "repo_url": "https://github.com/x/y"}
+_WF_BODY = {"name": "my-workflow", "prompt": "Do the thing"}
 
 
 async def _create_skill(client: AsyncClient) -> Any:
@@ -60,7 +60,7 @@ async def test_list_workflow_sessions_respects_limit_param(
 ) -> None:
     skill = await _create_skill(workflow_client)
     body = {
-        "name": "My Workflow",
+        "name": "my-workflow",
         "prompt": "Do the thing",
         "agent_skill_id": skill["id"],
     }

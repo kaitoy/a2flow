@@ -7,17 +7,16 @@ serialized to clients.
 
 from datetime import UTC, datetime
 
-from pydantic import field_serializer, field_validator
+from pydantic import EmailStr, field_serializer
 from pydantic.alias_generators import to_camel
 from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity, TZDateTime
+from models.constraints import Password, PersonName, Username
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
-
-_PASSWORD_MIN_LENGTH = 12
 
 #: Identifier of the seeded system user that owns the bootstrap records. It is the
 #: ``created_by`` / ``updated_by`` of the very first records and is hidden from the
@@ -49,42 +48,22 @@ class UserUpdate(SQLModel):
     """
 
     model_config = _alias_config
-    first_name: str | None = None
-    last_name: str | None = None
-    password: str | None = None
-    email: str | None = None
+    first_name: PersonName | None = None
+    last_name: PersonName | None = None
+    password: Password | None = None
+    email: EmailStr | None = None
     enabled: bool | None = None
     email_verified: bool | None = None
-
-    @field_validator("password")
-    @classmethod
-    def password_min_length(cls, v: str | None) -> str | None:
-        """Enforce the minimum password length when a password is supplied.
-
-        Args:
-            v: The plaintext password value, or ``None`` when omitted.
-
-        Returns:
-            The original value if valid.
-
-        Raises:
-            ValueError: If the password is shorter than :data:`_PASSWORD_MIN_LENGTH`.
-        """
-        if v is not None and len(v) < _PASSWORD_MIN_LENGTH:
-            raise ValueError(
-                f"Password must be at least {_PASSWORD_MIN_LENGTH} characters"
-            )
-        return v
 
 
 class UserCreate(UserUpdate):
     """Creation payload for a User with required fields and boolean defaults."""
 
-    username: str
-    first_name: str
-    last_name: str
-    password: str
-    email: str
+    username: Username
+    first_name: PersonName
+    last_name: PersonName
+    password: Password
+    email: EmailStr
     enabled: bool = True
     email_verified: bool = False
 

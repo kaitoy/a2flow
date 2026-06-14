@@ -21,12 +21,12 @@ vi.mock("next/navigation", () => ({
 describe("WorkflowsPage", () => {
   it("renders workflow row after load", async () => {
     render(<WorkflowsPage />);
-    await waitFor(() => expect(screen.getByText("My Workflow")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("my-workflow")).toBeInTheDocument());
   });
 
   it("renders a Run button per workflow", async () => {
     render(<WorkflowsPage />);
-    await waitFor(() => screen.getByText("My Workflow"));
+    await waitFor(() => screen.getByText("my-workflow"));
     expect(screen.getByRole("button", { name: "Run" })).toBeInTheDocument();
   });
 
@@ -34,7 +34,7 @@ describe("WorkflowsPage", () => {
     pushMock.mockClear();
     const user = userEvent.setup();
     render(<WorkflowsPage />);
-    await waitFor(() => screen.getByText("My Workflow"));
+    await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: "Run" }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/ws-1"));
   });
@@ -48,7 +48,7 @@ describe("WorkflowsPage", () => {
     );
     const user = userEvent.setup();
     render(<WorkflowsPage />);
-    await waitFor(() => screen.getByText("My Workflow"));
+    await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: "Run" }));
     await waitFor(() => expect(screen.getByText(/500/)).toBeInTheDocument());
   });
@@ -59,7 +59,7 @@ describe("WorkflowsPage", () => {
     server.use(http.delete("http://localhost:8000/api/v1/workflows/:id", deleteSpy));
 
     render(<WorkflowsPage />);
-    await waitFor(() => screen.getByText("My Workflow"));
+    await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));

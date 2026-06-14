@@ -14,18 +14,19 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { zUserCreate } from "@/generated/api/zod.gen";
 import { deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
 
-const schema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  // Optional on edit: a blank value leaves the stored password unchanged.
+// Reuse the generated create-schema field constraints, but drop the immutable
+// username and relax the password: on edit a blank value leaves the stored
+// password unchanged, so empty string is allowed alongside the 12–72 range.
+const schema = zUserCreate.omit({ username: true, password: true }).extend({
   password: z
     .string()
-    .refine((v) => v === "" || v.length >= 12, "Password must be at least 12 characters"),
-  email: z.string().email("Must be a valid email"),
-  enabled: z.boolean(),
-  emailVerified: z.boolean(),
+    .refine(
+      (v) => v === "" || (v.length >= 12 && v.length <= 72),
+      "Password must be 12–72 characters"
+    ),
 });
 
 type FormValues = z.infer<typeof schema>;

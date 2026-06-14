@@ -5,23 +5,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import type { z } from "zod";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { zUserCreate } from "@/generated/api/zod.gen";
 import { createUser } from "@/lib/api";
 
-const schema = z.object({
-  username: z.string().min(1, "Username is required"),
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  password: z.string().min(12, "Password must be at least 12 characters"),
-  email: z.string().email("Must be a valid email"),
-  enabled: z.boolean(),
-  emailVerified: z.boolean(),
-});
+const schema = zUserCreate;
 
 type FormValues = z.infer<typeof schema>;
 

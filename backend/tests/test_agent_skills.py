@@ -55,7 +55,7 @@ async def skill_client(
         await mem_engine.dispose()
 
 
-_CREATE_BODY = {"name": "My Skill", "repo_url": "https://github.com/example/repo"}
+_CREATE_BODY = {"name": "my-skill", "repo_url": "https://github.com/example/repo"}
 
 
 # ---------- create ----------
@@ -75,7 +75,7 @@ async def test_create_skill_response_has_correct_name(
     skill_client: AsyncClient,
 ) -> None:
     response = await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY)
-    assert assert_ok(response, status=201)["name"] == "My Skill"
+    assert assert_ok(response, status=201)["name"] == "my-skill"
 
 
 async def test_create_skill_missing_name_returns_422(skill_client: AsyncClient) -> None:
@@ -89,7 +89,7 @@ async def test_create_skill_missing_repo_url_returns_422(
     skill_client: AsyncClient,
 ) -> None:
     response = await skill_client.post(
-        "/api/v1/agent-skills", json={"name": "My Skill"}
+        "/api/v1/agent-skills", json={"name": "my-skill"}
     )
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
@@ -112,7 +112,7 @@ async def test_list_skills_respects_limit_param(skill_client: AsyncClient) -> No
     for i in range(3):
         await skill_client.post(
             "/api/v1/agent-skills",
-            json={"name": f"Skill {i}", "repo_url": "https://github.com/x/y"},
+            json={"name": f"skill-{i}", "repo_url": "https://github.com/x/y"},
         )
     response = await skill_client.get("/api/v1/agent-skills", params={"limit": 2})
     assert len(assert_ok(response)) == 2
@@ -122,7 +122,7 @@ async def test_list_skills_respects_offset_param(skill_client: AsyncClient) -> N
     for i in range(3):
         await skill_client.post(
             "/api/v1/agent-skills",
-            json={"name": f"Skill {i}", "repo_url": "https://github.com/x/y"},
+            json={"name": f"skill-{i}", "repo_url": "https://github.com/x/y"},
         )
     response = await skill_client.get(
         "/api/v1/agent-skills", params={"limit": 10, "offset": 2}
@@ -137,7 +137,7 @@ async def _create_named_skills(skill_client: AsyncClient) -> None:
     for i in range(3):
         await skill_client.post(
             "/api/v1/agent-skills",
-            json={"name": f"Skill {i}", "repo_url": "https://github.com/x/y"},
+            json={"name": f"skill-{i}", "repo_url": "https://github.com/x/y"},
         )
 
 
@@ -145,23 +145,23 @@ async def test_list_skills_sort_by_name_asc(skill_client: AsyncClient) -> None:
     await _create_named_skills(skill_client)
     response = await skill_client.get("/api/v1/agent-skills", params={"s": "name"})
     names = [s["name"] for s in assert_ok(response)]
-    assert names == ["Skill 0", "Skill 1", "Skill 2"]
+    assert names == ["skill-0", "skill-1", "skill-2"]
 
 
 async def test_list_skills_sort_by_name_desc(skill_client: AsyncClient) -> None:
     await _create_named_skills(skill_client)
     response = await skill_client.get("/api/v1/agent-skills", params={"s": "-name"})
     names = [s["name"] for s in assert_ok(response)]
-    assert names == ["Skill 2", "Skill 1", "Skill 0"]
+    assert names == ["skill-2", "skill-1", "skill-0"]
 
 
 async def test_list_skills_filter_eq(skill_client: AsyncClient) -> None:
     await _create_named_skills(skill_client)
     response = await skill_client.get(
-        "/api/v1/agent-skills", params={"q": "name:eq:Skill 1"}
+        "/api/v1/agent-skills", params={"q": "name:eq:skill-1"}
     )
     data = assert_ok(response)
-    assert [s["name"] for s in data] == ["Skill 1"]
+    assert [s["name"] for s in data] == ["skill-1"]
 
 
 async def test_list_skills_filter_like_is_case_insensitive(
@@ -215,7 +215,7 @@ async def test_get_skill_returns_correct_data(skill_client: AsyncClient) -> None
         await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
     )
     response = await skill_client.get(f"/api/v1/agent-skills/{created['id']}")
-    assert assert_ok(response)["name"] == "My Skill"
+    assert assert_ok(response)["name"] == "my-skill"
 
 
 async def test_get_skill_unknown_id_returns_404(skill_client: AsyncClient) -> None:
@@ -322,3 +322,48 @@ async def test_update_skill_preserves_created_by_and_overwrites_updated_by(
     body = assert_ok(response)
     assert body["createdBy"] == "alice"
     assert body["updatedBy"] == "bob"
+
+
+# ---------- field validation ----------
+
+
+async def test_create_skill_accepts_name_with_spaces(
+    skill_client: AsyncClient,
+) -> None:
+    """Names may contain half-width and full-width spaces and unicode letters."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={"name": "My Skill　日本語", "repo_url": "https://github.com/x/y"},
+    )
+    assert assert_ok(response, status=201)["name"] == "My Skill　日本語"
+
+
+async def test_create_skill_rejects_name_with_control_char(
+    skill_client: AsyncClient,
+) -> None:
+    """A name containing a control character is non-printable and returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={"name": "bad\tname", "repo_url": "https://github.com/x/y"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_overlong_name(skill_client: AsyncClient) -> None:
+    """A name longer than the 256-character ceiling returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={"name": "a" * 257, "repo_url": "https://github.com/x/y"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_non_http_repo_url(
+    skill_client: AsyncClient,
+) -> None:
+    """A repo_url that is not an http(s) URL returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={"name": "ok-name", "repo_url": "ftp://example.com/repo"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)

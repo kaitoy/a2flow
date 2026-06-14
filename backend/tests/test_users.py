@@ -372,3 +372,32 @@ async def test_delete_referenced_user_soft_deletes(user_client: AsyncClient) -> 
 async def test_system_user_is_hidden_from_list(user_client: AsyncClient) -> None:
     listed = assert_ok(await user_client.get("/api/v1/users"))
     assert all(u["id"] != SYSTEM_USER_ID for u in listed)
+
+
+# ---------- field validation ----------
+
+
+async def test_create_user_rejects_short_password(user_client: AsyncClient) -> None:
+    """A password shorter than 12 characters returns 422."""
+    response = await user_client.post(
+        "/api/v1/users", json={**_CREATE_BODY, "password": "short"}
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_user_rejects_invalid_email(user_client: AsyncClient) -> None:
+    """A malformed email address returns 422."""
+    response = await user_client.post(
+        "/api/v1/users", json={**_CREATE_BODY, "email": "not-an-email"}
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_user_rejects_username_with_bad_charset(
+    user_client: AsyncClient,
+) -> None:
+    """A username with characters outside the slug set returns 422."""
+    response = await user_client.post(
+        "/api/v1/users", json={**_CREATE_BODY, "username": "has space"}
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)

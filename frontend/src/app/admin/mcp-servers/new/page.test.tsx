@@ -26,7 +26,7 @@ describe("NewMcpServerPage", () => {
     );
 
     render(<NewMcpServerPage />);
-    await user.type(screen.getByLabelText(/name/i), "Test Server");
+    await user.type(screen.getByLabelText(/name/i), "test-server");
     await user.type(screen.getByLabelText(/url/i), "https://mcp.test/mcp");
     await user.click(screen.getByRole("button", { name: /add row/i }));
     await user.type(screen.getByLabelText("headers key 1"), "Authorization");
@@ -35,7 +35,7 @@ describe("NewMcpServerPage", () => {
 
     await waitFor(() =>
       expect(receivedBody).toEqual({
-        name: "Test Server",
+        name: "test-server",
         url: "https://mcp.test/mcp",
         headers: { Authorization: "Bearer abc" },
       })
@@ -55,7 +55,7 @@ describe("NewMcpServerPage", () => {
     });
 
     render(<NewMcpServerPage />);
-    await user.type(screen.getByLabelText(/name/i), "Test Server");
+    await user.type(screen.getByLabelText(/name/i), "test-server");
     await user.type(screen.getByLabelText(/url/i), "https://mcp.test/mcp");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -67,7 +67,7 @@ describe("NewMcpServerPage", () => {
     render(<NewMcpServerPage />);
     await user.type(screen.getByLabelText(/url/i), "not-a-url");
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/must be a valid url/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
   });
 
   it("shows error on api failure", async () => {
@@ -80,7 +80,7 @@ describe("NewMcpServerPage", () => {
     );
 
     render(<NewMcpServerPage />);
-    await user.type(screen.getByLabelText(/name/i), "Test Server");
+    await user.type(screen.getByLabelText(/name/i), "test-server");
     await user.type(screen.getByLabelText(/url/i), "https://mcp.test/mcp");
     await user.click(screen.getByRole("button", { name: /save/i }));
 

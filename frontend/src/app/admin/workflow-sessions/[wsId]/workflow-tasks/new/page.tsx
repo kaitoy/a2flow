@@ -13,17 +13,26 @@ import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { zWorkflowTaskCreate } from "@/generated/api/zod.gen";
 import { createWorkflowTask, listWorkflowTasks, type WorkflowTask } from "@/lib/api";
 import { loadMcpToolOptions, type McpToolOption, valueToBinding } from "@/lib/mcp-tool-options";
 
-const schema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string(),
-  status: z.enum(["pending", "in_progress", "completed", "failed", "skipped"]),
-  position: z.coerce.number().int().min(0, "Position must be 0 or greater"),
-  dependsOnIds: z.array(z.string()),
-  toolBindings: z.array(z.string()),
-});
+// Generated schema carries the title/description/status/position constraints.
+// The parent session id comes from the URL, and the form edits dependencies and
+// tool bindings as plain string arrays (encoded values), so omit those and
+// re-add them in the form's shape. Position is coerced from the number input.
+const schema = zWorkflowTaskCreate
+  .omit({
+    workflowSessionId: true,
+    position: true,
+    dependsOnIds: true,
+    toolBindings: true,
+  })
+  .extend({
+    position: z.coerce.number().int().min(0, "Position must be 0 or greater").max(100000),
+    dependsOnIds: z.array(z.string()),
+    toolBindings: z.array(z.string()),
+  });
 
 type FormValues = z.infer<typeof schema>;
 

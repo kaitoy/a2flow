@@ -78,7 +78,15 @@ describe("NewUserPage", () => {
     render(<NewUserPage />);
     await user.click(screen.getByRole("textbox", { name: /username/i }));
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/username is required/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/at least 3 character/i)).toBeInTheDocument());
+  });
+
+  it("shows validation error on blur when username has invalid characters", async () => {
+    const user = userEvent.setup();
+    render(<NewUserPage />);
+    await user.type(screen.getByRole("textbox", { name: /username/i }), "has space");
+    await user.tab();
+    await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
   });
 
   it("shows validation error on blur when email is invalid", async () => {
@@ -86,7 +94,7 @@ describe("NewUserPage", () => {
     render(<NewUserPage />);
     await user.type(screen.getByRole("textbox", { name: /email/i }), "not-an-email");
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/must be a valid email/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/invalid email/i)).toBeInTheDocument());
   });
 
   it("shows validation error when password is too short", async () => {
@@ -94,7 +102,7 @@ describe("NewUserPage", () => {
     render(<NewUserPage />);
     await user.type(screen.getByLabelText(/password/i), "short");
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/at least 12 characters/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/at least 12 character/i)).toBeInTheDocument());
   });
 
   it("shows error on api failure", async () => {

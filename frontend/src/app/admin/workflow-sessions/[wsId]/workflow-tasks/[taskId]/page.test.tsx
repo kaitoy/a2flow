@@ -210,7 +210,7 @@ describe("EditWorkflowTaskPage", () => {
 
     render(<EditWorkflowTaskPage />);
     // The task binds MCP_SERVER_1's "search" tool, so its checkbox is pre-checked.
-    expect(await screen.findByRole("checkbox", { name: "My MCP Server: search" })).toBeChecked();
+    expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeChecked();
 
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(pushMock).toHaveBeenCalled());
@@ -244,7 +244,7 @@ describe("EditWorkflowTaskPage", () => {
     render(<EditWorkflowTaskPage />);
     // The catalog fetch fails, but the existing binding is merged in (labeled
     // with the registered server name) so it stays visible and deselectable.
-    expect(await screen.findByRole("checkbox", { name: "My MCP Server: search" })).toBeChecked();
+    expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeChecked();
   });
 
   it("opens the confirm dialog and calls DELETE", async () => {

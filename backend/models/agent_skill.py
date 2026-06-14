@@ -6,6 +6,7 @@ from sqlmodel import SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
+from models.constraints import DescText, EntityName, HttpUrl, RepoPath
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -14,18 +15,18 @@ class AgentSkillUpdate(SQLModel):
     """Partial update payload for an AgentSkill — all fields are optional."""
 
     model_config = _alias_config
-    name: str | None = None
-    repo_url: str | None = None
-    repo_path: str | None = None
-    description: str | None = None
+    name: EntityName | None = None
+    repo_url: HttpUrl | None = None
+    repo_path: RepoPath | None = None
+    description: DescText | None = None
 
 
 class AgentSkillCreate(AgentSkillUpdate):
     """Creation payload for an AgentSkill with required fields."""
 
-    name: str
-    repo_url: str
-    repo_path: str = ""
+    name: EntityName
+    repo_url: HttpUrl
+    repo_path: RepoPath = ""
 
 
 class AgentSkill(AgentSkillCreate, BaseEntity, table=True):

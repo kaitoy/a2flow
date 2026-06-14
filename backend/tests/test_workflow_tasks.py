@@ -28,7 +28,7 @@ async def _create_workflow_session(client: AsyncClient) -> Any:
     skill = assert_ok(
         await client.post(
             "/api/v1/agent-skills",
-            json={"name": f"Skill {n}", "repo_url": f"https://github.com/x/y{n}"},
+            json={"name": f"skill-{n}", "repo_url": f"https://github.com/x/y{n}"},
         ),
         status=201,
     )
@@ -36,7 +36,7 @@ async def _create_workflow_session(client: AsyncClient) -> Any:
         await client.post(
             "/api/v1/workflows",
             json={
-                "name": f"Workflow {n}",
+                "name": f"workflow-{n}",
                 "prompt": _WF_PROMPT,
                 "agent_skill_id": skill["id"],
             },
@@ -597,7 +597,7 @@ async def _create_mcp_server(client: AsyncClient) -> Any:
     return assert_ok(
         await client.post(
             "/api/v1/mcp-servers",
-            json={"name": f"MCP {n}", "url": f"https://mcp{n}.example.com/mcp"},
+            json={"name": f"mcp-{n}", "url": f"https://mcp{n}.example.com/mcp"},
         ),
         status=201,
     )
@@ -724,3 +724,18 @@ async def test_delete_task_cascades_tool_bindings(
     # With the binding gone, the server is deletable (no CONFLICT_REFERENCED).
     response = await workflow_client.delete(f"/api/v1/mcp-servers/{server['id']}")
     assert assert_ok(response, status=200) is None
+
+
+# ---------- field validation ----------
+
+
+async def test_create_task_rejects_negative_position(
+    workflow_client: AsyncClient,
+) -> None:
+    """A negative position violates the ``ge=0`` bound and returns 422."""
+    ws = await _create_workflow_session(workflow_client)
+    response = await workflow_client.post(
+        "/api/v1/workflow-tasks",
+        json={"workflowSessionId": ws["id"], "title": "Step 1", "position": -1},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)

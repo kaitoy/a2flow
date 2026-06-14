@@ -20,7 +20,7 @@ describe("McpServersPage", () => {
 
   it("renders server row after load", async () => {
     render(<McpServersPage />);
-    await waitFor(() => expect(screen.getByText("My MCP Server")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("my-mcp-server")).toBeInTheDocument());
     expect(screen.getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
     expect(screen.getByText("1 header")).toBeInTheDocument();
   });
@@ -46,7 +46,7 @@ describe("McpServersPage", () => {
 
   it("add server link is present", async () => {
     render(<McpServersPage />);
-    await waitFor(() => screen.getByText("My MCP Server"));
+    await waitFor(() => screen.getByText("my-mcp-server"));
     expect(screen.getByRole("link", { name: /add server/i })).toHaveAttribute(
       "href",
       "/admin/mcp-servers/new"
@@ -59,7 +59,7 @@ describe("McpServersPage", () => {
     server.use(http.delete("http://localhost:8000/api/v1/mcp-servers/:id", deleteSpy));
 
     render(<McpServersPage />);
-    await waitFor(() => screen.getByText("My MCP Server"));
+    await waitFor(() => screen.getByText("my-mcp-server"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));

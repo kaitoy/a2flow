@@ -20,7 +20,7 @@ describe("AgentSkillsPage", () => {
 
   it("renders skill row after load", async () => {
     render(<AgentSkillsPage />);
-    await waitFor(() => expect(screen.getByText("My Skill")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("my-skill")).toBeInTheDocument());
   });
 
   it("shows empty state when no skills", async () => {
@@ -44,7 +44,7 @@ describe("AgentSkillsPage", () => {
 
   it("add skill link is present", async () => {
     render(<AgentSkillsPage />);
-    await waitFor(() => screen.getByText("My Skill"));
+    await waitFor(() => screen.getByText("my-skill"));
     expect(screen.getByRole("link", { name: /add skill/i })).toHaveAttribute(
       "href",
       "/admin/agent-skills/new"
@@ -57,7 +57,7 @@ describe("AgentSkillsPage", () => {
     server.use(http.delete("http://localhost:8000/api/v1/agent-skills/:id", deleteSpy));
 
     render(<AgentSkillsPage />);
-    await waitFor(() => screen.getByText("My Skill"));
+    await waitFor(() => screen.getByText("my-skill"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));

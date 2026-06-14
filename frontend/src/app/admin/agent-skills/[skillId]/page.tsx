@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import type { z } from "zod";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
@@ -14,14 +14,10 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { zAgentSkillCreate } from "@/generated/api/zod.gen";
 import { deleteAgentSkill, getAgentSkill, updateAgentSkill } from "@/lib/api";
 
-const schema = z.object({
-  name: z.string().min(1, "Name is required"),
-  repoUrl: z.string().url("Must be a valid URL").min(1, "Repo URL is required"),
-  repoPath: z.string(),
-  description: z.string(),
-});
+const schema = zAgentSkillCreate;
 
 type FormValues = z.infer<typeof schema>;
 

@@ -5,7 +5,7 @@ const BASE = "http://localhost:8000";
 
 const SKILL_1 = {
   id: "skill-1",
-  name: "My Skill",
+  name: "my-skill",
   repoUrl: "https://github.com/example/repo",
   repoPath: "",
   description: null,
@@ -31,7 +31,7 @@ const USER_1 = {
 
 const WORKFLOW_1 = {
   id: "wf-1",
-  name: "My Workflow",
+  name: "my-workflow",
   prompt: "Do the thing",
   description: null,
   agentSkillId: "skill-1",
@@ -77,7 +77,7 @@ const WORKFLOW_TASK_1 = {
 
 export const MCP_SERVER_1 = {
   id: "mcp-1",
-  name: "My MCP Server",
+  name: "my-mcp-server",
   url: "https://mcp.example.com/mcp",
   headers: { Authorization: "Bearer secret" },
   createdAt: "2026-01-01T00:00:00Z",

@@ -96,8 +96,8 @@ describe("WorkflowTasksPage", () => {
 
     render(<WorkflowTasksPage />);
     expect(await screen.findByText("Tools")).toBeInTheDocument();
-    // The global handlers register MCP_SERVER_1 (id "mcp-1", name "My MCP Server").
-    await waitFor(() => expect(screen.getByText("My MCP Server: search")).toBeInTheDocument());
+    // The global handlers register MCP_SERVER_1 (id "mcp-1", name "my-mcp-server").
+    await waitFor(() => expect(screen.getByText("my-mcp-server: search")).toBeInTheDocument());
   });
 
   it("shows a placeholder in the Tools column when a task has no bindings", async () => {

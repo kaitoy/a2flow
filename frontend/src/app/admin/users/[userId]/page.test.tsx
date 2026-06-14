@@ -159,7 +159,7 @@ describe("EditUserPage", () => {
     const firstNameInput = screen.getByRole("textbox", { name: /first name/i });
     await user.clear(firstNameInput);
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/first name is required/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
   });
 
   it("shows error on load failure", async () => {
