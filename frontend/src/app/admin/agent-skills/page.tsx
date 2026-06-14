@@ -2,13 +2,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { useTableQuery } from "@/hooks/useTableQuery";
 import { type AgentSkill, deleteAgentSkill, listAgentSkills } from "@/lib/api";
 
 const LIMIT = 20;
@@ -16,51 +17,45 @@ const LIMIT = 20;
 const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
   {
     header: "Name",
+    sortField: "name",
+    filterField: "name",
     cell: (s) => <span className="font-medium">{s.name}</span>,
   },
   {
     header: "Repo URL",
-    className: "max-w-[200px] truncate",
+    truncate: true,
+    sortField: "repoUrl",
+    filterField: "repoUrl",
     cell: (s) => s.repoUrl,
   },
   {
     header: "Repo Path",
+    sortField: "repoPath",
+    filterField: "repoPath",
     cell: (s) => s.repoPath || "—",
   },
   {
     header: "Description",
-    className: "max-w-[200px] truncate",
+    truncate: true,
+    sortField: "description",
+    filterField: "description",
     cell: (s) => s.description || "—",
   },
   {
     header: "Created At",
+    sortField: "createdAt",
     cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
   },
 ];
 
 export default function AgentSkillsPage() {
-  const [skills, setSkills] = useState<AgentSkill[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
+  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
+    useTableQuery<AgentSkill>(listAgentSkills, {
+      limit: LIMIT,
+      errorMessage: "Failed to load agent skills",
+    });
+  const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listAgentSkills(LIMIT, offset);
-      setSkills(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load agent skills");
-    } finally {
-      setLoading(false);
-    }
-  }, [offset]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
@@ -71,9 +66,10 @@ export default function AgentSkillsPage() {
     try {
       await deleteAgentSkill(confirmTarget.id);
       setConfirmTarget(null);
-      await load();
+      setActionError(null);
+      await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete agent skill");
+      setActionError(e instanceof Error ? e.message : "Failed to delete agent skill");
       setConfirmTarget(null);
     }
   }
@@ -109,18 +105,22 @@ export default function AgentSkillsPage() {
         addHref="/admin/agent-skills/new"
         addLabel="+ Add skill"
       />
-      <ErrorBanner error={error} />
+      <ErrorBanner error={actionError ?? error} />
       <DataTable
         columns={columns}
-        rows={skills}
+        rows={rows}
         loading={loading}
         emptyMessage="No agent skills registered yet."
         getRowKey={(skill) => skill.id}
+        sort={sort}
+        onSortChange={setSort}
+        filters={filters}
+        onFilterChange={setFilters}
       />
       <PaginationControls
         offset={offset}
         limit={LIMIT}
-        count={skills.length}
+        count={rows.length}
         onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
         onNext={() => setOffset((o) => o + LIMIT)}
       />

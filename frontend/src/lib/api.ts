@@ -1,7 +1,7 @@
 import { type A2UIInlineCatalogSchema, A2UIMiddleware } from "@ag-ui/a2ui-middleware";
 import { HttpAgent } from "@ag-ui/client";
 import type { Message } from "@ag-ui/core";
-import axios, { type AxiosResponse } from "axios";
+import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
 import type { z } from "zod";
 import type {
   AgentSkillCreate,
@@ -218,6 +218,55 @@ export type {
   WorkflowUpdate,
 };
 
+/** A single server-side sort directive: order by `field`, descending when set. */
+export interface SortSpec {
+  /** camelCase field name to sort by (matches the model field exposed by the API). */
+  field: string;
+  /** When true, sort descending; otherwise ascending. */
+  descending: boolean;
+}
+
+/** A single server-side filter directive applied as `field:op:value`. */
+export interface FilterSpec {
+  /** camelCase field name to filter on. */
+  field: string;
+  /** Comparison operator: one of `eq`/`ne`/`lt`/`lte`/`gt`/`gte`/`like`/`in`. */
+  op: string;
+  /** Value to compare against (for `in`, a comma-separated list). */
+  value: string;
+}
+
+/** Pagination plus optional server-side sort and filters for a list endpoint. */
+export interface ListQuery {
+  /** Page size (1–1000). Defaults to 20. */
+  limit?: number;
+  /** Number of records to skip. Defaults to 0. */
+  offset?: number;
+  /** Single-column sort directive, or null/undefined for the server default order. */
+  sort?: SortSpec | null;
+  /** Filter directives, combined with AND. */
+  filters?: FilterSpec[];
+}
+
+/**
+ * Build the axios request config (query params + serializer) for a list call.
+ *
+ * Encodes `sort` into the `s` param (`-` prefix for descending) and `filters`
+ * into repeated `q` params (`field:op:value`). `indexes: null` makes axios emit
+ * repeated keys without brackets (`q=a&q=b`), matching FastAPI's list-query shape.
+ */
+function listConfig({
+  limit = 20,
+  offset = 0,
+  sort = null,
+  filters = [],
+}: ListQuery = {}): Pick<AxiosRequestConfig, "params" | "paramsSerializer"> {
+  const params: Record<string, unknown> = { limit, offset };
+  if (sort) params.s = `${sort.descending ? "-" : ""}${sort.field}`;
+  if (filters.length > 0) params.q = filters.map((f) => `${f.field}:${f.op}:${f.value}`);
+  return { params, paramsSerializer: { indexes: null } };
+}
+
 /**
  * Authenticate with username and password. On success the backend sets the
  * session and CSRF cookies and returns the logged-in user.
@@ -274,10 +323,10 @@ export async function deleteSession(sessionId: string): Promise<void> {
   );
 }
 
-/** List agent skills with optional pagination. */
-export async function listAgentSkills(limit = 20, offset = 0): Promise<AgentSkill[]> {
+/** List agent skills with optional pagination, sort, and filters. */
+export async function listAgentSkills(query: ListQuery = {}): Promise<AgentSkill[]> {
   return fetchEnvelope(
-    apiClient.get("/api/v1/agent-skills", { params: { limit, offset } }),
+    apiClient.get("/api/v1/agent-skills", listConfig(query)),
     zListAgentSkillsApiV1AgentSkillsGetResponse
   ) as Promise<AgentSkill[]>;
 }
@@ -314,10 +363,10 @@ export async function deleteAgentSkill(id: string): Promise<void> {
   );
 }
 
-/** List registered MCP servers with optional pagination. */
-export async function listMcpServers(limit = 20, offset = 0): Promise<McpServer[]> {
+/** List registered MCP servers with optional pagination, sort, and filters. */
+export async function listMcpServers(query: ListQuery = {}): Promise<McpServer[]> {
   return fetchEnvelope(
-    apiClient.get("/api/v1/mcp-servers", { params: { limit, offset } }),
+    apiClient.get("/api/v1/mcp-servers", listConfig(query)),
     zListMcpServersApiV1McpServersGetResponse
   ) as Promise<McpServer[]>;
 }
@@ -362,10 +411,10 @@ export async function listMcpServerTools(id: string): Promise<McpToolInfo[]> {
   ) as Promise<McpToolInfo[]>;
 }
 
-/** List users with optional pagination. */
-export async function listUsers(limit = 20, offset = 0): Promise<User[]> {
+/** List users with optional pagination, sort, and filters. */
+export async function listUsers(query: ListQuery = {}): Promise<User[]> {
   return fetchEnvelope(
-    apiClient.get("/api/v1/users", { params: { limit, offset } }),
+    apiClient.get("/api/v1/users", listConfig(query)),
     zListUsersApiV1UsersGetResponse
   ) as Promise<User[]>;
 }
@@ -429,10 +478,10 @@ export async function getUserNames(ids: Iterable<string>): Promise<Map<string, s
   return new Map(entries.filter((e): e is [string, string] => e !== null));
 }
 
-/** List workflows with optional pagination. */
-export async function listWorkflows(limit = 20, offset = 0): Promise<Workflow[]> {
+/** List workflows with optional pagination, sort, and filters. */
+export async function listWorkflows(query: ListQuery = {}): Promise<Workflow[]> {
   return fetchEnvelope(
-    apiClient.get("/api/v1/workflows", { params: { limit, offset } }),
+    apiClient.get("/api/v1/workflows", listConfig(query)),
     zListWorkflowsApiV1WorkflowsGetResponse
   ) as Promise<Workflow[]>;
 }
@@ -487,24 +536,26 @@ export async function getWorkflowSession(id: string): Promise<WorkflowSession> {
   ) as Promise<WorkflowSession>;
 }
 
-/** List WorkflowSession records (newest first) with optional pagination. */
-export async function listWorkflowSessions(limit = 20, offset = 0): Promise<WorkflowSession[]> {
+/** List WorkflowSession records (newest first) with optional pagination, sort, and filters. */
+export async function listWorkflowSessions(query: ListQuery = {}): Promise<WorkflowSession[]> {
   return fetchEnvelope(
-    apiClient.get("/api/v1/workflow-sessions", { params: { limit, offset } }),
+    apiClient.get("/api/v1/workflow-sessions", listConfig(query)),
     zListWorkflowSessionsApiV1WorkflowSessionsGetResponse
   ) as Promise<WorkflowSession[]>;
 }
 
-/** List the WorkflowTasks belonging to the given WorkflowSession (position ASC). */
+/**
+ * List the WorkflowTasks belonging to the given WorkflowSession (position ASC by
+ * default) with optional pagination, sort, and filters.
+ */
 export async function listWorkflowTasks(
   workflowSessionId: string,
-  limit = 20,
-  offset = 0
+  query: ListQuery = {}
 ): Promise<WorkflowTask[]> {
   return fetchEnvelope(
     apiClient.get(
       `/api/v1/workflow-sessions/${encodeURIComponent(workflowSessionId)}/workflow-tasks`,
-      { params: { limit, offset } }
+      listConfig(query)
     ),
     zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse
   ) as Promise<WorkflowTask[]>;

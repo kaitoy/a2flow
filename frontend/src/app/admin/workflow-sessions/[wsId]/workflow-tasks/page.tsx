@@ -14,8 +14,10 @@ import { Select } from "@/components/ui/select";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import {
   deleteWorkflowTask,
+  type FilterSpec,
   listMcpServers,
   listWorkflowTasks,
+  type SortSpec,
   updateWorkflowTask,
   type WorkflowTask,
   type WorkflowTaskStatus,
@@ -68,18 +70,24 @@ function buildColumns(
     {
       header: "#",
       className: "w-12 text-on-surface-variant",
+      sortField: "position",
       cell: (t) => t.position ?? 0,
     },
     {
       header: "Title",
+      sortField: "title",
+      filterField: "title",
       cell: (t) => <span className="font-medium">{t.title}</span>,
     },
     {
       header: "Description",
-      className: "max-w-[280px] truncate",
+      truncate: true,
+      sortField: "description",
+      filterField: "description",
       cell: (t) => t.description || "—",
     },
     {
+      // Resolved from the dependency join table; not a real column.
       header: "Depends on",
       cell: (t) => {
         const deps = t.dependsOnIds ?? [];
@@ -94,6 +102,7 @@ function buildColumns(
       },
     },
     {
+      // Resolved from the tool-binding join table; not a real column.
       header: "Tools",
       cell: (t) => {
         const bindings = t.toolBindings ?? [];
@@ -114,6 +123,13 @@ function buildColumns(
     },
     {
       header: "Status",
+      sortField: "status",
+      filterField: "status",
+      filterOp: "eq",
+      filterOptions: WORKFLOW_TASK_STATUSES.map((s) => ({
+        label: formatStatusLabel(s),
+        value: s,
+      })),
       cell: (t) => (
         <div className="flex items-center gap-2">
           <StatusDot status={t.status ?? "pending"} />
@@ -161,6 +177,8 @@ export default function WorkflowTasksPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
+  const [sort, setSort] = useState<SortSpec | null>(null);
+  const [filters, setFilters] = useState<FilterSpec[]>([]);
   const [view, setView] = useState<View>("table");
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
@@ -169,25 +187,38 @@ export default function WorkflowTasksPage() {
     setLoading(true);
     setError(null);
     try {
-      // The graph needs every task so dependency edges are not cut across pages.
+      // The graph needs every task (in position order) so dependency edges are
+      // not cut across pages or hidden by sort/filter.
       const data =
         view === "graph"
-          ? await listWorkflowTasks(wsId, GRAPH_LIMIT, 0)
-          : await listWorkflowTasks(wsId, LIMIT, offset);
+          ? await listWorkflowTasks(wsId, { limit: GRAPH_LIMIT })
+          : await listWorkflowTasks(wsId, { limit: LIMIT, offset, sort, filters });
       setTasks(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load workflow tasks");
     } finally {
       setLoading(false);
     }
-  }, [wsId, offset, view]);
+  }, [wsId, offset, view, sort, filters]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  /** Set the sort directive and return to the first page. */
+  function handleSortChange(next: SortSpec | null) {
+    setSort(next);
+    setOffset(0);
+  }
+
+  /** Set the filter directives and return to the first page. */
+  function handleFilterChange(next: FilterSpec[]) {
+    setFilters(next);
+    setOffset(0);
+  }
+
   useEffect(() => {
-    listMcpServers(SERVER_LIMIT, 0)
+    listMcpServers({ limit: SERVER_LIMIT })
       .then((servers) => setServerNameById(new Map(servers.map((s) => [s.id, s.name]))))
       .catch(() => {
         // Server names are cosmetic; tool chips fall back to truncated ids.
@@ -258,6 +289,10 @@ export default function WorkflowTasksPage() {
             loading={loading}
             emptyMessage="No tasks for this session yet."
             getRowKey={(t) => t.id}
+            sort={sort}
+            onSortChange={handleSortChange}
+            filters={filters}
+            onFilterChange={handleFilterChange}
           />
           <PaginationControls
             offset={offset}

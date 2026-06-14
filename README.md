@@ -94,6 +94,8 @@ See [backend/README.md](backend/README.md#authentication) for the endpoint and c
 
 The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admin).
 
+Every admin list table shares interactive features: **per-column sorting and filtering** (applied server-side via the list APIs' `s` and `q` query parameters, so they cover the whole dataset rather than just the current page), **drag-to-resize column widths** (kept for the session, not persisted), and **hover tooltips** that reveal the full text of any cell clipped to its column width.
+
 ### Users
 
 Navigate to [http://localhost:3000/admin/users](http://localhost:3000/admin/users) to manage application users.

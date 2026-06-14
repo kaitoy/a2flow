@@ -2,15 +2,22 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteUser, listUsers, type User } from "@/lib/api";
 
 const LIMIT = 20;
+
+/** Yes/No options for the boolean `eq` column filters. */
+const BOOL_FILTER_OPTIONS = [
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
+];
 
 /** Render a boolean cell as a checkmark or an em dash. */
 function boolCell(value: boolean): string {
@@ -20,50 +27,46 @@ function boolCell(value: boolean): string {
 const STATIC_COLUMNS: ColumnDef<User>[] = [
   {
     header: "Username",
+    sortField: "username",
+    filterField: "username",
     cell: (u) => <span className="font-medium">{u.username}</span>,
   },
   {
     header: "Name",
+    sortField: "firstName",
+    filterField: "firstName",
     cell: (u) => `${u.firstName} ${u.lastName}`,
   },
   {
     header: "Email",
-    className: "max-w-[220px] truncate",
+    truncate: true,
+    sortField: "email",
+    filterField: "email",
     cell: (u) => u.email,
   },
   {
     header: "Enabled",
+    sortField: "enabled",
+    filterField: "enabled",
+    filterOp: "eq",
+    filterOptions: BOOL_FILTER_OPTIONS,
     cell: (u) => boolCell(u.enabled),
   },
   {
     header: "Verified",
+    sortField: "emailVerified",
+    filterField: "emailVerified",
+    filterOp: "eq",
+    filterOptions: BOOL_FILTER_OPTIONS,
     cell: (u) => boolCell(u.emailVerified),
   },
 ];
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
+  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
+    useTableQuery<User>(listUsers, { limit: LIMIT, errorMessage: "Failed to load users" });
+  const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listUsers(LIMIT, offset);
-      setUsers(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load users");
-    } finally {
-      setLoading(false);
-    }
-  }, [offset]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
@@ -74,9 +77,10 @@ export default function UsersPage() {
     try {
       await deleteUser(confirmTarget.id);
       setConfirmTarget(null);
-      await load();
+      setActionError(null);
+      await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete user");
+      setActionError(e instanceof Error ? e.message : "Failed to delete user");
       setConfirmTarget(null);
     }
   }
@@ -108,18 +112,22 @@ export default function UsersPage() {
   return (
     <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader title="Users" addHref="/admin/users/new" addLabel="+ Add user" />
-      <ErrorBanner error={error} />
+      <ErrorBanner error={actionError ?? error} />
       <DataTable
         columns={columns}
-        rows={users}
+        rows={rows}
         loading={loading}
         emptyMessage="No users registered yet."
         getRowKey={(user) => user.id}
+        sort={sort}
+        onSortChange={setSort}
+        filters={filters}
+        onFilterChange={setFilters}
       />
       <PaginationControls
         offset={offset}
         limit={LIMIT}
-        count={users.length}
+        count={rows.length}
         onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
         onNext={() => setOffset((o) => o + LIMIT)}
       />

@@ -54,7 +54,7 @@ export default function EditWorkflowPage() {
   });
 
   useEffect(() => {
-    Promise.all([getWorkflow(workflowId), listAgentSkills(1000, 0)])
+    Promise.all([getWorkflow(workflowId), listAgentSkills({ limit: 1000 })])
       .then(([workflow, skillList]) => {
         setSkills(skillList);
         reset({

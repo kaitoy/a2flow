@@ -63,7 +63,7 @@ export default function NewWorkflowTaskPage() {
   });
 
   useEffect(() => {
-    listWorkflowTasks(wsId, 100)
+    listWorkflowTasks(wsId, { limit: 100 })
       .then(setCandidates)
       .catch(() => {
         // Candidate list is non-essential; the picker simply renders empty.

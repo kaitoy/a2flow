@@ -29,7 +29,7 @@ export default function NewWorkflowPage() {
   const [skills, setSkills] = useState<AgentSkill[]>([]);
 
   useEffect(() => {
-    listAgentSkills(1000, 0)
+    listAgentSkills({ limit: 1000 })
       .then(setSkills)
       .catch((e: unknown) => {
         setApiError(e instanceof Error ? e.message : "Failed to load agent skills");

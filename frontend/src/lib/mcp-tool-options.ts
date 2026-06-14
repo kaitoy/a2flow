@@ -52,7 +52,7 @@ export interface McpToolCatalog {
  * already-bound tools can be labeled.
  */
 export async function loadMcpToolOptions(): Promise<McpToolCatalog> {
-  const servers = await listMcpServers(SERVER_LIMIT, 0);
+  const servers = await listMcpServers({ limit: SERVER_LIMIT });
   const serverNames = new Map(servers.map((s) => [s.id, s.name]));
   const results = await Promise.allSettled(
     servers.map(async (server) => {

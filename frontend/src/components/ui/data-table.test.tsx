@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import { type ColumnDef, DataTable } from "./data-table";
 
 interface Row {
@@ -114,5 +115,92 @@ describe("DataTable", () => {
       <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} />
     );
     expect(container.firstChild).toHaveClass("glass-panel");
+  });
+
+  it("wraps truncate columns in a single-line clipping span", () => {
+    const cols: ColumnDef<Row>[] = [{ header: "Name", truncate: true, cell: (r) => r.name }];
+    render(<DataTable columns={cols} rows={[ROWS[0]]} getRowKey={(r) => r.id} />);
+    expect(screen.getByText("Alpha").className).toContain("truncate");
+  });
+
+  it("renders a resize handle for every column", () => {
+    const { container } = render(
+      <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} />
+    );
+    expect(container.querySelectorAll("[data-resize-handle]")).toHaveLength(COLUMNS.length);
+  });
+
+  it("cycles a column's sort asc → desc → none on header click", async () => {
+    const user = userEvent.setup();
+    const onSortChange = vi.fn();
+    const cols: ColumnDef<Row>[] = [{ header: "Name", sortField: "name", cell: (r) => r.name }];
+    const { rerender } = render(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        sort={null}
+        onSortChange={onSortChange}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /Name/ }));
+    expect(onSortChange).toHaveBeenLastCalledWith({ field: "name", descending: false });
+
+    rerender(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        sort={{ field: "name", descending: false }}
+        onSortChange={onSortChange}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /Name/ }));
+    expect(onSortChange).toHaveBeenLastCalledWith({ field: "name", descending: true });
+
+    rerender(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        sort={{ field: "name", descending: true }}
+        onSortChange={onSortChange}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /Name/ }));
+    expect(onSortChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("does not render a sort button without onSortChange", () => {
+    const cols: ColumnDef<Row>[] = [{ header: "Name", sortField: "name", cell: (r) => r.name }];
+    render(<DataTable columns={cols} rows={ROWS} getRowKey={(r) => r.id} />);
+    expect(screen.queryByRole("button", { name: /Name/ })).not.toBeInTheDocument();
+  });
+
+  it("emits a filter spec when a select filter changes", async () => {
+    const user = userEvent.setup();
+    const onFilterChange = vi.fn();
+    const cols: ColumnDef<Row>[] = [
+      {
+        header: "Name",
+        filterField: "name",
+        filterOp: "eq",
+        filterOptions: [{ label: "Alpha", value: "alpha" }],
+        cell: (r) => r.name,
+      },
+    ];
+    render(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        filters={[]}
+        onFilterChange={onFilterChange}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: "Filter Name" }));
+    const select = await screen.findByRole("combobox");
+    await user.selectOptions(select, "alpha");
+    expect(onFilterChange).toHaveBeenCalledWith([{ field: "name", op: "eq", value: "alpha" }]);
   });
 });

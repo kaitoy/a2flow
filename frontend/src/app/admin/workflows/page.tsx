@@ -3,13 +3,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteWorkflow,
   executeWorkflow,
@@ -29,24 +30,32 @@ function buildColumns(
   return [
     {
       header: "Name",
+      sortField: "name",
+      filterField: "name",
       cell: (w) => <span className="font-medium">{w.name}</span>,
     },
     {
       header: "Prompt",
-      className: "max-w-[200px] truncate",
+      truncate: true,
+      sortField: "prompt",
+      filterField: "prompt",
       cell: (w) => w.prompt,
     },
     {
+      // Resolved from agentSkillId to a display name; not a real column, so no sort/filter.
       header: "Agent Skill",
       cell: (w) => skillMap.get(w.agentSkillId) ?? w.agentSkillId,
     },
     {
       header: "Description",
-      className: "max-w-[200px] truncate",
+      truncate: true,
+      sortField: "description",
+      filterField: "description",
       cell: (w) => w.description || "—",
     },
     {
       header: "Created At",
+      sortField: "createdAt",
       cell: (w) => <DateTime value={w.createdAt} className="text-on-surface-variant" />,
     },
     {
@@ -82,34 +91,24 @@ function buildColumns(
 
 export default function WorkflowsPage() {
   const router = useRouter();
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
+    useTableQuery<Workflow>(listWorkflows, {
+      limit: LIMIT,
+      errorMessage: "Failed to load workflows",
+    });
   const [skillMap, setSkillMap] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [data, skills] = await Promise.all([
-        listWorkflows(LIMIT, offset),
-        listAgentSkills(1000, 0),
-      ]);
-      setWorkflows(data);
-      setSkillMap(new Map(skills.map((s) => [s.id, s.name])));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load workflows");
-    } finally {
-      setLoading(false);
-    }
-  }, [offset]);
-
+  // Load the agent-skill name map once, to label the Agent Skill column.
   useEffect(() => {
-    load();
-  }, [load]);
+    listAgentSkills({ limit: 1000 })
+      .then((skills) => setSkillMap(new Map(skills.map((s) => [s.id, s.name]))))
+      .catch(() => {
+        // Non-fatal: the column falls back to showing the raw skill id.
+      });
+  }, []);
 
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
@@ -120,21 +119,22 @@ export default function WorkflowsPage() {
     try {
       await deleteWorkflow(confirmTarget.id);
       setConfirmTarget(null);
-      await load();
+      setActionError(null);
+      await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete workflow");
+      setActionError(e instanceof Error ? e.message : "Failed to delete workflow");
       setConfirmTarget(null);
     }
   }
 
   async function handleRun(id: string) {
-    setError(null);
+    setActionError(null);
     setRunningId(id);
     try {
       const workflowSession = await executeWorkflow(id);
       router.push(`/workflow-sessions/${workflowSession.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to run workflow");
+      setActionError(e instanceof Error ? e.message : "Failed to run workflow");
       setRunningId(null);
     }
   }
@@ -142,18 +142,22 @@ export default function WorkflowsPage() {
   return (
     <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader title="Workflows" addHref="/admin/workflows/new" addLabel="+ Add workflow" />
-      <ErrorBanner error={error} />
+      <ErrorBanner error={actionError ?? error} />
       <DataTable
         columns={buildColumns(skillMap, handleRun, runningId, handleDelete)}
-        rows={workflows}
+        rows={rows}
         loading={loading}
         emptyMessage="No workflows registered yet."
         getRowKey={(w) => w.id}
+        sort={sort}
+        onSortChange={setSort}
+        filters={filters}
+        onFilterChange={setFilters}
       />
       <PaginationControls
         offset={offset}
         limit={LIMIT}
-        count={workflows.length}
+        count={rows.length}
         onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
         onNext={() => setOffset((o) => o + LIMIT)}
       />

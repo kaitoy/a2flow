@@ -27,6 +27,8 @@ interface TooltipProps {
   placement?: TooltipPlacement;
   /** Hover delay before the tooltip becomes visible, in milliseconds. Defaults to `300`. */
   delay?: number;
+  /** When true, render the child unchanged with no tooltip behavior. Defaults to `false`. */
+  disabled?: boolean;
   /** Single element that acts as the hover/focus trigger. */
   children: ReactElement;
 }
@@ -49,7 +51,13 @@ const EDGE_PADDING = 8;
  * trigger's scroll container, and uses React Spring's `useTransition` to
  * animate the chip in and out with the project's `gentle` motion preset.
  */
-export function Tooltip({ label, placement = "top", delay = 300, children }: TooltipProps) {
+export function Tooltip({
+  label,
+  placement = "top",
+  delay = 300,
+  disabled = false,
+  children,
+}: TooltipProps) {
   const triggerRef = useRef<HTMLElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,6 +194,9 @@ export function Tooltip({ label, placement = "top", delay = 300, children }: Too
     onBlur: compose<FocusEvent<HTMLElement>>(childProps.onBlur, hide),
     "aria-describedby": describedBy,
   });
+
+  // When disabled, behave as a transparent wrapper: no handlers, no portal.
+  if (disabled) return children;
 
   return (
     <>

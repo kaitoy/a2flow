@@ -2,13 +2,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteMcpServer, listMcpServers, type McpServer } from "@/lib/api";
 
 const LIMIT = 20;
@@ -16,11 +17,15 @@ const LIMIT = 20;
 const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
   {
     header: "Name",
+    sortField: "name",
+    filterField: "name",
     cell: (s) => <span className="font-medium">{s.name}</span>,
   },
   {
     header: "URL",
-    className: "max-w-[280px] truncate",
+    truncate: true,
+    sortField: "url",
+    filterField: "url",
     cell: (s) => s.url,
   },
   {
@@ -36,33 +41,19 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
   },
   {
     header: "Created At",
+    sortField: "createdAt",
     cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
   },
 ];
 
 export default function McpServersPage() {
-  const [servers, setServers] = useState<McpServer[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
+  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
+    useTableQuery<McpServer>(listMcpServers, {
+      limit: LIMIT,
+      errorMessage: "Failed to load MCP servers",
+    });
+  const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listMcpServers(LIMIT, offset);
-      setServers(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load MCP servers");
-    } finally {
-      setLoading(false);
-    }
-  }, [offset]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
@@ -73,9 +64,10 @@ export default function McpServersPage() {
     try {
       await deleteMcpServer(confirmTarget.id);
       setConfirmTarget(null);
-      await load();
+      setActionError(null);
+      await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete MCP server");
+      setActionError(e instanceof Error ? e.message : "Failed to delete MCP server");
       setConfirmTarget(null);
     }
   }
@@ -111,18 +103,22 @@ export default function McpServersPage() {
         addHref="/admin/mcp-servers/new"
         addLabel="+ Add server"
       />
-      <ErrorBanner error={error} />
+      <ErrorBanner error={actionError ?? error} />
       <DataTable
         columns={columns}
-        rows={servers}
+        rows={rows}
         loading={loading}
         emptyMessage="No MCP servers registered yet."
         getRowKey={(server) => server.id}
+        sort={sort}
+        onSortChange={setSort}
+        filters={filters}
+        onFilterChange={setFilters}
       />
       <PaginationControls
         offset={offset}
         limit={LIMIT}
-        count={servers.length}
+        count={rows.length}
         onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
         onNext={() => setOffset((o) => o + LIMIT)}
       />
