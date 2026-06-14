@@ -23,7 +23,6 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
   },
   {
     header: "Repo URL",
-    truncate: true,
     sortField: "repoUrl",
     filterField: "repoUrl",
     cell: (s) => s.repoUrl,
@@ -36,7 +35,6 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
   },
   {
     header: "Description",
-    truncate: true,
     sortField: "description",
     filterField: "description",
     cell: (s) => s.description || "—",
@@ -78,6 +76,7 @@ export default function AgentSkillsPage() {
     ...STATIC_COLUMNS,
     {
       header: "Actions",
+      noTruncate: true,
       cell: (skill) => (
         <div className="flex gap-2">
           <Link

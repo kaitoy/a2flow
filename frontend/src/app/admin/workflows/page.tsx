@@ -36,7 +36,6 @@ function buildColumns(
     },
     {
       header: "Prompt",
-      truncate: true,
       sortField: "prompt",
       filterField: "prompt",
       cell: (w) => w.prompt,
@@ -48,7 +47,6 @@ function buildColumns(
     },
     {
       header: "Description",
-      truncate: true,
       sortField: "description",
       filterField: "description",
       cell: (w) => w.description || "—",
@@ -60,6 +58,7 @@ function buildColumns(
     },
     {
       header: "Actions",
+      noTruncate: true,
       cell: (w) => (
         <div className="flex gap-2">
           <button

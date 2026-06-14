@@ -56,6 +56,7 @@
   --color-glass-overlay: var(--c-glass-overlay);
   --color-glass-border: var(--c-glass-border);
   --color-glass-highlight: var(--c-glass-highlight);
+  --color-divider: var(--c-divider);
   --color-accent: var(--c-accent);
   --color-accent-soft: var(--c-accent-soft);
 
@@ -128,6 +129,9 @@
   --c-glass-overlay: rgba(255, 255, 255, 0.58);
   --c-glass-border: rgba(255, 255, 255, 0.65);
   --c-glass-highlight: rgba(255, 255, 255, 0.85);
+  /* Grid lines (table column/row dividers). Tinted dark so they stay visible
+     against the light, near-white glass surfaces where glass-border vanishes. */
+  --c-divider: rgba(15, 23, 42, 0.16);
 
   --c-accent: #0e7c7b;
   --c-accent-soft: rgba(20, 184, 166, 0.18);
@@ -189,6 +193,7 @@
   --c-glass-overlay: rgba(15, 23, 42, 0.5);
   --c-glass-border: rgba(148, 163, 184, 0.2);
   --c-glass-highlight: rgba(148, 163, 184, 0.35);
+  --c-divider: rgba(148, 163, 184, 0.28);
 
   --c-accent: #5eead4;
   --c-accent-soft: rgba(94, 234, 212, 0.18);

@@ -117,10 +117,35 @@ describe("DataTable", () => {
     expect(container.firstChild).toHaveClass("glass-panel");
   });
 
-  it("wraps truncate columns in a single-line clipping span", () => {
-    const cols: ColumnDef<Row>[] = [{ header: "Name", truncate: true, cell: (r) => r.name }];
-    render(<DataTable columns={cols} rows={[ROWS[0]]} getRowKey={(r) => r.id} />);
+  it("wraps cells in a single-line clipping span by default", () => {
+    render(<DataTable columns={COLUMNS} rows={[ROWS[0]]} getRowKey={(r) => r.id} />);
     expect(screen.getByText("Alpha").className).toContain("truncate");
+  });
+
+  it("renders noTruncate columns without a clipping span", () => {
+    const cols: ColumnDef<Row>[] = [{ header: "Name", noTruncate: true, cell: (r) => r.name }];
+    render(<DataTable columns={cols} rows={[ROWS[0]]} getRowKey={(r) => r.id} />);
+    expect(screen.getByText("Alpha").className).not.toContain("truncate");
+  });
+
+  it("separates columns with a vertical divider on all but the last cell", () => {
+    const { container } = render(
+      <DataTable columns={COLUMNS} rows={[ROWS[0]]} getRowKey={(r) => r.id} />
+    );
+    // Header cells: divider on every column except the last.
+    const headers = container.querySelectorAll("thead th");
+    expect(headers[0].className).toContain("border-r");
+    // Body cells carry the same not-last-child divider utility.
+    const cells = container.querySelectorAll("tbody td");
+    expect(cells[0].className).toContain("border-r");
+  });
+
+  it("zebra-stripes body rows via the even variant", () => {
+    const { container } = render(
+      <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} />
+    );
+    const rows = container.querySelectorAll("tbody tr");
+    expect(rows[0].className).toContain("even:bg-glass-strong/15");
   });
 
   it("renders a resize handle for every column", () => {
@@ -202,5 +227,21 @@ describe("DataTable", () => {
     const select = await screen.findByRole("combobox");
     await user.selectOptions(select, "alpha");
     expect(onFilterChange).toHaveBeenCalledWith([{ field: "name", op: "eq", value: "alpha" }]);
+  });
+
+  it("renders the filter trigger as a square icon button", () => {
+    const cols: ColumnDef<Row>[] = [{ header: "Name", filterField: "name", cell: (r) => r.name }];
+    render(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        filters={[]}
+        onFilterChange={vi.fn()}
+      />
+    );
+    const button = screen.getByRole("button", { name: "Filter Name" });
+    expect(button.className).toContain("h-6");
+    expect(button.className).toContain("w-6");
   });
 });

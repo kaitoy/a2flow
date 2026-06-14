@@ -39,7 +39,6 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
   },
   {
     header: "Email",
-    truncate: true,
     sortField: "email",
     filterField: "email",
     cell: (u) => u.email,
@@ -89,6 +88,7 @@ export default function UsersPage() {
     ...STATIC_COLUMNS,
     {
       header: "Actions",
+      noTruncate: true,
       cell: (user) => (
         <div className="flex gap-2">
           <Link

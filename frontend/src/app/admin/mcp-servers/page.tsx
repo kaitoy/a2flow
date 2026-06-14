@@ -23,7 +23,6 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
   },
   {
     header: "URL",
-    truncate: true,
     sortField: "url",
     filterField: "url",
     cell: (s) => s.url,
@@ -76,6 +75,7 @@ export default function McpServersPage() {
     ...STATIC_COLUMNS,
     {
       header: "Actions",
+      noTruncate: true,
       cell: (server) => (
         <div className="flex gap-2">
           <Link

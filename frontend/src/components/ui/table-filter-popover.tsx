@@ -162,9 +162,15 @@ export function TableFilterPopover({ label, value, onChange, options }: TableFil
         aria-label={`Filter ${label}`}
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent-soft/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        className={`relative inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${active || open ? "bg-accent-soft/50" : "hover:bg-accent-soft/40"}`}
       >
         <FunnelIcon active={active} />
+        {active ? (
+          <span
+            aria-hidden="true"
+            className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-accent"
+          />
+        ) : null}
       </button>
       {typeof document !== "undefined" &&
         createPortal(

@@ -17,14 +17,12 @@ function buildColumns(userMap: Map<string, string>): ColumnDef<WorkflowSession>[
   return [
     {
       header: "Workflow",
-      truncate: true,
       sortField: "workflowName",
       filterField: "workflowName",
       cell: (s) => <span className="font-medium">{s.workflowName}</span>,
     },
     {
       header: "Agent Skill",
-      truncate: true,
       sortField: "agentSkillName",
       filterField: "agentSkillName",
       cell: (s) => s.agentSkillName,
@@ -41,6 +39,7 @@ function buildColumns(userMap: Map<string, string>): ColumnDef<WorkflowSession>[
     },
     {
       header: "Actions",
+      noTruncate: true,
       cell: (s) => (
         <div className="flex gap-2">
           <Link

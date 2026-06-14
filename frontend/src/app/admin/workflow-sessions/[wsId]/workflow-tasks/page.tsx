@@ -81,7 +81,6 @@ function buildColumns(
     },
     {
       header: "Description",
-      truncate: true,
       sortField: "description",
       filterField: "description",
       cell: (t) => t.description || "—",
@@ -89,6 +88,7 @@ function buildColumns(
     {
       // Resolved from the dependency join table; not a real column.
       header: "Depends on",
+      noTruncate: true,
       cell: (t) => {
         const deps = t.dependsOnIds ?? [];
         if (deps.length === 0) return <span className="text-on-surface-variant">—</span>;
@@ -104,6 +104,7 @@ function buildColumns(
     {
       // Resolved from the tool-binding join table; not a real column.
       header: "Tools",
+      noTruncate: true,
       cell: (t) => {
         const bindings = t.toolBindings ?? [];
         if (bindings.length === 0) return <span className="text-on-surface-variant">—</span>;
@@ -123,6 +124,7 @@ function buildColumns(
     },
     {
       header: "Status",
+      noTruncate: true,
       sortField: "status",
       filterField: "status",
       filterOp: "eq",
@@ -149,6 +151,7 @@ function buildColumns(
     },
     {
       header: "Actions",
+      noTruncate: true,
       cell: (t) => (
         <div className="flex gap-2">
           <Link
