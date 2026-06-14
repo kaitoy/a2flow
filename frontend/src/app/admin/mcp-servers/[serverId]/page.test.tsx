@@ -16,7 +16,7 @@ describe("EditMcpServerPage", () => {
   it("prefills form with server data including headers", async () => {
     setup();
     render(<EditMcpServerPage />);
-    await waitFor(() => expect(screen.getByDisplayValue("My MCP Server")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByDisplayValue("my-mcp-server")).toBeInTheDocument());
     expect(screen.getByDisplayValue("https://mcp.example.com/mcp")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Authorization")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Bearer secret")).toBeInTheDocument();
@@ -33,13 +33,13 @@ describe("EditMcpServerPage", () => {
     );
 
     render(<EditMcpServerPage />);
-    await waitFor(() => screen.getByDisplayValue("My MCP Server"));
+    await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("button", { name: "Remove headers row 1" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() =>
       expect(receivedBody).toEqual({
-        name: "My MCP Server",
+        name: "my-mcp-server",
         url: "https://mcp.example.com/mcp",
         headers: {},
       })
@@ -59,7 +59,7 @@ describe("EditMcpServerPage", () => {
     });
 
     render(<EditMcpServerPage />);
-    await waitFor(() => screen.getByDisplayValue("My MCP Server"));
+    await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/mcp-servers"));
@@ -80,7 +80,7 @@ describe("EditMcpServerPage", () => {
     server.use(http.delete("http://localhost:8000/api/v1/mcp-servers/:serverId", deleteSpy));
 
     render(<EditMcpServerPage />);
-    await waitFor(() => screen.getByDisplayValue("My MCP Server"));
+    await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("button", { name: /^delete$/i }));
     const dialog = screen.getByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: /delete/i }));

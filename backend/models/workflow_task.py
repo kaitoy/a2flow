@@ -26,6 +26,7 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
+from models.constraints import DescText, Position, ShortText, ToolName
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -45,7 +46,7 @@ class ToolBinding(SQLModel):
 
     model_config = _alias_config
     mcp_server_id: str
-    tool_name: str
+    tool_name: ToolName
 
 
 class WorkflowTaskUpdate(SQLModel):
@@ -59,10 +60,10 @@ class WorkflowTaskUpdate(SQLModel):
     """
 
     model_config = _alias_config
-    title: str | None = None
-    description: str | None = None
+    title: ShortText | None = None
+    description: DescText | None = None
     status: WorkflowTaskStatus | None = None
-    position: int | None = None
+    position: Position | None = None
     depends_on_ids: list[str] | None = None
     tool_bindings: list[ToolBinding] | None = None
 
@@ -77,9 +78,9 @@ class WorkflowTaskCreate(WorkflowTaskUpdate):
     """
 
     workflow_session_id: str
-    title: str
+    title: ShortText
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
-    position: int = 0
+    position: Position = 0
     depends_on_ids: list[str] = []
     tool_bindings: list[ToolBinding] = []
 

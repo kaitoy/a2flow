@@ -20,6 +20,7 @@ from sqlmodel import SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
+from models.constraints import BodyText, ShortText
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -52,8 +53,8 @@ class NotificationCreate(NotificationUpdate):
 
     user_id: str
     type: NotificationType
-    title: str
-    body: str | None = None
+    title: ShortText
+    body: BodyText | None = None
     workflow_session_id: str | None = None
     read: bool = False
 

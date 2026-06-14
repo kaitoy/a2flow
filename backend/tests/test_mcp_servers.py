@@ -61,7 +61,7 @@ async def mcp_client(mem_engine: AsyncEngine) -> AsyncGenerator[AsyncClient, Non
 
 
 _CREATE_BODY = {
-    "name": "My MCP Server",
+    "name": "my-mcp-server",
     "url": "https://mcp.example.com/mcp",
     "headers": {"Authorization": "Bearer secret"},
 }
@@ -80,7 +80,7 @@ async def test_create_server_response_has_fields(mcp_client: AsyncClient) -> Non
         await mcp_client.post("/api/v1/mcp-servers", json=_CREATE_BODY), status=201
     )
     assert body["id"]
-    assert body["name"] == "My MCP Server"
+    assert body["name"] == "my-mcp-server"
     assert body["url"] == "https://mcp.example.com/mcp"
     assert body["headers"] == {"Authorization": "Bearer secret"}
 
@@ -130,7 +130,7 @@ async def test_get_server_returns_correct_data(mcp_client: AsyncClient) -> None:
         await mcp_client.post("/api/v1/mcp-servers", json=_CREATE_BODY), status=201
     )
     response = await mcp_client.get(f"/api/v1/mcp-servers/{created['id']}")
-    assert assert_ok(response)["name"] == "My MCP Server"
+    assert assert_ok(response)["name"] == "my-mcp-server"
 
 
 async def test_get_server_unknown_id_returns_404(mcp_client: AsyncClient) -> None:
@@ -150,7 +150,7 @@ async def test_update_server_replaces_headers(mcp_client: AsyncClient) -> None:
     )
     body = assert_ok(response)
     assert body["headers"] == {"X-Api-Key": "k"}
-    assert body["name"] == "My MCP Server"
+    assert body["name"] == "my-mcp-server"
 
 
 async def test_update_server_duplicate_name_returns_409(
@@ -164,7 +164,7 @@ async def test_update_server_duplicate_name_returns_409(
         status=201,
     )
     response = await mcp_client.patch(
-        f"/api/v1/mcp-servers/{other['id']}", json={"name": "My MCP Server"}
+        f"/api/v1/mcp-servers/{other['id']}", json={"name": "my-mcp-server"}
     )
     assert_err(response, code="CONFLICT_UNIQUE", status=409)
 

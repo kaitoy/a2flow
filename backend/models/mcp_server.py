@@ -14,14 +14,22 @@ local, single-operator deployment model.
 
 from typing import Any
 
+from pydantic import model_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import JSON, Column, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
+from models.constraints import EntityName, HttpUrl
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
+
+#: Maximum number of header entries allowed on an MCP server.
+_MAX_HEADERS = 50
+
+#: Maximum length, in characters, of each header key and value.
+_MAX_HEADER_VALUE_LENGTH = 1024
 
 
 class MCPServerUpdate(SQLModel):
@@ -32,16 +40,41 @@ class MCPServerUpdate(SQLModel):
     """
 
     model_config = _alias_config
-    name: str | None = None
-    url: str | None = None
+    name: EntityName | None = None
+    url: HttpUrl | None = None
     headers: dict[str, str] | None = None
+
+    @model_validator(mode="after")
+    def _validate_headers(self) -> "MCPServerUpdate":
+        """Bound the headers mapping size and the length of each key and value.
+
+        Returns:
+            The validated model instance.
+
+        Raises:
+            ValueError: If there are more than ``_MAX_HEADERS`` entries, or any
+                header key or value exceeds ``_MAX_HEADER_VALUE_LENGTH`` characters.
+        """
+        if self.headers is not None:
+            if len(self.headers) > _MAX_HEADERS:
+                raise ValueError(f"At most {_MAX_HEADERS} headers are allowed")
+            for key, value in self.headers.items():
+                if (
+                    len(key) > _MAX_HEADER_VALUE_LENGTH
+                    or len(value) > _MAX_HEADER_VALUE_LENGTH
+                ):
+                    raise ValueError(
+                        "Header keys and values must be at most "
+                        f"{_MAX_HEADER_VALUE_LENGTH} characters"
+                    )
+        return self
 
 
 class MCPServerCreate(MCPServerUpdate):
     """Creation payload for an MCPServer with required fields."""
 
-    name: str
-    url: str
+    name: EntityName
+    url: HttpUrl
     headers: dict[str, str] = Field(default_factory=dict)
 
 

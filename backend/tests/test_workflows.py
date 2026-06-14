@@ -6,8 +6,8 @@ from httpx import AsyncClient
 
 from tests._envelope import assert_err, assert_ok
 
-_SKILL_BODY = {"name": "Skill A", "repo_url": "https://github.com/x/y"}
-_WF_BODY = {"name": "My Workflow", "prompt": "Do the thing"}
+_SKILL_BODY = {"name": "skill-a", "repo_url": "https://github.com/x/y"}
+_WF_BODY = {"name": "my-workflow", "prompt": "Do the thing"}
 
 
 async def _create_skill(client: AsyncClient) -> Any:
@@ -49,7 +49,7 @@ async def test_create_workflow_response_has_correct_name(
     response = await workflow_client.post(
         "/api/v1/workflows", json={**_WF_BODY, "agent_skill_id": skill["id"]}
     )
-    assert assert_ok(response, status=201)["name"] == "My Workflow"
+    assert assert_ok(response, status=201)["name"] == "my-workflow"
 
 
 async def test_create_workflow_missing_name_returns_422(
@@ -110,7 +110,7 @@ async def test_list_workflows_respects_limit_param(
 ) -> None:
     skill = await _create_skill(workflow_client)
     for i in range(3):
-        await _create_workflow(workflow_client, skill["id"], name=f"WF {i}")
+        await _create_workflow(workflow_client, skill["id"], name=f"wf-{i}")
     response = await workflow_client.get("/api/v1/workflows", params={"limit": 2})
     assert len(assert_ok(response)) == 2
 
@@ -120,7 +120,7 @@ async def test_list_workflows_respects_offset_param(
 ) -> None:
     skill = await _create_skill(workflow_client)
     for i in range(3):
-        await _create_workflow(workflow_client, skill["id"], name=f"WF {i}")
+        await _create_workflow(workflow_client, skill["id"], name=f"wf-{i}")
     response = await workflow_client.get(
         "/api/v1/workflows", params={"limit": 10, "offset": 2}
     )
@@ -195,7 +195,7 @@ async def test_get_workflow_returns_correct_data(workflow_client: AsyncClient) -
     skill = await _create_skill(workflow_client)
     created = await _create_workflow(workflow_client, skill["id"])
     response = await workflow_client.get(f"/api/v1/workflows/{created['id']}")
-    assert assert_ok(response)["name"] == "My Workflow"
+    assert assert_ok(response)["name"] == "my-workflow"
 
 
 async def test_get_workflow_unknown_id_returns_404(
@@ -235,7 +235,7 @@ async def test_update_workflow_updates_agent_skill_id(
     skill2 = assert_ok(
         await workflow_client.post(
             "/api/v1/agent-skills",
-            json={"name": "Skill B", "repo_url": "https://github.com/x/z"},
+            json={"name": "skill-b", "repo_url": "https://github.com/x/z"},
         ),
         status=201,
     )
@@ -352,7 +352,7 @@ async def test_execute_workflow_returns_201_with_workflow_session(
     body = assert_ok(response, status=201)
     assert "id" in body
     assert "sessionId" in body
-    assert body["workflowName"] == "My Workflow"
+    assert body["workflowName"] == "my-workflow"
 
 
 async def test_execute_workflow_unknown_id_returns_404(

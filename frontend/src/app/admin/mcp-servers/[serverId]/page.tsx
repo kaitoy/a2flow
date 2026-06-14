@@ -19,11 +19,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { zMcpServerCreate } from "@/generated/api/zod.gen";
 import { deleteMcpServer, getMcpServer, updateMcpServer } from "@/lib/api";
 
-const schema = z.object({
-  name: z.string().min(1, "Name is required"),
-  url: z.string().url("Must be a valid URL").min(1, "URL is required"),
+// Generated schema carries the name/url constraints; the form edits headers as
+// an ordered key/value pair list (converted to a record on submit), so override
+// that one field's shape while keeping the rest from the generated schema.
+const schema = zMcpServerCreate.omit({ headers: true }).extend({
   headers: z.array(z.object({ key: z.string(), value: z.string() })),
 });
 

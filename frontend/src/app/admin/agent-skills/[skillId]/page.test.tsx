@@ -9,7 +9,7 @@ import EditAgentSkillPage from "./page";
 
 const FULL_SKILL = {
   id: "skill-1",
-  name: "My Skill",
+  name: "my-skill",
   repoUrl: "https://github.com/example/repo",
   repoPath: "",
   description: null,
@@ -27,7 +27,7 @@ describe("EditAgentSkillPage", () => {
   it("prefills form with skill data", async () => {
     setup();
     render(<EditAgentSkillPage />);
-    await waitFor(() => expect(screen.getByDisplayValue("My Skill")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByDisplayValue("my-skill")).toBeInTheDocument());
     expect(screen.getByDisplayValue("https://github.com/example/repo")).toBeInTheDocument();
   });
 
@@ -37,7 +37,7 @@ describe("EditAgentSkillPage", () => {
     server.use(http.patch("http://localhost:8000/api/v1/agent-skills/:skillId", patchSpy));
 
     render(<EditAgentSkillPage />);
-    await waitFor(() => screen.getByDisplayValue("My Skill"));
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(patchSpy).toHaveBeenCalled());
@@ -56,7 +56,7 @@ describe("EditAgentSkillPage", () => {
     });
 
     render(<EditAgentSkillPage />);
-    await waitFor(() => screen.getByDisplayValue("My Skill"));
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/agent-skills"));
@@ -77,7 +77,7 @@ describe("EditAgentSkillPage", () => {
     server.use(http.delete("http://localhost:8000/api/v1/agent-skills/:skillId", deleteSpy));
 
     render(<EditAgentSkillPage />);
-    await waitFor(() => screen.getByDisplayValue("My Skill"));
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     const dialog = screen.getByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: /delete/i }));
@@ -90,11 +90,11 @@ describe("EditAgentSkillPage", () => {
     setup();
     const user = userEvent.setup();
     render(<EditAgentSkillPage />);
-    await waitFor(() => screen.getByDisplayValue("My Skill"));
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
     const nameInput = screen.getByLabelText(/name/i);
     await user.clear(nameInput);
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/name is required/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
   });
 
   it("shows error on load failure", async () => {

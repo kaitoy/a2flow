@@ -15,6 +15,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { zWorkflowCreate } from "@/generated/api/zod.gen";
 import {
   type AgentSkill,
   deleteWorkflow,
@@ -23,11 +24,10 @@ import {
   updateWorkflow,
 } from "@/lib/api";
 
-const schema = z.object({
-  name: z.string().min(1, "Name is required"),
-  prompt: z.string().min(1, "Prompt is required"),
+// Generated schema carries name/prompt/description constraints; tighten the
+// agentSkillId foreign key to a required selection for the form's dropdown.
+const schema = zWorkflowCreate.extend({
   agentSkillId: z.string().min(1, "Agent skill is required"),
-  description: z.string(),
 });
 
 type FormValues = z.infer<typeof schema>;

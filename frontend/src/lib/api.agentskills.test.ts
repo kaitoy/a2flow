@@ -15,7 +15,7 @@ describe("listAgentSkills", () => {
   it("returns parsed skill list", async () => {
     const skills = await listAgentSkills();
     expect(Array.isArray(skills)).toBe(true);
-    expect(skills[0].name).toBe("My Skill");
+    expect(skills[0].name).toBe("my-skill");
   });
 
   it("throws on server error", async () => {
@@ -46,7 +46,7 @@ describe("getAgentSkill", () => {
 describe("createAgentSkill", () => {
   it("returns created skill with id", async () => {
     const skill = await createAgentSkill({
-      name: "My Skill",
+      name: "my-skill",
       repoUrl: "https://github.com/example/repo",
     });
     expect(skill.id).toBe("new-skill-id");

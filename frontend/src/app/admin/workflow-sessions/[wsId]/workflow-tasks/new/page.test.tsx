@@ -114,7 +114,7 @@ describe("NewWorkflowTaskPage", () => {
     expect(screen.getByText("MCP Tools")).toBeInTheDocument();
     // The global handlers register MCP_SERVER_1 advertising the "search" tool.
     expect(
-      await screen.findByRole("checkbox", { name: "My MCP Server: search" })
+      await screen.findByRole("checkbox", { name: "my-mcp-server: search" })
     ).toBeInTheDocument();
   });
 
@@ -147,7 +147,7 @@ describe("NewWorkflowTaskPage", () => {
 
     render(<NewWorkflowTaskPage />);
     await user.type(screen.getByLabelText(/Title/), "Step 2");
-    await user.click(await screen.findByRole("checkbox", { name: "My MCP Server: search" }));
+    await user.click(await screen.findByRole("checkbox", { name: "my-mcp-server: search" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(pushMock).toHaveBeenCalled());
@@ -175,7 +175,7 @@ describe("NewWorkflowTaskPage", () => {
     const user = userEvent.setup();
     render(<NewWorkflowTaskPage />);
     await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByText("Title is required")).toBeInTheDocument();
+    expect(await screen.findByText(/at least 1 character/i)).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
   });
 });

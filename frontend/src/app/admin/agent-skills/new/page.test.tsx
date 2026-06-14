@@ -72,7 +72,17 @@ describe("NewAgentSkillPage", () => {
     const nameInput = screen.getByLabelText(/name/i);
     await user.click(nameInput);
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/name is required/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
+  });
+
+  it("shows validation error on blur when name has a non-printable character", async () => {
+    const user = userEvent.setup();
+    render(<NewAgentSkillPage />);
+    // A no-break space (U+00A0) is non-printable and rejected; an ordinary
+    // space would be accepted.
+    await user.type(screen.getByLabelText(/name/i), "bad\u00a0name");
+    await user.tab();
+    await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
   });
 
   it("shows validation error on blur when repo url is invalid", async () => {
@@ -81,7 +91,7 @@ describe("NewAgentSkillPage", () => {
     const repoUrlInput = screen.getByLabelText(/repo url/i);
     await user.type(repoUrlInput, "not-a-url");
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/must be a valid url/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
   });
 
   it("shows error on api failure", async () => {
