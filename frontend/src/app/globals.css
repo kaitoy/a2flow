@@ -53,6 +53,7 @@
   /* Glass + accent — used by frosted panels, inputs, and bubbles. */
   --color-glass: var(--c-glass);
   --color-glass-strong: var(--c-glass-strong);
+  --color-glass-overlay: var(--c-glass-overlay);
   --color-glass-border: var(--c-glass-border);
   --color-glass-highlight: var(--c-glass-highlight);
   --color-accent: var(--c-accent);
@@ -124,6 +125,7 @@
 
   --c-glass: rgba(255, 255, 255, 0.55);
   --c-glass-strong: rgba(255, 255, 255, 0.72);
+  --c-glass-overlay: rgba(255, 255, 255, 0.58);
   --c-glass-border: rgba(255, 255, 255, 0.65);
   --c-glass-highlight: rgba(255, 255, 255, 0.85);
 
@@ -184,6 +186,7 @@
 
   --c-glass: rgba(15, 23, 42, 0.45);
   --c-glass-strong: rgba(15, 23, 42, 0.65);
+  --c-glass-overlay: rgba(15, 23, 42, 0.5);
   --c-glass-border: rgba(148, 163, 184, 0.2);
   --c-glass-highlight: rgba(148, 163, 184, 0.35);
 
@@ -343,19 +346,33 @@ body::after {
 }
 
 /* Reusable utility for frosted-glass panels — single source of truth so we
-   can tweak blur/border once and have every glass surface follow. */
+   can tweak blur/border once and have every glass surface follow.
+
+   The frosted blur is applied via Tailwind's own `backdrop-blur`/
+   `backdrop-saturate` utilities (`@apply`) rather than a raw `backdrop-filter`
+   declaration: Tailwind v4 composes `backdrop-filter` from `--tw-backdrop-*`
+   custom properties, so a bare `backdrop-filter` written inside an `@utility`
+   is dropped during compilation and never reaches the browser. */
 @utility glass-panel {
+  @apply backdrop-blur-[20px] backdrop-saturate-[1.5];
   background-color: var(--color-glass);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
   border: 1px solid var(--color-glass-border);
   box-shadow: var(--shadow-glass);
 }
 
 @utility glass-panel-strong {
+  @apply backdrop-blur-[24px] backdrop-saturate-[1.6];
   background-color: var(--color-glass-strong);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--color-glass-border);
+  box-shadow: var(--shadow-glass-lg);
+}
+
+/* Floating popover surfaces (tooltips, dropdown/list menus). Same large shadow
+   as `glass-panel-strong` but a lighter blur and a more translucent fill so the
+   content behind the overlay reads through more clearly. */
+@utility glass-panel-overlay {
+  @apply backdrop-blur-[16px] backdrop-saturate-[1.6];
+  background-color: var(--color-glass-overlay);
   border: 1px solid var(--color-glass-border);
   box-shadow: var(--shadow-glass-lg);
 }

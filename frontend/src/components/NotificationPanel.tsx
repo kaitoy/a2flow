@@ -147,7 +147,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
               zIndex: 9999,
               boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
             }}
-            className="glass-panel-strong max-h-[70vh] overflow-y-auto rounded-xl p-2 text-on-surface"
+            className="glass-panel-overlay max-h-[70vh] overflow-y-auto rounded-xl p-2 text-on-surface"
           >
             <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
               Notifications

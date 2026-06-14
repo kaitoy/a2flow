@@ -7,6 +7,7 @@ colors:
     surface-dim: '#d8e2f4'
     glass: 'rgba(255, 255, 255, 0.55)'
     glass-strong: 'rgba(255, 255, 255, 0.72)'
+    glass-overlay: 'rgba(255, 255, 255, 0.58)'
     glass-border: 'rgba(255, 255, 255, 0.65)'
     glass-highlight: 'rgba(255, 255, 255, 0.85)'
     on-surface: '#0b1c30'
@@ -33,6 +34,7 @@ colors:
     surface-dim: '#0a1224'
     glass: 'rgba(15, 23, 42, 0.45)'
     glass-strong: 'rgba(15, 23, 42, 0.65)'
+    glass-overlay: 'rgba(15, 23, 42, 0.50)'
     glass-border: 'rgba(148, 163, 184, 0.20)'
     glass-highlight: 'rgba(148, 163, 184, 0.35)'
     on-surface: '#e2e8f0'
@@ -148,7 +150,7 @@ The system supports **light** and **dark** themes via a `data-theme` attribute o
 The palette has two roles: a saturated **accent** (teal in light, neon mint in dark) for actions and highlights, and a **glass** family (translucent whites in light, translucent slates in dark) for surfaces.
 
 - **Accent (`--color-accent`)** — Used for primary buttons, links, focus rings, active states, and the streaming caret. Pairs with the secondary indigo/violet for gradient fills (`from-accent to-secondary`).
-- **Glass surfaces** — Three tiers (`glass`, `glass-strong`, plus `glass-highlight` for inner edges). Always rendered with `backdrop-filter: blur(20px) saturate(150%)`.
+- **Glass surfaces** — Tiers: `glass`, `glass-strong`, `glass-overlay` (more translucent fill for floating popovers), plus `glass-highlight` for inner edges. Always rendered with a `backdrop-filter` blur + saturate (applied via Tailwind's `backdrop-blur`/`backdrop-saturate` utilities — see [Elevation & Depth](#elevation--depth)).
 - **Background blobs** — Four soft radial gradients painted on `body::before` provide the colored "light" that the glass refracts. Blob colors differ between light and dark to match each theme's mood.
 - **Semantic** — `error`, `success`, `alert` retained for status indication. `error-container` is rendered as translucent red.
 
@@ -169,7 +171,10 @@ Depth is achieved through **layered translucency** rather than hard borders or h
 - **Layer 0 (Canvas)** — `body::before` paints a fixed mesh of four radial gradients, slowly drifting via `float-slow` keyframes. `body::after` overlays a subtle SVG film-grain to break up banding.
 - **Layer 1 (Glass)** — `.glass-panel`: 55–65% translucent fill, 20px blur + 150% saturate, 1px white-tinted border, soft drop shadow + inner-top highlight.
 - **Layer 2 (Glass-Strong)** — `.glass-panel-strong`: 72% translucent fill, 24px blur, larger drop shadow. Used for floating chat input and admin form cards.
+- **Layer 2b (Glass-Overlay)** — `.glass-panel-overlay`: large shadow like glass-strong but a more translucent fill (light 58%, dark 50%) and a lighter 16px blur, so content reads through floating popovers more clearly. Used for tooltips and dropdown/list menus (user menu, notification panel).
 - **Glow** — Active/hover states emit a 36px accent glow (`shadow-glow`).
+
+> **Note** — The `backdrop-filter` blur on all glass tiers is applied through Tailwind's `backdrop-blur-*`/`backdrop-saturate-*` utilities via `@apply`, not a raw `backdrop-filter` declaration: Tailwind v4 composes `backdrop-filter` from `--tw-backdrop-*` custom properties and silently drops a bare declaration written inside an `@utility`.
 
 ## Shapes
 
