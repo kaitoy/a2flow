@@ -143,7 +143,7 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
               zIndex: 9999,
               boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
             }}
-            className="glass-panel-strong rounded-xl p-2 text-on-surface"
+            className="glass-panel-overlay rounded-xl p-2 text-on-surface"
           >
             <div className="flex flex-col gap-0.5 px-3 py-2">
               {user ? (
