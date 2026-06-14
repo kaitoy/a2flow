@@ -121,6 +121,25 @@ async def test_logout_revokes_session(auth_client: AsyncClient) -> None:
     )
 
 
+@pytest.mark.asyncio
+async def test_invalid_session_clears_auth_cookies(auth_client: AsyncClient) -> None:
+    """A 401 from a protected route must expire the stale session and CSRF cookies.
+
+    Otherwise the still-present session cookie keeps the edge middleware treating
+    the visitor as logged in, bouncing them back to a protected route instead of
+    rendering ``/login``.
+    """
+    auth_client.cookies.set(SESSION_COOKIE_NAME, "bogus")
+    response = await auth_client.get("/api/v1/auth/me")
+    assert_err(response, code="UNAUTHENTICATED", status=401)
+
+    set_cookies = response.headers.get_list("set-cookie")
+    for name in (SESSION_COOKIE_NAME, CSRF_COOKIE_NAME):
+        cleared = next((c for c in set_cookies if c.startswith(f"{name}=")), None)
+        assert cleared is not None, f"{name} was not cleared on 401"
+        assert "Max-Age=0" in cleared or "max-age=0" in cleared.lower()
+
+
 @pytest_asyncio.fixture()
 async def auth_service_engine() -> AsyncGenerator[Any, None]:
     """Provide an in-memory engine seeded with the system user for service tests."""

@@ -12,6 +12,7 @@ from fastapi import HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from dependencies.auth import CSRF_COOKIE_NAME, SESSION_COOKIE_NAME
 from models.response import ApiError, ApiMeta, ApiResponse
 from repositories.exceptions import (
     CsrfError,
@@ -165,14 +166,24 @@ async def unique_violation_exception_handler(
 async def unauthorized_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
-    """Return HTTP 401 with UNAUTHENTICATED code when no valid session is present."""
+    """Return HTTP 401 with UNAUTHENTICATED code when no valid session is present.
+
+    Also clears the session and CSRF cookies on the response. The cookies are
+    session cookies with no ``Max-Age``, so a server-side idle expiry leaves a
+    stale cookie in the browser; clearing it here ensures the edge middleware
+    (which only checks cookie presence) stops treating the visitor as logged in
+    and lets ``/login`` render instead of bouncing back to a protected route.
+    """
     assert isinstance(exc, UnauthorizedError)
-    return _envelope_error(
+    response = _envelope_error(
         request,
         code="UNAUTHENTICATED",
         message=str(exc),
         status_code=401,
     )
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+    response.delete_cookie(CSRF_COOKIE_NAME, path="/")
+    return response
 
 
 async def csrf_exception_handler(request: Request, exc: Exception) -> JSONResponse:
