@@ -29,6 +29,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@react-spring/web": "^10.0.4",
     "@reduxjs/toolkit": "^2.5.0",
+    "@scalar/nextjs-api-reference": "^0.11.3",
     "@xyflow/react": "^12.11.0",
     "axios": "^1.16.0",
     "marked": "^18.0.3",

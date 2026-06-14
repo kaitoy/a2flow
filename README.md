@@ -208,12 +208,7 @@ Two workflow events generate a notification, both raised by the agent's task too
 
 Clicking a notification marks it read and deep-links to the relevant `/workflow-sessions/{id}` chat.
 
-| Operation | Path |
-|-----------|------|
-| List the current user's notifications (`?unreadOnly=true` for unread) | `GET /api/v1/notifications` |
-| Mark a notification read | `PATCH /api/v1/notifications/{id}` |
-
-The list and mark-read endpoints are scoped to the authenticated user; reading or updating another user's notification returns HTTP 404. Notifications cascade-delete with their recipient user and their linked `WorkflowSession`.
+The list (`?unreadOnly=true` for unread) and mark-read endpoints are documented in the [API reference](http://localhost:3000/api-doc); both are scoped to the authenticated user, so reading or updating another user's notification returns HTTP 404. Notifications cascade-delete with their recipient user and their linked `WorkflowSession`.
 
 ## How it works
 
@@ -244,6 +239,10 @@ frontend/src/generated/api/{types.gen.ts, zod.gen.ts}  ◄─── gitignored
 The AG-UI streaming endpoint (`POST /agent`) is marked `include_in_schema=False` and is intentionally excluded from the spec — its events are typed by `@ag-ui/core`. The `{meta, data, error}` response envelope is applied by middleware and is not part of the spec; the frontend's `unwrap()` helper handles it, and the generated Zod schemas validate the inner `data` payload.
 
 `pnpm generate:api` (frontend) runs the backend export step via `uv` first, then the Zod codegen — so a single command keeps both layers in sync. The frontend's `predev` and `prebuild` hooks invoke it automatically, so `pnpm dev` and `pnpm build` regenerate the spec and schemas on every run. `uv` must be available on `PATH`.
+
+### Interactive API reference
+
+An interactive [Scalar](https://scalar.com/) reference is served at [http://localhost:3000/api-doc](http://localhost:3000/api-doc). It loads the FastAPI app's live OpenAPI document (`/openapi.json`, proxied to the backend by `next.config.ts`), so it always reflects the running backend. The page is behind the same login gate as the rest of the app.
 
 ## List query parameters
 

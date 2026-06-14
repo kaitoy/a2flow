@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
         source: '/api/:path*',
         destination: `${BACKEND_BASE_URL}/api/:path*`,
       },
+      {
+        // FastAPI serves its OpenAPI document at the app root; expose it on the
+        // frontend origin so the Scalar viewer at /api-doc can fetch it.
+        source: '/openapi.json',
+        destination: `${BACKEND_BASE_URL}/openapi.json`,
+      },
     ];
   },
   turbopack: {

@@ -163,90 +163,25 @@ cd backend && uv run pytest -v
 
 ## API
 
+All REST endpoints are documented interactively by the [Scalar API reference](http://localhost:3000/api-doc) (frontend route `/api-doc`), generated from the live OpenAPI spec — paths, request/response schemas, status codes, and a built-in "Test Request" console stay in sync with the running backend automatically. This section does not repeat those per-endpoint signatures; it covers only what the spec does not capture: the conventions shared by every endpoint, each resource's business rules, and the two surfaces intentionally **excluded** from the spec — the agent's AG-UI streaming endpoint and the agent's function tools.
+
+### Conventions
+
+- **Base path** — every REST endpoint is served under `/api/v1` (e.g. `GET /api/v1/agent-skills`).
+- **Identity** — the caller is resolved from the authenticated `a2flow_session` cookie (see [Authentication](#authentication)); calling a protected endpoint with `curl` needs a logged-in cookie jar saved with `curl -c`/`-b`.
+- **CSRF** — state-changing requests (`POST` / `PATCH` / `DELETE`) must echo the `a2flow_csrf` cookie in the `X-CSRF-Token` header.
+- **List parameters** — collection endpoints accept shared `limit` / `offset` / sort (`s`) / filter (`q`) query parameters with camelCase field names.
+- **Envelope** — JSON responses are wrapped in a uniform `{meta, data, error}` shape by middleware (the `POST /agent` SSE stream and `GET /health` are excluded).
+
 ### Session management
 
-Sessions are created lazily: the backend ADK session is materialized on the first `POST /agent` request that supplies a fresh `threadId`. The client picks the UUID, and that same UUID is reused on subsequent requests to preserve conversation history. There is no explicit "create session" endpoint.
-
-The caller's identity is resolved from the authenticated session cookie (see [Authentication](#authentication)); the examples below assume a logged-in cookie jar saved with `curl -c`/`-b`.
-
-#### `GET /sessions` — List sessions
-
-```bash
-curl -b cookies.txt "http://localhost:8000/api/v1/sessions"
-```
-
-#### `GET /sessions/{session_id}` — Get a session
-
-```bash
-curl -b cookies.txt "http://localhost:8000/api/v1/sessions/my-session"
-```
-
-Returns `404` if the session does not exist or belongs to a different user.
-
-#### `GET /sessions/{session_id}/messages` — Get session messages
-
-```bash
-curl -b cookies.txt "http://localhost:8000/api/v1/sessions/my-session/messages"
-```
-
-#### `DELETE /sessions/{session_id}` — Delete a session
-
-Requires the `X-CSRF-Token` header (see [Authentication](#authentication)).
-
-```bash
-curl -X DELETE -b cookies.txt -H "X-CSRF-Token: $CSRF" "http://localhost:8000/api/v1/sessions/my-session"
-```
+Sessions are created lazily: the backend ADK session is materialized on the first `POST /agent` request that supplies a fresh `threadId`. The client picks the UUID, and that same UUID is reused on subsequent requests to preserve conversation history. **There is no explicit "create session" endpoint.** The list / get / messages / delete endpoints are in the [API reference](http://localhost:3000/api-doc).
 
 ---
 
 ### Agent skills
 
-Agent skills are reusable skill definitions (name, repository URL, description) that can be attached to workflows.
-
-#### `POST /agent-skills` — Create an agent skill
-
-```bash
-curl -X POST http://localhost:8000/agent-skills \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-skill", "repo_url": "https://github.com/example/skill"}'
-```
-
-**Request body**
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `name` | string | Yes | Unique skill name |
-| `repo_url` | string | Yes | Git repository URL |
-| `repo_path` | string | No | Path within the repository (default: `""`) |
-| `description` | string | No | Human-readable description |
-
-#### `GET /agent-skills` — List agent skills
-
-```bash
-curl "http://localhost:8000/agent-skills?limit=20&offset=0"
-```
-
-#### `GET /agent-skills/{skill_id}` — Get an agent skill
-
-```bash
-curl http://localhost:8000/agent-skills/<id>
-```
-
-#### `PATCH /agent-skills/{skill_id}` — Update an agent skill
-
-```bash
-curl -X PATCH http://localhost:8000/agent-skills/<id> \
-  -H "Content-Type: application/json" \
-  -d '{"description": "updated description"}'
-```
-
-#### `DELETE /agent-skills/{skill_id}` — Delete an agent skill
-
-Returns `204 No Content`. Returns `409 Conflict` if the skill is referenced by one or more workflows.
-
-```bash
-curl -X DELETE http://localhost:8000/agent-skills/<id>
-```
+Agent skills are reusable skill definitions that can be attached to workflows. Each record stores a unique `name`, a Git `repoUrl`, an optional `repoPath` (default `""`), and an optional `description`. Deleting a skill that is still referenced by one or more workflows returns `409 CONFLICT_REFERENCED`. CRUD endpoints are in the [API reference](http://localhost:3000/api-doc).
 
 ---
 
@@ -254,61 +189,7 @@ curl -X DELETE http://localhost:8000/agent-skills/<id>
 
 A registry of remote [MCP](https://modelcontextprotocol.io/) servers whose tools the workflow agent can bind to WorkflowTasks. Connections use **streamable HTTP** only (SSE-transport servers are not supported). The optional `headers` map (e.g. `{"Authorization": "Bearer …"}`) is sent verbatim with every request to the server and is stored **in plaintext**.
 
-#### `POST /api/v1/mcp-servers` — Register an MCP server
-
-```bash
-curl -X POST http://localhost:8000/api/v1/mcp-servers \
-  -H "Content-Type: application/json" \
-  -d '{"name": "web-search", "url": "https://mcp.example.com/mcp", "headers": {"Authorization": "Bearer token"}}'
-```
-
-**Request body**
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `name` | string | Yes | Unique server name |
-| `url` | string | Yes | Streamable HTTP endpoint URL |
-| `headers` | object | No | HTTP headers sent with every request (default: `{}`) |
-
-Returns `409 CONFLICT_UNIQUE` on a duplicate name.
-
-#### `GET /api/v1/mcp-servers` — List MCP servers
-
-```bash
-curl "http://localhost:8000/api/v1/mcp-servers?limit=20&offset=0"
-```
-
-#### `GET /api/v1/mcp-servers/{server_id}` — Get an MCP server
-
-```bash
-curl http://localhost:8000/api/v1/mcp-servers/<id>
-```
-
-#### `GET /api/v1/mcp-servers/{server_id}/tools` — List the server's advertised tools
-
-Connects to the remote server and returns the tools it advertises (`name`, `description`, `inputSchema`). Returns `502 MCP_UNREACHABLE` when the server cannot be reached within the 30-second timeout.
-
-```bash
-curl http://localhost:8000/api/v1/mcp-servers/<id>/tools
-```
-
-#### `PATCH /api/v1/mcp-servers/{server_id}` — Update an MCP server
-
-Sending `headers` replaces the full header map; omitting it leaves the headers unchanged.
-
-```bash
-curl -X PATCH http://localhost:8000/api/v1/mcp-servers/<id> \
-  -H "Content-Type: application/json" \
-  -d '{"headers": {"Authorization": "Bearer new-token"}}'
-```
-
-#### `DELETE /api/v1/mcp-servers/{server_id}` — Delete an MCP server
-
-Returns `409 CONFLICT_REFERENCED` while WorkflowTask tool bindings still reference the server.
-
-```bash
-curl -X DELETE http://localhost:8000/api/v1/mcp-servers/<id>
-```
+The CRUD endpoints are in the [API reference](http://localhost:3000/api-doc). On create, `name` and `url` are required and `headers` defaults to `{}`; a duplicate name returns `409 CONFLICT_UNIQUE`. On update, sending `headers` replaces the full map while omitting it leaves it unchanged. Two behaviors are worth calling out: `GET /api/v1/mcp-servers/{id}/tools` connects to the remote server live and returns its advertised tools (`name`, `description`, `inputSchema`), or `502 MCP_UNREACHABLE` if it cannot be reached within the 30-second timeout; and a server cannot be deleted while WorkflowTask tool bindings still reference it (`409 CONFLICT_REFERENCED`).
 
 ---
 
@@ -316,50 +197,7 @@ curl -X DELETE http://localhost:8000/api/v1/mcp-servers/<id>
 
 A workflow pairs a prompt with an agent skill. Each workflow references exactly one agent skill; a single agent skill may be used by multiple workflows.
 
-#### `POST /workflows` — Create a workflow
-
-```bash
-curl -X POST http://localhost:8000/workflows \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-workflow", "prompt": "Do the thing", "agent_skill_id": "<skill_id>"}'
-```
-
-**Request body**
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `name` | string | Yes | Unique workflow name |
-| `prompt` | string | Yes | Prompt text executed by the workflow |
-| `agent_skill_id` | string | Yes | ID of the agent skill to use |
-| `description` | string | No | Human-readable description |
-
-#### `GET /workflows` — List workflows
-
-```bash
-curl "http://localhost:8000/workflows?limit=20&offset=0"
-```
-
-#### `GET /workflows/{workflow_id}` — Get a workflow
-
-```bash
-curl http://localhost:8000/workflows/<id>
-```
-
-#### `PATCH /workflows/{workflow_id}` — Update a workflow
-
-```bash
-curl -X PATCH http://localhost:8000/workflows/<id> \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "new prompt"}'
-```
-
-#### `DELETE /workflows/{workflow_id}` — Delete a workflow
-
-Returns `204 No Content`.
-
-```bash
-curl -X DELETE http://localhost:8000/workflows/<id>
-```
+A workflow requires a unique `name`, a `prompt`, and an `agentSkillId`; `description` is optional. The CRUD endpoints are in the [API reference](http://localhost:3000/api-doc). Executing a workflow — `POST /api/v1/workflows/{id}/execute` — snapshots its configuration into a new `WorkflowSession` (see below).
 
 ---
 
@@ -367,17 +205,7 @@ curl -X DELETE http://localhost:8000/workflows/<id>
 
 A `WorkflowSession` is the snapshot record created when a workflow is executed via `POST /workflows/{id}/execute`. The chat experience is exposed at `POST /workflow-sessions/{id}/agent` (streaming) and the session metadata is fetched via `GET /workflow-sessions/{id}`. A list endpoint enables the admin UI to browse all executed sessions ordered by most recent first.
 
-#### `GET /api/v1/workflow-sessions` — List workflow sessions
-
-```bash
-curl "http://localhost:8000/api/v1/workflow-sessions?limit=20&offset=0"
-```
-
-#### `GET /api/v1/workflow-sessions/{id}` — Get a workflow session
-
-```bash
-curl http://localhost:8000/api/v1/workflow-sessions/<id>
-```
+The list (ordered most-recent-first) and get endpoints are in the [API reference](http://localhost:3000/api-doc).
 
 ---
 
@@ -406,57 +234,7 @@ When a workflow runs, the skill-bound agent is given six function tools so it ca
 
 The tools resolve the current session by mapping the ADK session id (the AG-UI thread id, stored on `WorkflowSession.session_id`) back to the `WorkflowSession` primary key, and they reject access to tasks belonging to other sessions. They live in `infrastructure/workflow_task_tools.py` and `infrastructure/mcp_tools.py` and are attached to the agent in `infrastructure/agent.py` only when a skill is bound. `call_mcp_tool` opens one streamable HTTP connection per call (30-second timeout) through the shared adapter in `infrastructure/mcp_client.py`.
 
-#### `POST /api/v1/workflow-tasks` — Create a workflow task
-
-```bash
-curl -X POST http://localhost:8000/api/v1/workflow-tasks \
-  -H "Content-Type: application/json" \
-  -d '{"workflowSessionId": "<ws_id>", "title": "Draft outline", "position": 0}'
-```
-
-**Request body**
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `workflowSessionId` | string | Yes | ID of the parent `WorkflowSession` |
-| `title` | string | Yes | Short, human-readable task title |
-| `description` | string | No | Longer-form details about the task |
-| `status` | string | No | One of `pending`, `in_progress`, `completed`, `failed`, `skipped` (default: `pending`) |
-| `position` | integer | No | Layout order within the session (default: `0`) |
-| `dependsOnIds` | string[] | No | IDs of tasks in the same session that must precede this one (default: `[]`) |
-| `toolBindings` | object[] | No | MCP tools the task may use: `[{"mcpServerId": …, "toolName": …}]` (default: `[]`) |
-
-Returns `422 FOREIGN_KEY_VIOLATION` if `workflowSessionId` does not match an existing session, if any `dependsOnIds` entry does not exist or belongs to another session, or if any `toolBindings` entry references an unregistered MCP server. Returns `409 DEPENDENCY_CYCLE` if the dependencies would create a cycle.
-
-#### `GET /api/v1/workflow-sessions/{session_id}/workflow-tasks` — List tasks for a session
-
-Returns the tasks belonging to a `WorkflowSession`, ordered by `position` ASC then `created_at` ASC. Returns `404` if the session does not exist.
-
-```bash
-curl "http://localhost:8000/api/v1/workflow-sessions/<ws_id>/workflow-tasks?limit=20&offset=0"
-```
-
-#### `GET /api/v1/workflow-tasks/{task_id}` — Get a workflow task
-
-```bash
-curl http://localhost:8000/api/v1/workflow-tasks/<id>
-```
-
-#### `PATCH /api/v1/workflow-tasks/{task_id}` — Update a workflow task
-
-`workflowSessionId` is not updatable; once a task is created it cannot be re-parented. Sending `dependsOnIds` replaces the task's full set of dependency edges, and sending `toolBindings` replaces its full set of bound MCP tools; omitting either leaves it unchanged. The same `422 FOREIGN_KEY_VIOLATION` / `409 DEPENDENCY_CYCLE` validation as create applies.
-
-```bash
-curl -X PATCH http://localhost:8000/api/v1/workflow-tasks/<id> \
-  -H "Content-Type: application/json" \
-  -d '{"status": "in_progress", "dependsOnIds": ["<other_task_id>"]}'
-```
-
-#### `DELETE /api/v1/workflow-tasks/{task_id}` — Delete a workflow task
-
-```bash
-curl -X DELETE http://localhost:8000/api/v1/workflow-tasks/<id>
-```
+The task CRUD endpoints — create, list-for-a-session (ordered `position` ASC then `created_at` ASC), get, update, delete — are in the [API reference](http://localhost:3000/api-doc). A few rules the spec does not spell out: `workflowSessionId` is fixed at creation and a task cannot be re-parented; sending `dependsOnIds` or `toolBindings` replaces that full set while omitting either leaves it unchanged; and the `422 FOREIGN_KEY_VIOLATION` (unknown session, cross-session dependency, or unregistered MCP server) / `409 DEPENDENCY_CYCLE` validation applies to both create and update.
 
 ---
 
@@ -466,25 +244,13 @@ Per-user notifications surfaced in the frontend's toolbar bell. Notifications ar
 
 Each notification stores a `type` (`approval_request` / `session_completed`), `title`, optional `body`, the linked `workflowSessionId`, and a `read` flag. Rows cascade-delete with their recipient user and their linked `WorkflowSession`.
 
-#### `GET /api/v1/notifications` — List the current user's notifications
-
-Returns the caller's notifications ordered by `created_at` DESC. Pass `unreadOnly=true` to return only unread notifications (used by the bell's unread badge).
-
-```bash
-curl "http://localhost:8000/api/v1/notifications?unreadOnly=true&limit=20&offset=0"
-```
-
-#### `PATCH /api/v1/notifications/{notification_id}` — Mark a notification read
-
-```bash
-curl -X PATCH http://localhost:8000/api/v1/notifications/<id>
-```
-
-Returns `404 NOT_FOUND` if the notification does not exist or is addressed to another user.
+Both endpoints — list (ordered `created_at` DESC, `?unreadOnly=true` for the bell's unread badge) and mark-read — are in the [API reference](http://localhost:3000/api-doc). Reading or marking another user's notification returns `404 NOT_FOUND`.
 
 ---
 
-### `POST /chat`
+### Agent streaming — `POST /api/v1/agent`
+
+This endpoint and its per-skill variant `POST /api/v1/workflow-sessions/{id}/agent` are marked `include_in_schema=False`, so they are **not** in the [API reference](http://localhost:3000/api-doc) and are documented here instead.
 
 Send an [AG-UI `RunAgentInput`](https://docs.ag-ui.com/concepts/events) to a session and receive the agent's response as an SSE stream. If no ADK session exists for the provided `threadId`, one is created implicitly.
 
@@ -553,11 +319,11 @@ curl -N -X POST http://localhost:8000/api/v1/agent \
 
 ---
 
-### `GET /health`
+### `GET /api/v1/health`
 
-Health check.
+Liveness probe — returns a minimal `{"status": "ok"}` outside the response envelope.
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/health
 # {"status": "ok"}
 ```
