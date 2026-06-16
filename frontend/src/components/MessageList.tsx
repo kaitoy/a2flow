@@ -12,10 +12,12 @@ export function MessageList({
   messages,
   isStreaming = false,
   onAction,
+  onApprovalResolved,
 }: {
   messages: Message[];
   isStreaming?: boolean;
   onAction?: (action: A2UIUserAction) => void;
+  onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected") => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const emptyConfig = useMotionConfig("gentle");
@@ -55,6 +57,7 @@ export function MessageList({
             message={msg}
             isStreaming={isStreaming && i === messages.length - 1}
             onAction={onAction}
+            onApprovalResolved={onApprovalResolved}
           />
         ))}
         <div ref={bottomRef} />

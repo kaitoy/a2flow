@@ -5,56 +5,95 @@ import {
 } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
 
 export type { Message };
 
+/** Parse a tool call's arguments into a plain object, or return null on failure. */
+function parseToolArgs(args: unknown): Record<string, unknown> | null {
+  try {
+    return JSON.parse(typeof args === "string" ? args : JSON.stringify(args));
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Reconstruct A2UI activity messages from RENDER_A2UI tool calls embedded in assistant messages.
+ * Reconstruct an approval activity message from a `render_approval` tool call.
+ *
+ * Mirrors the live-streaming path (which dispatches an activity message keyed by
+ * the tool call id) so resumed sessions show the approve/reject controls again.
+ */
+function synthesizeApprovalActivityMessage(
+  toolCallId: string,
+  args: Record<string, unknown>
+): Message | null {
+  const { approvalId, title, description } = args as {
+    approvalId?: string;
+    title?: string;
+    description?: string;
+  };
+  if (!approvalId) return null;
+  return {
+    id: toolCallId,
+    role: "activity",
+    activityType: APPROVAL_ACTIVITY_TYPE,
+    content: { approvalId, title, description },
+  } as Message;
+}
+
+/** Reconstruct an A2UI activity message from a RENDER_A2UI tool call's args. */
+function synthesizeA2UIActivityMessage(
+  toolCallId: string,
+  args: Record<string, unknown>
+): Message | null {
+  const { surfaceId, catalogId, components, data } = args as {
+    surfaceId?: string;
+    catalogId?: string;
+    components?: unknown[];
+    data?: unknown;
+  };
+  if (!surfaceId) return null;
+  const ops: Record<string, unknown>[] = [
+    { version: "v0.9", createSurface: { surfaceId, catalogId } },
+    { version: "v0.9", updateComponents: { surfaceId, components: components ?? [] } },
+  ];
+  if (data != null) ops.push({ version: "v0.9", updateDataModel: { surfaceId, value: data } });
+  return {
+    // ID format mirrors A2UIMiddleware's live-streaming synthesis:
+    //   messageId = `a2ui-surface-${surfaceId}-${toolCallId}`
+    // Keeping the same format ensures addActivityMessage's upsert logic
+    // (which matches by id) works correctly if a surface is later updated.
+    id: `a2ui-surface-${surfaceId}-${toolCallId}`,
+    role: "activity",
+    activityType: A2UIActivityType,
+    content: { [A2UI_OPERATIONS_KEY]: ops },
+  } as Message;
+}
+
+/**
+ * Reconstruct activity messages from the client-tool calls embedded in assistant messages.
  *
  * When resuming a session, the backend returns raw AG-UI messages. Tool calls are stored on
  * assistant messages, not as standalone activity messages. This generator re-synthesizes the
- * activity messages so resumed sessions display A2UI surfaces identically to live sessions.
- * The synthesized message IDs mirror the format used by A2UIMiddleware during live streaming
- * so the upsert logic in ``addActivityMessage`` works correctly if a surface is later updated.
+ * activity messages — A2UI surfaces (``render_a2ui``) and approval controls (``render_approval``)
+ * — so resumed sessions display them identically to live sessions. The synthesized message IDs
+ * mirror the ones used during live streaming so ``addActivityMessage``'s upsert logic works.
  */
-function* synthesizeA2UIActivityMessages(messages: Message[]): Generator<Message> {
+function* synthesizeActivityMessages(messages: Message[]): Generator<Message> {
   for (const msg of messages) {
     yield msg;
     if (msg.role !== "assistant" || !msg.toolCalls) continue;
     for (const tc of msg.toolCalls) {
-      if (tc.function.name !== RENDER_A2UI_TOOL_NAME) continue;
-      let args: Record<string, unknown>;
-      try {
-        args = JSON.parse(
-          typeof tc.function.arguments === "string"
-            ? tc.function.arguments
-            : JSON.stringify(tc.function.arguments)
-        );
-      } catch {
-        continue;
+      const args = parseToolArgs(tc.function.arguments);
+      if (args === null) continue;
+      let synthesized: Message | null = null;
+      if (tc.function.name === RENDER_A2UI_TOOL_NAME) {
+        synthesized = synthesizeA2UIActivityMessage(tc.id, args);
+      } else if (tc.function.name === RENDER_APPROVAL_TOOL_NAME) {
+        synthesized = synthesizeApprovalActivityMessage(tc.id, args);
       }
-      const { surfaceId, catalogId, components, data } = args as {
-        surfaceId?: string;
-        catalogId?: string;
-        components?: unknown[];
-        data?: unknown;
-      };
-      if (!surfaceId) continue;
-      const ops: Record<string, unknown>[] = [
-        { version: "v0.9", createSurface: { surfaceId, catalogId } },
-        { version: "v0.9", updateComponents: { surfaceId, components: components ?? [] } },
-      ];
-      if (data != null) ops.push({ version: "v0.9", updateDataModel: { surfaceId, value: data } });
-      yield {
-        // ID format mirrors A2UIMiddleware's live-streaming synthesis:
-        //   messageId = `a2ui-surface-${surfaceId}-${toolCallId}`
-        // Keeping the same format ensures addActivityMessage's upsert logic
-        // (which matches by id) works correctly if a surface is later updated.
-        id: `a2ui-surface-${surfaceId}-${tc.id}`,
-        role: "activity",
-        activityType: A2UIActivityType,
-        content: { [A2UI_OPERATIONS_KEY]: ops },
-      } as Message;
+      if (synthesized) yield synthesized;
     }
   }
 }
@@ -94,7 +133,7 @@ const chatSlice = createSlice({
     },
     resumeSession(state, action: PayloadAction<{ sessionId: string; messages: Message[] }>) {
       state.sessionId = action.payload.sessionId;
-      state.messages = [...synthesizeA2UIActivityMessages(action.payload.messages)];
+      state.messages = [...synthesizeActivityMessages(action.payload.messages)];
       state.isRunning = false;
       state.isStreaming = false;
       state.error = null;

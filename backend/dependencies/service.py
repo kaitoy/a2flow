@@ -11,6 +11,7 @@ from fastapi import Depends
 
 from services import (
     AgentSkillService,
+    ApprovalService,
     AuthService,
     MCPServerService,
     NotificationService,
@@ -22,6 +23,7 @@ from services import (
 
 from .repository import (
     AgentSkillRepositoryDep,
+    ApprovalRepositoryDep,
     AuthSessionRepositoryDep,
     MCPServerRepositoryDep,
     NotificationRepositoryDep,
@@ -113,3 +115,11 @@ def get_workflow_task_service(repo: WorkflowTaskRepositoryDep) -> WorkflowTaskSe
 WorkflowTaskServiceDep = Annotated[
     WorkflowTaskService, Depends(get_workflow_task_service)
 ]
+
+
+def get_approval_service(repo: ApprovalRepositoryDep) -> ApprovalService:
+    """Create an ApprovalService backed by the request's repository."""
+    return ApprovalService(repo)
+
+
+ApprovalServiceDep = Annotated[ApprovalService, Depends(get_approval_service)]

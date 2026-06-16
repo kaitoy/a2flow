@@ -84,6 +84,27 @@ describe("useWorkflowSessionChat", () => {
     expect(mockAgent.runAgent).toHaveBeenCalled();
   });
 
+  it("sendApprovalResult posts the decision as a tool result and resumes the run", async () => {
+    vi.mocked(api.getSessionMessages).mockResolvedValue([
+      { id: "m1", role: "user", content: "existing" },
+    ]);
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
+    mockAgent.addMessage.mockClear();
+    mockAgent.runAgent.mockClear();
+
+    await result.current.sendApprovalResult("tool-call-1", "approved");
+
+    expect(mockAgent.addMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "tool", toolCallId: "tool-call-1", content: "approved" })
+    );
+    expect(mockAgent.runAgent).toHaveBeenCalled();
+  });
+
   it("dispatches setError when runAgent throws during sendMessage", async () => {
     vi.mocked(api.getSessionMessages).mockResolvedValue([
       { id: "m1", role: "user", content: "existing" },

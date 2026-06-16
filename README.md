@@ -186,6 +186,17 @@ The individual tasks produced during a workflow session are persisted as `Workfl
 
 Tasks form a **directed acyclic graph (DAG)** rather than a flat list: each task may depend on zero or more other tasks in the same session via its `dependsOnIds` field (`(task, dependsOn)` edges are stored in the `workflow_task_dependencies` join table). A task's edges can be set at creation time or replaced on update by sending the full `dependsOnIds` list; omitting the field on update leaves edges unchanged. Dependency targets must exist and belong to the same session (otherwise HTTP 422 `FOREIGN_KEY_VIOLATION`), and edges that would introduce a cycle — including a self-dependency — are rejected with HTTP 409 `DEPENDENCY_CYCLE`. Deleting a task cascades to the dependency edges that reference it in either direction.
 
+##### Human approval
+
+When a task needs the user's explicit go-ahead before the agent acts (for example a destructive or irreversible operation), the agent asks for an **approval** mid-execution:
+
+1. The agent calls the `request_approval` backend tool, which persists a `pending` **Approval** record for the current session (optionally linked to a `WorkflowTask`) and raises an **approval-request notification** addressed to the session owner.
+2. The agent explains the request in plain text and then calls **`render_approval`** — an AG-UI **frontend tool** (declared by the client via `RunAgentInput.tools`, distinct from A2UI). Like `render_a2ui`, the bridge exposes it as a long-running client tool: the run pauses and the frontend renders **Approve / Reject** controls in the chat.
+3. Clicking a button writes the decision **directly** to the backend via `PATCH /api/v1/approvals/{id}` (recording the approver in the audit fields), then returns the decision as the tool result so the agent run resumes.
+4. On `approved` the agent proceeds; on `rejected` it marks the task `failed` (or `skipped`). The agent can re-check a decision with the `get_approval` tool.
+
+Approvals are persisted in `a2flow.db` and cascade-delete with their `WorkflowSession` (the optional `WorkflowTask` link is set to `NULL` when that task is deleted). Browse them in the [Approvals](#approvals) admin view.
+
 ### Workflow Sessions
 
 Navigate to [http://localhost:3000/admin/workflow-sessions](http://localhost:3000/admin/workflow-sessions) to browse every executed `WorkflowSession`. Each row links to the chat UI (`/workflow-sessions/{id}`) and to the nested **Workflow Tasks** admin page (`/admin/workflow-sessions/{id}/workflow-tasks`) where individual tasks belonging to that session can be created, edited, deleted, and have their status updated inline. The create and edit forms include a **Depends on** picker for selecting which other tasks in the same session a task depends on (its DAG edges); dependencies are shown as a column on the list, and edges that would form a cycle are rejected by the server. The Workflow Tasks page offers a **Table / Graph** toggle: the Graph view renders the task DAG with [React Flow](https://reactflow.dev/), auto-laid-out top-to-bottom with [dagre](https://github.com/dagrejs/dagre) so prerequisites sit above the tasks that depend on them. The graph is read-only (pan / zoom / fit) — dependencies are edited from the task forms.
@@ -197,6 +208,10 @@ Navigate to [http://localhost:3000/admin/workflow-sessions](http://localhost:300
 | Create a task | `GET /admin/workflow-sessions/{id}/workflow-tasks/new` |
 | Edit / delete a task | `GET /admin/workflow-sessions/{id}/workflow-tasks/{taskId}` |
 
+### Approvals
+
+Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/approvals) to browse every **Approval** request (see [Human approval](#human-approval)). The list shows the title, status (`pending` / `approved` / `rejected`), a link to the originating `/workflow-sessions/{id}` chat, and the creation time, with sort and filter controls. Decisions are normally made from the in-chat Approve / Reject controls; this view is read-only browsing. The `GET`/`PATCH /api/v1/approvals` endpoints are documented in the [API reference](http://localhost:3000/api-doc).
+
 ## Notifications
 
 A **bell icon** in the top toolbar (present on both the chat header and the admin sidebar) opens a notification center with an unread-count badge. Notifications are **per-user**, persisted in `a2flow.db`, and delivered by **polling** (the frontend refreshes every 30 seconds).
@@ -205,7 +220,7 @@ Two workflow events generate a notification, both raised by the agent's task too
 
 | Type | Raised when |
 |---|---|
-| `approval_request` | The agent registers a plan (`register_workflow_tasks`) and is waiting for human approval. |
+| `approval_request` | The agent registers a plan (`register_workflow_tasks`), or requests a mid-execution decision (`request_approval`), and is waiting for human approval. |
 | `session_completed` | Every `WorkflowTask` in the session has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per session. |
 
 Clicking a notification marks it read and deep-links to the relevant `/workflow-sessions/{id}` chat.

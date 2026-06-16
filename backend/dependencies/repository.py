@@ -13,10 +13,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.database import get_session
 from repositories import (
     AgentSkillRepository,
+    ApprovalRepository,
     AuthSessionRepository,
     MCPServerRepository,
     NotificationRepository,
     SqlAgentSkillRepository,
+    SqlApprovalRepository,
     SqlAuthSessionRepository,
     SqlMCPServerRepository,
     SqlNotificationRepository,
@@ -119,3 +121,18 @@ def get_workflow_task_repository(
 WorkflowTaskRepositoryDep = Annotated[
     WorkflowTaskRepository, Depends(get_workflow_task_repository)
 ]
+
+
+def get_approval_repository(
+    db: DBSessionDep,
+    ws_repo: WorkflowSessionRepositoryDep,
+) -> ApprovalRepository:
+    """Create an ApprovalRepository backed by the current database session.
+
+    The injected WorkflowSessionRepository is used to validate that the parent
+    session exists when creating an approval.
+    """
+    return SqlApprovalRepository(db, ws_repo)
+
+
+ApprovalRepositoryDep = Annotated[ApprovalRepository, Depends(get_approval_repository)]

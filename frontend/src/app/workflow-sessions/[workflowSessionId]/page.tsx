@@ -17,11 +17,8 @@ import { useAppDispatch } from "@/store/hooks";
 
 function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
   const dispatch = useAppDispatch();
-  const { messages, isRunning, isStreaming, error, sendMessage } = useWorkflowSessionChat(
-    ws.id,
-    ws.sessionId,
-    ws.workflowPrompt
-  );
+  const { messages, isRunning, isStreaming, error, sendMessage, sendApprovalResult } =
+    useWorkflowSessionChat(ws.id, ws.sessionId, ws.workflowPrompt);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -46,7 +43,11 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
 
         <ChatErrorBanner error={error} onDismiss={() => dispatch(clearError())} />
 
-        <MessageList messages={messages} isStreaming={isStreaming} />
+        <MessageList
+          messages={messages}
+          isStreaming={isStreaming}
+          onApprovalResolved={sendApprovalResult}
+        />
         <ChatInput onSend={sendMessage} disabled={isRunning} />
       </div>
     </div>

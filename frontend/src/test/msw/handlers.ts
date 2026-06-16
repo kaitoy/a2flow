@@ -75,6 +75,20 @@ const WORKFLOW_TASK_1 = {
   updatedBy: "",
 };
 
+const APPROVAL_1 = {
+  id: "appr-1",
+  workflowSessionId: "ws-1",
+  workflowTaskId: null,
+  title: "Deploy to production",
+  description: "The agent wants to deploy. Approve?",
+  status: "pending",
+  response: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "owner",
+  updatedBy: "owner",
+};
+
 export const MCP_SERVER_1 = {
   id: "mcp-1",
   name: "my-mcp-server",
@@ -208,6 +222,23 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(MCP_SERVER_1)),
 
   http.delete(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/approvals`, () => envelope([APPROVAL_1])),
+
+  http.get(`${BASE}/api/v1/approvals/:approvalId`, ({ params }) =>
+    envelope({ ...APPROVAL_1, id: params.approvalId as string })
+  ),
+
+  http.patch(`${BASE}/api/v1/approvals/:approvalId`, async ({ params, request }) => {
+    const body = (await request.json()) as { status?: string; response?: string | null };
+    return envelope({
+      ...APPROVAL_1,
+      id: params.approvalId as string,
+      status: body.status ?? "pending",
+      response: body.response ?? null,
+      updatedBy: "alice",
+    });
+  }),
 
   http.get(`${BASE}/api/v1/notifications`, () => envelope([])),
 

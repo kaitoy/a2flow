@@ -11,15 +11,23 @@ export function MessageBubble({
   message,
   isStreaming = false,
   onAction,
+  onApprovalResolved,
 }: {
   message: Message;
   isStreaming?: boolean;
   onAction?: (action: A2UIUserAction) => void;
+  onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected") => void;
 }) {
   if (message.role === "user") return <UserMessageBubble message={message} />;
   if (message.role === "assistant")
     return <AssistantMessageBubble message={message} isStreaming={isStreaming} />;
   if (message.role === "activity")
-    return <ActivityMessageBubble message={message} onAction={onAction} />;
+    return (
+      <ActivityMessageBubble
+        message={message}
+        onAction={onAction}
+        onApprovalResolved={onApprovalResolved}
+      />
+    );
   return null;
 }

@@ -4,6 +4,11 @@ import { RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
 import type { AgentSubscriber } from "@ag-ui/client";
 import { useCallback, useEffect, useRef } from "react";
 import { createWorkflowSessionAgent, getSessionMessages } from "@/lib/api";
+import {
+  APPROVAL_ACTIVITY_TYPE,
+  RENDER_APPROVAL_TOOL,
+  RENDER_APPROVAL_TOOL_NAME,
+} from "@/lib/approvalTool";
 import { logAgUiEvent } from "@/lib/devEventLogger";
 import logger from "@/lib/logger";
 import type { AppDispatch } from "@/store";
@@ -17,6 +22,7 @@ import {
   setError,
   setSession,
   startAssistantMessage,
+  startRun,
 } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
@@ -52,9 +58,26 @@ function makeEventHandlers(
         })
       );
     },
-    onToolCallEndEvent: async ({ event, toolCallName }) => {
+    onToolCallEndEvent: async ({ event, toolCallName, toolCallArgs }) => {
       if (toolCallName === RENDER_A2UI_TOOL_NAME) {
         onRenderA2uiEnd(event.toolCallId);
+      } else if (toolCallName === RENDER_APPROVAL_TOOL_NAME) {
+        // Render approve/reject controls; the decision is sent back as this
+        // tool's result by sendApprovalResult, so it is not auto-acknowledged.
+        const { approvalId, title, description } = toolCallArgs as {
+          approvalId?: string;
+          title?: string;
+          description?: string;
+        };
+        if (approvalId) {
+          dispatch(
+            addActivityMessage({
+              id: event.toolCallId,
+              activityType: APPROVAL_ACTIVITY_TYPE,
+              content: { approvalId, title, description },
+            })
+          );
+        }
       }
     },
     onRunErrorEvent: async ({ event }) => {
@@ -102,7 +125,51 @@ export function useWorkflowSessionChat(
 
       try {
         await agent.runAgent(
-          undefined,
+          { tools: [RENDER_APPROVAL_TOOL] },
+          makeEventHandlers(dispatch, (tcId) => {
+            pendingRenderToolCallIds.current.push(tcId);
+          })
+        );
+      } catch (err) {
+        logger.error(err, "stream error");
+        dispatch(setError("An error occurred while communicating with the agent."));
+        return;
+      }
+
+      dispatch(finishRun());
+    },
+    [workflowSessionId, sessionId, isRunning, dispatch]
+  );
+
+  const sendApprovalResult = useCallback(
+    async (toolCallId: string, decision: "approved" | "rejected") => {
+      if (!sessionId || isRunning) return;
+
+      dispatch(startRun());
+
+      const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
+
+      for (const tcId of pendingRenderToolCallIds.current) {
+        agent.addMessage({
+          id: crypto.randomUUID(),
+          role: "tool",
+          toolCallId: tcId,
+          content: "rendered",
+        });
+      }
+      pendingRenderToolCallIds.current = [];
+
+      // The approval tool's result resumes the agent run with the decision.
+      agent.addMessage({
+        id: crypto.randomUUID(),
+        role: "tool",
+        toolCallId,
+        content: decision,
+      });
+
+      try {
+        await agent.runAgent(
+          { tools: [RENDER_APPROVAL_TOOL] },
           makeEventHandlers(dispatch, (tcId) => {
             pendingRenderToolCallIds.current.push(tcId);
           })
@@ -146,5 +213,6 @@ export function useWorkflowSessionChat(
     isStreaming,
     error,
     sendMessage,
+    sendApprovalResult,
   };
 }

@@ -219,7 +219,7 @@ Tasks may additionally bind **MCP tools** from [registered MCP servers](#mcp-ser
 
 #### Agent task tools
 
-When a workflow runs, the skill-bound agent is given six function tools so it can plan and drive the task DAG itself, in addition to the REST endpoints below. The agent runs a **plan-then-execute** flow: it registers the plan, waits for the user's approval, then iterates the tasks updating their status.
+When a workflow runs, the skill-bound agent is given function tools so it can plan and drive the task DAG itself, request human approval, and call MCP tools, in addition to the REST endpoints below. The agent runs a **plan-then-execute** flow: it registers the plan, waits for the user's approval, then iterates the tasks updating their status.
 
 | Tool | Purpose |
 |---|---|
@@ -229,10 +229,14 @@ When a workflow runs, the skill-bound agent is given six function tools so it ca
 | `get_workflow_task` | Fetch one task in the current session |
 | `update_workflow_task` | Change a task's title / description / status / position / dependencies / tool bindings |
 | `delete_workflow_task` | Delete a task |
+| `request_approval` | Create a `pending` [Approval](#approvals) for the current session (optionally linked to a task) and raise an `approval_request` notification; returns the `approval_id` to pass to the client-side `render_approval` tool |
+| `get_approval` | Fetch the current state of an approval in the current session (to re-check a decision) |
 | `list_mcp_tools` | Discover the tools advertised by every [registered MCP server](#mcp-servers) (queried live and concurrently; per-server failures are isolated) |
 | `call_mcp_tool` | Invoke an MCP tool bound to the task currently `in_progress`; calls to unbound tools are rejected with an error listing the allowed tools |
 
-The tools resolve the current session by mapping the ADK session id (the AG-UI thread id, stored on `WorkflowSession.session_id`) back to the `WorkflowSession` primary key, and they reject access to tasks belonging to other sessions. They live in `infrastructure/workflow_task_tools.py` and `infrastructure/mcp_tools.py` and are attached to the agent in `infrastructure/agent.py` only when a skill is bound. `call_mcp_tool` opens one streamable HTTP connection per call (30-second timeout) through the shared adapter in `infrastructure/mcp_client.py`.
+The tools resolve the current session by mapping the ADK session id (the AG-UI thread id, stored on `WorkflowSession.session_id`) back to the `WorkflowSession` primary key, and they reject access to records belonging to other sessions. They live in `infrastructure/workflow_task_tools.py`, `infrastructure/approval_tools.py`, and `infrastructure/mcp_tools.py` and are attached to the agent in `infrastructure/agent.py` only when a skill is bound. `call_mcp_tool` opens one streamable HTTP connection per call (30-second timeout) through the shared adapter in `infrastructure/mcp_client.py`.
+
+The approver's actual approve/reject decision is written from the frontend via `PATCH /api/v1/approvals/{id}` (not an agent tool), and surfaces to the agent as the result of the client-side `render_approval` tool. See [Approvals](#approvals).
 
 The task CRUD endpoints — create, list-for-a-session (ordered `position` ASC then `created_at` ASC), get, update, delete — are in the [API reference](http://localhost:3000/api-doc). A few rules the spec does not spell out: `workflowSessionId` is fixed at creation and a task cannot be re-parented; sending `dependsOnIds` or `toolBindings` replaces that full set while omitting either leaves it unchanged; and the `422 FOREIGN_KEY_VIOLATION` (unknown session, cross-session dependency, or unregistered MCP server) / `409 DEPENDENCY_CYCLE` validation applies to both create and update.
 
@@ -243,6 +247,14 @@ The task CRUD endpoints — create, list-for-a-session (ordered `position` ASC t
 Per-user notifications surfaced in the frontend's toolbar bell. Notifications are generated as a side effect of the agent's task tools — `register_workflow_tasks` raises an `approval_request`, and the final `update_workflow_task` that drives every task to a terminal state raises a one-shot `session_completed` — and are addressed to the user who started the workflow session. Both endpoints below are scoped to the authenticated user; the list never accepts a `user_id`, and reading or marking another user's notification returns `404 NOT_FOUND`.
 
 Each notification stores a `type` (`approval_request` / `session_completed`), `title`, optional `body`, the linked `workflowSessionId`, and a `read` flag. Rows cascade-delete with their recipient user and their linked `WorkflowSession`.
+
+---
+
+### Approvals
+
+A human-in-the-loop decision the workflow agent asks for mid-execution. The agent creates a `pending` Approval with the `request_approval` [agent tool](#agent-task-tools) (which also raises an `approval_request` notification), then calls the client-side `render_approval` tool to show Approve / Reject controls. The frontend writes the decision back via `PATCH /api/v1/approvals/{approval_id}`, which records the requesting user as the approver in the audit fields.
+
+Each approval stores `workflowSessionId` (FK, `ON DELETE CASCADE`), an optional `workflowTaskId` (FK, `ON DELETE SET NULL`), a `title`, optional `description`, a `status` (`pending` / `approved` / `rejected`), and an optional `response` comment. The `GET /api/v1/approvals` (list, with the shared pagination / sort / filter query params) and `GET` / `PATCH /api/v1/approvals/{id}` endpoints are in the [API reference](http://localhost:3000/api-doc). Fetching a missing approval returns `404 NOT_FOUND`.
 
 Both endpoints — list (ordered `created_at` DESC, `?unreadOnly=true` for the bell's unread badge) and mark-read — are in the [API reference](http://localhost:3000/api-doc). Reading or marking another user's notification returns `404 NOT_FOUND`.
 

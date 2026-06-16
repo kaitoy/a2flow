@@ -1,0 +1,167 @@
+"""Tests for the Approval agent tools in ``infrastructure.approval_tools``.
+
+Like the WorkflowTask tools, these open their own ``AsyncSession`` on
+``infrastructure.database.engine``; each test monkeypatches that engine to an
+isolated in-memory SQLite database and drives the tools with a lightweight fake
+ToolContext exposing only ``session.id`` and ``user_id``.
+"""
+
+from collections.abc import AsyncGenerator
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+import pytest_asyncio
+from sqlalchemy import event as sa_event
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.pool import StaticPool
+from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from infrastructure.approval_tools import get_approval, request_approval
+from infrastructure.workflow_task_tools import create_workflow_task
+from models.approval import ApprovalStatus
+from models.notification import Notification, NotificationType
+from models.workflow_session import WorkflowSession
+from repositories import SqlApprovalRepository, SqlNotificationRepository
+from tests._seed import seed_users
+
+
+@pytest_asyncio.fixture()
+async def engine(
+    monkeypatch: pytest.MonkeyPatch,
+) -> AsyncGenerator[AsyncEngine, None]:
+    """Yield an in-memory engine and point the tools' module-level engine at it."""
+    eng = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+
+    @sa_event.listens_for(eng.sync_engine, "connect")
+    def _set_fk(dbapi_conn: Any, _: object) -> None:
+        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+
+    async with eng.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    await seed_users(eng)
+
+    monkeypatch.setattr("infrastructure.database.engine", eng)
+    yield eng
+    await eng.dispose()
+
+
+async def _seed_session(
+    eng: AsyncEngine, *, session_id: str = "sess-abc", user_id: str = "owner"
+) -> str:
+    """Insert a WorkflowSession with the given ADK session id and return its PK."""
+    async with AsyncSession(eng) as db:
+        ws = WorkflowSession(
+            session_id=session_id,
+            workflow_name="wf",
+            workflow_prompt="do it",
+            agent_skill_id="skill-1",
+            agent_skill_name="skill",
+            agent_skill_repo_url="https://example.com/repo",
+            agent_skill_repo_path=".",
+            skill_dir="/tmp/skill",
+            user_id=user_id,
+            created_by=user_id,
+            updated_by=user_id,
+        )
+        db.add(ws)
+        await db.commit()
+        await db.refresh(ws)
+        return ws.id
+
+
+def _ctx(session_id: str = "sess-abc", user_id: str = "owner") -> Any:
+    """Build a fake ToolContext exposing ``session.id`` and ``user_id``."""
+    return SimpleNamespace(session=SimpleNamespace(id=session_id), user_id=user_id)
+
+
+async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notification]:
+    """Return all notifications addressed to ``user_id`` via the repository."""
+    async with AsyncSession(eng) as db:
+        repo = SqlNotificationRepository(db)
+        return await repo.list(user_id=user_id, limit=100, offset=0)
+
+
+async def test_request_approval_creates_pending_record(engine: AsyncEngine) -> None:
+    await _seed_session(engine, user_id="owner")
+    result = await request_approval(
+        "Deploy to prod", _ctx(), description="Are you sure?"
+    )
+    assert "error" not in result
+    assert result["status"] == "pending"
+
+    fetched = await get_approval(result["approval_id"], _ctx())
+    assert fetched["title"] == "Deploy to prod"
+    assert fetched["status"] == ApprovalStatus.pending.value
+
+
+async def test_request_approval_notifies_session_owner(engine: AsyncEngine) -> None:
+    await _seed_session(engine, user_id="owner")
+    await request_approval("Need sign-off", _ctx(), description="please review")
+    notifs = await _notifications_for(engine, "owner")
+    assert len(notifs) == 1
+    assert notifs[0].type is NotificationType.approval_request
+    assert notifs[0].title == "Need sign-off"
+    assert notifs[0].user_id == "owner"
+
+
+async def test_request_approval_without_session_errors(engine: AsyncEngine) -> None:
+    result = await request_approval("X", _ctx("unknown-session"))
+    assert "error" in result
+
+
+async def test_request_approval_links_valid_task(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    task = await create_workflow_task("A task", _ctx())
+    result = await request_approval("Approve task", _ctx(), workflow_task_id=task["id"])
+    assert "error" not in result
+    fetched = await get_approval(result["approval_id"], _ctx())
+    assert fetched["workflow_task_id"] == task["id"]
+
+
+async def test_request_approval_rejects_foreign_task(engine: AsyncEngine) -> None:
+    await _seed_session(engine, session_id="sess-a")
+    await _seed_session(engine, session_id="sess-b")
+    task = await create_workflow_task("In A", _ctx("sess-a"))
+    result = await request_approval(
+        "Approve", _ctx("sess-b"), workflow_task_id=task["id"]
+    )
+    assert "error" in result
+
+
+async def test_get_approval_cross_session_guard(engine: AsyncEngine) -> None:
+    await _seed_session(engine, session_id="sess-a")
+    await _seed_session(engine, session_id="sess-b")
+    created = await request_approval("Owned by A", _ctx("sess-a"))
+    approval_id = created["approval_id"]
+
+    blocked = await get_approval(approval_id, _ctx("sess-b"))
+    assert "error" in blocked
+    allowed = await get_approval(approval_id, _ctx("sess-a"))
+    assert allowed["approval_id"] == approval_id
+
+
+async def test_get_approval_reflects_resolution(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    created = await request_approval("Decide", _ctx())
+    # Resolve directly through the repository (the frontend's PATCH path).
+    async with AsyncSession(engine) as db:
+        repo = SqlApprovalRepository(db, _ws_repo(db))
+        from models.approval import ApprovalUpdate
+
+        await repo.update(
+            created["approval_id"],
+            ApprovalUpdate(status=ApprovalStatus.approved, response="ok"),
+            user_id="owner",
+        )
+    fetched = await get_approval(created["approval_id"], _ctx())
+    assert fetched["status"] == ApprovalStatus.approved.value
+    assert fetched["response"] == "ok"
+
+
+def _ws_repo(db: AsyncSession) -> Any:
+    """Build a WorkflowSession repository for the approval repository's FK check."""
+    from repositories import SqlWorkflowSessionRepository
+
+    return SqlWorkflowSessionRepository(db)

@@ -9,6 +9,9 @@ import type {
   AgentSkillUpdate,
   ApiError,
   ApiMeta,
+  Approval as ApprovalModel,
+  ApprovalStatus,
+  ApprovalUpdate,
   LoginRequest,
   McpServerCreate,
   McpServer as McpServerModel,
@@ -44,6 +47,7 @@ import {
   zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
   zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
+  zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
@@ -52,6 +56,7 @@ import {
   zGetWorkflowSessionApiV1WorkflowSessionsWsIdGetResponse,
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
+  zListApprovalsApiV1ApprovalsGetResponse,
   zListMcpServersApiV1McpServersGetResponse,
   zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse,
   zListNotificationsApiV1NotificationsGetResponse,
@@ -64,6 +69,7 @@ import {
   zLogoutApiV1AuthLogoutPostResponse,
   zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse,
   zMeApiV1AuthMeGetResponse,
+  zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
@@ -193,6 +199,7 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
   Required<Pick<T, AuditedKeys>>;
 
 export type AgentSkill = WithAudit<AgentSkillModel>;
+export type Approval = WithAudit<ApprovalModel>;
 export type McpServer = WithAudit<McpServerModel>;
 export type Notification = WithAudit<NotificationModel>;
 export type User = WithAudit<UserReadModel>;
@@ -203,6 +210,8 @@ export type Session = SessionModel;
 export type {
   AgentSkillCreate,
   AgentSkillUpdate,
+  ApprovalStatus,
+  ApprovalUpdate,
   LoginRequest,
   McpServerCreate,
   McpServerUpdate,
@@ -620,6 +629,37 @@ export async function markNotificationRead(id: string): Promise<Notification> {
     apiClient.patch(`/api/v1/notifications/${encodeURIComponent(id)}`),
     zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse
   ) as Promise<Notification>;
+}
+
+/** List approval requests (newest first) with optional pagination, sort, and filters. */
+export async function listApprovals(query: ListQuery = {}): Promise<Approval[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/approvals", listConfig(query)),
+    zListApprovalsApiV1ApprovalsGetResponse
+  ) as Promise<Approval[]>;
+}
+
+/** Fetch a single approval request by ID. */
+export async function getApproval(id: string): Promise<Approval> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}`),
+    zGetApprovalApiV1ApprovalsApprovalIdGetResponse
+  ) as Promise<Approval>;
+}
+
+/**
+ * Resolve an approval request, recording the decision and an optional comment.
+ * Used by the in-chat approval controls to write the approver's choice directly.
+ */
+export async function resolveApproval(
+  id: string,
+  status: ApprovalStatus,
+  response?: string
+): Promise<Approval> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/approvals/${encodeURIComponent(id)}`, { status, response }),
+    zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse
+  ) as Promise<Approval>;
 }
 
 /**

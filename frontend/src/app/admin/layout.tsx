@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/mcp-servers", label: "MCP Servers" },
   { href: "/admin/workflows", label: "Workflows" },
   { href: "/admin/workflow-sessions", label: "Workflow Sessions" },
+  { href: "/admin/approvals", label: "Approvals" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

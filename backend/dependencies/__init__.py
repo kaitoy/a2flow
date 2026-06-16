@@ -36,6 +36,7 @@ from .context import (
 )
 from .repository import (
     AgentSkillRepositoryDep,
+    ApprovalRepositoryDep,
     AuthSessionRepositoryDep,
     DBSessionDep,
     MCPServerRepositoryDep,
@@ -45,6 +46,7 @@ from .repository import (
     WorkflowSessionRepositoryDep,
     WorkflowTaskRepositoryDep,
     get_agent_skill_repository,
+    get_approval_repository,
     get_auth_session_repository,
     get_mcp_server_repository,
     get_notification_repository,
@@ -55,6 +57,7 @@ from .repository import (
 )
 from .service import (
     AgentSkillServiceDep,
+    ApprovalServiceDep,
     AuthServiceDep,
     MCPServerServiceDep,
     NotificationServiceDep,
@@ -63,6 +66,7 @@ from .service import (
     WorkflowSessionServiceDep,
     WorkflowTaskServiceDep,
     get_agent_skill_service,
+    get_approval_service,
     get_auth_service,
     get_mcp_server_service,
     get_notification_service,
@@ -89,6 +93,8 @@ __all__ = [
     "AgentSkillRepositoryDep",
     "AgentSkillServiceDep",
     "ApiMetaDep",
+    "ApprovalRepositoryDep",
+    "ApprovalServiceDep",
     "AuthServiceDep",
     "AuthSessionRepositoryDep",
     "CurrentUserDep",
@@ -118,6 +124,8 @@ __all__ = [
     "get_agent_registry",
     "get_agent_skill_repository",
     "get_agent_skill_service",
+    "get_approval_repository",
+    "get_approval_service",
     "get_auth_service",
     "get_auth_session_repository",
     "get_current_user",

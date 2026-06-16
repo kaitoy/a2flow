@@ -14,6 +14,7 @@ from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.base_toolset import BaseToolset
 from google.adk.tools.skill_toolset import SkillToolset
 
+from infrastructure.approval_tools import get_approval, request_approval
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.workflow_task_tools import (
     create_workflow_task,
@@ -102,7 +103,17 @@ WORKFLOW_AGENT_INSTRUCTION = (
     "Never start a task before its dependencies are completed. When every task is "
     "completed, failed, or skipped, summarize the outcome. Use "
     "`create_workflow_task`, `get_workflow_task`, and `delete_workflow_task` to "
-    "adjust the plan when needed."
+    "adjust the plan when needed.\n\n"
+    "Human approval: when a task requires the user's explicit go-ahead before you "
+    "act (for example a destructive or irreversible operation), call "
+    "`request_approval(title, description, workflow_task_id)` to record a pending "
+    "approval and notify the user. Then briefly explain the request in plain text "
+    "and call the `render_approval` tool with the returned `approval_id` to show "
+    "approve/reject controls in the UI; do NOT use A2UI buttons for this. The "
+    "user's decision is returned as the `render_approval` result (and you can "
+    "re-check it with `get_approval`). Only proceed when the decision is "
+    "`approved`; if it is `rejected`, mark the task `failed` (or `skipped` when "
+    "appropriate) and do not perform the action."
 )
 
 
@@ -168,6 +179,8 @@ def create_agent(skill_dir: Path | None = None) -> LlmAgent:
                 get_workflow_task,
                 update_workflow_task,
                 delete_workflow_task,
+                request_approval,
+                get_approval,
                 list_mcp_tools,
                 call_mcp_tool,
             ]
