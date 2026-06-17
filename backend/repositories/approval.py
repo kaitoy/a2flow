@@ -7,6 +7,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalCreate, ApprovalUpdate
+from models.user import User
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
@@ -96,10 +97,16 @@ class SqlApprovalRepository:
 
         Raises:
             ForeignKeyViolationError: If ``workflow_session_id`` does not match an
-                existing workflow session.
+                existing workflow session, or ``approver`` is set but does not
+                match an existing user.
         """
         if await self._ws_repo.get(data.workflow_session_id) is None:
             raise ForeignKeyViolationError("WorkflowSession", data.workflow_session_id)
+        if (
+            data.approver is not None
+            and await self._db.get(User, data.approver) is None
+        ):
+            raise ForeignKeyViolationError("User", data.approver)
         approval = Approval.model_validate(
             {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
         )

@@ -21,6 +21,13 @@ describe("ApprovalsPage", () => {
     await waitFor(() => expect(screen.getByText("Deploy to production")).toBeInTheDocument());
   });
 
+  it("shows the resolved approver name and comment", async () => {
+    render(<ApprovalsPage />);
+    await waitFor(() => screen.getByText("Deploy to production"));
+    await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
+    expect(screen.getByText("Looks good to me")).toBeInTheDocument();
+  });
+
   it("links to the workflow session chat", async () => {
     render(<ApprovalsPage />);
     await waitFor(() => screen.getByText("Deploy to production"));

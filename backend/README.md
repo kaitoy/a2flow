@@ -231,6 +231,7 @@ When a workflow runs, the skill-bound agent is given function tools so it can pl
 | `delete_workflow_task` | Delete a task |
 | `request_approval` | Create a `pending` [Approval](#approvals) for the current session (optionally linked to a task) and raise an `approval_request` notification; returns the `approval_id` to pass to the client-side `render_approval` tool |
 | `get_approval` | Fetch the current state of an approval in the current session (to re-check a decision) |
+| `list_users` | List the registered users (id, username, name, email; system and soft-deleted users excluded) so the agent can choose an `approver` id for `request_approval` |
 | `list_mcp_tools` | Discover the tools advertised by every [registered MCP server](#mcp-servers) (queried live and concurrently; per-server failures are isolated) |
 | `call_mcp_tool` | Invoke an MCP tool bound to the task currently `in_progress`; calls to unbound tools are rejected with an error listing the allowed tools |
 

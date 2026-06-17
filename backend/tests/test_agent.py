@@ -304,6 +304,7 @@ def test_create_agent_with_skill_uses_workflow_instruction(tmp_path: Any) -> Non
 
 def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
     from infrastructure.agent import create_agent
+    from infrastructure.approval_tools import get_approval, list_users, request_approval
     from infrastructure.workflow_task_tools import (
         create_workflow_task,
         delete_workflow_task,
@@ -328,6 +329,9 @@ def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
         get_workflow_task,
         update_workflow_task,
         delete_workflow_task,
+        request_approval,
+        get_approval,
+        list_users,
     ):
         assert tool in agent.tools
 
