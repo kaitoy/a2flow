@@ -8,8 +8,10 @@ continues or aborts the task based on the recorded decision.
 
 ``workflow_session_id`` links the approval to the workflow session it belongs to
 (so the GUI can deep-link to the session chat); the optional ``workflow_task_id``
-ties it to the specific task that needs approval. ``response`` records an
-optional free-text comment supplied when the approver resolves the request.
+ties it to the specific task that needs approval. The optional ``approver`` is
+the user the agent addresses the request to (the request's destination), set when
+the agent creates the approval. ``response`` records an optional free-text comment
+supplied when the approver resolves the request.
 """
 
 from enum import StrEnum
@@ -50,14 +52,16 @@ class ApprovalCreate(ApprovalUpdate):
     """Creation payload for an Approval.
 
     Adds the required ``workflow_session_id`` and ``title``, the optional
-    ``description`` and ``workflow_task_id`` link, and defaults ``status`` to
-    ``pending`` so a freshly requested approval starts unresolved.
+    ``description``, ``workflow_task_id`` link, and ``approver`` (the user the
+    request is addressed to), and defaults ``status`` to ``pending`` so a freshly
+    requested approval starts unresolved.
     """
 
     workflow_session_id: str
     title: ShortText
     description: BodyText | None = None
     workflow_task_id: str | None = None
+    approver: str | None = None
     status: ApprovalStatus = ApprovalStatus.pending
 
 
@@ -68,13 +72,15 @@ class Approval(ApprovalCreate, BaseEntity, table=True):
     (``ON DELETE CASCADE``), so deleting the session removes its approvals. The
     optional ``workflow_task_id`` references the task the approval concerns
     (``ON DELETE SET NULL``), so deleting the task leaves the approval record
-    intact but unlinked.
+    intact but unlinked. The optional ``approver`` references the user the request
+    is addressed to (``ON DELETE RESTRICT``), matching the audit user FKs.
     """
 
     __tablename__ = "approvals"
     __table_args__ = (
         Index("ix_approvals_workflow_session_id", "workflow_session_id"),
         Index("ix_approvals_workflow_task_id", "workflow_task_id"),
+        Index("ix_approvals_approver", "approver"),
         ForeignKeyConstraint(
             ["workflow_session_id"],
             ["workflow_sessions.id"],
@@ -86,5 +92,11 @@ class Approval(ApprovalCreate, BaseEntity, table=True):
             ["workflow_tasks.id"],
             ondelete="SET NULL",
             name="fk_approvals_workflow_task_id",
+        ),
+        ForeignKeyConstraint(
+            ["approver"],
+            ["users.id"],
+            ondelete="RESTRICT",
+            name="fk_approvals_approver",
         ),
     )

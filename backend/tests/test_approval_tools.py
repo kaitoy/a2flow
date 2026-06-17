@@ -18,7 +18,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.approval_tools import get_approval, request_approval
+from infrastructure.approval_tools import get_approval, list_users, request_approval
 from infrastructure.workflow_task_tools import create_workflow_task
 from models.approval import ApprovalStatus
 from models.notification import Notification, NotificationType
@@ -120,6 +120,20 @@ async def test_request_approval_links_valid_task(engine: AsyncEngine) -> None:
     assert fetched["workflow_task_id"] == task["id"]
 
 
+async def test_request_approval_records_approver(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    result = await request_approval("Approve me", _ctx(), approver="alice")
+    assert "error" not in result
+    fetched = await get_approval(result["approval_id"], _ctx())
+    assert fetched["approver"] == "alice"
+
+
+async def test_request_approval_rejects_unknown_approver(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    result = await request_approval("Approve me", _ctx(), approver="nobody")
+    assert "error" in result
+
+
 async def test_request_approval_rejects_foreign_task(engine: AsyncEngine) -> None:
     await _seed_session(engine, session_id="sess-a")
     await _seed_session(engine, session_id="sess-b")
@@ -158,6 +172,34 @@ async def test_get_approval_reflects_resolution(engine: AsyncEngine) -> None:
     fetched = await get_approval(created["approval_id"], _ctx())
     assert fetched["status"] == ApprovalStatus.approved.value
     assert fetched["response"] == "ok"
+
+
+async def test_list_users_returns_seeded_users(engine: AsyncEngine) -> None:
+    result = await list_users()
+    assert "error" not in result
+    usernames = {u["username"] for u in result["users"]}
+    assert {"alice", "bob", "carol", "owner", "tester"} <= usernames
+    alice = next(u for u in result["users"] if u["username"] == "alice")
+    assert alice["id"] == "alice"
+    assert alice["email"] == "alice@test.local"
+    assert set(alice) == {"id", "username", "first_name", "last_name", "email"}
+
+
+async def test_list_users_excludes_system_user(engine: AsyncEngine) -> None:
+    result = await list_users()
+    from models.user import SYSTEM_USER_ID
+
+    assert all(u["id"] != SYSTEM_USER_ID for u in result["users"])
+
+
+async def test_list_users_id_usable_as_approver(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    users = await list_users()
+    approver_id = users["users"][0]["id"]
+    result = await request_approval("Approve me", _ctx(), approver=approver_id)
+    assert "error" not in result
+    fetched = await get_approval(result["approval_id"], _ctx())
+    assert fetched["approver"] == approver_id
 
 
 def _ws_repo(db: AsyncSession) -> Any:

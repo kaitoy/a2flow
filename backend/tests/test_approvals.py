@@ -83,6 +83,7 @@ async def _insert_approval(
     title: str = "Approve me",
     status: ApprovalStatus = ApprovalStatus.pending,
     user_id: str = "owner",
+    approver: str | None = None,
 ) -> str:
     """Insert an Approval for the given session and return its id."""
     async with AsyncSession(eng) as db:
@@ -90,6 +91,7 @@ async def _insert_approval(
             workflow_session_id=workflow_session_id,
             title=title,
             status=status,
+            approver=approver,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -153,6 +155,29 @@ async def test_resolve_approval_approves(
     assert data["status"] == ApprovalStatus.approved.value
     assert data["response"] == "looks good"
     # The approver is recorded in the audit field.
+    assert data["updatedBy"] == "alice"
+
+
+async def test_resolve_keeps_designated_approver(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    ws_id = await _seed_session(eng)
+    approval_id = await _insert_approval(eng, workflow_session_id=ws_id, approver="bob")
+
+    res = await client.get(
+        f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}
+    )
+    assert assert_ok(res)["approver"] == "bob"
+
+    # Resolving by a different user does not change the designated approver.
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": "alice"},
+    )
+    data = assert_ok(res)
+    assert data["approver"] == "bob"
     assert data["updatedBy"] == "alice"
 
 

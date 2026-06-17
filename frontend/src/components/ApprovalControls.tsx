@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { type Approval, type ApprovalStatus, getApproval, resolveApproval } from "@/lib/api";
 import logger from "@/lib/logger";
 import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
 
 /** A resolved (non-pending) approval decision. */
 type Decision = Extract<ApprovalStatus, "approved" | "rejected">;
@@ -31,6 +32,8 @@ export function ApprovalControls({
   onResolved?: (toolCallId: string, decision: Decision) => void;
 }) {
   const [status, setStatus] = useState<ApprovalStatus>("pending");
+  const [comment, setComment] = useState("");
+  const [resolvedComment, setResolvedComment] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +41,11 @@ export function ApprovalControls({
     let active = true;
     getApproval(approvalId)
       .then((approval: Approval) => {
-        if (active && approval.status) setStatus(approval.status);
+        if (!active) return;
+        if (approval.status) setStatus(approval.status);
+        if (approval.status && approval.status !== "pending") {
+          setResolvedComment(approval.response ?? null);
+        }
       })
       .catch(() => {
         // Non-fatal: keep the pending controls if the lookup fails.
@@ -53,8 +60,10 @@ export function ApprovalControls({
     setBusy(true);
     setError(null);
     try {
-      await resolveApproval(approvalId, decision);
+      const trimmed = comment.trim();
+      await resolveApproval(approvalId, decision, trimmed || undefined);
       setStatus(decision);
+      setResolvedComment(trimmed || null);
       onResolved?.(toolCallId, decision);
     } catch (err) {
       logger.error(err, "failed to resolve approval");
@@ -72,23 +81,39 @@ export function ApprovalControls({
       {description && <p className="mt-1 text-sm text-on-surface-variant">{description}</p>}
 
       {status === "pending" ? (
-        <div className="mt-3 flex gap-2">
-          <Button variant="primary" disabled={busy} onClick={() => resolve("approved")}>
-            Approve
-          </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => resolve("rejected")}>
-            Reject
-          </Button>
-        </div>
+        <>
+          <Textarea
+            className="mt-3"
+            rows={2}
+            placeholder="Comment (optional)"
+            value={comment}
+            disabled={busy}
+            onChange={(e) => setComment(e.target.value)}
+            aria-label="Comment"
+          />
+          <div className="mt-3 flex gap-2">
+            <Button variant="primary" disabled={busy} onClick={() => resolve("approved")}>
+              Approve
+            </Button>
+            <Button variant="secondary" disabled={busy} onClick={() => resolve("rejected")}>
+              Reject
+            </Button>
+          </div>
+        </>
       ) : (
-        <p
-          className={[
-            "mt-3 text-sm font-medium",
-            status === "approved" ? "text-accent" : "text-on-surface-variant",
-          ].join(" ")}
-        >
-          {status === "approved" ? "Approved" : "Rejected"}
-        </p>
+        <>
+          <p
+            className={[
+              "mt-3 text-sm font-medium",
+              status === "approved" ? "text-accent" : "text-on-surface-variant",
+            ].join(" ")}
+          >
+            {status === "approved" ? "Approved" : "Rejected"}
+          </p>
+          {resolvedComment && (
+            <p className="mt-1 text-sm text-on-surface-variant">{resolvedComment}</p>
+          )}
+        </>
       )}
 
       {error && <p className="mt-2 text-sm text-error">{error}</p>}

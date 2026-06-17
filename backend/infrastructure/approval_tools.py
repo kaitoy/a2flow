@@ -35,12 +35,14 @@ from infrastructure.workflow_task_tools import (
 )
 from models.approval import ApprovalCreate
 from models.notification import NotificationType
+from models.user import User
 from repositories import (
     ApprovalRepository,
     NotificationRepository,
     SqlApprovalRepository,
     SqlMCPServerRepository,
     SqlNotificationRepository,
+    SqlUserRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
     WorkflowSessionRepository,
@@ -87,6 +89,7 @@ async def request_approval(
     tool_context: ToolContext,
     description: str | None = None,
     workflow_task_id: str | None = None,
+    approver: str | None = None,
 ) -> dict[str, Any]:
     """Create a pending approval request and notify the session owner.
 
@@ -105,11 +108,14 @@ async def request_approval(
         description: Optional longer explanation of the request.
         workflow_task_id: Optional id of the WorkflowTask this approval concerns;
             must belong to the current session.
+        approver: Optional id of the user the request is addressed to (its
+            destination); must match an existing user. Use :func:`list_users` to
+            discover valid ids.
 
     Returns:
         On success ``{"approval_id": <id>, "status": "pending"}``. On failure
-        ``{"error": <message>}`` (unresolved session, unknown task, or a
-        persistence error).
+        ``{"error": <message>}`` (unresolved session, unknown task, unknown
+        approver, or a persistence error).
     """
     async with _repos() as (ws_repo, approval_repo, task_repo, notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
@@ -127,6 +133,7 @@ async def request_approval(
             title=title,
             description=description,
             workflow_task_id=workflow_task_id,
+            approver=approver,
         )
         try:
             approval = await approval_repo.create(data, user_id=_user_id(tool_context))
@@ -146,6 +153,35 @@ async def request_approval(
         return result
 
 
+def _user_to_dict(user: User) -> dict[str, Any]:
+    """Convert a User into the plain dict the approver-selection tool returns."""
+    return {
+        "id": user.id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+    }
+
+
+async def list_users() -> dict[str, Any]:
+    """List the registered users who can be addressed as an approval's ``approver``.
+
+    Call this before :func:`request_approval` to discover valid ``approver`` ids:
+    pick the intended person from the returned list and pass their ``id`` as the
+    ``approver`` argument. Soft-deleted accounts and the internal system user are
+    excluded.
+
+    Returns:
+        ``{"users": [{"id", "username", "first_name", "last_name", "email"}, ...]}``
+        ordered by creation time (newest first).
+    """
+    async with AsyncSession(database.engine) as db:
+        user_repo = SqlUserRepository(db)
+        users = await user_repo.list(limit=1000, offset=0)
+        return {"users": [_user_to_dict(u) for u in users]}
+
+
 async def get_approval(approval_id: str, tool_context: ToolContext) -> dict[str, Any]:
     """Fetch the current state of an approval in the current session.
 
@@ -158,7 +194,7 @@ async def get_approval(approval_id: str, tool_context: ToolContext) -> dict[str,
             to the model.
 
     Returns:
-        On success ``{"approval_id", "title", "status", "response",
+        On success ``{"approval_id", "title", "status", "response", "approver",
         "workflow_task_id"}``. On failure ``{"error": <message>}`` if the session
         cannot be resolved or the approval does not belong to it.
     """
@@ -176,5 +212,6 @@ async def get_approval(approval_id: str, tool_context: ToolContext) -> dict[str,
             "title": approval.title,
             "status": approval.status.value,
             "response": approval.response,
+            "approver": approval.approver,
             "workflow_task_id": approval.workflow_task_id,
         }
