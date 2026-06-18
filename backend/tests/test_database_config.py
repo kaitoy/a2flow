@@ -5,6 +5,8 @@ ADK session-service factory branching, and the stale-writer tolerance of
 :class:`~infrastructure.session_service.StaleTolerantDatabaseSessionService`.
 """
 
+import asyncio
+
 import pytest
 from google.adk.events.event import Event
 from google.adk.sessions.database_session_service import DatabaseSessionService
@@ -159,3 +161,36 @@ class TestStaleTolerantDatabaseSessionService:
         )
         assert stored is not None
         assert event.id in [e.id for e in stored.events]
+
+    async def test_stale_tolerant_service_survives_concurrent_writers(self) -> None:
+        """Two concurrent appends on separately fetched session copies.
+
+        This reproduces the human-approval failure: the Runner and ag_ui_adk
+        append to the same logical session at the same time. Both copies do
+        their revision pre-read before either acquires the upstream per-session
+        lock, so the loser's refreshed marker goes stale and a single pre-read
+        is not enough — the retry loop must let it succeed.
+        """
+
+        service = StaleTolerantDatabaseSessionService("sqlite+aiosqlite:///:memory:")
+        created = await service.create_session(app_name="app", user_id="u1")
+        copy_a = await service.get_session(
+            app_name="app", user_id="u1", session_id=created.id
+        )
+        copy_b = await service.get_session(
+            app_name="app", user_id="u1", session_id=created.id
+        )
+        assert copy_a is not None and copy_b is not None
+        event_a = Event(author="user")
+        event_b = Event(author="user")
+        await asyncio.gather(
+            service.append_event(copy_a, event_a),
+            service.append_event(copy_b, event_b),
+        )
+        stored = await service.get_session(
+            app_name="app", user_id="u1", session_id=created.id
+        )
+        assert stored is not None
+        stored_ids = [e.id for e in stored.events]
+        assert event_a.id in stored_ids
+        assert event_b.id in stored_ids
