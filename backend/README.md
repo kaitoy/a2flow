@@ -62,6 +62,14 @@ PORT=8000
 
 Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted.
 
+### Agent skill cache
+
+```env
+SKILLS_CACHE_DIR=.skills_cache
+```
+
+Directory where Agent Skill repositories are shallow-cloned for ADK Skill loading. Defaults to `backend/.skills_cache` (relative to the working directory). Under `docker compose` it is set to `/var/cache/a2flow/skills` and backed by the `skills_cache` named volume, so clones persist across container recreation instead of being re-cloned on every start.
+
 ### Application database
 
 ```env

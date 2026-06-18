@@ -39,6 +39,9 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CORS_ORIGINS: http://localhost:3000
+      SKILLS_CACHE_DIR: /var/cache/a2flow/skills
+    volumes:
+      - skills_cache:/var/cache/a2flow/skills
     depends_on:
       db:
         condition: service_healthy
@@ -56,3 +59,4 @@ services:
 
 volumes:
   pgdata:
+  skills_cache:
