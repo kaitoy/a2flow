@@ -199,11 +199,12 @@ Approvals are persisted in `a2flow.db` and cascade-delete with their `WorkflowSe
 
 ### Workflow Sessions
 
-Navigate to [http://localhost:3000/admin/workflow-sessions](http://localhost:3000/admin/workflow-sessions) to browse every executed `WorkflowSession`. Each row links to the chat UI (`/workflow-sessions/{id}`) and to the nested **Workflow Tasks** admin page (`/admin/workflow-sessions/{id}/workflow-tasks`) where individual tasks belonging to that session can be created, edited, deleted, and have their status updated inline. The create and edit forms include a **Depends on** picker for selecting which other tasks in the same session a task depends on (its DAG edges); dependencies are shown as a column on the list, and edges that would form a cycle are rejected by the server. The Workflow Tasks page offers a **Table / Graph** toggle: the Graph view renders the task DAG with [React Flow](https://reactflow.dev/), auto-laid-out top-to-bottom with [dagre](https://github.com/dagrejs/dagre) so prerequisites sit above the tasks that depend on them. The graph is read-only (pan / zoom / fit) — dependencies are edited from the task forms.
+Navigate to [http://localhost:3000/admin/workflow-sessions](http://localhost:3000/admin/workflow-sessions) to browse every executed `WorkflowSession`. Each row links to the chat UI (`/workflow-sessions/{id}`) and to the nested **Workflow Tasks** admin page (`/admin/workflow-sessions/{id}/workflow-tasks`) where individual tasks belonging to that session can be created, edited, deleted, and have their status updated inline. A row's **Delete** action removes the `WorkflowSession` after a confirmation prompt: the record, its tasks (cascade), and the underlying ADK chat session are all deleted. The create and edit forms include a **Depends on** picker for selecting which other tasks in the same session a task depends on (its DAG edges); dependencies are shown as a column on the list, and edges that would form a cycle are rejected by the server. The Workflow Tasks page offers a **Table / Graph** toggle: the Graph view renders the task DAG with [React Flow](https://reactflow.dev/), auto-laid-out top-to-bottom with [dagre](https://github.com/dagrejs/dagre) so prerequisites sit above the tasks that depend on them. The graph is read-only (pan / zoom / fit) — dependencies are edited from the task forms.
 
 | Operation | Path |
 |-----------|------|
 | List all sessions | `GET /admin/workflow-sessions` |
+| Delete a session | `DELETE /api/v1/workflow-sessions/{id}` |
 | List a session's tasks | `GET /admin/workflow-sessions/{id}/workflow-tasks` |
 | Create a task | `GET /admin/workflow-sessions/{id}/workflow-tasks/new` |
 | Edit / delete a task | `GET /admin/workflow-sessions/{id}/workflow-tasks/{taskId}` |

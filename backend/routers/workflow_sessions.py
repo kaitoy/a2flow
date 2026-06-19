@@ -79,6 +79,20 @@ async def list_workflow_session_tasks(
     return ApiResponse(meta=meta, data=items)
 
 
+@router.delete("/{ws_id}", response_model=ApiResponse[None])
+async def delete_workflow_session(
+    ws_id: str,
+    service: WorkflowSessionServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[None]:
+    """Delete a WorkflowSession, its WorkflowTasks, and its ADK chat session.
+
+    Raises HTTP 404 (``NotFoundError``) if no session exists with the given ID.
+    """
+    await service.delete(ws_id)
+    return ApiResponse(meta=meta, data=None)
+
+
 @router.post("/{ws_id}/agent", include_in_schema=False)
 async def workflow_session_agent(
     ws_id: str,

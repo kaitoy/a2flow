@@ -21,6 +21,7 @@ from services import (
     WorkflowTaskService,
 )
 
+from .context import APP_NAME
 from .repository import (
     AgentSkillRepositoryDep,
     ApprovalRepositoryDep,
@@ -32,7 +33,7 @@ from .repository import (
     WorkflowSessionRepositoryDep,
     WorkflowTaskRepositoryDep,
 )
-from .singletons import AgentRegistryDep, SkillManagerDep
+from .singletons import AgentRegistryDep, SessionServiceDep, SkillManagerDep
 
 
 def get_agent_skill_service(repo: AgentSkillRepositoryDep) -> AgentSkillService:
@@ -97,9 +98,10 @@ def get_workflow_session_service(
     ws_repo: WorkflowSessionRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     registry: AgentRegistryDep,
+    session_service: SessionServiceDep,
 ) -> WorkflowSessionService:
-    """Create a WorkflowSessionService wiring the repositories and agent registry."""
-    return WorkflowSessionService(ws_repo, tasks, registry)
+    """Create a WorkflowSessionService wiring the repositories, agent registry, and session store."""
+    return WorkflowSessionService(ws_repo, tasks, registry, session_service, APP_NAME)
 
 
 WorkflowSessionServiceDep = Annotated[

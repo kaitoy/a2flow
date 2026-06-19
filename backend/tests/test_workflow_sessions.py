@@ -2,8 +2,11 @@ from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import MagicMock
 
+from google.adk.sessions import InMemorySessionService
 from httpx import AsyncClient
 
+from dependencies import APP_NAME
+from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
 
 _SKILL_BODY = {"name": "skill-a", "repo_url": "https://github.com/x/y"}
@@ -213,3 +216,76 @@ async def test_workflow_session_agent_injects_user_id_from_header(
         headers={"X-User-Id": "alice"},
     )
     assert received_inputs[0].forwarded_props["userId"] == "alice"
+
+
+# ---------- DELETE /workflow-sessions/{id} ----------
+
+
+async def test_delete_workflow_session_returns_200(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+    response = await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
+    assert assert_ok(response, status=200) is None
+
+
+async def test_delete_workflow_session_removes_from_list(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+    await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
+    response = await workflow_client.get("/api/v1/workflow-sessions")
+    assert assert_ok(response) == []
+
+
+async def test_delete_workflow_session_cascades_tasks(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+    task = assert_ok(
+        await workflow_client.post(
+            "/api/v1/workflow-tasks",
+            json={"workflowSessionId": ws["id"], "title": "Step one"},
+        ),
+        status=201,
+    )
+    await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
+    response = await workflow_client.get(f"/api/v1/workflow-tasks/{task['id']}")
+    assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_delete_workflow_session_deletes_adk_session(
+    workflow_client: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+    await real_session_service.create_session(
+        app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=ws["sessionId"]
+    )
+    await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
+    remaining = await real_session_service.get_session(
+        app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=ws["sessionId"]
+    )
+    assert remaining is None
+
+
+async def test_delete_workflow_session_succeeds_without_adk_session(
+    workflow_client: AsyncClient,
+) -> None:
+    # The ADK session is created lazily on the first agent call, so a freshly
+    # executed session has none. Deletion must still succeed.
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+    response = await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
+    assert assert_ok(response, status=200) is None
+
+
+async def test_delete_workflow_session_unknown_id_returns_404(
+    workflow_client: AsyncClient,
+) -> None:
+    response = await workflow_client.delete("/api/v1/workflow-sessions/nonexistent")
+    assert_err(response, code="NOT_FOUND", status=404)

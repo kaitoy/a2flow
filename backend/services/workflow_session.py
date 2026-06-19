@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from ag_ui_adk import ADKAgent
+from google.adk.sessions import BaseSessionService
 
 from infrastructure.agent import AgentRegistry
 from models.workflow_session import WorkflowSession
@@ -28,6 +29,8 @@ class WorkflowSessionService:
         ws_repo: WorkflowSessionRepository,
         tasks: WorkflowTaskRepository,
         registry: AgentRegistry,
+        session_service: BaseSessionService,
+        app_name: str,
     ) -> None:
         """Initialize the service.
 
@@ -35,10 +38,15 @@ class WorkflowSessionService:
             ws_repo: Repository providing WorkflowSession persistence.
             tasks: Repository providing WorkflowTask persistence.
             registry: Registry resolving ADK agents per skill.
+            session_service: ADK session store, used to delete the underlying
+                chat session when a WorkflowSession is removed.
+            app_name: ADK application name keying sessions in the store.
         """
         self._ws_repo = ws_repo
         self._tasks = tasks
         self._registry = registry
+        self._session_service = session_service
+        self._app_name = app_name
 
     async def get(self, ws_id: str) -> WorkflowSession:
         """Return the WorkflowSession with the given ID.
@@ -132,3 +140,32 @@ class WorkflowSessionService:
         ws = await self.get(ws_id)
         skill_dir = Path(ws.skill_dir)
         return self._registry.get(ws.agent_skill_id, skill_dir)
+
+    async def delete(self, ws_id: str) -> None:
+        """Delete a WorkflowSession and its underlying ADK chat session.
+
+        Removes, in order: the ADK chat session keyed by the record's
+        ``session_id`` (best effort — skipped if it no longer exists), then the
+        WorkflowSession row itself. Deleting the row cascades to its
+        WorkflowTasks (and their dependency edges and tool bindings) via the
+        ``ON DELETE CASCADE`` foreign keys.
+
+        Args:
+            ws_id: Identifier of the session to delete.
+
+        Raises:
+            NotFoundError: If no WorkflowSession exists with the given ID.
+        """
+        ws = await self.get(ws_id)
+        existing = await self._session_service.get_session(
+            app_name=self._app_name,
+            user_id=ws.user_id,
+            session_id=ws.session_id,
+        )
+        if existing is not None:
+            await self._session_service.delete_session(
+                app_name=self._app_name,
+                user_id=ws.user_id,
+                session_id=ws.session_id,
+            )
+        await self._ws_repo.delete(ws_id)

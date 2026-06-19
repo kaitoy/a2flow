@@ -6,14 +6,27 @@ import { useEffect, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { getUserNames, listWorkflowSessions, type WorkflowSession } from "@/lib/api";
+import {
+  deleteWorkflowSession,
+  getUserNames,
+  listWorkflowSessions,
+  type WorkflowSession,
+} from "@/lib/api";
 
 const LIMIT = 20;
 
-function buildColumns(userMap: Map<string, string>): ColumnDef<WorkflowSession>[] {
+/**
+ * Build the table columns, resolving user ids to display names via `userMap`
+ * and wiring the Actions column's Delete button to `onDelete`.
+ */
+function buildColumns(
+  userMap: Map<string, string>,
+  onDelete: (id: string, name: string) => void
+): ColumnDef<WorkflowSession>[] {
   return [
     {
       header: "Workflow",
@@ -54,6 +67,13 @@ function buildColumns(userMap: Map<string, string>): ColumnDef<WorkflowSession>[
           >
             Open chat
           </Link>
+          <button
+            type="button"
+            onClick={() => onDelete(s.id, s.workflowName)}
+            className="cursor-pointer text-error transition-colors hover:underline"
+          >
+            Delete
+          </button>
         </div>
       ),
     },
@@ -68,6 +88,25 @@ export default function WorkflowSessionsPage() {
       errorMessage: "Failed to load workflow sessions",
     });
   const [userMap, setUserMap] = useState<Map<string, string>>(new Map());
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
+
+  function handleDelete(id: string, name: string) {
+    setConfirmTarget({ id, name });
+  }
+
+  async function executeDelete() {
+    if (!confirmTarget) return;
+    try {
+      await deleteWorkflowSession(confirmTarget.id);
+      setConfirmTarget(null);
+      setActionError(null);
+      await reload();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Failed to delete workflow session");
+      setConfirmTarget(null);
+    }
+  }
 
   // Resolve user display names for the current page of sessions.
   useEffect(() => {
@@ -83,9 +122,9 @@ export default function WorkflowSessionsPage() {
   return (
     <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader title="Workflow Sessions" onRefresh={reload} refreshing={loading} />
-      <ErrorBanner error={error} />
+      <ErrorBanner error={actionError ?? error} />
       <DataTable
-        columns={buildColumns(userMap)}
+        columns={buildColumns(userMap, handleDelete)}
         rows={rows}
         loading={loading}
         emptyMessage="No workflow sessions yet. Run a workflow to create one."
@@ -101,6 +140,13 @@ export default function WorkflowSessionsPage() {
         count={rows.length}
         onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
         onNext={() => setOffset((o) => o + LIMIT)}
+      />
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        title="Delete Workflow Session"
+        description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmTarget(null)}
       />
     </div>
   );

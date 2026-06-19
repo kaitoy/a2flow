@@ -44,6 +44,7 @@ import {
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
   zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
+  zDeleteWorkflowSessionApiV1WorkflowSessionsWsIdDeleteResponse,
   zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
   zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
@@ -551,6 +552,14 @@ export async function listWorkflowSessions(query: ListQuery = {}): Promise<Workf
     apiClient.get("/api/v1/workflow-sessions", listConfig(query)),
     zListWorkflowSessionsApiV1WorkflowSessionsGetResponse
   ) as Promise<WorkflowSession[]>;
+}
+
+/** Delete a WorkflowSession by ID, along with its tasks and ADK chat session. */
+export async function deleteWorkflowSession(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/workflow-sessions/${encodeURIComponent(id)}`),
+    zDeleteWorkflowSessionApiV1WorkflowSessionsWsIdDeleteResponse
+  );
 }
 
 /**
