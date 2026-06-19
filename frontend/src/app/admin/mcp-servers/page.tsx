@@ -102,6 +102,8 @@ export default function McpServersPage() {
         title="MCP Servers"
         addHref="/admin/mcp-servers/new"
         addLabel="+ Add server"
+        onRefresh={reload}
+        refreshing={loading}
       />
       <ErrorBanner error={actionError ?? error} />
       <DataTable

@@ -103,6 +103,8 @@ export default function AgentSkillsPage() {
         title="Agent Skills"
         addHref="/admin/agent-skills/new"
         addLabel="+ Add skill"
+        onRefresh={reload}
+        refreshing={loading}
       />
       <ErrorBanner error={actionError ?? error} />
       <DataTable

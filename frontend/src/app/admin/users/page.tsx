@@ -111,7 +111,13 @@ export default function UsersPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-8">
-      <AdminPageHeader title="Users" addHref="/admin/users/new" addLabel="+ Add user" />
+      <AdminPageHeader
+        title="Users"
+        addHref="/admin/users/new"
+        addLabel="+ Add user"
+        onRefresh={reload}
+        refreshing={loading}
+      />
       <ErrorBanner error={actionError ?? error} />
       <DataTable
         columns={columns}

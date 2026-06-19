@@ -21,7 +21,7 @@ const STATUS_STYLES: Record<ApprovalStatus, string> = {
 
 /** Admin list of approval requests ordered by most recent first. */
 export default function ApprovalsPage() {
-  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters } =
+  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
     useTableQuery<Approval>(listApprovals, {
       limit: LIMIT,
       errorMessage: "Failed to load approvals",
@@ -102,7 +102,7 @@ export default function ApprovalsPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-8">
-      <AdminPageHeader title="Approvals" />
+      <AdminPageHeader title="Approvals" onRefresh={reload} refreshing={loading} />
       <ErrorBanner error={error} />
       <DataTable
         columns={columns}
