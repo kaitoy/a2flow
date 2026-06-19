@@ -62,7 +62,7 @@ function buildColumns(userMap: Map<string, string>): ColumnDef<WorkflowSession>[
 
 /** Admin list of WorkflowSessions ordered by most recent first. */
 export default function WorkflowSessionsPage() {
-  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters } =
+  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
     useTableQuery<WorkflowSession>(listWorkflowSessions, {
       limit: LIMIT,
       errorMessage: "Failed to load workflow sessions",
@@ -82,7 +82,7 @@ export default function WorkflowSessionsPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-8">
-      <AdminPageHeader title="Workflow Sessions" />
+      <AdminPageHeader title="Workflow Sessions" onRefresh={reload} refreshing={loading} />
       <ErrorBanner error={error} />
       <DataTable
         columns={buildColumns(userMap)}

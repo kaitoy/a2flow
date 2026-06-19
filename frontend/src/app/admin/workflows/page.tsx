@@ -140,7 +140,13 @@ export default function WorkflowsPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-8">
-      <AdminPageHeader title="Workflows" addHref="/admin/workflows/new" addLabel="+ Add workflow" />
+      <AdminPageHeader
+        title="Workflows"
+        addHref="/admin/workflows/new"
+        addLabel="+ Add workflow"
+        onRefresh={reload}
+        refreshing={loading}
+      />
       <ErrorBanner error={actionError ?? error} />
       <DataTable
         columns={buildColumns(skillMap, handleRun, runningId, handleDelete)}

@@ -266,6 +266,8 @@ export default function WorkflowTasksPage() {
         title="Workflow Tasks"
         addHref={`/admin/workflow-sessions/${wsId}/workflow-tasks/new`}
         addLabel="+ Add task"
+        onRefresh={load}
+        refreshing={loading}
       />
       <div className="mb-4">
         <SegmentedControl
