@@ -46,6 +46,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
         <MessageList
           messages={messages}
           isStreaming={isStreaming}
+          isRunning={isRunning}
           onApprovalResolved={sendApprovalResult}
         />
         <ChatInput onSend={sendMessage} disabled={isRunning} />

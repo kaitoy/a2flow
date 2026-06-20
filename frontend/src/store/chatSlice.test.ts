@@ -4,6 +4,11 @@ import {
   RENDER_A2UI_TOOL_NAME,
 } from "@ag-ui/a2ui-middleware";
 import { describe, expect, it } from "vitest";
+import {
+  CALL_MCP_TOOL_NAME,
+  TOOL_CALL_ACTIVITY_TYPE,
+  type ToolCallActivityContent,
+} from "@/lib/agentActivity";
 import type { Message } from "./chatSlice";
 import chatReducer, {
   addActivityMessage,
@@ -81,6 +86,61 @@ describe("chatSlice", () => {
       expect(activityMsg.id).toBe(`a2ui-surface-${surfaceId}-${toolCallId}`);
       const ops = activityMsg.content[A2UI_OPERATIONS_KEY] as unknown[];
       expect(ops).toHaveLength(2);
+    });
+
+    it("synthesizes a done MCP tool activity from a call_mcp_tool tool call", () => {
+      const messages: Message[] = [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-mcp",
+              type: "function",
+              function: {
+                name: CALL_MCP_TOOL_NAME,
+                arguments: JSON.stringify({
+                  server_id: "srv-1",
+                  tool_name: "search_web",
+                  arguments: {},
+                }),
+              },
+            },
+          ],
+        },
+      ];
+      const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
+      expect(state.messages).toHaveLength(2);
+      const activityMsg = state.messages[1];
+      if (activityMsg.role !== "activity") throw new Error("expected activity message");
+      expect(activityMsg.activityType).toBe(TOOL_CALL_ACTIVITY_TYPE);
+      expect(activityMsg.id).toBe("tc-mcp");
+      const content = activityMsg.content as unknown as ToolCallActivityContent;
+      expect(content).toMatchObject({ name: "search_web", status: "done", isMcp: true });
+    });
+
+    it("does NOT synthesize activity for an internal tool call", () => {
+      const messages: Message[] = [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-internal",
+              type: "function",
+              function: {
+                name: "create_workflow_task",
+                arguments: JSON.stringify({ title: "do it" }),
+              },
+            },
+          ],
+        },
+      ];
+      const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
+      expect(state.messages).toHaveLength(1);
+      expect(state.messages.some((m) => m.role === "activity")).toBe(false);
     });
   });
 

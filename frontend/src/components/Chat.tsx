@@ -15,7 +15,12 @@ export function Chat({ sessionId: initialSessionId }: { sessionId: string | null
 
   return (
     <>
-      <MessageList messages={messages} isStreaming={isStreaming} onAction={sendA2uiAction} />
+      <MessageList
+        messages={messages}
+        isStreaming={isStreaming}
+        isRunning={isRunning}
+        onAction={sendA2uiAction}
+      />
       <ChatInput onSend={sendMessage} disabled={isRunning} />
     </>
   );

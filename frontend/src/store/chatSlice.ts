@@ -5,6 +5,11 @@ import {
 } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import {
+  CALL_MCP_TOOL_NAME,
+  getToolDisplayName,
+  TOOL_CALL_ACTIVITY_TYPE,
+} from "@/lib/agentActivity";
 import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
 
 export type { Message };
@@ -72,13 +77,35 @@ function synthesizeA2UIActivityMessage(
 }
 
 /**
+ * Reconstruct a completed tool-call activity message from a `call_mcp_tool` call.
+ *
+ * Only user-added MCP tool calls (always routed through the `call_mcp_tool`
+ * proxy) are reproduced on resume; internal A2Flow tool calls are intentionally
+ * left out so they stay live-only. The line is shown under the real MCP tool
+ * name carried in the call's `tool_name` argument.
+ */
+function synthesizeMcpToolActivityMessage(
+  toolCallId: string,
+  args: Record<string, unknown>
+): Message {
+  return {
+    id: toolCallId,
+    role: "activity",
+    activityType: TOOL_CALL_ACTIVITY_TYPE,
+    content: { name: getToolDisplayName(CALL_MCP_TOOL_NAME, args), status: "done", isMcp: true },
+  } as Message;
+}
+
+/**
  * Reconstruct activity messages from the client-tool calls embedded in assistant messages.
  *
  * When resuming a session, the backend returns raw AG-UI messages. Tool calls are stored on
  * assistant messages, not as standalone activity messages. This generator re-synthesizes the
- * activity messages — A2UI surfaces (``render_a2ui``) and approval controls (``render_approval``)
- * — so resumed sessions display them identically to live sessions. The synthesized message IDs
- * mirror the ones used during live streaming so ``addActivityMessage``'s upsert logic works.
+ * activity messages — A2UI surfaces (``render_a2ui``), approval controls (``render_approval``),
+ * and user-added MCP tool calls (``call_mcp_tool``) — so resumed sessions display them
+ * identically to live sessions. Internal A2Flow tool calls are intentionally not reproduced.
+ * The synthesized message IDs mirror the ones used during live streaming so
+ * ``addActivityMessage``'s upsert logic works.
  */
 function* synthesizeActivityMessages(messages: Message[]): Generator<Message> {
   for (const msg of messages) {
@@ -92,6 +119,8 @@ function* synthesizeActivityMessages(messages: Message[]): Generator<Message> {
         synthesized = synthesizeA2UIActivityMessage(tc.id, args);
       } else if (tc.function.name === RENDER_APPROVAL_TOOL_NAME) {
         synthesized = synthesizeApprovalActivityMessage(tc.id, args);
+      } else if (tc.function.name === CALL_MCP_TOOL_NAME) {
+        synthesized = synthesizeMcpToolActivityMessage(tc.id, args);
       }
       if (synthesized) yield synthesized;
     }

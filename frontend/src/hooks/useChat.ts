@@ -1,70 +1,22 @@
 "use client";
 
-import { type A2UIUserAction, RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
-import type { AgentSubscriber } from "@ag-ui/client";
+import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { useStore } from "react-redux";
+import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import { createChatAgent, getSessionMessages } from "@/lib/api";
-import { logAgUiEvent } from "@/lib/devEventLogger";
 import logger from "@/lib/logger";
-import type { AppDispatch, RootState } from "@/store";
+import type { RootState } from "@/store";
 import {
-  addActivityMessage,
   addUserMessage,
-  appendDelta,
-  endAssistantMessage,
   finishRun,
   resumeSession,
   setError,
   setSession,
-  startAssistantMessage,
   startRun,
 } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-
-/**
- * Build the AG-UI subscriber object that maps incoming events to Redux actions.
- *
- * @param onRenderA2uiEnd - Called with the tool call ID whenever a RENDER_A2UI tool call ends,
- *   so the next agent run can acknowledge the render as a tool result.
- */
-function makeEventHandlers(
-  dispatch: AppDispatch,
-  onRenderA2uiEnd: (toolCallId: string) => void
-): AgentSubscriber {
-  return {
-    onEvent: async ({ event }) => {
-      logAgUiEvent(event);
-    },
-    onTextMessageStartEvent: async ({ event }) => {
-      dispatch(startAssistantMessage(event.messageId));
-    },
-    onTextMessageContentEvent: async ({ event }) => {
-      dispatch(appendDelta({ messageId: event.messageId, delta: event.delta }));
-    },
-    onTextMessageEndEvent: async ({ event: _event }) => {
-      dispatch(endAssistantMessage());
-    },
-    onActivitySnapshotEvent: async ({ event }) => {
-      dispatch(
-        addActivityMessage({
-          id: event.messageId,
-          activityType: event.activityType,
-          content: event.content as Record<string, unknown>,
-        })
-      );
-    },
-    onToolCallEndEvent: async ({ event, toolCallName }) => {
-      if (toolCallName === RENDER_A2UI_TOOL_NAME) {
-        onRenderA2uiEnd(event.toolCallId);
-      }
-    },
-    onRunErrorEvent: async ({ event }) => {
-      dispatch(setError(event.message));
-    },
-  };
-}
 
 /** Serialize an A2UIUserAction into a human-readable string sent as a user message to the agent. */
 function formatActionContent(action: A2UIUserAction): string {
@@ -160,8 +112,10 @@ export function useChat(initialSessionId: string | null) {
       try {
         await agent.runAgent(
           undefined,
-          makeEventHandlers(dispatch, (tcId) => {
-            pendingRenderToolCallIds.current.push(tcId);
+          createAgentSubscriber(dispatch, {
+            onRenderA2uiEnd: (tcId) => {
+              pendingRenderToolCallIds.current.push(tcId);
+            },
           })
         );
       } catch (err) {
@@ -192,8 +146,10 @@ export function useChat(initialSessionId: string | null) {
       try {
         await agent.runAgent(
           undefined,
-          makeEventHandlers(dispatch, (tcId) => {
-            pendingRenderToolCallIds.current.push(tcId);
+          createAgentSubscriber(dispatch, {
+            onRenderA2uiEnd: (tcId) => {
+              pendingRenderToolCallIds.current.push(tcId);
+            },
           })
         );
       } catch (err) {

@@ -1,6 +1,7 @@
 import { A2UIActivityType } from "@ag-ui/a2ui-middleware";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { REASONING_ACTIVITY_TYPE, TOOL_CALL_ACTIVITY_TYPE } from "@/lib/agentActivity";
 import { APPROVAL_ACTIVITY_TYPE } from "@/lib/approvalTool";
 import { ActivityMessageBubble } from "./ActivityMessageBubble";
 
@@ -71,6 +72,36 @@ describe("ActivityMessageBubble", () => {
       "data-approval-id",
       "appr-1"
     );
+  });
+
+  it("renders a tool-call status line for the tool_call activity type", () => {
+    render(
+      <ActivityMessageBubble
+        message={{
+          id: "tc-1",
+          role: "activity",
+          activityType: TOOL_CALL_ACTIVITY_TYPE,
+          content: { name: "search_web", status: "done", isMcp: true },
+        }}
+      />
+    );
+    expect(screen.getByText("search_web")).toBeInTheDocument();
+    expect(screen.getByText("done")).toBeInTheDocument();
+    expect(screen.getByText("MCP")).toBeInTheDocument();
+  });
+
+  it("renders reasoning text for the reasoning activity type", () => {
+    render(
+      <ActivityMessageBubble
+        message={{
+          id: "r-1",
+          role: "activity",
+          activityType: REASONING_ACTIVITY_TYPE,
+          content: { text: "Let me think about this." },
+        }}
+      />
+    );
+    expect(screen.getByText("Let me think about this.")).toBeInTheDocument();
   });
 
   it("renders null for an approval activity missing approvalId", () => {

@@ -1,89 +1,53 @@
 "use client";
 
-import { RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
-import type { AgentSubscriber } from "@ag-ui/client";
 import { useCallback, useEffect, useRef } from "react";
+import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import { createWorkflowSessionAgent, getSessionMessages } from "@/lib/api";
-import {
-  APPROVAL_ACTIVITY_TYPE,
-  RENDER_APPROVAL_TOOL,
-  RENDER_APPROVAL_TOOL_NAME,
-} from "@/lib/approvalTool";
-import { logAgUiEvent } from "@/lib/devEventLogger";
+import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL } from "@/lib/approvalTool";
 import logger from "@/lib/logger";
 import type { AppDispatch } from "@/store";
 import {
   addActivityMessage,
   addUserMessage,
-  appendDelta,
-  endAssistantMessage,
   finishRun,
   resumeSession,
   setError,
   setSession,
-  startAssistantMessage,
   startRun,
 } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 /**
- * Build the AG-UI subscriber object that maps incoming events to Redux actions.
+ * Build the workflow-session AG-UI subscriber: the shared subscriber plus an
+ * approval-rendering handler that turns `render_approval` tool calls into
+ * approval-control activity messages.
  *
- * @param onRenderA2uiEnd - Called with the tool call ID whenever a RENDER_A2UI tool call ends,
- *   so the next agent run can acknowledge the render as a tool result.
+ * @param dispatch - The Redux dispatch used to apply the mapped actions.
+ * @param onRenderA2uiEnd - Called with the tool call ID whenever a RENDER_A2UI
+ *   tool call ends, so the next agent run can acknowledge the render.
  */
-function makeEventHandlers(
-  dispatch: AppDispatch,
-  onRenderA2uiEnd: (toolCallId: string) => void
-): AgentSubscriber {
-  return {
-    onEvent: async ({ event }) => {
-      logAgUiEvent(event);
-    },
-    onTextMessageStartEvent: async ({ event }) => {
-      dispatch(startAssistantMessage(event.messageId));
-    },
-    onTextMessageContentEvent: async ({ event }) => {
-      dispatch(appendDelta({ messageId: event.messageId, delta: event.delta }));
-    },
-    onTextMessageEndEvent: async ({ event: _event }) => {
-      dispatch(endAssistantMessage());
-    },
-    onActivitySnapshotEvent: async ({ event }) => {
-      dispatch(
-        addActivityMessage({
-          id: event.messageId,
-          activityType: event.activityType,
-          content: event.content as Record<string, unknown>,
-        })
-      );
-    },
-    onToolCallEndEvent: async ({ event, toolCallName, toolCallArgs }) => {
-      if (toolCallName === RENDER_A2UI_TOOL_NAME) {
-        onRenderA2uiEnd(event.toolCallId);
-      } else if (toolCallName === RENDER_APPROVAL_TOOL_NAME) {
-        // Render approve/reject controls; the decision is sent back as this
-        // tool's result by sendApprovalResult, so it is not auto-acknowledged.
-        const { approvalId, title, description } = toolCallArgs as {
-          approvalId?: string;
-          title?: string;
-          description?: string;
-        };
-        if (approvalId) {
-          dispatch(
-            addActivityMessage({
-              id: event.toolCallId,
-              activityType: APPROVAL_ACTIVITY_TYPE,
-              content: { approvalId, title, description },
-            })
-          );
-        }
+function makeEventHandlers(dispatch: AppDispatch, onRenderA2uiEnd: (toolCallId: string) => void) {
+  return createAgentSubscriber(dispatch, {
+    onRenderA2uiEnd,
+    onRenderApprovalEnd: (toolCallId, args) => {
+      // Render approve/reject controls; the decision is sent back as this
+      // tool's result by sendApprovalResult, so it is not auto-acknowledged.
+      const { approvalId, title, description } = args as {
+        approvalId?: string;
+        title?: string;
+        description?: string;
+      };
+      if (approvalId) {
+        dispatch(
+          addActivityMessage({
+            id: toolCallId,
+            activityType: APPROVAL_ACTIVITY_TYPE,
+            content: { approvalId, title, description },
+          })
+        );
       }
     },
-    onRunErrorEvent: async ({ event }) => {
-      dispatch(setError(event.message));
-    },
-  };
+  });
 }
 
 /**

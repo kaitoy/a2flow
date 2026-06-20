@@ -39,4 +39,29 @@ describe("MessageList", () => {
     render(<MessageList messages={[]} />);
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
+
+  it("shows the working indicator while running and not streaming", () => {
+    const messages: Message[] = [{ id: "m1", role: "user", content: "hi" }];
+    render(<MessageList messages={messages} isRunning={true} />);
+    expect(screen.getByText("エージェントが考えています…")).toBeInTheDocument();
+  });
+
+  it("hides the working indicator while streaming text", () => {
+    const messages: Message[] = [{ id: "m1", role: "assistant", content: "" }];
+    render(<MessageList messages={messages} isRunning={true} isStreaming={true} />);
+    expect(screen.queryByText("エージェントが考えています…")).not.toBeInTheDocument();
+  });
+
+  it("hides the working indicator when the last message is a running tool line", () => {
+    const messages: Message[] = [
+      {
+        id: "tc-1",
+        role: "activity",
+        activityType: "tool_call",
+        content: { name: "create_workflow_task", status: "running" },
+      } as Message,
+    ];
+    render(<MessageList messages={messages} isRunning={true} />);
+    expect(screen.queryByText("エージェントが考えています…")).not.toBeInTheDocument();
+  });
 });

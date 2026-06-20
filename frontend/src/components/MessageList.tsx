@@ -4,18 +4,55 @@ import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { animated, useSpring } from "@react-spring/web";
 import { useEffect, useRef } from "react";
+import { TOOL_CALL_ACTIVITY_TYPE, type ToolCallActivityContent } from "@/lib/agentActivity";
 import { useMotionConfig } from "@/lib/motion";
 import { MessageBubble } from "./MessageBubble";
+
+/**
+ * Whether the agent is working but has nothing on screen yet — true when a run
+ * is in progress, no text is streaming, and the latest message is not already a
+ * running tool line (which shows its own spinner).
+ */
+function shouldShowWorkingIndicator(
+  messages: Message[],
+  isRunning: boolean,
+  isStreaming: boolean
+): boolean {
+  if (!isRunning || isStreaming) return false;
+  const last = messages[messages.length - 1];
+  if (
+    last?.role === "activity" &&
+    last.activityType === TOOL_CALL_ACTIVITY_TYPE &&
+    (last.content as unknown as ToolCallActivityContent).status === "running"
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** Subtle "agent is thinking" pulse shown at the bottom of the list while a run is in flight. */
+function WorkingIndicator() {
+  return (
+    <div className="mb-3 flex justify-start animate-message-in" aria-live="polite">
+      <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs glass-panel text-on-surface-variant">
+        <span className="inline-block h-2 w-2 rounded-full bg-accent shadow-glow animate-pulse" />
+        <span>エージェントが考えています…</span>
+      </div>
+    </div>
+  );
+}
 
 /** Scrollable list of chat messages that auto-scrolls to the bottom when new messages arrive. */
 export function MessageList({
   messages,
   isStreaming = false,
+  isRunning = false,
   onAction,
   onApprovalResolved,
 }: {
   messages: Message[];
   isStreaming?: boolean;
+  isRunning?: boolean;
   onAction?: (action: A2UIUserAction) => void;
   onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected") => void;
 }) {
@@ -60,6 +97,7 @@ export function MessageList({
             onApprovalResolved={onApprovalResolved}
           />
         ))}
+        {shouldShowWorkingIndicator(messages, isRunning, isStreaming) && <WorkingIndicator />}
         <div ref={bottomRef} />
       </div>
     </div>
