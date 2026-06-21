@@ -1,6 +1,7 @@
 /** @module UsersPage — Admin list page for managing application users. */
 "use client";
 
+import { Users as UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -113,6 +114,7 @@ export default function UsersPage() {
     <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader
         title="Users"
+        icon={UsersIcon}
         addHref="/admin/users/new"
         addLabel="+ Add user"
         onRefresh={reload}
@@ -124,6 +126,7 @@ export default function UsersPage() {
         rows={rows}
         loading={loading}
         emptyMessage="No users registered yet."
+        emptyIcon={UsersIcon}
         getRowKey={(user) => user.id}
         sort={sort}
         onSortChange={setSort}

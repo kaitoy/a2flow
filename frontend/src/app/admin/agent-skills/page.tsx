@@ -1,6 +1,7 @@
 /** @module AgentSkillsPage — Admin list page for managing agent skills. */
 "use client";
 
+import { Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -101,6 +102,7 @@ export default function AgentSkillsPage() {
     <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader
         title="Agent Skills"
+        icon={Wand2}
         addHref="/admin/agent-skills/new"
         addLabel="+ Add skill"
         onRefresh={reload}
@@ -112,6 +114,7 @@ export default function AgentSkillsPage() {
         rows={rows}
         loading={loading}
         emptyMessage="No agent skills registered yet."
+        emptyIcon={Wand2}
         getRowKey={(skill) => skill.id}
         sort={sort}
         onSortChange={setSort}

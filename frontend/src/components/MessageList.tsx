@@ -3,10 +3,12 @@
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { animated, useSpring } from "@react-spring/web";
+import { Sparkles } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { TOOL_CALL_ACTIVITY_TYPE, type ToolCallActivityContent } from "@/lib/agentActivity";
 import { useMotionConfig } from "@/lib/motion";
 import { MessageBubble } from "./MessageBubble";
+import { EmptyState } from "./ui/empty-state";
 
 /**
  * Whether the agent is working but has nothing on screen yet — true when a run
@@ -73,19 +75,13 @@ export function MessageList({
     <div className="flex-1 overflow-y-auto px-4 py-6">
       <div className="mx-auto flex max-w-3xl flex-col">
         {messages.length === 0 && (
-          <animated.div
-            style={emptyStateSpring}
-            className="flex h-full flex-col items-center justify-center py-20 text-center select-none"
-          >
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl glass-panel-strong shadow-glow">
-              <span className="text-2xl">✦</span>
-            </div>
-            <h2 className="mb-1 text-2xl font-semibold tracking-tight text-gradient-accent">
-              Start a conversation
-            </h2>
-            <p className="text-sm text-on-surface-variant">
-              Ask anything, build an A2UI surface, or kick off a workflow.
-            </p>
+          <animated.div style={emptyStateSpring}>
+            <EmptyState
+              icon={Sparkles}
+              animation="breathe"
+              title="Start a conversation"
+              description="Ask anything, build an A2UI surface, or kick off a workflow."
+            />
           </animated.div>
         )}
         {messages.map((msg, i) => (

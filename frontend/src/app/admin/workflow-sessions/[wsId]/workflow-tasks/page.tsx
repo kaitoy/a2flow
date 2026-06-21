@@ -1,6 +1,7 @@
 /** @module WorkflowTasksPage — Admin list page for WorkflowTasks belonging to a single WorkflowSession. */
 "use client";
 
+import { ListTree } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -264,6 +265,7 @@ export default function WorkflowTasksPage() {
       </Link>
       <AdminPageHeader
         title="Workflow Tasks"
+        icon={ListTree}
         addHref={`/admin/workflow-sessions/${wsId}/workflow-tasks/new`}
         addLabel="+ Add task"
         onRefresh={load}
@@ -293,6 +295,7 @@ export default function WorkflowTasksPage() {
             rows={tasks}
             loading={loading}
             emptyMessage="No tasks for this session yet."
+            emptyIcon={ListTree}
             getRowKey={(t) => t.id}
             sort={sort}
             onSortChange={handleSortChange}

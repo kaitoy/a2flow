@@ -1,6 +1,7 @@
 /** @module McpServersPage — Admin list page for managing registered MCP servers. */
 "use client";
 
+import { Server } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -100,6 +101,7 @@ export default function McpServersPage() {
     <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader
         title="MCP Servers"
+        icon={Server}
         addHref="/admin/mcp-servers/new"
         addLabel="+ Add server"
         onRefresh={reload}
@@ -111,6 +113,7 @@ export default function McpServersPage() {
         rows={rows}
         loading={loading}
         emptyMessage="No MCP servers registered yet."
+        emptyIcon={Server}
         getRowKey={(server) => server.id}
         sort={sort}
         onSortChange={setSort}

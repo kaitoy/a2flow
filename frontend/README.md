@@ -11,6 +11,7 @@ Chat UI for [A2Flow](../README.md). Streams responses from the backend via SSE a
 | State | Redux Toolkit + React Redux |
 | Styling | Tailwind CSS v4 |
 | Animation | @react-spring/web (mount/unmount, list staggering, modals) + CSS keyframes |
+| Icons | lucide-react (wrapped by `AnimatedIcon` for subtle, motion-safe animation) |
 | Graph viz | @xyflow/react (React Flow) + @dagrejs/dagre (auto layout) |
 | HTTP | Fetch API (REST) / @ag-ui/client (SSE streaming) |
 | Logging | pino (browser mode) |

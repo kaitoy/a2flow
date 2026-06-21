@@ -1,6 +1,7 @@
 "use client";
 
 import { animated, useTransition } from "@react-spring/web";
+import { MessagesSquare, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { deleteSession, getSession, listSessions, type Session } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
@@ -8,6 +9,7 @@ import { useAppSelector } from "@/store/hooks";
 import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { formatFullTimestamp } from "./ui/date-time";
+import { EmptyState } from "./ui/empty-state";
 import { Skeleton } from "./ui/skeleton";
 import { SlidingIndicator } from "./ui/sliding-indicator";
 import { Tooltip } from "./ui/tooltip";
@@ -94,8 +96,19 @@ export function SessionList({
   return (
     <aside className="relative flex h-full w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl">
       <div className="shrink-0 px-3 py-4 border-b border-glass-border">
-        <Button variant="primary" onClick={onNew} disabled={disabled} className="w-full">
-          + New session
+        <Button
+          variant="primary"
+          onClick={onNew}
+          disabled={disabled}
+          className="group w-full gap-2"
+        >
+          <SquarePen
+            size={16}
+            strokeWidth={1.8}
+            aria-hidden="true"
+            className="transition-transform duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:rotate-[-8deg]"
+          />
+          New session
         </Button>
       </div>
       <div className="relative flex-1 overflow-y-auto py-2">
@@ -114,7 +127,13 @@ export function SessionList({
           </div>
         )}
         {!loading && sessions.length === 0 && (
-          <p className="px-3 text-xs text-on-surface-variant">No sessions</p>
+          <EmptyState
+            icon={MessagesSquare}
+            animation="bob"
+            description="No sessions"
+            compact
+            className="px-3 py-8"
+          />
         )}
         {transitions((style, s) => {
           const isActive = s.id === currentSessionId;

@@ -1,6 +1,7 @@
 /** @module ApprovalsPage — Admin list page for browsing approval requests. */
 "use client";
 
+import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -102,13 +103,19 @@ export default function ApprovalsPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-8">
-      <AdminPageHeader title="Approvals" onRefresh={reload} refreshing={loading} />
+      <AdminPageHeader
+        title="Approvals"
+        icon={CheckCircle2}
+        onRefresh={reload}
+        refreshing={loading}
+      />
       <ErrorBanner error={error} />
       <DataTable
         columns={columns}
         rows={rows}
         loading={loading}
         emptyMessage="No approval requests yet."
+        emptyIcon={CheckCircle2}
         getRowKey={(a) => a.id}
         sort={sort}
         onSortChange={setSort}

@@ -75,6 +75,16 @@
   --animate-pulse-cursor: pulse-cursor 1.1s ease-in-out infinite;
   --animate-shimmer: shimmer 1.6s linear infinite;
 
+  /* Decorative icon motion — small-amplitude, calm loops for accent icons in
+     empty states, page headers, and the login backdrop. Kept distinct from the
+     large-amplitude background drifts (float-slow/float-slower). */
+  --animate-bob: bob 3.2s ease-in-out infinite;
+  --animate-breathe: breathe 3.5s ease-in-out infinite;
+  --animate-spin-slow: spin-slow 9s linear infinite;
+  --animate-spin-occasional: spin-occasional 8s ease-in-out infinite;
+  --animate-wiggle: wiggle 0.7s ease-in-out;
+  --animate-attention: attention 3s ease-in-out infinite;
+
   /* Motion tokens (durations & Material You "emphasized" easing). */
   --motion-duration-fast: 150ms;
   --motion-duration-base: 240ms;
@@ -333,6 +343,97 @@ body::after {
   }
   100% {
     background-position: 220% 0;
+  }
+}
+
+/* Gentle vertical bob for decorative/accent icons. Small amplitude so it reads
+   as a calm float, not a bounce. */
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Soft "breathing" pulse — slight scale + opacity swell for sparkle-style icons. */
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+/* Slow continuous rotation for gear/loader-style accents. */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Occasional single spin — a quick full turn around the Y (vertical) axis,
+   followed by a long rest, so an accent icon flips like a coin every few
+   seconds rather than rotating continuously. `perspective(...)` gives the
+   rotation depth instead of a flat horizontal squish at 90°/270°. */
+@keyframes spin-occasional {
+  0% {
+    transform: perspective(200px) rotateY(0deg);
+  }
+  12%,
+  100% {
+    transform: perspective(200px) rotateY(360deg);
+  }
+}
+
+/* Brief left-right wiggle — used as a one-shot "alert" cue (e.g. notification bell). */
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-9deg);
+  }
+  40% {
+    transform: rotate(7deg);
+  }
+  60% {
+    transform: rotate(-5deg);
+  }
+  80% {
+    transform: rotate(3deg);
+  }
+}
+
+/* Looping "attention" cue — a brief wiggle followed by a long rest, so a
+   notification bell nudges periodically without rattling continuously. */
+@keyframes attention {
+  0%,
+  20%,
+  100% {
+    transform: rotate(0deg);
+  }
+  4% {
+    transform: rotate(-10deg);
+  }
+  8% {
+    transform: rotate(8deg);
+  }
+  12% {
+    transform: rotate(-6deg);
+  }
+  16% {
+    transform: rotate(4deg);
   }
 }
 

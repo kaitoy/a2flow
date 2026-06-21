@@ -200,6 +200,11 @@ The shape language is **Soft Modern**.
   - *Assistant:* `glass-panel`, asymmetric corner (`rounded-tl-md`), accent-colored streaming caret.
 - **A2UI surfaces:** `customCard` is rendered as `glass-panel-strong`. `customChoicePicker` chips use the same primary-gradient when selected and `glass-panel` when not, and scale up slightly (~1.03) on hover (motion-safe).
 - **Theme Toggle:** A 36×36 round glass button in the chat header / admin sidebar bottom. Sun/Moon SVG icons; scales up slightly (~1.05) and emits accent glow on hover. Icons cross-fade with a 90° rotation on toggle.
+- **EmptyState:** Centered placeholder for empty regions (no messages, no rows, no sessions). Pairs an `AnimatedIcon` inside a frosted-glass tile with an optional title and description. Has a `compact` variant for tight containers (session sidebar, table empty cell). See `@/components/ui/empty-state.tsx`.
+
+### Iconography
+
+Icons come from [`lucide-react`](https://lucide.dev) (stroke icons, `strokeWidth={1.8}` to match the app's hand-drawn glyphs, `currentColor` for theme tinting). Wrap any icon that should animate in `AnimatedIcon` (`@/components/ui/animated-icon.tsx`), which applies a `motion-safe`-gated looping animation (`bob`, `breathe`, `spin-slow`, `spin-occasional`, `wiggle`, or `none`). Decorative icons are `aria-hidden` by default — add a label when an icon carries standalone meaning. Admin list headers pass an `icon` to `AdminPageHeader` (and the matching `emptyIcon` to `DataTable`) so each section reads at a glance; both twirl occasionally (`spin-occasional`) rather than bobbing.
 
 ## Motion
 
@@ -234,6 +239,7 @@ Choose presets by intent (`useMotionConfig("gentle")`) rather than tuning tensio
 - **Buttons** — All variants share `active:scale-[0.97]` for tactile press feedback and lift 2px on hover (`motion-safe`-guarded).
 - **Streaming caret** — Assistant bubble caret uses both `animate-blink` (the original step-start blink, preserved for tests) and `motion-safe:animate-pulse-cursor` (a softer opacity + scaleY pulse) so motion-safe users get the richer effect.
 - **Theme toggle** — Scales up slightly on hover (motion-safe); Sun/Moon icons cross-fade with a 90° rotation via `useTransition`.
+- **Decorative icons** — Accent icons in empty states and page headers loop through small-amplitude keyframes, all `motion-safe`-gated: `bob` (gentle ±4px float, chat/sidebar empty states), `breathe` (subtle scale + opacity swell, chat empty state), `spin-slow` (9s continuous rotation), `spin-occasional` (a quick full turn around the Y/vertical axis — a coin-like flip with `perspective` depth — every ~8s on a long rest, used by admin header and admin empty-table icons), `wiggle` (one-shot ±10° shake), and `attention` (a brief wiggle on a long rest, used by the notification bell when there are unread items). Kept deliberately distinct from the large-amplitude background drifts (`float-slow`/`float-slower`).
 
 ### Reduced motion
 

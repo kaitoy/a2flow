@@ -1,6 +1,7 @@
 /** @module WorkflowsPage — Admin list page for managing workflows. */
 "use client";
 
+import { Workflow as WorkflowIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -142,6 +143,7 @@ export default function WorkflowsPage() {
     <div className="mx-auto max-w-6xl p-8">
       <AdminPageHeader
         title="Workflows"
+        icon={WorkflowIcon}
         addHref="/admin/workflows/new"
         addLabel="+ Add workflow"
         onRefresh={reload}
@@ -153,6 +155,7 @@ export default function WorkflowsPage() {
         rows={rows}
         loading={loading}
         emptyMessage="No workflows registered yet."
+        emptyIcon={WorkflowIcon}
         getRowKey={(w) => w.id}
         sort={sort}
         onSortChange={setSort}

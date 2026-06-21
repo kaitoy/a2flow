@@ -1,6 +1,7 @@
 /** @module WorkflowSessionsPage — Admin list page for browsing executed WorkflowSessions. */
 "use client";
 
+import { ListChecks } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -121,13 +122,19 @@ export default function WorkflowSessionsPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-8">
-      <AdminPageHeader title="Workflow Sessions" onRefresh={reload} refreshing={loading} />
+      <AdminPageHeader
+        title="Workflow Sessions"
+        icon={ListChecks}
+        onRefresh={reload}
+        refreshing={loading}
+      />
       <ErrorBanner error={actionError ?? error} />
       <DataTable
         columns={buildColumns(userMap, handleDelete)}
         rows={rows}
         loading={loading}
         emptyMessage="No workflow sessions yet. Run a workflow to create one."
+        emptyIcon={ListChecks}
         getRowKey={(s) => s.id}
         sort={sort}
         onSortChange={setSort}

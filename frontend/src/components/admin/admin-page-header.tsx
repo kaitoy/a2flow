@@ -1,8 +1,12 @@
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { Tooltip } from "@/components/ui/tooltip";
 
 interface AdminPageHeaderProps {
   title: string;
+  /** Optional accent icon shown to the left of the title; twirls occasionally. */
+  icon?: LucideIcon;
   addHref?: string;
   addLabel?: string;
   /** When provided, render a refresh button that re-runs the table fetch on click. */
@@ -21,6 +25,7 @@ interface AdminPageHeaderProps {
  */
 export function AdminPageHeader({
   title,
+  icon,
   addHref,
   addLabel,
   onRefresh,
@@ -28,7 +33,14 @@ export function AdminPageHeader({
 }: AdminPageHeaderProps) {
   return (
     <div className="mb-6 flex items-center justify-between">
-      <h1 className="text-3xl font-semibold tracking-tight text-gradient-accent">{title}</h1>
+      <div className="flex items-center gap-3">
+        {icon && (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl glass-panel-strong text-accent shadow-glow">
+            <AnimatedIcon icon={icon} animation="spin-occasional" size={22} />
+          </span>
+        )}
+        <h1 className="text-3xl font-semibold tracking-tight text-gradient-accent">{title}</h1>
+      </div>
       <div className="flex items-center gap-2">
         {onRefresh && (
           <Tooltip label="Refresh" placement="bottom">
