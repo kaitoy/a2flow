@@ -1,6 +1,7 @@
 /** @module AdminLayout — Admin section shell with sidebar navigation and theme toggle. */
 "use client";
 
+import { CheckCircle2, ListChecks, Server, Users, Wand2, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef } from "react";
@@ -9,12 +10,12 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 
 const NAV = [
-  { href: "/admin/users", label: "Users" },
-  { href: "/admin/agent-skills", label: "Agent Skills" },
-  { href: "/admin/mcp-servers", label: "MCP Servers" },
-  { href: "/admin/workflows", label: "Workflows" },
-  { href: "/admin/workflow-sessions", label: "Workflow Sessions" },
-  { href: "/admin/approvals", label: "Approvals" },
+  { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/agent-skills", label: "Agent Skills", icon: Wand2 },
+  { href: "/admin/mcp-servers", label: "MCP Servers", icon: Server },
+  { href: "/admin/workflows", label: "Workflows", icon: Workflow },
+  { href: "/admin/workflow-sessions", label: "Workflow Sessions", icon: ListChecks },
+  { href: "/admin/approvals", label: "Approvals", icon: CheckCircle2 },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -46,7 +47,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         : "text-on-surface-variant hover:bg-glass hover:text-on-surface",
                     ].join(" ")}
                   >
-                    {item.label}
+                    <span className="flex items-center gap-2.5">
+                      <item.icon
+                        size={18}
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                        className="shrink-0"
+                      />
+                      {item.label}
+                    </span>
                   </Link>
                 </li>
               );
