@@ -40,6 +40,11 @@ frontend/next-env.d.ts
 # pnpm
 frontend/node_modules/
 
+# Stray npm install at the repo root (the real manifests live in frontend/ and backend/)
+/node_modules/
+/package.json
+/package-lock.json
+
 # env
 frontend/.env.local
 
