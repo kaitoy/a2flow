@@ -1,6 +1,7 @@
 from .agent_skill import AgentSkillService
 from .approval import ApprovalService
 from .auth import AuthService
+from .mcp_registry import MCPRegistryService
 from .mcp_server import MCPServerService
 from .notification import NotificationService
 from .user import UserService
@@ -12,6 +13,7 @@ __all__ = [
     "AgentSkillService",
     "ApprovalService",
     "AuthService",
+    "MCPRegistryService",
     "MCPServerService",
     "NotificationService",
     "UserService",

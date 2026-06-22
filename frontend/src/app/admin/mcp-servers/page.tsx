@@ -1,17 +1,26 @@
 /** @module McpServersPage — Admin list page for managing registered MCP servers. */
 "use client";
 
-import { Server } from "lucide-react";
+import { PackageSearch, Server } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { RegistrySearchDialog } from "@/components/admin/registry-search-dialog";
+import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { deleteMcpServer, listMcpServers, type McpServer } from "@/lib/api";
+import {
+  deleteMcpServer,
+  listMcpServers,
+  type McpRegistryServerEntry,
+  type McpServer,
+} from "@/lib/api";
+import { buildPrefillHref } from "@/lib/mcp-registry-prefill";
 
 const LIMIT = 20;
 
@@ -52,11 +61,19 @@ export default function McpServersPage() {
       limit: LIMIT,
       errorMessage: "Failed to load MCP servers",
     });
+  const router = useRouter();
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
+  const [registryOpen, setRegistryOpen] = useState(false);
 
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
+  }
+
+  /** Close the registry dialog and open the create form pre-filled from the pick. */
+  function handleRegistrySelect(entry: McpRegistryServerEntry) {
+    setRegistryOpen(false);
+    router.push(buildPrefillHref(entry));
   }
 
   async function executeDelete() {
@@ -104,6 +121,16 @@ export default function McpServersPage() {
         icon={Server}
         addHref="/admin/mcp-servers/new"
         addLabel="+ Add server"
+        secondaryAction={
+          <Button
+            variant="secondary"
+            className="inline-flex items-center gap-1.5"
+            onClick={() => setRegistryOpen(true)}
+          >
+            <PackageSearch size={16} />
+            Browse registry
+          </Button>
+        }
         onRefresh={reload}
         refreshing={loading}
       />
@@ -133,6 +160,11 @@ export default function McpServersPage() {
         description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
+      />
+      <RegistrySearchDialog
+        open={registryOpen}
+        onClose={() => setRegistryOpen(false)}
+        onSelect={handleRegistrySelect}
       />
     </div>
   );

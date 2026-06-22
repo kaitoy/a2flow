@@ -256,6 +256,7 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `ForeignKeyViolationError` | 422 | `FOREIGN_KEY_VIOLATION` | Referenced entity not found; `details` carries `entity` and `id` |
 | `RequestValidationError` | 422 | `VALIDATION_ERROR` | FastAPI body/query validation; `details.errors` from Pydantic |
 | `McpConnectionError` | 502 | `MCP_UNREACHABLE` | Remote MCP server unreachable; `details` carries `server` and `reason` |
+| `RegistryUnavailableError` | 502 | `REGISTRY_UNREACHABLE` | Official MCP registry unreachable; `details` carries `reason` |
 | `HTTPException` (any other raise) | passthrough | `HTTP_<status>` | Fallback for callers still raising `HTTPException` |
 | Uncaught `Exception` | 500 | `INTERNAL_ERROR` | Logged with `request_id` |
 

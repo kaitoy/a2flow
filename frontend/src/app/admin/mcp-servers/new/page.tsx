@@ -2,8 +2,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ErrorBanner } from "@/components/admin/error-banner";
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { zMcpServerCreate } from "@/generated/api/zod.gen";
 import { createMcpServer } from "@/lib/api";
+import { parsePrefill } from "@/lib/mcp-registry-prefill";
 
 // Generated schema carries the name/url constraints; the form edits headers as
 // an ordered key/value pair list (converted to a record on submit), so override
@@ -27,9 +28,22 @@ const schema = zMcpServerCreate.omit({ headers: true }).extend({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function NewMcpServerPage() {
+/** The create form itself; reads registry prefill from the URL search params. */
+function NewMcpServerForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Seed the form from registry prefill query params (set by the registry search
+  // dialog); falls back to empty values for a manual entry.
+  const defaultValues = useMemo(() => {
+    const prefill = parsePrefill(searchParams);
+    return {
+      name: prefill.name,
+      url: prefill.url,
+      headers: prefill.headers satisfies KeyValuePair[],
+    };
+  }, [searchParams]);
 
   const {
     register,
@@ -39,7 +53,7 @@ export default function NewMcpServerPage() {
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: { name: "", url: "", headers: [] as KeyValuePair[] },
+    defaultValues,
   });
 
   async function onSubmit(values: FormValues) {
@@ -102,5 +116,19 @@ export default function NewMcpServerPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+/**
+ * Admin page for registering a new remote MCP server.
+ *
+ * Wraps the form in a Suspense boundary because it reads `useSearchParams` to
+ * pick up registry prefill values.
+ */
+export default function NewMcpServerPage() {
+  return (
+    <Suspense>
+      <NewMcpServerForm />
+    </Suspense>
   );
 }

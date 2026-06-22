@@ -136,6 +136,8 @@ Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admi
 
 Each record stores a unique name, the server's **streamable HTTP** endpoint URL (SSE-only servers are not supported), and an optional set of HTTP headers sent with every request — typically `Authorization: Bearer …` for servers that require auth. ⚠️ Header values are stored **in plaintext** in `a2flow.db` and returned by the API; this is acceptable for the app's local single-operator deployment model, but don't store credentials you can't afford to expose to other users of the same instance.
 
+The list page's **Browse registry** button opens a search dialog backed by the official [MCP registry](https://registry.modelcontextprotocol.io/) (`GET /api/v1/mcp-registry`). It searches servers by name and lists only those reachable over streamable HTTP (the only transport A2Flow supports). Picking a result opens the create form pre-filled with the server's name, URL, and required header keys, so you only fill in secret header values before saving. The registry base URL is configurable via the `MCP_REGISTRY_URL` env var; an unreachable registry yields HTTP 502 (`REGISTRY_UNREACHABLE`).
+
 `GET /api/v1/mcp-servers/{id}/tools` queries the live server and returns the tools it advertises (name, description, input schema); the admin task forms use it to populate the tool picker. An unreachable server yields HTTP 502 (`MCP_UNREACHABLE`). A server cannot be deleted while WorkflowTask tool bindings still reference it (HTTP 409 `CONFLICT_REFERENCED`).
 
 ### Workflows

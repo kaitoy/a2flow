@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -9,6 +10,8 @@ interface AdminPageHeaderProps {
   icon?: LucideIcon;
   addHref?: string;
   addLabel?: string;
+  /** Optional extra action rendered before the "Add" button (e.g. a dialog trigger). */
+  secondaryAction?: ReactNode;
   /** When provided, render a refresh button that re-runs the table fetch on click. */
   onRefresh?: () => void;
   /** True while a refresh is in flight; disables the button and spins the icon. */
@@ -28,6 +31,7 @@ export function AdminPageHeader({
   icon,
   addHref,
   addLabel,
+  secondaryAction,
   onRefresh,
   refreshing = false,
 }: AdminPageHeaderProps) {
@@ -62,6 +66,7 @@ export function AdminPageHeader({
             </button>
           </Tooltip>
         )}
+        {secondaryAction}
         {addHref && addLabel && (
           <Link
             href={addHref}

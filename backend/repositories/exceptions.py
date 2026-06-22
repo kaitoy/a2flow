@@ -77,6 +77,18 @@ class McpConnectionError(Exception):
         super().__init__(f"MCP server {server!r} unreachable: {reason}")
 
 
+class RegistryUnavailableError(Exception):
+    """Raised when the official MCP registry cannot be reached or errors out.
+
+    Carries a human-readable ``reason`` so the HTTP layer can surface it in the
+    error envelope's ``details`` block when returning HTTP 502.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(f"MCP registry unavailable: {reason}")
+
+
 class DependencyCycleError(RepositoryError):
     """Raised when adding WorkflowTask dependency edges would create a cycle.
 

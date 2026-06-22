@@ -13,6 +13,7 @@ from services import (
     AgentSkillService,
     ApprovalService,
     AuthService,
+    MCPRegistryService,
     MCPServerService,
     NotificationService,
     UserService,
@@ -61,6 +62,14 @@ def get_mcp_server_service(repo: MCPServerRepositoryDep) -> MCPServerService:
 
 
 MCPServerServiceDep = Annotated[MCPServerService, Depends(get_mcp_server_service)]
+
+
+def get_mcp_registry_service() -> MCPRegistryService:
+    """Create an MCPRegistryService for official-registry discovery."""
+    return MCPRegistryService()
+
+
+MCPRegistryServiceDep = Annotated[MCPRegistryService, Depends(get_mcp_registry_service)]
 
 
 def get_notification_service(repo: NotificationRepositoryDep) -> NotificationService:

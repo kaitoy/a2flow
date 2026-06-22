@@ -13,6 +13,9 @@ import type {
   ApprovalStatus,
   ApprovalUpdate,
   LoginRequest,
+  McpRegistryHeader,
+  McpRegistrySearchResult,
+  McpRegistryServerEntry,
   McpServerCreate,
   McpServer as McpServerModel,
   McpServerUpdate,
@@ -71,6 +74,7 @@ import {
   zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse,
   zMeApiV1AuthMeGetResponse,
   zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
+  zSearchMcpRegistryApiV1McpRegistryGetResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
@@ -214,6 +218,9 @@ export type {
   ApprovalStatus,
   ApprovalUpdate,
   LoginRequest,
+  McpRegistryHeader,
+  McpRegistrySearchResult,
+  McpRegistryServerEntry,
   McpServerCreate,
   McpServerUpdate,
   McpToolInfo,
@@ -419,6 +426,22 @@ export async function listMcpServerTools(id: string): Promise<McpToolInfo[]> {
     apiClient.get(`/api/v1/mcp-servers/${encodeURIComponent(id)}/tools`),
     zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse
   ) as Promise<McpToolInfo[]>;
+}
+
+/**
+ * Search the official MCP registry for registrable (streamable-HTTP) servers.
+ *
+ * @param params - Optional `search` substring (matched against server names) and
+ *   `cursor` for the next page (from a previous result's `nextCursor`).
+ * @returns A page of registry servers plus the cursor for the next page.
+ */
+export async function searchMcpRegistry(
+  params: { search?: string; cursor?: string } = {}
+): Promise<McpRegistrySearchResult> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/mcp-registry", { params }),
+    zSearchMcpRegistryApiV1McpRegistryGetResponse
+  ) as Promise<McpRegistrySearchResult>;
 }
 
 /** List users with optional pagination, sort, and filters. */

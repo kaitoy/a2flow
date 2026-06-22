@@ -199,6 +199,8 @@ A registry of remote [MCP](https://modelcontextprotocol.io/) servers whose tools
 
 The CRUD endpoints are in the [API reference](http://localhost:3000/api-doc). On create, `name` and `url` are required and `headers` defaults to `{}`; a duplicate name returns `409 CONFLICT_UNIQUE`. On update, sending `headers` replaces the full map while omitting it leaves it unchanged. Two behaviors are worth calling out: `GET /api/v1/mcp-servers/{id}/tools` connects to the remote server live and returns its advertised tools (`name`, `description`, `inputSchema`), or `502 MCP_UNREACHABLE` if it cannot be reached within the 30-second timeout; and a server cannot be deleted while WorkflowTask tool bindings still reference it (`409 CONFLICT_REFERENCED`).
 
+`GET /api/v1/mcp-registry` proxies the official [MCP registry](https://registry.modelcontextprotocol.io/) for server discovery. It accepts `search` (substring matched against server names) and `cursor` (pagination) query params and returns `{ servers, nextCursor }`, where each server is flattened to the fields A2Flow can use — only servers exposing a streamable-HTTP remote are included, since that is the only transport supported. The registry base URL is configurable via the `MCP_REGISTRY_URL` env var (default `https://registry.modelcontextprotocol.io`); a registry that cannot be reached returns `502 REGISTRY_UNREACHABLE`. Registration itself reuses the ordinary `POST /api/v1/mcp-servers` create flow from a pre-filled admin form.
+
 ---
 
 ### Workflows

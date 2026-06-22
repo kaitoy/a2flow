@@ -22,6 +22,7 @@ from repositories.exceptions import (
     NotFoundError,
     QueryValidationError,
     ReferencedError,
+    RegistryUnavailableError,
     UnauthorizedError,
     UniqueViolationError,
 )
@@ -133,6 +134,20 @@ async def mcp_connection_exception_handler(
         message=str(exc),
         status_code=502,
         details={"server": exc.server, "reason": exc.reason},
+    )
+
+
+async def registry_unavailable_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 502 with REGISTRY_UNREACHABLE code when the MCP registry fails."""
+    assert isinstance(exc, RegistryUnavailableError)
+    return _envelope_error(
+        request,
+        code="REGISTRY_UNREACHABLE",
+        message=str(exc),
+        status_code=502,
+        details={"reason": exc.reason},
     )
 
 
