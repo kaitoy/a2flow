@@ -6,9 +6,9 @@ import { formatStatusLabel, STATUS_DOT_CLASS } from "@/lib/workflow-task-status"
 
 /**
  * Custom React Flow node rendering a single workflow task as a glass panel with
- * its position number, title, and a colored status dot. Top and bottom handles
- * connect dependency edges (prerequisites flow in from the top, dependents flow
- * out of the bottom).
+ * its position number, title, and a colored status dot. Left and right handles
+ * connect dependency edges (prerequisites flow in from the left, dependents flow
+ * out of the right).
  *
  * @param props - React Flow node props carrying the task in `data.task`.
  */
@@ -18,7 +18,7 @@ export function WorkflowTaskNode({ data }: NodeProps<WorkflowTaskFlowNode>) {
 
   return (
     <div className="glass-panel w-[220px] rounded-lg px-3 py-2 text-on-surface shadow-sm">
-      <Handle type="target" position={Position.Top} className="!bg-on-surface-variant" />
+      <Handle type="target" position={Position.Left} className="!bg-on-surface-variant" />
       <div className="flex items-start gap-2">
         <span className="mt-1 inline-block w-5 shrink-0 text-xs text-on-surface-variant tabular-nums">
           #{task.position ?? 0}
@@ -32,7 +32,7 @@ export function WorkflowTaskNode({ data }: NodeProps<WorkflowTaskFlowNode>) {
         />
         <span className="text-on-surface-variant text-xs">{formatStatusLabel(status)}</span>
       </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-on-surface-variant" />
+      <Handle type="source" position={Position.Right} className="!bg-on-surface-variant" />
     </div>
   );
 }

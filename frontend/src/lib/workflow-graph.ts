@@ -70,12 +70,13 @@ export function buildWorkflowGraph(tasks: WorkflowTask[]): {
 }
 
 /**
- * Assign coordinates to workflow-task nodes using a dagre top-to-bottom
- * hierarchical layout, so dependencies sit above the tasks that depend on them.
+ * Assign coordinates to workflow-task nodes using a dagre left-to-right
+ * hierarchical layout, so dependencies sit to the left of the tasks that depend
+ * on them.
  *
  * dagre reports node centers; the returned positions are converted to React
- * Flow's top-left origin. Source/target handle positions are set to bottom/top
- * to match the vertical flow direction.
+ * Flow's top-left origin. Source/target handle positions are set to right/left
+ * to match the horizontal flow direction.
  *
  * @param nodes - Nodes produced by {@link buildWorkflowGraph}.
  * @param edges - Edges produced by {@link buildWorkflowGraph}.
@@ -88,7 +89,7 @@ export function layoutWorkflowGraph(
 ): WorkflowTaskFlowNode[] {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
-  graph.setGraph({ rankdir: "TB", nodesep: 48, ranksep: 64 });
+  graph.setGraph({ rankdir: "LR", nodesep: 48, ranksep: 64 });
 
   for (const node of nodes) {
     graph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
@@ -103,8 +104,8 @@ export function layoutWorkflowGraph(
     const { x, y } = graph.node(node.id);
     return {
       ...node,
-      sourcePosition: Position.Bottom,
-      targetPosition: Position.Top,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
       position: { x: x - NODE_WIDTH / 2, y: y - NODE_HEIGHT / 2 },
     };
   });

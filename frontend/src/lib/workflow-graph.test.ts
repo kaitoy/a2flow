@@ -57,10 +57,10 @@ describe("layoutWorkflowGraph", () => {
     expect(nodes[0].position).toEqual({ x: 0, y: 0 });
   });
 
-  it("places a dependent task below its dependency (larger y)", () => {
+  it("places a dependent task to the right of its dependency (larger x)", () => {
     const { nodes } = buildLayoutedWorkflowGraph([task("a"), task("b", ["a"])]);
     const a = nodes.find((n) => n.id === "a");
     const b = nodes.find((n) => n.id === "b");
-    expect(b?.position.y).toBeGreaterThan(a?.position.y ?? 0);
+    expect(b?.position.x).toBeGreaterThan(a?.position.x ?? 0);
   });
 });
