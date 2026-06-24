@@ -17,6 +17,7 @@ from models.response import ApiError, ApiMeta, ApiResponse
 from repositories.exceptions import (
     CsrfError,
     DependencyCycleError,
+    ForbiddenError,
     ForeignKeyViolationError,
     McpConnectionError,
     NotFoundError,
@@ -207,6 +208,17 @@ async def csrf_exception_handler(request: Request, exc: Exception) -> JSONRespon
     return _envelope_error(
         request,
         code="CSRF_FAILED",
+        message=str(exc),
+        status_code=403,
+    )
+
+
+async def forbidden_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Return HTTP 403 with FORBIDDEN code when the user lacks permission."""
+    assert isinstance(exc, ForbiddenError)
+    return _envelope_error(
+        request,
+        code="FORBIDDEN",
         message=str(exc),
         status_code=403,
     )

@@ -254,6 +254,7 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `ReferencedError` | 409 | `CONFLICT_REFERENCED` | Cannot delete a referenced resource |
 | `UniqueViolationError` | 409 | `CONFLICT_UNIQUE` | Unique constraint violated; `details` carries `field` and `value` |
 | `ForeignKeyViolationError` | 422 | `FOREIGN_KEY_VIOLATION` | Referenced entity not found; `details` carries `entity` and `id` |
+| `ForbiddenError` | 403 | `FORBIDDEN` | Authenticated user lacks permission for the resource (e.g. not an approval's designated approver) |
 | `RequestValidationError` | 422 | `VALIDATION_ERROR` | FastAPI body/query validation; `details.errors` from Pydantic |
 | `McpConnectionError` | 502 | `MCP_UNREACHABLE` | Remote MCP server unreachable; `details` carries `server` and `reason` |
 | `RegistryUnavailableError` | 502 | `REGISTRY_UNREACHABLE` | Official MCP registry unreachable; `details` carries `reason` |

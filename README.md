@@ -192,12 +192,14 @@ Tasks form a **directed acyclic graph (DAG)** rather than a flat list: each task
 
 When a task needs the user's explicit go-ahead before the agent acts (for example a destructive or irreversible operation), the agent asks for an **approval** mid-execution:
 
-1. The agent calls the `request_approval` backend tool, which persists a `pending` **Approval** record for the current session (optionally linked to a `WorkflowTask`, and optionally addressed to a specific `approver` user — the agent looks one up with the `list_users` tool) and raises an **approval-request notification** addressed to the session owner.
-2. The agent explains the request in plain text and then calls **`render_approval`** — an AG-UI **frontend tool** (declared by the client via `RunAgentInput.tools`, distinct from A2UI). Like `render_a2ui`, the bridge exposes it as a long-running client tool: the run pauses and the frontend renders **Approve / Reject** controls, plus an optional **comment** field, in the chat.
-3. Clicking a button writes the decision (and any comment) **directly** to the backend via `PATCH /api/v1/approvals/{id}` (recording the resolving user in the audit fields), then returns the decision as the tool result so the agent run resumes.
+1. The agent calls the `request_approval` backend tool, which persists a `pending` **Approval** record for the current session (optionally linked to a `WorkflowTask`) addressed to a specific **`approver`** user — the agent looks one up with the `list_users` tool, and the approver is **required**. It raises an **approval-request notification** addressed to that approver, so only they are alerted.
+2. The agent explains the request in plain text and then calls **`render_approval`** — an AG-UI **frontend tool** (declared by the client via `RunAgentInput.tools`, distinct from A2UI). Like `render_a2ui`, the bridge exposes it as a long-running client tool: the run pauses and the frontend renders **Approve / Reject** controls, plus an optional **comment** field, in the chat. The controls are shown **only to the designated approver**; everyone else sees a read-only "waiting for the approver" message.
+3. Clicking a button writes the decision (and any comment) **directly** to the backend via `PATCH /api/v1/approvals/{id}` (recording the resolving user in the audit fields), then returns the decision as the tool result so the agent run resumes. Only the designated approver may resolve a request — a `PATCH` from any other user is rejected with HTTP 403 (`FORBIDDEN`).
 4. On `approved` the agent proceeds; on `rejected` it marks the task `failed` (or `skipped`). The agent can re-check a decision with the `get_approval` tool.
 
 Approvals are persisted in `a2flow.db` and cascade-delete with their `WorkflowSession` (the optional `WorkflowTask` link is set to `NULL` when that task is deleted). Browse them in the [Approvals](#approvals) admin view.
+
+A workflow session's underlying ADK chat session is keyed by the session's **owner** (the user who started it), not by whoever is currently viewing it. So when a designated approver — a different user — opens the workflow session chat, they share the **same** ADK session: they see the owner's full conversation and state, and approving resumes the original run rather than starting a fresh, empty session. Both the agent stream (`POST /workflow-sessions/{id}/agent`) and the history load (`GET /workflow-sessions/{id}/messages`) resolve the owner from the `WorkflowSession` record. (Regular, non-workflow chat sessions remain keyed per user.)
 
 ### Workflow Sessions
 
@@ -219,11 +221,11 @@ Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/
 
 A **bell icon** in the top toolbar (present on both the chat header and the admin sidebar) opens a notification center with an unread-count badge. Notifications are **per-user**, persisted in `a2flow.db`, and delivered by **polling** (the frontend refreshes every 30 seconds).
 
-Two workflow events generate a notification, both raised by the agent's task tools and addressed to the user who started the session:
+Two workflow events generate a notification, both raised by the agent's task tools. The recipient depends on the event: a `request_approval` notification is addressed to that approval's **designated approver**, while a `register_workflow_tasks` plan-approval notification and the `session_completed` notification are addressed to the **user who started the session**:
 
 | Type | Raised when |
 |---|---|
-| `approval_request` | The agent registers a plan (`register_workflow_tasks`), or requests a mid-execution decision (`request_approval`), and is waiting for human approval. |
+| `approval_request` | The agent registers a plan (`register_workflow_tasks`) and waits for the session owner's approval, or requests a mid-execution decision (`request_approval`) and waits for the designated approver. |
 | `session_completed` | Every `WorkflowTask` in the session has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per session. |
 
 Clicking a notification marks it read and deep-links to the relevant `/workflow-sessions/{id}` chat.

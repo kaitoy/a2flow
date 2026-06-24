@@ -7,7 +7,7 @@ so the router never repeats the null check.
 
 from models.approval import Approval, ApprovalUpdate
 from repositories import ApprovalRepository
-from repositories.exceptions import NotFoundError
+from repositories.exceptions import ForbiddenError, NotFoundError
 from repositories.query import FilterSpec, SortSpec
 
 
@@ -67,16 +67,25 @@ class ApprovalService:
     ) -> Approval:
         """Resolve a pending approval to ``approved`` or ``rejected``.
 
+        Only the approval's designated ``approver`` may resolve it; any other user
+        is rejected so an approval request can be acted on solely by its addressee.
+
         Args:
             approval_id: Identifier of the approval to update.
             data: The new status and optional response comment.
-            user_id: The approver, recorded in the audit fields.
+            user_id: The acting user; must equal the approval's ``approver`` and is
+                recorded in the audit fields.
 
         Returns:
             The updated approval.
 
         Raises:
             NotFoundError: If the approval does not exist.
+            ForbiddenError: If the acting user is not the designated approver.
         """
-        await self.get(approval_id)
+        approval = await self.get(approval_id)
+        if approval.approver != user_id:
+            raise ForbiddenError(
+                "Only the designated approver can resolve this approval"
+            )
         return await self._repo.update(approval_id, data, user_id=user_id)

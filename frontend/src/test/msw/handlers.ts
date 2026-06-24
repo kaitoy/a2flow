@@ -196,6 +196,8 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/workflow-sessions/:id`, () => envelope(WORKFLOW_SESSION_1)),
 
+  http.get(`${BASE}/api/v1/workflow-sessions/:wsId/messages`, () => envelope([])),
+
   http.get(`${BASE}/api/v1/workflow-sessions/:wsId/workflow-tasks`, () =>
     envelope([WORKFLOW_TASK_1])
   ),

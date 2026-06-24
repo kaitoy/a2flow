@@ -22,6 +22,7 @@ from middleware.envelope import RequestContextMiddleware
 from repositories.exceptions import (
     CsrfError,
     DependencyCycleError,
+    ForbiddenError,
     ForeignKeyViolationError,
     McpConnectionError,
     NotFoundError,
@@ -35,6 +36,7 @@ from routers import api_router
 from routers.exception_handlers import (
     csrf_exception_handler,
     dependency_cycle_exception_handler,
+    forbidden_exception_handler,
     foreign_key_violation_exception_handler,
     http_exception_handler,
     mcp_connection_exception_handler,
@@ -94,6 +96,7 @@ app.add_exception_handler(
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
 app.add_exception_handler(UnauthorizedError, unauthorized_exception_handler)
 app.add_exception_handler(CsrfError, csrf_exception_handler)
+app.add_exception_handler(ForbiddenError, forbidden_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 

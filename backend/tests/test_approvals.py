@@ -144,7 +144,9 @@ async def test_resolve_approval_approves(
 ) -> None:
     client, eng = approval_env
     ws_id = await _seed_session(eng)
-    approval_id = await _insert_approval(eng, workflow_session_id=ws_id)
+    approval_id = await _insert_approval(
+        eng, workflow_session_id=ws_id, approver="alice"
+    )
 
     res = await client.patch(
         f"/api/v1/approvals/{approval_id}",
@@ -156,6 +158,28 @@ async def test_resolve_approval_approves(
     assert data["response"] == "looks good"
     # The approver is recorded in the audit field.
     assert data["updatedBy"] == "alice"
+
+
+async def test_resolve_by_non_approver_is_forbidden(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    ws_id = await _seed_session(eng)
+    approval_id = await _insert_approval(eng, workflow_session_id=ws_id, approver="bob")
+
+    # alice is not the designated approver, so she cannot resolve it.
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": "alice"},
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+    # The approval remains pending.
+    res = await client.get(
+        f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}
+    )
+    assert assert_ok(res)["status"] == ApprovalStatus.pending.value
 
 
 async def test_resolve_keeps_designated_approver(
@@ -170,15 +194,15 @@ async def test_resolve_keeps_designated_approver(
     )
     assert assert_ok(res)["approver"] == "bob"
 
-    # Resolving by a different user does not change the designated approver.
+    # The designated approver resolves it; the approver field is preserved.
     res = await client.patch(
         f"/api/v1/approvals/{approval_id}",
         json={"status": "approved"},
-        headers={"X-User-Id": "alice"},
+        headers={"X-User-Id": "bob"},
     )
     data = assert_ok(res)
     assert data["approver"] == "bob"
-    assert data["updatedBy"] == "alice"
+    assert data["updatedBy"] == "bob"
 
 
 async def test_resolve_unknown_approval_is_404(

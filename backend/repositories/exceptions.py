@@ -26,6 +26,19 @@ class CsrfError(Exception):
         super().__init__(message)
 
 
+class ForbiddenError(Exception):
+    """Raised when an authenticated user is not allowed to perform an action.
+
+    Mapped to HTTP 403 with the ``FORBIDDEN`` error code. Unlike
+    :class:`UnauthorizedError` (no valid session), the caller is authenticated but
+    lacks permission for the specific resource — for example resolving an approval
+    they are not the designated approver of.
+    """
+
+    def __init__(self, message: str = "Operation not permitted") -> None:
+        super().__init__(message)
+
+
 class NotFoundError(RepositoryError):
     """Raised when a requested entity does not exist in the database."""
 

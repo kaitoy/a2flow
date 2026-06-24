@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
-import { createWorkflowSessionAgent, getSessionMessages } from "@/lib/api";
+import { createWorkflowSessionAgent, getWorkflowSessionMessages } from "@/lib/api";
 import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL } from "@/lib/approvalTool";
 import logger from "@/lib/logger";
 import type { AppDispatch } from "@/store";
@@ -152,7 +152,7 @@ export function useWorkflowSessionChat(
   // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and autoSentRef guards against double-sends
   useEffect(() => {
     dispatch(setSession(sessionId));
-    getSessionMessages(sessionId)
+    getWorkflowSessionMessages(workflowSessionId)
       .then((loadedMessages) => {
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
         if (loadedMessages.length === 0 && !autoSentRef.current) {

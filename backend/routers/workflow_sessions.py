@@ -1,6 +1,7 @@
 """Endpoints for retrieving WorkflowSession details and streaming the workflow agent."""
 
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from ag_ui.core import RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
@@ -9,7 +10,6 @@ from fastapi.responses import StreamingResponse
 
 from dependencies import (
     ApiMetaDep,
-    CurrentUserIdDep,
     FilterDep,
     PaginationDep,
     SortDep,
@@ -99,7 +99,6 @@ async def workflow_session_agent(
     input_data: RunAgentInput,
     request: Request,
     service: WorkflowSessionServiceDep,
-    user_id: CurrentUserIdDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent bound to a specific workflow session.
 
@@ -107,13 +106,13 @@ async def workflow_session_agent(
     the correct ADK tools are loaded regardless of the global agent state.
     SystemMessages are stripped to prevent prompt injection.
     """
-    adk_agent = await service.resolve_agent(ws_id)
+    adk_agent, ws = await service.resolve_agent(ws_id)
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
-    # Override forwarded_props.userId with the trusted X-User-Id header so the
-    # agent run is keyed by the server-validated user rather than client props.
-    input_data = with_user_id(input_data, user_id)
+    # Key the ADK run by the WorkflowSession's owner rather than the current user
+    # so every viewer (e.g. a designated approver) shares the same ADK session.
+    input_data = with_user_id(input_data, ws.user_id)
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -121,3 +120,20 @@ async def workflow_session_agent(
             yield encoder.encode(event)
 
     return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
+
+
+@router.get("/{ws_id}/messages", response_model=ApiResponse[list[dict[str, Any]]])
+async def get_workflow_session_messages(
+    ws_id: str,
+    service: WorkflowSessionServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[dict[str, Any]]]:
+    """Return the chat history of a WorkflowSession's ADK session.
+
+    The history is keyed by the session's owner, so a designated approver (or any
+    other viewer) opening the chat sees the owner's conversation rather than an
+    empty, separate session. Returns an empty list when the ADK session has not
+    been created yet. Raises HTTP 404 if the WorkflowSession does not exist.
+    """
+    messages = await service.get_messages(ws_id)
+    return ApiResponse(meta=meta, data=messages)

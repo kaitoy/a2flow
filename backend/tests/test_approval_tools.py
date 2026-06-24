@@ -86,7 +86,7 @@ async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notificatio
 async def test_request_approval_creates_pending_record(engine: AsyncEngine) -> None:
     await _seed_session(engine, user_id="owner")
     result = await request_approval(
-        "Deploy to prod", _ctx(), description="Are you sure?"
+        "Deploy to prod", _ctx(), approver="alice", description="Are you sure?"
     )
     assert "error" not in result
     assert result["status"] == "pending"
@@ -96,25 +96,37 @@ async def test_request_approval_creates_pending_record(engine: AsyncEngine) -> N
     assert fetched["status"] == ApprovalStatus.pending.value
 
 
-async def test_request_approval_notifies_session_owner(engine: AsyncEngine) -> None:
+async def test_request_approval_notifies_approver(engine: AsyncEngine) -> None:
     await _seed_session(engine, user_id="owner")
-    await request_approval("Need sign-off", _ctx(), description="please review")
-    notifs = await _notifications_for(engine, "owner")
+    await request_approval(
+        "Need sign-off", _ctx(), approver="alice", description="please review"
+    )
+    # The notification is addressed to the designated approver, not the owner.
+    assert await _notifications_for(engine, "owner") == []
+    notifs = await _notifications_for(engine, "alice")
     assert len(notifs) == 1
     assert notifs[0].type is NotificationType.approval_request
     assert notifs[0].title == "Need sign-off"
-    assert notifs[0].user_id == "owner"
+    assert notifs[0].user_id == "alice"
+
+
+async def test_request_approval_requires_approver(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    result = await request_approval("No approver", _ctx(), approver="")
+    assert "error" in result
 
 
 async def test_request_approval_without_session_errors(engine: AsyncEngine) -> None:
-    result = await request_approval("X", _ctx("unknown-session"))
+    result = await request_approval("X", _ctx("unknown-session"), approver="alice")
     assert "error" in result
 
 
 async def test_request_approval_links_valid_task(engine: AsyncEngine) -> None:
     await _seed_session(engine)
     task = await create_workflow_task("A task", _ctx())
-    result = await request_approval("Approve task", _ctx(), workflow_task_id=task["id"])
+    result = await request_approval(
+        "Approve task", _ctx(), approver="alice", workflow_task_id=task["id"]
+    )
     assert "error" not in result
     fetched = await get_approval(result["approval_id"], _ctx())
     assert fetched["workflow_task_id"] == task["id"]
@@ -139,7 +151,7 @@ async def test_request_approval_rejects_foreign_task(engine: AsyncEngine) -> Non
     await _seed_session(engine, session_id="sess-b")
     task = await create_workflow_task("In A", _ctx("sess-a"))
     result = await request_approval(
-        "Approve", _ctx("sess-b"), workflow_task_id=task["id"]
+        "Approve", _ctx("sess-b"), approver="alice", workflow_task_id=task["id"]
     )
     assert "error" in result
 
@@ -147,7 +159,7 @@ async def test_request_approval_rejects_foreign_task(engine: AsyncEngine) -> Non
 async def test_get_approval_cross_session_guard(engine: AsyncEngine) -> None:
     await _seed_session(engine, session_id="sess-a")
     await _seed_session(engine, session_id="sess-b")
-    created = await request_approval("Owned by A", _ctx("sess-a"))
+    created = await request_approval("Owned by A", _ctx("sess-a"), approver="alice")
     approval_id = created["approval_id"]
 
     blocked = await get_approval(approval_id, _ctx("sess-b"))
@@ -158,7 +170,7 @@ async def test_get_approval_cross_session_guard(engine: AsyncEngine) -> None:
 
 async def test_get_approval_reflects_resolution(engine: AsyncEngine) -> None:
     await _seed_session(engine)
-    created = await request_approval("Decide", _ctx())
+    created = await request_approval("Decide", _ctx(), approver="alice")
     # Resolve directly through the repository (the frontend's PATCH path).
     async with AsyncSession(engine) as db:
         repo = SqlApprovalRepository(db, _ws_repo(db))

@@ -8,7 +8,7 @@ import { useWorkflowSessionChat } from "./useWorkflowSessionChat";
 
 vi.mock("@/lib/api", () => ({
   createWorkflowSessionAgent: vi.fn(),
-  getSessionMessages: vi.fn(),
+  getWorkflowSessionMessages: vi.fn(),
 }));
 
 const mockAgent = {
@@ -26,22 +26,22 @@ function makeWrapper(store: ReturnType<typeof makeStore>) {
 beforeEach(() => {
   vi.mocked(api.createWorkflowSessionAgent).mockClear();
   vi.mocked(api.createWorkflowSessionAgent).mockReturnValue(mockAgent as never);
-  vi.mocked(api.getSessionMessages).mockResolvedValue([]);
+  vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
   mockAgent.addMessage.mockClear();
   mockAgent.runAgent.mockClear();
 });
 
 describe("useWorkflowSessionChat", () => {
-  it("calls getSessionMessages on mount with the given sessionId", async () => {
+  it("calls getWorkflowSessionMessages on mount with the workflow session id", async () => {
     const store = makeStore();
     renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"), {
       wrapper: makeWrapper(store),
     });
-    await waitFor(() => expect(api.getSessionMessages).toHaveBeenCalledWith("sess-abc"));
+    await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalledWith("ws-1"));
   });
 
   it("auto-sends workflowPrompt when messages are empty on mount", async () => {
-    vi.mocked(api.getSessionMessages).mockResolvedValue([]);
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
     const store = makeStore();
     renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"), {
       wrapper: makeWrapper(store),
@@ -55,14 +55,14 @@ describe("useWorkflowSessionChat", () => {
   });
 
   it("does NOT auto-send when messages already exist", async () => {
-    vi.mocked(api.getSessionMessages).mockResolvedValue([
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
       { id: "m1", role: "user", content: "previous message" },
     ]);
     const store = makeStore();
     renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"), {
       wrapper: makeWrapper(store),
     });
-    await waitFor(() => expect(api.getSessionMessages).toHaveBeenCalled());
+    await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalled());
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
     expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
   });
@@ -73,7 +73,7 @@ describe("useWorkflowSessionChat", () => {
       () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"),
       { wrapper: makeWrapper(store) }
     );
-    await waitFor(() => expect(api.getSessionMessages).toHaveBeenCalled());
+    await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalled());
     // Wait for auto-send to finish
     await waitFor(() => expect(mockAgent.runAgent).toHaveBeenCalled());
     mockAgent.runAgent.mockClear();
@@ -85,7 +85,7 @@ describe("useWorkflowSessionChat", () => {
   });
 
   it("sendApprovalResult posts the decision as a tool result and resumes the run", async () => {
-    vi.mocked(api.getSessionMessages).mockResolvedValue([
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
       { id: "m1", role: "user", content: "existing" },
     ]);
     const store = makeStore();
@@ -106,7 +106,7 @@ describe("useWorkflowSessionChat", () => {
   });
 
   it("dispatches setError when runAgent throws during sendMessage", async () => {
-    vi.mocked(api.getSessionMessages).mockResolvedValue([
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
       { id: "m1", role: "user", content: "existing" },
     ]);
     mockAgent.runAgent.mockRejectedValueOnce(new Error("stream failure"));

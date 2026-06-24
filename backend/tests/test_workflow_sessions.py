@@ -192,11 +192,12 @@ async def test_workflow_session_agent_strips_system_messages(
     assert all(m.role != "system" for m in received_inputs[0].messages)
 
 
-async def test_workflow_session_agent_injects_user_id_from_header(
+async def test_workflow_session_agent_keys_run_by_session_owner(
     workflow_client: AsyncClient,
     mock_adk_agent: MagicMock,
 ) -> None:
     skill = await _create_skill(workflow_client)
+    # The session is executed (owned) by the default workflow_client user.
     ws = await _execute_workflow(workflow_client, skill["id"])
 
     received_inputs: list[Any] = []
@@ -210,12 +211,71 @@ async def test_workflow_session_agent_injects_user_id_from_header(
 
     mock_adk_agent.run = _capturing_run
 
+    # A different user (alice) drives the agent, but the ADK run must be keyed by
+    # the session's owner so everyone shares the same ADK session.
     await workflow_client.post(
         f"/api/v1/workflow-sessions/{ws['id']}/agent",
         json=_make_run_agent_input(),
         headers={"X-User-Id": "alice"},
     )
-    assert received_inputs[0].forwarded_props["userId"] == "alice"
+    assert received_inputs[0].forwarded_props["userId"] == ws["userId"]
+    assert ws["userId"] == SYSTEM_USER_ID
+
+
+# ---------- GET /workflow-sessions/{id}/messages ----------
+
+
+async def test_workflow_session_messages_empty_before_first_run(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+    )
+    assert assert_ok(response) == []
+
+
+async def test_workflow_session_messages_shared_across_users(
+    workflow_client: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    from google.adk.events.event import Event
+    from google.genai import types
+
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+
+    # Seed the owner's ADK session with one user message.
+    session = await real_session_service.create_session(
+        app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+    )
+    await real_session_service.append_event(
+        session,
+        Event(
+            author="user",
+            content=types.Content(
+                role="user", parts=[types.Part(text="hello from owner")]
+            ),
+        ),
+    )
+
+    # A different user (alice) fetches the history and sees the owner's messages.
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/messages",
+        headers={"X-User-Id": "alice"},
+    )
+    messages = assert_ok(response)
+    assert [m["content"] for m in messages] == ["hello from owner"]
+
+
+async def test_workflow_session_messages_unknown_id_returns_404(
+    workflow_client: AsyncClient,
+) -> None:
+    response = await workflow_client.get(
+        "/api/v1/workflow-sessions/nonexistent/messages"
+    )
+    assert_err(response, code="NOT_FOUND", status=404)
 
 
 # ---------- DELETE /workflow-sessions/{id} ----------

@@ -58,6 +58,7 @@ import {
   zGetUserApiV1UsersUserIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
   zGetWorkflowSessionApiV1WorkflowSessionsWsIdGetResponse,
+  zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse,
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
   zListApprovalsApiV1ApprovalsGetResponse,
@@ -567,6 +568,20 @@ export async function getWorkflowSession(id: string): Promise<WorkflowSession> {
     apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(id)}`),
     zGetWorkflowSessionApiV1WorkflowSessionsWsIdGetResponse
   ) as Promise<WorkflowSession>;
+}
+
+/**
+ * Fetch the chat history of a WorkflowSession's ADK session.
+ *
+ * Unlike {@link getSessionMessages}, the history is keyed by the workflow
+ * session's owner on the backend, so any viewer (for example a designated
+ * approver) sees the same conversation instead of a separate, empty session.
+ */
+export async function getWorkflowSessionMessages(wsId: string): Promise<Message[]> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(wsId)}/messages`),
+    zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse
+  ) as Promise<Message[]>;
 }
 
 /** List WorkflowSession records (newest first) with optional pagination, sort, and filters. */

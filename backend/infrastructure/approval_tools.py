@@ -4,11 +4,11 @@ These callables are attached to the skill-driven workflow agent (see
 :func:`infrastructure.agent.create_agent`) so it can pause for a human decision
 before performing a sensitive action. The agent calls :func:`request_approval`
 to create a ``pending`` :class:`~models.approval.Approval` and notify the
-session owner, then invokes the client-side ``render_approval`` frontend tool to
-show approve/reject controls. The approver's decision is written back to the
-approval record directly from the frontend (``PATCH /approvals/{id}``); the
-agent learns the outcome from that tool's result and can re-check it with
-:func:`get_approval`.
+designated approver, then invokes the client-side ``render_approval`` frontend
+tool to show approve/reject controls. Only that approver can resolve the request:
+their decision is written back to the approval record directly from the frontend
+(``PATCH /approvals/{id}``); the agent learns the outcome from that tool's result
+and can re-check it with :func:`get_approval`.
 
 Like the WorkflowTask tools, these run *during* the AG-UI SSE stream outside
 FastAPI's request scope, so each call opens its own ``AsyncSession`` on the
@@ -87,36 +87,39 @@ async def _repos() -> AsyncIterator[
 async def request_approval(
     title: str,
     tool_context: ToolContext,
+    approver: str,
     description: str | None = None,
     workflow_task_id: str | None = None,
-    approver: str | None = None,
 ) -> dict[str, Any]:
-    """Create a pending approval request and notify the session owner.
+    """Create a pending approval request and notify the designated approver.
 
-    Call this before performing an action that needs the user's go-ahead. It
-    records a ``pending`` Approval for the current workflow session and creates an
-    ``approval_request`` notification so the user is alerted. After it returns,
-    explain the request to the user and call the client-side ``render_approval``
-    frontend tool with the returned ``approval_id`` to show approve/reject
-    controls; the user's decision comes back as that tool's result. Do NOT
-    proceed with the action until the decision is ``approved``.
+    Call this before performing an action that needs a human go-ahead. It records
+    a ``pending`` Approval for the current workflow session and creates an
+    ``approval_request`` notification addressed to ``approver`` so only they are
+    alerted. After it returns, explain the request to the user and call the
+    client-side ``render_approval`` frontend tool with the returned ``approval_id``
+    to show approve/reject controls; only the designated approver can resolve the
+    request, and their decision comes back as that tool's result. Do NOT proceed
+    with the action until the decision is ``approved``.
 
     Args:
         title: Short headline describing what needs approval (required).
         tool_context: Injected by ADK; identifies the current session. Not shown
             to the model.
+        approver: Id of the user the request is addressed to (required). Only this
+            user receives the notification and may resolve the request; it must
+            match an existing user. Use :func:`list_users` to discover valid ids.
         description: Optional longer explanation of the request.
         workflow_task_id: Optional id of the WorkflowTask this approval concerns;
             must belong to the current session.
-        approver: Optional id of the user the request is addressed to (its
-            destination); must match an existing user. Use :func:`list_users` to
-            discover valid ids.
 
     Returns:
         On success ``{"approval_id": <id>, "status": "pending"}``. On failure
-        ``{"error": <message>}`` (unresolved session, unknown task, unknown
-        approver, or a persistence error).
+        ``{"error": <message>}`` (missing approver, unresolved session, unknown
+        task, unknown approver, or a persistence error).
     """
+    if not approver:
+        return {"error": "approver is required"}
     async with _repos() as (ws_repo, approval_repo, task_repo, notif_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
@@ -149,6 +152,7 @@ async def request_approval(
             NotificationType.approval_request,
             title,
             body=description,
+            recipient=approver,
         )
         return result
 

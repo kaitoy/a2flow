@@ -130,14 +130,18 @@ async def _notify(
     notification_type: NotificationType,
     title: str,
     body: str | None = None,
+    recipient: str | None = None,
 ) -> None:
-    """Create a notification addressed to the workflow session's owner.
+    """Create a notification addressed to ``recipient`` (default: the session owner).
 
-    The recipient and audit user are both the session's ``created_by`` (the real
-    user who started the session), which keeps the ``created_by`` foreign key
-    valid even though the tool's own ``tool_context`` user id may be a placeholder.
-    Notification creation is best-effort: any failure is logged and swallowed so a
-    notification problem never breaks the task operation that triggered it.
+    When ``recipient`` is omitted the notification is addressed to the session's
+    ``created_by`` (the real user who started the session); pass ``recipient`` to
+    target a different user, such as an approval request's designated approver.
+    The audit user is always the session's ``created_by``, which keeps the
+    ``created_by`` foreign key valid even though the tool's own ``tool_context``
+    user id may be a placeholder. Notification creation is best-effort: any failure
+    is logged and swallowed so a notification problem never breaks the task
+    operation that triggered it.
 
     Args:
         ws_repo: Repository used to resolve the session and its owner.
@@ -146,13 +150,15 @@ async def _notify(
         notification_type: The kind of event being announced.
         title: Short headline shown in the notification panel.
         body: Optional longer description.
+        recipient: User id to address the notification to; defaults to the
+            session owner when ``None``.
     """
     try:
         ws = await ws_repo.get(ws_id)
         if ws is None:
             return
         data = NotificationCreate(
-            user_id=ws.created_by,
+            user_id=recipient or ws.created_by,
             type=notification_type,
             title=title,
             body=body,

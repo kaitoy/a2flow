@@ -3,7 +3,12 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { createChatAgent, getSessionMessages, listSessions } from "./api";
+import {
+  createChatAgent,
+  getSessionMessages,
+  getWorkflowSessionMessages,
+  listSessions,
+} from "./api";
 
 const BASE = "http://localhost:8000";
 
@@ -45,6 +50,21 @@ describe("getSessionMessages", () => {
       )
     );
     await expect(getSessionMessages("missing")).rejects.toThrow("404");
+  });
+});
+
+describe("getWorkflowSessionMessages", () => {
+  it("fetches the workflow-session-scoped messages URL", async () => {
+    let calledUrl = "";
+    server.use(
+      http.get(`${BASE}/api/v1/workflow-sessions/:wsId/messages`, ({ request }) => {
+        calledUrl = request.url;
+        return envelope([]);
+      })
+    );
+    const result = await getWorkflowSessionMessages("ws-1");
+    expect(Array.isArray(result)).toBe(true);
+    expect(calledUrl).toContain("/workflow-sessions/ws-1/messages");
   });
 });
 
