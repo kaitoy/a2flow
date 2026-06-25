@@ -20,6 +20,7 @@ from infrastructure.database import engine, init_db
 from infrastructure.logging_context import setup_logging
 from middleware.envelope import RequestContextMiddleware
 from repositories.exceptions import (
+    AvatarValidationError,
     CsrfError,
     DependencyCycleError,
     ForbiddenError,
@@ -34,6 +35,7 @@ from repositories.exceptions import (
 )
 from routers import api_router
 from routers.exception_handlers import (
+    avatar_validation_exception_handler,
     csrf_exception_handler,
     dependency_cycle_exception_handler,
     forbidden_exception_handler,
@@ -94,6 +96,7 @@ app.add_exception_handler(
     RegistryUnavailableError, registry_unavailable_exception_handler
 )
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
+app.add_exception_handler(AvatarValidationError, avatar_validation_exception_handler)
 app.add_exception_handler(UnauthorizedError, unauthorized_exception_handler)
 app.add_exception_handler(CsrfError, csrf_exception_handler)
 app.add_exception_handler(ForbiddenError, forbidden_exception_handler)

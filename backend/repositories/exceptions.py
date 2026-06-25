@@ -120,6 +120,18 @@ class DependencyCycleError(RepositoryError):
         )
 
 
+class AvatarValidationError(RepositoryError):
+    """Raised when an uploaded avatar image has an unsupported type or exceeds the size limit.
+
+    Carries a human-readable ``reason`` so the HTTP layer can surface it in the
+    error envelope's ``details`` block when returning HTTP 422.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class QueryValidationError(RepositoryError):
     """Raised when a sort or filter query parameter is malformed or references an unknown field.
 

@@ -22,10 +22,12 @@ from repositories import (
     SqlAuthSessionRepository,
     SqlMCPServerRepository,
     SqlNotificationRepository,
+    SqlUserAvatarRepository,
     SqlUserRepository,
     SqlWorkflowRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
+    UserAvatarRepository,
     UserRepository,
     WorkflowRepository,
     WorkflowSessionRepository,
@@ -81,6 +83,16 @@ def get_user_repository(db: DBSessionDep) -> UserRepository:
 
 
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
+
+
+def get_user_avatar_repository(db: DBSessionDep) -> UserAvatarRepository:
+    """Create a UserAvatarRepository backed by the current database session."""
+    return SqlUserAvatarRepository(db)
+
+
+UserAvatarRepositoryDep = Annotated[
+    UserAvatarRepository, Depends(get_user_avatar_repository)
+]
 
 
 def get_workflow_repository(

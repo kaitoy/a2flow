@@ -29,6 +29,15 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.75.0(react@19.2.5))
+      '@humation/assets-humation-1':
+        specifier: ^1.0.1
+        version: 1.0.1
+      '@humation/core':
+        specifier: ^1.0.1
+        version: 1.0.1
+      '@humation/react':
+        specifier: ^1.0.1
+        version: 1.0.1(react@19.2.5)
       '@react-spring/web':
         specifier: ^10.0.4
         version: 10.0.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -367,6 +376,20 @@ packages:
     resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
     peerDependencies:
       react-hook-form: ^7.55.0
+
+  '@humation/assets-humation-1@1.0.1':
+    resolution: {integrity: sha512-ucLZMrsRPKLX0Stu6LzX/9eqoWmRPhyDKvKQsy6nQyXhR4ynK1ySQ2tYNnMCJ0BpT/SteZXHxjYAIH6ccuZfCg==}
+    engines: {node: '>=18.0.0'}
+
+  '@humation/core@1.0.1':
+    resolution: {integrity: sha512-gpt6qnXDZY3MUqVxx2Q70xM4S+qrcWuxT+bvWA8nsFOvObf7kLiO4KIXxExARroq56HtywYsoJ9ftgzwW2b1oA==}
+    engines: {node: '>=18.0.0'}
+
+  '@humation/react@1.0.1':
+    resolution: {integrity: sha512-hOHa90cGuF9udMysLr3FRTwpsG8H6dRnxKukjyNh9eL/mw7H8NXL02YHp1ihYdia7DOnBxYDYOnkCcs2vGzQ6A==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -2498,6 +2521,17 @@ snapshots:
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.75.0(react@19.2.5)
+
+  '@humation/assets-humation-1@1.0.1':
+    dependencies:
+      '@humation/core': 1.0.1
+
+  '@humation/core@1.0.1': {}
+
+  '@humation/react@1.0.1(react@19.2.5)':
+    dependencies:
+      '@humation/core': 1.0.1
+      react: 19.2.5
 
   '@img/colour@1.1.0':
     optional: true

@@ -84,10 +84,14 @@ class User(UserCreate, BaseEntity, table=True):
     )
 
     deleted_at: datetime | None = Field(default=None, sa_type=TZDateTime)
+    #: Set when the user has a custom uploaded avatar (see :class:`~models.user_avatar.UserAvatar`)
+    #: and cleared when it is removed. Acts as a presence marker plus cache-busting
+    #: timestamp so read views report a custom avatar without loading its blob.
+    avatar_updated_at: datetime | None = Field(default=None, sa_type=TZDateTime)
 
-    @field_serializer("deleted_at", when_used="json")
+    @field_serializer("deleted_at", "avatar_updated_at", when_used="json")
     def _serialize_deleted_at(self, dt: datetime | None) -> str | None:
-        """Serialize ``deleted_at`` as ISO-8601 with a ``Z`` suffix, or ``None`` when unset."""
+        """Serialize the timestamp as ISO-8601 with a ``Z`` suffix, or ``None`` when unset."""
         return _serialize_deleted_at(dt)
 
 
@@ -102,8 +106,11 @@ class UserRead(BaseEntity):
     enabled: bool
     email_verified: bool
     deleted_at: datetime | None = None
+    #: ISO-8601 timestamp of the last custom-avatar change, or ``None`` when the
+    #: user has no uploaded avatar (the client then renders a generated default).
+    avatar_updated_at: datetime | None = None
 
-    @field_serializer("deleted_at", when_used="json")
+    @field_serializer("deleted_at", "avatar_updated_at", when_used="json")
     def _serialize_deleted_at(self, dt: datetime | None) -> str | None:
-        """Serialize ``deleted_at`` as ISO-8601 with a ``Z`` suffix, or ``None`` when unset."""
+        """Serialize the timestamp as ISO-8601 with a ``Z`` suffix, or ``None`` when unset."""
         return _serialize_deleted_at(dt)

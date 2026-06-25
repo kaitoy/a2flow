@@ -46,6 +46,7 @@ import {
   zDeleteMcpServerApiV1McpServersServerIdDeleteResponse,
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
   zDeleteUserApiV1UsersUserIdDeleteResponse,
+  zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse,
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
   zDeleteWorkflowSessionApiV1WorkflowSessionsWsIdDeleteResponse,
   zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
@@ -81,6 +82,7 @@ import {
   zUpdateUserApiV1UsersUserIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
   zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
+  zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse,
 } from "@/generated/api/zod.gen";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import logger from "./logger";
@@ -488,6 +490,44 @@ export async function deleteUser(id: string): Promise<void> {
 /** Join a user's first and last name into a single display string. */
 export function formatUserName(user: Pick<User, "firstName" | "lastName">): string {
   return `${user.firstName} ${user.lastName}`.trim();
+}
+
+/**
+ * Build the URL serving a user's uploaded avatar image, or `null` when the user
+ * has no custom avatar (callers then render a generated default).
+ *
+ * The `avatarUpdatedAt` timestamp is appended as a cache-busting query so a
+ * freshly uploaded image replaces any previously cached one.
+ */
+export function avatarUrl(user: Pick<User, "id" | "avatarUpdatedAt">): string | null {
+  if (!user.avatarUpdatedAt) return null;
+  const version = encodeURIComponent(user.avatarUpdatedAt);
+  return `${API_BASE}/api/v1/users/${encodeURIComponent(user.id)}/avatar?v=${version}`;
+}
+
+/**
+ * Upload (or replace) a user's custom avatar image and return the updated user.
+ *
+ * The file is sent as multipart form data; the `Content-Type` is cleared so the
+ * browser sets it with the correct multipart boundary.
+ */
+export async function uploadUserAvatar(id: string, file: File): Promise<User> {
+  const form = new FormData();
+  form.append("file", file);
+  return fetchEnvelope(
+    apiClient.put(`/api/v1/users/${encodeURIComponent(id)}/avatar`, form, {
+      headers: { "Content-Type": null },
+    }),
+    zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse
+  ) as Promise<User>;
+}
+
+/** Remove a user's custom avatar, reverting them to the generated default. */
+export async function deleteUserAvatar(id: string): Promise<User> {
+  return fetchEnvelope(
+    apiClient.delete(`/api/v1/users/${encodeURIComponent(id)}/avatar`),
+    zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse
+  ) as Promise<User>;
 }
 
 /**

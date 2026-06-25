@@ -7,6 +7,7 @@ import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { Avatar } from "@/components/ui/avatar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { useTableQuery } from "@/hooks/useTableQuery";
@@ -26,6 +27,11 @@ function boolCell(value: boolean): string {
 }
 
 const STATIC_COLUMNS: ColumnDef<User>[] = [
+  {
+    header: "",
+    noTruncate: true,
+    cell: (u) => <Avatar user={u} size={28} />,
+  },
   {
     header: "Username",
     sortField: "username",

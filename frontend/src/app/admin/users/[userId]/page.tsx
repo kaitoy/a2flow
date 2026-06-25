@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
+import { AvatarField } from "@/components/admin/avatar-field";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
@@ -41,6 +42,9 @@ export default function EditUserPage() {
   // Username is immutable after creation, so it lives outside the form state and
   // is rendered read-only.
   const [username, setUsername] = useState("");
+  // Avatar presence marker, kept outside the form so uploads/removals refresh
+  // the preview without touching the editable fields.
+  const [avatarUpdatedAt, setAvatarUpdatedAt] = useState<string | null>(null);
 
   const {
     register,
@@ -64,6 +68,7 @@ export default function EditUserPage() {
     getUser(userId)
       .then((user) => {
         setUsername(user.username);
+        setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
         reset({
           firstName: user.firstName,
           lastName: user.lastName,
@@ -138,6 +143,11 @@ export default function EditUserPage() {
         onSubmit={handleSubmit(onSubmit)}
         className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
       >
+        <AvatarField
+          user={{ id: userId, username, avatarUpdatedAt }}
+          onChange={(user) => setAvatarUpdatedAt(user.avatarUpdatedAt ?? null)}
+        />
+
         <FormField htmlFor="username" label="Username">
           <Input id="username" value={username} readOnly disabled />
         </FormField>

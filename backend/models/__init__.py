@@ -9,6 +9,7 @@ from .notification import (
     NotificationUpdate,
 )
 from .session import Session
+from .user_avatar import UserAvatar
 from .workflow import Workflow, WorkflowCreate, WorkflowUpdate
 from .workflow_session import WorkflowSession, WorkflowSessionCreate
 from .workflow_task import (
@@ -41,6 +42,7 @@ __all__ = [
     "NotificationUpdate",
     "Session",
     "ToolBinding",
+    "UserAvatar",
     "Workflow",
     "WorkflowCreate",
     "WorkflowUpdate",

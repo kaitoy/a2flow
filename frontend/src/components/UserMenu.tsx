@@ -9,6 +9,7 @@ import { formatUserName, logout, type User } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 import { clearUser } from "@/store/authSlice";
 import { useAppDispatch } from "@/store/hooks";
+import { Avatar } from "./ui/avatar";
 
 /** Props for {@link UserMenu}. */
 interface UserMenuProps {
@@ -145,21 +146,24 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
             }}
             className="glass-panel-overlay rounded-xl p-2 text-on-surface"
           >
-            <div className="flex flex-col gap-0.5 px-3 py-2">
-              {user ? (
-                <>
-                  <span className="truncate text-sm font-medium text-on-surface">
-                    {displayName(user)}
-                  </span>
-                  {fullName && (
-                    <span className="truncate text-xs text-on-surface-variant">
-                      @{user.username}
+            <div className="flex items-center gap-3 px-3 py-2">
+              {user && <Avatar user={user} size={36} />}
+              <div className="flex min-w-0 flex-col gap-0.5">
+                {user ? (
+                  <>
+                    <span className="truncate text-sm font-medium text-on-surface">
+                      {displayName(user)}
                     </span>
-                  )}
-                </>
-              ) : (
-                <span className="text-sm text-on-surface-variant">Not signed in</span>
-              )}
+                    {fullName && (
+                      <span className="truncate text-xs text-on-surface-variant">
+                        @{user.username}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-sm text-on-surface-variant">Not signed in</span>
+                )}
+              </div>
             </div>
             <div className="my-1 h-px bg-glass-border" />
             <button

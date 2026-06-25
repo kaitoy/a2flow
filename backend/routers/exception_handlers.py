@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from dependencies.auth import CSRF_COOKIE_NAME, SESSION_COOKIE_NAME
 from models.response import ApiError, ApiMeta, ApiResponse
 from repositories.exceptions import (
+    AvatarValidationError,
     CsrfError,
     DependencyCycleError,
     ForbiddenError,
@@ -93,6 +94,20 @@ async def foreign_key_violation_exception_handler(
         message=str(exc),
         status_code=422,
         details={"entity": exc.entity, "id": exc.id},
+    )
+
+
+async def avatar_validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 422 with INVALID_AVATAR code for an unsupported or oversized avatar image."""
+    assert isinstance(exc, AvatarValidationError)
+    return _envelope_error(
+        request,
+        code="INVALID_AVATAR",
+        message=str(exc),
+        status_code=422,
+        details={"reason": exc.reason},
     )
 
 

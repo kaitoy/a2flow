@@ -16,6 +16,7 @@ from services import (
     MCPRegistryService,
     MCPServerService,
     NotificationService,
+    UserAvatarService,
     UserService,
     WorkflowService,
     WorkflowSessionService,
@@ -29,6 +30,7 @@ from .repository import (
     AuthSessionRepositoryDep,
     MCPServerRepositoryDep,
     NotificationRepositoryDep,
+    UserAvatarRepositoryDep,
     UserRepositoryDep,
     WorkflowRepositoryDep,
     WorkflowSessionRepositoryDep,
@@ -88,6 +90,14 @@ def get_user_service(repo: UserRepositoryDep) -> UserService:
 
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+
+
+def get_user_avatar_service(repo: UserAvatarRepositoryDep) -> UserAvatarService:
+    """Create a UserAvatarService backed by the request's repository."""
+    return UserAvatarService(repo)
+
+
+UserAvatarServiceDep = Annotated[UserAvatarService, Depends(get_user_avatar_service)]
 
 
 def get_workflow_service(
