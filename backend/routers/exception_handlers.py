@@ -5,6 +5,7 @@ populated, mirroring the wire format produced by router success responses.
 """
 
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -57,6 +58,37 @@ def _envelope_error(
     )
 
 
+def _sanitize_validation_errors(
+    errors: Sequence[Any],
+) -> list[dict[str, Any]]:
+    """Return validation errors with non-JSON-serializable context stringified.
+
+    A ``ValueError`` raised inside a Pydantic validator is surfaced by
+    ``RequestValidationError.errors()`` as ``ctx={"error": <ValueError>}``; the
+    exception object cannot be JSON-serialized into the response envelope. This
+    replaces any such non-primitive ``ctx`` value with its string form.
+
+    Args:
+        errors: The raw error dicts from ``RequestValidationError.errors()``.
+
+    Returns:
+        A copy of the errors safe to serialize as JSON.
+    """
+    safe: list[dict[str, Any]] = []
+    for err in errors:
+        entry = dict(err)
+        ctx = entry.get("ctx")
+        if isinstance(ctx, dict):
+            entry["ctx"] = {
+                key: value
+                if isinstance(value, str | int | float | bool | None.__class__)
+                else str(value)
+                for key, value in ctx.items()
+            }
+        safe.append(entry)
+    return safe
+
+
 async def validation_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
@@ -67,7 +99,7 @@ async def validation_exception_handler(
         code="VALIDATION_ERROR",
         message="Invalid request",
         status_code=422,
-        details={"errors": exc.errors()},
+        details={"errors": _sanitize_validation_errors(exc.errors())},
     )
 
 

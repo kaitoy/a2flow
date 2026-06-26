@@ -249,6 +249,69 @@ async def test_update_user_unknown_id_returns_404(user_client: AsyncClient) -> N
     assert_err(response, code="NOT_FOUND", status=404)
 
 
+# ---------- avatar config ----------
+
+
+_AVATAR_CONFIG = {
+    "selections": {"head": "braids", "body": "hoodie"},
+    "colors": {"hair": "#4A3728"},
+    "background": "#EFEFEF",
+}
+
+
+async def test_create_user_avatar_config_defaults_none(
+    user_client: AsyncClient,
+) -> None:
+    body = assert_ok(
+        await user_client.post("/api/v1/users", json=_CREATE_BODY), status=201
+    )
+    assert body["avatarConfig"] is None
+
+
+async def test_update_user_avatar_config_round_trips(user_client: AsyncClient) -> None:
+    created = assert_ok(
+        await user_client.post("/api/v1/users", json=_CREATE_BODY), status=201
+    )
+    updated = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}", json={"avatarConfig": _AVATAR_CONFIG}
+        )
+    )
+    assert updated["avatarConfig"] == _AVATAR_CONFIG
+    fetched = assert_ok(await user_client.get(f"/api/v1/users/{created['id']}"))
+    assert fetched["avatarConfig"] == _AVATAR_CONFIG
+
+
+async def test_update_user_avatar_config_can_be_cleared(
+    user_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await user_client.post("/api/v1/users", json=_CREATE_BODY), status=201
+    )
+    await user_client.patch(
+        f"/api/v1/users/{created['id']}", json={"avatarConfig": _AVATAR_CONFIG}
+    )
+    cleared = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}", json={"avatarConfig": None}
+        )
+    )
+    assert cleared["avatarConfig"] is None
+
+
+async def test_update_user_avatar_config_rejects_oversized(
+    user_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await user_client.post("/api/v1/users", json=_CREATE_BODY), status=201
+    )
+    oversized = {"selections": {f"slot{i}": "part" for i in range(51)}}
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}", json={"avatarConfig": oversized}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
 # ---------- delete ----------
 
 

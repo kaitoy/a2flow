@@ -166,6 +166,19 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
               </div>
             </div>
             <div className="my-1 h-px bg-glass-border" />
+            {user && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onClose();
+                  router.push("/account");
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                Account
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"

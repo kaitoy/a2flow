@@ -7,6 +7,15 @@ import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import EditUserPage from "./page";
 
+// Replace the real Avatar with a stub that surfaces the avatarConfig it receives,
+// so the test can assert the page threads the loaded customization through to the
+// preview without depending on the Humation renderer's internals.
+vi.mock("@/components/ui/avatar", () => ({
+  Avatar: ({ user }: { user: { avatarConfig?: unknown } | null }) => (
+    <div data-testid="avatar" data-config={JSON.stringify(user?.avatarConfig ?? null)} />
+  ),
+}));
+
 const FULL_USER = {
   id: "user-1",
   username: "alice",
@@ -160,6 +169,28 @@ describe("EditUserPage", () => {
     await user.clear(firstNameInput);
     await user.tab();
     await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
+  });
+
+  it("passes the loaded avatar customization to the preview", async () => {
+    setup();
+    const avatarConfig = {
+      selections: { head: "braids" },
+      colors: { hair: "#4A3728" },
+      background: "#EFEFEF",
+    };
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, avatarConfig })
+      )
+    );
+
+    render(<EditUserPage />);
+    await waitFor(() => screen.getByDisplayValue("alice"));
+
+    expect(screen.getByTestId("avatar")).toHaveAttribute(
+      "data-config",
+      JSON.stringify(avatarConfig)
+    );
   });
 
   it("shows error on load failure", async () => {

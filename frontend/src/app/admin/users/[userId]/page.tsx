@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
-import { deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
+import { type AvatarConfig, deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
 
 // Reuse the generated create-schema field constraints, but drop the immutable
 // username and relax the password: on edit a blank value leaves the stored
@@ -42,9 +42,13 @@ export default function EditUserPage() {
   // Username is immutable after creation, so it lives outside the form state and
   // is rendered read-only.
   const [username, setUsername] = useState("");
-  // Avatar presence marker, kept outside the form so uploads/removals refresh
-  // the preview without touching the editable fields.
+  // Avatar state, kept outside the form so uploads/removals and the loaded
+  // generated-avatar customization refresh the preview without touching the
+  // editable fields. `avatarUpdatedAt` marks a custom uploaded image;
+  // `avatarConfig` holds the user's Humation customization so the preview
+  // matches their generated avatar elsewhere in the app.
   const [avatarUpdatedAt, setAvatarUpdatedAt] = useState<string | null>(null);
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
 
   const {
     register,
@@ -69,6 +73,7 @@ export default function EditUserPage() {
       .then((user) => {
         setUsername(user.username);
         setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
+        setAvatarConfig(user.avatarConfig ?? null);
         reset({
           firstName: user.firstName,
           lastName: user.lastName,
@@ -144,8 +149,11 @@ export default function EditUserPage() {
         className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
       >
         <AvatarField
-          user={{ id: userId, username, avatarUpdatedAt }}
-          onChange={(user) => setAvatarUpdatedAt(user.avatarUpdatedAt ?? null)}
+          user={{ id: userId, username, avatarUpdatedAt, avatarConfig }}
+          onChange={(user) => {
+            setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
+            setAvatarConfig(user.avatarConfig ?? null);
+          }}
         />
 
         <FormField htmlFor="username" label="Username">

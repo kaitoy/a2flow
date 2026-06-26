@@ -7,7 +7,7 @@ import { useState } from "react";
 import { avatarUrl, type User } from "@/lib/api";
 
 /** The subset of user fields an {@link Avatar} needs to render. */
-export type AvatarUser = Pick<User, "id" | "username" | "avatarUpdatedAt">;
+export type AvatarUser = Pick<User, "id" | "username" | "avatarUpdatedAt" | "avatarConfig">;
 
 /** Props for {@link Avatar}. */
 interface AvatarProps {
@@ -23,10 +23,12 @@ interface AvatarProps {
  * Circular user avatar.
  *
  * Renders the user's uploaded image when one exists (falling back to the
- * generated default if it fails to load), otherwise a deterministic
- * {@link https://github.com/humation-labs/humation | Humation} illustration
- * seeded from the username. While the user is still loading (`null`), a neutral
- * placeholder keeps the layout stable.
+ * generated default if it fails to load), otherwise a
+ * {@link https://github.com/humation-labs/humation | Humation} illustration.
+ * The illustration is always seeded from the username, and any saved
+ * `avatarConfig` (part selections, colors, background) overrides the seeded
+ * parts so a customized avatar renders consistently everywhere. While the user
+ * is still loading (`null`), a neutral placeholder keeps the layout stable.
  */
 export function Avatar({ user, size = 36, className }: AvatarProps) {
   const url = user ? avatarUrl(user) : null;
@@ -70,9 +72,17 @@ export function Avatar({ user, size = 36, className }: AvatarProps) {
   // The generated avatar is decorative: a username or accessible control label
   // always accompanies it (table cell, menu text, button aria-label), so it is
   // left without an SVG <title> to avoid duplicating that text.
+  const config = user.avatarConfig;
   return (
     <span className={cls} style={style}>
-      <HumationAvatar assets={humation1} seed={user.username} size={size} />
+      <HumationAvatar
+        assets={humation1}
+        seed={user.username}
+        selections={config?.selections}
+        colors={config?.colors}
+        background={config?.background ?? undefined}
+        size={size}
+      />
     </span>
   );
 }
