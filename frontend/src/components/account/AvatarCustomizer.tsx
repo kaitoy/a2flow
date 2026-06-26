@@ -23,8 +23,14 @@ type BackgroundMode = "default" | "transparent" | "color";
 /** Fallback solid color shown in the background picker before one is chosen. */
 const DEFAULT_BACKGROUND_COLOR = "#e2e8f0";
 
-/** UI groups sorted by their declared display order. */
-const SORTED_GROUPS: UiGroup[] = [...humation1.uiGroups].sort((a, b) => a.order - b.order);
+/**
+ * UI groups sorted by their declared display order. The "bottom" group is
+ * excluded: the Humation crop clips the lower-body layer, so its controls have
+ * no visible effect on the rendered avatar.
+ */
+const SORTED_GROUPS: UiGroup[] = humation1.uiGroups
+  .filter((group) => group.id !== "bottom")
+  .sort((a, b) => a.order - b.order);
 
 /**
  * Derive the initial {@link BackgroundMode} and color value from a stored config.
@@ -125,16 +131,7 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
       <div className="flex flex-col gap-6 rounded-2xl glass-panel-strong p-6">
         <div className="flex items-center gap-4">
           <Avatar user={previewUser} size={96} />
-          <div className="flex flex-wrap gap-2">
-            <Button variant="primary" onClick={handleSave} disabled={pending}>
-              {pending ? "Saving…" : "Save"}
-            </Button>
-            <Button variant="ghost" onClick={handleReset} disabled={pending}>
-              Reset to default
-            </Button>
-          </div>
         </div>
-        {error && <p className="text-xs text-error">{error}</p>}
 
         {SORTED_GROUPS.map((group) => (
           <PartGroup
@@ -155,6 +152,18 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
           onModeChange={setBgMode}
           onColorChange={setBgColor}
         />
+
+        <div className="flex flex-col items-end gap-2">
+          {error && <p className="text-xs text-error">{error}</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="primary" onClick={handleSave} disabled={pending}>
+              {pending ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="ghost" onClick={handleReset} disabled={pending}>
+              Reset to default
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -237,7 +246,9 @@ interface ColorPickersProps {
 
 /** A grid of color inputs, one per Humation color slot. */
 function ColorPickers({ colors, onChange }: ColorPickersProps) {
-  const slots: ColorSlot[] = humation1.colors;
+  // Exclude the "bottom" color: it tints the clipped lower-body layer, which is
+  // not visible in the rendered avatar.
+  const slots: ColorSlot[] = humation1.colors.filter((slot) => slot.id !== "bottom");
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
