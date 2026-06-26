@@ -17,7 +17,11 @@ from google.adk.sessions import BaseSessionService
 from infrastructure.agent import AgentRegistry
 from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTaskRead
-from repositories import WorkflowSessionRepository, WorkflowTaskRepository
+from repositories import (
+    MessageSenderRepository,
+    WorkflowSessionRepository,
+    WorkflowTaskRepository,
+)
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec
 
@@ -29,6 +33,7 @@ class WorkflowSessionService:
         self,
         ws_repo: WorkflowSessionRepository,
         tasks: WorkflowTaskRepository,
+        senders: MessageSenderRepository,
         registry: AgentRegistry,
         session_service: BaseSessionService,
         app_name: str,
@@ -38,6 +43,8 @@ class WorkflowSessionService:
         Args:
             ws_repo: Repository providing WorkflowSession persistence.
             tasks: Repository providing WorkflowTask persistence.
+            senders: Repository recording and reading per-message sender
+                attribution for the shared workflow chat.
             registry: Registry resolving ADK agents per skill.
             session_service: ADK session store, used to delete the underlying
                 chat session when a WorkflowSession is removed.
@@ -45,6 +52,7 @@ class WorkflowSessionService:
         """
         self._ws_repo = ws_repo
         self._tasks = tasks
+        self._senders = senders
         self._registry = registry
         self._session_service = session_service
         self._app_name = app_name
@@ -175,7 +183,77 @@ class WorkflowSessionService:
         if session is None:
             return []
         messages = adk_events_to_messages(session.events)
-        return [m.model_dump(mode="json", by_alias=True) for m in messages]
+        senders = await self._senders.senders_for_session(ws_id)
+        result: builtins.list[dict[str, Any]] = []
+        for message in messages:
+            data = message.model_dump(mode="json", by_alias=True)
+            data["senderUserId"] = (
+                senders.get(data["id"]) if data.get("role") == "user" else None
+            )
+            result.append(data)
+        return result
+
+    async def user_event_ids(self, ws_id: str) -> set[str]:
+        """Return the ids of the session's ADK ``"user"`` events.
+
+        Snapshotting these ids before an agent run lets the router attribute the
+        events that appear afterwards (the messages the current user sent) to
+        their sender. Returns an empty set when the ADK session does not exist
+        yet (before the first run).
+
+        Args:
+            ws_id: Identifier of the WorkflowSession whose user events to read.
+
+        Returns:
+            The set of ADK event ids whose author is ``"user"``.
+
+        Raises:
+            NotFoundError: If no WorkflowSession exists with the given ID.
+        """
+        ws = await self.get(ws_id)
+        session = await self._session_service.get_session(
+            app_name=self._app_name,
+            user_id=ws.user_id,
+            session_id=ws.session_id,
+        )
+        if session is None:
+            return set()
+        return {event.id for event in session.events if event.author == "user"}
+
+    async def record_new_senders(
+        self, ws_id: str, prior_event_ids: set[str], sender_user_id: str
+    ) -> None:
+        """Attribute the session's new ``"user"`` events to ``sender_user_id``.
+
+        Compares the session's current ``"user"`` events against the snapshot
+        taken before the run; every event not in ``prior_event_ids`` was sent by
+        the current user, so it is recorded (idempotently). Does nothing when the
+        ADK session does not exist.
+
+        Args:
+            ws_id: Identifier of the WorkflowSession that was run.
+            prior_event_ids: The ``"user"`` event ids present before the run.
+            sender_user_id: The user who sent the new messages.
+
+        Raises:
+            NotFoundError: If no WorkflowSession exists with the given ID.
+            ForeignKeyViolationError: If ``sender_user_id`` does not match a user.
+        """
+        ws = await self.get(ws_id)
+        session = await self._session_service.get_session(
+            app_name=self._app_name,
+            user_id=ws.user_id,
+            session_id=ws.session_id,
+        )
+        if session is None:
+            return
+        for event in session.events:
+            if event.author == "user" and event.id not in prior_event_ids:
+                await self._senders.record(
+                    workflow_session_id=ws_id,
+                    adk_event_id=event.id,
+                    sender_user_id=sender_user_id,
+                )
 
     async def delete(self, ws_id: str) -> None:
         """Delete a WorkflowSession and its underlying ADK chat session.

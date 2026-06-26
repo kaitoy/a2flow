@@ -39,4 +39,24 @@ describe("UserMessageBubble", () => {
     );
     expect(screen.getByText("hi")).toBeInTheDocument();
   });
+
+  it("renders the sender avatar beside the bubble when provided", () => {
+    const { container } = render(
+      <UserMessageBubble
+        message={{ id: "1", role: "user", content: "hello" }}
+        avatar={<span data-testid="sender-avatar">A</span>}
+      />
+    );
+    expect(screen.getByTestId("sender-avatar")).toBeInTheDocument();
+    // The row switches to an avatar-aware layout only when an avatar is present.
+    expect(container.firstChild).toHaveClass("items-end");
+    expect(container.firstChild).toHaveClass("gap-2");
+  });
+
+  it("keeps the plain layout when no avatar is provided", () => {
+    const { container } = render(
+      <UserMessageBubble message={{ id: "1", role: "user", content: "hello" }} />
+    );
+    expect(container.firstChild).not.toHaveClass("items-end");
+  });
 });

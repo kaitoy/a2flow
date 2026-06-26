@@ -554,6 +554,28 @@ export async function getUserNames(ids: Iterable<string>): Promise<Map<string, s
   return new Map(entries.filter((e): e is [string, string] => e !== null));
 }
 
+/**
+ * Resolve a set of user IDs to their full {@link User} records.
+ *
+ * Each unique ID is fetched individually via {@link getUser} (which resolves
+ * soft-deleted users too), so avatars and names still render for users that
+ * have been soft-deleted. IDs that cannot be fetched are omitted, letting
+ * callers fall back to a placeholder.
+ */
+export async function getUsersByIds(ids: Iterable<string>): Promise<Map<string, User>> {
+  const unique = [...new Set([...ids].filter(Boolean))];
+  const entries = await Promise.all(
+    unique.map(async (id): Promise<[string, User] | null> => {
+      try {
+        return [id, await getUser(id)];
+      } catch {
+        return null;
+      }
+    })
+  );
+  return new Map(entries.filter((e): e is [string, User] => e !== null));
+}
+
 /** List workflows with optional pagination, sort, and filters. */
 export async function listWorkflows(query: ListQuery = {}): Promise<Workflow[]> {
   return fetchEnvelope(
@@ -624,6 +646,30 @@ export async function getWorkflowSessionMessages(wsId: string): Promise<Message[
     apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(wsId)}/messages`),
     zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse
   ) as Promise<Message[]>;
+}
+
+/**
+ * Fetch the per-message sender attribution for a WorkflowSession's chat.
+ *
+ * Returns a map from message id (the ADK event id) to the id of the user who
+ * actually sent it. Only attributed human (`user`) messages are present; agent
+ * messages and legacy history sent before attribution existed are absent, so
+ * callers fall back to the session owner. Hits the same `/messages` endpoint as
+ * {@link getWorkflowSessionMessages}, reading the `senderUserId` each record
+ * carries alongside its `id`.
+ */
+export async function getWorkflowSessionMessageSenders(wsId: string): Promise<Map<string, string>> {
+  const records = (await fetchEnvelope(
+    apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(wsId)}/messages`),
+    zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse
+  )) as Array<{ id?: string; senderUserId?: string | null }>;
+  const senders = new Map<string, string>();
+  for (const record of records) {
+    if (record.id && record.senderUserId) {
+      senders.set(record.id, record.senderUserId);
+    }
+  }
+  return senders;
 }
 
 /** List WorkflowSession records (newest first) with optional pagination, sort, and filters. */

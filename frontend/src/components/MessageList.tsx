@@ -4,7 +4,7 @@ import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { animated, useSpring } from "@react-spring/web";
 import { Sparkles } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { TOOL_CALL_ACTIVITY_TYPE, type ToolCallActivityContent } from "@/lib/agentActivity";
 import { useMotionConfig } from "@/lib/motion";
 import { MessageBubble } from "./MessageBubble";
@@ -49,12 +49,19 @@ export function MessageList({
   messages,
   isStreaming = false,
   isRunning = false,
+  renderAvatar,
   onAction,
   onApprovalResolved,
 }: {
   messages: Message[];
   isStreaming?: boolean;
   isRunning?: boolean;
+  /**
+   * Optional sender-avatar renderer. When provided (workflow sessions) the
+   * returned node is shown beside each conversational bubble; omitted for the
+   * single-user chat, which renders no avatars.
+   */
+  renderAvatar?: (message: Message) => ReactNode;
   onAction?: (action: A2UIUserAction) => void;
   onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected") => void;
 }) {
@@ -89,6 +96,7 @@ export function MessageList({
             key={msg.id}
             message={msg}
             isStreaming={isStreaming && i === messages.length - 1}
+            avatar={renderAvatar?.(msg)}
             onAction={onAction}
             onApprovalResolved={onApprovalResolved}
           />

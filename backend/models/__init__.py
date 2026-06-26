@@ -2,6 +2,7 @@ from .agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from .approval import Approval, ApprovalCreate, ApprovalStatus, ApprovalUpdate
 from .auth_session import AuthSession
 from .mcp_server import MCPServer, MCPServerCreate, MCPServerUpdate, McpToolInfo
+from .message_sender import MessageSender
 from .notification import (
     Notification,
     NotificationCreate,
@@ -36,6 +37,7 @@ __all__ = [
     "MCPServerCreate",
     "MCPServerUpdate",
     "McpToolInfo",
+    "MessageSender",
     "Notification",
     "NotificationCreate",
     "NotificationType",

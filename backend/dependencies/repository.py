@@ -16,11 +16,13 @@ from repositories import (
     ApprovalRepository,
     AuthSessionRepository,
     MCPServerRepository,
+    MessageSenderRepository,
     NotificationRepository,
     SqlAgentSkillRepository,
     SqlApprovalRepository,
     SqlAuthSessionRepository,
     SqlMCPServerRepository,
+    SqlMessageSenderRepository,
     SqlNotificationRepository,
     SqlUserAvatarRepository,
     SqlUserRepository,
@@ -113,6 +115,16 @@ def get_workflow_session_repository(db: DBSessionDep) -> WorkflowSessionReposito
 
 WorkflowSessionRepositoryDep = Annotated[
     WorkflowSessionRepository, Depends(get_workflow_session_repository)
+]
+
+
+def get_message_sender_repository(db: DBSessionDep) -> MessageSenderRepository:
+    """Create a MessageSenderRepository backed by the current database session."""
+    return SqlMessageSenderRepository(db)
+
+
+MessageSenderRepositoryDep = Annotated[
+    MessageSenderRepository, Depends(get_message_sender_repository)
 ]
 
 

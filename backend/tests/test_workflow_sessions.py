@@ -267,6 +267,59 @@ async def test_workflow_session_messages_shared_across_users(
     )
     messages = assert_ok(response)
     assert [m["content"] for m in messages] == ["hello from owner"]
+    # A message with no attribution row (legacy history) reports no sender, so
+    # the UI can fall back to the session owner.
+    assert messages[0]["senderUserId"] is None
+
+
+async def test_workflow_session_messages_record_sender_after_run(
+    workflow_client: AsyncClient,
+    mock_adk_agent: MagicMock,
+    real_session_service: InMemorySessionService,
+) -> None:
+    from google.adk.events.event import Event
+    from google.genai import types
+
+    skill = await _create_skill(workflow_client)
+    # Session is owned by the default workflow_client user (SYSTEM_USER_ID).
+    ws = await _execute_workflow(workflow_client, skill["id"])
+
+    async def _appending_run(
+        input_data: Any, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        # Simulate ag_ui_adk appending the sender's user message to the shared,
+        # owner-keyed ADK session during the run.
+        session = await real_session_service.create_session(
+            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+        )
+        await real_session_service.append_event(
+            session,
+            Event(
+                author="user",
+                content=types.Content(
+                    role="user", parts=[types.Part(text="hi from alice")]
+                ),
+            ),
+        )
+        return
+        yield
+
+    mock_adk_agent.run = _appending_run
+
+    # Alice (a designated approver, not the owner) drives the run.
+    await workflow_client.post(
+        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Id": "alice"},
+    )
+
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+    )
+    messages = assert_ok(response)
+    assert [m["content"] for m in messages] == ["hi from alice"]
+    # The message is attributed to the actual sender, not the session owner.
+    assert messages[0]["senderUserId"] == "alice"
 
 
 async def test_workflow_session_messages_unknown_id_returns_404(

@@ -11,6 +11,7 @@ from .exceptions import (
     UniqueViolationError,
 )
 from .mcp_server import MCPServerRepository, SqlMCPServerRepository
+from .message_sender import MessageSenderRepository, SqlMessageSenderRepository
 from .notification import NotificationRepository, SqlNotificationRepository
 from .user import SqlUserRepository, UserRepository
 from .user_avatar import SqlUserAvatarRepository, UserAvatarRepository
@@ -25,6 +26,7 @@ __all__ = [
     "CsrfError",
     "ForeignKeyViolationError",
     "MCPServerRepository",
+    "MessageSenderRepository",
     "NotFoundError",
     "NotificationRepository",
     "ReferencedError",
@@ -33,6 +35,7 @@ __all__ = [
     "SqlApprovalRepository",
     "SqlAuthSessionRepository",
     "SqlMCPServerRepository",
+    "SqlMessageSenderRepository",
     "SqlNotificationRepository",
     "SqlUserAvatarRepository",
     "SqlUserRepository",

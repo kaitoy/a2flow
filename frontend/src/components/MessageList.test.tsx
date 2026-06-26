@@ -1,11 +1,22 @@
 import type { Message } from "@ag-ui/core";
 import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { MessageList } from "./MessageList";
 
 vi.mock("./MessageBubble", () => ({
-  MessageBubble: ({ message, isStreaming }: { message: Message; isStreaming: boolean }) => (
-    <div data-testid={`bubble-${message.id}`} data-streaming={String(isStreaming)} />
+  MessageBubble: ({
+    message,
+    isStreaming,
+    avatar,
+  }: {
+    message: Message;
+    isStreaming: boolean;
+    avatar?: ReactNode;
+  }) => (
+    <div data-testid={`bubble-${message.id}`} data-streaming={String(isStreaming)}>
+      {avatar}
+    </div>
   ),
 }));
 
@@ -23,6 +34,21 @@ describe("MessageList", () => {
     render(<MessageList messages={messages} />);
     expect(screen.getByTestId("bubble-m1")).toBeInTheDocument();
     expect(screen.getByTestId("bubble-m2")).toBeInTheDocument();
+  });
+
+  it("passes a renderAvatar result to each bubble when provided", () => {
+    const messages: Message[] = [
+      { id: "m1", role: "user", content: "hi" },
+      { id: "m2", role: "assistant", content: "hello" },
+    ];
+    render(
+      <MessageList
+        messages={messages}
+        renderAvatar={(m) => <span data-testid={`avatar-${m.id}`}>{m.role}</span>}
+      />
+    );
+    expect(screen.getByTestId("avatar-m1")).toHaveTextContent("user");
+    expect(screen.getByTestId("avatar-m2")).toHaveTextContent("assistant");
   });
 
   it("only the last bubble receives isStreaming=true when list isStreaming", () => {

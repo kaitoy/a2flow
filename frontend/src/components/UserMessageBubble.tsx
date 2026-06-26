@@ -1,6 +1,7 @@
 "use client";
 
 import type { TextInputContent, UserMessage } from "@ag-ui/core";
+import type { ReactNode } from "react";
 
 /** Extract the plain text from a user message, handling both string and content-part array forms. */
 function getUserTextContent(content: UserMessage["content"]): string {
@@ -12,11 +13,26 @@ function getUserTextContent(content: UserMessage["content"]): string {
         .join("");
 }
 
-/** Render a user message as a right-aligned gradient bubble. */
-export function UserMessageBubble({ message }: { message: UserMessage }) {
+/**
+ * Render a user message as a right-aligned gradient bubble.
+ *
+ * When `avatar` is provided (workflow sessions, where several people share the
+ * chat) it is shown on the outer (right) edge so the sender is identifiable;
+ * without it the layout is unchanged for the single-user chat.
+ */
+export function UserMessageBubble({
+  message,
+  avatar,
+}: {
+  message: UserMessage;
+  avatar?: ReactNode;
+}) {
   const textContent = getUserTextContent(message.content);
+  const rowClass = avatar
+    ? "flex justify-end items-end gap-2 mb-3 animate-message-in"
+    : "flex justify-end mb-3 animate-message-in";
   return (
-    <div className="flex justify-end mb-3 animate-message-in">
+    <div className={rowClass}>
       <div
         className={[
           "max-w-[75%] rounded-2xl rounded-tr-md px-4 py-2.5",
@@ -27,6 +43,7 @@ export function UserMessageBubble({ message }: { message: UserMessage }) {
       >
         {textContent || " "}
       </div>
+      {avatar}
     </div>
   );
 }

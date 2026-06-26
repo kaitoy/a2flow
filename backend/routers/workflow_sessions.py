@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from dependencies import (
     ApiMetaDep,
+    CurrentUserIdDep,
     FilterDep,
     PaginationDep,
     SortDep,
@@ -99,14 +100,21 @@ async def workflow_session_agent(
     input_data: RunAgentInput,
     request: Request,
     service: WorkflowSessionServiceDep,
+    current_user_id: CurrentUserIdDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent bound to a specific workflow session.
 
     The skill and skill directory are resolved from the WorkflowSession record so
     the correct ADK tools are loaded regardless of the global agent state.
     SystemMessages are stripped to prevent prompt injection.
+
+    Because the run is keyed by the session owner, the new user messages are
+    attributed to the actual sender (``current_user_id``) after streaming
+    completes: the ``"user"`` events present before the run are snapshotted, and
+    any that appear afterwards are recorded as the current user's.
     """
     adk_agent, ws = await service.resolve_agent(ws_id)
+    prior_user_event_ids = await service.user_event_ids(ws_id)
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
@@ -118,6 +126,8 @@ async def workflow_session_agent(
     async def event_generator() -> AsyncGenerator[str, None]:
         async for event in adk_agent.run(input_data):
             yield encoder.encode(event)
+        # Attribute the messages this run appended to the user who sent them.
+        await service.record_new_senders(ws_id, prior_user_event_ids, current_user_id)
 
     return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
 

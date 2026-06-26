@@ -9,6 +9,9 @@ import { useWorkflowSessionChat } from "./useWorkflowSessionChat";
 vi.mock("@/lib/api", () => ({
   createWorkflowSessionAgent: vi.fn(),
   getWorkflowSessionMessages: vi.fn(),
+  getWorkflowSessionMessageSenders: vi.fn(),
+  getUsersByIds: vi.fn(),
+  formatUserName: (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`,
 }));
 
 const mockAgent = {
@@ -27,6 +30,8 @@ beforeEach(() => {
   vi.mocked(api.createWorkflowSessionAgent).mockClear();
   vi.mocked(api.createWorkflowSessionAgent).mockReturnValue(mockAgent as never);
   vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
+  vi.mocked(api.getWorkflowSessionMessageSenders).mockResolvedValue(new Map());
+  vi.mocked(api.getUsersByIds).mockResolvedValue(new Map());
   mockAgent.addMessage.mockClear();
   mockAgent.runAgent.mockClear();
 });
@@ -34,7 +39,7 @@ beforeEach(() => {
 describe("useWorkflowSessionChat", () => {
   it("calls getWorkflowSessionMessages on mount with the workflow session id", async () => {
     const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"), {
+    renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"), {
       wrapper: makeWrapper(store),
     });
     await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalledWith("ws-1"));
@@ -43,7 +48,7 @@ describe("useWorkflowSessionChat", () => {
   it("auto-sends workflowPrompt when messages are empty on mount", async () => {
     vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
     const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"), {
+    renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"), {
       wrapper: makeWrapper(store),
     });
     await waitFor(() =>
@@ -59,7 +64,7 @@ describe("useWorkflowSessionChat", () => {
       { id: "m1", role: "user", content: "previous message" },
     ]);
     const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"), {
+    renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"), {
       wrapper: makeWrapper(store),
     });
     await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalled());
@@ -70,7 +75,7 @@ describe("useWorkflowSessionChat", () => {
   it("sendMessage uses createWorkflowSessionAgent with the correct ids", async () => {
     const store = makeStore();
     const { result } = renderHook(
-      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"),
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
       { wrapper: makeWrapper(store) }
     );
     await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalled());
@@ -90,7 +95,7 @@ describe("useWorkflowSessionChat", () => {
     ]);
     const store = makeStore();
     const { result } = renderHook(
-      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"),
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
       { wrapper: makeWrapper(store) }
     );
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
@@ -105,6 +110,25 @@ describe("useWorkflowSessionChat", () => {
     expect(mockAgent.runAgent).toHaveBeenCalled();
   });
 
+  it("exposes resolved message senders loaded on mount", async () => {
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
+      { id: "m1", role: "user", content: "existing" },
+    ]);
+    vi.mocked(api.getWorkflowSessionMessageSenders).mockResolvedValue(new Map([["m1", "alice"]]));
+    vi.mocked(api.getUsersByIds).mockResolvedValue(
+      new Map([["alice", { id: "alice", username: "alice" } as never]])
+    );
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(api.getWorkflowSessionMessageSenders).toHaveBeenCalledWith("ws-1"));
+    await waitFor(() => expect(result.current.messageSenders.get("m1")).toBe("alice"));
+    expect(api.getUsersByIds).toHaveBeenCalledWith(["owner-1", "alice"]);
+    expect(result.current.senderUsers.get("alice")?.username).toBe("alice");
+  });
+
   it("dispatches setError when runAgent throws during sendMessage", async () => {
     vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
       { id: "m1", role: "user", content: "existing" },
@@ -112,7 +136,7 @@ describe("useWorkflowSessionChat", () => {
     mockAgent.runAgent.mockRejectedValueOnce(new Error("stream failure"));
     const store = makeStore();
     const { result } = renderHook(
-      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing"),
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
       { wrapper: makeWrapper(store) }
     );
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));

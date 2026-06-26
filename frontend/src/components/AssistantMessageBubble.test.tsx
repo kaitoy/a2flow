@@ -42,4 +42,16 @@ describe("AssistantMessageBubble", () => {
     expect(screen.getByText("hello")).toBeInTheDocument();
     expect(container.querySelector(".animate-blink")).toBeInTheDocument();
   });
+
+  it("renders the agent avatar beside the bubble when provided", () => {
+    const { container } = render(
+      <AssistantMessageBubble
+        message={{ id: "1", role: "assistant", content: "hi there" }}
+        avatar={<span data-testid="agent-avatar">AI</span>}
+      />
+    );
+    expect(screen.getByTestId("agent-avatar")).toBeInTheDocument();
+    expect(container.firstChild).toHaveClass("items-end");
+    expect(container.firstChild).toHaveClass("gap-2");
+  });
 });

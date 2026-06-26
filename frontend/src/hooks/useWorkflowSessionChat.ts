@@ -1,8 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
-import { createWorkflowSessionAgent, getWorkflowSessionMessages } from "@/lib/api";
+import {
+  createWorkflowSessionAgent,
+  getUsersByIds,
+  getWorkflowSessionMessageSenders,
+  getWorkflowSessionMessages,
+  type User,
+} from "@/lib/api";
 import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL } from "@/lib/approvalTool";
 import logger from "@/lib/logger";
 import type { AppDispatch } from "@/store";
@@ -59,12 +65,34 @@ function makeEventHandlers(dispatch: AppDispatch, onRenderA2uiEnd: (toolCallId: 
 export function useWorkflowSessionChat(
   workflowSessionId: string,
   sessionId: string,
-  workflowPrompt: string
+  workflowPrompt: string,
+  ownerUserId: string
 ) {
   const dispatch = useAppDispatch();
   const { messages, isRunning, isStreaming, error } = useAppSelector((s) => s.chat);
   const pendingRenderToolCallIds = useRef<string[]>([]);
   const autoSentRef = useRef(false);
+  // Per-message sender attribution for the shared workflow chat: a map from
+  // message id to the sender's user id, and the resolved sender User records
+  // (always including the owner, for the fallback below).
+  const [messageSenders, setMessageSenders] = useState<Map<string, string>>(new Map());
+  const [senderUsers, setSenderUsers] = useState<Map<string, User>>(new Map());
+  // Ids of user messages the current viewer sent this session. Their optimistic
+  // client ids differ from the persisted ADK event ids, so they are absent from
+  // `messageSenders`; the UI attributes them to the current user until a reload
+  // replaces them with the persisted, attributed history.
+  const locallySentIds = useRef<Set<string>>(new Set());
+
+  const refreshSenders = useCallback(async () => {
+    try {
+      const senders = await getWorkflowSessionMessageSenders(workflowSessionId);
+      const users = await getUsersByIds([ownerUserId, ...senders.values()]);
+      setMessageSenders(senders);
+      setSenderUsers(users);
+    } catch (err) {
+      logger.error(err, "failed to load message senders");
+    }
+  }, [workflowSessionId, ownerUserId]);
 
   const sendMessage = useCallback(
     async (prompt: string) => {
@@ -72,6 +100,7 @@ export function useWorkflowSessionChat(
 
       const msgId = crypto.randomUUID();
       dispatch(addUserMessage({ id: msgId, content: prompt }));
+      locallySentIds.current.add(msgId);
 
       const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
 
@@ -101,8 +130,11 @@ export function useWorkflowSessionChat(
       }
 
       dispatch(finishRun());
+      // The message this run sent is now persisted with its sender; refresh the
+      // attribution map so reloaded history shows the correct avatar.
+      void refreshSenders();
     },
-    [workflowSessionId, sessionId, isRunning, dispatch]
+    [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders]
   );
 
   const sendApprovalResult = useCallback(
@@ -152,6 +184,7 @@ export function useWorkflowSessionChat(
   // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and autoSentRef guards against double-sends
   useEffect(() => {
     dispatch(setSession(sessionId));
+    void refreshSenders();
     getWorkflowSessionMessages(workflowSessionId)
       .then((loadedMessages) => {
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
@@ -178,5 +211,8 @@ export function useWorkflowSessionChat(
     error,
     sendMessage,
     sendApprovalResult,
+    messageSenders,
+    senderUsers,
+    locallySentMessageIds: locallySentIds.current,
   };
 }

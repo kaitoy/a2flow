@@ -1,24 +1,76 @@
 /** @module WorkflowSessionPage — Loads a WorkflowSession record and renders the workflow chat view. */
 "use client";
 
+import type { Message } from "@ag-ui/core";
 import Image from "next/image";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import logo from "@/../assets/logo.png";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { ChatErrorBanner } from "@/components/ChatErrorBanner";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
-import { getWorkflowSession, type WorkflowSession } from "@/lib/api";
+import { formatUserName, getWorkflowSession, type User, type WorkflowSession } from "@/lib/api";
 import { clearError } from "@/store/chatSlice";
-import { useAppDispatch } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
   const dispatch = useAppDispatch();
-  const { messages, isRunning, isStreaming, error, sendMessage, sendApprovalResult } =
-    useWorkflowSessionChat(ws.id, ws.sessionId, ws.workflowPrompt);
+  const currentUser = useAppSelector((s) => s.auth.user);
+  const {
+    messages,
+    isRunning,
+    isStreaming,
+    error,
+    sendMessage,
+    sendApprovalResult,
+    messageSenders,
+    senderUsers,
+    locallySentMessageIds,
+  } = useWorkflowSessionChat(ws.id, ws.sessionId, ws.workflowPrompt, ws.userId);
+
+  /**
+   * Render the sender avatar shown beside a message: the workflow agent for its
+   * own (`assistant`) messages, and the resolved human (applicant or approver)
+   * for `user` messages. Messages whose sender is unknown fall back to the
+   * session owner; messages the current viewer just sent are attributed to them
+   * until the persisted, attributed history reloads.
+   */
+  const renderAvatar = (message: Message): ReactNode => {
+    if (message.role === "assistant") {
+      return (
+        <Tooltip label={ws.workflowName}>
+          <span className="inline-flex">
+            <AgentAvatar size={28} />
+          </span>
+        </Tooltip>
+      );
+    }
+    if (message.role === "user") {
+      const senderId = messageSenders.get(message.id);
+      let user: User | null;
+      if (senderId) {
+        user = senderUsers.get(senderId) ?? null;
+      } else if (locallySentMessageIds.has(message.id)) {
+        user = currentUser;
+      } else {
+        user = senderUsers.get(ws.userId) ?? null;
+      }
+      return (
+        <Tooltip label={user ? formatUserName(user) : "Unknown sender"}>
+          <span className="inline-flex">
+            <Avatar user={user} size={28} />
+          </span>
+        </Tooltip>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -47,6 +99,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           messages={messages}
           isStreaming={isStreaming}
           isRunning={isRunning}
+          renderAvatar={renderAvatar}
           onApprovalResolved={sendApprovalResult}
         />
         <ChatInput onSend={sendMessage} disabled={isRunning} />
