@@ -5,6 +5,7 @@ import { ListChecks } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -68,13 +69,7 @@ function buildColumns(
           >
             Open chat
           </Link>
-          <button
-            type="button"
-            onClick={() => onDelete(s.id, s.workflowName)}
-            className="cursor-pointer text-error transition-colors hover:underline"
-          >
-            Delete
-          </button>
+          <DeleteIconButton onClick={() => onDelete(s.id, s.workflowName)} />
         </div>
       ),
     },

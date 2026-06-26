@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { RegistrySearchDialog } from "@/components/admin/registry-search-dialog";
@@ -103,13 +104,7 @@ export default function McpServersPage() {
       noTruncate: true,
       cell: (server) => (
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => handleDelete(server.id, server.name)}
-            className="cursor-pointer text-error transition-colors hover:underline"
-          >
-            Delete
-          </button>
+          <DeleteIconButton onClick={() => handleDelete(server.id, server.name)} />
         </div>
       ),
     },

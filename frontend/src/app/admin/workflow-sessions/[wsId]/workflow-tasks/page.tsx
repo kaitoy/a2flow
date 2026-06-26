@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -161,13 +162,7 @@ function buildColumns(
           >
             Edit
           </Link>
-          <button
-            type="button"
-            onClick={() => onDelete(t.id, t.title)}
-            className="cursor-pointer text-error transition-colors hover:underline"
-          >
-            Delete
-          </button>
+          <DeleteIconButton onClick={() => onDelete(t.id, t.title)} />
         </div>
       ),
     },

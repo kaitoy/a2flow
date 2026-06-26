@@ -5,6 +5,7 @@ import { Users as UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { Avatar } from "@/components/ui/avatar";
@@ -105,13 +106,7 @@ export default function UsersPage() {
       noTruncate: true,
       cell: (user) => (
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => handleDelete(user.id, user.username)}
-            className="cursor-pointer text-error transition-colors hover:underline"
-          >
-            Delete
-          </button>
+          <DeleteIconButton onClick={() => handleDelete(user.id, user.username)} />
         </div>
       ),
     },

@@ -5,6 +5,7 @@ import { Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -87,13 +88,7 @@ export default function AgentSkillsPage() {
       noTruncate: true,
       cell: (skill) => (
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => handleDelete(skill.id, skill.name)}
-            className="cursor-pointer text-error transition-colors hover:underline"
-          >
-            Delete
-          </button>
+          <DeleteIconButton onClick={() => handleDelete(skill.id, skill.name)} />
         </div>
       ),
     },
