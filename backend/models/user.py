@@ -10,11 +10,11 @@ from typing import Any
 
 from pydantic import EmailStr, field_serializer, model_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import JSON, Column, Index, UniqueConstraint
+from sqlalchemy import Column, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity, TZDateTime
+from models.base import BaseEntity, JSONColumn, TZDateTime
 from models.constraints import Password, PersonName, Username
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -154,7 +154,7 @@ class User(UserCreate, BaseEntity, table=True):
     #: typed :class:`AvatarConfig` inherited from :class:`UserUpdate` so it
     #: persists as a plain dict column.
     avatar_config: dict[str, Any] | None = Field(  # type: ignore[assignment]
-        default=None, sa_column=Column(JSON, nullable=True)
+        default=None, sa_column=Column(JSONColumn, nullable=True)
     )
 
     @field_serializer("deleted_at", "avatar_updated_at", when_used="json")

@@ -104,6 +104,10 @@ Use `str | None` (not `Optional[str]`). Default to `None` unless a sensible non-
 
 Foreign key columns store the string representation of the referenced entity's UUID7. Use `ondelete="RESTRICT"` to prevent deletion of a referenced parent; the database will raise an `IntegrityError`, which the repository catches and re-raises as `ReferencedError`.
 
+### JSON Columns
+
+JSON columns must use the `JSONColumn` type from `models/base.py` (`sa_column=Column(JSONColumn, nullable=...)`), never the bare SQLAlchemy `JSON`. `JSONColumn` is `JSON().with_variant(JSONB(), "postgresql")`, so it stores `jsonb` on PostgreSQL (decomposed binary form — faster to query, GIN-indexable) and falls back to plain `JSON` on SQLite (which has no `jsonb` type). This mirrors how `TZDateTime` adapts datetime columns per dialect; the database is still selected purely via `DB_URL` with no code change.
+
 ---
 
 ## Repository Layer
@@ -352,6 +356,7 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 - The ADK session service factory (`dependencies/singletons.py`) branches on `is_sqlite_url(DB_URL)`: SQLite keeps `StaleTolerantSqliteSessionService`; anything else uses `StaleTolerantDatabaseSessionService` (SQLAlchemy-based, same database).
 - `repositories/_integrity.py` classifies `IntegrityError`s by message markers for **both** dialects (`FOREIGN KEY constraint failed` / `violates foreign key constraint`, `UNIQUE constraint failed` / `duplicate key value violates unique constraint`). When adding constraint-translation logic, cover both.
 - Datetime table columns must use `sa_type=TZDateTime` (`models/base.py`) — asyncpg rejects tz-aware values on naive `TIMESTAMP` columns; `TZDateTime` maps to `timestamptz` on PostgreSQL and is a no-op on SQLite.
+- JSON table columns must use `JSONColumn` (`models/base.py`) — maps to `jsonb` on PostgreSQL and plain `JSON` on SQLite.
 - Tables are created at application startup via `SQLModel.metadata.create_all()` (works on both backends; no migrations).
 
 ---
@@ -361,6 +366,7 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 1. **Model file** (`models/<entity>.py`):
    - Define `EntityUpdate` (all optional), `EntityCreate` (required fields), `Entity` (table=True, inherits `BaseEntity`).
    - Follow constraint naming conventions.
+   - Use `sa_type=TZDateTime` for datetime columns and `Column(JSONColumn, ...)` for JSON columns (both from `models/base.py`).
 2. **Repository file** (`repositories/<entity>.py`):
    - Define a `Protocol` with the standard five methods plus `exists()`.
    - Implement `SqlEntityRepository`.

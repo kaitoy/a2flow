@@ -16,11 +16,11 @@ from typing import Any
 
 from pydantic import model_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import JSON, Column, Index, UniqueConstraint
+from sqlalchemy import Column, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity
+from models.base import BaseEntity, JSONColumn
 from models.constraints import EntityName, HttpUrl
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -88,7 +88,7 @@ class MCPServer(MCPServerCreate, BaseEntity, table=True):
     )
 
     headers: dict[str, str] = Field(
-        default_factory=dict, sa_column=Column(JSON, nullable=False)
+        default_factory=dict, sa_column=Column(JSONColumn, nullable=False)
     )
 
 

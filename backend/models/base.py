@@ -6,7 +6,8 @@ from typing import Any, cast
 import uuid_utils
 from pydantic import field_serializer
 from pydantic.alias_generators import to_camel
-from sqlalchemy import DateTime
+from sqlalchemy import JSON, DateTime
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
@@ -17,6 +18,16 @@ Maps to ``timestamptz`` on PostgreSQL (asyncpg rejects tz-aware values on
 naive columns) and is a storage no-op on SQLite. Cast because SQLModel's
 ``sa_type`` stub only admits type objects while instances are supported at
 runtime.
+"""
+
+JSONColumn = JSON().with_variant(JSONB(), "postgresql")
+"""JSON column type that maps to ``jsonb`` on PostgreSQL and plain ``JSON`` elsewhere.
+
+``jsonb`` stores a decomposed binary form that is faster to query and indexable,
+while SQLite (which has no ``jsonb`` type) falls back to ``JSON``. Reuse this single
+instance across columns via ``sa_column=Column(JSONColumn, ...)`` — mirrors how
+``TZDateTime`` is shared across audit-timestamp columns. No cast is needed because
+``Column`` accepts a ``TypeEngine`` instance directly.
 """
 
 
