@@ -1,9 +1,10 @@
 /** @module AvatarField — Admin control for uploading or removing a user's avatar. */
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar, type AvatarUser } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { deleteUserAvatar, type User, uploadUserAvatar } from "@/lib/api";
 
 /** Props for {@link AvatarField}. */
@@ -26,14 +27,38 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Upload gets the full three-stage feedback (incl. the "done" wiggle); remove
+  // skips the done stage because its button unmounts as soon as the avatar is
+  // gone, so there is nothing left to celebrate on.
+  const upload = useAsyncAction();
+  const remove = useAsyncAction({ showDone: false });
+  // Defer clearing the picked file until the upload's "done" wiggle has finished
+  // (see the effect below): clearing immediately would unmount the Upload button
+  // before its celebratory wiggle could play.
+  const uploadedRef = useRef(false);
 
   // Revoke the object URL when the preview changes or the field unmounts.
   useEffect(() => {
     if (!previewUrl) return;
     return () => URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
+
+  const clearSelection = useCallback(() => {
+    setFile(null);
+    setPreviewUrl(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }, []);
+
+  // Once the upload's "done" stage has elapsed and the button reverts to idle,
+  // collapse the preview/Upload UI back to the Choose-image/Remove view.
+  useEffect(() => {
+    if (uploadedRef.current && upload.status === "idle") {
+      uploadedRef.current = false;
+      clearSelection();
+    }
+  }, [upload.status, clearSelection]);
 
   function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0] ?? null;
@@ -42,35 +67,28 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
     setPreviewUrl(selected ? URL.createObjectURL(selected) : null);
   }
 
-  function clearSelection() {
-    setFile(null);
-    setPreviewUrl(null);
-    if (inputRef.current) inputRef.current.value = "";
-  }
-
   async function handleUpload() {
     if (!file) return;
-    setPending(true);
     setError(null);
     try {
-      onChange(await uploadUserAvatar(user.id, file));
-      clearSelection();
+      await upload.run(async () => {
+        onChange(await uploadUserAvatar(user.id, file));
+      });
+      // Selection is cleared by the effect above once the wiggle has played.
+      uploadedRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to upload avatar");
-    } finally {
-      setPending(false);
     }
   }
 
   async function handleRemove() {
-    setPending(true);
     setError(null);
     try {
-      onChange(await deleteUserAvatar(user.id));
+      await remove.run(async () => {
+        onChange(await deleteUserAvatar(user.id));
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove avatar");
-    } finally {
-      setPending(false);
     }
   }
 
@@ -103,10 +121,23 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
           />
           {file ? (
             <>
-              <Button type="button" variant="primary" onClick={handleUpload} disabled={pending}>
-                {pending ? "Uploading…" : "Upload"}
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleUpload}
+                disabled={upload.inFlight}
+                status={upload.status}
+                pendingLabel="Uploading…"
+                doneLabel="Uploaded!"
+              >
+                Upload
               </Button>
-              <Button type="button" variant="ghost" onClick={clearSelection} disabled={pending}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={clearSelection}
+                disabled={upload.inFlight || upload.status !== "idle"}
+              >
                 Cancel
               </Button>
             </>
@@ -116,7 +147,7 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
                 type="button"
                 variant="secondary"
                 onClick={() => inputRef.current?.click()}
-                disabled={pending}
+                disabled={remove.inFlight}
               >
                 Choose image
               </Button>
@@ -125,7 +156,9 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
                   type="button"
                   variant="ghost"
                   onClick={handleRemove}
-                  disabled={pending}
+                  disabled={remove.inFlight}
+                  status={remove.status}
+                  pendingLabel="Removing…"
                   className="text-error"
                 >
                   Remove
