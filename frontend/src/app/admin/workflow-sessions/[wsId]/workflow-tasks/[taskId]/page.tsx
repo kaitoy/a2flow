@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { zWorkflowTaskCreate } from "@/generated/api/zod.gen";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
   deleteWorkflowTask,
   getWorkflowTask,
@@ -72,13 +73,14 @@ export default function EditWorkflowTaskPage() {
     [toolCatalog, taskBindings]
   );
 
+  const save = useAsyncAction();
   const {
     register,
     handleSubmit,
     reset,
     control,
     getValues,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
@@ -136,15 +138,17 @@ export default function EditWorkflowTaskPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
-      await updateWorkflowTask(taskId, {
-        title: values.title,
-        description: values.description || null,
-        status: values.status,
-        position: values.position,
-        dependsOnIds: values.dependsOnIds,
-        toolBindings: values.toolBindings.map(valueToBinding),
+      await save.run(async () => {
+        await updateWorkflowTask(taskId, {
+          title: values.title,
+          description: values.description || null,
+          status: values.status,
+          position: values.position,
+          dependsOnIds: values.dependsOnIds,
+          toolBindings: values.toolBindings.map(valueToBinding),
+        });
+        router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
       });
-      router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to update task");
     }
@@ -248,8 +252,15 @@ export default function EditWorkflowTaskPage() {
         <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Save"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.inFlight}
+            status={save.status}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
           </Button>
           <Button
             type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type Approval, type ApprovalStatus, getApproval, resolveApproval } from "@/lib/api";
 import logger from "@/lib/logger";
 import { useAppSelector } from "@/store/hooks";
@@ -40,7 +41,10 @@ export function ApprovalControls({
   const [approver, setApprover] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [resolvedComment, setResolvedComment] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const action = useAsyncAction({ showDone: false });
+  // Which decision is in flight, so only the clicked button shows the pending
+  // label while both stay disabled.
+  const [pendingDecision, setPendingDecision] = useState<Decision | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,15 +77,27 @@ export function ApprovalControls({
         rows={2}
         placeholder="Comment (optional)"
         value={comment}
-        disabled={busy}
+        disabled={action.inFlight}
         onChange={(e) => setComment(e.target.value)}
         aria-label="Comment"
       />
       <div className="mt-3 flex gap-2">
-        <Button variant="primary" disabled={busy} onClick={() => resolve("approved")}>
+        <Button
+          variant="primary"
+          disabled={action.inFlight}
+          status={pendingDecision === "approved" ? action.status : "idle"}
+          pendingLabel="Approving…"
+          onClick={() => resolve("approved")}
+        >
           Approve
         </Button>
-        <Button variant="secondary" disabled={busy} onClick={() => resolve("rejected")}>
+        <Button
+          variant="secondary"
+          disabled={action.inFlight}
+          status={pendingDecision === "rejected" ? action.status : "idle"}
+          pendingLabel="Rejecting…"
+          onClick={() => resolve("rejected")}
+        >
           Reject
         </Button>
       </div>
@@ -91,20 +107,20 @@ export function ApprovalControls({
   );
 
   const resolve = async (decision: Decision) => {
-    if (busy || status !== "pending") return;
-    setBusy(true);
+    if (action.inFlight || status !== "pending") return;
     setError(null);
+    setPendingDecision(decision);
     try {
       const trimmed = comment.trim();
-      await resolveApproval(approvalId, decision, trimmed || undefined);
+      await action.run(async () => {
+        await resolveApproval(approvalId, decision, trimmed || undefined);
+      });
       setStatus(decision);
       setResolvedComment(trimmed || null);
       onResolved?.(toolCallId, decision);
     } catch (err) {
       logger.error(err, "failed to resolve approval");
       setError("Failed to record your decision. Please try again.");
-    } finally {
-      setBusy(false);
     }
   };
 

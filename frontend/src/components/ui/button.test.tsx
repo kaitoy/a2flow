@@ -57,4 +57,76 @@ describe("Button", () => {
     expect(cls).toContain("from-accent");
     expect(cls).toContain("w-full");
   });
+
+  describe("status labels", () => {
+    it("idle status shows the children label", () => {
+      render(
+        <Button status="idle" pendingLabel="Saving…" doneLabel="Saved!">
+          Save
+        </Button>
+      );
+      expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    });
+
+    it("pending status shows the pending label", () => {
+      render(
+        <Button status="pending" pendingLabel="Saving…" doneLabel="Saved!">
+          Save
+        </Button>
+      );
+      expect(screen.getByRole("button", { name: "Saving…" })).toBeInTheDocument();
+    });
+
+    it("done status shows the done label", () => {
+      render(
+        <Button status="done" pendingLabel="Saving…" doneLabel="Saved!">
+          Save
+        </Button>
+      );
+      expect(screen.getByRole("button", { name: "Saved!" })).toBeInTheDocument();
+    });
+
+    it("done status disables the button and applies the success style", () => {
+      render(
+        <Button status="done" pendingLabel="Saving…" doneLabel="Saved!">
+          Save
+        </Button>
+      );
+      const button = screen.getByRole("button", { name: "Saved!" });
+      expect(button).toBeDisabled();
+      expect(button.className).toContain("bg-success");
+      expect(button.className).toContain("animate-wiggle");
+    });
+
+    it("pending status disables the button", () => {
+      render(
+        <Button status="pending" pendingLabel="Saving…" doneLabel="Saved!">
+          Save
+        </Button>
+      );
+      expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    });
+
+    it("idle status leaves the button enabled", () => {
+      render(
+        <Button status="idle" pendingLabel="Saving…" doneLabel="Saved!">
+          Save
+        </Button>
+      );
+      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    });
+
+    it("reserves width with hidden, aria-hidden copies of every label", () => {
+      render(
+        <Button status="pending" pendingLabel="Saving…" doneLabel="Saved!">
+          Save
+        </Button>
+      );
+      // The idle and done labels stay in the DOM (as width-reservation sizers)
+      // but are hidden from the accessible name, so only "Saving…" is exposed.
+      const button = screen.getByRole("button", { name: "Saving…" });
+      expect(button.textContent).toContain("Save");
+      expect(button.textContent).toContain("Saved!");
+    });
+  });
 });

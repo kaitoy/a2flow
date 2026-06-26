@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zAgentSkillCreate } from "@/generated/api/zod.gen";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createAgentSkill } from "@/lib/api";
 
 const schema = zAgentSkillCreate;
@@ -22,10 +23,11 @@ export default function NewAgentSkillPage() {
   const router = useRouter();
   const [apiError, setApiError] = useState<string | null>(null);
 
+  const save = useAsyncAction();
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
@@ -35,13 +37,15 @@ export default function NewAgentSkillPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
-      await createAgentSkill({
-        name: values.name,
-        repoUrl: values.repoUrl,
-        repoPath: values.repoPath || undefined,
-        description: values.description || null,
+      await save.run(async () => {
+        await createAgentSkill({
+          name: values.name,
+          repoUrl: values.repoUrl,
+          repoPath: values.repoPath || undefined,
+          description: values.description || null,
+        });
+        router.push("/admin/agent-skills");
       });
-      router.push("/admin/agent-skills");
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to create agent skill");
     }
@@ -89,8 +93,15 @@ export default function NewAgentSkillPage() {
         <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Save"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.inFlight}
+            status={save.status}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
           </Button>
           <Button type="button" variant="ghost" onClick={() => router.push("/admin/agent-skills")}>
             Cancel

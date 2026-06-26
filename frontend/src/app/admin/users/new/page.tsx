@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createUser } from "@/lib/api";
 
 const schema = zUserCreate;
@@ -22,10 +23,11 @@ export default function NewUserPage() {
   const router = useRouter();
   const [apiError, setApiError] = useState<string | null>(null);
 
+  const save = useAsyncAction();
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
@@ -43,16 +45,18 @@ export default function NewUserPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
-      await createUser({
-        username: values.username,
-        firstName: values.firstName,
-        lastName: values.lastName,
-        password: values.password,
-        email: values.email,
-        enabled: values.enabled,
-        emailVerified: values.emailVerified,
+      await save.run(async () => {
+        await createUser({
+          username: values.username,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          password: values.password,
+          email: values.email,
+          enabled: values.enabled,
+          emailVerified: values.emailVerified,
+        });
+        router.push("/admin/users");
       });
-      router.push("/admin/users");
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to create user");
     }
@@ -102,8 +106,15 @@ export default function NewUserPage() {
         <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Save"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.inFlight}
+            status={save.status}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
           </Button>
           <Button type="button" variant="ghost" onClick={() => router.push("/admin/users")}>
             Cancel

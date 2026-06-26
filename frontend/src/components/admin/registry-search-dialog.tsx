@@ -7,6 +7,7 @@ import { ErrorBanner } from "@/components/admin/error-banner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type McpRegistryServerEntry, searchMcpRegistry } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 
@@ -45,6 +46,7 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
   const [servers, setServers] = useState<McpRegistryServerEntry[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const loadMoreAction = useAsyncAction({ showDone: false });
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state when the dialog closes so it reopens clean.
@@ -122,15 +124,14 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
 
   async function loadMore() {
     if (!cursor) return;
-    setLoading(true);
     try {
-      const result = await searchMcpRegistry({ search: query || undefined, cursor });
-      setServers((prev) => [...prev, ...result.servers]);
-      setCursor(result.nextCursor ?? null);
+      await loadMoreAction.run(async () => {
+        const result = await searchMcpRegistry({ search: query || undefined, cursor });
+        setServers((prev) => [...prev, ...result.servers]);
+        setCursor(result.nextCursor ?? null);
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load more results");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -231,8 +232,14 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
 
                   {cursor && (
                     <div className="mt-3 flex justify-center">
-                      <Button variant="secondary" onClick={loadMore} disabled={loading}>
-                        {loading ? "Loading…" : "Load more"}
+                      <Button
+                        variant="secondary"
+                        onClick={loadMore}
+                        disabled={loadMoreAction.inFlight}
+                        status={loadMoreAction.status}
+                        pendingLabel="Loading…"
+                      >
+                        Load more
                       </Button>
                     </div>
                   )}

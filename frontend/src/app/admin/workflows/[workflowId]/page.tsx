@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { zWorkflowCreate } from "@/generated/api/zod.gen";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
   type AgentSkill,
   deleteWorkflow,
@@ -41,12 +42,13 @@ export default function EditWorkflowPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
+  const save = useAsyncAction();
   const {
     register,
     handleSubmit,
     reset,
     getValues,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
@@ -79,13 +81,15 @@ export default function EditWorkflowPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
-      await updateWorkflow(workflowId, {
-        name: values.name,
-        prompt: values.prompt,
-        agentSkillId: values.agentSkillId,
-        description: values.description || null,
+      await save.run(async () => {
+        await updateWorkflow(workflowId, {
+          name: values.name,
+          prompt: values.prompt,
+          agentSkillId: values.agentSkillId,
+          description: values.description || null,
+        });
+        router.push("/admin/workflows");
       });
-      router.push("/admin/workflows");
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to update workflow");
     }
@@ -157,8 +161,15 @@ export default function EditWorkflowPage() {
         <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Save"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.inFlight}
+            status={save.status}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
           </Button>
           <Button type="button" variant="ghost" onClick={() => router.push("/admin/workflows")}>
             Cancel

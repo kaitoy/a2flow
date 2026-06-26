@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { zMcpServerCreate } from "@/generated/api/zod.gen";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { deleteMcpServer, getMcpServer, updateMcpServer } from "@/lib/api";
 
 // Generated schema carries the name/url constraints; the form edits headers as
@@ -39,13 +40,14 @@ export default function EditMcpServerPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
+  const save = useAsyncAction();
   const {
     register,
     handleSubmit,
     reset,
     control,
     getValues,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
@@ -76,12 +78,14 @@ export default function EditMcpServerPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
-      await updateMcpServer(serverId, {
-        name: values.name,
-        url: values.url,
-        headers: pairsToRecord(values.headers),
+      await save.run(async () => {
+        await updateMcpServer(serverId, {
+          name: values.name,
+          url: values.url,
+          headers: pairsToRecord(values.headers),
+        });
+        router.push("/admin/mcp-servers");
       });
-      router.push("/admin/mcp-servers");
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to update MCP server");
     }
@@ -149,8 +153,15 @@ export default function EditMcpServerPage() {
         <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Save"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.inFlight}
+            status={save.status}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
           </Button>
           <Button type="button" variant="ghost" onClick={() => router.push("/admin/mcp-servers")}>
             Cancel

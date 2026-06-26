@@ -10,6 +10,7 @@ import { FormField } from "@/components/admin/form-field";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { login } from "@/lib/api";
 import { setUser } from "@/store/authSlice";
 import { useAppDispatch } from "@/store/hooks";
@@ -24,27 +25,29 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  // No `done` stage: a successful sign-in navigates away immediately, so the
+  // success color/checkmark/wiggle would only flash before the page unmounts.
+  const signIn = useAsyncAction({ showDone: false });
 
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       setError(null);
-      setPending(true);
       try {
-        const user = await login(username, password);
-        dispatch(setUser(user));
-        router.replace("/new-session");
+        await signIn.run(async () => {
+          const user = await login(username, password);
+          dispatch(setUser(user));
+          router.replace("/new-session");
+        });
       } catch (err) {
         setError(
           axios.isAxiosError(err) && err.response?.status === 401
             ? "Invalid username or password."
             : "Something went wrong. Please try again."
         );
-        setPending(false);
       }
     },
-    [username, password, dispatch, router]
+    [username, password, dispatch, router, signIn.run]
   );
 
   return (
@@ -99,8 +102,15 @@ export default function LoginPage() {
 
         {error && <p className="text-sm text-error">{error}</p>}
 
-        <Button type="submit" variant="primary" disabled={pending} className="w-full">
-          {pending ? "Signing in…" : "Sign in"}
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={signIn.inFlight}
+          status={signIn.status}
+          pendingLabel="Signing in…"
+          className="w-full"
+        >
+          Sign in
         </Button>
       </form>
     </main>

@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AvatarConfig, deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
 
 // Reuse the generated create-schema field constraints, but drop the immutable
@@ -50,11 +51,12 @@ export default function EditUserPage() {
   const [avatarUpdatedAt, setAvatarUpdatedAt] = useState<string | null>(null);
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
 
+  const save = useAsyncAction();
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
@@ -108,8 +110,10 @@ export default function EditUserPage() {
       body.password = values.password;
     }
     try {
-      await updateUser(userId, body);
-      router.push("/admin/users");
+      await save.run(async () => {
+        await updateUser(userId, body);
+        router.push("/admin/users");
+      });
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to update user");
     }
@@ -192,8 +196,15 @@ export default function EditUserPage() {
         <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Save"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.inFlight}
+            status={save.status}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
           </Button>
           <Button type="button" variant="ghost" onClick={() => router.push("/admin/users")}>
             Cancel

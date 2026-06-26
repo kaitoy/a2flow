@@ -7,6 +7,7 @@ import { createPartPreview, getPartsForUiGroup } from "@humation/core";
 import { useMemo, useState } from "react";
 import { Avatar, type AvatarUser } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AvatarConfig, updateUser } from "@/lib/api";
 import { setUser } from "@/store/authSlice";
 import { useAppDispatch } from "@/store/hooks";
@@ -67,7 +68,10 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
   const [bgMode, setBgMode] = useState<BackgroundMode>(initialBg.mode);
   const [bgColor, setBgColor] = useState<string>(initialBg.color);
 
-  const [pending, setPending] = useState(false);
+  const action = useAsyncAction();
+  // Which button triggered the in-flight request, so only that button shows the
+  // pending/done label while both stay disabled.
+  const [pendingAction, setPendingAction] = useState<"save" | "reset" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // The background value the renderer and persisted config should use.
@@ -96,22 +100,22 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
     setColors((prev) => ({ ...prev, [slotId]: value }));
   }
 
-  async function persist(config: AvatarConfig | null) {
-    setPending(true);
+  async function persist(config: AvatarConfig | null, which: "save" | "reset") {
     setError(null);
+    setPendingAction(which);
     try {
-      dispatch(setUser(await updateUser(user.id, { avatarConfig: config })));
+      await action.run(async () => {
+        dispatch(setUser(await updateUser(user.id, { avatarConfig: config })));
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save avatar");
-    } finally {
-      setPending(false);
     }
   }
 
   function handleSave() {
     const config: AvatarConfig = { selections, colors };
     if (background !== null) config.background = background;
-    void persist(config);
+    void persist(config, "save");
   }
 
   function handleReset() {
@@ -119,7 +123,7 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
     setColors({});
     setBgMode("default");
     setBgColor(DEFAULT_BACKGROUND_COLOR);
-    void persist(null);
+    void persist(null, "reset");
   }
 
   return (
@@ -156,10 +160,24 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
         <div className="flex flex-col items-end gap-2">
           {error && <p className="text-xs text-error">{error}</p>}
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="primary" onClick={handleSave} disabled={pending}>
-              {pending ? "Saving…" : "Save"}
+            <Button
+              variant="primary"
+              onClick={handleSave}
+              disabled={action.inFlight}
+              status={pendingAction === "save" ? action.status : "idle"}
+              pendingLabel="Saving…"
+              doneLabel="Saved!"
+            >
+              Save
             </Button>
-            <Button variant="ghost" onClick={handleReset} disabled={pending}>
+            <Button
+              variant="ghost"
+              onClick={handleReset}
+              disabled={action.inFlight}
+              status={pendingAction === "reset" ? action.status : "idle"}
+              pendingLabel="Resetting…"
+              doneLabel="Reset!"
+            >
               Reset to default
             </Button>
           </div>

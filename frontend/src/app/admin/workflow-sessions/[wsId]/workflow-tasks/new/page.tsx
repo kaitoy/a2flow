@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { zWorkflowTaskCreate } from "@/generated/api/zod.gen";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createWorkflowTask, listWorkflowTasks, type WorkflowTask } from "@/lib/api";
 import { loadMcpToolOptions, type McpToolOption, valueToBinding } from "@/lib/mcp-tool-options";
 
@@ -44,11 +45,12 @@ export default function NewWorkflowTaskPage() {
   const [candidates, setCandidates] = useState<WorkflowTask[]>([]);
   const [toolOptions, setToolOptions] = useState<McpToolOption[]>([]);
 
+  const save = useAsyncAction();
   const {
     register,
     handleSubmit,
     control,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
@@ -81,16 +83,18 @@ export default function NewWorkflowTaskPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
-      await createWorkflowTask({
-        workflowSessionId: wsId,
-        title: values.title,
-        description: values.description || null,
-        status: values.status,
-        position: values.position,
-        dependsOnIds: values.dependsOnIds,
-        toolBindings: values.toolBindings.map(valueToBinding),
+      await save.run(async () => {
+        await createWorkflowTask({
+          workflowSessionId: wsId,
+          title: values.title,
+          description: values.description || null,
+          status: values.status,
+          position: values.position,
+          dependsOnIds: values.dependsOnIds,
+          toolBindings: values.toolBindings.map(valueToBinding),
+        });
+        router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
       });
-      router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to create task");
     }
@@ -168,8 +172,15 @@ export default function NewWorkflowTaskPage() {
         <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Save"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.inFlight}
+            status={save.status}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
           </Button>
           <Button
             type="button"

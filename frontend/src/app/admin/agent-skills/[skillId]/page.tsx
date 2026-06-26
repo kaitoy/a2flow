@@ -15,6 +15,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zAgentSkillCreate } from "@/generated/api/zod.gen";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { deleteAgentSkill, getAgentSkill, updateAgentSkill } from "@/lib/api";
 
 const schema = zAgentSkillCreate;
@@ -29,12 +30,13 @@ export default function EditAgentSkillPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
+  const save = useAsyncAction();
   const {
     register,
     handleSubmit,
     reset,
     getValues,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
@@ -66,13 +68,15 @@ export default function EditAgentSkillPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
-      await updateAgentSkill(skillId, {
-        name: values.name,
-        repoUrl: values.repoUrl,
-        repoPath: values.repoPath,
-        description: values.description || null,
+      await save.run(async () => {
+        await updateAgentSkill(skillId, {
+          name: values.name,
+          repoUrl: values.repoUrl,
+          repoPath: values.repoPath,
+          description: values.description || null,
+        });
+        router.push("/admin/agent-skills");
       });
-      router.push("/admin/agent-skills");
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to update agent skill");
     }
@@ -132,8 +136,15 @@ export default function EditAgentSkillPage() {
         <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Save"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.inFlight}
+            status={save.status}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
           </Button>
           <Button type="button" variant="ghost" onClick={() => router.push("/admin/agent-skills")}>
             Cancel

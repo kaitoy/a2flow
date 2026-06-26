@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { zMcpServerCreate } from "@/generated/api/zod.gen";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createMcpServer } from "@/lib/api";
 import { parsePrefill } from "@/lib/mcp-registry-prefill";
 
@@ -45,11 +46,12 @@ function NewMcpServerForm() {
     };
   }, [searchParams]);
 
+  const save = useAsyncAction();
   const {
     register,
     handleSubmit,
     control,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
@@ -59,12 +61,14 @@ function NewMcpServerForm() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
-      await createMcpServer({
-        name: values.name,
-        url: values.url,
-        headers: pairsToRecord(values.headers),
+      await save.run(async () => {
+        await createMcpServer({
+          name: values.name,
+          url: values.url,
+          headers: pairsToRecord(values.headers),
+        });
+        router.push("/admin/mcp-servers");
       });
-      router.push("/admin/mcp-servers");
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to create MCP server");
     }
@@ -107,8 +111,15 @@ function NewMcpServerForm() {
         <ErrorBanner error={apiError} />
 
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : "Save"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.inFlight}
+            status={save.status}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
           </Button>
           <Button type="button" variant="ghost" onClick={() => router.push("/admin/mcp-servers")}>
             Cancel
