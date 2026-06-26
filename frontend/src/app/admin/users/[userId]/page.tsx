@@ -7,10 +7,10 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
-import { AvatarField } from "@/components/admin/avatar-field";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -43,9 +43,10 @@ export default function EditUserPage() {
   // Username is immutable after creation, so it lives outside the form state and
   // is rendered read-only.
   const [username, setUsername] = useState("");
-  // Avatar state, kept outside the form so uploads/removals and the loaded
-  // generated-avatar customization refresh the preview without touching the
-  // editable fields. `avatarUpdatedAt` marks a custom uploaded image;
+  // Avatar state, kept outside the form so the loaded avatar renders in a
+  // read-only preview without touching the editable fields. Avatar editing is
+  // self-service only (the account page); the admin form just displays the
+  // current avatar. `avatarUpdatedAt` marks a custom uploaded image;
   // `avatarConfig` holds the user's Humation customization so the preview
   // matches their generated avatar elsewhere in the app.
   const [avatarUpdatedAt, setAvatarUpdatedAt] = useState<string | null>(null);
@@ -152,13 +153,12 @@ export default function EditUserPage() {
         onSubmit={handleSubmit(onSubmit)}
         className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
       >
-        <AvatarField
-          user={{ id: userId, username, avatarUpdatedAt, avatarConfig }}
-          onChange={(user) => {
-            setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
-            setAvatarConfig(user.avatarConfig ?? null);
-          }}
-        />
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+            Avatar
+          </span>
+          <Avatar user={{ id: userId, username, avatarUpdatedAt, avatarConfig }} size={96} />
+        </div>
 
         <FormField htmlFor="username" label="Username">
           <Input id="username" value={username} readOnly disabled />

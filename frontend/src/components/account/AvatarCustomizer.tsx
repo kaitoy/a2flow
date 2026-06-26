@@ -1,4 +1,4 @@
-/** @module AvatarCustomizer — Self-service editor for a user's generated avatar. */
+/** @module AvatarCustomizer — Self-service editor for a user's avatar (uploaded image and generated default). */
 "use client";
 
 import { humation1 } from "@humation/assets-humation-1";
@@ -6,6 +6,7 @@ import type { ColorSlot, PartOption, UiGroup } from "@humation/core";
 import { createPartPreview, getPartsForUiGroup } from "@humation/core";
 import { useMemo, useState } from "react";
 import { Avatar, type AvatarUser } from "@/components/ui/avatar";
+import { AvatarField } from "@/components/ui/avatar-field";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AvatarConfig, updateUser } from "@/lib/api";
@@ -49,10 +50,12 @@ function initBackground(background: string | null | undefined): {
 }
 
 /**
- * Editor that lets a signed-in user customize their generated (Humation) avatar:
- * pick a part per group, override colors, and choose a background. Selections and
- * colors are stored as an {@link AvatarConfig} on the user; saving refreshes the
- * auth slice so every avatar across the app updates immediately.
+ * Editor for a signed-in user's avatar. The top section uploads or removes a
+ * custom image (which takes priority everywhere it is shown); the lower section
+ * customizes the generated (Humation) avatar — pick a part per group, override
+ * colors, and choose a background — used when no image is uploaded. Both an
+ * upload/removal and a saved {@link AvatarConfig} refresh the auth slice so every
+ * avatar across the app (including the header button) updates immediately.
  */
 export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
   const dispatch = useAppDispatch();
@@ -133,6 +136,13 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
       </h1>
 
       <div className="flex flex-col gap-6 rounded-2xl glass-panel-strong p-6">
+        <AvatarField user={user} onChange={(updated) => dispatch(setUser(updated))} />
+
+        <div className="flex flex-col gap-1 border-t border-glass-border pt-6">
+          <h2 className="text-sm font-semibold text-on-surface">Generated avatar</h2>
+          <p className="text-xs text-on-surface-variant">Used when no image is uploaded.</p>
+        </div>
+
         <div className="flex items-center gap-4">
           <Avatar user={previewUser} size={96} />
         </div>

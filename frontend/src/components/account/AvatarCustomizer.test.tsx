@@ -1,9 +1,16 @@
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import { AvatarCustomizer } from "./AvatarCustomizer";
+
+beforeAll(() => {
+  // jsdom doesn't implement object URLs; the embedded AvatarField uses them for
+  // the selected-file preview.
+  URL.createObjectURL = vi.fn(() => "blob:preview");
+  URL.revokeObjectURL = vi.fn();
+});
 
 const USER = {
   id: "user-1",
@@ -77,5 +84,28 @@ describe("AvatarCustomizer", () => {
     await userEvent.click(screen.getByRole("button", { name: "Reset to default" }));
     await waitFor(() => expect(captured.current).toBeDefined());
     expect((captured.current as { avatarConfig: unknown }).avatarConfig).toBeNull();
+  });
+
+  it("uploads an image and refreshes the auth user so every avatar updates", async () => {
+    const uploaded = { ...USER, avatarUpdatedAt: "2026-06-25T00:00:00.000Z" };
+    server.use(
+      http.put("http://localhost:8000/api/v1/users/:userId/avatar", () =>
+        HttpResponse.json({
+          meta: { requestId: "r", receivedAt: "", respondedAt: "" },
+          data: uploaded,
+          error: null,
+        })
+      )
+    );
+
+    const { container, store } = render(<AvatarCustomizer user={USER} />);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["image-bytes"], "a.png", { type: "image/png" });
+    await userEvent.upload(input, file);
+    await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
+
+    await waitFor(() =>
+      expect(store.getState().auth.user?.avatarUpdatedAt).toBe(uploaded.avatarUpdatedAt)
+    );
   });
 });
