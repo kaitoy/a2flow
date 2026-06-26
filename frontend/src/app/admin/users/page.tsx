@@ -36,7 +36,14 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
     header: "Username",
     sortField: "username",
     filterField: "username",
-    cell: (u) => <span className="font-medium">{u.username}</span>,
+    cell: (u) => (
+      <Link
+        href={`/admin/users/${u.id}`}
+        className="font-medium text-accent transition-colors hover:underline"
+      >
+        {u.username}
+      </Link>
+    ),
   },
   {
     header: "Name",
@@ -98,12 +105,6 @@ export default function UsersPage() {
       noTruncate: true,
       cell: (user) => (
         <div className="flex gap-2">
-          <Link
-            href={`/admin/users/${user.id}`}
-            className="text-accent transition-colors hover:underline"
-          >
-            Edit
-          </Link>
           <button
             type="button"
             onClick={() => handleDelete(user.id, user.username)}

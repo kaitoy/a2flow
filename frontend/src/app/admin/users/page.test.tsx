@@ -24,6 +24,15 @@ describe("UsersPage", () => {
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
   });
 
+  it("username links to the edit page", async () => {
+    render(<UsersPage />);
+    await waitFor(() => screen.getByText("alice"));
+    expect(screen.getByRole("link", { name: "alice" })).toHaveAttribute(
+      "href",
+      "/admin/users/user-1"
+    );
+  });
+
   it("shows empty state when no users", async () => {
     server.use(http.get("http://localhost:8000/api/v1/users", () => envelope([])));
     render(<UsersPage />);

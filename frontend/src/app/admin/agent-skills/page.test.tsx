@@ -23,6 +23,15 @@ describe("AgentSkillsPage", () => {
     await waitFor(() => expect(screen.getByText("my-skill")).toBeInTheDocument());
   });
 
+  it("name links to the edit page", async () => {
+    render(<AgentSkillsPage />);
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getByRole("link", { name: "my-skill" })).toHaveAttribute(
+      "href",
+      "/admin/agent-skills/skill-1"
+    );
+  });
+
   it("shows empty state when no skills", async () => {
     server.use(http.get("http://localhost:8000/api/v1/agent-skills", () => envelope([])));
     render(<AgentSkillsPage />);

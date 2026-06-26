@@ -29,7 +29,14 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
     header: "Name",
     sortField: "name",
     filterField: "name",
-    cell: (s) => <span className="font-medium">{s.name}</span>,
+    cell: (s) => (
+      <Link
+        href={`/admin/mcp-servers/${s.id}`}
+        className="font-medium text-accent transition-colors hover:underline"
+      >
+        {s.name}
+      </Link>
+    ),
   },
   {
     header: "URL",
@@ -96,12 +103,6 @@ export default function McpServersPage() {
       noTruncate: true,
       cell: (server) => (
         <div className="flex gap-2">
-          <Link
-            href={`/admin/mcp-servers/${server.id}`}
-            className="text-accent transition-colors hover:underline"
-          >
-            Edit
-          </Link>
           <button
             type="button"
             onClick={() => handleDelete(server.id, server.name)}

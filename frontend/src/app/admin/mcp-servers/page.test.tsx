@@ -25,6 +25,15 @@ describe("McpServersPage", () => {
     expect(screen.getByText("1 header")).toBeInTheDocument();
   });
 
+  it("name links to the edit page", async () => {
+    render(<McpServersPage />);
+    await waitFor(() => screen.getByText("my-mcp-server"));
+    expect(screen.getByRole("link", { name: "my-mcp-server" })).toHaveAttribute(
+      "href",
+      "/admin/mcp-servers/mcp-1"
+    );
+  });
+
   it("shows empty state when no servers", async () => {
     server.use(http.get("http://localhost:8000/api/v1/mcp-servers", () => envelope([])));
     render(<McpServersPage />);

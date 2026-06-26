@@ -20,7 +20,14 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
     header: "Name",
     sortField: "name",
     filterField: "name",
-    cell: (s) => <span className="font-medium">{s.name}</span>,
+    cell: (s) => (
+      <Link
+        href={`/admin/agent-skills/${s.id}`}
+        className="font-medium text-accent transition-colors hover:underline"
+      >
+        {s.name}
+      </Link>
+    ),
   },
   {
     header: "Repo URL",
@@ -80,12 +87,6 @@ export default function AgentSkillsPage() {
       noTruncate: true,
       cell: (skill) => (
         <div className="flex gap-2">
-          <Link
-            href={`/admin/agent-skills/${skill.id}`}
-            className="text-accent transition-colors hover:underline"
-          >
-            Edit
-          </Link>
           <button
             type="button"
             onClick={() => handleDelete(skill.id, skill.name)}
