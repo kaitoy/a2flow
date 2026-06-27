@@ -34,7 +34,14 @@ function buildColumns(
       header: "Name",
       sortField: "name",
       filterField: "name",
-      cell: (w) => <span className="font-medium">{w.name}</span>,
+      cell: (w) => (
+        <Link
+          href={`/admin/workflows/${w.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {w.name}
+        </Link>
+      ),
     },
     {
       header: "Prompt",
@@ -71,12 +78,6 @@ function buildColumns(
           >
             {runningId === w.id ? "Running…" : "Run"}
           </button>
-          <Link
-            href={`/admin/workflows/${w.id}`}
-            className="text-accent transition-colors hover:underline"
-          >
-            Edit
-          </Link>
           <DeleteIconButton onClick={() => onDelete(w.id, w.name)} />
         </div>
       ),

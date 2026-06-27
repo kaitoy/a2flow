@@ -23,10 +23,10 @@ describe("WorkflowTasksPage", () => {
     await waitFor(() => expect(screen.getByText("Step 1")).toBeInTheDocument());
   });
 
-  it("renders Edit link to the task detail route", async () => {
+  it("links the task title to the task detail route", async () => {
     render(<WorkflowTasksPage />);
     await waitFor(() => screen.getByText("Step 1"));
-    const link = screen.getByRole("link", { name: "Edit" });
+    const link = screen.getByRole("link", { name: "Step 1" });
     expect(link).toHaveAttribute("href", "/admin/workflow-sessions/ws-1/workflow-tasks/task-1");
   });
 

@@ -79,7 +79,14 @@ function buildColumns(
       header: "Title",
       sortField: "title",
       filterField: "title",
-      cell: (t) => <span className="font-medium">{t.title}</span>,
+      cell: (t) => (
+        <Link
+          href={`/admin/workflow-sessions/${wsId}/workflow-tasks/${t.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {t.title}
+        </Link>
+      ),
     },
     {
       header: "Description",
@@ -156,12 +163,6 @@ function buildColumns(
       noTruncate: true,
       cell: (t) => (
         <div className="flex gap-2">
-          <Link
-            href={`/admin/workflow-sessions/${wsId}/workflow-tasks/${t.id}`}
-            className="text-accent transition-colors hover:underline"
-          >
-            Edit
-          </Link>
           <DeleteIconButton onClick={() => onDelete(t.id, t.title)} />
         </div>
       ),
