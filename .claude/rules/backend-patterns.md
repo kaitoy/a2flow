@@ -250,7 +250,7 @@ async def get_agent_skill(
     return ApiResponse(meta=meta, data=skill)
 ```
 
-Repository (and service) exceptions propagate to global exception handlers (`backend/exception_handlers.py`) which produce structured `{code, message, details}` error bodies. Routers should not catch and re-raise as `HTTPException`. The middleware then wraps the error body in the response envelope.
+Repository (and service) exceptions propagate to global exception handlers (`backend/routers/exception_handlers.py`) which build the full `{meta, data, error}` envelope (via `_envelope_error`) with a structured `{code, message, details}` error body. Routers should not catch and re-raise as `HTTPException`.
 
 | Exception | HTTP status | Error code | Notes |
 |---|---|---|---|
@@ -279,7 +279,7 @@ The caller's identity comes from the authenticated session cookie. `dependencies
 
 ## Response Envelope
 
-All JSON responses are wrapped by `ResponseEnvelopeMiddleware` (`backend/middleware/envelope.py`) into a uniform shape:
+All JSON responses share a uniform envelope. It is **not** applied by middleware: each route declares `response_model=ApiResponse[T]` and returns `ApiResponse(meta=…, data=…)` (`models/response.py`), and the exception handlers (`backend/routers/exception_handlers.py`) build the same shape for errors via `_envelope_error`. The shape is therefore:
 
 ```jsonc
 {
@@ -293,23 +293,23 @@ All JSON responses are wrapped by `ResponseEnvelopeMiddleware` (`backend/middlew
 }
 ```
 
-- **`meta.requestId`** is generated per request and also exposed via the `X-Request-Id` response header.
+- **`meta.requestId`** is generated per request by `RequestContextMiddleware` (`backend/middleware/envelope.py`), which stamps it (plus `receivedAt`) onto `request.state` for the route's `ApiMetaDep`/handler to read, and also exposes it via the `X-Request-Id` response header.
 - **`meta.receivedAt`** / **`meta.respondedAt`** are ISO 8601 UTC strings (`Z` suffix).
 - Successful responses populate `data` and leave `error` as `null`. Error responses do the inverse.
 - `DELETE` endpoints return status 200 with `data: null` (the `status_code=204` decorator should not be used).
 
-### Excluded paths
+### Endpoints without the envelope
 
-The middleware skips wrapping for:
+Two endpoints intentionally skip the `ApiResponse` envelope by simply not using it:
 
 - `POST /agent` — SSE stream (must not be buffered)
-- `GET /health` — kept as a minimal `{"status":"ok"}` for liveness probes
+- `GET /health` — returns a minimal `{"status":"ok"}` for liveness probes
 
-Both still log under the same `request_id` filter (the `/health` request has `request_id=-` because the middleware also handles contextvar setup; excluded paths bypass it).
+`RequestContextMiddleware` still runs for both (it has no path exclusions), so they receive a `request_id`, log under it, and get the `X-Request-Id` header like any other request.
 
 ### Request ID logging
 
-`backend/logging_context.py` defines a `ContextVar` plus `RequestIdFilter` that injects the active request's `request_id` into every log record under the format `[req=<uuid>]: ...`. Use the standard `logging.getLogger(__name__)` API in routers/repositories — no extra wiring needed.
+`backend/infrastructure/logging_context.py` defines a `ContextVar` plus `RequestIdFilter` that injects the active request's `request_id` into every log record under the format `[req=<uuid>]: ...`. Use the standard `logging.getLogger(__name__)` API in routers/repositories — no extra wiring needed.
 
 ---
 
@@ -318,7 +318,7 @@ Both still log under the same `request_id` filter (the `/health` request has `re
 Error codes are uppercase `SCREAMING_SNAKE_CASE` strings. The current set is documented in the Error Mapping table above. When introducing a new repository exception:
 
 1. Add it to `backend/repositories/exceptions.py`.
-2. Add a handler in `backend/exception_handlers.py` returning the inner JSON `{code, message, details}` (the middleware wraps it).
+2. Add a handler in `backend/routers/exception_handlers.py` that builds the envelope with `_envelope_error(...)`, passing the `{code, message, details}` error body.
 3. Register the handler in `backend/main.py` via `app.add_exception_handler(...)`.
 4. Append a row to the Error Mapping table above with the new HTTP status and `code`.
 
@@ -326,7 +326,7 @@ Error codes are uppercase `SCREAMING_SNAKE_CASE` strings. The current set is doc
 
 ## Dependency Injection
 
-All FastAPI dependencies are defined as `Annotated` type aliases in `dependencies.py`:
+All FastAPI dependencies are defined as `Annotated` type aliases in the `dependencies/` package — split by concern across `auth.py`, `context.py`, `repository.py`, `service.py`, and `singletons.py`, and all re-exported from `dependencies/__init__.py` so callers can still `from dependencies import …`. A representative subset:
 
 ```python
 CurrentUserDep      # User, from the authenticated session cookie
@@ -337,8 +337,9 @@ AgentSkillRepositoryDep   # SqlAgentSkillRepository, per-request
 WorkflowRepositoryDep     # SqlWorkflowRepository, per-request (injects AgentSkillRepository)
 AgentSkillServiceDep      # AgentSkillService, per-request (injects AgentSkillRepository)
 WorkflowServiceDep        # WorkflowService, per-request (injects repos + SkillManager)
-SessionServiceDep   # ADK SqliteSessionService, singleton
-ADKAgentDep         # ADKAgent, singleton
+SessionServiceDep   # ADK BaseSessionService (SQLite- or DB-backed), singleton
+AgentRegistryDep    # AgentRegistry (wraps the session service), singleton
+SkillManagerDep     # SkillManager (git-backed skill clones), singleton
 ```
 
 Routers inject the `*ServiceDep` aliases; the repository aliases exist so the
@@ -373,9 +374,9 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
    - Raise `NotFoundError` / `ReferencedError` / `ForeignKeyViolationError` as appropriate.
 3. **Exceptions**: reuse existing exception types; add new ones to `repositories/exceptions.py` only if needed.
 4. **Service file** (`services/<entity>.py`): define `EntityService` as a concrete class wrapping the repository. Raise `NotFoundError` on missing single-entity fetches and host any multi-collaborator orchestration here.
-5. **Dependencies** (`dependencies.py`): add the `EntityRepositoryDep` alias **and** the `EntityServiceDep` alias (the service factory composes the repository deps).
+5. **Dependencies** (`dependencies/`): add the `EntityRepositoryDep` alias to `repository.py` **and** the `EntityServiceDep` alias to `service.py` (the service factory composes the repository deps), then re-export both from `__init__.py`.
 6. **Router file** (`routers/<entity>.py`):
    - Inject the `EntityServiceDep` (not the repository) and follow RESTful conventions and the error mapping table above.
    - Register in `main.py` with the correct prefix and tag.
-   - Do not catch repository/service exceptions; let global handlers map them. If a new repository exception is introduced, add a corresponding handler in `backend/exception_handlers.py` and document the error code in the Error Codes table.
+   - Do not catch repository/service exceptions; let global handlers map them. If a new repository exception is introduced, add a corresponding handler in `backend/routers/exception_handlers.py` and document the error code in the Error Codes table.
 6. **Tests**: cover create, list, get, update, delete, not-found, and any FK constraints. Use the `assert_ok` / `assert_err` helpers in `tests/_envelope.py` to unwrap the response envelope.

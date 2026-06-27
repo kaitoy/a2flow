@@ -11,7 +11,7 @@ The frontend uses a **glassmorphism** visual style with a **light/dark theme tog
 │   Next.js frontend               │  (render_a2ui tool injected by   │  FastAPI backend     │
 │   @ag-ui/client                  │ ───────────────────────────────► │  Google ADK agent    │
 │   @ag-ui/a2ui-middleware         │   A2UIMiddleware)                 │  AGUIToolset         │
-│   Redux Toolkit                  │                                   │  InMemorySession     │
+│   Redux Toolkit                  │                                   │  DB SessionService   │
 │   Admin UI (/admin)              │ ◄─────────────────────────────── │  SQLite/PostgreSQL   │
 └──────────────────────────────────┘  AG-UI events (SSE) incl.        └──────────────────────┘
      :3000                            A2UI (TOOL_CALL_*)                    :8000
@@ -291,7 +291,7 @@ backend/openapi.yaml ◄─── gitignored (regenerated locally / in CI)
 frontend/src/generated/api/{types.gen.ts, zod.gen.ts}  ◄─── gitignored
 ```
 
-The AG-UI streaming endpoint (`POST /agent`) is marked `include_in_schema=False` and is intentionally excluded from the spec — its events are typed by `@ag-ui/core`. The `{meta, data, error}` response envelope is applied by middleware and is not part of the spec; the frontend's `unwrap()` helper handles it, and the generated Zod schemas validate the inner `data` payload.
+The AG-UI streaming endpoint (`POST /agent`) is marked `include_in_schema=False` and is intentionally excluded from the spec — its events are typed by `@ag-ui/core`. The `{meta, data, error}` response envelope is built by the routes themselves (each declares `response_model=ApiResponse[T]` and returns `ApiResponse(meta=…, data=…)`) and by the exception handlers for errors, so its shape **is** part of the spec. The generated Zod schemas therefore describe the whole envelope; the frontend's internal `fetchEnvelope()` helper parses it and returns the inner `data` (throwing `ApiClientError` if the envelope carries an error body).
 
 `pnpm generate:api` (frontend) runs the backend export step via `uv` first, then the Zod codegen — so a single command keeps both layers in sync. The frontend's `predev` and `prebuild` hooks invoke it automatically, so `pnpm dev` and `pnpm build` regenerate the spec and schemas on every run. `uv` must be available on `PATH`.
 
