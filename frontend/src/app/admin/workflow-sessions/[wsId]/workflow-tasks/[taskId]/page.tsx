@@ -33,6 +33,8 @@ import {
   mergeBindingOptions,
   valueToBinding,
 } from "@/lib/mcp-tool-options";
+import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 // Generated schema carries the title/description/status/position constraints.
 // The parent session id comes from the URL, and the form edits dependencies and
@@ -57,6 +59,7 @@ type FormValues = z.infer<typeof schema>;
 export default function EditWorkflowTaskPage() {
   const { wsId, taskId } = useParams<{ wsId: string; taskId: string }>();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -73,7 +76,7 @@ export default function EditWorkflowTaskPage() {
     [toolCatalog, taskBindings]
   );
 
-  const save = useAsyncAction();
+  const save = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -147,6 +150,7 @@ export default function EditWorkflowTaskPage() {
           dependsOnIds: values.dependsOnIds,
           toolBindings: values.toolBindings.map(valueToBinding),
         });
+        dispatch(showToast({ message: "Task updated" }));
         router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
       });
     } catch (err) {
@@ -258,7 +262,6 @@ export default function EditWorkflowTaskPage() {
             disabled={save.inFlight}
             status={save.status}
             pendingLabel="Saving…"
-            doneLabel="Saved!"
           >
             Save
           </Button>

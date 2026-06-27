@@ -19,6 +19,8 @@ import { zMcpServerCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createMcpServer } from "@/lib/api";
 import { parsePrefill } from "@/lib/mcp-registry-prefill";
+import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 // Generated schema carries the name/url constraints; the form edits headers as
 // an ordered key/value pair list (converted to a record on submit), so override
@@ -32,6 +34,7 @@ type FormValues = z.infer<typeof schema>;
 /** The create form itself; reads registry prefill from the URL search params. */
 function NewMcpServerForm() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -46,7 +49,7 @@ function NewMcpServerForm() {
     };
   }, [searchParams]);
 
-  const save = useAsyncAction();
+  const save = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -67,6 +70,7 @@ function NewMcpServerForm() {
           url: values.url,
           headers: pairsToRecord(values.headers),
         });
+        dispatch(showToast({ message: "MCP server created" }));
         router.push("/admin/mcp-servers");
       });
     } catch (err) {
@@ -117,7 +121,6 @@ function NewMcpServerForm() {
             disabled={save.inFlight}
             status={save.status}
             pendingLabel="Saving…"
-            doneLabel="Saved!"
           >
             Save
           </Button>

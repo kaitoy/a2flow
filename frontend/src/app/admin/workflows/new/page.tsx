@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { zWorkflowCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AgentSkill, createWorkflow, listAgentSkills } from "@/lib/api";
+import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 // Generated schema carries name/prompt/description constraints; tighten the
 // agentSkillId foreign key to a required selection for the form's dropdown.
@@ -26,6 +28,7 @@ type FormValues = z.infer<typeof schema>;
 
 export default function NewWorkflowPage() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [apiError, setApiError] = useState<string | null>(null);
   const [skills, setSkills] = useState<AgentSkill[]>([]);
 
@@ -37,7 +40,7 @@ export default function NewWorkflowPage() {
       });
   }, []);
 
-  const save = useAsyncAction();
+  const save = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -58,6 +61,7 @@ export default function NewWorkflowPage() {
           agentSkillId: values.agentSkillId,
           description: values.description || null,
         });
+        dispatch(showToast({ message: "Workflow created" }));
         router.push("/admin/workflows");
       });
     } catch (err) {
@@ -122,7 +126,6 @@ export default function NewWorkflowPage() {
             disabled={save.inFlight}
             status={save.status}
             pendingLabel="Saving…"
-            doneLabel="Saved!"
           >
             Save
           </Button>

@@ -17,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { zAgentSkillCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { deleteAgentSkill, getAgentSkill, updateAgentSkill } from "@/lib/api";
+import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 const schema = zAgentSkillCreate;
 
@@ -25,12 +27,13 @@ type FormValues = z.infer<typeof schema>;
 export default function EditAgentSkillPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
-  const save = useAsyncAction();
+  const save = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -75,6 +78,7 @@ export default function EditAgentSkillPage() {
           repoPath: values.repoPath,
           description: values.description || null,
         });
+        dispatch(showToast({ message: "Agent skill updated" }));
         router.push("/admin/agent-skills");
       });
     } catch (err) {
@@ -142,7 +146,6 @@ export default function EditAgentSkillPage() {
             disabled={save.inFlight}
             status={save.status}
             pendingLabel="Saving…"
-            doneLabel="Saved!"
           >
             Save
           </Button>

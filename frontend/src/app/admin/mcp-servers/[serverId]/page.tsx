@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { zMcpServerCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { deleteMcpServer, getMcpServer, updateMcpServer } from "@/lib/api";
+import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 // Generated schema carries the name/url constraints; the form edits headers as
 // an ordered key/value pair list (converted to a record on submit), so override
@@ -35,12 +37,13 @@ type FormValues = z.infer<typeof schema>;
 export default function EditMcpServerPage() {
   const { serverId } = useParams<{ serverId: string }>();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
-  const save = useAsyncAction();
+  const save = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -84,6 +87,7 @@ export default function EditMcpServerPage() {
           url: values.url,
           headers: pairsToRecord(values.headers),
         });
+        dispatch(showToast({ message: "MCP server updated" }));
         router.push("/admin/mcp-servers");
       });
     } catch (err) {
@@ -159,7 +163,6 @@ export default function EditMcpServerPage() {
             disabled={save.inFlight}
             status={save.status}
             pendingLabel="Saving…"
-            doneLabel="Saved!"
           >
             Save
           </Button>

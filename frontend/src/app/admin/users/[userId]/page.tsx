@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AvatarConfig, deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
+import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 // Reuse the generated create-schema field constraints, but drop the immutable
 // username and relax the password: on edit a blank value leaves the stored
@@ -36,6 +38,7 @@ type FormValues = z.infer<typeof schema>;
 export default function EditUserPage() {
   const { userId } = useParams<{ userId: string }>();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -52,7 +55,7 @@ export default function EditUserPage() {
   const [avatarUpdatedAt, setAvatarUpdatedAt] = useState<string | null>(null);
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
 
-  const save = useAsyncAction();
+  const save = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -113,6 +116,7 @@ export default function EditUserPage() {
     try {
       await save.run(async () => {
         await updateUser(userId, body);
+        dispatch(showToast({ message: "User updated" }));
         router.push("/admin/users");
       });
     } catch (err) {
@@ -202,7 +206,6 @@ export default function EditUserPage() {
             disabled={save.inFlight}
             status={save.status}
             pendingLabel="Saving…"
-            doneLabel="Saved!"
           >
             Save
           </Button>

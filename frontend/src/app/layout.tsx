@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { Toaster } from "@/components/ui/toast";
 import { StoreProvider } from "@/store/provider";
 import "./globals.css";
 
@@ -37,7 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={inter.className}>
         <ThemeProvider>
-          <StoreProvider>{children}</StoreProvider>
+          <StoreProvider>
+            <Toaster />
+            {children}
+          </StoreProvider>
         </ThemeProvider>
       </body>
     </html>

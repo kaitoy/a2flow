@@ -24,6 +24,8 @@ import {
   listAgentSkills,
   updateWorkflow,
 } from "@/lib/api";
+import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 // Generated schema carries name/prompt/description constraints; tighten the
 // agentSkillId foreign key to a required selection for the form's dropdown.
@@ -36,13 +38,14 @@ type FormValues = z.infer<typeof schema>;
 export default function EditWorkflowPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [skills, setSkills] = useState<AgentSkill[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
-  const save = useAsyncAction();
+  const save = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -88,6 +91,7 @@ export default function EditWorkflowPage() {
           agentSkillId: values.agentSkillId,
           description: values.description || null,
         });
+        dispatch(showToast({ message: "Workflow updated" }));
         router.push("/admin/workflows");
       });
     } catch (err) {
@@ -167,7 +171,6 @@ export default function EditWorkflowPage() {
             disabled={save.inFlight}
             status={save.status}
             pendingLabel="Saving…"
-            doneLabel="Saved!"
           >
             Save
           </Button>

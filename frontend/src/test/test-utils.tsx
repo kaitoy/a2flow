@@ -7,6 +7,7 @@ import type { RootState } from "@/store";
 import authReducer from "@/store/authSlice";
 import chatReducer from "@/store/chatSlice";
 import notificationsReducer from "@/store/notificationsSlice";
+import toastReducer from "@/store/toastSlice";
 
 export function makeStore(preloadedState?: Partial<RootState>) {
   return configureStore({
@@ -17,6 +18,11 @@ export function makeStore(preloadedState?: Partial<RootState>) {
         RootState["notifications"],
         UnknownAction,
         RootState["notifications"] | undefined
+      >,
+      toast: toastReducer as Reducer<
+        RootState["toast"],
+        UnknownAction,
+        RootState["toast"] | undefined
       >,
     },
     preloadedState,

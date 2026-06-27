@@ -17,6 +17,8 @@ import { zWorkflowTaskCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createWorkflowTask, listWorkflowTasks, type WorkflowTask } from "@/lib/api";
 import { loadMcpToolOptions, type McpToolOption, valueToBinding } from "@/lib/mcp-tool-options";
+import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 // Generated schema carries the title/description/status/position constraints.
 // The parent session id comes from the URL, and the form edits dependencies and
@@ -41,11 +43,12 @@ type FormValues = z.infer<typeof schema>;
 export default function NewWorkflowTaskPage() {
   const { wsId } = useParams<{ wsId: string }>();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [apiError, setApiError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<WorkflowTask[]>([]);
   const [toolOptions, setToolOptions] = useState<McpToolOption[]>([]);
 
-  const save = useAsyncAction();
+  const save = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -93,6 +96,7 @@ export default function NewWorkflowTaskPage() {
           dependsOnIds: values.dependsOnIds,
           toolBindings: values.toolBindings.map(valueToBinding),
         });
+        dispatch(showToast({ message: "Task created" }));
         router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
       });
     } catch (err) {
@@ -178,7 +182,6 @@ export default function NewWorkflowTaskPage() {
             disabled={save.inFlight}
             status={save.status}
             pendingLabel="Saving…"
-            doneLabel="Saved!"
           >
             Save
           </Button>

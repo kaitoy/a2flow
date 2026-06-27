@@ -1,4 +1,3 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { useParams, useRouter } from "next/navigation";
@@ -6,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { envelope } from "@/test/msw/envelope";
 import { MCP_SERVER_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import EditMcpServerPage from "./page";
 
 function setup() {

@@ -1,10 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
+import { render, screen, waitFor } from "@/test/test-utils";
 import NewAgentSkillPage from "./page";
 
 describe("NewAgentSkillPage", () => {

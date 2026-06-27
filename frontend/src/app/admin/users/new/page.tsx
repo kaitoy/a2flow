@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createUser } from "@/lib/api";
+import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 const schema = zUserCreate;
 
@@ -21,9 +23,10 @@ type FormValues = z.infer<typeof schema>;
 
 export default function NewUserPage() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const save = useAsyncAction();
+  const save = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -55,6 +58,7 @@ export default function NewUserPage() {
           enabled: values.enabled,
           emailVerified: values.emailVerified,
         });
+        dispatch(showToast({ message: "User created" }));
         router.push("/admin/users");
       });
     } catch (err) {
@@ -112,7 +116,6 @@ export default function NewUserPage() {
             disabled={save.inFlight}
             status={save.status}
             pendingLabel="Saving…"
-            doneLabel="Saved!"
           >
             Save
           </Button>
