@@ -27,7 +27,7 @@ export interface AppHeaderProps {
  */
 export function AppHeader({ children }: AppHeaderProps) {
   return (
-    <header className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-glass-border bg-glass backdrop-blur-xl">
+    <header className="shrink-0 flex h-16 items-center justify-between px-6 border-b border-glass-border bg-glass backdrop-blur-xl">
       <div className="flex min-w-0 items-center gap-3">
         <Link
           href="/admin"
