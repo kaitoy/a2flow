@@ -1,10 +1,11 @@
 /** @module WorkflowsPage — Admin list page for managing workflows. */
 "use client";
 
-import { Workflow as WorkflowIcon } from "lucide-react";
+import { Loader2, Play, Workflow as WorkflowIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
@@ -70,14 +71,13 @@ function buildColumns(
       noTruncate: true,
       cell: (w) => (
         <div className="flex gap-2">
-          <button
-            type="button"
+          <ActionIconButton
+            icon={runningId === w.id ? Loader2 : Play}
+            label="Run"
             onClick={() => onRun(w.id)}
             disabled={runningId !== null}
-            className="cursor-pointer text-accent transition-colors hover:underline disabled:cursor-wait disabled:opacity-50"
-          >
-            {runningId === w.id ? "Running…" : "Run"}
-          </button>
+            spinning={runningId === w.id}
+          />
           <DeleteIconButton onClick={() => onDelete(w.id, w.name)} />
         </div>
       ),

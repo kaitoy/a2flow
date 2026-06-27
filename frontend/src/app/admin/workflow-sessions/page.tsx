@@ -1,9 +1,9 @@
 /** @module WorkflowSessionsPage — Admin list page for browsing executed WorkflowSessions. */
 "use client";
 
-import { ListChecks } from "lucide-react";
-import Link from "next/link";
+import { ListChecks, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
@@ -57,18 +57,16 @@ function buildColumns(
       noTruncate: true,
       cell: (s) => (
         <div className="flex gap-2">
-          <Link
+          <ActionIconButton
+            icon={ListChecks}
+            label="View tasks"
             href={`/admin/workflow-sessions/${s.id}/workflow-tasks`}
-            className="text-accent transition-colors hover:underline"
-          >
-            View tasks
-          </Link>
-          <Link
+          />
+          <ActionIconButton
+            icon={MessageSquare}
+            label="Open chat"
             href={`/workflow-sessions/${s.id}`}
-            className="text-accent transition-colors hover:underline"
-          >
-            Open chat
-          </Link>
+          />
           <DeleteIconButton onClick={() => onDelete(s.id, s.workflowName)} />
         </div>
       ),
