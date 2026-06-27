@@ -3,7 +3,7 @@
 
 import type { Message } from "@ag-ui/core";
 import { useParams } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/components/auth/auth-provider";
@@ -13,6 +13,7 @@ import { MessageList } from "@/components/MessageList";
 import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
+import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import { formatUserName, getWorkflowSession, type User, type WorkflowSession } from "@/lib/api";
 import { clearError } from "@/store/chatSlice";
@@ -31,7 +32,26 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
     messageSenders,
     senderUsers,
     locallySentMessageIds,
+    messageTasks,
+    tasks,
   } = useWorkflowSessionChat(ws.id, ws.sessionId, ws.workflowPrompt, ws.userId);
+  const [timelineCollapsed, setTimelineCollapsed] = useState(false);
+
+  // Task lookup for labelling the in-chat dividers, and the in-progress task to
+  // highlight in the timeline (the latest by position when several are running).
+  const tasksById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+  const activeTaskId = useMemo(() => {
+    const running = tasks.filter((t) => t.status === "in_progress");
+    if (running.length === 0) return null;
+    return running.reduce((a, b) => ((b.position ?? 0) >= (a.position ?? 0) ? b : a)).id;
+  }, [tasks]);
+
+  /** Scroll the chat to the divider that introduces the selected task. */
+  const handleSelectTask = (taskId: string) => {
+    document
+      .getElementById(`wf-task-divider-${taskId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   /**
    * Render the sender avatar shown beside a message: the workflow agent for its
@@ -73,6 +93,13 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <WorkflowTaskTimeline
+        tasks={tasks}
+        activeTaskId={activeTaskId}
+        onSelectTask={handleSelectTask}
+        collapsed={timelineCollapsed}
+        onToggle={() => setTimelineCollapsed((c) => !c)}
+      />
       <div className="flex flex-col flex-1 min-w-0">
         <AppHeader>
           <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />
@@ -89,6 +116,8 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           isStreaming={isStreaming}
           isRunning={isRunning}
           renderAvatar={renderAvatar}
+          messageTasks={messageTasks}
+          tasksById={tasksById}
           onApprovalResolved={sendApprovalResult}
         />
         <ChatInput onSend={sendMessage} disabled={isRunning} />
@@ -105,6 +134,12 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
 function WorkflowSessionSkeleton() {
   return (
     <div role="status" aria-label="Loading" className="flex h-screen overflow-hidden">
+      <div className="flex w-[260px] shrink-0 flex-col gap-3 border-r border-glass-border bg-glass px-4 py-4 backdrop-blur-xl">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-9 w-full rounded-xl" />
+        <Skeleton className="h-9 w-full rounded-xl" />
+        <Skeleton className="h-9 w-full rounded-xl" />
+      </div>
       <div className="flex flex-col flex-1 min-w-0">
         <AppHeader>
           <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />

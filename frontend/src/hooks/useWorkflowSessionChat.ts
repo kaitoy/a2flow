@@ -7,7 +7,10 @@ import {
   getUsersByIds,
   getWorkflowSessionMessageSenders,
   getWorkflowSessionMessages,
+  getWorkflowSessionMessageTasks,
+  listWorkflowTasks,
   type User,
+  type WorkflowTask,
 } from "@/lib/api";
 import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL } from "@/lib/approvalTool";
 import logger from "@/lib/logger";
@@ -77,6 +80,10 @@ export function useWorkflowSessionChat(
   // (always including the owner, for the fallback below).
   const [messageSenders, setMessageSenders] = useState<Map<string, string>>(new Map());
   const [senderUsers, setSenderUsers] = useState<Map<string, User>>(new Map());
+  // Per-message task association (message id -> WorkflowTask id) and the session's
+  // WorkflowTasks, used to render the task timeline and the in-chat task dividers.
+  const [messageTasks, setMessageTasks] = useState<Map<string, string>>(new Map());
+  const [tasks, setTasks] = useState<WorkflowTask[]>([]);
   // Ids of user messages the current viewer sent this session. Their optimistic
   // client ids differ from the persisted ADK event ids, so they are absent from
   // `messageSenders`; the UI attributes them to the current user until a reload
@@ -93,6 +100,19 @@ export function useWorkflowSessionChat(
       logger.error(err, "failed to load message senders");
     }
   }, [workflowSessionId, ownerUserId]);
+
+  const refreshTasks = useCallback(async () => {
+    try {
+      const [taskList, taskMap] = await Promise.all([
+        listWorkflowTasks(workflowSessionId),
+        getWorkflowSessionMessageTasks(workflowSessionId),
+      ]);
+      setTasks(taskList);
+      setMessageTasks(taskMap);
+    } catch (err) {
+      logger.error(err, "failed to load workflow tasks");
+    }
+  }, [workflowSessionId]);
 
   const sendMessage = useCallback(
     async (prompt: string) => {
@@ -133,8 +153,10 @@ export function useWorkflowSessionChat(
       // The message this run sent is now persisted with its sender; refresh the
       // attribution map so reloaded history shows the correct avatar.
       void refreshSenders();
+      // Refresh task state and the per-message task association the run produced.
+      void refreshTasks();
     },
-    [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders]
+    [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
   );
 
   const sendApprovalResult = useCallback(
@@ -177,14 +199,18 @@ export function useWorkflowSessionChat(
       }
 
       dispatch(finishRun());
+      // The agent may have advanced tasks while resuming after the decision;
+      // refresh task state and the per-message task association.
+      void refreshTasks();
     },
-    [workflowSessionId, sessionId, isRunning, dispatch]
+    [workflowSessionId, sessionId, isRunning, dispatch, refreshTasks]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and autoSentRef guards against double-sends
   useEffect(() => {
     dispatch(setSession(sessionId));
     void refreshSenders();
+    void refreshTasks();
     getWorkflowSessionMessages(workflowSessionId)
       .then((loadedMessages) => {
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
@@ -214,5 +240,7 @@ export function useWorkflowSessionChat(
     messageSenders,
     senderUsers,
     locallySentMessageIds: locallySentIds.current,
+    messageTasks,
+    tasks,
   };
 }

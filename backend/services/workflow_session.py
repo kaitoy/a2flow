@@ -18,7 +18,7 @@ from infrastructure.agent import AgentRegistry
 from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTaskRead
 from repositories import (
-    MessageSenderRepository,
+    MessageMetaRepository,
     WorkflowSessionRepository,
     WorkflowTaskRepository,
 )
@@ -33,7 +33,7 @@ class WorkflowSessionService:
         self,
         ws_repo: WorkflowSessionRepository,
         tasks: WorkflowTaskRepository,
-        senders: MessageSenderRepository,
+        meta: MessageMetaRepository,
         registry: AgentRegistry,
         session_service: BaseSessionService,
         app_name: str,
@@ -43,8 +43,9 @@ class WorkflowSessionService:
         Args:
             ws_repo: Repository providing WorkflowSession persistence.
             tasks: Repository providing WorkflowTask persistence.
-            senders: Repository recording and reading per-message sender
-                attribution for the shared workflow chat.
+            meta: Repository recording and reading per-message side-channel
+                metadata (sender attribution and task association) for the
+                shared workflow chat.
             registry: Registry resolving ADK agents per skill.
             session_service: ADK session store, used to delete the underlying
                 chat session when a WorkflowSession is removed.
@@ -52,7 +53,7 @@ class WorkflowSessionService:
         """
         self._ws_repo = ws_repo
         self._tasks = tasks
-        self._senders = senders
+        self._meta = meta
         self._registry = registry
         self._session_service = session_service
         self._app_name = app_name
@@ -183,13 +184,17 @@ class WorkflowSessionService:
         if session is None:
             return []
         messages = adk_events_to_messages(session.events)
-        senders = await self._senders.senders_for_session(ws_id)
+        meta = await self._meta.meta_for_session(ws_id)
         result: builtins.list[dict[str, Any]] = []
         for message in messages:
             data = message.model_dump(mode="json", by_alias=True)
+            row = meta.get(data["id"])
             data["senderUserId"] = (
-                senders.get(data["id"]) if data.get("role") == "user" else None
+                row.sender_user_id
+                if row is not None and data.get("role") == "user"
+                else None
             )
+            data["workflowTaskId"] = row.workflow_task_id if row is not None else None
             result.append(data)
         return result
 
@@ -249,10 +254,60 @@ class WorkflowSessionService:
             return
         for event in session.events:
             if event.author == "user" and event.id not in prior_event_ids:
-                await self._senders.record(
+                await self._meta.set_sender(
                     workflow_session_id=ws_id,
                     adk_event_id=event.id,
                     sender_user_id=sender_user_id,
+                )
+
+    async def record_message_tasks(self, ws_id: str) -> None:
+        """Associate each ADK event with the WorkflowTask in progress at the time.
+
+        The agent drives the task lifecycle by calling ``update_workflow_task``
+        with ``status="in_progress"`` before working on a task. Walking the
+        session's events in order and tracking the most recent such transition
+        therefore yields, for every event, the task that was in progress when it
+        was produced. Each event from the first ``in_progress`` transition onward
+        is recorded against its task (idempotently); events before any
+        transition (the initial planning exchange) are left unassociated.
+        Non-``in_progress`` transitions (e.g. ``completed``) do not change the
+        current task, so a task's own wrap-up stays grouped under it. Does
+        nothing when the ADK session does not exist.
+
+        Args:
+            ws_id: Identifier of the WorkflowSession that was run.
+
+        Raises:
+            NotFoundError: If no WorkflowSession exists with the given ID.
+        """
+        ws = await self.get(ws_id)
+        session = await self._session_service.get_session(
+            app_name=self._app_name,
+            user_id=ws.user_id,
+            session_id=ws.session_id,
+        )
+        if session is None:
+            return
+        # Capture the audit user before the loop: each set_task commit expires
+        # the ``ws`` instance, and re-reading ``ws.created_by`` afterwards would
+        # trigger a lazy load outside the async greenlet context.
+        owner_id = ws.created_by
+        current_task_id: str | None = None
+        for event in session.events:
+            for call in event.get_function_calls():
+                if call.name != "update_workflow_task":
+                    continue
+                args = call.args or {}
+                if args.get("status") == "in_progress":
+                    task_id = args.get("task_id")
+                    if isinstance(task_id, str) and task_id:
+                        current_task_id = task_id
+            if current_task_id is not None:
+                await self._meta.set_task(
+                    workflow_session_id=ws_id,
+                    adk_event_id=event.id,
+                    workflow_task_id=current_task_id,
+                    user_id=owner_id,
                 )
 
     async def delete(self, ws_id: str) -> None:

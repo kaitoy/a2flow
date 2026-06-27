@@ -29,7 +29,7 @@ from .repository import (
     ApprovalRepositoryDep,
     AuthSessionRepositoryDep,
     MCPServerRepositoryDep,
-    MessageSenderRepositoryDep,
+    MessageMetaRepositoryDep,
     NotificationRepositoryDep,
     UserAvatarRepositoryDep,
     UserRepositoryDep,
@@ -117,13 +117,13 @@ WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
 def get_workflow_session_service(
     ws_repo: WorkflowSessionRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
-    senders: MessageSenderRepositoryDep,
+    meta: MessageMetaRepositoryDep,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
 ) -> WorkflowSessionService:
     """Create a WorkflowSessionService wiring the repositories, agent registry, and session store."""
     return WorkflowSessionService(
-        ws_repo, tasks, senders, registry, session_service, APP_NAME
+        ws_repo, tasks, meta, registry, session_service, APP_NAME
     )
 
 

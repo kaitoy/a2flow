@@ -322,6 +322,88 @@ async def test_workflow_session_messages_record_sender_after_run(
     assert messages[0]["senderUserId"] == "alice"
 
 
+async def test_workflow_session_messages_record_task_after_run(
+    workflow_client: AsyncClient,
+    mock_adk_agent: MagicMock,
+    real_session_service: InMemorySessionService,
+) -> None:
+    from google.adk.events.event import Event
+    from google.genai import types
+
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+    task = assert_ok(
+        await workflow_client.post(
+            "/api/v1/workflow-tasks",
+            json={"workflowSessionId": ws["id"], "title": "Step one"},
+        ),
+        status=201,
+    )
+
+    async def _appending_run(
+        input_data: Any, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        session = await real_session_service.create_session(
+            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+        )
+        # A user message before any task is started.
+        await real_session_service.append_event(
+            session,
+            Event(
+                author="user",
+                content=types.Content(role="user", parts=[types.Part(text="kick off")]),
+            ),
+        )
+        # The agent marks the task in progress.
+        await real_session_service.append_event(
+            session,
+            Event(
+                author="agent",
+                content=types.Content(
+                    role="model",
+                    parts=[
+                        types.Part(
+                            function_call=types.FunctionCall(
+                                name="update_workflow_task",
+                                args={"task_id": task["id"], "status": "in_progress"},
+                            )
+                        )
+                    ],
+                ),
+            ),
+        )
+        # The agent produces work under that task.
+        await real_session_service.append_event(
+            session,
+            Event(
+                author="agent",
+                content=types.Content(
+                    role="model", parts=[types.Part(text="work done")]
+                ),
+            ),
+        )
+        return
+        yield
+
+    mock_adk_agent.run = _appending_run
+
+    await workflow_client.post(
+        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        json=_make_run_agent_input(),
+    )
+
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+    )
+    messages = assert_ok(response)
+    # The leading user message precedes the in_progress transition, so it is not
+    # associated with any task.
+    assert messages[0]["workflowTaskId"] is None
+    # The work produced after the transition is associated with the task.
+    assert messages[-1]["workflowTaskId"] == task["id"]
+    assert any(m["workflowTaskId"] == task["id"] for m in messages)
+
+
 async def test_workflow_session_messages_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:

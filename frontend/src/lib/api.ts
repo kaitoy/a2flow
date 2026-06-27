@@ -672,6 +672,29 @@ export async function getWorkflowSessionMessageSenders(wsId: string): Promise<Ma
   return senders;
 }
 
+/**
+ * Fetch the per-message WorkflowTask association for a WorkflowSession's chat.
+ *
+ * Returns a map from message id (the ADK event id) to the id of the WorkflowTask
+ * that was in progress when the message was produced. Messages produced outside
+ * any task (for example the initial planning exchange) are absent. Hits the same
+ * `/messages` endpoint as {@link getWorkflowSessionMessages}, reading the
+ * `workflowTaskId` each record carries alongside its `id`.
+ */
+export async function getWorkflowSessionMessageTasks(wsId: string): Promise<Map<string, string>> {
+  const records = (await fetchEnvelope(
+    apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(wsId)}/messages`),
+    zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse
+  )) as Array<{ id?: string; workflowTaskId?: string | null }>;
+  const tasks = new Map<string, string>();
+  for (const record of records) {
+    if (record.id && record.workflowTaskId) {
+      tasks.set(record.id, record.workflowTaskId);
+    }
+  }
+  return tasks;
+}
+
 /** List WorkflowSession records (newest first) with optional pagination, sort, and filters. */
 export async function listWorkflowSessions(query: ListQuery = {}): Promise<WorkflowSession[]> {
   return fetchEnvelope(

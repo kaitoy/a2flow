@@ -128,6 +128,8 @@ async def workflow_session_agent(
             yield encoder.encode(event)
         # Attribute the messages this run appended to the user who sent them.
         await service.record_new_senders(ws_id, prior_user_event_ids, current_user_id)
+        # Associate each message with the workflow task in progress at the time.
+        await service.record_message_tasks(ws_id)
 
     return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
 

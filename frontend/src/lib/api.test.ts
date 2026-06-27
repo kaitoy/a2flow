@@ -7,6 +7,7 @@ import {
   createChatAgent,
   getSessionMessages,
   getWorkflowSessionMessages,
+  getWorkflowSessionMessageTasks,
   listSessions,
 } from "./api";
 
@@ -65,6 +66,24 @@ describe("getWorkflowSessionMessages", () => {
     const result = await getWorkflowSessionMessages("ws-1");
     expect(Array.isArray(result)).toBe(true);
     expect(calledUrl).toContain("/workflow-sessions/ws-1/messages");
+  });
+});
+
+describe("getWorkflowSessionMessageTasks", () => {
+  it("maps message ids to their workflow task id, skipping null", async () => {
+    server.use(
+      http.get(`${BASE}/api/v1/workflow-sessions/:wsId/messages`, () =>
+        envelope([
+          { id: "m1", role: "user", content: "go", workflowTaskId: null },
+          { id: "m2", role: "assistant", content: "a", workflowTaskId: "task-a" },
+          { id: "m3", role: "assistant", content: "b", workflowTaskId: "task-b" },
+        ])
+      )
+    );
+    const result = await getWorkflowSessionMessageTasks("ws-1");
+    expect(result.get("m1")).toBeUndefined();
+    expect(result.get("m2")).toBe("task-a");
+    expect(result.get("m3")).toBe("task-b");
   });
 });
 
