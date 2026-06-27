@@ -82,7 +82,7 @@ The async driver suffix (`aiosqlite` / `asyncpg`) is added automatically. Tables
 
 ## Authentication
 
-The app requires sign-in. Visiting any page while logged out redirects to `/login`. On first run, log in with the seeded **`admin`** user (password from `ADMIN_PASSWORD`, default `admin12345678`); manage additional users from the [admin UI](#users).
+The app requires sign-in. Visiting any page while logged out redirects to `/login`. On first run, log in with the seeded **`admin`** user (password from `ADMIN_PASSWORD`, default `admin12345678`); manage additional users from the [admin UI](#users). After signing in the user lands on the [welcome page](#welcome-page).
 
 - **Session** — login creates a server-side session (`auth_sessions` table) and sets an HttpOnly `a2flow_session` cookie holding an opaque token (only its hash is stored). Sessions use a sliding **idle timeout** (`SESSION_IDLE_TIMEOUT_SECONDS`, default 8 hours).
 - **CSRF** — login also sets a readable `a2flow_csrf` cookie; the frontend echoes it in the `X-CSRF-Token` header on every state-changing request (double-submit cookie). The backend rejects mismatches with `403`.
@@ -93,6 +93,10 @@ See [backend/README.md](backend/README.md#authentication) for the endpoint and c
 ## Admin UI
 
 The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admin).
+
+### Welcome page
+
+[http://localhost:3000/admin](http://localhost:3000/admin) is the welcome landing page. It renders inside the admin shell (sidebar + app bar) and greets the user with quick-action cards that link to a new chat and each admin section. This is where the user lands when visiting the site root (`/`), after signing in, and when clicking the **A2Flow** logo in the app bar from any screen.
 
 Every admin list table shares interactive features: **per-column sorting and filtering** (applied server-side via the list APIs' `s` and `q` query parameters, so they cover the whole dataset rather than just the current page), **drag-to-resize column widths** (kept for the session, not persisted), and **hover tooltips** that reveal the full text of any cell clipped to its column width.
 
@@ -162,7 +166,7 @@ Clicking **Run** on a workflow creates a **WorkflowSession** — an independent 
 1. The backend shallow-clones the linked Agent Skill's repository into `backend/.skills_cache/<agent_skill_id>/` (only on first run) using [Dulwich](https://www.dulwich.io/) — no external `git` CLI required. The cache directory is configurable via the `SKILLS_CACHE_DIR` environment variable; under `docker compose` it is set to `/var/cache/a2flow/skills` and persisted in the `skills_cache` Docker volume so clones survive container recreation.
 2. A new ADK session is created with the skill binding stored in its state. A `WorkflowSession` record is persisted to the database, capturing the workflow name, prompt, skill details, and the ADK session ID.
 3. The backend returns the `WorkflowSession` (HTTP 201). The frontend redirects to `/workflow-sessions/{workflowSession.id}`.
-4. On mount, the `/workflow-sessions/{id}` page fetches the `WorkflowSession`, and if no prior messages exist for the session, it automatically sends `workflow.prompt` as the first user message via `POST /workflow-sessions/{id}/agent`.
+4. On mount, the `/workflow-sessions/{id}` page fetches the `WorkflowSession`, and if no prior messages exist for the session, it automatically sends `workflow.prompt` as the first user message via `POST /workflow-sessions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](#welcome-page).
 5. The `/workflow-sessions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id`) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under a **plan-then-execute** workflow instruction and is equipped with WorkflowTask management tools (see below).
 6. Subsequent user messages continue to flow through `POST /workflow-sessions/{id}/agent`, so A2UI rendering and the full chat experience work normally.
 

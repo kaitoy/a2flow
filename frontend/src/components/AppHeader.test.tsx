@@ -19,4 +19,9 @@ describe("AppHeader", () => {
     expect(screen.getByRole("button", { name: /account/i })).toBeInTheDocument();
     expect(screen.getByTestId("theme-toggle-mock")).toBeInTheDocument();
   });
+
+  it("links the logo to the /admin welcome page", () => {
+    render(<AppHeader />);
+    expect(screen.getByRole("link", { name: "A2Flow home" })).toHaveAttribute("href", "/admin");
+  });
 });

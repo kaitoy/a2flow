@@ -1,4 +1,4 @@
-/** @module Home — Root page: immediately redirects to /new-session. */
+/** @module Home — Root page: immediately redirects to the /admin welcome page. */
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -8,7 +8,7 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/new-session");
+    router.replace("/admin");
   }, [router]);
 
   return null;

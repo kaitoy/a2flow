@@ -1,34 +1,25 @@
 /** @module AdminLayout — Admin section shell with sidebar navigation and theme toggle. */
 "use client";
 
-import { CheckCircle2, ListChecks, Server, Users, Wand2, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
-
-const NAV = [
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/agent-skills", label: "Agent Skills", icon: Wand2 },
-  { href: "/admin/mcp-servers", label: "MCP Servers", icon: Server },
-  { href: "/admin/workflows", label: "Workflows", icon: Workflow },
-  { href: "/admin/workflow-sessions", label: "Workflow Sessions", icon: ListChecks },
-  { href: "/admin/approvals", label: "Approvals", icon: CheckCircle2 },
-];
+import { adminNavItems } from "@/lib/admin-nav";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const itemMap = useRef<Map<string, HTMLElement | null>>(new Map());
-  const activeKey = NAV.find((n) => pathname?.startsWith(n.href))?.href ?? null;
+  const activeKey = adminNavItems.find((n) => pathname?.startsWith(n.href))?.href ?? null;
 
   return (
     <AuthProvider>
       <div className="flex h-screen overflow-hidden">
         <nav className="relative flex w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl">
           <ul className="relative flex flex-col gap-1 px-3 py-3">
-            {NAV.map((item) => {
+            {adminNavItems.map((item) => {
               const isActive = pathname?.startsWith(item.href);
               return (
                 <li

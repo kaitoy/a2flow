@@ -29,7 +29,7 @@ describe("LoginPage", () => {
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 
-  it("logs in and navigates to the chat on success", async () => {
+  it("logs in and navigates to the welcome page on success", async () => {
     const user = userEvent.setup();
     const replaceMock = vi.fn();
     vi.mocked(useRouter).mockReturnValue({
@@ -48,7 +48,7 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => expect(loginSpy).toHaveBeenCalled());
-    expect(replaceMock).toHaveBeenCalledWith("/new-session");
+    expect(replaceMock).toHaveBeenCalledWith("/admin");
   });
 
   it("shows an error message on invalid credentials", async () => {

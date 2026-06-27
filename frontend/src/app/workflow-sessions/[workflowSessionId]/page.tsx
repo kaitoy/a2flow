@@ -2,15 +2,14 @@
 "use client";
 
 import type { Message } from "@ag-ui/core";
-import Image from "next/image";
 import { useParams } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
-import logo from "@/../assets/logo.png";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { AppHeader } from "@/components/AppHeader";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatErrorBanner } from "@/components/ChatErrorBanner";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -75,23 +74,13 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
   return (
     <div className="flex h-screen overflow-hidden">
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-glass-border bg-glass backdrop-blur-xl">
-          <div className="flex items-center gap-3">
-            <Image
-              src={logo}
-              alt="A2Flow logo"
-              width={logo.width}
-              height={logo.height}
-              className="h-10 w-auto"
-              priority
-            />
-            <span className="inline-block h-2 w-2 rounded-full bg-accent shadow-glow animate-pulse" />
-            <h1 className="text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">
-              {ws.workflowName}
-            </h1>
-          </div>
-          <ThemeToggle />
-        </header>
+        <AppHeader>
+          <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />
+          <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-accent shadow-glow animate-pulse" />
+          <span className="truncate text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">
+            {ws.workflowName}
+          </span>
+        </AppHeader>
 
         <ChatErrorBanner error={error} onDismiss={() => dispatch(clearError())} />
 
@@ -117,20 +106,10 @@ function WorkflowSessionSkeleton() {
   return (
     <div role="status" aria-label="Loading" className="flex h-screen overflow-hidden">
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-glass-border bg-glass backdrop-blur-xl">
-          <div className="flex items-center gap-3">
-            <Image
-              src={logo}
-              alt="A2Flow logo"
-              width={logo.width}
-              height={logo.height}
-              className="h-10 w-auto"
-              priority
-            />
-            <Skeleton className="h-5 w-40" />
-          </div>
-          <ThemeToggle />
-        </header>
+        <AppHeader>
+          <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />
+          <Skeleton className="h-5 w-40" />
+        </AppHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -160,6 +139,9 @@ export default function WorkflowSessionPage() {
       .catch(() => {});
   }, [workflowSessionId]);
 
-  if (!workflowSession) return <WorkflowSessionSkeleton />;
-  return <WorkflowSessionView ws={workflowSession} />;
+  return (
+    <AuthProvider>
+      {workflowSession ? <WorkflowSessionView ws={workflowSession} /> : <WorkflowSessionSkeleton />}
+    </AuthProvider>
+  );
 }

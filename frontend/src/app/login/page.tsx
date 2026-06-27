@@ -17,7 +17,8 @@ import { useAppDispatch } from "@/store/hooks";
 
 /**
  * Public sign-in page. On success the backend sets the session and CSRF cookies,
- * the current user is stored in the auth slice, and the user is sent to the chat.
+ * the current user is stored in the auth slice, and the user is sent to the
+ * /admin welcome page.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -37,7 +38,7 @@ export default function LoginPage() {
         await signIn.run(async () => {
           const user = await login(username, password);
           dispatch(setUser(user));
-          router.replace("/new-session");
+          router.replace("/admin");
         });
       } catch (err) {
         setError(
