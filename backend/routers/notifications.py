@@ -41,6 +41,17 @@ async def list_notifications(
     return ApiResponse(meta=meta, data=items)
 
 
+@router.post("/read-all", response_model=ApiResponse[None])
+async def mark_all_notifications_read(
+    service: NotificationServiceDep,
+    user_id: CurrentUserIdDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[None]:
+    """Mark all of the current user's unread notifications as read."""
+    await service.mark_all_read(user_id=user_id)
+    return ApiResponse(meta=meta, data=None)
+
+
 @router.patch("/{notification_id}", response_model=ApiResponse[Notification])
 async def mark_notification_read(
     notification_id: str,
@@ -54,3 +65,18 @@ async def mark_notification_read(
     """
     notification = await service.mark_read(notification_id, user_id=user_id)
     return ApiResponse(meta=meta, data=notification)
+
+
+@router.delete("/{notification_id}", response_model=ApiResponse[None])
+async def delete_notification(
+    notification_id: str,
+    service: NotificationServiceDep,
+    user_id: CurrentUserIdDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[None]:
+    """Delete one of the current user's notifications.
+
+    Raises HTTP 404 if the notification does not exist or belongs to another user.
+    """
+    await service.delete(notification_id, user_id=user_id)
+    return ApiResponse(meta=meta, data=None)

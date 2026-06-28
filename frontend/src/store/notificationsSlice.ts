@@ -52,10 +52,26 @@ const notificationsSlice = createSlice({
         state.unreadCount = countUnread(state.items);
       }
     },
+    /** Optimistically remove a single notification and recompute the unread count. */
+    removeLocal(state, action: PayloadAction<string>) {
+      state.items = state.items.filter((n) => n.id !== action.payload);
+      state.unreadCount = countUnread(state.items);
+    },
+    /** Optimistically mark every notification as read and zero the unread count. */
+    markAllReadLocal(state) {
+      for (const item of state.items) item.read = true;
+      state.unreadCount = 0;
+    },
   },
 });
 
-export const { notificationsLoading, setNotifications, notificationsError, markReadLocal } =
-  notificationsSlice.actions;
+export const {
+  notificationsLoading,
+  setNotifications,
+  notificationsError,
+  markReadLocal,
+  removeLocal,
+  markAllReadLocal,
+} = notificationsSlice.actions;
 
 export default notificationsSlice.reducer;

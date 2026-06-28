@@ -45,6 +45,7 @@ import {
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse,
   zDeleteMcpServerApiV1McpServersServerIdDeleteResponse,
+  zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse,
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
   zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse,
@@ -74,6 +75,7 @@ import {
   zListWorkflowsApiV1WorkflowsGetResponse,
   zLoginApiV1AuthLoginPostResponse,
   zLogoutApiV1AuthLogoutPostResponse,
+  zMarkAllNotificationsReadApiV1NotificationsReadAllPostResponse,
   zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse,
   zMeApiV1AuthMeGetResponse,
   zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
@@ -787,6 +789,22 @@ export async function markNotificationRead(id: string): Promise<Notification> {
     apiClient.patch(`/api/v1/notifications/${encodeURIComponent(id)}`),
     zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse
   ) as Promise<Notification>;
+}
+
+/** Mark all of the current user's unread notifications as read. */
+export async function markAllNotificationsRead(): Promise<void> {
+  await fetchEnvelope(
+    apiClient.post("/api/v1/notifications/read-all"),
+    zMarkAllNotificationsReadApiV1NotificationsReadAllPostResponse
+  );
+}
+
+/** Permanently delete a single notification. */
+export async function deleteNotification(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/notifications/${encodeURIComponent(id)}`),
+    zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse
+  );
 }
 
 /** List approval requests (newest first) with optional pagination, sort, and filters. */

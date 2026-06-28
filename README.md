@@ -242,9 +242,9 @@ Two workflow events generate a notification, both raised by the agent's task too
 | `approval_request` | The agent registers a plan (`register_workflow_tasks`) and waits for the session owner's approval, or requests a mid-execution decision (`request_approval`) and waits for the designated approver. |
 | `session_completed` | Every `WorkflowTask` in the session has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per session. |
 
-Clicking a notification marks it read and deep-links to the relevant `/workflow-sessions/{id}` chat.
+Clicking a notification marks it read and deep-links to the relevant `/workflow-sessions/{id}` chat. Each row also has a **dismiss (✕)** button that permanently deletes that notification, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once.
 
-The list (`?unreadOnly=true` for unread) and mark-read endpoints are documented in the [API reference](http://localhost:3000/api-doc); both are scoped to the authenticated user, so reading or updating another user's notification returns HTTP 404. Notifications cascade-delete with their recipient user and their linked `WorkflowSession`.
+The list (`?unreadOnly=true` for unread), mark-read, mark-all-read, and delete endpoints are documented in the [API reference](http://localhost:3000/api-doc); all are scoped to the authenticated user, so reading, updating, or deleting another user's notification returns HTTP 404. Notifications cascade-delete with their recipient user and their linked `WorkflowSession`.
 
 ## Agent activity in the chat
 

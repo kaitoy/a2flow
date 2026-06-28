@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Notification } from "@/lib/api";
 import reducer, {
+  markAllReadLocal,
   markReadLocal,
   notificationsError,
   notificationsLoading,
+  removeLocal,
   setNotifications,
 } from "./notificationsSlice";
 
@@ -59,6 +61,33 @@ describe("notificationsSlice", () => {
       setNotifications([makeNotification({ id: "a", read: true })])
     );
     const next = reducer(initial, markReadLocal("a"));
+    expect(next.unreadCount).toBe(0);
+  });
+
+  it("removes a single notification and recomputes the unread count", () => {
+    const initial = reducer(
+      undefined,
+      setNotifications([
+        makeNotification({ id: "a", read: false }),
+        makeNotification({ id: "b", read: false }),
+      ])
+    );
+    const next = reducer(initial, removeLocal("a"));
+    expect(next.items.map((n) => n.id)).toEqual(["b"]);
+    expect(next.unreadCount).toBe(1);
+  });
+
+  it("marks every notification read and zeroes the unread count", () => {
+    const initial = reducer(
+      undefined,
+      setNotifications([
+        makeNotification({ id: "a", read: false }),
+        makeNotification({ id: "b", read: false }),
+        makeNotification({ id: "c", read: true }),
+      ])
+    );
+    const next = reducer(initial, markAllReadLocal());
+    expect(next.items.every((n) => n.read)).toBe(true);
     expect(next.unreadCount).toBe(0);
   });
 

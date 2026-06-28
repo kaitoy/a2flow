@@ -1,14 +1,17 @@
 "use client";
 
 import { animated, useTransition } from "@react-spring/web";
+import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type RefObject, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { markNotificationRead } from "@/lib/api";
+import { ActionIconButton } from "@/components/admin/action-icon-button";
+import { deleteNotification, markAllNotificationsRead, markNotificationRead } from "@/lib/api";
 import logger from "@/lib/logger";
 import { useMotionConfig } from "@/lib/motion";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { markReadLocal } from "@/store/notificationsSlice";
+import { markAllReadLocal, markReadLocal, removeLocal } from "@/store/notificationsSlice";
+import { Button } from "./ui/button";
 import { formatFullTimestamp } from "./ui/date-time";
 import { Tooltip } from "./ui/tooltip";
 
@@ -57,6 +60,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
   const dispatch = useAppDispatch();
   const router = useRouter();
   const items = useAppSelector((s) => s.notifications.items);
+  const unreadCount = useAppSelector((s) => s.notifications.unreadCount);
   const [coords, setCoords] = useState<Coords | null>(null);
   const config = useMotionConfig("snappy");
 
@@ -119,6 +123,23 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
     [dispatch, router, onClose]
   );
 
+  const onDismiss = useCallback(
+    (id: string) => {
+      dispatch(removeLocal(id));
+      deleteNotification(id).catch((error) => {
+        logger.error({ error, id }, "failed to delete notification");
+      });
+    },
+    [dispatch]
+  );
+
+  const onMarkAllRead = useCallback(() => {
+    dispatch(markAllReadLocal());
+    markAllNotificationsRead().catch((error) => {
+      logger.error({ error }, "failed to mark all notifications read");
+    });
+  }, [dispatch]);
+
   const transitions = useTransition(open, {
     from: { opacity: 0, y: -6 },
     enter: { opacity: 1, y: 0 },
@@ -149,8 +170,15 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
             }}
             className="glass-panel-overlay max-h-[70vh] overflow-y-auto rounded-xl p-2 text-on-surface"
           >
-            <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-              Notifications
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                Notifications
+              </span>
+              {unreadCount > 0 && (
+                <Button variant="ghost" onClick={onMarkAllRead}>
+                  Mark all read
+                </Button>
+              )}
             </div>
             {items.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-on-surface-variant">
@@ -159,11 +187,11 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
             ) : (
               <ul className="flex flex-col gap-1">
                 {items.map((n) => (
-                  <li key={n.id}>
+                  <li key={n.id} className="flex items-start gap-1">
                     <button
                       type="button"
                       onClick={() => onSelect(n.id, n.workflowSessionId)}
-                      className="flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                      className="flex min-w-0 flex-1 items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                     >
                       <span
                         aria-hidden="true"
@@ -188,6 +216,9 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                         </Tooltip>
                       </span>
                     </button>
+                    <span className="shrink-0 pt-2">
+                      <ActionIconButton icon={X} label="Dismiss" onClick={() => onDismiss(n.id)} />
+                    </span>
                   </li>
                 ))}
               </ul>

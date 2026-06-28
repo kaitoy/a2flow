@@ -82,3 +82,25 @@ class NotificationService:
         return await self._repo.update(
             notification_id, NotificationUpdate(read=True), user_id=user_id
         )
+
+    async def mark_all_read(self, *, user_id: str) -> None:
+        """Mark all of the requesting user's unread notifications as read.
+
+        Args:
+            user_id: The requesting user whose notifications to mark read.
+        """
+        await self._repo.mark_all_read(user_id=user_id)
+
+    async def delete(self, notification_id: str, *, user_id: str) -> None:
+        """Delete one of the user's notifications.
+
+        Args:
+            notification_id: Identifier of the notification to delete.
+            user_id: The requesting user; must be the notification's recipient.
+
+        Raises:
+            NotFoundError: If the notification does not exist or is not addressed
+                to ``user_id``.
+        """
+        await self.get(notification_id, user_id=user_id)
+        await self._repo.delete(notification_id)

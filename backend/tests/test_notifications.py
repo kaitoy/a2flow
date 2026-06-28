@@ -135,3 +135,61 @@ async def test_mark_other_users_notification_is_404(
         f"/api/v1/notifications/{notif_id}", headers={"X-User-Id": "alice"}
     )
     assert_err(res, "NOT_FOUND", 404)
+
+
+async def test_delete_own_notification(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = notif_env
+    notif_id = await _insert_notification(eng, user_id="alice", title="Bye")
+
+    res = await client.delete(
+        f"/api/v1/notifications/{notif_id}", headers={"X-User-Id": "alice"}
+    )
+    assert assert_ok(res) is None
+
+    listed = await client.get("/api/v1/notifications", headers={"X-User-Id": "alice"})
+    assert [n["title"] for n in assert_ok(listed)] == []
+
+
+async def test_delete_other_users_notification_is_404(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = notif_env
+    notif_id = await _insert_notification(eng, user_id="bob")
+
+    res = await client.delete(
+        f"/api/v1/notifications/{notif_id}", headers={"X-User-Id": "alice"}
+    )
+    assert_err(res, "NOT_FOUND", 404)
+
+
+async def test_delete_missing_notification_is_404(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = notif_env
+
+    res = await client.delete(
+        "/api/v1/notifications/does-not-exist", headers={"X-User-Id": "alice"}
+    )
+    assert_err(res, "NOT_FOUND", 404)
+
+
+async def test_mark_all_read_only_affects_caller(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = notif_env
+    await _insert_notification(eng, user_id="alice", title="A1", read=False)
+    await _insert_notification(eng, user_id="alice", title="A2", read=False)
+    await _insert_notification(eng, user_id="bob", title="B1", read=False)
+
+    res = await client.post(
+        "/api/v1/notifications/read-all", headers={"X-User-Id": "alice"}
+    )
+    assert assert_ok(res) is None
+
+    alice = await client.get("/api/v1/notifications", headers={"X-User-Id": "alice"})
+    assert all(n["read"] is True for n in assert_ok(alice))
+
+    bob = await client.get("/api/v1/notifications", headers={"X-User-Id": "bob"})
+    assert all(n["read"] is False for n in assert_ok(bob))

@@ -84,4 +84,55 @@ describe("NotificationPanel", () => {
     expect(onClose).toHaveBeenCalled();
     expect(store.getState().notifications.unreadCount).toBe(0);
   });
+
+  it("dismisses a single notification, removing it from the store", async () => {
+    const { store } = render(<Harness onClose={vi.fn()} />, {
+      preloadedState: {
+        notifications: {
+          items: [makeNotification()],
+          unreadCount: 1,
+          status: "idle",
+        },
+      },
+    });
+    await waitFor(() => screen.getByText("Plan ready for approval"));
+    screen.getByRole("button", { name: "Dismiss" }).click();
+
+    await waitFor(() => expect(store.getState().notifications.items).toHaveLength(0));
+    expect(store.getState().notifications.unreadCount).toBe(0);
+  });
+
+  it("marks all notifications read, clearing the unread count and hiding its button", async () => {
+    const { store } = render(<Harness onClose={vi.fn()} />, {
+      preloadedState: {
+        notifications: {
+          items: [
+            makeNotification({ id: "a", read: false }),
+            makeNotification({ id: "b", read: false }),
+          ],
+          unreadCount: 2,
+          status: "idle",
+        },
+      },
+    });
+    const button = await screen.findByRole("button", { name: "Mark all read" });
+    button.click();
+
+    await waitFor(() => expect(store.getState().notifications.unreadCount).toBe(0));
+    expect(screen.queryByRole("button", { name: "Mark all read" })).not.toBeInTheDocument();
+  });
+
+  it("hides the mark-all-read button when nothing is unread", async () => {
+    render(<Harness onClose={vi.fn()} />, {
+      preloadedState: {
+        notifications: {
+          items: [makeNotification({ read: true })],
+          unreadCount: 0,
+          status: "idle",
+        },
+      },
+    });
+    await waitFor(() => screen.getByText("Plan ready for approval"));
+    expect(screen.queryByRole("button", { name: "Mark all read" })).not.toBeInTheDocument();
+  });
 });

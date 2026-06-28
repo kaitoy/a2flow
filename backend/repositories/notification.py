@@ -42,6 +42,10 @@ class NotificationRepository(Protocol):
         self, notification_id: str, data: NotificationUpdate, *, user_id: str
     ) -> Notification: ...
 
+    async def delete(self, notification_id: str) -> None: ...
+
+    async def mark_all_read(self, *, user_id: str) -> int: ...
+
     async def exists_for_session(
         self, workflow_session_id: str, notification_type: NotificationType
     ) -> bool: ...
@@ -107,6 +111,40 @@ class SqlNotificationRepository:
         await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(notification)
         return notification
+
+    async def delete(self, notification_id: str) -> None:
+        """Delete a Notification by ID, raising NotFoundError if it does not exist.
+
+        Notifications are leaf rows that nothing references, so a plain commit
+        cannot raise a referential-integrity error.
+        """
+        notification = await self._db.get(Notification, notification_id)
+        if notification is None:
+            raise NotFoundError("Notification", notification_id)
+        await self._db.delete(notification)
+        await self._db.commit()
+
+    async def mark_all_read(self, *, user_id: str) -> int:
+        """Mark all of the recipient's unread notifications as read.
+
+        Args:
+            user_id: Recipient whose unread notifications to mark read; also
+                recorded as the acting ``updated_by`` on each affected row.
+
+        Returns:
+            The number of notifications that were marked read.
+        """
+        stmt = select(Notification).where(
+            Notification.user_id == user_id, col(Notification.read).is_(False)
+        )
+        result = await self._db.exec(stmt)
+        notifications = list(result.all())
+        for notification in notifications:
+            notification.read = True
+            notification.updated_by = user_id
+            self._db.add(notification)
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
+        return len(notifications)
 
     async def exists_for_session(
         self, workflow_session_id: str, notification_type: NotificationType
