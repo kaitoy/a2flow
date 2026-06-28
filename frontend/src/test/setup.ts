@@ -33,6 +33,19 @@ if (!window.ResizeObserver) {
   } as unknown as typeof ResizeObserver;
 }
 
+// jsdom doesn't implement IntersectionObserver. MessageList uses it for the
+// workflow scroll-spy, so stub it with no-ops (it never fires under jsdom).
+if (!window.IntersectionObserver) {
+  window.IntersectionObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof IntersectionObserver;
+}
+
 vi.mock("@/lib/logger", () => ({
   default: {
     info: vi.fn(),

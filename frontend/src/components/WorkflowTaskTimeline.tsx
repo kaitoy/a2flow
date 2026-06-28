@@ -2,7 +2,7 @@
 
 import { ChevronLeft, ListTree } from "lucide-react";
 import type { WorkflowTask } from "@/lib/api";
-import { formatStatusLabel, STATUS_DOT_CLASS } from "@/lib/workflow-task-status";
+import { formatStatusLabel, STATUS_RAIL_CLASS } from "@/lib/workflow-task-status";
 
 /**
  * Props for {@link WorkflowTaskTimeline}.
@@ -12,8 +12,17 @@ export interface WorkflowTaskTimelineProps {
   tasks: WorkflowTask[];
   /** Id of the task currently in progress, highlighted in the list. */
   activeTaskId: string | null;
+  /**
+   * Optional WorkflowTask id -> 1-based ordinal shown in each entry's badge,
+   * shared with the chat groups. Falls back to the list order when omitted.
+   */
+  taskIndexById?: Map<string, number>;
+  /** Id of the focused task (chat hover / scroll-spy), shown with a ring. */
+  highlightedTaskId?: string | null;
   /** Called with a task id when its entry is clicked (to scroll the chat to it). */
   onSelectTask: (taskId: string) => void;
+  /** Called with a task id on hover and `null` on leave, to drive chat linkage. */
+  onHoverTask?: (taskId: string | null) => void;
   /** Whether the panel is collapsed to a thin toggle bar. */
   collapsed: boolean;
   /** Toggles the collapsed state. */
@@ -22,13 +31,18 @@ export interface WorkflowTaskTimelineProps {
 
 /**
  * Collapsible left-hand timeline of a workflow session's tasks. Each entry shows
- * the task's status dot and title, highlights the in-progress task, and scrolls
- * the chat to the matching {@link WorkflowTaskDivider} when clicked.
+ * a numbered status badge and the task's title, highlights the in-progress task,
+ * follows the chat's scroll position / hover, and scrolls the chat to the
+ * matching {@link WorkflowTaskGroup} when clicked. The badge number matches the
+ * chat group's heading so the two views can be paired at a glance.
  */
 export function WorkflowTaskTimeline({
   tasks,
   activeTaskId,
+  taskIndexById,
+  highlightedTaskId = null,
   onSelectTask,
+  onHoverTask,
   collapsed,
   onToggle,
 }: WorkflowTaskTimelineProps) {
@@ -71,30 +85,38 @@ export function WorkflowTaskTimeline({
           tasks.map((task, i) => {
             const status = task.status ?? "pending";
             const isActive = task.id === activeTaskId;
+            const isHighlighted = task.id === highlightedTaskId;
+            const index = taskIndexById?.get(task.id) ?? i + 1;
             return (
               <li key={task.id} className="relative">
                 {i < tasks.length - 1 && (
                   <span
                     aria-hidden="true"
-                    className="absolute bottom-0 left-[0.8rem] top-[1.9rem] w-px bg-glass-border"
+                    className="absolute bottom-0 left-[1.125rem] top-[1.85rem] w-px bg-glass-border"
                   />
                 )}
                 <button
                   type="button"
                   onClick={() => onSelectTask(task.id)}
+                  onMouseEnter={() => onHoverTask?.(task.id)}
+                  onMouseLeave={() => onHoverTask?.(null)}
                   aria-current={isActive ? "true" : undefined}
-                  className={`relative flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left transition-colors ${
+                  className={`relative flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left transition-all ${
                     isActive
                       ? "bg-accent-soft text-on-surface"
-                      : "text-on-surface-variant hover:bg-glass hover:text-on-surface"
-                  }`}
+                      : isHighlighted
+                        ? "bg-glass text-on-surface"
+                        : "text-on-surface-variant hover:bg-glass hover:text-on-surface"
+                  } ${isHighlighted ? "ring-2 ring-inset ring-accent/50" : ""}`}
                 >
                   <span
-                    className={`mt-1 inline-block size-2.5 shrink-0 rounded-full ${STATUS_DOT_CLASS[status]} ${
+                    className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-2 bg-surface text-[11px] font-semibold leading-none text-on-surface ${STATUS_RAIL_CLASS[status]} ${
                       isActive ? "shadow-glow" : ""
                     }`}
                     aria-hidden="true"
-                  />
+                  >
+                    {index}
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium leading-snug">
                       {task.title}

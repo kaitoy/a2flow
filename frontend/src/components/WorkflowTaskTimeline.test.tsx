@@ -88,6 +88,22 @@ describe("WorkflowTaskTimeline", () => {
     expect(onToggle).toHaveBeenCalled();
   });
 
+  it("numbers each entry from its position by default", () => {
+    render(
+      <WorkflowTaskTimeline
+        tasks={tasks}
+        activeTaskId="t2"
+        onSelectTask={vi.fn()}
+        collapsed={false}
+        onToggle={vi.fn()}
+      />
+    );
+    // Default ordinals follow the task order: 1, 2, 3.
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
   it("shows an empty state when there are no tasks", () => {
     render(
       <WorkflowTaskTimeline

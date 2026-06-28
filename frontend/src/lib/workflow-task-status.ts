@@ -25,6 +25,19 @@ export const STATUS_DOT_CLASS: Record<WorkflowTaskStatus, string> = {
 };
 
 /**
+ * Tailwind border-color class for the vertical rail that wraps a task's chat
+ * messages (`border-l-*`). Uses the same palette as {@link STATUS_DOT_CLASS} so
+ * the rail and dot read as one status colour.
+ */
+export const STATUS_RAIL_CLASS: Record<WorkflowTaskStatus, string> = {
+  pending: "border-on-surface-variant",
+  in_progress: "border-accent",
+  completed: "border-green-500/80",
+  failed: "border-error",
+  skipped: "border-on-surface-variant/50",
+};
+
+/**
  * Human-readable label for a status (e.g. `in_progress` -> `in progress`).
  *
  * @param status - The status to format.

@@ -36,20 +36,27 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
     tasks,
   } = useWorkflowSessionChat(ws.id, ws.sessionId, ws.workflowPrompt, ws.userId);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
+  // Focus state shared by the timeline and chat: a hovered entry wins over the
+  // scroll-spy position so a deliberate hover always drives the highlight.
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
+  const [scrolledTaskId, setScrolledTaskId] = useState<string | null>(null);
+  const highlightedTaskId = hoveredTaskId ?? scrolledTaskId;
 
-  // Task lookup for labelling the in-chat dividers, and the in-progress task to
-  // highlight in the timeline (the latest by position when several are running).
+  // Task lookup for labelling the chat groups, a shared task-id -> ordinal map so
+  // the timeline and chat badges match, and the in-progress task to highlight in
+  // the timeline (the latest by position when several are running).
   const tasksById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+  const taskIndexById = useMemo(() => new Map(tasks.map((t, i) => [t.id, i + 1])), [tasks]);
   const activeTaskId = useMemo(() => {
     const running = tasks.filter((t) => t.status === "in_progress");
     if (running.length === 0) return null;
     return running.reduce((a, b) => ((b.position ?? 0) >= (a.position ?? 0) ? b : a)).id;
   }, [tasks]);
 
-  /** Scroll the chat to the divider that introduces the selected task. */
+  /** Scroll the chat to the group that introduces the selected task. */
   const handleSelectTask = (taskId: string) => {
     document
-      .getElementById(`wf-task-divider-${taskId}`)
+      .getElementById(`wf-task-group-${taskId}`)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -96,7 +103,10 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
       <WorkflowTaskTimeline
         tasks={tasks}
         activeTaskId={activeTaskId}
+        taskIndexById={taskIndexById}
+        highlightedTaskId={highlightedTaskId}
         onSelectTask={handleSelectTask}
+        onHoverTask={setHoveredTaskId}
         collapsed={timelineCollapsed}
         onToggle={() => setTimelineCollapsed((c) => !c)}
       />
@@ -118,6 +128,10 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           renderAvatar={renderAvatar}
           messageTasks={messageTasks}
           tasksById={tasksById}
+          taskIndexById={taskIndexById}
+          highlightedTaskId={highlightedTaskId}
+          onVisibleTaskChange={setScrolledTaskId}
+          onHoverTask={setHoveredTaskId}
           onApprovalResolved={sendApprovalResult}
         />
         <ChatInput onSend={sendMessage} disabled={isRunning} />
