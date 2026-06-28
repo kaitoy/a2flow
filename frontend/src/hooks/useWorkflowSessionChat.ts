@@ -26,6 +26,9 @@ import {
 } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
+/** How often (ms) to poll the shared workflow chat for new messages. */
+const POLL_INTERVAL_MS = 10_000;
+
 /**
  * Build the workflow-session AG-UI subscriber: the shared subscriber plus an
  * approval-rendering handler that turns `render_approval` tool calls into
@@ -64,6 +67,11 @@ function makeEventHandlers(dispatch: AppDispatch, onRenderA2uiEnd: (toolCallId: 
  *
  * On mount, loads prior message history and auto-sends the workflow prompt if the session is new.
  * Subsequent user messages are routed to the workflow session's dedicated agent endpoint.
+ *
+ * Because the chat is shared (owner, approvers, and the agent all post into it),
+ * the history is also re-fetched every {@link POLL_INTERVAL_MS} so messages from
+ * other participants appear without a reload. Polling pauses while the current
+ * viewer's own run is in flight and skips re-applying an unchanged history.
  */
 export function useWorkflowSessionChat(
   workflowSessionId: string,
@@ -89,6 +97,15 @@ export function useWorkflowSessionChat(
   // `messageSenders`; the UI attributes them to the current user until a reload
   // replaces them with the persisted, attributed history.
   const locallySentIds = useRef<Set<string>>(new Set());
+  // Live run state mirrored into refs so the polling interval reads the latest
+  // value without being torn down and recreated on every render.
+  const isRunningRef = useRef(isRunning);
+  isRunningRef.current = isRunning;
+  const isStreamingRef = useRef(isStreaming);
+  isStreamingRef.current = isStreaming;
+  // Signature of the message history last applied to the store, so an idle poll
+  // (no new messages) skips the redundant resumeSession dispatch and re-render.
+  const appliedSignatureRef = useRef<string | null>(null);
 
   const refreshSenders = useCallback(async () => {
     try {
@@ -113,6 +130,28 @@ export function useWorkflowSessionChat(
       logger.error(err, "failed to load workflow tasks");
     }
   }, [workflowSessionId]);
+
+  const refreshMessages = useCallback(async () => {
+    // Never clobber an in-flight run: resumeSession replaces the whole message
+    // array and resets the streaming flags, so polling is only safe between runs.
+    if (isRunningRef.current || isStreamingRef.current) return;
+    try {
+      const loaded = await getWorkflowSessionMessages(workflowSessionId);
+      // A run may have started while the fetch was in flight; re-check the guard.
+      if (isRunningRef.current || isStreamingRef.current) return;
+      // The shared chat is append-only, so length + last id uniquely identify the
+      // history; skip re-applying an unchanged fetch to avoid a needless scroll.
+      const signature = `${loaded.length}:${loaded.at(-1)?.id ?? ""}`;
+      if (signature === appliedSignatureRef.current) return;
+      appliedSignatureRef.current = signature;
+      dispatch(resumeSession({ sessionId, messages: loaded }));
+      // Keep sender avatars and the task timeline/groups in sync with the newly
+      // visible messages.
+      await Promise.all([refreshSenders(), refreshTasks()]);
+    } catch (err) {
+      logger.error(err, "failed to poll workflow session messages");
+    }
+  }, [workflowSessionId, sessionId, dispatch, refreshSenders, refreshTasks]);
 
   const sendMessage = useCallback(
     async (prompt: string) => {
@@ -214,6 +253,8 @@ export function useWorkflowSessionChat(
     getWorkflowSessionMessages(workflowSessionId)
       .then((loadedMessages) => {
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
+        // Record the loaded history so the first poll doesn't re-apply it.
+        appliedSignatureRef.current = `${loadedMessages.length}:${loadedMessages.at(-1)?.id ?? ""}`;
         if (loadedMessages.length === 0 && !autoSentRef.current) {
           autoSentRef.current = true;
           sendMessage(workflowPrompt);
@@ -228,6 +269,21 @@ export function useWorkflowSessionChat(
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, dispatch]);
+
+  // Poll the shared chat so messages posted by other participants (and agent
+  // progress made while a different person is viewing) appear without a reload.
+  // The mount effect handles the first load, so the interval only covers updates.
+  useEffect(() => {
+    if (!sessionId) return;
+    let active = true;
+    const id = setInterval(() => {
+      if (active) void refreshMessages();
+    }, POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [sessionId, refreshMessages]);
 
   return {
     messages,

@@ -4,7 +4,7 @@ import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { animated, useSpring } from "@react-spring/web";
 import { Sparkles } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useMemo, useRef } from "react";
+import { Fragment, type ReactNode, type UIEvent, useEffect, useMemo, useRef } from "react";
 import { TOOL_CALL_ACTIVITY_TYPE, type ToolCallActivityContent } from "@/lib/agentActivity";
 import type { WorkflowTask } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
@@ -58,7 +58,12 @@ function WorkingIndicator() {
   );
 }
 
-/** Scrollable list of chat messages that auto-scrolls to the bottom when new messages arrive. */
+/**
+ * Scrollable list of chat messages. New messages follow to the bottom only when
+ * the viewer is already near the bottom, so an incoming message (for example one
+ * polled in from another workflow participant) never yanks a reader away from
+ * earlier history they're scrolled up to read.
+ */
 export function MessageList({
   messages,
   isStreaming = false,
@@ -103,6 +108,9 @@ export function MessageList({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Whether the viewer is parked near the bottom. Updated on scroll *before* the
+  // next content append, so the scroll effect can decide whether to follow.
+  const stickToBottomRef = useRef(true);
   const emptyConfig = useMotionConfig("gentle");
   const emptyStateSpring = useSpring({
     from: { opacity: 0, transform: "scale(0.92)" },
@@ -148,8 +156,14 @@ export function MessageList({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to bottom whenever messages change
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (stickToBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  /** Track whether the viewer is near the bottom so new messages only follow then. */
+  const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
 
   // Scroll-spy: report which task group sits at the top of the viewport so the
   // timeline can follow the scroll. Rebuilt whenever the set of groups changes.
@@ -200,7 +214,7 @@ export function MessageList({
   );
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
+    <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-6">
       <div className="mx-auto flex max-w-3xl flex-col">
         {messages.length === 0 && (
           <animated.div style={emptyStateSpring}>

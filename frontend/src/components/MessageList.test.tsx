@@ -1,5 +1,5 @@
 import type { Message } from "@ag-ui/core";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkflowTask } from "@/lib/api";
@@ -76,6 +76,34 @@ describe("MessageList", () => {
   it("calls scrollIntoView on mount", () => {
     render(<MessageList messages={[]} />);
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("follows new messages to the bottom while the viewer is near the bottom", () => {
+    const initial: Message[] = [{ id: "m1", role: "user", content: "hi" }];
+    const { container, rerender } = render(<MessageList messages={initial} />);
+    const scrollEl = container.querySelector(".overflow-y-auto") as HTMLElement;
+    // Near the bottom: scrollHeight === clientHeight, scrollTop 0 -> distance 0.
+    Object.defineProperty(scrollEl, "scrollHeight", { value: 200, configurable: true });
+    Object.defineProperty(scrollEl, "clientHeight", { value: 200, configurable: true });
+    fireEvent.scroll(scrollEl);
+
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+    rerender(<MessageList messages={[...initial, { id: "m2", role: "user", content: "yo" }]} />);
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("does not follow new messages after the viewer scrolls up", () => {
+    const initial: Message[] = [{ id: "m1", role: "user", content: "hi" }];
+    const { container, rerender } = render(<MessageList messages={initial} />);
+    const scrollEl = container.querySelector(".overflow-y-auto") as HTMLElement;
+    // Scrolled up: 1000 - 0 - 200 = 800px from the bottom, well past the 120 threshold.
+    Object.defineProperty(scrollEl, "scrollHeight", { value: 1000, configurable: true });
+    Object.defineProperty(scrollEl, "clientHeight", { value: 200, configurable: true });
+    fireEvent.scroll(scrollEl);
+
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+    rerender(<MessageList messages={[...initial, { id: "m2", role: "user", content: "yo" }]} />);
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 
   it("shows the working indicator while running and not streaming", () => {

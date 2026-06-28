@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Provider } from "react-redux";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +10,8 @@ vi.mock("@/lib/api", () => ({
   createWorkflowSessionAgent: vi.fn(),
   getWorkflowSessionMessages: vi.fn(),
   getWorkflowSessionMessageSenders: vi.fn(),
+  getWorkflowSessionMessageTasks: vi.fn(),
+  listWorkflowTasks: vi.fn(),
   getUsersByIds: vi.fn(),
   formatUserName: (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`,
 }));
@@ -31,6 +33,8 @@ beforeEach(() => {
   vi.mocked(api.createWorkflowSessionAgent).mockReturnValue(mockAgent as never);
   vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
   vi.mocked(api.getWorkflowSessionMessageSenders).mockResolvedValue(new Map());
+  vi.mocked(api.getWorkflowSessionMessageTasks).mockResolvedValue(new Map());
+  vi.mocked(api.listWorkflowTasks).mockResolvedValue([]);
   vi.mocked(api.getUsersByIds).mockResolvedValue(new Map());
   mockAgent.addMessage.mockClear();
   mockAgent.runAgent.mockClear();
@@ -142,5 +146,123 @@ describe("useWorkflowSessionChat", () => {
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
     await result.current.sendMessage("hi");
     await waitFor(() => expect(store.getState().chat.error).not.toBeNull());
+  });
+
+  describe("polling", () => {
+    it("re-fetches messages on the polling interval", async () => {
+      vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
+        { id: "m1", role: "user", content: "existing" },
+      ]);
+      vi.useFakeTimers();
+      try {
+        const store = makeStore();
+        renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"), {
+          wrapper: makeWrapper(store),
+        });
+        // Flush the mount load (no auto-send: messages already exist).
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        const afterMount = vi.mocked(api.getWorkflowSessionMessages).mock.calls.length;
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10_000);
+        });
+        expect(vi.mocked(api.getWorkflowSessionMessages).mock.calls.length).toBeGreaterThan(
+          afterMount
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("applies messages a poll discovers from another participant", async () => {
+      vi.mocked(api.getWorkflowSessionMessages)
+        .mockResolvedValueOnce([{ id: "m1", role: "user", content: "mine" }])
+        .mockResolvedValue([
+          { id: "m1", role: "user", content: "mine" },
+          { id: "m2", role: "user", content: "from someone else" },
+        ]);
+      vi.useFakeTimers();
+      try {
+        const store = makeStore();
+        renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"), {
+          wrapper: makeWrapper(store),
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(store.getState().chat.messages).toHaveLength(1);
+        const sendersBefore = vi.mocked(api.getWorkflowSessionMessageSenders).mock.calls.length;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10_000);
+        });
+        expect(store.getState().chat.messages).toHaveLength(2);
+        // The changed history triggers a sender refresh so avatars stay in sync.
+        expect(vi.mocked(api.getWorkflowSessionMessageSenders).mock.calls.length).toBeGreaterThan(
+          sendersBefore
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("skips re-applying an unchanged history", async () => {
+      vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
+        { id: "m1", role: "user", content: "existing" },
+      ]);
+      vi.useFakeTimers();
+      try {
+        const store = makeStore();
+        renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"), {
+          wrapper: makeWrapper(store),
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        const sendersBefore = vi.mocked(api.getWorkflowSessionMessageSenders).mock.calls.length;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10_000);
+        });
+        // Same length + last id: no resumeSession, no extra sender refresh.
+        expect(store.getState().chat.messages).toHaveLength(1);
+        expect(vi.mocked(api.getWorkflowSessionMessageSenders).mock.calls.length).toBe(
+          sendersBefore
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not poll while the viewer's own run is in flight", async () => {
+      vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
+        { id: "m1", role: "user", content: "existing" },
+      ]);
+      vi.useFakeTimers();
+      try {
+        const store = makeStore();
+        const { result } = renderHook(
+          () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
+          { wrapper: makeWrapper(store) }
+        );
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        // Start a run that never resolves so isRunning stays true across the tick.
+        mockAgent.runAgent.mockImplementationOnce(() => new Promise<void>(() => {}));
+        act(() => {
+          void result.current.sendMessage("hi");
+        });
+        const fetchesBefore = vi.mocked(api.getWorkflowSessionMessages).mock.calls.length;
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10_000);
+        });
+        expect(vi.mocked(api.getWorkflowSessionMessages).mock.calls.length).toBe(fetchesBefore);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
