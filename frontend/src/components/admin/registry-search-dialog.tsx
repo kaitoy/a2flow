@@ -146,7 +146,7 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
             <animated.button
               type="button"
               style={{ opacity: style.opacity }}
-              className="absolute inset-0 h-full w-full cursor-default border-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 h-full w-full cursor-default border-0 bg-black/25 backdrop-blur-sm"
               onClick={onClose}
               aria-label="Close registry search"
               tabIndex={-1}
@@ -161,7 +161,7 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                   opacity: style.opacity,
                   transform: style.scale.to((s) => `scale(${s})`),
                 }}
-                className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl glass-panel-strong p-6 pointer-events-auto"
+                className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl glass-panel-overlay p-6 pointer-events-auto"
               >
                 <h2
                   id="registry-search-title"

@@ -7,7 +7,7 @@ colors:
     surface-dim: '#d8e2f4'
     glass: 'rgba(255, 255, 255, 0.55)'
     glass-strong: 'rgba(255, 255, 255, 0.72)'
-    glass-overlay: 'rgba(255, 255, 255, 0.58)'
+    glass-overlay: 'rgba(255, 255, 255, 0.45)'
     glass-border: 'rgba(255, 255, 255, 0.65)'
     glass-highlight: 'rgba(255, 255, 255, 0.85)'
     on-surface: '#0b1c30'
@@ -34,7 +34,7 @@ colors:
     surface-dim: '#0a1224'
     glass: 'rgba(15, 23, 42, 0.45)'
     glass-strong: 'rgba(15, 23, 42, 0.65)'
-    glass-overlay: 'rgba(15, 23, 42, 0.50)'
+    glass-overlay: 'rgba(15, 23, 42, 0.38)'
     glass-border: 'rgba(148, 163, 184, 0.20)'
     glass-highlight: 'rgba(148, 163, 184, 0.35)'
     on-surface: '#e2e8f0'
@@ -171,7 +171,7 @@ Depth is achieved through **layered translucency** rather than hard borders or h
 - **Layer 0 (Canvas)** — `body::before` paints a fixed mesh of four radial gradients, slowly drifting via `float-slow` keyframes. `body::after` overlays a subtle SVG film-grain to break up banding.
 - **Layer 1 (Glass)** — `.glass-panel`: 55–65% translucent fill, 20px blur + 150% saturate, 1px white-tinted border, soft drop shadow + inner-top highlight.
 - **Layer 2 (Glass-Strong)** — `.glass-panel-strong`: 72% translucent fill, 24px blur, larger drop shadow. Used for floating chat input and admin form cards.
-- **Layer 2b (Glass-Overlay)** — `.glass-panel-overlay`: large shadow like glass-strong but a more translucent fill (light 58%, dark 50%) and a lighter 16px blur, so content reads through floating popovers more clearly. Used for tooltips and dropdown/list menus (user menu, notification panel).
+- **Layer 2b (Glass-Overlay)** — `.glass-panel-overlay`: large shadow like glass-strong but a more translucent fill (light 45%, dark 38%) and a lighter 16px blur, so content reads through floating popovers more clearly. Used for tooltips, dropdown/list menus (user menu, notification panel), and modal dialogs (`ConfirmDialog`, `RegistrySearchDialog`).
 - **Glow** — Active/hover states emit a 36px accent glow (`shadow-glow`).
 
 > **Note** — The `backdrop-filter` blur on all glass tiers is applied through Tailwind's `backdrop-blur-*`/`backdrop-saturate-*` utilities via `@apply`, not a raw `backdrop-filter` declaration: Tailwind v4 composes `backdrop-filter` from `--tw-backdrop-*` custom properties and silently drops a bare declaration written inside an `@utility`.
@@ -237,7 +237,7 @@ Choose presets by intent (`useMotionConfig("gentle")`) rather than tuning tensio
 
 - **Entrance** — Message bubbles, error banners use the `animate-message-in` keyframe (`opacity 0→1` + `translateY(8px)→0` + slight `scale(0.985)→1`).
 - **List staggering** — Session list rows use React Spring `useTransition` with `trail: 40` to ripple in horizontally on first load.
-- **Modal** — `ConfirmDialog` cross-fades the backdrop and `scale(0.94)→1` the body with a gentle spring.
+- **Modal** — `ConfirmDialog` cross-fades the backdrop and `scale(0.94)→1` the body with a gentle spring. The scrim carries only a light `backdrop-blur-sm` (4px) — most of the frosted look comes from the panel's own `glass-panel-overlay` blur, so the scrim stays light enough that colorful content is still visible for the panel to refract.
 - **Buttons** — All variants share `active:scale-[0.97]` for tactile press feedback and lift 2px on hover (`motion-safe`-guarded). Server-submitting buttons additionally use **optimistic UI** via `useAsyncAction`: the button disables immediately on click (preventing double-submits), and the `pending` label ("Saving…") only appears if the response takes longer than 200ms — fast responses skip straight to the `done` label, so quick saves never flash a transient "Saving…". On success the button stays non-interactive and celebrates with a green fill, checkmark, and one-shot `wiggle` (see Components → Buttons → Success state). The label width is fixed (see Components → Buttons) so none of these transitions reflow the button.
 - **Streaming caret** — Assistant bubble caret uses both `animate-blink` (the original step-start blink, preserved for tests) and `motion-safe:animate-pulse-cursor` (a softer opacity + scaleY pulse) so motion-safe users get the richer effect.
 - **Theme toggle** — Scales up slightly on hover (motion-safe); Sun/Moon icons cross-fade with a 90° rotation via `useTransition`.

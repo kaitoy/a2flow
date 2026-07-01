@@ -77,7 +77,7 @@ export function ConfirmDialog({
             <animated.button
               type="button"
               style={{ opacity: style.opacity }}
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm cursor-default"
+              className="absolute inset-0 bg-black/25 backdrop-blur-sm cursor-default"
               onClick={onCancel}
               tabIndex={-1}
               aria-hidden="true"
@@ -92,7 +92,7 @@ export function ConfirmDialog({
                   opacity: style.opacity,
                   transform: style.scale.to((s) => `scale(${s})`),
                 }}
-                className="glass-panel-strong rounded-2xl p-6 max-w-sm w-full pointer-events-auto"
+                className="glass-panel-overlay rounded-2xl p-6 max-w-sm w-full pointer-events-auto"
               >
                 <h2
                   id="confirm-dialog-title"
