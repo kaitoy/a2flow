@@ -3,7 +3,7 @@
 
 import { animated, useTransition } from "@react-spring/web";
 import { Check } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMotionConfig } from "@/lib/motion";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -56,6 +56,7 @@ function ToastCard({ toast }: { toast: Toast }) {
 export function Toaster() {
   const items = useAppSelector((s) => s.toast.items);
   const config = useMotionConfig("snappy");
+  const [mounted, setMounted] = useState(false);
 
   const transitions = useTransition(items, {
     keys: (t) => t.id,
@@ -65,9 +66,11 @@ export function Toaster() {
     config,
   });
 
-  // Guard against SSR — createPortal needs document.body, which is not
-  // available during Next.js prerendering.
-  if (typeof document === "undefined") return null;
+  // Defer the portal to a post-mount effect so the first client render
+  // matches the server render (both skip it), avoiding a hydration mismatch
+  // — createPortal needs document.body, which isn't available during SSR.
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
 
   return createPortal(
     <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-2">

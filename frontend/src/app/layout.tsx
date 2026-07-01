@@ -1,6 +1,7 @@
 /** @module RootLayout — Applies fonts, theme flash-prevention script, and global providers. */
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
+import Script from "next/script";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/toast";
 import { StoreProvider } from "@/store/provider";
@@ -32,11 +33,13 @@ const NO_FLASH_SCRIPT = `(() => {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={spaceGrotesk.variable}>
-      <head>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline script for FOUC prevention */}
-        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }} />
-      </head>
       <body className={inter.className}>
+        <Script
+          id="no-flash-theme"
+          strategy="beforeInteractive"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline script for FOUC prevention
+          dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }}
+        />
         <ThemeProvider>
           <StoreProvider>
             <Toaster />
