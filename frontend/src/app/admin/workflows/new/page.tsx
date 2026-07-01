@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
+import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,70 +73,79 @@ export default function NewWorkflowPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs
+        items={[
+          { label: "Admin", href: "/admin" },
+          { label: "Workflows", href: "/admin/workflows" },
+          { label: "New" },
+        ]}
+      />
       <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
         New Workflow
       </h1>
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
-      >
-        <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-          <Input id="name" placeholder="e.g. code-review-flow" {...register("name")} />
-        </FormField>
-
-        <FormField
-          htmlFor="agentSkillId"
-          label="Agent Skill"
-          required
-          error={errors.agentSkillId?.message}
+      <FormColumn>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <Select id="agentSkillId" {...register("agentSkillId")}>
-            <option value="">— Select a skill —</option>
-            {skills.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </Select>
-        </FormField>
+          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+            <Input id="name" placeholder="e.g. code-review-flow" {...register("name")} />
+          </FormField>
 
-        <FormField htmlFor="prompt" label="Prompt" required error={errors.prompt?.message}>
-          <Textarea
-            id="prompt"
-            rows={6}
-            placeholder="Instructions for the agent (required)"
-            {...register("prompt")}
-          />
-        </FormField>
-
-        <FormField htmlFor="description" label="Description">
-          <Textarea
-            id="description"
-            rows={3}
-            placeholder="What this workflow does (optional)"
-            {...register("description")}
-          />
-        </FormField>
-
-        <ErrorBanner error={apiError} />
-
-        <div className="flex gap-2">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={save.inFlight}
-            status={save.status}
-            pendingLabel="Saving…"
+          <FormField
+            htmlFor="agentSkillId"
+            label="Agent Skill"
+            required
+            error={errors.agentSkillId?.message}
           >
-            Save
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => router.push("/admin/workflows")}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </div>
+            <Select id="agentSkillId" {...register("agentSkillId")}>
+              <option value="">— Select a skill —</option>
+              {skills.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField htmlFor="prompt" label="Prompt" required error={errors.prompt?.message}>
+            <Textarea
+              id="prompt"
+              rows={6}
+              placeholder="Instructions for the agent (required)"
+              {...register("prompt")}
+            />
+          </FormField>
+
+          <FormField htmlFor="description" label="Description">
+            <Textarea
+              id="description"
+              rows={3}
+              placeholder="What this workflow does (optional)"
+              {...register("description")}
+            />
+          </FormField>
+
+          <ErrorBanner error={apiError} />
+
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={save.inFlight}
+              status={save.status}
+              pendingLabel="Saving…"
+            >
+              Save
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => router.push("/admin/workflows")}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </FormColumn>
+    </AdminPageContainer>
   );
 }

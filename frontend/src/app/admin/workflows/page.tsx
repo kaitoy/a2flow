@@ -6,7 +6,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
@@ -136,7 +138,8 @@ export default function WorkflowsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Workflows" }]} />
       <AdminPageHeader
         title="Workflows"
         icon={WorkflowIcon}
@@ -172,6 +175,6 @@ export default function WorkflowsPage() {
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />
-    </div>
+    </AdminPageContainer>
   );
 }

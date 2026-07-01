@@ -6,7 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
+import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import {
   KeyValueEditor,
@@ -79,57 +82,66 @@ function NewMcpServerForm() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs
+        items={[
+          { label: "Admin", href: "/admin" },
+          { label: "MCP Servers", href: "/admin/mcp-servers" },
+          { label: "New" },
+        ]}
+      />
       <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
         New MCP Server
       </h1>
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
-      >
-        <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-          <Input id="name" placeholder="e.g. web-search" {...register("name")} />
-        </FormField>
+      <FormColumn>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
+        >
+          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+            <Input id="name" placeholder="e.g. web-search" {...register("name")} />
+          </FormField>
 
-        <FormField htmlFor="url" label="URL" required error={errors.url?.message}>
-          <Input id="url" placeholder="https://mcp.example.com/mcp" {...register("url")} />
-        </FormField>
+          <FormField htmlFor="url" label="URL" required error={errors.url?.message}>
+            <Input id="url" placeholder="https://mcp.example.com/mcp" {...register("url")} />
+          </FormField>
 
-        <FormField htmlFor="headers" label="HTTP Headers">
-          <Controller
-            control={control}
-            name="headers"
-            render={({ field }) => (
-              <KeyValueEditor
-                name="headers"
-                pairs={field.value}
-                onChange={field.onChange}
-                keyPlaceholder="Authorization"
-                valuePlaceholder="Bearer …"
-              />
-            )}
-          />
-        </FormField>
+          <FormField htmlFor="headers" label="HTTP Headers">
+            <Controller
+              control={control}
+              name="headers"
+              render={({ field }) => (
+                <KeyValueEditor
+                  name="headers"
+                  pairs={field.value}
+                  onChange={field.onChange}
+                  keyPlaceholder="Authorization"
+                  valuePlaceholder="Bearer …"
+                />
+              )}
+            />
+          </FormField>
 
-        <ErrorBanner error={apiError} />
+          <ErrorBanner error={apiError} />
 
-        <div className="flex gap-2">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={save.inFlight}
-            status={save.status}
-            pendingLabel="Saving…"
-          >
-            Save
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => router.push("/admin/mcp-servers")}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </div>
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={save.inFlight}
+              status={save.status}
+              pendingLabel="Saving…"
+            >
+              Save
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => router.push("/admin/mcp-servers")}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </FormColumn>
+    </AdminPageContainer>
   );
 }
 

@@ -5,7 +5,9 @@ import { ListChecks, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
@@ -125,7 +127,8 @@ export default function WorkflowSessionsPage() {
   }, [rows]);
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Workflow Sessions" }]} />
       <AdminPageHeader
         title="Workflow Sessions"
         icon={ListChecks}
@@ -159,6 +162,6 @@ export default function WorkflowSessionsPage() {
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />
-    </div>
+    </AdminPageContainer>
   );
 }

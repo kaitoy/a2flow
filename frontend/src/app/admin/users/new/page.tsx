@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
+import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -67,63 +70,72 @@ export default function NewUserPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs
+        items={[
+          { label: "Admin", href: "/admin" },
+          { label: "Users", href: "/admin/users" },
+          { label: "New" },
+        ]}
+      />
       <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">New User</h1>
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
-      >
-        <FormField htmlFor="username" label="Username" required error={errors.username?.message}>
-          <Input id="username" placeholder="e.g. alice" {...register("username")} />
-        </FormField>
-
-        <FormField
-          htmlFor="firstName"
-          label="First Name"
-          required
-          error={errors.firstName?.message}
+      <FormColumn>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <Input id="firstName" placeholder="Alice" {...register("firstName")} />
-        </FormField>
+          <FormField htmlFor="username" label="Username" required error={errors.username?.message}>
+            <Input id="username" placeholder="e.g. alice" {...register("username")} />
+          </FormField>
 
-        <FormField htmlFor="lastName" label="Last Name" required error={errors.lastName?.message}>
-          <Input id="lastName" placeholder="Smith" {...register("lastName")} />
-        </FormField>
-
-        <FormField htmlFor="email" label="Email" required error={errors.email?.message}>
-          <Input id="email" type="email" placeholder="alice@example.com" {...register("email")} />
-        </FormField>
-
-        <FormField htmlFor="password" label="Password" required error={errors.password?.message}>
-          <Input
-            id="password"
-            type="password"
-            placeholder="At least 12 characters"
-            {...register("password")}
-          />
-        </FormField>
-
-        <Checkbox label="Enabled" {...register("enabled")} />
-        <Checkbox label="Email verified" {...register("emailVerified")} />
-
-        <ErrorBanner error={apiError} />
-
-        <div className="flex gap-2">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={save.inFlight}
-            status={save.status}
-            pendingLabel="Saving…"
+          <FormField
+            htmlFor="firstName"
+            label="First Name"
+            required
+            error={errors.firstName?.message}
           >
-            Save
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => router.push("/admin/users")}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </div>
+            <Input id="firstName" placeholder="Alice" {...register("firstName")} />
+          </FormField>
+
+          <FormField htmlFor="lastName" label="Last Name" required error={errors.lastName?.message}>
+            <Input id="lastName" placeholder="Smith" {...register("lastName")} />
+          </FormField>
+
+          <FormField htmlFor="email" label="Email" required error={errors.email?.message}>
+            <Input id="email" type="email" placeholder="alice@example.com" {...register("email")} />
+          </FormField>
+
+          <FormField htmlFor="password" label="Password" required error={errors.password?.message}>
+            <Input
+              id="password"
+              type="password"
+              placeholder="At least 12 characters"
+              {...register("password")}
+            />
+          </FormField>
+
+          <Checkbox label="Enabled" {...register("enabled")} />
+          <Checkbox label="Email verified" {...register("emailVerified")} />
+
+          <ErrorBanner error={apiError} />
+
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={save.inFlight}
+              status={save.status}
+              pendingLabel="Saving…"
+            >
+              Save
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => router.push("/admin/users")}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </FormColumn>
+    </AdminPageContainer>
   );
 }

@@ -5,7 +5,9 @@ import { PackageSearch, Server } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
@@ -111,7 +113,8 @@ export default function McpServersPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "MCP Servers" }]} />
       <AdminPageHeader
         title="MCP Servers"
         icon={Server}
@@ -162,6 +165,6 @@ export default function McpServersPage() {
         onClose={() => setRegistryOpen(false)}
         onSelect={handleRegistrySelect}
       />
-    </div>
+    </AdminPageContainer>
   );
 }

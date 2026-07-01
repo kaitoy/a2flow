@@ -6,8 +6,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
+import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Avatar } from "@/components/ui/avatar";
@@ -138,95 +141,107 @@ export default function EditUserPage() {
     }
   }
 
+  const breadcrumbItems = [
+    { label: "Admin", href: "/admin" },
+    { label: "Users", href: "/admin/users" },
+    { label: "Edit" },
+  ];
+
   if (loading) {
     return (
-      <div className="mx-auto max-w-2xl p-8">
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
         <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
           Edit User
         </h1>
-        <FormSkeleton fields={6} />
-      </div>
+        <FormColumn>
+          <FormSkeleton fields={6} />
+        </FormColumn>
+      </AdminPageContainer>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs items={breadcrumbItems} />
       <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">Edit User</h1>
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
-      >
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-            Avatar
-          </span>
-          <Avatar user={{ id: userId, username, avatarUpdatedAt, avatarConfig }} size={96} />
-        </div>
-
-        <FormField htmlFor="username" label="Username">
-          <Input id="username" value={username} readOnly disabled />
-        </FormField>
-
-        <FormField
-          htmlFor="firstName"
-          label="First Name"
-          required
-          error={errors.firstName?.message}
+      <FormColumn>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <Input id="firstName" {...register("firstName")} />
-        </FormField>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+              Avatar
+            </span>
+            <Avatar user={{ id: userId, username, avatarUpdatedAt, avatarConfig }} size={96} />
+          </div>
 
-        <FormField htmlFor="lastName" label="Last Name" required error={errors.lastName?.message}>
-          <Input id="lastName" {...register("lastName")} />
-        </FormField>
+          <FormField htmlFor="username" label="Username">
+            <Input id="username" value={username} readOnly disabled />
+          </FormField>
 
-        <FormField htmlFor="email" label="Email" required error={errors.email?.message}>
-          <Input id="email" type="email" {...register("email")} />
-        </FormField>
-
-        <FormField htmlFor="password" label="Password" error={errors.password?.message}>
-          <Input
-            id="password"
-            type="password"
-            placeholder="Leave blank to keep unchanged"
-            {...register("password")}
-          />
-        </FormField>
-
-        <Checkbox label="Enabled" {...register("enabled")} />
-        <Checkbox label="Email verified" {...register("emailVerified")} />
-
-        <ErrorBanner error={apiError} />
-
-        <div className="flex gap-2">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={save.inFlight}
-            status={save.status}
-            pendingLabel="Saving…"
+          <FormField
+            htmlFor="firstName"
+            label="First Name"
+            required
+            error={errors.firstName?.message}
           >
-            Save
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => router.push("/admin/users")}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleDelete}
-            className="ml-auto text-error"
-          >
-            Delete
-          </Button>
-        </div>
-      </form>
-      {audit && (
-        <div className="mt-4">
-          <AuditMeta {...audit} />
-        </div>
-      )}
+            <Input id="firstName" {...register("firstName")} />
+          </FormField>
+
+          <FormField htmlFor="lastName" label="Last Name" required error={errors.lastName?.message}>
+            <Input id="lastName" {...register("lastName")} />
+          </FormField>
+
+          <FormField htmlFor="email" label="Email" required error={errors.email?.message}>
+            <Input id="email" type="email" {...register("email")} />
+          </FormField>
+
+          <FormField htmlFor="password" label="Password" error={errors.password?.message}>
+            <Input
+              id="password"
+              type="password"
+              placeholder="Leave blank to keep unchanged"
+              {...register("password")}
+            />
+          </FormField>
+
+          <Checkbox label="Enabled" {...register("enabled")} />
+          <Checkbox label="Email verified" {...register("emailVerified")} />
+
+          <ErrorBanner error={apiError} />
+
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={save.inFlight}
+              status={save.status}
+              pendingLabel="Saving…"
+            >
+              Save
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => router.push("/admin/users")}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleDelete}
+              className="ml-auto text-error"
+            >
+              Delete
+            </Button>
+          </div>
+        </form>
+        {audit && (
+          <div className="mt-4">
+            <AuditMeta {...audit} />
+          </div>
+        )}
+      </FormColumn>
       <ConfirmDialog
         open={confirmOpen}
         title="Delete User"
@@ -234,6 +249,6 @@ export default function EditUserPage() {
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />
-    </div>
+    </AdminPageContainer>
   );
 }

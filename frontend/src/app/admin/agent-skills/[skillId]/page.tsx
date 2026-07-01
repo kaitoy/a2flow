@@ -6,8 +6,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
+import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
@@ -100,73 +103,89 @@ export default function EditAgentSkillPage() {
     }
   }
 
+  const breadcrumbItems = [
+    { label: "Admin", href: "/admin" },
+    { label: "Agent Skills", href: "/admin/agent-skills" },
+    { label: "Edit" },
+  ];
+
   if (loading) {
     return (
-      <div className="mx-auto max-w-2xl p-8">
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
         <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
           Edit Agent Skill
         </h1>
-        <FormSkeleton fields={4} />
-      </div>
+        <FormColumn>
+          <FormSkeleton fields={4} />
+        </FormColumn>
+      </AdminPageContainer>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs items={breadcrumbItems} />
       <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
         Edit Agent Skill
       </h1>
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
-      >
-        <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-          <Input id="name" {...register("name")} />
-        </FormField>
+      <FormColumn>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
+        >
+          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+            <Input id="name" {...register("name")} />
+          </FormField>
 
-        <FormField htmlFor="repoUrl" label="Repo URL" required error={errors.repoUrl?.message}>
-          <Input id="repoUrl" {...register("repoUrl")} />
-        </FormField>
+          <FormField htmlFor="repoUrl" label="Repo URL" required error={errors.repoUrl?.message}>
+            <Input id="repoUrl" {...register("repoUrl")} />
+          </FormField>
 
-        <FormField htmlFor="repoPath" label="Repo Path">
-          <Input id="repoPath" {...register("repoPath")} />
-        </FormField>
+          <FormField htmlFor="repoPath" label="Repo Path">
+            <Input id="repoPath" {...register("repoPath")} />
+          </FormField>
 
-        <FormField htmlFor="description" label="Description">
-          <Textarea id="description" rows={4} {...register("description")} />
-        </FormField>
+          <FormField htmlFor="description" label="Description">
+            <Textarea id="description" rows={4} {...register("description")} />
+          </FormField>
 
-        <ErrorBanner error={apiError} />
+          <ErrorBanner error={apiError} />
 
-        <div className="flex gap-2">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={save.inFlight}
-            status={save.status}
-            pendingLabel="Saving…"
-          >
-            Save
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => router.push("/admin/agent-skills")}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleDelete}
-            className="ml-auto text-error"
-          >
-            Delete
-          </Button>
-        </div>
-      </form>
-      {audit && (
-        <div className="mt-4">
-          <AuditMeta {...audit} />
-        </div>
-      )}
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={save.inFlight}
+              status={save.status}
+              pendingLabel="Saving…"
+            >
+              Save
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => router.push("/admin/agent-skills")}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleDelete}
+              className="ml-auto text-error"
+            >
+              Delete
+            </Button>
+          </div>
+        </form>
+        {audit && (
+          <div className="mt-4">
+            <AuditMeta {...audit} />
+          </div>
+        )}
+      </FormColumn>
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Agent Skill"
@@ -174,6 +193,6 @@ export default function EditAgentSkillPage() {
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />
-    </div>
+    </AdminPageContainer>
   );
 }

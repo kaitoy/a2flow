@@ -4,7 +4,9 @@
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
@@ -102,7 +104,8 @@ export default function ApprovalsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Approvals" }]} />
       <AdminPageHeader
         title="Approvals"
         icon={CheckCircle2}
@@ -129,6 +132,6 @@ export default function ApprovalsPage() {
         onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
         onNext={() => setOffset((o) => o + LIMIT)}
       />
-    </div>
+    </AdminPageContainer>
   );
 }

@@ -6,8 +6,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
+import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import {
@@ -109,81 +112,93 @@ export default function EditMcpServerPage() {
     }
   }
 
+  const breadcrumbItems = [
+    { label: "Admin", href: "/admin" },
+    { label: "MCP Servers", href: "/admin/mcp-servers" },
+    { label: "Edit" },
+  ];
+
   if (loading) {
     return (
-      <div className="mx-auto max-w-2xl p-8">
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
         <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
           Edit MCP Server
         </h1>
-        <FormSkeleton fields={3} />
-      </div>
+        <FormColumn>
+          <FormSkeleton fields={3} />
+        </FormColumn>
+      </AdminPageContainer>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs items={breadcrumbItems} />
       <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
         Edit MCP Server
       </h1>
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
-      >
-        <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-          <Input id="name" {...register("name")} />
-        </FormField>
+      <FormColumn>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
+        >
+          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+            <Input id="name" {...register("name")} />
+          </FormField>
 
-        <FormField htmlFor="url" label="URL" required error={errors.url?.message}>
-          <Input id="url" {...register("url")} />
-        </FormField>
+          <FormField htmlFor="url" label="URL" required error={errors.url?.message}>
+            <Input id="url" {...register("url")} />
+          </FormField>
 
-        <FormField htmlFor="headers" label="HTTP Headers">
-          <Controller
-            control={control}
-            name="headers"
-            render={({ field }) => (
-              <KeyValueEditor
-                name="headers"
-                pairs={field.value}
-                onChange={field.onChange}
-                keyPlaceholder="Authorization"
-                valuePlaceholder="Bearer …"
-              />
-            )}
-          />
-        </FormField>
+          <FormField htmlFor="headers" label="HTTP Headers">
+            <Controller
+              control={control}
+              name="headers"
+              render={({ field }) => (
+                <KeyValueEditor
+                  name="headers"
+                  pairs={field.value}
+                  onChange={field.onChange}
+                  keyPlaceholder="Authorization"
+                  valuePlaceholder="Bearer …"
+                />
+              )}
+            />
+          </FormField>
 
-        <ErrorBanner error={apiError} />
+          <ErrorBanner error={apiError} />
 
-        <div className="flex gap-2">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={save.inFlight}
-            status={save.status}
-            pendingLabel="Saving…"
-          >
-            Save
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => router.push("/admin/mcp-servers")}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleDelete}
-            className="ml-auto text-error"
-          >
-            Delete
-          </Button>
-        </div>
-      </form>
-      {audit && (
-        <div className="mt-4">
-          <AuditMeta {...audit} />
-        </div>
-      )}
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={save.inFlight}
+              status={save.status}
+              pendingLabel="Saving…"
+            >
+              Save
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => router.push("/admin/mcp-servers")}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleDelete}
+              className="ml-auto text-error"
+            >
+              Delete
+            </Button>
+          </div>
+        </form>
+        {audit && (
+          <div className="mt-4">
+            <AuditMeta {...audit} />
+          </div>
+        )}
+      </FormColumn>
       <ConfirmDialog
         open={confirmOpen}
         title="Delete MCP Server"
@@ -191,6 +206,6 @@ export default function EditMcpServerPage() {
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />
-    </div>
+    </AdminPageContainer>
   );
 }

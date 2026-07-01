@@ -5,7 +5,9 @@ import { ListTree } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
@@ -252,13 +254,14 @@ export default function WorkflowTasksPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
-      <Link
-        href="/admin/workflow-sessions"
-        className="mb-4 inline-block text-xs text-on-surface-variant transition-colors hover:text-accent"
-      >
-        ← Back to sessions
-      </Link>
+    <AdminPageContainer>
+      <Breadcrumbs
+        items={[
+          { label: "Admin", href: "/admin" },
+          { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
+          { label: "Workflow Tasks" },
+        ]}
+      />
       <AdminPageHeader
         title="Workflow Tasks"
         icon={ListTree}
@@ -314,6 +317,6 @@ export default function WorkflowTasksPage() {
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />
-    </div>
+    </AdminPageContainer>
   );
 }

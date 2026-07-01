@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
+import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,61 +59,74 @@ export default function NewAgentSkillPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs
+        items={[
+          { label: "Admin", href: "/admin" },
+          { label: "Agent Skills", href: "/admin/agent-skills" },
+          { label: "New" },
+        ]}
+      />
       <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
         New Agent Skill
       </h1>
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
-      >
-        <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-          <Input id="name" placeholder="e.g. code-review" {...register("name")} />
-        </FormField>
+      <FormColumn>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
+        >
+          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+            <Input id="name" placeholder="e.g. code-review" {...register("name")} />
+          </FormField>
 
-        <FormField htmlFor="repoUrl" label="Repo URL" required error={errors.repoUrl?.message}>
-          <Input
-            id="repoUrl"
-            placeholder="https://github.com/owner/repo"
-            {...register("repoUrl")}
-          />
-        </FormField>
+          <FormField htmlFor="repoUrl" label="Repo URL" required error={errors.repoUrl?.message}>
+            <Input
+              id="repoUrl"
+              placeholder="https://github.com/owner/repo"
+              {...register("repoUrl")}
+            />
+          </FormField>
 
-        <FormField htmlFor="repoPath" label="Repo Path">
-          <Input
-            id="repoPath"
-            placeholder="path/within/repo (optional)"
-            {...register("repoPath")}
-          />
-        </FormField>
+          <FormField htmlFor="repoPath" label="Repo Path">
+            <Input
+              id="repoPath"
+              placeholder="path/within/repo (optional)"
+              {...register("repoPath")}
+            />
+          </FormField>
 
-        <FormField htmlFor="description" label="Description">
-          <Textarea
-            id="description"
-            rows={4}
-            placeholder="What this skill does (optional)"
-            {...register("description")}
-          />
-        </FormField>
+          <FormField htmlFor="description" label="Description">
+            <Textarea
+              id="description"
+              rows={4}
+              placeholder="What this skill does (optional)"
+              {...register("description")}
+            />
+          </FormField>
 
-        <ErrorBanner error={apiError} />
+          <ErrorBanner error={apiError} />
 
-        <div className="flex gap-2">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={save.inFlight}
-            status={save.status}
-            pendingLabel="Saving…"
-          >
-            Save
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => router.push("/admin/agent-skills")}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </div>
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={save.inFlight}
+              status={save.status}
+              pendingLabel="Saving…"
+            >
+              Save
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => router.push("/admin/agent-skills")}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </FormColumn>
+    </AdminPageContainer>
   );
 }

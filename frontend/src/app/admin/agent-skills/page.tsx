@@ -4,7 +4,9 @@
 import { Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
@@ -95,7 +97,8 @@ export default function AgentSkillsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <AdminPageContainer>
+      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Agent Skills" }]} />
       <AdminPageHeader
         title="Agent Skills"
         icon={Wand2}
@@ -131,6 +134,6 @@ export default function AgentSkillsPage() {
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />
-    </div>
+    </AdminPageContainer>
   );
 }
