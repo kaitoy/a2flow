@@ -2,11 +2,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Server } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
@@ -122,9 +124,7 @@ export default function EditMcpServerPage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-          Edit MCP Server
-        </h1>
+        <AdminPageHeader title="Edit MCP Server" icon={Server} />
         <FormColumn>
           <FormSkeleton fields={3} />
         </FormColumn>
@@ -135,9 +135,7 @@ export default function EditMcpServerPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-        Edit MCP Server
-      </h1>
+      <AdminPageHeader title="Edit MCP Server" icon={Server} />
 
       <FormColumn>
         <form

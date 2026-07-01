@@ -2,11 +2,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormColumn } from "@/components/admin/form-column";
@@ -67,9 +69,7 @@ export default function NewAgentSkillPage() {
           { label: "New" },
         ]}
       />
-      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-        New Agent Skill
-      </h1>
+      <AdminPageHeader title="New Agent Skill" icon={Wand2} />
 
       <FormColumn>
         <form

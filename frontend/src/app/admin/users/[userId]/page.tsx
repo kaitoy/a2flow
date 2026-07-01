@@ -2,11 +2,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Users as UsersIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
@@ -151,9 +153,7 @@ export default function EditUserPage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-          Edit User
-        </h1>
+        <AdminPageHeader title="Edit User" icon={UsersIcon} />
         <FormColumn>
           <FormSkeleton fields={6} />
         </FormColumn>
@@ -164,7 +164,7 @@ export default function EditUserPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">Edit User</h1>
+      <AdminPageHeader title="Edit User" icon={UsersIcon} />
 
       <FormColumn>
         <form

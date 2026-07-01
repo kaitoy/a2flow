@@ -2,11 +2,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Workflow as WorkflowIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
@@ -126,9 +128,7 @@ export default function EditWorkflowPage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-          Edit Workflow
-        </h1>
+        <AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />
         <FormColumn>
           <FormSkeleton fields={4} />
         </FormColumn>
@@ -139,9 +139,7 @@ export default function EditWorkflowPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-        Edit Workflow
-      </h1>
+      <AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />
 
       <FormColumn>
         <form

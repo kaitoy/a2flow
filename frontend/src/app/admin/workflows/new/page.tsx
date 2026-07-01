@@ -2,11 +2,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Workflow as WorkflowIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormColumn } from "@/components/admin/form-column";
@@ -81,9 +83,7 @@ export default function NewWorkflowPage() {
           { label: "New" },
         ]}
       />
-      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-        New Workflow
-      </h1>
+      <AdminPageHeader title="New Workflow" icon={WorkflowIcon} />
 
       <FormColumn>
         <form

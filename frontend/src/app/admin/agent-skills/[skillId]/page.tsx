@@ -2,11 +2,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Wand2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
@@ -113,9 +115,7 @@ export default function EditAgentSkillPage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-          Edit Agent Skill
-        </h1>
+        <AdminPageHeader title="Edit Agent Skill" icon={Wand2} />
         <FormColumn>
           <FormSkeleton fields={4} />
         </FormColumn>
@@ -126,9 +126,7 @@ export default function EditAgentSkillPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-        Edit Agent Skill
-      </h1>
+      <AdminPageHeader title="Edit Agent Skill" icon={Wand2} />
 
       <FormColumn>
         <form

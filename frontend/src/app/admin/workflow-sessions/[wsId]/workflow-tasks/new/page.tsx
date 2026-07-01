@@ -2,11 +2,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ListTree } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ErrorBanner } from "@/components/admin/error-banner";
 import { FormColumn } from "@/components/admin/form-column";
@@ -117,9 +119,7 @@ export default function NewWorkflowTaskPage() {
           { label: "New" },
         ]}
       />
-      <h1 className="mb-6 text-3xl font-semibold tracking-tight text-gradient-accent">
-        New Workflow Task
-      </h1>
+      <AdminPageHeader title="New Workflow Task" icon={ListTree} />
 
       <FormColumn>
         <form
