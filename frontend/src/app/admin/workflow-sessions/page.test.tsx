@@ -36,6 +36,12 @@ describe("WorkflowSessionsPage", () => {
     await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
   });
 
+  it("links the user name to the user's edit page", async () => {
+    render(<WorkflowSessionsPage />);
+    const link = await screen.findByRole("link", { name: "Alice Smith" });
+    expect(link).toHaveAttribute("href", "/admin/users/user");
+  });
+
   it("renders View tasks link to nested admin route", async () => {
     render(<WorkflowSessionsPage />);
     await waitFor(() => screen.getByText("My Workflow"));

@@ -2,6 +2,7 @@
 "use client";
 
 import { ListChecks, MessageSquare } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -45,7 +46,17 @@ function buildColumns(
     {
       // Resolved from userId to a display name; not sorted/filtered by raw id.
       header: "User",
-      cell: (s) => (s.userId ? (userMap.get(s.userId) ?? s.userId) : "—"),
+      cell: (s) =>
+        s.userId ? (
+          <Link
+            href={`/admin/users/${s.userId}`}
+            className="font-medium text-accent transition-colors hover:underline"
+          >
+            {userMap.get(s.userId) ?? s.userId}
+          </Link>
+        ) : (
+          "—"
+        ),
     },
     {
       header: "Created At",
