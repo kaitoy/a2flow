@@ -1,3 +1,5 @@
+import { RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
+import type { AgentSubscriber } from "@ag-ui/client";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Provider } from "react-redux";
@@ -146,6 +148,7 @@ describe("useChat", () => {
         isRunning: false,
         isStreaming: false,
         error: null,
+        pendingRenderToolCallIds: [],
       },
     });
     renderHook(() => useChat(null), { wrapper: makeWrapper(store) });
@@ -162,6 +165,7 @@ describe("useChat", () => {
         isRunning: false,
         isStreaming: false,
         error: null,
+        pendingRenderToolCallIds: [],
       },
     });
     renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
@@ -185,5 +189,68 @@ describe("useChat", () => {
     expect(api.createChatAgent).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000001");
     expect(mockAgent.runAgent).toHaveBeenCalled();
     uuidSpy.mockRestore();
+  });
+
+  it("preserves a pending render_a2ui ack across a /new-session remount", async () => {
+    let capturedSubscriber: AgentSubscriber | undefined;
+    let resolveRunAgent: () => void = () => {};
+    mockAgent.runAgent.mockImplementationOnce((_opts: unknown, subscriber: AgentSubscriber) => {
+      capturedSubscriber = subscriber;
+      // Stays pending until resolveRunAgent() is called below — mirrors the
+      // still-streaming run whose promise chain the OLD <Chat>/useChat instance
+      // holds a closure over even after router.replace remounts the component.
+      return new Promise<void>((resolve) => {
+        resolveRunAgent = resolve;
+      });
+    });
+
+    const store = makeStore();
+    const { result: result1, unmount } = renderHook(() => useChat(null), {
+      wrapper: makeWrapper(store),
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    act(() => {
+      void result1.current.sendMessage("hello");
+    });
+    const sessionId = store.getState().chat.sessionId;
+    expect(sessionId).not.toBeNull();
+
+    await act(async () => {
+      await capturedSubscriber?.onToolCallEndEvent?.({
+        event: { toolCallId: "tc-a2ui-1" },
+        toolCallName: RENDER_A2UI_TOOL_NAME,
+        toolCallArgs: {},
+      } as unknown as Parameters<NonNullable<AgentSubscriber["onToolCallEndEvent"]>>[0]);
+    });
+    expect(store.getState().chat.pendingRenderToolCallIds).toEqual(["tc-a2ui-1"]);
+
+    // The stream finishes (dispatch(finishRun()) runs on the OLD mount's closure,
+    // but writes into the same shared store) before the user gets to click the
+    // surface button.
+    resolveRunAgent();
+    await waitFor(() => expect(store.getState().chat.isRunning).toBe(false));
+
+    // Simulate the remount: the old <Chat>/useChat instance is torn down and a
+    // fresh instance mounts for the now-URL'd session.
+    unmount();
+    mockAgent.addMessage.mockClear();
+
+    const { result: result2 } = renderHook(() => useChat(sessionId), {
+      wrapper: makeWrapper(store),
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    await result2.current.sendA2uiAction({
+      name: "click",
+      surfaceId: "s1",
+      sourceComponentId: "btn1",
+      context: {},
+    });
+
+    expect(mockAgent.addMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "tool", toolCallId: "tc-a2ui-1" })
+    );
+    expect(store.getState().chat.pendingRenderToolCallIds).toEqual([]);
   });
 });

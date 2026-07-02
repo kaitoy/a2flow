@@ -13,9 +13,11 @@ import {
 import type { Message } from "./chatSlice";
 import chatReducer, {
   addActivityMessage,
+  addPendingRenderToolCallId,
   addUserMessage,
   appendDelta,
   clearError,
+  clearPendingRenderToolCallIds,
   endAssistantMessage,
   finishRun,
   resumeSession,
@@ -38,6 +40,7 @@ describe("chatSlice", () => {
       expect(state.isRunning).toBe(false);
       expect(state.isStreaming).toBe(false);
       expect(state.error).toBeNull();
+      expect(state.pendingRenderToolCallIds).toEqual([]);
     });
   });
 
@@ -52,6 +55,7 @@ describe("chatSlice", () => {
       expect(state.messages).toHaveLength(2);
       expect(state.messages[0].id).toBe("m1");
       expect(state.isRunning).toBe(false);
+      expect(state.pendingRenderToolCallIds).toEqual([]);
     });
 
     it("synthesizes A2UI activity message from RENDER_A2UI_TOOL_NAME tool call", () => {
@@ -228,6 +232,31 @@ describe("chatSlice", () => {
     it("clears error", () => {
       const state = chatReducer({ ...emptyState, error: "oops" }, clearError());
       expect(state.error).toBeNull();
+    });
+  });
+
+  describe("addPendingRenderToolCallId", () => {
+    it("appends a tool call id", () => {
+      const state = chatReducer(emptyState, addPendingRenderToolCallId("tc-1"));
+      expect(state.pendingRenderToolCallIds).toEqual(["tc-1"]);
+    });
+
+    it("appends to existing ids without clobbering", () => {
+      const state = chatReducer(
+        { ...emptyState, pendingRenderToolCallIds: ["tc-1"] },
+        addPendingRenderToolCallId("tc-2")
+      );
+      expect(state.pendingRenderToolCallIds).toEqual(["tc-1", "tc-2"]);
+    });
+  });
+
+  describe("clearPendingRenderToolCallIds", () => {
+    it("resets to an empty array", () => {
+      const state = chatReducer(
+        { ...emptyState, pendingRenderToolCallIds: ["tc-1", "tc-2"] },
+        clearPendingRenderToolCallIds()
+      );
+      expect(state.pendingRenderToolCallIds).toEqual([]);
     });
   });
 });

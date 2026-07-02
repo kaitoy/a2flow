@@ -2,14 +2,16 @@
 
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { useStore } from "react-redux";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import { createChatAgent, getSessionMessages } from "@/lib/api";
 import logger from "@/lib/logger";
 import type { RootState } from "@/store";
 import {
+  addPendingRenderToolCallId,
   addUserMessage,
+  clearPendingRenderToolCallIds,
   finishRun,
   resumeSession,
   setError,
@@ -39,7 +41,6 @@ export function useChat(initialSessionId: string | null) {
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
   const { messages, sessionId, isRunning, isStreaming, error } = useAppSelector((s) => s.chat);
-  const pendingRenderToolCallIds = useRef<string[]>([]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   useEffect(() => {
@@ -81,6 +82,7 @@ export function useChat(initialSessionId: string | null) {
     [sessionId, router]
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
     async (prompt: string) => {
       if (isRunning) return;
@@ -97,7 +99,8 @@ export function useChat(initialSessionId: string | null) {
 
       const agent = createChatAgent(activeSessionId);
 
-      for (const tcId of pendingRenderToolCallIds.current) {
+      const pendingIds = store.getState().chat.pendingRenderToolCallIds;
+      for (const tcId of pendingIds) {
         agent.addMessage({
           id: crypto.randomUUID(),
           role: "tool",
@@ -105,7 +108,7 @@ export function useChat(initialSessionId: string | null) {
           content: "rendered",
         });
       }
-      pendingRenderToolCallIds.current = [];
+      if (pendingIds.length > 0) dispatch(clearPendingRenderToolCallIds());
 
       agent.addMessage({ id: msgId, role: "user", content: prompt });
 
@@ -114,7 +117,7 @@ export function useChat(initialSessionId: string | null) {
           undefined,
           createAgentSubscriber(dispatch, {
             onRenderA2uiEnd: (tcId) => {
-              pendingRenderToolCallIds.current.push(tcId);
+              dispatch(addPendingRenderToolCallId(tcId));
             },
           })
         );
@@ -129,6 +132,7 @@ export function useChat(initialSessionId: string | null) {
     [sessionId, isRunning, dispatch, router]
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendA2uiAction = useCallback(
     async (action: A2UIUserAction) => {
       if (!sessionId || isRunning) return;
@@ -138,17 +142,18 @@ export function useChat(initialSessionId: string | null) {
       const agent = createChatAgent(sessionId);
       const content = formatActionContent(action);
 
-      for (const tcId of pendingRenderToolCallIds.current) {
+      const pendingIds = store.getState().chat.pendingRenderToolCallIds;
+      for (const tcId of pendingIds) {
         agent.addMessage({ id: crypto.randomUUID(), role: "tool", toolCallId: tcId, content });
       }
-      pendingRenderToolCallIds.current = [];
+      if (pendingIds.length > 0) dispatch(clearPendingRenderToolCallIds());
 
       try {
         await agent.runAgent(
           undefined,
           createAgentSubscriber(dispatch, {
             onRenderA2uiEnd: (tcId) => {
-              pendingRenderToolCallIds.current.push(tcId);
+              dispatch(addPendingRenderToolCallId(tcId));
             },
           })
         );

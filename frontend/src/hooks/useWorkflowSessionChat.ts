@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useStore } from "react-redux";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
   createWorkflowSessionAgent,
@@ -14,10 +15,12 @@ import {
 } from "@/lib/api";
 import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL } from "@/lib/approvalTool";
 import logger from "@/lib/logger";
-import type { AppDispatch } from "@/store";
+import type { AppDispatch, RootState } from "@/store";
 import {
   addActivityMessage,
+  addPendingRenderToolCallId,
   addUserMessage,
+  clearPendingRenderToolCallIds,
   finishRun,
   resumeSession,
   setError,
@@ -80,8 +83,8 @@ export function useWorkflowSessionChat(
   ownerUserId: string
 ) {
   const dispatch = useAppDispatch();
+  const store = useStore<RootState>();
   const { messages, isRunning, isStreaming, error } = useAppSelector((s) => s.chat);
-  const pendingRenderToolCallIds = useRef<string[]>([]);
   const autoSentRef = useRef(false);
   // Per-message sender attribution for the shared workflow chat: a map from
   // message id to the sender's user id, and the resolved sender User records
@@ -153,6 +156,7 @@ export function useWorkflowSessionChat(
     }
   }, [workflowSessionId, sessionId, dispatch, refreshSenders, refreshTasks]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
     async (prompt: string) => {
       if (!sessionId || isRunning) return;
@@ -163,7 +167,8 @@ export function useWorkflowSessionChat(
 
       const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
 
-      for (const tcId of pendingRenderToolCallIds.current) {
+      const pendingIds = store.getState().chat.pendingRenderToolCallIds;
+      for (const tcId of pendingIds) {
         agent.addMessage({
           id: crypto.randomUUID(),
           role: "tool",
@@ -171,7 +176,7 @@ export function useWorkflowSessionChat(
           content: "rendered",
         });
       }
-      pendingRenderToolCallIds.current = [];
+      if (pendingIds.length > 0) dispatch(clearPendingRenderToolCallIds());
 
       agent.addMessage({ id: msgId, role: "user", content: prompt });
 
@@ -179,7 +184,7 @@ export function useWorkflowSessionChat(
         await agent.runAgent(
           { tools: [RENDER_APPROVAL_TOOL] },
           makeEventHandlers(dispatch, (tcId) => {
-            pendingRenderToolCallIds.current.push(tcId);
+            dispatch(addPendingRenderToolCallId(tcId));
           })
         );
       } catch (err) {
@@ -198,6 +203,7 @@ export function useWorkflowSessionChat(
     [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendApprovalResult = useCallback(
     async (toolCallId: string, decision: "approved" | "rejected") => {
       if (!sessionId || isRunning) return;
@@ -206,7 +212,8 @@ export function useWorkflowSessionChat(
 
       const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
 
-      for (const tcId of pendingRenderToolCallIds.current) {
+      const pendingIds = store.getState().chat.pendingRenderToolCallIds;
+      for (const tcId of pendingIds) {
         agent.addMessage({
           id: crypto.randomUUID(),
           role: "tool",
@@ -214,7 +221,7 @@ export function useWorkflowSessionChat(
           content: "rendered",
         });
       }
-      pendingRenderToolCallIds.current = [];
+      if (pendingIds.length > 0) dispatch(clearPendingRenderToolCallIds());
 
       // The approval tool's result resumes the agent run with the decision.
       agent.addMessage({
@@ -228,7 +235,7 @@ export function useWorkflowSessionChat(
         await agent.runAgent(
           { tools: [RENDER_APPROVAL_TOOL] },
           makeEventHandlers(dispatch, (tcId) => {
-            pendingRenderToolCallIds.current.push(tcId);
+            dispatch(addPendingRenderToolCallId(tcId));
           })
         );
       } catch (err) {

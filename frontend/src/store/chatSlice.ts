@@ -144,6 +144,8 @@ interface ChatState {
   isStreaming: boolean;
   /** Non-null when the last agent run produced an error. */
   error: string | null;
+  /** Tool call ids from render_a2ui calls awaiting an acknowledging tool result on the next agent run. */
+  pendingRenderToolCallIds: string[];
 }
 
 const initialState: ChatState = {
@@ -152,6 +154,7 @@ const initialState: ChatState = {
   isRunning: false,
   isStreaming: false,
   error: null,
+  pendingRenderToolCallIds: [],
 };
 
 const chatSlice = createSlice({
@@ -164,6 +167,7 @@ const chatSlice = createSlice({
       state.isRunning = false;
       state.isStreaming = false;
       state.error = null;
+      state.pendingRenderToolCallIds = [];
     },
     resumeSession(state, action: PayloadAction<{ sessionId: string; messages: Message[] }>) {
       state.sessionId = action.payload.sessionId;
@@ -171,6 +175,7 @@ const chatSlice = createSlice({
       state.isRunning = false;
       state.isStreaming = false;
       state.error = null;
+      state.pendingRenderToolCallIds = [];
     },
     addUserMessage(state, action: PayloadAction<{ id: string; content: string }>) {
       state.messages.push({
@@ -228,6 +233,12 @@ const chatSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
+    addPendingRenderToolCallId(state, action: PayloadAction<string>) {
+      state.pendingRenderToolCallIds.push(action.payload);
+    },
+    clearPendingRenderToolCallIds(state) {
+      state.pendingRenderToolCallIds = [];
+    },
   },
 });
 
@@ -243,6 +254,8 @@ export const {
   finishRun,
   setError,
   clearError,
+  addPendingRenderToolCallId,
+  clearPendingRenderToolCallIds,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;
