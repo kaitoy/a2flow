@@ -5,6 +5,7 @@ import {
 } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { A2UI_CATALOG_ID } from "@/lib/a2uiCatalogId";
 import {
   CALL_MCP_TOOL_NAME,
   getToolDisplayName,
@@ -59,16 +60,20 @@ function synthesizeA2UIActivityMessage(
     data?: unknown;
   };
   if (!surfaceId) return null;
+  // The message processor resolves catalogId strictly against registered catalog
+  // ids. Mirror A2UIMiddleware's live-path behavior: the alias "basic" (or a
+  // missing catalogId) maps to the app's registered catalog.
+  const resolvedCatalogId = catalogId && catalogId !== "basic" ? catalogId : A2UI_CATALOG_ID;
   const ops: Record<string, unknown>[] = [
-    { version: "v0.9", createSurface: { surfaceId, catalogId } },
+    { version: "v0.9", createSurface: { surfaceId, catalogId: resolvedCatalogId } },
     { version: "v0.9", updateComponents: { surfaceId, components: components ?? [] } },
   ];
   if (data != null) ops.push({ version: "v0.9", updateDataModel: { surfaceId, value: data } });
   return {
-    // ID format mirrors A2UIMiddleware's live-streaming synthesis:
-    //   messageId = `a2ui-surface-${surfaceId}-${toolCallId}`
-    // Keeping the same format ensures addActivityMessage's upsert logic
-    // (which matches by id) works correctly if a surface is later updated.
+    // Unique per render call so addActivityMessage's upsert logic (which
+    // matches by id) works correctly if the same surface is re-synthesized.
+    // Live streaming uses `a2ui-surface-${toolCallId}`; the two never coexist
+    // for the same surface because a resume rebuilds the whole message list.
     id: `a2ui-surface-${surfaceId}-${toolCallId}`,
     role: "activity",
     activityType: A2UIActivityType,

@@ -13,6 +13,7 @@ const markdownRenderer = (text: string) => Promise.resolve(marked(text) as strin
 /**
  * Process a raw A2UI payload and render the resulting surfaces using the tailwind catalog.
  * Surfaces are re-processed from scratch whenever the payload reference changes.
+ * Nullish payloads (e.g. middleware lifecycle snapshots without operations) render nothing.
  */
 export function A2uiRenderer({
   payload,
@@ -26,6 +27,7 @@ export function A2uiRenderer({
   onActionRef.current = onAction;
 
   useEffect(() => {
+    if (payload == null) return;
     const processor = new MessageProcessor<ReactComponentImplementation>([tailwindCatalog]);
     const actionSubs: { unsubscribe: () => void }[] = [];
 

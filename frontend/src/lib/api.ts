@@ -88,6 +88,7 @@ import {
   zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse,
 } from "@/generated/api/zod.gen";
 import basicCatalogJson from "../generated/basic_catalog.json";
+import { A2UI_CATALOG_ID } from "./a2uiCatalogId";
 import logger from "./logger";
 
 /**
@@ -872,6 +873,7 @@ export function createChatAgent(sessionId: string): HttpAgent {
     new A2UIMiddleware({
       injectA2UITool: true,
       schema: basicCatalogJson as unknown as A2UIInlineCatalogSchema,
+      defaultCatalogId: A2UI_CATALOG_ID,
     })
   );
   return agent;
@@ -893,6 +895,7 @@ export function createWorkflowSessionAgent(
     new A2UIMiddleware({
       injectA2UITool: true,
       schema: basicCatalogJson as unknown as A2UIInlineCatalogSchema,
+      defaultCatalogId: A2UI_CATALOG_ID,
     })
   );
   return agent;

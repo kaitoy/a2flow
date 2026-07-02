@@ -39,10 +39,14 @@ export function ActivityMessageBubble({
     return <ReasoningBubble content={message.content as unknown as ReasoningActivityContent} />;
   }
   if (message.activityType === A2UIActivityType) {
+    // The middleware also emits lifecycle snapshots (e.g. { status: "building" })
+    // under the same activity type; only snapshots carrying operations are renderable.
+    const payload = message.content[A2UI_OPERATIONS_KEY];
+    if (payload == null) return null;
     return (
       <div className="mb-3 flex justify-start">
         <div className="max-w-[85%] w-full">
-          <A2uiRenderer payload={message.content[A2UI_OPERATIONS_KEY]} onAction={onAction} />
+          <A2uiRenderer payload={payload} onAction={onAction} />
         </div>
       </div>
     );

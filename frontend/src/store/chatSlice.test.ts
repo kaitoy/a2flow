@@ -4,6 +4,7 @@ import {
   RENDER_A2UI_TOOL_NAME,
 } from "@ag-ui/a2ui-middleware";
 import { describe, expect, it } from "vitest";
+import { A2UI_CATALOG_ID } from "@/lib/a2uiCatalogId";
 import {
   CALL_MCP_TOOL_NAME,
   TOOL_CALL_ACTIVITY_TYPE,
@@ -84,8 +85,13 @@ describe("chatSlice", () => {
       if (activityMsg.role !== "activity") throw new Error("expected activity message");
       expect(activityMsg.activityType).toBe(A2UIActivityType);
       expect(activityMsg.id).toBe(`a2ui-surface-${surfaceId}-${toolCallId}`);
-      const ops = activityMsg.content[A2UI_OPERATIONS_KEY] as unknown[];
+      const ops = activityMsg.content[A2UI_OPERATIONS_KEY] as {
+        createSurface?: { catalogId?: string };
+      }[];
       expect(ops).toHaveLength(2);
+      // The "basic" alias must resolve to the app's registered catalog id,
+      // matching what tailwindCatalog is constructed with.
+      expect(ops[0].createSurface?.catalogId).toBe(A2UI_CATALOG_ID);
     });
 
     it("synthesizes a done MCP tool activity from a call_mcp_tool tool call", () => {

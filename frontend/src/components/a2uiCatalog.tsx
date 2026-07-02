@@ -6,6 +6,7 @@ import type { ReactComponentImplementation } from "@a2ui/react/v0_9";
 import { basicCatalog } from "@a2ui/react/v0_9";
 import { Catalog } from "@a2ui/web_core/v0_9";
 import { BASIC_FUNCTIONS } from "@a2ui/web_core/v0_9/basic_catalog";
+import { A2UI_CATALOG_ID } from "@/lib/a2uiCatalogId";
 import { customButton } from "./a2ui/button";
 import { customCard } from "./a2ui/card";
 import { customChoicePicker } from "./a2ui/choicePicker";
@@ -29,7 +30,7 @@ const remainingComponents = Array.from(basicCatalog.components.values()).filter(
 );
 
 export const tailwindCatalog = new Catalog<ReactComponentImplementation>(
-  "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+  A2UI_CATALOG_ID,
   [
     customText,
     customButton,

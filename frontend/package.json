@@ -20,9 +20,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@a2ui/react": "0.9.1",
-    "@a2ui/web_core": "0.9.2",
-    "@ag-ui/a2ui-middleware": "^0.0.5",
+    "@a2ui/react": "0.10.1",
+    "@a2ui/web_core": "0.10.3",
+    "@ag-ui/a2ui-middleware": "^0.0.10",
     "@ag-ui/client": "^0.0.53",
     "@ag-ui/core": "^0.0.53",
     "@dagrejs/dagre": "^3.0.0",
@@ -39,8 +39,8 @@
     "marked": "^18.0.3",
     "next": "^16.2.4",
     "pino": "^10.3.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-hook-form": "^7.75.0",
     "react-redux": "^9.2.0",
     "zod": "^3.25.0"

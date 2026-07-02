@@ -32,6 +32,20 @@ describe("ActivityMessageBubble", () => {
     expect(screen.getByTestId("a2ui-renderer-mock")).toBeInTheDocument();
   });
 
+  it("renders null for an A2UI lifecycle snapshot without operations", () => {
+    const { container } = render(
+      <ActivityMessageBubble
+        message={{
+          id: "1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { status: "building" },
+        }}
+      />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("renders null for unknown activityType", () => {
     const { container } = render(
       <ActivityMessageBubble

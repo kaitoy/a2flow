@@ -1,3 +1,10 @@
 allowBuilds:
   msw: true
   sharp: true
+
+# @a2ui/markdown-it@0.0.4 still declares peer @a2ui/web_core ^0.9.2, but
+# @a2ui/react@0.10.1 itself depends on web_core ^0.10.1 — upstream forgot to
+# widen the peer range. Allow it until a fixed @a2ui/markdown-it is released.
+peerDependencyRules:
+  allowedVersions:
+    "@a2ui/markdown-it>@a2ui/web_core": "^0.10.0"

@@ -82,13 +82,21 @@ TOOL_CALL_* events (SSE)
             {
               "type":         "ACTIVITY_SNAPSHOT",
               "activityType": "a2ui-surface",
-              "messageId":    "a2ui-surface-result-<toolCallId>",
+              "messageId":    "a2ui-surface-<toolCallId>",
               "content":      { "a2ui_operations": [ ... ] },
               "replace":      true
             }
 ```
 
 Intermediate snapshots may be emitted while the tool args are still streaming. Each snapshot with the same `messageId` replaces the previous one.
+
+The middleware also emits **lifecycle snapshots** under the same `activityType` while a surface
+is being generated — e.g. `content: { "status": "building" }` (or `retrying` / `failed`) with no
+`a2ui_operations` key. `ActivityMessageBubble` renders nothing for these; only snapshots that
+carry `a2ui_operations` reach `A2uiRenderer`. If the LLM omits `catalogId` in the tool args
+(or passes the alias `"basic"`), the middleware substitutes the `defaultCatalogId` configured
+in `createChatAgent` / `createWorkflowSessionAgent` (`A2UI_CATALOG_ID` from
+`src/lib/a2uiCatalogId.ts`), which must match the id `tailwindCatalog` is registered under.
 
 ---
 
@@ -146,7 +154,7 @@ GET /sessions/{id}/messages
                           role:         "activity",
                           activityType: "a2ui-surface",
                           content:      { a2ui_operations: [
-                            { version: "v0.9", createSurface:   { surfaceId, catalogId } },
+                            { version: "v0.9", createSurface:   { surfaceId, catalogId: resolved } },  // "basic"/missing → A2UI_CATALOG_ID
                             { version: "v0.9", updateComponents: { surfaceId, components } },
                             { version: "v0.9", updateDataModel:  { surfaceId, value: data } }  // if data present
                           ]}
@@ -154,9 +162,10 @@ GET /sessions/{id}/messages
                  └─ state.messages = [...generator result]
 ```
 
-The synthesized `ActivityMessage` ID uses the same format as `A2UIMiddleware` does during live
-streaming (`a2ui-surface-{surfaceId}-{toolCallId}`). This ensures the `addActivityMessage`
-upsert logic in the reducer matches correctly if the same surface is updated in a later turn.
+The synthesized `ActivityMessage` ID (`a2ui-surface-{surfaceId}-{toolCallId}`) is unique per
+render call so the `addActivityMessage` upsert logic in the reducer matches correctly if the
+same surface is re-synthesized. (Live streaming uses `a2ui-surface-{toolCallId}`; the two paths
+never coexist for the same surface because a resume rebuilds the whole message list.)
 
 ---
 
