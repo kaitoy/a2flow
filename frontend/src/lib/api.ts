@@ -654,23 +654,27 @@ export async function getWorkflowSessionMessages(wsId: string): Promise<Message[
 /**
  * Fetch the per-message sender attribution for a WorkflowSession's chat.
  *
- * Returns a map from message id (the ADK event id) to the id of the user who
- * actually sent it. Only attributed human (`user`) messages are present; agent
- * messages and legacy history sent before attribution existed are absent, so
- * callers fall back to the session owner. Hits the same `/messages` endpoint as
+ * Returns a map keyed by whichever id identifies the message to the rest of
+ * the UI: the message id (the ADK event id) for attributed human (`user`)
+ * messages, and the `toolCallId` for attributed tool-result messages (for
+ * example an A2UI user-action acknowledgement) — the backend keys those by
+ * `toolCallId` since a tool message's own `id` is regenerated on every fetch
+ * and cannot be used to correlate it back to its sender. Agent messages and
+ * legacy history sent before attribution existed are absent, so callers fall
+ * back to the session owner. Hits the same `/messages` endpoint as
  * {@link getWorkflowSessionMessages}, reading the `senderUserId` each record
- * carries alongside its `id`.
+ * carries.
  */
 export async function getWorkflowSessionMessageSenders(wsId: string): Promise<Map<string, string>> {
   const records = (await fetchEnvelope(
     apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(wsId)}/messages`),
     zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse
-  )) as Array<{ id?: string; senderUserId?: string | null }>;
+  )) as Array<{ id?: string; role?: string; toolCallId?: string; senderUserId?: string | null }>;
   const senders = new Map<string, string>();
   for (const record of records) {
-    if (record.id && record.senderUserId) {
-      senders.set(record.id, record.senderUserId);
-    }
+    if (!record.senderUserId) continue;
+    const key = record.role === "tool" ? record.toolCallId : record.id;
+    if (key) senders.set(key, record.senderUserId);
   }
   return senders;
 }

@@ -1,8 +1,11 @@
+import { RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Provider } from "react-redux";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { formatActionContent, RENDER_ACK_CONTENT } from "@/lib/a2uiAction";
 import * as api from "@/lib/api";
+import { addPendingRenderCall } from "@/store/chatSlice";
 import { makeStore } from "@/test/test-utils";
 import { useWorkflowSessionChat } from "./useWorkflowSessionChat";
 
@@ -93,6 +96,173 @@ describe("useWorkflowSessionChat", () => {
     expect(mockAgent.runAgent).toHaveBeenCalled();
   });
 
+  it("sendA2uiAction posts the action as a tool result and resumes the run", async () => {
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
+      { id: "m1", role: "user", content: "existing" },
+    ]);
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
+    store.dispatch(addPendingRenderCall({ toolCallId: "tc-a2ui-1", surfaceId: "s1" }));
+    mockAgent.addMessage.mockClear();
+    mockAgent.runAgent.mockClear();
+    vi.mocked(api.getWorkflowSessionMessages).mockClear();
+
+    const action = { name: "click", surfaceId: "s1", sourceComponentId: "btn1", context: {} };
+    await result.current.sendA2uiAction(action);
+
+    expect(mockAgent.addMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: "tool",
+        toolCallId: "tc-a2ui-1",
+        content: formatActionContent(action),
+      })
+    );
+    expect(store.getState().chat.pendingRenderCalls).toEqual([]);
+    expect(mockAgent.runAgent).toHaveBeenCalled();
+    // The tool result is now persisted with its sender; the attribution map
+    // is refreshed so the acted-on A2UI surface shows the right avatar.
+    expect(api.getWorkflowSessionMessageSenders).toHaveBeenCalled();
+    // The full history is re-fetched (not just the sender map) so the
+    // resolved A2UI card's sourceToolCallId is re-derived from the same
+    // persisted ids the sender map uses, instead of trusting the id streamed
+    // live to the browser (which ADK can remap for long-running client tools).
+    expect(api.getWorkflowSessionMessages).toHaveBeenCalledWith("ws-1");
+  });
+
+  it("sendA2uiAction targets the acted-on surface and no-op acks the rest", async () => {
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
+      { id: "m1", role: "user", content: "existing" },
+    ]);
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
+    // Two surfaces pending: a display-only one and the one the user acts on.
+    store.dispatch(addPendingRenderCall({ toolCallId: "tc-display", surfaceId: "s-display" }));
+    store.dispatch(addPendingRenderCall({ toolCallId: "tc-acted", surfaceId: "s-acted" }));
+    mockAgent.addMessage.mockClear();
+
+    const action = { name: "click", surfaceId: "s-acted", sourceComponentId: "btn1", context: {} };
+    await result.current.sendA2uiAction(action);
+
+    // Only the acted-on call carries the action; the display-only surface gets
+    // the no-op ack the backend skips when attributing senders.
+    expect(mockAgent.addMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ toolCallId: "tc-display", content: RENDER_ACK_CONTENT })
+    );
+    expect(mockAgent.addMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ toolCallId: "tc-acted", content: formatActionContent(action) })
+    );
+  });
+
+  it("sendA2uiAction acknowledges render calls derived from the loaded history", async () => {
+    // After a page reload (or when another participant's run rendered the
+    // surface), no live stream ever added the pending call — it must be
+    // re-derived from the persisted history so the action is not dropped.
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
+      {
+        id: "m1",
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "tc-from-history",
+            type: "function",
+            function: {
+              name: RENDER_A2UI_TOOL_NAME,
+              arguments: JSON.stringify({ surfaceId: "s1", components: [] }),
+            },
+          },
+        ],
+      },
+    ]);
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() =>
+      expect(store.getState().chat.pendingRenderCalls).toEqual([
+        { toolCallId: "tc-from-history", surfaceId: "s1" },
+      ])
+    );
+    mockAgent.addMessage.mockClear();
+
+    const action = { name: "click", surfaceId: "s1", sourceComponentId: "btn1", context: {} };
+    await result.current.sendA2uiAction(action);
+
+    expect(mockAgent.addMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: "tool",
+        toolCallId: "tc-from-history",
+        content: formatActionContent(action),
+      })
+    );
+  });
+
+  it("re-derives pending render calls from the resynced history after sendA2uiAction", async () => {
+    // If the agent's response to the acknowledgment immediately renders a
+    // follow-up A2UI surface, the post-run resync replaces the live-streamed
+    // pending id with the one persisted in the history (ADK can remap
+    // long-running client-tool ids between the streamed and persisted events).
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValueOnce([
+      { id: "m1", role: "user", content: "existing" },
+    ]);
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
+    store.dispatch(addPendingRenderCall({ toolCallId: "tc-a2ui-1", surfaceId: "s1" }));
+
+    mockAgent.runAgent.mockImplementationOnce(async () => {
+      // Simulate the follow-up render_a2ui call ending mid-run, before the
+      // resync fires.
+      store.dispatch(addPendingRenderCall({ toolCallId: "tc-a2ui-2-live", surfaceId: "s2" }));
+    });
+    // The resync returns the persisted history: the acted-on call is answered,
+    // the follow-up render call is not (and carries its persisted id).
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
+      { id: "m1", role: "user", content: "existing" },
+      { id: "t1", role: "tool", toolCallId: "tc-a2ui-1", content: "acted" },
+      {
+        id: "m2",
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "tc-a2ui-2-persisted",
+            type: "function",
+            function: {
+              name: RENDER_A2UI_TOOL_NAME,
+              arguments: JSON.stringify({ surfaceId: "s2", components: [] }),
+            },
+          },
+        ],
+      },
+    ]);
+
+    await result.current.sendA2uiAction({
+      name: "click",
+      surfaceId: "s1",
+      sourceComponentId: "btn1",
+      context: {},
+    });
+
+    await waitFor(() =>
+      expect(store.getState().chat.pendingRenderCalls).toEqual([
+        { toolCallId: "tc-a2ui-2-persisted", surfaceId: "s2" },
+      ])
+    );
+  });
+
   it("sendApprovalResult posts the decision as a tool result and resumes the run", async () => {
     vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
       { id: "m1", role: "user", content: "existing" },
@@ -105,6 +275,7 @@ describe("useWorkflowSessionChat", () => {
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
     mockAgent.addMessage.mockClear();
     mockAgent.runAgent.mockClear();
+    vi.mocked(api.getWorkflowSessionMessageSenders).mockClear();
 
     await result.current.sendApprovalResult("tool-call-1", "approved");
 
@@ -112,6 +283,9 @@ describe("useWorkflowSessionChat", () => {
       expect.objectContaining({ role: "tool", toolCallId: "tool-call-1", content: "approved" })
     );
     expect(mockAgent.runAgent).toHaveBeenCalled();
+    // The decision is now persisted with its sender; the attribution map is
+    // refreshed so the approval bubble shows the decider's avatar right away.
+    expect(api.getWorkflowSessionMessageSenders).toHaveBeenCalledWith("ws-1");
   });
 
   it("exposes resolved message senders loaded on mount", async () => {

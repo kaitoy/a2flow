@@ -2,6 +2,7 @@
 
 import { A2UI_OPERATIONS_KEY, A2UIActivityType, type A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { ActivityMessage } from "@ag-ui/core";
+import type { ReactNode } from "react";
 import {
   REASONING_ACTIVITY_TYPE,
   type ReasoningActivityContent,
@@ -22,13 +23,19 @@ type Decision = "approved" | "rejected";
  * surfaces to {@link A2uiRenderer}, approval requests to {@link ApprovalControls},
  * tool-call status lines to {@link ToolActivityBubble}, and streamed reasoning to
  * {@link ReasoningBubble}. Ignores unknown activity types.
+ *
+ * `avatar` is used by the A2UI branch (the user who resolved the surface's
+ * pending action) and the approval branch (the user who decided the approval);
+ * other branches ignore it.
  */
 export function ActivityMessageBubble({
   message,
+  avatar,
   onAction,
   onApprovalResolved,
 }: {
   message: ActivityMessage;
+  avatar?: ReactNode;
   onAction?: (action: A2UIUserAction) => void;
   onApprovalResolved?: (toolCallId: string, decision: Decision) => void;
 }) {
@@ -44,10 +51,13 @@ export function ActivityMessageBubble({
     const payload = message.content[A2UI_OPERATIONS_KEY];
     if (payload == null) return null;
     return (
-      <div className="mb-3 flex justify-start">
+      <div
+        className={avatar ? "mb-3 flex justify-start items-end gap-2" : "mb-3 flex justify-start"}
+      >
         <div className="max-w-[85%] w-full">
           <A2uiRenderer payload={payload} onAction={onAction} />
         </div>
+        {avatar}
       </div>
     );
   }
@@ -59,7 +69,9 @@ export function ActivityMessageBubble({
     };
     if (!content.approvalId) return null;
     return (
-      <div className="mb-3 flex justify-start">
+      <div
+        className={avatar ? "mb-3 flex justify-start items-end gap-2" : "mb-3 flex justify-start"}
+      >
         <div className="max-w-[85%] w-full">
           <ApprovalControls
             approvalId={content.approvalId}
@@ -69,6 +81,7 @@ export function ActivityMessageBubble({
             onResolved={onApprovalResolved}
           />
         </div>
+        {avatar}
       </div>
     );
   }

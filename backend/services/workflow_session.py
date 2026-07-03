@@ -25,6 +25,13 @@ from repositories import (
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec
 
+#: Tool-response payload of the frontend's no-op ``render_a2ui``
+#: acknowledgement (``RENDER_ACK_CONTENT`` in ``frontend/src/lib/a2uiAction.ts``,
+#: mirroring the ``@ag-ui/a2ui-middleware`` convention). Such a response merely
+#: unblocks the long-running render call for a surface nobody acted on, so it
+#: must not be attributed to the user whose run happened to flush it.
+_RENDER_ACK_RESPONSE = {"status": "rendered"}
+
 
 class WorkflowSessionService:
     """Application service orchestrating WorkflowSession operations."""
@@ -188,29 +195,35 @@ class WorkflowSessionService:
         result: builtins.list[dict[str, Any]] = []
         for message in messages:
             data = message.model_dump(mode="json", by_alias=True)
-            row = meta.get(data["id"])
-            data["senderUserId"] = (
-                row.sender_user_id
-                if row is not None and data.get("role") == "user"
-                else None
-            )
+            # "user" and "assistant" messages keep the ADK event id as their
+            # own id, but `adk_events_to_messages` regenerates a fresh random
+            # id for every "tool" message on each call -- their only stable,
+            # round-trip-safe correlation key is the tool_call_id they resolve.
+            key = data.get("toolCallId") if data.get("role") == "tool" else data["id"]
+            row = meta.get(key) if key is not None else None
+            data["senderUserId"] = row.sender_user_id if row is not None else None
             data["workflowTaskId"] = row.workflow_task_id if row is not None else None
             result.append(data)
         return result
 
-    async def user_event_ids(self, ws_id: str) -> set[str]:
-        """Return the ids of the session's ADK ``"user"`` events.
+    async def attributable_keys(self, ws_id: str) -> set[str]:
+        """Return the correlation keys of the session's attributable events.
 
-        Snapshotting these ids before an agent run lets the router attribute the
-        events that appear afterwards (the messages the current user sent) to
-        their sender. Returns an empty set when the ADK session does not exist
-        yet (before the first run).
+        Two kinds of events can be attributed to a sender: ADK ``"user"``
+        events (keyed by their own event id) and tool-response
+        (function-response) events -- including A2UI user-action
+        acknowledgements -- keyed by their function response id (the
+        ``tool_call_id`` the frontend sent). Snapshotting this set before an
+        agent run lets the router attribute whatever appears afterwards to the
+        user who drove the run. Returns an empty set when the ADK session does
+        not exist yet (before the first run).
 
         Args:
-            ws_id: Identifier of the WorkflowSession whose user events to read.
+            ws_id: Identifier of the WorkflowSession whose events to read.
 
         Returns:
-            The set of ADK event ids whose author is ``"user"``.
+            The set of correlation keys (event ids and tool_call_ids)
+            representing attributable events already present in the session.
 
         Raises:
             NotFoundError: If no WorkflowSession exists with the given ID.
@@ -223,21 +236,35 @@ class WorkflowSessionService:
         )
         if session is None:
             return set()
-        return {event.id for event in session.events if event.author == "user"}
+        keys: set[str] = set()
+        for event in session.events:
+            if event.author == "user":
+                keys.add(event.id)
+            for fr in event.get_function_responses():
+                if fr.id:
+                    keys.add(fr.id)
+        return keys
 
     async def record_new_senders(
-        self, ws_id: str, prior_event_ids: set[str], sender_user_id: str
+        self, ws_id: str, prior_keys: set[str], sender_user_id: str
     ) -> None:
-        """Attribute the session's new ``"user"`` events to ``sender_user_id``.
+        """Attribute the session's new attributable events to ``sender_user_id``.
 
-        Compares the session's current ``"user"`` events against the snapshot
-        taken before the run; every event not in ``prior_event_ids`` was sent by
-        the current user, so it is recorded (idempotently). Does nothing when the
-        ADK session does not exist.
+        Compares the session's current attributable keys (see
+        :meth:`attributable_keys`) against the snapshot taken before the run;
+        every key not in ``prior_keys`` was produced by the current user, so it
+        is recorded (idempotently) -- new ``"user"`` events by their event id,
+        and new tool-response events (including A2UI action acknowledgements)
+        by their tool_call_id. Tool responses matching
+        :data:`_RENDER_ACK_RESPONSE` are skipped: they are the no-op
+        acknowledgements the frontend flushes for every still-pending render
+        call on the user's next run, not actions the user performed, and
+        attributing them would paint the user's avatar onto surfaces they never
+        touched. Does nothing when the ADK session does not exist.
 
         Args:
             ws_id: Identifier of the WorkflowSession that was run.
-            prior_event_ids: The ``"user"`` event ids present before the run.
+            prior_keys: The attributable keys present before the run.
             sender_user_id: The user who sent the new messages.
 
         Raises:
@@ -253,12 +280,21 @@ class WorkflowSessionService:
         if session is None:
             return
         for event in session.events:
-            if event.author == "user" and event.id not in prior_event_ids:
+            if event.author == "user" and event.id not in prior_keys:
                 await self._meta.set_sender(
                     workflow_session_id=ws_id,
                     adk_event_id=event.id,
                     sender_user_id=sender_user_id,
                 )
+            for fr in event.get_function_responses():
+                if fr.response == _RENDER_ACK_RESPONSE:
+                    continue
+                if fr.id and fr.id not in prior_keys:
+                    await self._meta.set_sender(
+                        workflow_session_id=ws_id,
+                        adk_event_id=fr.id,
+                        sender_user_id=sender_user_id,
+                    )
 
     async def record_message_tasks(self, ws_id: str) -> None:
         """Associate each ADK event with the WorkflowTask in progress at the time.

@@ -148,7 +148,7 @@ describe("useChat", () => {
         isRunning: false,
         isStreaming: false,
         error: null,
-        pendingRenderToolCallIds: [],
+        pendingRenderCalls: [],
       },
     });
     renderHook(() => useChat(null), { wrapper: makeWrapper(store) });
@@ -165,7 +165,7 @@ describe("useChat", () => {
         isRunning: false,
         isStreaming: false,
         error: null,
-        pendingRenderToolCallIds: [],
+        pendingRenderCalls: [],
       },
     });
     renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
@@ -220,10 +220,12 @@ describe("useChat", () => {
       await capturedSubscriber?.onToolCallEndEvent?.({
         event: { toolCallId: "tc-a2ui-1" },
         toolCallName: RENDER_A2UI_TOOL_NAME,
-        toolCallArgs: {},
+        toolCallArgs: { surfaceId: "s1" },
       } as unknown as Parameters<NonNullable<AgentSubscriber["onToolCallEndEvent"]>>[0]);
     });
-    expect(store.getState().chat.pendingRenderToolCallIds).toEqual(["tc-a2ui-1"]);
+    expect(store.getState().chat.pendingRenderCalls).toEqual([
+      { toolCallId: "tc-a2ui-1", surfaceId: "s1" },
+    ]);
 
     // The stream finishes (dispatch(finishRun()) runs on the OLD mount's closure,
     // but writes into the same shared store) before the user gets to click the
@@ -251,6 +253,6 @@ describe("useChat", () => {
     expect(mockAgent.addMessage).toHaveBeenCalledWith(
       expect.objectContaining({ role: "tool", toolCallId: "tc-a2ui-1" })
     );
-    expect(store.getState().chat.pendingRenderToolCallIds).toEqual([]);
+    expect(store.getState().chat.pendingRenderCalls).toEqual([]);
   });
 });

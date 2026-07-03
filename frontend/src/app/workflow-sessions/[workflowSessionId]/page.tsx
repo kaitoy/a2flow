@@ -1,6 +1,7 @@
 /** @module WorkflowSessionPage — Loads a WorkflowSession record and renders the workflow chat view. */
 "use client";
 
+import { A2UIActivityType } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { useParams } from "next/navigation";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
@@ -15,7 +16,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
+import { A2UI_SOURCE_TOOL_CALL_ID_KEY } from "@/lib/agentActivity";
 import { formatUserName, getWorkflowSession, type User, type WorkflowSession } from "@/lib/api";
+import { APPROVAL_ACTIVITY_TYPE } from "@/lib/approvalTool";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
@@ -28,6 +31,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
     isStreaming,
     error,
     sendMessage,
+    sendA2uiAction,
     sendApprovalResult,
     messageSenders,
     senderUsers,
@@ -60,12 +64,24 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  /** Render a tooltip-wrapped avatar for the given (possibly unresolved) user. */
+  const userAvatar = (user: User | null): ReactNode => (
+    <Tooltip label={user ? formatUserName(user) : "Unknown sender"}>
+      <span className="inline-flex">
+        <Avatar user={user} size={28} />
+      </span>
+    </Tooltip>
+  );
+
   /**
    * Render the sender avatar shown beside a message: the workflow agent for its
-   * own (`assistant`) messages, and the resolved human (applicant or approver)
-   * for `user` messages. Messages whose sender is unknown fall back to the
-   * session owner; messages the current viewer just sent are attributed to them
-   * until the persisted, attributed history reloads.
+   * own (`assistant`) messages, the resolved human (applicant or approver) for
+   * `user` messages, and — once resolved — the human who acted on a rendered
+   * A2UI surface or decided an approval request. Messages whose sender is
+   * unknown fall back to the session owner; messages the current viewer just
+   * sent are attributed to them until the persisted, attributed history
+   * reloads. A2UI surfaces and approval controls show no avatar until someone
+   * has actually resolved them.
    */
   const renderAvatar = (message: Message): ReactNode => {
     if (message.role === "assistant") {
@@ -87,13 +103,21 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
       } else {
         user = senderUsers.get(ws.userId) ?? null;
       }
-      return (
-        <Tooltip label={user ? formatUserName(user) : "Unknown sender"}>
-          <span className="inline-flex">
-            <Avatar user={user} size={28} />
-          </span>
-        </Tooltip>
-      );
+      return userAvatar(user);
+    }
+    if (message.role === "activity" && message.activityType === A2UIActivityType) {
+      const toolCallId = message.content[A2UI_SOURCE_TOOL_CALL_ID_KEY];
+      const senderId = typeof toolCallId === "string" ? messageSenders.get(toolCallId) : undefined;
+      if (!senderId) return null;
+      return userAvatar(senderUsers.get(senderId) ?? null);
+    }
+    if (message.role === "activity" && message.activityType === APPROVAL_ACTIVITY_TYPE) {
+      // An approval activity's id is the render_approval tool call id, which is
+      // also the key the decision's tool result is attributed under — so the
+      // sender lookup resolves to the user who approved or rejected.
+      const senderId = messageSenders.get(message.id);
+      if (!senderId) return null;
+      return userAvatar(senderUsers.get(senderId) ?? null);
     }
     return null;
   };
@@ -132,6 +156,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           highlightedTaskId={highlightedTaskId}
           onVisibleTaskChange={setScrolledTaskId}
           onHoverTask={setHoveredTaskId}
+          onAction={sendA2uiAction}
           onApprovalResolved={sendApprovalResult}
         />
         <ChatInput onSend={sendMessage} disabled={isRunning} />

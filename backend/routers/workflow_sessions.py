@@ -108,13 +108,17 @@ async def workflow_session_agent(
     the correct ADK tools are loaded regardless of the global agent state.
     SystemMessages are stripped to prevent prompt injection.
 
-    Because the run is keyed by the session owner, the new user messages are
+    Because the run is keyed by the session owner, the new messages are
     attributed to the actual sender (``current_user_id``) after streaming
-    completes: the ``"user"`` events present before the run are snapshotted, and
-    any that appear afterwards are recorded as the current user's.
+    completes: the session's attributable keys present before the run are
+    snapshotted (``"user"`` event ids and tool-response tool_call_ids -- the
+    latter covers A2UI user-action acknowledgements), and any that appear
+    afterwards are recorded as the current user's -- except no-op render
+    acknowledgements, which merely unblock surfaces nobody acted on (see
+    ``WorkflowSessionService.record_new_senders``).
     """
     adk_agent, ws = await service.resolve_agent(ws_id)
-    prior_user_event_ids = await service.user_event_ids(ws_id)
+    prior_keys = await service.attributable_keys(ws_id)
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
@@ -127,7 +131,7 @@ async def workflow_session_agent(
         async for event in adk_agent.run(input_data):
             yield encoder.encode(event)
         # Attribute the messages this run appended to the user who sent them.
-        await service.record_new_senders(ws_id, prior_user_event_ids, current_user_id)
+        await service.record_new_senders(ws_id, prior_keys, current_user_id)
         # Associate each message with the workflow task in progress at the time.
         await service.record_message_tasks(ws_id)
 

@@ -5,8 +5,10 @@ import {
 } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import type { PendingRenderCall } from "@/lib/a2uiAction";
 import { A2UI_CATALOG_ID } from "@/lib/a2uiCatalogId";
 import {
+  A2UI_SOURCE_TOOL_CALL_ID_KEY,
   CALL_MCP_TOOL_NAME,
   getToolDisplayName,
   TOOL_CALL_ACTIVITY_TYPE,
@@ -77,7 +79,10 @@ function synthesizeA2UIActivityMessage(
     id: `a2ui-surface-${surfaceId}-${toolCallId}`,
     role: "activity",
     activityType: A2UIActivityType,
-    content: { [A2UI_OPERATIONS_KEY]: ops },
+    // Stamped alongside the ops so the UI can look up who resolved this
+    // render call (see A2UI_SOURCE_TOOL_CALL_ID_KEY) without parsing it back
+    // out of the id above, whose format differs from the live-streaming path.
+    content: { [A2UI_OPERATIONS_KEY]: ops, [A2UI_SOURCE_TOOL_CALL_ID_KEY]: toolCallId },
   } as Message;
 }
 
@@ -99,6 +104,35 @@ function synthesizeMcpToolActivityMessage(
     activityType: TOOL_CALL_ACTIVITY_TYPE,
     content: { name: getToolDisplayName(CALL_MCP_TOOL_NAME, args), status: "done", isMcp: true },
   } as Message;
+}
+
+/**
+ * Derive the `render_a2ui` calls still awaiting an acknowledging tool result
+ * from a persisted message history.
+ *
+ * A render call is pending when no `tool` message answers its id (the same
+ * rule as the A2UI middleware's `findPendingToolCalls`). Because the history
+ * is the source of truth, this re-derivation also restores pending calls that
+ * live streaming never saw in this browser — after a page reload, or when
+ * another participant's run rendered the surface — so a user action can always
+ * be delivered as the acted-on call's tool result.
+ */
+function derivePendingRenderCalls(messages: Message[]): PendingRenderCall[] {
+  const answeredIds = new Set<string>();
+  for (const msg of messages) {
+    if (msg.role === "tool" && msg.toolCallId) answeredIds.add(msg.toolCallId);
+  }
+  const pending: PendingRenderCall[] = [];
+  for (const msg of messages) {
+    if (msg.role !== "assistant" || !msg.toolCalls) continue;
+    for (const tc of msg.toolCalls) {
+      if (tc.function.name !== RENDER_A2UI_TOOL_NAME || answeredIds.has(tc.id)) continue;
+      const args = parseToolArgs(tc.function.arguments);
+      const surfaceId = typeof args?.surfaceId === "string" ? args.surfaceId : null;
+      pending.push({ toolCallId: tc.id, surfaceId });
+    }
+  }
+  return pending;
 }
 
 /**
@@ -144,8 +178,8 @@ interface ChatState {
   isStreaming: boolean;
   /** Non-null when the last agent run produced an error. */
   error: string | null;
-  /** Tool call ids from render_a2ui calls awaiting an acknowledging tool result on the next agent run. */
-  pendingRenderToolCallIds: string[];
+  /** render_a2ui calls awaiting an acknowledging tool result on the next agent run. */
+  pendingRenderCalls: PendingRenderCall[];
 }
 
 const initialState: ChatState = {
@@ -154,7 +188,7 @@ const initialState: ChatState = {
   isRunning: false,
   isStreaming: false,
   error: null,
-  pendingRenderToolCallIds: [],
+  pendingRenderCalls: [],
 };
 
 const chatSlice = createSlice({
@@ -167,7 +201,7 @@ const chatSlice = createSlice({
       state.isRunning = false;
       state.isStreaming = false;
       state.error = null;
-      state.pendingRenderToolCallIds = [];
+      state.pendingRenderCalls = [];
     },
     resumeSession(state, action: PayloadAction<{ sessionId: string; messages: Message[] }>) {
       state.sessionId = action.payload.sessionId;
@@ -175,7 +209,12 @@ const chatSlice = createSlice({
       state.isRunning = false;
       state.isStreaming = false;
       state.error = null;
-      state.pendingRenderToolCallIds = [];
+      // The persisted history is the source of truth for unacknowledged render
+      // calls: re-deriving them keeps calls still pending across polls, and
+      // restores calls this browser never streamed (page reload, or a surface
+      // rendered by another participant's run) so a later user action can
+      // still be delivered as the acted-on call's tool result.
+      state.pendingRenderCalls = derivePendingRenderCalls(action.payload.messages);
     },
     addUserMessage(state, action: PayloadAction<{ id: string; content: string }>) {
       state.messages.push({
@@ -233,11 +272,11 @@ const chatSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
-    addPendingRenderToolCallId(state, action: PayloadAction<string>) {
-      state.pendingRenderToolCallIds.push(action.payload);
+    addPendingRenderCall(state, action: PayloadAction<PendingRenderCall>) {
+      state.pendingRenderCalls.push(action.payload);
     },
-    clearPendingRenderToolCallIds(state) {
-      state.pendingRenderToolCallIds = [];
+    clearPendingRenderCalls(state) {
+      state.pendingRenderCalls = [];
     },
   },
 });
@@ -254,8 +293,8 @@ export const {
   finishRun,
   setError,
   clearError,
-  addPendingRenderToolCallId,
-  clearPendingRenderToolCallIds,
+  addPendingRenderCall,
+  clearPendingRenderCalls,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

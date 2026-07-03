@@ -1,7 +1,9 @@
 "use client";
 
+import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "react-redux";
+import { buildRenderAckMessages, type PendingRenderCall } from "@/lib/a2uiAction";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
   createWorkflowSessionAgent,
@@ -18,9 +20,9 @@ import logger from "@/lib/logger";
 import type { AppDispatch, RootState } from "@/store";
 import {
   addActivityMessage,
-  addPendingRenderToolCallId,
+  addPendingRenderCall,
   addUserMessage,
-  clearPendingRenderToolCallIds,
+  clearPendingRenderCalls,
   finishRun,
   resumeSession,
   setError,
@@ -38,12 +40,19 @@ const POLL_INTERVAL_MS = 10_000;
  * approval-control activity messages.
  *
  * @param dispatch - The Redux dispatch used to apply the mapped actions.
- * @param onRenderA2uiEnd - Called with the tool call ID whenever a RENDER_A2UI
- *   tool call ends, so the next agent run can acknowledge the render.
+ * @param onRenderA2uiEnd - Called with the pending render call (tool call ID
+ *   plus rendered surfaceId) whenever a RENDER_A2UI tool call ends, so the next
+ *   agent run can acknowledge the render.
  */
-function makeEventHandlers(dispatch: AppDispatch, onRenderA2uiEnd: (toolCallId: string) => void) {
+function makeEventHandlers(
+  dispatch: AppDispatch,
+  onRenderA2uiEnd: (call: PendingRenderCall) => void
+) {
   return createAgentSubscriber(dispatch, {
-    onRenderA2uiEnd,
+    onRenderA2uiEnd: (toolCallId, args) => {
+      const surfaceId = typeof args.surfaceId === "string" ? args.surfaceId : null;
+      onRenderA2uiEnd({ toolCallId, surfaceId });
+    },
     onRenderApprovalEnd: (toolCallId, args) => {
       // Render approve/reject controls; the decision is sent back as this
       // tool's result by sendApprovalResult, so it is not auto-acknowledged.
@@ -69,7 +78,8 @@ function makeEventHandlers(dispatch: AppDispatch, onRenderA2uiEnd: (toolCallId: 
  * Manage the agent interaction for a workflow session.
  *
  * On mount, loads prior message history and auto-sends the workflow prompt if the session is new.
- * Subsequent user messages are routed to the workflow session's dedicated agent endpoint.
+ * Subsequent user messages and A2UI user actions (e.g. a button click inside a
+ * rendered surface) are routed to the workflow session's dedicated agent endpoint.
  *
  * Because the chat is shared (owner, approvers, and the agent all post into it),
  * the history is also re-fetched every {@link POLL_INTERVAL_MS} so messages from
@@ -167,24 +177,19 @@ export function useWorkflowSessionChat(
 
       const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
 
-      const pendingIds = store.getState().chat.pendingRenderToolCallIds;
-      for (const tcId of pendingIds) {
-        agent.addMessage({
-          id: crypto.randomUUID(),
-          role: "tool",
-          toolCallId: tcId,
-          content: "rendered",
-        });
+      const pending = store.getState().chat.pendingRenderCalls;
+      for (const ack of buildRenderAckMessages(pending)) {
+        agent.addMessage(ack);
       }
-      if (pendingIds.length > 0) dispatch(clearPendingRenderToolCallIds());
+      if (pending.length > 0) dispatch(clearPendingRenderCalls());
 
       agent.addMessage({ id: msgId, role: "user", content: prompt });
 
       try {
         await agent.runAgent(
           { tools: [RENDER_APPROVAL_TOOL] },
-          makeEventHandlers(dispatch, (tcId) => {
-            dispatch(addPendingRenderToolCallId(tcId));
+          makeEventHandlers(dispatch, (call) => {
+            dispatch(addPendingRenderCall(call));
           })
         );
       } catch (err) {
@@ -204,6 +209,53 @@ export function useWorkflowSessionChat(
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
+  const sendA2uiAction = useCallback(
+    async (action: A2UIUserAction) => {
+      if (!sessionId || isRunning) return;
+
+      dispatch(startRun());
+
+      const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
+
+      // The action rides as the tool result of the render call that produced
+      // the acted-on surface; other pending calls get the no-op ack, so the
+      // backend attributes only the acted-on call to this user.
+      const pending = store.getState().chat.pendingRenderCalls;
+      for (const ack of buildRenderAckMessages(pending, action)) {
+        agent.addMessage(ack);
+      }
+      if (pending.length > 0) dispatch(clearPendingRenderCalls());
+
+      try {
+        await agent.runAgent(
+          { tools: [RENDER_APPROVAL_TOOL] },
+          makeEventHandlers(dispatch, (call) => {
+            dispatch(addPendingRenderCall(call));
+          })
+        );
+      } catch (err) {
+        logger.error(err, "stream error");
+        dispatch(setError("An error occurred while communicating with the agent."));
+        return;
+      }
+
+      dispatch(finishRun());
+      // refreshMessages guards on isRunningRef/isStreamingRef, which only sync
+      // to Redux on the next render; set them directly so the resync below
+      // doesn't bail out on the stale pre-finishRun value.
+      isRunningRef.current = false;
+      isStreamingRef.current = false;
+      // Resync the full history (not just the sender map): the just-resolved
+      // A2UI card's live-stamped sourceToolCallId can differ from the id the
+      // backend persisted (ADK remaps long-running client-tool ids between the
+      // streamed and persisted events), so re-deriving it from /messages via
+      // the same resumed-history path keeps it consistent with the sender map.
+      void refreshMessages();
+    },
+    [workflowSessionId, sessionId, isRunning, dispatch, refreshMessages]
+  );
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendApprovalResult = useCallback(
     async (toolCallId: string, decision: "approved" | "rejected") => {
       if (!sessionId || isRunning) return;
@@ -212,16 +264,11 @@ export function useWorkflowSessionChat(
 
       const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
 
-      const pendingIds = store.getState().chat.pendingRenderToolCallIds;
-      for (const tcId of pendingIds) {
-        agent.addMessage({
-          id: crypto.randomUUID(),
-          role: "tool",
-          toolCallId: tcId,
-          content: "rendered",
-        });
+      const pending = store.getState().chat.pendingRenderCalls;
+      for (const ack of buildRenderAckMessages(pending)) {
+        agent.addMessage(ack);
       }
-      if (pendingIds.length > 0) dispatch(clearPendingRenderToolCallIds());
+      if (pending.length > 0) dispatch(clearPendingRenderCalls());
 
       // The approval tool's result resumes the agent run with the decision.
       agent.addMessage({
@@ -234,8 +281,8 @@ export function useWorkflowSessionChat(
       try {
         await agent.runAgent(
           { tools: [RENDER_APPROVAL_TOOL] },
-          makeEventHandlers(dispatch, (tcId) => {
-            dispatch(addPendingRenderToolCallId(tcId));
+          makeEventHandlers(dispatch, (call) => {
+            dispatch(addPendingRenderCall(call));
           })
         );
       } catch (err) {
@@ -245,11 +292,15 @@ export function useWorkflowSessionChat(
       }
 
       dispatch(finishRun());
+      // The decision's tool result is now persisted with its sender; refresh
+      // the attribution map so the approval bubble shows the decider's avatar
+      // right away instead of waiting for the next poll.
+      void refreshSenders();
       // The agent may have advanced tasks while resuming after the decision;
       // refresh task state and the per-message task association.
       void refreshTasks();
     },
-    [workflowSessionId, sessionId, isRunning, dispatch, refreshTasks]
+    [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and autoSentRef guards against double-sends
@@ -299,6 +350,7 @@ export function useWorkflowSessionChat(
     isStreaming,
     error,
     sendMessage,
+    sendA2uiAction,
     sendApprovalResult,
     messageSenders,
     senderUsers,

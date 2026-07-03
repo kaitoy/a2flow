@@ -73,7 +73,7 @@ describe("ChatShell", () => {
             isRunning: true,
             isStreaming: false,
             error: null,
-            pendingRenderToolCallIds: [],
+            pendingRenderCalls: [],
           },
         },
       }
@@ -95,7 +95,7 @@ describe("ChatShell", () => {
             isRunning: false,
             isStreaming: false,
             error: "Something went wrong",
-            pendingRenderToolCallIds: [],
+            pendingRenderCalls: [],
           },
         },
       }
@@ -125,7 +125,7 @@ describe("ChatShell", () => {
             isRunning: false,
             isStreaming: false,
             error: "Oops",
-            pendingRenderToolCallIds: [],
+            pendingRenderCalls: [],
           },
         },
       }
@@ -170,7 +170,7 @@ describe("ChatShell", () => {
             isRunning: true,
             isStreaming: false,
             error: null,
-            pendingRenderToolCallIds: [],
+            pendingRenderCalls: [],
           },
         },
       }
@@ -193,7 +193,7 @@ describe("ChatShell", () => {
             isRunning: false,
             isStreaming: false,
             error: null,
-            pendingRenderToolCallIds: [],
+            pendingRenderCalls: [],
           },
         },
       }
@@ -216,7 +216,7 @@ describe("ChatShell", () => {
             isRunning: false,
             isStreaming: false,
             error: null,
-            pendingRenderToolCallIds: [],
+            pendingRenderCalls: [],
           },
         },
       }

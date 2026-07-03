@@ -71,6 +71,36 @@ describe("ActivityMessageBubble", () => {
     expect(screen.getByTestId("a2ui-renderer-mock")).toHaveAttribute("data-has-action", "true");
   });
 
+  it("renders the avatar beside an A2UI surface when provided", () => {
+    render(
+      <ActivityMessageBubble
+        message={{
+          id: "1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { a2ui_operations: [] },
+        }}
+        avatar={<div data-testid="mock-avatar" />}
+      />
+    );
+    expect(screen.getByTestId("mock-avatar")).toBeInTheDocument();
+  });
+
+  it("ignores the avatar for the tool_call activity type", () => {
+    render(
+      <ActivityMessageBubble
+        message={{
+          id: "tc-1",
+          role: "activity",
+          activityType: TOOL_CALL_ACTIVITY_TYPE,
+          content: { name: "search_web", status: "done" },
+        }}
+        avatar={<div data-testid="mock-avatar" />}
+      />
+    );
+    expect(screen.queryByTestId("mock-avatar")).not.toBeInTheDocument();
+  });
+
   it("renders ApprovalControls for the approval activity type", () => {
     render(
       <ActivityMessageBubble
@@ -86,6 +116,22 @@ describe("ActivityMessageBubble", () => {
       "data-approval-id",
       "appr-1"
     );
+  });
+
+  it("renders the avatar beside the approval controls when provided", () => {
+    render(
+      <ActivityMessageBubble
+        message={{
+          id: "tc-1",
+          role: "activity",
+          activityType: APPROVAL_ACTIVITY_TYPE,
+          content: { approvalId: "appr-1", title: "Deploy?" },
+        }}
+        avatar={<div data-testid="mock-avatar" />}
+      />
+    );
+    expect(screen.getByTestId("approval-controls-mock")).toBeInTheDocument();
+    expect(screen.getByTestId("mock-avatar")).toBeInTheDocument();
   });
 
   it("renders a tool-call status line for the tool_call activity type", () => {

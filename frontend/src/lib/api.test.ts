@@ -6,6 +6,7 @@ import { server } from "@/test/msw/server";
 import {
   createChatAgent,
   getSessionMessages,
+  getWorkflowSessionMessageSenders,
   getWorkflowSessionMessages,
   getWorkflowSessionMessageTasks,
   listSessions,
@@ -84,6 +85,34 @@ describe("getWorkflowSessionMessageTasks", () => {
     expect(result.get("m1")).toBeUndefined();
     expect(result.get("m2")).toBe("task-a");
     expect(result.get("m3")).toBe("task-b");
+  });
+});
+
+describe("getWorkflowSessionMessageSenders", () => {
+  it("keys user messages by id and tool messages by toolCallId, skipping unattributed", async () => {
+    server.use(
+      http.get(`${BASE}/api/v1/workflow-sessions/:wsId/messages`, () =>
+        envelope([
+          { id: "m1", role: "user", content: "go", senderUserId: "alice" },
+          { id: "m2", role: "assistant", content: "a", senderUserId: null },
+          {
+            id: "m3-random",
+            role: "tool",
+            toolCallId: "tc-1",
+            content: "ack",
+            senderUserId: "bob",
+          },
+          { id: "m4", role: "user", content: "later", senderUserId: null },
+        ])
+      )
+    );
+    const result = await getWorkflowSessionMessageSenders("ws-1");
+    expect(result.get("m1")).toBe("alice");
+    // Tool messages are keyed by toolCallId, not their own (regenerated) id.
+    expect(result.get("tc-1")).toBe("bob");
+    expect(result.has("m3-random")).toBe(false);
+    expect(result.has("m2")).toBe(false);
+    expect(result.has("m4")).toBe(false);
   });
 });
 

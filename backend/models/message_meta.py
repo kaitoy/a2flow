@@ -26,15 +26,24 @@ class MessageMeta(BaseEntity, table=True):
 
     ``workflow_session_id`` references the owning workflow session
     (``ON DELETE CASCADE``), so deleting the session removes its metadata.
-    ``adk_event_id`` is the id of the ADK event, which is also the ``id`` of the
-    message surfaced to the frontend. ``sender_user_id`` references the user who
-    actually sent a human message (``ON DELETE RESTRICT``, matching the audit
-    user FKs) and is null for agent-authored events. ``workflow_task_id``
-    references the WorkflowTask that was in progress when the event was produced
-    (``ON DELETE CASCADE``) and is null for messages produced outside any task
-    (for example the initial planning exchange). ``(workflow_session_id,
-    adk_event_id)`` is unique so each event has at most one metadata row and
-    re-recording is idempotent.
+    ``adk_event_id`` is a correlation key, not always literally the ADK event
+    id: for ``"user"`` events it is the event id, which is also the ``id`` of
+    the message surfaced to the frontend. For tool-response events (including
+    A2UI user-action acknowledgements) it is instead the resolved
+    ``tool_call_id`` -- `adk_events_to_messages` regenerates a fresh random
+    ``id`` for every tool message on each read, so the event id itself cannot
+    be used to correlate a row back to a surfaced message; ``tool_call_id`` is
+    the only value that round-trips stably. ``sender_user_id`` references the
+    user who actually sent a human message or performed the user action a tool
+    response carries (``ON DELETE RESTRICT``, matching the audit user FKs) and
+    is null for agent-authored events; no-op render acknowledgements (the
+    frontend's automatic ``{"status": "rendered"}`` tool results) are never
+    recorded, so a row's presence on a tool response means a genuine action. ``workflow_task_id`` references the WorkflowTask
+    that was in progress when the event was produced (``ON DELETE CASCADE``)
+    and is null for messages produced outside any task (for example the
+    initial planning exchange). ``(workflow_session_id, adk_event_id)`` is
+    unique so each event has at most one metadata row and re-recording is
+    idempotent.
     """
 
     __tablename__ = "message_meta"

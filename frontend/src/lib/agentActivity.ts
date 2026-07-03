@@ -22,6 +22,15 @@ export const REASONING_ACTIVITY_TYPE = "reasoning";
  */
 export const CALL_MCP_TOOL_NAME = "call_mcp_tool";
 
+/**
+ * Content key holding the `render_a2ui` tool call id that produced an A2UI
+ * activity message, stamped on at construction time (both the live-streaming
+ * and resumed-history paths) so the UI can look up who resolved that call
+ * without parsing it back out of the message's own id, whose format differs
+ * between the two paths.
+ */
+export const A2UI_SOURCE_TOOL_CALL_ID_KEY = "sourceToolCallId";
+
 /** Lifecycle state of a tool-call activity line. */
 export type ToolCallStatus = "running" | "done";
 

@@ -4,14 +4,15 @@ import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect } from "react";
 import { useStore } from "react-redux";
-import { createAgentSubscriber } from "@/lib/agentSubscriber";
+import { buildRenderAckMessages } from "@/lib/a2uiAction";
+import { type AgentSubscriberOptions, createAgentSubscriber } from "@/lib/agentSubscriber";
 import { createChatAgent, getSessionMessages } from "@/lib/api";
 import logger from "@/lib/logger";
-import type { RootState } from "@/store";
+import type { AppDispatch, RootState } from "@/store";
 import {
-  addPendingRenderToolCallId,
+  addPendingRenderCall,
   addUserMessage,
-  clearPendingRenderToolCallIds,
+  clearPendingRenderCalls,
   finishRun,
   resumeSession,
   setError,
@@ -20,14 +21,18 @@ import {
 } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
-/** Serialize an A2UIUserAction into a human-readable string sent as a user message to the agent. */
-function formatActionContent(action: A2UIUserAction): string {
-  const name = action.name ?? "unknown_action";
-  const surfaceId = action.surfaceId ?? "unknown_surface";
-  let text = `User performed action "${name}" on surface "${surfaceId}"`;
-  if (action.sourceComponentId) text += ` (component: ${action.sourceComponentId})`;
-  text += `. Context: ${action.context ? JSON.stringify(action.context) : "{}"}`;
-  return text;
+/**
+ * Build the `onRenderA2uiEnd` subscriber option that records a finished
+ * `render_a2ui` call (tool call id plus rendered surfaceId) as pending, so the
+ * next agent run can acknowledge it.
+ */
+function makePendingRenderHandler(
+  dispatch: AppDispatch
+): AgentSubscriberOptions["onRenderA2uiEnd"] {
+  return (toolCallId, args) => {
+    const surfaceId = typeof args.surfaceId === "string" ? args.surfaceId : null;
+    dispatch(addPendingRenderCall({ toolCallId, surfaceId }));
+  };
 }
 
 /**
@@ -99,16 +104,11 @@ export function useChat(initialSessionId: string | null) {
 
       const agent = createChatAgent(activeSessionId);
 
-      const pendingIds = store.getState().chat.pendingRenderToolCallIds;
-      for (const tcId of pendingIds) {
-        agent.addMessage({
-          id: crypto.randomUUID(),
-          role: "tool",
-          toolCallId: tcId,
-          content: "rendered",
-        });
+      const pending = store.getState().chat.pendingRenderCalls;
+      for (const ack of buildRenderAckMessages(pending)) {
+        agent.addMessage(ack);
       }
-      if (pendingIds.length > 0) dispatch(clearPendingRenderToolCallIds());
+      if (pending.length > 0) dispatch(clearPendingRenderCalls());
 
       agent.addMessage({ id: msgId, role: "user", content: prompt });
 
@@ -116,9 +116,7 @@ export function useChat(initialSessionId: string | null) {
         await agent.runAgent(
           undefined,
           createAgentSubscriber(dispatch, {
-            onRenderA2uiEnd: (tcId) => {
-              dispatch(addPendingRenderToolCallId(tcId));
-            },
+            onRenderA2uiEnd: makePendingRenderHandler(dispatch),
           })
         );
       } catch (err) {
@@ -140,21 +138,20 @@ export function useChat(initialSessionId: string | null) {
       dispatch(startRun());
 
       const agent = createChatAgent(sessionId);
-      const content = formatActionContent(action);
 
-      const pendingIds = store.getState().chat.pendingRenderToolCallIds;
-      for (const tcId of pendingIds) {
-        agent.addMessage({ id: crypto.randomUUID(), role: "tool", toolCallId: tcId, content });
+      // The action rides as the tool result of the render call that produced
+      // the acted-on surface; other pending calls get the no-op ack.
+      const pending = store.getState().chat.pendingRenderCalls;
+      for (const ack of buildRenderAckMessages(pending, action)) {
+        agent.addMessage(ack);
       }
-      if (pendingIds.length > 0) dispatch(clearPendingRenderToolCallIds());
+      if (pending.length > 0) dispatch(clearPendingRenderCalls());
 
       try {
         await agent.runAgent(
           undefined,
           createAgentSubscriber(dispatch, {
-            onRenderA2uiEnd: (tcId) => {
-              dispatch(addPendingRenderToolCallId(tcId));
-            },
+            onRenderA2uiEnd: makePendingRenderHandler(dispatch),
           })
         );
       } catch (err) {

@@ -6,6 +6,7 @@ import {
 import { describe, expect, it } from "vitest";
 import { A2UI_CATALOG_ID } from "@/lib/a2uiCatalogId";
 import {
+  A2UI_SOURCE_TOOL_CALL_ID_KEY,
   CALL_MCP_TOOL_NAME,
   TOOL_CALL_ACTIVITY_TYPE,
   type ToolCallActivityContent,
@@ -13,11 +14,11 @@ import {
 import type { Message } from "./chatSlice";
 import chatReducer, {
   addActivityMessage,
-  addPendingRenderToolCallId,
+  addPendingRenderCall,
   addUserMessage,
   appendDelta,
   clearError,
-  clearPendingRenderToolCallIds,
+  clearPendingRenderCalls,
   endAssistantMessage,
   finishRun,
   resumeSession,
@@ -40,7 +41,7 @@ describe("chatSlice", () => {
       expect(state.isRunning).toBe(false);
       expect(state.isStreaming).toBe(false);
       expect(state.error).toBeNull();
-      expect(state.pendingRenderToolCallIds).toEqual([]);
+      expect(state.pendingRenderCalls).toEqual([]);
     });
   });
 
@@ -55,7 +56,58 @@ describe("chatSlice", () => {
       expect(state.messages).toHaveLength(2);
       expect(state.messages[0].id).toBe("m1");
       expect(state.isRunning).toBe(false);
-      expect(state.pendingRenderToolCallIds).toEqual([]);
+      expect(state.pendingRenderCalls).toEqual([]);
+    });
+
+    it("derives pending render calls from unanswered render_a2ui tool calls", () => {
+      // The history is the source of truth: a render call with no answering
+      // tool message is still pending — even in a browser that never streamed
+      // it (page reload, or another participant's run) — while an answered one
+      // is not. This keeps a later user action deliverable as the acted-on
+      // call's tool result.
+      const messages: Message[] = [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-answered",
+              type: "function",
+              function: {
+                name: RENDER_A2UI_TOOL_NAME,
+                arguments: JSON.stringify({ surfaceId: "surf-old", components: [] }),
+              },
+            },
+          ],
+        },
+        { id: "t1", role: "tool", toolCallId: "tc-answered", content: "rendered" },
+        {
+          id: "m2",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-pending",
+              type: "function",
+              function: {
+                name: RENDER_A2UI_TOOL_NAME,
+                arguments: JSON.stringify({ surfaceId: "surf-new", components: [] }),
+              },
+            },
+          ],
+        },
+      ];
+      // A stale live-streamed pending call is replaced by the derived list.
+      const stateWithPending = {
+        ...emptyState,
+        sessionId: "sess-1",
+        pendingRenderCalls: [{ toolCallId: "tc-stale", surfaceId: null }],
+      };
+      const state = chatReducer(stateWithPending, resumeSession({ sessionId: "sess-1", messages }));
+      expect(state.pendingRenderCalls).toEqual([
+        { toolCallId: "tc-pending", surfaceId: "surf-new" },
+      ]);
     });
 
     it("synthesizes A2UI activity message from RENDER_A2UI_TOOL_NAME tool call", () => {
@@ -89,6 +141,9 @@ describe("chatSlice", () => {
       if (activityMsg.role !== "activity") throw new Error("expected activity message");
       expect(activityMsg.activityType).toBe(A2UIActivityType);
       expect(activityMsg.id).toBe(`a2ui-surface-${surfaceId}-${toolCallId}`);
+      // Stamped so the UI can look up who resolved this render call without
+      // parsing it back out of the id above.
+      expect(activityMsg.content[A2UI_SOURCE_TOOL_CALL_ID_KEY]).toBe(toolCallId);
       const ops = activityMsg.content[A2UI_OPERATIONS_KEY] as {
         createSurface?: { catalogId?: string };
       }[];
@@ -235,28 +290,40 @@ describe("chatSlice", () => {
     });
   });
 
-  describe("addPendingRenderToolCallId", () => {
-    it("appends a tool call id", () => {
-      const state = chatReducer(emptyState, addPendingRenderToolCallId("tc-1"));
-      expect(state.pendingRenderToolCallIds).toEqual(["tc-1"]);
+  describe("addPendingRenderCall", () => {
+    it("appends a pending render call", () => {
+      const state = chatReducer(
+        emptyState,
+        addPendingRenderCall({ toolCallId: "tc-1", surfaceId: "surf-1" })
+      );
+      expect(state.pendingRenderCalls).toEqual([{ toolCallId: "tc-1", surfaceId: "surf-1" }]);
     });
 
-    it("appends to existing ids without clobbering", () => {
+    it("appends to existing calls without clobbering", () => {
       const state = chatReducer(
-        { ...emptyState, pendingRenderToolCallIds: ["tc-1"] },
-        addPendingRenderToolCallId("tc-2")
+        { ...emptyState, pendingRenderCalls: [{ toolCallId: "tc-1", surfaceId: "surf-1" }] },
+        addPendingRenderCall({ toolCallId: "tc-2", surfaceId: null })
       );
-      expect(state.pendingRenderToolCallIds).toEqual(["tc-1", "tc-2"]);
+      expect(state.pendingRenderCalls).toEqual([
+        { toolCallId: "tc-1", surfaceId: "surf-1" },
+        { toolCallId: "tc-2", surfaceId: null },
+      ]);
     });
   });
 
-  describe("clearPendingRenderToolCallIds", () => {
+  describe("clearPendingRenderCalls", () => {
     it("resets to an empty array", () => {
       const state = chatReducer(
-        { ...emptyState, pendingRenderToolCallIds: ["tc-1", "tc-2"] },
-        clearPendingRenderToolCallIds()
+        {
+          ...emptyState,
+          pendingRenderCalls: [
+            { toolCallId: "tc-1", surfaceId: "surf-1" },
+            { toolCallId: "tc-2", surfaceId: null },
+          ],
+        },
+        clearPendingRenderCalls()
       );
-      expect(state.pendingRenderToolCallIds).toEqual([]);
+      expect(state.pendingRenderCalls).toEqual([]);
     });
   });
 });

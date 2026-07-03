@@ -322,6 +322,129 @@ async def test_workflow_session_messages_record_sender_after_run(
     assert messages[0]["senderUserId"] == "alice"
 
 
+async def test_workflow_session_messages_record_tool_sender_after_run(
+    workflow_client: AsyncClient,
+    mock_adk_agent: MagicMock,
+    real_session_service: InMemorySessionService,
+) -> None:
+    from google.adk.events.event import Event
+    from google.genai import types
+
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+
+    async def _appending_run(
+        input_data: Any, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        # Simulate ag_ui_adk appending an A2UI user-action tool-result event
+        # (a function response, author "tool") to the shared, owner-keyed ADK
+        # session during the run.
+        session = await real_session_service.create_session(
+            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+        )
+        await real_session_service.append_event(
+            session,
+            Event(
+                author="tool",
+                content=types.Content(
+                    role="function",
+                    parts=[
+                        types.Part(
+                            function_response=types.FunctionResponse(
+                                id="tc-1",
+                                name="tc-1",
+                                response={"result": "ack"},
+                            )
+                        )
+                    ],
+                ),
+            ),
+        )
+        return
+        yield
+
+    mock_adk_agent.run = _appending_run
+
+    # Alice (a designated approver, not the owner) resolves the A2UI action.
+    await workflow_client.post(
+        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Id": "alice"},
+    )
+
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+    )
+    messages = assert_ok(response)
+    assert len(messages) == 1
+    assert messages[0]["role"] == "tool"
+    assert messages[0]["toolCallId"] == "tc-1"
+    # The tool result is attributed to the user who resolved it, even though
+    # `adk_events_to_messages` regenerates its `id` on every read.
+    assert messages[0]["senderUserId"] == "alice"
+
+
+async def test_workflow_session_messages_skip_render_ack_sender(
+    workflow_client: AsyncClient,
+    mock_adk_agent: MagicMock,
+    real_session_service: InMemorySessionService,
+) -> None:
+    from google.adk.events.event import Event
+    from google.genai import types
+
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+
+    async def _appending_run(
+        input_data: Any, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        # Simulate ag_ui_adk appending the frontend's no-op render
+        # acknowledgement -- the automatic tool result flushed for a pending
+        # render_a2ui call the user never acted on.
+        session = await real_session_service.create_session(
+            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+        )
+        await real_session_service.append_event(
+            session,
+            Event(
+                author="tool",
+                content=types.Content(
+                    role="function",
+                    parts=[
+                        types.Part(
+                            function_response=types.FunctionResponse(
+                                id="tc-1",
+                                name="tc-1",
+                                response={"status": "rendered"},
+                            )
+                        )
+                    ],
+                ),
+            ),
+        )
+        return
+        yield
+
+    mock_adk_agent.run = _appending_run
+
+    # Alice's run flushes the no-op acknowledgement, but she did not act on
+    # the surface, so the response must stay unattributed.
+    await workflow_client.post(
+        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Id": "alice"},
+    )
+
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+    )
+    messages = assert_ok(response)
+    assert len(messages) == 1
+    assert messages[0]["role"] == "tool"
+    assert messages[0]["toolCallId"] == "tc-1"
+    assert messages[0]["senderUserId"] is None
+
+
 async def test_workflow_session_messages_record_task_after_run(
     workflow_client: AsyncClient,
     mock_adk_agent: MagicMock,

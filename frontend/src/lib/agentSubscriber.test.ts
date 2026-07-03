@@ -1,6 +1,10 @@
-import { RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
+import { A2UIActivityType, RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
 import { describe, expect, it, vi } from "vitest";
-import { CALL_MCP_TOOL_NAME, TOOL_CALL_ACTIVITY_TYPE } from "@/lib/agentActivity";
+import {
+  A2UI_SOURCE_TOOL_CALL_ID_KEY,
+  CALL_MCP_TOOL_NAME,
+  TOOL_CALL_ACTIVITY_TYPE,
+} from "@/lib/agentActivity";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import { RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
 import { makeStore } from "@/test/test-utils";
@@ -59,9 +63,11 @@ describe("createAgentSubscriber", () => {
     await sub.onToolCallEndEvent?.({
       event: { toolCallId: "tc-a2ui" },
       toolCallName: RENDER_A2UI_TOOL_NAME,
-      toolCallArgs: {},
+      toolCallArgs: { surfaceId: "surf-1" },
     } as never);
-    expect(onRenderA2uiEnd).toHaveBeenCalledWith("tc-a2ui");
+    // The parsed args ride along so the caller can record which surface the
+    // pending call rendered.
+    expect(onRenderA2uiEnd).toHaveBeenCalledWith("tc-a2ui", { surfaceId: "surf-1" });
     expect(store.getState().chat.messages).toHaveLength(0);
   });
 
@@ -95,5 +101,33 @@ describe("createAgentSubscriber", () => {
     const msg = lastActivity(store);
     expect(store.getState().chat.messages).toHaveLength(1);
     expect(msg.content).toMatchObject({ text: "Plan the steps" });
+  });
+
+  it("stamps sourceToolCallId onto an A2UI activity snapshot from its messageId", async () => {
+    const store = makeStore();
+    const sub = createAgentSubscriber(store.dispatch, { onRenderA2uiEnd: vi.fn() });
+
+    await sub.onActivitySnapshotEvent?.({
+      event: {
+        messageId: "a2ui-surface-tc-live-1",
+        activityType: A2UIActivityType,
+        content: { a2ui_operations: [] },
+      },
+    } as never);
+
+    const msg = lastActivity(store);
+    expect(msg.content).toMatchObject({ [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-live-1" });
+  });
+
+  it("leaves non-A2UI activity snapshots untouched", async () => {
+    const store = makeStore();
+    const sub = createAgentSubscriber(store.dispatch, { onRenderA2uiEnd: vi.fn() });
+
+    await sub.onActivitySnapshotEvent?.({
+      event: { messageId: "other-1", activityType: "some_other_type", content: { foo: "bar" } },
+    } as never);
+
+    const msg = lastActivity(store);
+    expect(msg.content).toEqual({ foo: "bar" });
   });
 });

@@ -53,6 +53,21 @@ describe("MessageBubble", () => {
     expect(screen.getByTestId("a2ui-renderer-mock")).toBeInTheDocument();
   });
 
+  it("forwards avatar to an A2UI activity message", () => {
+    render(
+      <MessageBubble
+        message={{
+          id: "1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { a2ui_operations: [] },
+        }}
+        avatar={<div data-testid="mock-avatar" />}
+      />
+    );
+    expect(screen.getByTestId("mock-avatar")).toBeInTheDocument();
+  });
+
   it("renders null for activity message with unknown activityType", () => {
     const { container } = render(
       <MessageBubble
