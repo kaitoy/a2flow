@@ -109,13 +109,13 @@ describe("MessageList", () => {
   it("shows the working indicator while running and not streaming", () => {
     const messages: Message[] = [{ id: "m1", role: "user", content: "hi" }];
     render(<MessageList messages={messages} isRunning={true} />);
-    expect(screen.getByText("エージェントが考えています…")).toBeInTheDocument();
+    expect(screen.getByText("Agent is thinking…")).toBeInTheDocument();
   });
 
   it("hides the working indicator while streaming text", () => {
     const messages: Message[] = [{ id: "m1", role: "assistant", content: "" }];
     render(<MessageList messages={messages} isRunning={true} isStreaming={true} />);
-    expect(screen.queryByText("エージェントが考えています…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent is thinking…")).not.toBeInTheDocument();
   });
 
   it("hides the working indicator when the last message is a running tool line", () => {
@@ -128,7 +128,7 @@ describe("MessageList", () => {
       } as Message,
     ];
     render(<MessageList messages={messages} isRunning={true} />);
-    expect(screen.queryByText("エージェントが考えています…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent is thinking…")).not.toBeInTheDocument();
   });
 
   it("wraps each task's messages in a group where the active task changes", () => {

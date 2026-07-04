@@ -47,7 +47,7 @@ describe("WorkflowTaskGroup", () => {
         <div>body</div>
       </WorkflowTaskGroup>
     );
-    expect(screen.getByText("タスク")).toBeInTheDocument();
+    expect(screen.getByText("Task")).toBeInTheDocument();
   });
 
   it("reports hover enter and leave with the task id", async () => {

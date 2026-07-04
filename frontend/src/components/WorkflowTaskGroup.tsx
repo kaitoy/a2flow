@@ -68,7 +68,7 @@ export function WorkflowTaskGroup({
           {index}
         </span>
         <span className="truncate text-sm font-medium text-on-surface">
-          {task?.title ?? "タスク"}
+          {task?.title ?? "Task"}
         </span>
         <span className="shrink-0 text-xs text-on-surface-variant">
           {formatStatusLabel(status)}

@@ -52,7 +52,7 @@ function WorkingIndicator() {
     <div className="mb-3 flex justify-start animate-message-in" aria-live="polite">
       <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs glass-panel text-on-surface-variant">
         <span className="inline-block h-2 w-2 rounded-full bg-accent shadow-glow animate-pulse" />
-        <span>エージェントが考えています…</span>
+        <span>Agent is thinking…</span>
       </div>
     </div>
   );
