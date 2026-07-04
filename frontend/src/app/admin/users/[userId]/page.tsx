@@ -172,9 +172,7 @@ export default function EditUserPage() {
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-              Avatar
-            </span>
+            <span className="text-label-caps">Avatar</span>
             <Avatar user={{ id: userId, username, avatarUpdatedAt, avatarConfig }} size={96} />
           </div>
 

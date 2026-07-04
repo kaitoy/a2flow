@@ -94,9 +94,7 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-        Avatar
-      </span>
+      <span className="text-label-caps">Avatar</span>
       <div className="flex items-center gap-4">
         {previewUrl ? (
           // biome-ignore lint/performance/noImgElement: a local object-URL preview of the chosen file; next/image cannot optimize an in-memory blob.

@@ -222,9 +222,7 @@ function PartGroup({ group, colors, selections, onSelect, onClear }: PartGroupPr
 
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-        {group.label}
-      </legend>
+      <legend className="text-label-caps">{group.label}</legend>
       <div className="flex flex-wrap gap-2">
         {group.selectionSlots.map((slotId) => (
           <button
@@ -279,9 +277,7 @@ function ColorPickers({ colors, onChange }: ColorPickersProps) {
   const slots: ColorSlot[] = humation1.colors.filter((slot) => slot.id !== "bottom");
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-        Colors
-      </legend>
+      <legend className="text-label-caps">Colors</legend>
       <div className="flex flex-wrap gap-4">
         {slots.map((slot) => (
           <label key={slot.id} className="flex items-center gap-2 text-sm text-on-surface">
@@ -320,9 +316,7 @@ function BackgroundPicker({ mode, color, onModeChange, onColorChange }: Backgrou
   ];
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-        Background
-      </legend>
+      <legend className="text-label-caps">Background</legend>
       <div className="flex flex-wrap items-center gap-4">
         {modes.map((m) => (
           <label key={m.value} className="flex items-center gap-1.5 text-sm text-on-surface">

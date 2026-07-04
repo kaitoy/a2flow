@@ -12,10 +12,7 @@ interface FormFieldProps {
 export function FormField({ htmlFor, label, required, error, children }: FormFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor={htmlFor}
-        className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant"
-      >
+      <label htmlFor={htmlFor} className="text-label-caps">
         {label} {required && <span className="text-accent">*</span>}
       </label>
       {children}

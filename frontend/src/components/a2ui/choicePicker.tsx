@@ -33,11 +33,7 @@ export const customChoicePicker = createComponentImplementation(
 
     return (
       <div className="flex flex-col gap-2 w-full">
-        {props.label && (
-          <strong className="text-[11px] leading-[16px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-            {String(props.label)}
-          </strong>
-        )}
+        {props.label && <strong className="text-label-caps">{String(props.label)}</strong>}
         {props.filterable && (
           <input
             type="text"

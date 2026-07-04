@@ -490,6 +490,15 @@ body::after {
   color: transparent;
 }
 
+@utility text-label-caps {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-on-surface-variant);
+}
+
 /* Shimmering placeholder surface for skeleton loading states. A tinted base
    block (--skeleton-base) gives the placeholder visible body against the glass
    panel in both themes, while a brighter band (--skeleton-sheen) sweeps across
