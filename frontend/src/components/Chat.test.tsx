@@ -12,9 +12,6 @@ vi.mock("@/hooks/useChat", () => ({
     error: null,
     sendMessage: vi.fn(),
     sendA2uiAction: vi.fn(),
-    switchSession: vi.fn(),
-    newSession: vi.fn(),
-    onSessionDeleted: vi.fn(),
   })),
 }));
 
@@ -53,9 +50,6 @@ describe("Chat", () => {
       error: null,
       sendMessage: vi.fn(),
       sendA2uiAction: vi.fn(),
-      switchSession: vi.fn(),
-      newSession: vi.fn(),
-      onSessionDeleted: vi.fn(),
     });
     render(<Chat sessionId="sess-1" />);
     expect(screen.getByTestId("chat-input-mock")).toBeDisabled();

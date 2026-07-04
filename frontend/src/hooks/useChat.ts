@@ -39,7 +39,7 @@ function makePendingRenderHandler(
  * Manage the active chat session and agent invocation for the general chat UI.
  *
  * Handles session initialization, message history loading on resume, sending user
- * messages, forwarding A2UI user actions, and session navigation.
+ * messages, and forwarding A2UI user actions.
  */
 export function useChat(initialSessionId: string | null) {
   const router = useRouter();
@@ -67,28 +67,6 @@ export function useChat(initialSessionId: string | null) {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSessionId, dispatch]);
-
-  const switchSession = useCallback(
-    (targetSessionId: string) => {
-      if (isRunning) return;
-      router.push(`/sessions/${targetSessionId}`);
-    },
-    [isRunning, router]
-  );
-
-  const newSession = useCallback(() => {
-    if (isRunning) return;
-    router.push("/new-session");
-  }, [isRunning, router]);
-
-  const onSessionDeleted = useCallback(
-    (deletedId: string) => {
-      if (deletedId === sessionId) {
-        router.push("/new-session");
-      }
-    },
-    [sessionId, router]
-  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
@@ -176,8 +154,5 @@ export function useChat(initialSessionId: string | null) {
     error,
     sendMessage,
     sendA2uiAction,
-    switchSession,
-    newSession,
-    onSessionDeleted,
   };
 }

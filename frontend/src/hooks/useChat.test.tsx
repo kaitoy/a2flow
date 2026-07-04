@@ -95,42 +95,6 @@ describe("useChat", () => {
     await waitFor(() => expect(store.getState().chat.error).not.toBeNull());
   });
 
-  it("switchSession calls router.push when not running", async () => {
-    const { useRouter } = await import("next/navigation");
-    const pushMock = vi.fn();
-    vi.mocked(useRouter).mockReturnValue({ push: pushMock } as never);
-    const store = makeStore();
-    const { result } = renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
-    await waitForInit(store);
-    result.current.switchSession("sess-xyz");
-    expect(pushMock).toHaveBeenCalledWith("/sessions/sess-xyz");
-  });
-
-  it("switchSession does NOT call router.push when isRunning", async () => {
-    const { useRouter } = await import("next/navigation");
-    const pushMock = vi.fn();
-    vi.mocked(useRouter).mockReturnValue({ push: pushMock } as never);
-    const store = makeStore();
-    const { result } = renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
-    await waitForInit(store);
-    act(() => {
-      store.dispatch(startRun());
-    });
-    result.current.switchSession("sess-xyz");
-    expect(pushMock).not.toHaveBeenCalled();
-  });
-
-  it("newSession navigates to /new-session (no backend call)", async () => {
-    const { useRouter } = await import("next/navigation");
-    const pushMock = vi.fn();
-    vi.mocked(useRouter).mockReturnValue({ push: pushMock } as never);
-    const store = makeStore();
-    const { result } = renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
-    await waitForInit(store);
-    result.current.newSession();
-    expect(pushMock).toHaveBeenCalledWith("/new-session");
-  });
-
   it("init effect skips fetch when initialSessionId is null (/new-session route)", async () => {
     const store = makeStore();
     renderHook(() => useChat(null), { wrapper: makeWrapper(store) });
