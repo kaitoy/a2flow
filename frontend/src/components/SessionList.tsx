@@ -159,7 +159,7 @@ export function SessionList({
                 "group relative mx-2 my-0.5 flex w-[calc(100%-1rem)] items-stretch rounded-xl",
                 "transition-[background-color,color,box-shadow] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
                 isActive
-                  ? "bg-accent-soft text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                  ? "bg-accent-soft text-on-surface shadow-[inset_0_1px_0_var(--inner-top-highlight)]"
                   : "text-on-surface-variant hover:bg-glass hover:text-on-surface",
               ].join(" ")}
             >

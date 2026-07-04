@@ -28,9 +28,9 @@ function ToastCard({ toast }: { toast: Toast }) {
   return (
     <div
       className={[
-        "flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm shadow-lg",
+        "flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm",
         isError
-          ? "border border-error/40 bg-error-container text-on-error-container backdrop-blur-md"
+          ? "border border-error/40 bg-error-container text-on-error-container shadow-glass-lg backdrop-blur-md"
           : "glass-panel-overlay border border-success/40 text-on-surface",
       ].join(" ")}
       role="status"

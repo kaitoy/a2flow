@@ -52,7 +52,7 @@ const DONE =
 const VARIANT: Record<ButtonVariant, string> = {
   primary:
     "px-4 py-2 text-on-primary bg-gradient-to-br from-accent to-secondary " +
-    "shadow-[0_4px_16px_-4px_var(--color-accent-soft),inset_0_1px_0_rgba(255,255,255,0.4)] " +
+    "shadow-[0_4px_16px_-4px_var(--color-accent-soft),inset_0_1px_0_var(--inner-top-highlight)] " +
     "hover:shadow-glow motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0",
   secondary:
     "px-4 py-2 glass-panel text-on-surface hover:text-accent hover:shadow-glow " +

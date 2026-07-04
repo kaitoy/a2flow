@@ -55,7 +55,7 @@ export const customChoicePicker = createComponentImplementation(
                   className={[
                     "cursor-pointer rounded-full px-3.5 py-1.5 text-sm tracking-tight transition-all duration-150 motion-safe:hover:scale-[1.03]",
                     isSelected
-                      ? "bg-gradient-to-br from-accent to-secondary text-on-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                      ? "bg-gradient-to-br from-accent to-secondary text-on-primary shadow-[inset_0_1px_0_var(--inner-top-highlight)]"
                       : "glass-panel text-on-surface hover:text-accent",
                   ].join(" ")}
                 >

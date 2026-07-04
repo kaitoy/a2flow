@@ -56,9 +56,7 @@ export function ChatInput({ onSend, disabled }: Props) {
         style={{
           boxShadow: glow.glow.to(
             (g) =>
-              `0 28px 60px -16px rgba(15, 23, 42, 0.18), ` +
-              `inset 0 1px 0 rgba(255, 255, 255, 0.6), ` +
-              `0 0 ${36 + g * 32}px rgba(20, 184, 166, ${0.0 + g * 0.55})`
+              `var(--shadow-glass-lg), 0 0 ${36 + g * 32}px rgba(var(--color-accent-rgb), ${0.0 + g * 0.55})`
           ),
         }}
         className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl glass-panel-strong p-2"

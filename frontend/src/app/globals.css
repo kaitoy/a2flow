@@ -59,6 +59,7 @@
   --color-divider: var(--c-divider);
   --color-accent: var(--c-accent);
   --color-accent-soft: var(--c-accent-soft);
+  --color-accent-rgb: var(--c-accent-rgb);
 
   /* Shadows (also used as utility shadow-{name}) */
   --shadow-card: var(--s-card);
@@ -145,6 +146,10 @@
 
   --c-accent: #0e7c7b;
   --c-accent-soft: rgba(20, 184, 166, 0.18);
+  /* R,G,B channels of the accent glow color, for animated/alpha-blended
+     contexts (e.g. ChatInput's spring-driven glow) that can't express alpha
+     as a static rgba() literal. */
+  --c-accent-rgb: 20, 184, 166;
 
   /* Skeleton placeholder: a soft gray tint with a white sweeping sheen so the
      shimmer reads clearly against the light glass panels. */
@@ -155,6 +160,12 @@
   --s-glass: 0 10px 32px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   --s-glass-lg: 0 28px 60px -16px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   --s-glow: 0 0 36px rgba(20, 184, 166, 0.32);
+
+  /* Inner highlight for elements combining a colored directional shadow with a
+     white inset top highlight (Button primary, chat bubbles, active nav/session
+     items, choice-picker chips). Distinct from --s-glass's own inset highlight
+     since these sit on solid/gradient fills, not glass. */
+  --inner-top-highlight: rgba(255, 255, 255, 0.4);
 
   /* Background blob colors (sampled by body::before). */
   --bg-blob-1: rgba(94, 234, 212, 0.5);
@@ -207,6 +218,7 @@
 
   --c-accent: #5eead4;
   --c-accent-soft: rgba(94, 234, 212, 0.18);
+  --c-accent-rgb: 94, 234, 212;
 
   /* Skeleton placeholder: a light slate tint with a brighter sweeping sheen
      against the dark glass panels. */
@@ -217,6 +229,8 @@
   --s-glass: 0 12px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --s-glass-lg: 0 32px 70px -16px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --s-glow: 0 0 42px rgba(94, 234, 212, 0.45);
+
+  --inner-top-highlight: rgba(255, 255, 255, 0.16);
 
   --bg-blob-1: rgba(45, 212, 191, 0.32);
   --bg-blob-2: rgba(167, 139, 250, 0.32);

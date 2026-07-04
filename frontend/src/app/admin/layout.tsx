@@ -69,7 +69,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         className={[
                           "relative block rounded-xl px-3 py-2 text-sm transition-all duration-150",
                           isActive
-                            ? "bg-accent-soft text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                            ? "bg-accent-soft text-on-surface shadow-[inset_0_1px_0_var(--inner-top-highlight)]"
                             : "text-on-surface-variant hover:bg-glass hover:text-on-surface",
                         ].join(" ")}
                       >

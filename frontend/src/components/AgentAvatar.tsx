@@ -24,7 +24,7 @@ export function AgentAvatar({ size = 28, className }: AgentAvatarProps) {
   const cls = [
     "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full",
     "bg-gradient-to-br from-accent to-secondary text-on-primary",
-    "shadow-[0_8px_24px_-12px_var(--color-accent-soft),inset_0_1px_0_rgba(255,255,255,0.35)]",
+    "shadow-[0_8px_24px_-12px_var(--color-accent-soft),inset_0_1px_0_var(--inner-top-highlight)]",
     className,
   ]
     .filter(Boolean)
