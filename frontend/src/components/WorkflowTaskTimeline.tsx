@@ -4,6 +4,16 @@ import { ChevronLeft, ListTree } from "lucide-react";
 import type { WorkflowTask } from "@/lib/api";
 import { formatStatusLabel, STATUS_RAIL_CLASS } from "@/lib/workflow-task-status";
 
+/** Expanded panel's outer `aside` class, shared with {@link WorkflowSessionSkeleton} so its loading chrome can't drift from the real sidebar. */
+export const TASK_TIMELINE_ASIDE_CLASS =
+  "flex w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl";
+
+/** Expanded panel's header row class, shared with {@link WorkflowSessionSkeleton}. */
+export const TASK_TIMELINE_HEADER_CLASS = "flex items-center justify-between px-4 py-3";
+
+/** Expanded panel's task-list class, shared with {@link WorkflowSessionSkeleton}. */
+export const TASK_TIMELINE_LIST_CLASS = "relative flex-1 overflow-y-auto px-3 pb-4";
+
 /**
  * Props for {@link WorkflowTaskTimeline}.
  */
@@ -63,8 +73,8 @@ export function WorkflowTaskTimeline({
   }
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl">
-      <div className="flex items-center justify-between px-4 py-3">
+    <aside className={TASK_TIMELINE_ASIDE_CLASS}>
+      <div className={TASK_TIMELINE_HEADER_CLASS}>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
           Tasks
         </h2>
@@ -78,7 +88,7 @@ export function WorkflowTaskTimeline({
           <ChevronLeft size={16} strokeWidth={1.8} aria-hidden="true" />
         </button>
       </div>
-      <ol className="relative flex-1 overflow-y-auto px-3 pb-4">
+      <ol className={TASK_TIMELINE_LIST_CLASS}>
         {tasks.length === 0 ? (
           <li className="px-2 py-3 text-sm text-on-surface-variant">No tasks yet.</li>
         ) : (
