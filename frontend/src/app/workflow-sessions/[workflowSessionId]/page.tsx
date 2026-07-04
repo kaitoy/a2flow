@@ -177,7 +177,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
 function WorkflowSessionSkeleton() {
   return (
     <div role="status" aria-label="Loading" className="flex h-screen overflow-hidden">
-      <div className="flex w-[260px] shrink-0 flex-col gap-3 border-r border-glass-border bg-glass px-4 py-4 backdrop-blur-xl">
+      <div className="flex w-64 shrink-0 flex-col gap-3 border-r border-glass-border bg-glass px-4 py-4 backdrop-blur-xl">
         <Skeleton className="h-4 w-16" />
         <Skeleton className="h-9 w-full rounded-xl" />
         <Skeleton className="h-9 w-full rounded-xl" />

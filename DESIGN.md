@@ -102,12 +102,13 @@ typography:
     fontWeight: '700'
     lineHeight: 12px
 rounded:
-  sm: 0.375rem
-  DEFAULT: 0.5rem
-  md: 0.5rem
-  lg: 0.75rem
-  xl: 1rem
-  2xl: 1.25rem
+  xs: 0.125rem
+  sm: 0.25rem
+  md: 0.375rem
+  lg: 0.5rem
+  xl: 0.75rem
+  2xl: 1rem
+  3xl: 1.5rem
   full: 9999px
 spacing:
   container-padding: 2rem
@@ -156,7 +157,7 @@ The palette has two roles: a saturated **accent** (teal in light, neon mint in d
 
 ## Typography
 
-**Inter** continues to be the sole typeface. Heading sizes are unchanged from earlier MD3 baselines, but **letter-spacing tightens** (`tracking-tight`) for headings to lean into the futuristic feel. Label-caps now use `0.08em` tracking and 11px size for a sharper, more compressed look.
+**Inter** remains the primary typeface for body text, labels, and most headings. **Space Grotesk** (`--font-space-grotesk`) is a secondary display typeface reserved for the "A2Flow" wordmark in `AppHeader`, giving the brand name a distinct geometric character while the rest of the UI stays on Inter. Heading sizes are unchanged from earlier MD3 baselines, but **letter-spacing tightens** (`tracking-tight`) for headings to lean into the futuristic feel. Label-caps now use `0.08em` tracking and 11px size for a sharper, more compressed look.
 
 ## Layout & Spacing
 
@@ -180,8 +181,8 @@ Depth is achieved through **layered translucency** rather than hard borders or h
 
 The shape language is **Soft Modern**.
 
-- **Glass panels & cards:** `1.25rem` (20px) radius (`rounded-2xl`).
-- **Buttons & inputs:** `1rem` (16px) radius (`rounded-xl`).
+- **Glass panels & cards:** `1rem` (16px) radius (`rounded-2xl`).
+- **Buttons & inputs:** `0.75rem` (12px) radius (`rounded-xl`).
 - **Chips & status badges:** `rounded-full` for pill shapes.
 - **Active sidebar item indicator:** A 3px accent vertical bar on the left edge, with a soft glow.
 
@@ -193,8 +194,8 @@ The shape language is **Soft Modern**.
   - *Ghost:* Transparent, on-surface-variant text, mild glass tint on hover; lifts 2px (motion-safe).
   - *Submitting state:* Buttons that send a server request (Save, Sign in, Approve/Reject, Load more) pass a `status` to the shared `Button` and cycle their label through three stages — idle → `pendingLabel` → `doneLabel` (e.g. `Save → Saving… → Saved!`), reverting to idle ~2s after success. All three labels are stacked in one grid cell so the button **reserves the widest label's width and never reflows** — the same "reserve layout to avoid a swap-time jump" intent as the **Skeleton**. The hidden sizer copies are `aria-hidden` so the button keeps its visible label as its accessible name. State is driven by the `useAsyncAction` hook (see Motion → Patterns).
   - *Success (`done`) state:* While "Saved!" shows, the button turns **solid success-green** (`--color-success`, overriding the variant's fill/gradient) with a leading **checkmark** icon and a matching green glow, and plays a one-shot celebratory **wiggle** (`motion-safe`). It is held **non-interactive** (rendered `disabled`, but kept at full opacity) for the whole ~2s so a completed save cannot be re-triggered. `pending` is likewise non-interactive but keeps the standard dimmed `disabled` look. Reduced-motion keeps the green + checkmark but drops the shake.
-- **Inputs / Textareas / Selects:** `glass-panel` background with accent ring on focus (`ring-accent/50`). 16px radius.
-- **Data Tables:** Wrapped in a 20px-radius `glass-panel`, `border-collapse`. Header uses a stronger glass tint (`glass-strong/70`) with a `divider` underline so it reads clearly apart from the body. Columns and rows are separated by `divider` grid lines — a dedicated token tinted dark in light mode and light in dark mode so it stays visible where the near-white `glass-border` would vanish (full strength in the header, `/60` in the body). Body rows are zebra-striped via the `even:` variant (`glass-strong/15`); hover overrides with an `accent-soft` wash. Each header cell carries a draggable resize strip on its right edge that tints `accent` on hover. Sort is a header pill (chevron tinted `accent` when active) and filter is a square `h-6 w-6` icon button with an `accent` dot when a filter is applied. By default every text cell clips to one line with an overflow tooltip; columns rendering interactive or multi-line content opt out. While loading, the body shows shimmering **skeleton** rows that mirror the column layout (no spinner) so the table never reflows on data arrival.
+- **Inputs / Textareas / Selects:** `glass-panel` background with accent ring on focus (`ring-accent/50`). 12px radius.
+- **Data Tables:** Wrapped in a 16px-radius `glass-panel`, `border-collapse`. Header uses a stronger glass tint (`glass-strong/70`) with a `divider` underline so it reads clearly apart from the body. Columns and rows are separated by `divider` grid lines — a dedicated token tinted dark in light mode and light in dark mode so it stays visible where the near-white `glass-border` would vanish (full strength in the header, `/60` in the body). Body rows are zebra-striped via the `even:` variant (`glass-strong/15`); hover overrides with an `accent-soft` wash. Each header cell carries a draggable resize strip on its right edge that tints `accent` on hover. Sort is a header pill (chevron tinted `accent` when active) and filter is a square `h-6 w-6` icon button with an `accent` dot when a filter is applied. By default every text cell clips to one line with an overflow tooltip; columns rendering interactive or multi-line content opt out. While loading, the body shows shimmering **skeleton** rows that mirror the column layout (no spinner) so the table never reflows on data arrival.
 - **Skeleton:** Shimmering placeholder surface (`@utility skeleton`: a tinted `--skeleton-base` block with a brighter `--skeleton-sheen` band swept across by `--animate-shimmer`). Both tokens are theme-tuned so the shimmer reads clearly against light and dark glass panels. Used to reserve layout during data fetches — list rows, edit-form fields, and the workflow chat view — so content swaps in without jump or blank flash. Reduced-motion collapses it to a static block.
 - **Status Badges:** Pill-shaped, gradient or glass per state.
 - **Chat bubbles:**

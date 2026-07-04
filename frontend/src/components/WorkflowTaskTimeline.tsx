@@ -63,7 +63,7 @@ export function WorkflowTaskTimeline({
   }
 
   return (
-    <aside className="flex w-[260px] shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl">
+    <aside className="flex w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl">
       <div className="flex items-center justify-between px-4 py-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
           Tasks
