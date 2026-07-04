@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { type RefObject, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 import { deleteNotification, markAllNotificationsRead, markNotificationRead } from "@/lib/api";
 import logger from "@/lib/logger";
 import { useMotionConfig } from "@/lib/motion";
@@ -88,26 +89,13 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
     };
   }, [open, computeCoords]);
 
-  // Close on Escape or a click outside both the panel and its anchor.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    const onPointer = (e: PointerEvent) => {
-      const target = e.target as Node;
-      if (anchorRef.current?.contains(target)) return;
-      const panel = document.getElementById("notification-panel");
-      if (panel?.contains(target)) return;
-      onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("pointerdown", onPointer);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onPointer);
-    };
-  }, [open, onClose, anchorRef]);
+  useDialogA11y({
+    open,
+    onClose,
+    anchorRef,
+    panelId: "notification-panel",
+    ready: coords !== null,
+  });
 
   const onSelect = useCallback(
     (id: string, workflowSessionId: string | null | undefined) => {
@@ -157,6 +145,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
           <animated.div
             id="notification-panel"
             role="dialog"
+            tabIndex={-1}
             aria-label="Notifications"
             style={{
               position: "fixed",

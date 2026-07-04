@@ -1,8 +1,8 @@
 import userEvent from "@testing-library/user-event";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
-import { render, screen, waitFor } from "@/test/test-utils";
+import { fireEvent, render, screen, waitFor } from "@/test/test-utils";
 import { UserMenu } from "./UserMenu";
 
 const replaceMock = vi.fn();
@@ -31,13 +31,27 @@ function makeUser(overrides: Partial<User> = {}): User {
 
 /** Render harness wiring a real anchor button to the menu under test. */
 function Harness({ user, onClose }: { user: User | null; onClose: () => void }) {
+  const [open, setOpen] = useState(true);
   const ref = useRef<HTMLButtonElement | null>(null);
   return (
     <>
-      <button type="button" ref={ref}>
+      {/* autoFocus simulates the anchor already holding focus from the click
+          that opens the menu in real usage, which the a11y hook needs in
+          order to capture it as the element to restore focus to on close. */}
+      {/* biome-ignore lint/a11y/noAutofocus: test-only, simulates a pre-focused trigger */}
+      <button type="button" ref={ref} autoFocus>
         anchor
       </button>
-      <UserMenu anchorRef={ref} open onClose={onClose} user={user} />
+      <button type="button">outside</button>
+      <UserMenu
+        anchorRef={ref}
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          onClose();
+        }}
+        user={user}
+      />
     </>
   );
 }
@@ -75,5 +89,45 @@ describe("UserMenu", () => {
     expect(onClose).toHaveBeenCalled();
     expect(store.getState().auth.user).toBeNull();
     expect(store.getState().auth.status).toBe("unauthenticated");
+  });
+
+  it("moves focus into the menu when it opens", async () => {
+    render(<Harness user={makeUser()} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus());
+  });
+
+  it("closes and returns focus to the anchor on Escape", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(<Harness user={makeUser()} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus());
+
+    await user.keyboard("{Escape}");
+
+    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText("anchor")).toHaveFocus());
+  });
+
+  it("closes on an outside pointerdown and returns focus to the anchor", async () => {
+    const onClose = vi.fn();
+    render(<Harness user={makeUser()} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus());
+
+    fireEvent.pointerDown(document.body);
+
+    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText("anchor")).toHaveFocus());
+  });
+
+  it("wraps Tab from the last item back to the first", async () => {
+    const user = userEvent.setup();
+    render(<Harness user={makeUser()} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus());
+
+    await user.tab();
+    expect(screen.getByRole("menuitem", { name: "Log out" })).toHaveFocus();
+    await user.tab();
+
+    expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus();
   });
 });

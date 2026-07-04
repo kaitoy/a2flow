@@ -1,13 +1,14 @@
 /** @module RegistrySearchDialog — modal to search the official MCP registry. */
 import { animated, useTransition } from "@react-spring/web";
 import { PackageSearch } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 import { type McpRegistryServerEntry, searchMcpRegistry } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 
@@ -32,7 +33,6 @@ const DEBOUNCE_MS = 300;
  * are returned by the backend, so every result is selectable.
  */
 export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearchDialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const config = useMotionConfig("gentle");
   const transitions = useTransition(open, {
     from: { opacity: 0, scale: 0.94 },
@@ -91,36 +91,7 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
     };
   }, [open, query]);
 
-  // Escape-to-close and a basic Tab focus trap, matching ConfirmDialog.
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (e.key === "Tab" && dialog) {
-        const focusable = dialog.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last?.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  useDialogA11y({ open, onClose, panelId: "registry-search-dialog", closeOnOutsideClick: false });
 
   async function loadMore() {
     if (!cursor) return;
@@ -148,12 +119,17 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
               style={{ opacity: style.opacity }}
               className="absolute inset-0 h-full w-full cursor-default border-0 bg-black/25 backdrop-blur-sm"
               onClick={onClose}
+              // Stop the backdrop itself from taking focus on click, so the
+              // a11y hook's close handler always restores focus to the
+              // trigger instead of leaving it on this transient scrim.
+              onMouseDown={(e) => e.preventDefault()}
               aria-label="Close registry search"
               tabIndex={-1}
             />
             <div className="relative flex min-h-full items-center justify-center p-4 pointer-events-none">
               <animated.div
-                ref={dialogRef}
+                id="registry-search-dialog"
+                tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="registry-search-title"
@@ -175,7 +151,6 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                 </p>
 
                 <Input
-                  autoFocus
                   value={term}
                   onChange={(e) => setTerm(e.target.value)}
                   placeholder="e.g. github, weather, search…"

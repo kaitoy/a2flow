@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { RegistrySearchDialog } from "@/components/admin/registry-search-dialog";
 import { envelope } from "@/test/msw/envelope";
@@ -92,5 +93,72 @@ describe("RegistrySearchDialog", () => {
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("moves focus into the search input when it opens", async () => {
+    server.use(pageHandler([]));
+    render(<RegistrySearchDialog open onClose={vi.fn()} onSelect={vi.fn()} />);
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: /search the mcp registry/i })).toHaveFocus()
+    );
+  });
+
+  it("closes on Escape", async () => {
+    server.use(pageHandler([]));
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(<RegistrySearchDialog open onClose={onClose} onSelect={vi.fn()} />);
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: /search the mcp registry/i })).toHaveFocus()
+    );
+
+    await user.keyboard("{Escape}");
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("wraps Tab from the Cancel button back to the search input", async () => {
+    server.use(pageHandler([]));
+    const user = userEvent.setup();
+    render(<RegistrySearchDialog open onClose={vi.fn()} onSelect={vi.fn()} />);
+    const input = await screen.findByRole("textbox", { name: /search the mcp registry/i });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    const dialog = screen.getByRole("dialog");
+    within(dialog)
+      .getByRole("button", { name: /cancel/i })
+      .focus();
+    await user.tab();
+
+    expect(input).toHaveFocus();
+  });
+
+  /** Wraps {@link RegistrySearchDialog} with a real trigger button, matching
+   * how it's opened in practice, so focus restoration on close is testable. */
+  function TriggerHarness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          open dialog
+        </button>
+        <RegistrySearchDialog open={open} onClose={() => setOpen(false)} onSelect={vi.fn()} />
+      </>
+    );
+  }
+
+  it("returns focus to the trigger after closing on Escape", async () => {
+    server.use(pageHandler([]));
+    const user = userEvent.setup();
+    render(<TriggerHarness />);
+
+    await user.click(screen.getByText("open dialog"));
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: /search the mcp registry/i })).toHaveFocus()
+    );
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.getByText("open dialog")).toHaveFocus());
   });
 });

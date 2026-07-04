@@ -1,7 +1,8 @@
-import { useRef } from "react";
+import userEvent from "@testing-library/user-event";
+import { useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Notification } from "@/lib/api";
-import { render, screen, waitFor } from "@/test/test-utils";
+import { fireEvent, render, screen, waitFor } from "@/test/test-utils";
 import { NotificationPanel } from "./NotificationPanel";
 
 const pushMock = vi.fn();
@@ -30,13 +31,26 @@ function makeNotification(overrides: Partial<Notification> = {}): Notification {
 
 /** Render harness wiring a real anchor button to the panel under test. */
 function Harness({ onClose }: { onClose: () => void }) {
+  const [open, setOpen] = useState(true);
   const ref = useRef<HTMLButtonElement | null>(null);
   return (
     <>
-      <button type="button" ref={ref}>
+      {/* autoFocus simulates the anchor already holding focus from the click
+          that opens the panel in real usage, which the a11y hook needs in
+          order to capture it as the element to restore focus to on close. */}
+      {/* biome-ignore lint/a11y/noAutofocus: test-only, simulates a pre-focused trigger */}
+      <button type="button" ref={ref} autoFocus>
         anchor
       </button>
-      <NotificationPanel anchorRef={ref} open onClose={onClose} />
+      <button type="button">outside</button>
+      <NotificationPanel
+        anchorRef={ref}
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          onClose();
+        }}
+      />
     </>
   );
 }
@@ -134,5 +148,83 @@ describe("NotificationPanel", () => {
     });
     await waitFor(() => screen.getByText("Plan ready for approval"));
     expect(screen.queryByRole("button", { name: "Mark all read" })).not.toBeInTheDocument();
+  });
+
+  it("moves focus into the panel when it opens", async () => {
+    render(<Harness onClose={vi.fn()} />, {
+      preloadedState: {
+        notifications: { items: [makeNotification()], unreadCount: 1, status: "idle" },
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Mark all read" })).toHaveFocus()
+    );
+  });
+
+  it("focuses the panel itself when there is nothing focusable inside it", async () => {
+    render(<Harness onClose={vi.fn()} />, {
+      preloadedState: { notifications: { items: [], unreadCount: 0, status: "idle" } },
+    });
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveFocus());
+  });
+
+  it("closes and returns focus to the anchor on Escape", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(<Harness onClose={onClose} />, {
+      preloadedState: {
+        notifications: {
+          items: [makeNotification({ read: true })],
+          unreadCount: 0,
+          status: "idle",
+        },
+      },
+    });
+    await waitFor(() => screen.getByText("Plan ready for approval"));
+
+    await user.keyboard("{Escape}");
+
+    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText("anchor")).toHaveFocus());
+  });
+
+  it("closes on an outside pointerdown and returns focus to the anchor", async () => {
+    const onClose = vi.fn();
+    render(<Harness onClose={onClose} />, {
+      preloadedState: {
+        notifications: {
+          items: [makeNotification({ read: true })],
+          unreadCount: 0,
+          status: "idle",
+        },
+      },
+    });
+    await waitFor(() => screen.getByText("Plan ready for approval"));
+
+    fireEvent.pointerDown(document.body);
+
+    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText("anchor")).toHaveFocus());
+  });
+
+  it("wraps Shift+Tab from the first focusable element back to the last", async () => {
+    const user = userEvent.setup();
+    render(<Harness onClose={vi.fn()} />, {
+      preloadedState: {
+        notifications: {
+          items: [makeNotification({ read: true })],
+          unreadCount: 0,
+          status: "idle",
+        },
+      },
+    });
+    // With no unread items, "Mark all read" is hidden: the only two focusable
+    // elements are the notification's select button (first) and its Dismiss
+    // button (last).
+    await waitFor(() => screen.getByText("Plan ready for approval"));
+
+    await user.tab({ shift: true });
+
+    expect(screen.getByRole("button", { name: "Dismiss" })).toHaveFocus();
   });
 });

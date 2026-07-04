@@ -4,6 +4,7 @@
 import { animated, useTransition } from "@react-spring/web";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 import { useMotionConfig } from "@/lib/motion";
 import { Input } from "./input";
 import { Select } from "./select";
@@ -100,34 +101,13 @@ export function TableFilterPopover({ label, value, onChange, options }: TableFil
     };
   }, [open, computeCoords]);
 
-  // Move focus into the field once the popover has opened.
-  useEffect(() => {
-    if (!open || !coords) return;
-    const raf = requestAnimationFrame(() => {
-      const panel = document.getElementById("table-filter-popover");
-      (panel?.querySelector("input, select") as HTMLElement | null)?.focus();
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [open, coords]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    const onPointer = (e: PointerEvent) => {
-      const target = e.target as Node;
-      if (buttonRef.current?.contains(target)) return;
-      if (document.getElementById("table-filter-popover")?.contains(target)) return;
-      setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("pointerdown", onPointer);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onPointer);
-    };
-  }, [open]);
+  useDialogA11y({
+    open,
+    onClose: () => setOpen(false),
+    anchorRef: buttonRef,
+    panelId: "table-filter-popover",
+    ready: coords !== null,
+  });
 
   useEffect(() => {
     return () => {
@@ -181,6 +161,7 @@ export function TableFilterPopover({ label, value, onChange, options }: TableFil
                 <animated.div
                   id="table-filter-popover"
                   role="dialog"
+                  tabIndex={-1}
                   aria-label={`Filter ${label}`}
                   style={{
                     position: "fixed",
