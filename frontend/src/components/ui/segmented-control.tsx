@@ -49,7 +49,7 @@ export function SegmentedControl<T extends string>({
           "duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
           selected
-            ? "bg-accent text-white shadow-sm"
+            ? "bg-accent text-on-primary shadow-sm"
             : "text-on-surface-variant hover:text-on-surface",
         ].join(" ");
 
