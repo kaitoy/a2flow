@@ -227,7 +227,12 @@ export function MessageList({
           </animated.div>
         )}
         {runs.map((run) => {
-          const key = run.messages[0]?.id ?? run.anchorId;
+          // Prefer the task's stable anchorId over the run's leading message id:
+          // messageTasks refreshes independently of messages, so the message
+          // that happens to lead a task's run can change between renders even
+          // though the task itself hasn't — keying on messages[0] there would
+          // remount the whole group (e.g. an in-progress ApprovalControls).
+          const key = run.anchorId ?? run.messages[0]?.id;
           if (!run.taskId) {
             return <Fragment key={key}>{run.messages.map(renderBubble)}</Fragment>;
           }

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { type Approval, type ApprovalStatus, getApproval, resolveApproval } from "@/lib/api";
+import { type Approval, type ApprovalStatus, resolveApproval } from "@/lib/api";
+import { getApprovalCached } from "@/lib/approvalCache";
 import logger from "@/lib/logger";
 import { useAppSelector } from "@/store/hooks";
 import { Button } from "./ui/button";
@@ -49,7 +50,7 @@ export function ApprovalControls({
 
   useEffect(() => {
     let active = true;
-    getApproval(approvalId)
+    getApprovalCached(approvalId)
       .then((approval: Approval) => {
         if (!active) return;
         setApprover(approval.approver ?? null);

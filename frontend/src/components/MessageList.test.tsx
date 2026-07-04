@@ -1,6 +1,7 @@
 import type { Message } from "@ag-ui/core";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkflowTask } from "@/lib/api";
 import { MessageList } from "./MessageList";
@@ -16,6 +17,8 @@ const makeTask = (id: string, title: string): WorkflowTask =>
     toolBindings: [],
   }) as WorkflowTask;
 
+const { mountSpy } = vi.hoisted(() => ({ mountSpy: vi.fn() }));
+
 vi.mock("./MessageBubble", () => ({
   MessageBubble: ({
     message,
@@ -25,11 +28,19 @@ vi.mock("./MessageBubble", () => ({
     message: Message;
     isStreaming: boolean;
     avatar?: ReactNode;
-  }) => (
-    <div data-testid={`bubble-${message.id}`} data-streaming={String(isStreaming)}>
-      {avatar}
-    </div>
-  ),
+  }) => {
+    // Mount-only (empty deps), mirroring how ApprovalControls fetches on mount —
+    // lets tests detect an unwanted remount of a message bubble.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally mount-only
+    useEffect(() => {
+      mountSpy(message.id);
+    }, []);
+    return (
+      <div data-testid={`bubble-${message.id}`} data-streaming={String(isStreaming)}>
+        {avatar}
+      </div>
+    );
+  },
 }));
 
 describe("MessageList", () => {
@@ -241,6 +252,42 @@ describe("MessageList", () => {
     );
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("does not remount a task group's bubbles when a lagging messageTasks update changes the run's leading message", () => {
+    const messages: Message[] = [
+      { id: "m0", role: "user", content: "kick off" },
+      { id: "m1", role: "assistant", content: "working" },
+      { id: "appr-1", role: "activity", activityType: "approval", content: {} } as Message,
+    ];
+    const tasksById = new Map<string, WorkflowTask>([["task-a", makeTask("task-a", "Task A")]]);
+
+    const { rerender } = render(
+      <MessageList
+        messages={messages}
+        messageTasks={new Map([["m1", "task-a"]])}
+        tasksById={tasksById}
+      />
+    );
+    mountSpy.mockClear();
+
+    // messageTasks "catches up" and now also maps the earlier message to the
+    // same task — this changes the run's leading message from m1 to m0
+    // without changing the task itself, which must not remount the group.
+    rerender(
+      <MessageList
+        messages={messages}
+        messageTasks={
+          new Map([
+            ["m0", "task-a"],
+            ["m1", "task-a"],
+          ])
+        }
+        tasksById={tasksById}
+      />
+    );
+
+    expect(mountSpy).not.toHaveBeenCalledWith("appr-1");
   });
 
   it("renders no task groups when messageTasks is omitted", () => {

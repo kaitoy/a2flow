@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import * as api from "@/lib/api";
+import { __resetApprovalCacheForTests } from "@/lib/approvalCache";
 import type { RootState } from "@/store";
 import { render, screen, waitFor } from "@/test/test-utils";
 import { ApprovalControls } from "./ApprovalControls";
@@ -17,6 +18,8 @@ function authState(userId: string): Partial<RootState> {
 }
 
 beforeEach(() => {
+  __resetApprovalCacheForTests();
+  vi.mocked(api.getApproval).mockClear();
   // By default the current user "u1" is the designated approver.
   vi.mocked(api.getApproval).mockResolvedValue({ status: "pending", approver: "u1" } as never);
   vi.mocked(api.resolveApproval).mockResolvedValue({ status: "approved" } as never);
@@ -104,5 +107,38 @@ describe("ApprovalControls", () => {
     await waitFor(() => expect(screen.getByText("Approved")).toBeInTheDocument());
     expect(screen.getByText("Approved earlier")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
+  it("dedupes concurrent fetches for the same approvalId", async () => {
+    render(<ApprovalControls approvalId="a1" title="Deploy?" toolCallId="tc1" />, {
+      preloadedState: authState("u1"),
+    });
+    render(<ApprovalControls approvalId="a1" title="Deploy?" toolCallId="tc2" />, {
+      preloadedState: authState("u1"),
+    });
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Waiting for the approver's decision.").length).toBeGreaterThan(0)
+    );
+    expect(api.getApproval).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refetch an approval that already resolved", async () => {
+    vi.mocked(api.getApproval).mockResolvedValue({
+      status: "approved",
+      response: "Approved earlier",
+    } as never);
+    const { unmount } = render(
+      <ApprovalControls approvalId="a1" title="Deploy?" toolCallId="tc1" />,
+      { preloadedState: authState("u1") }
+    );
+    await waitFor(() => expect(screen.getByText("Approved")).toBeInTheDocument());
+    unmount();
+
+    render(<ApprovalControls approvalId="a1" title="Deploy?" toolCallId="tc1" />, {
+      preloadedState: authState("u1"),
+    });
+    await waitFor(() => expect(screen.getByText("Approved")).toBeInTheDocument());
+    expect(api.getApproval).toHaveBeenCalledTimes(1);
   });
 });
