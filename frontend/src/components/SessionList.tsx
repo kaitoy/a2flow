@@ -160,7 +160,7 @@ export function SessionList({
               ].join(" ")}
             >
               <Tooltip
-                label={`${s.id} — ${formatFullTimestamp(s.lastUpdateTime)}`}
+                label={`${s.title ? `${s.title} — ` : ""}${s.id} — ${formatFullTimestamp(s.lastUpdateTime)}`}
                 placement="right"
               >
                 <button
@@ -170,10 +170,10 @@ export function SessionList({
                   className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-3 py-2 text-left text-xs disabled:cursor-default"
                 >
                   <span className="block truncate font-mono text-[10px] uppercase tracking-wider opacity-60">
-                    {s.id.slice(0, 8)}…
+                    {s.title ? label : `${s.id.slice(0, 8)}…`}
                   </span>
                   <span className="block truncate text-[12px] font-medium text-on-surface">
-                    {label}
+                    {s.title ?? label}
                   </span>
                 </button>
               </Tooltip>

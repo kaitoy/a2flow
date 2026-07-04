@@ -2,14 +2,18 @@ from google.adk.sessions import InMemorySessionService
 from httpx import AsyncClient
 
 from dependencies import APP_NAME
+from infrastructure.agent import SESSION_TITLE_KEY
 from tests._envelope import assert_err, assert_ok
 
 
 async def _create_session(
-    service: InMemorySessionService, user_id: str, session_id: str | None = None
+    service: InMemorySessionService,
+    user_id: str,
+    session_id: str | None = None,
+    state: dict[str, object] | None = None,
 ) -> str:
     session = await service.create_session(
-        app_name=APP_NAME, user_id=user_id, session_id=session_id
+        app_name=APP_NAME, user_id=user_id, session_id=session_id, state=state
     )
     return session.id
 
@@ -110,3 +114,42 @@ async def test_delete_session_returns_404_for_unknown_session(
         "/api/v1/sessions/nonexistent-id", headers={"X-User-Id": "grace"}
     )
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_list_sessions_includes_title_from_state(
+    client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    await _create_session(
+        real_session_service, "heidi", state={SESSION_TITLE_KEY: "Plan the launch"}
+    )
+    response = await client_with_real_sessions.get(
+        "/api/v1/sessions", headers={"X-User-Id": "heidi"}
+    )
+    sessions = assert_ok(response)
+    assert sessions[0]["title"] == "Plan the launch"
+
+
+async def test_list_sessions_title_is_none_without_state(
+    client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    await _create_session(real_session_service, "ivan")
+    response = await client_with_real_sessions.get(
+        "/api/v1/sessions", headers={"X-User-Id": "ivan"}
+    )
+    sessions = assert_ok(response)
+    assert sessions[0]["title"] is None
+
+
+async def test_get_session_includes_title_from_state(
+    client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    session_id = await _create_session(
+        real_session_service, "judy", state={SESSION_TITLE_KEY: "Debug the pipeline"}
+    )
+    response = await client_with_real_sessions.get(
+        f"/api/v1/sessions/{session_id}", headers={"X-User-Id": "judy"}
+    )
+    assert assert_ok(response)["title"] == "Debug the pipeline"

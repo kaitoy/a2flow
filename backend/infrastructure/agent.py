@@ -1,9 +1,9 @@
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
-from ag_ui.core import RunAgentInput
+from ag_ui.core import Message, RunAgentInput, TextInputContent, UserMessage
 from ag_ui_adk import CONTEXT_STATE_KEY, ADKAgent, AGUIToolset
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
@@ -31,9 +31,55 @@ LITELLM_PREFIX = "litellm:"
 
 AGENT_SKILL_ID_KEY = "agent_skill_id"
 SKILL_DIR_KEY = "skill_dir"
+SESSION_TITLE_KEY = "session_title"
 
 USER_ID_PROP_KEY = "userId"
 DEFAULT_USER_ID = "user"
+
+_SESSION_TITLE_MAX_LENGTH = 60
+
+
+def first_user_message_text(messages: Sequence[Message]) -> str | None:
+    """Return the text of the first user message in ``messages``, if any.
+
+    Args:
+        messages: The AG-UI messages to scan.
+
+    Returns:
+        The message's ``content`` when it is a plain string, the first
+        ``TextInputContent`` fragment's text when it is multimodal content, or
+        ``None`` when no user message with extractable text is found.
+    """
+    for message in messages:
+        if not isinstance(message, UserMessage):
+            continue
+        if isinstance(message.content, str):
+            return message.content
+        for part in message.content:
+            if isinstance(part, TextInputContent):
+                return part.text
+        return None
+    return None
+
+
+def derive_session_title(text: str) -> str | None:
+    """Derive a short session title from a message's raw text.
+
+    Args:
+        text: The raw message text to summarize.
+
+    Returns:
+        The whitespace-collapsed text truncated to
+        :data:`_SESSION_TITLE_MAX_LENGTH` characters (with a trailing
+        ellipsis when truncated), or ``None`` when ``text`` has no visible
+        content.
+    """
+    collapsed = " ".join(text.split())
+    if not collapsed:
+        return None
+    if len(collapsed) <= _SESSION_TITLE_MAX_LENGTH:
+        return collapsed
+    return collapsed[:_SESSION_TITLE_MAX_LENGTH].rstrip() + "…"
 
 
 def extract_user_id(input_data: RunAgentInput) -> str:

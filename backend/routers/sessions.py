@@ -10,6 +10,7 @@ from dependencies import (
     CurrentUserIdDep,
     SessionServiceDep,
 )
+from infrastructure.agent import SESSION_TITLE_KEY
 from models.response import ApiResponse
 from models.session import Session
 from repositories.exceptions import NotFoundError
@@ -33,6 +34,7 @@ async def list_sessions(
             id=s.id,
             user_id=s.user_id,
             last_update_time=datetime.fromtimestamp(s.last_update_time, tz=UTC),
+            title=(s.state or {}).get(SESSION_TITLE_KEY),
         )
         for s in response.sessions
     ]
@@ -58,6 +60,7 @@ async def get_session(
         id=session.id,
         user_id=session.user_id,
         last_update_time=datetime.fromtimestamp(session.last_update_time, tz=UTC),
+        title=(session.state or {}).get(SESSION_TITLE_KEY),
     )
     return ApiResponse(meta=meta, data=item)
 

@@ -13,6 +13,7 @@ class Session(BaseModel):
     id: str
     user_id: str
     last_update_time: datetime
+    title: str | None = None
 
     @field_serializer("last_update_time", when_used="json")
     def _serialize_last_update_time(self, dt: datetime) -> str:

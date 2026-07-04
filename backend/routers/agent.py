@@ -9,7 +9,14 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from dependencies import APP_NAME, AgentRegistryDep, CurrentUserIdDep, SessionServiceDep
-from infrastructure.agent import AGENT_SKILL_ID_KEY, SKILL_DIR_KEY, with_user_id
+from infrastructure.agent import (
+    AGENT_SKILL_ID_KEY,
+    SESSION_TITLE_KEY,
+    SKILL_DIR_KEY,
+    derive_session_title,
+    first_user_message_text,
+    with_user_id,
+)
 
 router = APIRouter()
 
@@ -49,6 +56,16 @@ async def agent_endpoint(
             skill_id = str(raw_skill_id)
         if raw_skill_dir:
             skill_dir = Path(str(raw_skill_dir))
+    else:
+        first_text = first_user_message_text(filtered)
+        title = derive_session_title(first_text) if first_text is not None else None
+        if title is not None:
+            await session_service.create_session(
+                app_name=APP_NAME,
+                user_id=user_id,
+                session_id=input_data.thread_id,
+                state={SESSION_TITLE_KEY: title},
+            )
     adk_agent = registry.get(skill_id, skill_dir)
 
     # Override forwarded_props.userId with the trusted X-User-Id header so the

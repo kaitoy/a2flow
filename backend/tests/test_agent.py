@@ -45,7 +45,8 @@ async def agent_client() -> AsyncGenerator[tuple[AsyncClient, MagicMock], None]:
     mock_registry = MagicMock()
     mock_registry.get.return_value = mock_agent
 
-    app.dependency_overrides[get_session_service] = lambda: InMemorySessionService()  # type: ignore[no-untyped-call]
+    session_service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    app.dependency_overrides[get_session_service] = lambda: session_service
     app.dependency_overrides[get_agent_registry] = lambda: mock_registry
     _install_auth_overrides(app)
     try:
@@ -227,6 +228,24 @@ async def test_agent_endpoint_encodes_events_as_sse(
 
     second = json.loads(data_lines[1].removeprefix("data: "))
     assert second["type"] == EventType.RUN_FINISHED.value
+
+
+async def test_agent_endpoint_seeds_session_title_from_first_message(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    client, _ = agent_client
+    messages: list[dict[str, Any]] = [
+        {"id": "msg-1", "role": "user", "content": "Plan the launch  \n"},
+    ]
+    await client.post(
+        "/api/v1/agent",
+        json=_make_run_agent_input(messages),
+        headers={"X-User-Id": "carol"},
+    )
+
+    response = await client.get("/api/v1/sessions", headers={"X-User-Id": "carol"})
+    sessions = response.json()["data"]
+    assert sessions[0]["title"] == "Plan the launch"
 
 
 async def test_agent_endpoint_invalid_body_returns_422(

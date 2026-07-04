@@ -33,6 +33,24 @@ describe("SessionList", () => {
     expect(buttons[1]).toHaveTextContent("sess-2");
   });
 
+  it("renders session title in place of the id fragment when provided", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/sessions", () =>
+        envelope([
+          {
+            id: "sess-titled",
+            userId: "user",
+            lastUpdateTime: "2026-05-10T12:00:01.000Z",
+            title: "Plan the launch",
+          },
+        ])
+      )
+    );
+    render(<SessionList {...defaultProps} />);
+    await waitFor(() => expect(screen.getByText("Plan the launch")).toBeInTheDocument());
+    expect(screen.queryByText(/sess-titl/i)).not.toBeInTheDocument();
+  });
+
   it("shows No sessions when API returns empty array", async () => {
     server.use(http.get("http://localhost:8000/api/v1/sessions", () => envelope([])));
     render(<SessionList {...defaultProps} />);
