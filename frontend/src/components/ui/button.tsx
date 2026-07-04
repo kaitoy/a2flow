@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import Link from "next/link";
 import type React from "react";
 import type { AsyncStatus } from "@/hooks/useAsyncAction";
 
@@ -6,6 +7,13 @@ type ButtonVariant = "primary" | "secondary" | "ghost";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  /**
+   * When provided, renders as a Next.js `Link` navigating to this href instead
+   * of a native `<button>`, sharing the same variant styling. Native-only props
+   * (`status`, `pendingLabel`, `doneLabel`, `disabled`, `type`) are ignored in
+   * this mode.
+   */
+  href?: string;
   /**
    * Lifecycle stage for a server-submitting button. When set, the label swaps
    * between `children` (idle), {@link pendingLabel}, and {@link doneLabel} without
@@ -84,6 +92,7 @@ function doneContent(doneLabel: React.ReactNode): React.ReactNode {
 export function Button({
   variant = "ghost",
   className,
+  href,
   status,
   pendingLabel,
   doneLabel,
@@ -91,6 +100,16 @@ export function Button({
   disabled,
   ...rest
 }: ButtonProps) {
+  if (href !== undefined) {
+    const cls = [BASE, VARIANT[variant], "disabled:opacity-50", className]
+      .filter(Boolean)
+      .join(" ");
+    return (
+      <Link href={href} className={cls}>
+        {children}
+      </Link>
+    );
+  }
   if (status === undefined) {
     const cls = [BASE, VARIANT[variant], "disabled:opacity-50", className]
       .filter(Boolean)

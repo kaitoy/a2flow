@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 
 interface AdminPageHeaderProps {
@@ -68,18 +68,9 @@ export function AdminPageHeader({
         )}
         {secondaryAction}
         {addHref && addLabel && (
-          <Link
-            href={addHref}
-            className={[
-              "inline-flex cursor-pointer items-center gap-1 rounded-xl px-4 py-2",
-              "text-sm font-medium tracking-tight text-on-primary",
-              "bg-gradient-to-br from-accent to-secondary",
-              "shadow-[0_4px_16px_-4px_var(--color-accent-soft),inset_0_1px_0_rgba(255,255,255,0.4)]",
-              "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-glow",
-            ].join(" ")}
-          >
+          <Button variant="primary" href={addHref}>
             {addLabel}
-          </Link>
+          </Button>
         )}
       </div>
     </div>
