@@ -157,7 +157,7 @@ The palette has two roles: a saturated **accent** (teal in light, neon mint in d
 
 ## Typography
 
-**Inter** remains the primary typeface for body text, labels, and most headings. **Space Grotesk** (`--font-space-grotesk`) is a secondary display typeface reserved for the "A2Flow" wordmark in `AppHeader`, giving the brand name a distinct geometric character while the rest of the UI stays on Inter. Heading sizes are unchanged from earlier MD3 baselines, but **letter-spacing tightens** (`tracking-tight`) for headings to lean into the futuristic feel. Label-caps now use `0.08em` tracking and 11px size for a sharper, more compressed look.
+**Inter** remains the primary typeface for body text, labels, and most headings. **Space Grotesk** (`--font-space-grotesk`) is a secondary display typeface reserved for the "A2Flow" wordmark in `AppHeader`, giving the brand name a distinct geometric character while the rest of the UI stays on Inter. Heading sizes are unchanged from earlier MD3 baselines, but **letter-spacing tightens** (`tracking-tight`) for headings to lean into the futuristic feel. Label-caps now use `0.08em` tracking and 11px size for a sharper, more compressed look. The `badge` scale (11px / 700 / 12px line-height) is implemented as the `text-badge` utility — used for small numeric/tag chips (`NotificationBell`'s unread count, `ToolActivityBubble`'s "MCP" tag) that need the same compact weight as label-caps but without its forced uppercase/tracking/color, since badge color and case vary by call site.
 
 ## Layout & Spacing
 

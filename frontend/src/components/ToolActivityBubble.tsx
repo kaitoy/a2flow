@@ -26,7 +26,7 @@ export function ToolActivityBubble({ content }: { content: ToolCallActivityConte
         )}
         <span className="font-medium text-on-surface">{content.name}</span>
         {content.isMcp && (
-          <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] tracking-wide uppercase text-accent">
+          <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-badge tracking-wide uppercase text-accent">
             MCP
           </span>
         )}

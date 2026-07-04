@@ -48,7 +48,7 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
                   size={14}
                   strokeWidth={1.8}
                   aria-hidden="true"
-                  className="text-on-surface-variant/50"
+                  className="text-on-surface-variant/70"
                 />
               )}
             </li>

@@ -513,6 +513,12 @@ body::after {
   color: var(--color-on-surface-variant);
 }
 
+@utility text-badge {
+  font-size: 11px;
+  line-height: 12px;
+  font-weight: 700;
+}
+
 /* Shimmering placeholder surface for skeleton loading states. A tinted base
    block (--skeleton-base) gives the placeholder visible body against the glass
    panel in both themes, while a brighter band (--skeleton-sheen) sweeps across

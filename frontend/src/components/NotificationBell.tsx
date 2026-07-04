@@ -63,7 +63,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
           {unreadCount > 0 && (
             <span
               aria-hidden="true"
-              className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-on-primary shadow-card"
+              className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-badge text-on-primary shadow-card"
             >
               {badge}
             </span>
