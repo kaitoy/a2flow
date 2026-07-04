@@ -3,8 +3,9 @@
 
 import { A2UIActivityType } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
+import { AlertTriangle } from "lucide-react";
 import { useParams } from "next/navigation";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/components/auth/auth-provider";
@@ -12,6 +13,8 @@ import { ChatErrorBanner } from "@/components/ChatErrorBanner";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
 import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
@@ -19,6 +22,7 @@ import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import { A2UI_SOURCE_TOOL_CALL_ID_KEY } from "@/lib/agentActivity";
 import { formatUserName, getWorkflowSession, type User, type WorkflowSession } from "@/lib/api";
 import { APPROVAL_ACTIVITY_TYPE } from "@/lib/approvalTool";
+import logger from "@/lib/logger";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
@@ -202,20 +206,52 @@ function WorkflowSessionSkeleton() {
   );
 }
 
+/** Full-screen error state shown when the WorkflowSession record fails to load, with a retry action. */
+function WorkflowSessionLoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex h-screen flex-col items-center justify-center gap-4">
+      <EmptyState
+        icon={AlertTriangle}
+        animation="wiggle"
+        title="Couldn't load this workflow"
+        description="Something went wrong while loading this workflow session."
+      />
+      <Button variant="secondary" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
+  );
+}
+
 export default function WorkflowSessionPage() {
   const params = useParams<{ workflowSessionId: string }>();
   const workflowSessionId = params.workflowSessionId;
   const [workflowSession, setWorkflowSession] = useState<WorkflowSession | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retryCount is a bump counter that re-triggers the fetch, not a data dependency
   useEffect(() => {
+    setLoadFailed(false);
     getWorkflowSession(workflowSessionId)
       .then(setWorkflowSession)
-      .catch(() => {});
-  }, [workflowSessionId]);
+      .catch((err: unknown) => {
+        logger.error(err, "failed to load workflow session");
+        setLoadFailed(true);
+      });
+  }, [workflowSessionId, retryCount]);
+
+  const retry = useCallback(() => setRetryCount((c) => c + 1), []);
 
   return (
     <AuthProvider>
-      {workflowSession ? <WorkflowSessionView ws={workflowSession} /> : <WorkflowSessionSkeleton />}
+      {workflowSession ? (
+        <WorkflowSessionView ws={workflowSession} />
+      ) : loadFailed ? (
+        <WorkflowSessionLoadError onRetry={retry} />
+      ) : (
+        <WorkflowSessionSkeleton />
+      )}
     </AuthProvider>
   );
 }

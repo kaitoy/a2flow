@@ -61,7 +61,10 @@ export function useChat(initialSessionId: string | null) {
     dispatch(setSession(initialSessionId));
     getSessionMessages(initialSessionId)
       .then((messages) => dispatch(resumeSession({ sessionId: initialSessionId, messages })))
-      .catch(() => {});
+      .catch((err) => {
+        logger.error(err, "failed to load session history");
+        dispatch(setError("Failed to load this session's message history."));
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSessionId, dispatch]);
 
