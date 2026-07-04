@@ -7,10 +7,10 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { type Approval, type ApprovalStatus, getUserNames, listApprovals } from "@/lib/api";
 
@@ -112,7 +112,9 @@ export default function ApprovalsPage() {
         onRefresh={reload}
         refreshing={loading}
       />
-      <ErrorBanner error={error} />
+      <div className="mb-4">
+        <ErrorBanner error={error} />
+      </div>
       <DataTable
         columns={columns}
         rows={rows}

@@ -9,10 +9,10 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
-import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
@@ -278,7 +278,9 @@ export default function WorkflowTasksPage() {
           aria-label="Task view"
         />
       </div>
-      <ErrorBanner error={error} />
+      <div className="mb-4">
+        <ErrorBanner error={error} />
+      </div>
       {view === "graph" ? (
         <WorkflowTaskGraph tasks={tasks} />
       ) : (

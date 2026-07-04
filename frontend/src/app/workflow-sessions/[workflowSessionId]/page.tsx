@@ -9,12 +9,12 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/components/auth/auth-provider";
-import { ChatErrorBanner } from "@/components/ChatErrorBanner";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
@@ -152,7 +152,11 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           </span>
         </AppHeader>
 
-        <ChatErrorBanner error={error} onDismiss={() => dispatch(clearError())} />
+        {error && (
+          <div className="shrink-0 mx-4 mt-3">
+            <ErrorBanner error={error} onDismiss={() => dispatch(clearError())} />
+          </div>
+        )}
 
         <MessageList
           messages={messages}

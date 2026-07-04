@@ -5,8 +5,8 @@ import { useCallback } from "react";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { AppHeader } from "./AppHeader";
-import { ChatErrorBanner } from "./ChatErrorBanner";
 import { SessionList } from "./SessionList";
+import { ErrorBanner } from "./ui/error-banner";
 
 /**
  * Persistent shell for chat routes: sidebar with session list, header with logo,
@@ -58,7 +58,11 @@ export function ChatShell({ children }: { children: React.ReactNode }) {
       <div className="flex flex-col flex-1 min-w-0">
         <AppHeader />
 
-        <ChatErrorBanner error={error} onDismiss={() => dispatch(clearError())} />
+        {error && (
+          <div className="shrink-0 mx-4 mt-3">
+            <ErrorBanner error={error} onDismiss={() => dispatch(clearError())} />
+          </div>
+        )}
 
         {children}
       </div>

@@ -8,11 +8,11 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
-import { ErrorBanner } from "@/components/admin/error-banner";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { type AgentSkill, deleteAgentSkill, listAgentSkills } from "@/lib/api";
 
@@ -107,7 +107,9 @@ export default function AgentSkillsPage() {
         onRefresh={reload}
         refreshing={loading}
       />
-      <ErrorBanner error={actionError ?? error} />
+      <div className="mb-4">
+        <ErrorBanner error={actionError ?? error} />
+      </div>
       <DataTable
         columns={columns}
         rows={rows}

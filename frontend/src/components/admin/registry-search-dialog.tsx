@@ -3,9 +3,9 @@ import { animated, useTransition } from "@react-spring/web";
 import { PackageSearch } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ErrorBanner } from "@/components/admin/error-banner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type McpRegistryServerEntry, searchMcpRegistry } from "@/lib/api";
@@ -182,7 +182,9 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                   aria-label="Search the MCP registry"
                 />
 
-                <ErrorBanner error={error} />
+                <div className="mb-4">
+                  <ErrorBanner error={error} />
+                </div>
 
                 <div className="mt-4 flex-1 overflow-y-auto">
                   {servers.length === 0 ? (
