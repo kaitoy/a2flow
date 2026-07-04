@@ -79,10 +79,9 @@ export function KeyValueEditor({
           />
           <Button
             type="button"
-            variant="ghost"
+            variant="danger"
             aria-label={`Remove ${name} row ${index + 1}`}
             onClick={() => removeRow(index)}
-            className="text-error"
           >
             ✕
           </Button>

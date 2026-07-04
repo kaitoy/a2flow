@@ -3,7 +3,7 @@ import Link from "next/link";
 import type React from "react";
 import type { AsyncStatus } from "@/hooks/useAsyncAction";
 
-type ButtonVariant = "primary" | "secondary" | "ghost";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -60,6 +60,9 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost:
     "px-3 py-2 text-on-surface-variant bg-transparent hover:bg-glass hover:text-accent " +
     "motion-safe:hover:-translate-y-0.5",
+  danger:
+    "px-4 py-2 glass-panel text-error hover:border-error/40 hover:bg-error/10 " +
+    "hover:shadow-[0_0_20px_-4px_var(--color-error)] motion-safe:hover:-translate-y-0.5",
 };
 
 /**
@@ -76,7 +79,7 @@ function doneContent(doneLabel: React.ReactNode): React.ReactNode {
 }
 
 /**
- * Base button with ``primary``, ``secondary``, and ``ghost`` style variants.
+ * Base button with ``primary``, ``secondary``, ``ghost``, and ``danger`` style variants.
  *
  * When {@link ButtonProps.status} is provided, the label cycles through the idle
  * (`children`), `pending`, and `done` text. All candidates are stacked in a

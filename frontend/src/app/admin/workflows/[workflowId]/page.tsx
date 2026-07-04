@@ -189,12 +189,7 @@ export default function EditWorkflowPage() {
             <Button type="button" variant="ghost" onClick={() => router.push("/admin/workflows")}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleDelete}
-              className="ml-auto text-error"
-            >
+            <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
               Delete
             </Button>
           </div>

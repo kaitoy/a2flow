@@ -105,7 +105,7 @@ export function ConfirmDialog({
                   <Button variant="ghost" onClick={onCancel}>
                     Cancel
                   </Button>
-                  <Button variant="secondary" onClick={onConfirm} className="text-error">
+                  <Button variant="danger" onClick={onConfirm}>
                     Delete
                   </Button>
                 </div>

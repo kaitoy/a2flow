@@ -152,12 +152,11 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
               {user.avatarUpdatedAt && (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="danger"
                   onClick={handleRemove}
                   disabled={remove.inFlight}
                   status={remove.status}
                   pendingLabel="Removing…"
-                  className="text-error"
                 >
                   Remove
                 </Button>
