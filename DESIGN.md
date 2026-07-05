@@ -186,6 +186,11 @@ The shape language is **Soft Modern**.
 - **Chips & status badges:** `rounded-full` for pill shapes.
 - **Active sidebar item indicator:** A 3px accent vertical bar on the left edge, with a soft glow.
 
+## Accessibility
+
+- **Focus ring** — Every interactive element (buttons, inputs, textareas, selects, custom clickable elements) uses `focus-visible:ring-2 focus-visible:ring-accent/50` as its keyboard-focus treatment. This is already consistent across ~15 components (`components/ui/button.tsx`, `ThemeToggle.tsx`, `NotificationBell.tsx`, `UserMenu.tsx`, etc.) — reuse it rather than inventing a one-off focus style for a new component.
+- **ARIA attributes** — Interactive or dynamically-updating elements carry appropriate `aria-label`, `aria-live`, and `role` (e.g. `role="menu"` for dropdowns) attributes. Purely decorative icons stay `aria-hidden` (see Iconography); an icon that carries standalone meaning gets a label instead.
+
 ## Components
 
 - **Buttons:**

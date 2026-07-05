@@ -52,6 +52,8 @@ Unit tests are implemented with [Vitest](https://vitest.dev/), [Testing Library]
 
 Test files live next to the source files they cover, named `*.test.ts(x)`.
 
+New UI components must ship with a co-located `*.test.tsx` in the same change — not just when modifying existing markup (see root `CLAUDE.md` "Keeping tests in sync" for the modification-time rule).
+
 Shared test infrastructure (custom renderer, MSW server, mocks) lives under `src/test/`:
 
 ```
