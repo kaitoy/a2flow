@@ -18,6 +18,31 @@ ALLOWED_CONTENT_TYPES = frozenset(
 MAX_AVATAR_BYTES = 2 * 1024 * 1024
 
 
+def _sniff_content_type(data: bytes) -> str | None:
+    """Detect an image MIME type from its magic-byte signature.
+
+    Used to verify that uploaded bytes actually are the type the client
+    claimed via the ``Content-Type`` header, since that header is
+    client-controlled and cannot be trusted on its own.
+
+    Args:
+        data: Raw file bytes to inspect.
+
+    Returns:
+        One of the values in :data:`ALLOWED_CONTENT_TYPES`, or ``None`` if
+        the bytes do not match any recognized image signature.
+    """
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
 class UserAvatarService:
     """Application service orchestrating custom user-avatar operations."""
 
@@ -61,8 +86,9 @@ class UserAvatarService:
             The stored :class:`UserAvatar`.
 
         Raises:
-            AvatarValidationError: If the type is unsupported or the image is
-                empty or larger than :data:`MAX_AVATAR_BYTES`.
+            AvatarValidationError: If the type is unsupported, the image is
+                empty or larger than :data:`MAX_AVATAR_BYTES`, or the file's
+                actual bytes do not match the declared type.
             ForeignKeyViolationError: If the owning user does not exist.
         """
         normalized = content_type.split(";", 1)[0].strip().lower()
@@ -76,6 +102,10 @@ class UserAvatarService:
         if len(data) > MAX_AVATAR_BYTES:
             raise AvatarValidationError(
                 f"Image exceeds the {MAX_AVATAR_BYTES // (1024 * 1024)} MiB size limit"
+            )
+        if _sniff_content_type(data) != normalized:
+            raise AvatarValidationError(
+                f"Image bytes do not match the declared type {content_type!r}"
             )
         return await self._repo.upsert(
             user_id,

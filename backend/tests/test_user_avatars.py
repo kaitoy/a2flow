@@ -109,6 +109,7 @@ async def test_uploaded_avatar_is_served_with_content_type(
     response = await avatar_client.get(f"/api/v1/users/{user_id}/avatar")
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
+    assert response.headers["x-content-type-options"] == "nosniff"
     assert response.content == _PNG_BYTES
 
 
@@ -135,6 +136,17 @@ async def test_upload_avatar_rejects_unsupported_type(
     response = await avatar_client.put(
         f"/api/v1/users/{user_id}/avatar",
         files={"file": ("a.txt", b"not an image", "text/plain")},
+    )
+    assert_err(response, code="INVALID_AVATAR", status=422)
+
+
+async def test_upload_avatar_rejects_type_mismatched_bytes(
+    avatar_client: AsyncClient,
+) -> None:
+    user_id = await _create_user(avatar_client)
+    response = await avatar_client.put(
+        f"/api/v1/users/{user_id}/avatar",
+        files={"file": ("fake.png", b"<script>alert(1)</script>", "image/png")},
     )
     assert_err(response, code="INVALID_AVATAR", status=422)
 

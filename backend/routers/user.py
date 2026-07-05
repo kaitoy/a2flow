@@ -128,7 +128,10 @@ async def get_user_avatar(
     return Response(
         content=avatar.data,
         media_type=avatar.content_type,
-        headers={"Cache-Control": "private, max-age=300"},
+        headers={
+            "Cache-Control": "private, max-age=300",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 
