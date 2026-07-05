@@ -17,12 +17,26 @@ The frontend uses a **glassmorphism** visual style with a **light/dark theme tog
      :3000                            A2UI (TOOL_CALL_*)                    :8000
 ```
 
+## Project homepage
+
+A single-page static homepage lives in [homepage/](homepage/) and is published to GitHub Pages at <https://kaitoy.github.io/a2flow/> by the [pages.yml](.github/workflows/pages.yml) workflow, which runs on every push to `master` that touches `homepage/**`. One-time setup: in the repository **Settings → Pages**, set **Source** to **GitHub Actions**.
+
+To preview it locally, serve the directory with Python's built-in HTTP server and open the printed URL:
+
+```bash
+cd homepage
+python -m http.server
+```
+
+Open [http://localhost:8000](http://localhost:8000).
+
 ## Repository layout
 
 ```
 a2flow/
 ├── backend/   # FastAPI + Google ADK agent
-└── frontend/  # Next.js 16 chat UI
+├── frontend/  # Next.js 16 chat UI
+└── homepage/  # Static project homepage (GitHub Pages)
 ```
 
 ## Quick start
@@ -82,7 +96,7 @@ The async driver suffix (`aiosqlite` / `asyncpg`) is added automatically. Tables
 
 ## Authentication
 
-The app requires sign-in. Visiting any page while logged out redirects to `/login`. On first run, log in with the seeded **`admin`** user (password from `ADMIN_PASSWORD`, default `admin12345678`); manage additional users from the [admin UI](#users). After signing in the user lands on the [welcome page](#welcome-page).
+The app requires sign-in. Visiting any page while logged out redirects to `/login`. On first run, log in with the seeded **`admin`** user: set `ADMIN_PASSWORD` before the first startup, or, if left unset, read the randomly generated password from `docker compose logs backend` (printed once and not recoverable afterwards). Manage additional users from the [admin UI](#users). After signing in the user lands on the [welcome page](#welcome-page).
 
 - **Session** — login creates a server-side session (`auth_sessions` table) and sets an HttpOnly `a2flow_session` cookie holding an opaque token (only its hash is stored). Sessions use a sliding **idle timeout** (`SESSION_IDLE_TIMEOUT_SECONDS`, default 8 hours).
 - **CSRF** — login also sets a readable `a2flow_csrf` cookie; the frontend echoes it in the `X-CSRF-Token` header on every state-changing request (double-submit cookie). The backend rejects mismatches with `403`.

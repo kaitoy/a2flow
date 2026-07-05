@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A2Flow — Agent as Workflow</title>
+<meta name="description" content="A2Flow rebuilds ITSM-style, multi-person, approval-gated workflows around an AI agent. It plans the work as a task graph, pauses for the humans who must sign off, and executes the rest.">
+<meta property="og:title" content="A2Flow — Agent as Workflow">
+<meta property="og:description" content="ITSM workflows, rebuilt around an AI agent. Plan, approve, execute — with humans signing off on the moments that matter.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kaitoy.github.io/a2flow/">
+<meta property="og:image" content="https://kaitoy.github.io/a2flow/assets/logo.png">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script>
+/* Apply the saved theme before first paint (mirrors the app's behavior). */
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("a2flow-home.theme"); } catch (e) {}
+  if (t !== "light" && t !== "dark") {
+    t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<style>
+/* ---------------------------------------------------------------- tokens */
+:root {
+  --surface: #f4f7ff;
+  --ink: #0b1c30;
+  --muted: #475569;
+  --accent: #0e7c7b;
+  --accent-bright: #14b8a6;
+  --secondary: #6366f1;
+  --accent-rgb: 20, 184, 166;
+  --on-primary: #ffffff;
+  --glass: rgba(255, 255, 255, 0.55);
+  --glass-strong: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --success: #10b981;
+  --error: #dc2626;
+  --code-bg: rgba(11, 28, 48, 0.85);
+  --code-ink: #d7e4f7;
+  --blob-1: rgba(94, 234, 212, 0.50);
+  --blob-2: rgba(165, 180, 252, 0.55);
+  --blob-3: rgba(252, 211, 170, 0.48);
+  --blob-4: rgba(186, 230, 253, 0.45);
+  --shadow-glass: 0 10px 32px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --shadow-glass-lg: 0 28px 60px -16px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --shadow-glow: 0 0 36px rgba(var(--accent-rgb), 0.32);
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+}
+[data-theme="dark"] {
+  --surface: #050912;
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #5eead4;
+  --accent-bright: #5eead4;
+  --secondary: #a78bfa;
+  --accent-rgb: 94, 234, 212;
+  --on-primary: #06231f;
+  --glass: rgba(15, 23, 42, 0.45);
+  --glass-strong: rgba(15, 23, 42, 0.65);
+  --glass-border: rgba(148, 163, 184, 0.20);
+  --success: #34d399;
+  --error: #fb7185;
+  --code-bg: rgba(2, 8, 20, 0.72);
+  --code-ink: #cbd8ec;
+  --blob-1: rgba(94, 234, 212, 0.26);
+  --blob-2: rgba(167, 139, 250, 0.28);
+  --blob-3: rgba(244, 114, 182, 0.22);
+  --blob-4: rgba(125, 211, 252, 0.24);
+  --shadow-glass: 0 10px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(148, 163, 184, 0.12);
+  --shadow-glass-lg: 0 28px 60px -16px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(148, 163, 184, 0.12);
+  --shadow-glow: 0 0 42px rgba(var(--accent-rgb), 0.45);
+}
+
+/* ---------------------------------------------------------------- base */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; }
+body {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--surface);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+/* Animated mesh-gradient canvas (layer 0), same technique as the app. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -12%;
+  z-index: -2;
+  background:
+    radial-gradient(38% 42% at 16% 18%, var(--blob-1) 0%, transparent 70%),
+    radial-gradient(44% 46% at 84% 22%, var(--blob-2) 0%, transparent 70%),
+    radial-gradient(40% 44% at 26% 86%, var(--blob-3) 0%, transparent 70%),
+    radial-gradient(42% 40% at 78% 78%, var(--blob-4) 0%, transparent 70%);
+  filter: saturate(120%);
+  animation: float-slow 22s ease-in-out infinite alternate;
+}
+/* Film-grain overlay. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+}
+@keyframes float-slow {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(2.5%, -2%, 0) scale(1.06); }
+}
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; line-height: 1.15; }
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+code { font-family: var(--font-mono); font-size: 0.92em; }
+:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.7); outline-offset: 2px; border-radius: 4px; }
+
+.wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
+
+/* ---------------------------------------------------------------- glass */
+.glass, .glass-strong {
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+}
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+}
+.glass-strong {
+  background: var(--glass-strong);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: var(--shadow-glass-lg);
+}
+
+.eyebrow {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.875rem;
+}
+.grad-text {
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.section { padding: 6.5rem 0 0; }
+.section-head { max-width: 44rem; margin-bottom: 3rem; }
+.section-head h2 { font-size: clamp(1.75rem, 3.4vw, 2.5rem); font-weight: 700; margin-bottom: 1rem; }
+.section-head p { color: var(--muted); font-size: 1.0625rem; }
+
+/* ---------------------------------------------------------------- buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font: 600 0.9375rem/1 var(--font-body);
+  padding: 0.8125rem 1.375rem;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 240ms cubic-bezier(0.2, 0, 0, 1), box-shadow 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+.btn-primary {
+  color: var(--on-primary);
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
+  box-shadow: 0 4px 16px -4px rgba(var(--accent-rgb), 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.btn-primary:hover { box-shadow: var(--shadow-glow); transform: translateY(-2px); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-ghost {
+  color: var(--ink);
+  background: var(--glass);
+  border-color: var(--glass-border);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+}
+.btn-ghost:hover { box-shadow: var(--shadow-glow); transform: translateY(-2px); }
+.btn svg { width: 1.05rem; height: 1.05rem; }
+
+/* ---------------------------------------------------------------- header */
+.site-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+}
+.site-header .wrap {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  height: 4rem;
+}
+.brand { display: flex; align-items: center; gap: 0.625rem; text-decoration: none; margin-right: auto; }
+.brand img { width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; }
+.brand span {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.site-nav { display: flex; gap: 1.5rem; }
+.site-nav a {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 150ms;
+}
+.site-nav a:hover { color: var(--accent); }
+.header-actions { display: flex; align-items: center; gap: 0.625rem; }
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.375rem; height: 2.375rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+  transition: box-shadow 240ms, transform 240ms;
+}
+.icon-btn:hover { box-shadow: var(--shadow-glow); transform: translateY(-1px); }
+.icon-btn svg { width: 1.125rem; height: 1.125rem; }
+#themeToggle .moon { display: none; }
+[data-theme="dark"] #themeToggle .sun { display: none; }
+[data-theme="dark"] #themeToggle .moon { display: block; }
+@media (max-width: 46rem) { .site-nav { display: none; } }
+
+/* ---------------------------------------------------------------- hero */
+.hero { padding: 9.5rem 0 1rem; }
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 3.5rem;
+  align-items: center;
+}
+.hero h1 {
+  font-size: clamp(2.375rem, 5.2vw, 3.75rem);
+  font-weight: 700;
+  margin-bottom: 1.375rem;
+}
+.hero-sub { color: var(--muted); font-size: 1.125rem; max-width: 34rem; margin-bottom: 2rem; }
+.hero-cta { display: flex; flex-wrap: wrap; gap: 0.875rem; margin-bottom: 2rem; }
+.hero-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3125rem 0.8125rem;
+  border-radius: 9999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--muted);
+}
+@media (max-width: 60rem) {
+  .hero { padding-top: 8rem; }
+  .hero-grid { grid-template-columns: 1fr; gap: 3rem; }
+}
+
+/* ------------------------------------------------------------ hero demo */
+.demo {
+  border-radius: 1rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.demo-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.8125rem 1.125rem;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.demo-titlebar .live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.demo-titlebar .live::before {
+  content: "";
+  width: 0.5rem; height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.8);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.demo-mark { width: 1.375rem; height: 1.375rem; border-radius: 0.375rem; }
+.demo-body {
+  padding: 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  height: 29rem;
+  overflow: hidden;
+  justify-content: flex-end;
+}
+.dmsg { display: flex; gap: 0.625rem; align-items: flex-end; }
+.dmsg.from-user { justify-content: flex-end; }
+.demo.live .dmsg { display: none; }
+.demo.live .dmsg.on {
+  display: flex;
+  animation: message-in 360ms cubic-bezier(0.3, 0, 0, 1) both;
+}
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.avatar {
+  flex: none;
+  width: 1.875rem; height: 1.875rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+.avatar.mika { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+.avatar.sam { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+.avatar.bot {
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
+  color: var(--on-primary);
+}
+.bubble {
+  max-width: 78%;
+  padding: 0.6875rem 0.9375rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.bubble.user {
+  border-bottom-right-radius: 0.375rem;
+  color: var(--on-primary);
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
+  box-shadow: 0 8px 24px -12px rgba(var(--accent-rgb), 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.bubble.agent {
+  border-bottom-left-radius: 0.375rem;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.bubble .who {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+}
+.plan { list-style: none; margin: 0.625rem 0 0.75rem; display: grid; gap: 0.4375rem; }
+.plan li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--muted); }
+.plan .tick {
+  flex: none;
+  width: 1.0625rem; height: 1.0625rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  opacity: 0.55;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+.plan .tick svg { width: 0.625rem; height: 0.625rem; opacity: 0; transition: opacity 300ms; }
+.plan li.doing .tick {
+  border-color: var(--accent-bright);
+  opacity: 1;
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.6);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+.plan li.doing { color: var(--ink); }
+.plan li.done .tick {
+  background: var(--success);
+  border-color: var(--success);
+  opacity: 1;
+  color: #fff;
+}
+.plan li.done .tick svg { opacity: 1; }
+.plan li.done { color: var(--ink); }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6875rem;
+  border-radius: 9999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  color: var(--muted);
+}
+.chip.ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, transparent); }
+.demo-sys {
+  align-self: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.demo-sys b { color: var(--ink); font-weight: 600; }
+.approval {
+  border: 1px solid color-mix(in srgb, var(--secondary) 45%, transparent);
+  border-radius: 0.875rem;
+  padding: 0.8125rem 0.9375rem;
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 78%;
+  font-size: 0.8125rem;
+  transition: border-color 400ms;
+}
+.approval .ttl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  margin-bottom: 0.375rem;
+  color: var(--secondary);
+}
+.approval .ttl svg { width: 1rem; height: 1rem; flex: none; }
+.approval p { color: var(--muted); font-size: 0.8125rem; margin-bottom: 0.625rem; }
+.approval .acts { display: flex; gap: 0.5rem; align-items: center; }
+.fbtn {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.375rem 0.9375rem;
+  border-radius: 0.5625rem;
+}
+.fbtn.yes { color: var(--on-primary); background: linear-gradient(135deg, var(--accent), var(--secondary)); }
+.fbtn.no { border: 1px solid var(--glass-border); color: var(--muted); }
+.approval .decided { display: none; align-items: center; gap: 0.4375rem; font-weight: 700; color: var(--success); font-size: 0.8125rem; }
+.approval .decided svg { width: 1rem; height: 1rem; }
+.approval.approved { border-color: color-mix(in srgb, var(--success) 55%, transparent); }
+.approval.approved .acts { display: none; }
+.approval.approved .decided { display: inline-flex; }
+.demo-caption {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-top: 0.875rem;
+}
+
+/* ---------------------------------------------------------------- concept */
+.contrast { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.contrast-card { border-radius: 1rem; padding: 2rem; }
+.contrast-card h3 { font-size: 1.1875rem; margin-bottom: 0.375rem; }
+.contrast-card .sub { font-size: 0.875rem; color: var(--muted); margin-bottom: 1.375rem; }
+.contrast-card.past { opacity: 0.92; }
+.contrast-card.past h3 { color: var(--muted); }
+.contrast-card.next { border-color: color-mix(in srgb, var(--accent-bright) 45%, var(--glass-border)); }
+.flow-steps { list-style: none; display: grid; gap: 0.9375rem; }
+.flow-steps li { display: flex; gap: 0.75rem; font-size: 0.9375rem; }
+.flow-steps .dot {
+  flex: none;
+  width: 1.625rem; height: 1.625rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.0625rem;
+}
+.flow-steps .dot svg { width: 0.875rem; height: 0.875rem; }
+.past .dot { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); }
+.next .dot {
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
+  color: var(--on-primary);
+}
+.flow-steps b { font-weight: 600; }
+.flow-steps span.note { display: block; font-size: 0.8125rem; color: var(--muted); }
+.concept-note {
+  margin-top: 1.5rem;
+  border-radius: 1rem;
+  padding: 1.375rem 1.75rem;
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+  font-size: 0.9375rem;
+  color: var(--muted);
+}
+.concept-note svg { flex: none; width: 1.25rem; height: 1.25rem; color: var(--accent); margin-top: 0.125rem; }
+.concept-note b { color: var(--ink); font-weight: 600; }
+@media (max-width: 56rem) { .contrast { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------- how */
+.how-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
+.steps { display: grid; gap: 1.25rem; counter-reset: step; }
+.step { border-radius: 1rem; padding: 1.625rem 1.75rem; position: relative; }
+.step .n {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  margin-bottom: 0.375rem;
+  display: block;
+}
+.step h3 { font-size: 1.1875rem; margin-bottom: 0.5rem; }
+.step p { font-size: 0.9375rem; color: var(--muted); }
+.step p code {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.3125rem;
+  font-size: 0.8125rem;
+}
+.dag-panel { border-radius: 1rem; padding: 1.75rem; }
+.dag-panel .panel-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.dag-panel .panel-title .views span { opacity: 0.5; }
+.dag-panel .panel-title .views .cur {
+  opacity: 1;
+  color: var(--accent);
+}
+.dag-svg { width: 100%; height: auto; display: block; }
+.dag-svg .node-box { fill: var(--glass); stroke: var(--glass-border); }
+.dag-svg .node-label { font: 600 11px var(--font-body); fill: var(--ink); }
+.dag-svg .node-sub { font: 700 8px var(--font-body); letter-spacing: 0.08em; }
+.dag-svg .edge { stroke: color-mix(in srgb, var(--muted) 45%, transparent); stroke-width: 1.5; fill: none; }
+.dag-svg .done-box { stroke: color-mix(in srgb, var(--success) 60%, transparent); }
+.dag-svg .doing-box { stroke: var(--accent-bright); }
+.dag-svg .doing-ring { animation: breathe 1.8s ease-in-out infinite; }
+.dag-svg .gate-box { stroke: color-mix(in srgb, var(--secondary) 60%, transparent); }
+.dag-svg .pend-box { stroke-dasharray: 4 3; }
+.dag-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; font-size: 0.75rem; color: var(--muted); }
+.dag-legend i {
+  display: inline-block;
+  width: 0.5625rem; height: 0.5625rem;
+  border-radius: 50%;
+  margin-right: 0.375rem;
+}
+@media (max-width: 56rem) { .how-grid { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------- roles */
+.roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.role-card { border-radius: 1rem; padding: 1.875rem; }
+.role-card .avatar { width: 2.5rem; height: 2.5rem; font-size: 0.9375rem; margin-bottom: 1.125rem; }
+.role-card h3 { font-size: 1.125rem; margin-bottom: 0.5rem; }
+.role-card p { font-size: 0.9375rem; color: var(--muted); }
+.trust-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+.trust-card { border-radius: 1rem; padding: 1.5rem 1.75rem; display: flex; gap: 1rem; align-items: flex-start; }
+.trust-card svg { flex: none; width: 1.375rem; height: 1.375rem; color: var(--accent); margin-top: 0.125rem; }
+.trust-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; font-family: var(--font-body); letter-spacing: 0; }
+.trust-card p { font-size: 0.875rem; color: var(--muted); }
+@media (max-width: 56rem) {
+  .roles { grid-template-columns: 1fr; }
+  .trust-row { grid-template-columns: 1fr; }
+}
+
+/* ---------------------------------------------------------------- features */
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.feature { border-radius: 1rem; padding: 1.875rem; transition: transform 240ms cubic-bezier(0.2, 0, 0, 1), box-shadow 240ms cubic-bezier(0.2, 0, 0, 1); }
+.feature:hover { transform: translateY(-4px); box-shadow: var(--shadow-glow); }
+.feature .fic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.625rem; height: 2.625rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.18), color-mix(in srgb, var(--secondary) 18%, transparent));
+  color: var(--accent);
+  margin-bottom: 1.125rem;
+}
+.feature .fic svg { width: 1.25rem; height: 1.25rem; }
+.feature h3 { font-size: 1.0625rem; margin-bottom: 0.5rem; }
+.feature p { font-size: 0.875rem; color: var(--muted); }
+.feature p code {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: 0.0625rem 0.3125rem;
+  border-radius: 0.3125rem;
+  font-size: 0.78em;
+}
+@media (max-width: 56rem) { .features { grid-template-columns: 1fr; } }
+@media (min-width: 56rem) and (max-width: 72rem) { .features { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---------------------------------------------------------------- architecture */
+.arch { border-radius: 1rem; padding: 2.5rem 2rem; }
+.arch-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.arch-node {
+  border-radius: 0.875rem;
+  padding: 1rem 1.375rem;
+  text-align: center;
+  min-width: 11rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.arch-node b { font-family: var(--font-display); font-size: 0.9375rem; letter-spacing: -0.01em; }
+.arch-node span { font-size: 0.75rem; color: var(--muted); }
+.arch-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  min-width: 5.5rem;
+}
+.arch-link svg { width: 1.5rem; height: 1.5rem; color: var(--accent); }
+.arch-side { display: flex; flex-direction: column; gap: 0.75rem; }
+.arch-side .arch-node { min-width: 10rem; padding: 0.75rem 1.125rem; }
+.stack-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 2rem; }
+@media (max-width: 56rem) {
+  .arch-flow { flex-direction: column; align-items: center; }
+  .arch-link { transform: rotate(90deg); min-width: 3rem; min-height: 3rem; }
+  .arch-side { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+}
+
+/* ---------------------------------------------------------------- footer */
+.cta-final { text-align: center; padding: 6.5rem 0 5rem; }
+.cta-final h2 { font-size: clamp(1.875rem, 4vw, 2.75rem); margin-bottom: 1rem; }
+.cta-final > .wrap > p { color: var(--muted); max-width: 36rem; margin: 0 auto 2.25rem; }
+.terminal {
+  max-width: 38rem;
+  margin: 0 auto 2.25rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  text-align: left;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass-lg);
+}
+.terminal-bar {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border-bottom: 1px solid var(--glass-border);
+}
+.terminal-bar i { width: 0.6875rem; height: 0.6875rem; border-radius: 50%; background: color-mix(in srgb, var(--muted) 35%, transparent); }
+.terminal pre {
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 1.375rem 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8438rem;
+  line-height: 1.9;
+  overflow-x: auto;
+}
+.terminal .p { color: var(--accent-bright); user-select: none; }
+[data-theme="dark"] .terminal .p { color: var(--accent); }
+.terminal .c { opacity: 0.5; }
+.site-footer {
+  border-top: 1px solid var(--glass-border);
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+}
+.site-footer .wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.625rem 1.5rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.site-footer .brand { margin-right: auto; }
+.site-footer .brand img { width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; }
+.site-footer .brand span { font-size: 1rem; }
+.site-footer a { color: var(--muted); text-decoration: none; }
+.site-footer a:hover { color: var(--accent); }
+
+/* ---------------------------------------------------------------- reveal */
+.js .reveal { opacity: 0; transform: translateY(14px); transition: opacity 600ms cubic-bezier(0.3, 0, 0, 1), transform 600ms cubic-bezier(0.3, 0, 0, 1); }
+.js .reveal.in { opacity: 1; transform: none; }
+
+/* ---------------------------------------------------------------- motion */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .js .reveal { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="A2Flow home">
+      <img src="assets/logo.png" alt="" width="36" height="36">
+      <span class="grad-text">A2Flow</span>
+    </a>
+    <nav class="site-nav" aria-label="Sections">
+      <a href="#concept">Concept</a>
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#architecture">Architecture</a>
+    </nav>
+    <div class="header-actions">
+      <a class="icon-btn" href="https://github.com/kaitoy/a2flow" aria-label="A2Flow on GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.24 2.76.12 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.2.67.79.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+      </a>
+      <button class="icon-btn" id="themeToggle" aria-label="Toggle color theme">
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ============================================================ hero -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">Agent as Workflow</span>
+        <h1>The workflow engine<br>is now <span class="grad-text">an agent</span>.</h1>
+        <p class="hero-sub">
+          A2Flow rebuilds ITSM-style workflows — service requests, change execution,
+          announcements — around an AI agent. It plans the work as a task graph, pauses
+          for the humans who must sign off, and executes the rest.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="https://github.com/kaitoy/a2flow">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.24 2.76.12 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.2.67.79.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+            View on GitHub
+          </a>
+          <a class="btn btn-ghost" href="#how">See how it works</a>
+        </div>
+        <div class="hero-tags">
+          <span class="tag">Google ADK</span>
+          <span class="tag">AG-UI protocol</span>
+          <span class="tag">MCP tools</span>
+          <span class="tag">Self-hosted</span>
+        </div>
+      </div>
+
+      <div>
+        <!-- Self-playing workflow session. Decorative: the story is told in the copy. -->
+        <div class="demo glass-strong" id="demo" aria-hidden="true">
+          <div class="demo-titlebar">
+            <img class="demo-mark" src="assets/logo.png" alt="">
+            Workflow session — Restart checkout pods
+            <span class="live">Live</span>
+          </div>
+          <div class="demo-body" id="demoBody">
+            <div class="dmsg from-user" data-step="1">
+              <div class="bubble user">Restart the checkout pods in prod — payments are timing out.</div>
+              <span class="avatar mika">M</span>
+            </div>
+            <div class="dmsg" data-step="2">
+              <span class="avatar bot">✦</span>
+              <div class="bubble agent">
+                <span class="who">Agent</span>
+                I read the <code>kubernetes-pod-restart</code> skill. Here is my plan:
+                <ul class="plan" id="planList">
+                  <li><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Identify the target deployment</li>
+                  <li><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Get approval — prod change</li>
+                  <li><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Rolling restart via kubectl</li>
+                  <li><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Verify the rollout</li>
+                </ul>
+                <span class="chip" id="planChip">Waiting for plan approval…</span>
+              </div>
+            </div>
+            <div class="dmsg demo-sys" data-step="3"><span><b>Mika</b> approved the plan</span></div>
+            <div class="dmsg" data-step="4">
+              <span class="avatar bot">✦</span>
+              <div class="approval" id="approvalCard">
+                <span class="ttl">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Approval required
+                </span>
+                <p>Rolling restart of <code>checkout</code> in <b>prod</b>. Approver: <b>Sam</b>.</p>
+                <span class="acts">
+                  <span class="fbtn yes">Approve</span>
+                  <span class="fbtn no">Reject</span>
+                </span>
+                <span class="decided">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  Approved by Sam — “Change window confirmed.”
+                </span>
+              </div>
+            </div>
+            <div class="dmsg" data-step="6">
+              <span class="avatar bot">✦</span>
+              <div class="bubble agent">
+                <span class="who">Agent</span>
+                Rolling restart complete — 12/12 pods healthy. All tasks done.
+                <span class="chip ok" style="margin-top:.5rem">Session completed 🔔</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="demo-caption">A workflow session: the applicant, the approver, and the agent — one conversation.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================= concept -->
+  <section class="section" id="concept">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">The concept</span>
+        <h2>ITSM workflows, <span class="grad-text">reimagined</span></h2>
+        <p>
+          Classic workflow engines encode a process as rigid forms, ticket queues, and
+          handoffs between people. Most of the elapsed time is waiting. A2Flow keeps the
+          two things that matter — the procedure and the approvals — and hands everything
+          in between to an agent.
+        </p>
+      </div>
+      <div class="contrast">
+        <div class="contrast-card glass past reveal">
+          <h3>The ticket pipeline</h3>
+          <p class="sub">Process as software: fixed forms, fixed states, humans as glue.</p>
+          <ul class="flow-steps">
+            <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg></span><span><b>Fill in the form</b><span class="note">One field wrong and it bounces back.</span></span></li>
+            <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span><b>Wait in the queue</b><span class="note">Your request is #14 in line.</span></span></li>
+            <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3h4v4M21 3l-7 7M7 21H3v-4M3 21l7-7"/></svg></span><span><b>Hand off between teams</b><span class="note">Context is lost at every hop.</span></span></li>
+            <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H5.2L4 17.2V4z"/><path d="M8 8h8M8 12h5"/></svg></span><span><b>Chase the status</b><span class="note">“Any update on my ticket?”</span></span></li>
+          </ul>
+        </div>
+        <div class="contrast-card glass next reveal">
+          <h3 class="grad-text">The agent workflow</h3>
+          <p class="sub">Process as conversation: the agent drives, humans decide.</p>
+          <ul class="flow-steps">
+            <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5c-1.6 0-3.1-.4-4.4-1.2L3 20l1.2-5.1A8.5 8.5 0 1 1 21 11.5z"/></svg></span><span><b>Describe the intent in chat</b><span class="note">No form. The Skill knows what to ask.</span></span></li>
+            <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M6.5 7.5 10.5 16M17.5 7.5 13.5 16"/></svg></span><span><b>The agent plans a task graph</b><span class="note">Concrete steps with dependencies — visible to everyone.</span></span></li>
+            <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span><span><b>Humans approve the moments that matter</b><span class="note">The plan itself, and every destructive step.</span></span></li>
+            <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span><span><b>The agent executes and verifies</b><span class="note">Live progress in the same conversation.</span></span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="concept-note glass reveal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3H9a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V8l-2-5z"/><path d="M15 3v5h2M10 13h4M10 17h4"/></svg>
+        <span>
+          The procedure itself is not code locked inside a workflow engine. It is an
+          <b>Agent Skill — a <code>SKILL.md</code> file in a Git repository</b> — versioned,
+          reviewable, and readable by anyone on the team.
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= how -->
+  <section class="section" id="how">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">How it works</span>
+        <h2>Plan. Approve. <span class="grad-text">Execute.</span></h2>
+        <p>
+          Every workflow session runs under the same two-phase policy: nothing executes
+          until a human has seen the plan, and nothing destructive executes until the
+          designated approver has said yes.
+        </p>
+      </div>
+      <div class="how-grid">
+        <div class="steps">
+          <div class="step glass reveal">
+            <span class="n">STEP 1 — PLAN</span>
+            <h3>The agent turns intent into a task graph</h3>
+            <p>
+              It reads the linked Agent Skill, breaks the request into WorkflowTasks with
+              explicit dependencies, and registers the whole DAG in one call — cycle
+              detection included. Nothing runs yet.
+            </p>
+          </div>
+          <div class="step glass reveal">
+            <span class="n">STEP 2 — APPROVE</span>
+            <h3>Humans gate the moments that matter</h3>
+            <p>
+              The session owner approves the plan before execution starts. Destructive
+              steps gate again on a <em>designated approver</em>: Approve / Reject controls
+              render right in the chat, and only that person can resolve them — anyone
+              else gets a <code>403</code>.
+            </p>
+          </div>
+          <div class="step glass reveal">
+            <span class="n">STEP 3 — EXECUTE</span>
+            <h3>The agent walks the graph</h3>
+            <p>
+              Tasks move <code>pending → in_progress → completed</code> in dependency
+              order, calling only the MCP tools bound to the current task. Everyone
+              watches live, in a table or as a graph.
+            </p>
+          </div>
+        </div>
+        <div class="dag-panel glass-strong reveal">
+          <div class="panel-title">
+            <span>WorkflowTasks</span>
+            <span class="views"><span>Table</span> · <span class="cur">Graph</span></span>
+          </div>
+          <svg class="dag-svg" viewBox="0 0 440 340" role="img" aria-label="A task graph: identify target and notify channel completed, prod approval gated, rolling restart in progress, verify rollout pending.">
+            <!-- edges -->
+            <path class="edge" d="M220 66 C 220 84, 130 88, 128 106"/>
+            <path class="edge" d="M220 66 C 220 84, 310 88, 312 106"/>
+            <path class="edge" d="M128 162 C 128 180, 216 184, 218 202"/>
+            <path class="edge" d="M220 258 C 220 270, 220 274, 220 286"/>
+            <!-- root: completed -->
+            <g>
+              <rect class="node-box done-box" x="130" y="10" width="180" height="56" rx="14"/>
+              <circle cx="156" cy="38" r="9" fill="var(--success)"/>
+              <path d="m152 38 3 3 5.5-6" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <text class="node-label" x="174" y="35">Identify target</text>
+              <text class="node-sub" x="174" y="50" fill="var(--success)">COMPLETED</text>
+            </g>
+            <!-- left branch: approval gate -->
+            <g>
+              <rect class="node-box gate-box" x="38" y="106" width="180" height="56" rx="14"/>
+              <path d="M64 29.5v6.8c0 5-4.5 7.4-6.8 8.2-2.3-.8-6.8-3.2-6.8-8.2v-6.8l6.8-2.5 6.8 2.5z" transform="translate(6 101)" fill="none" stroke="var(--secondary)" stroke-width="1.8" stroke-linejoin="round"/>
+              <text class="node-label" x="86" y="131">Approve prod change</text>
+              <text class="node-sub" x="86" y="146" fill="var(--secondary)">WAITING · SAM</text>
+            </g>
+            <!-- right branch: completed -->
+            <g>
+              <rect class="node-box done-box" x="222" y="106" width="180" height="56" rx="14"/>
+              <circle cx="248" cy="134" r="9" fill="var(--success)"/>
+              <path d="m244 134 3 3 5.5-6" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <text class="node-label" x="266" y="131">Notify #ops channel</text>
+              <text class="node-sub" x="266" y="146" fill="var(--success)">COMPLETED</text>
+            </g>
+            <!-- in progress -->
+            <g>
+              <rect class="node-box doing-box" x="130" y="202" width="180" height="56" rx="14"/>
+              <circle class="doing-ring" cx="156" cy="230" r="9" fill="none" stroke="var(--accent-bright)" stroke-width="2.5"/>
+              <circle cx="156" cy="230" r="3.5" fill="var(--accent-bright)"/>
+              <text class="node-label" x="174" y="227">Rolling restart</text>
+              <text class="node-sub" x="174" y="242" fill="var(--accent-bright)">IN PROGRESS</text>
+            </g>
+            <!-- pending -->
+            <g opacity="0.65">
+              <rect class="node-box pend-box" x="130" y="286" width="180" height="46" rx="14"/>
+              <circle cx="156" cy="309" r="8" fill="none" stroke="var(--muted)" stroke-width="1.8" opacity="0.6"/>
+              <text class="node-label" x="174" y="306">Verify rollout</text>
+              <text class="node-sub" x="174" y="320" fill="var(--muted)">PENDING</text>
+            </g>
+          </svg>
+          <div class="dag-legend">
+            <span><i style="background:var(--success)"></i>completed</span>
+            <span><i style="background:var(--accent-bright)"></i>in progress</span>
+            <span><i style="background:var(--secondary)"></i>approval gate</span>
+            <span><i style="border:1.5px dashed var(--muted);background:transparent"></i>pending</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================== roles -->
+  <section class="section" id="teams">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">Built for teams</span>
+        <h2>Three roles, <span class="grad-text">one conversation</span></h2>
+        <p>
+          A workflow session is a shared chat. The applicant, the approver, and the agent
+          all post into the same thread — no side channels, no “any update on my ticket?”
+        </p>
+      </div>
+      <div class="roles">
+        <div class="role-card glass reveal">
+          <span class="avatar mika">M</span>
+          <h3>The applicant</h3>
+          <p>
+            Owns the session. Describes the intent, answers the agent's questions, and
+            approves the plan before anything runs.
+          </p>
+        </div>
+        <div class="role-card glass reveal">
+          <span class="avatar sam">S</span>
+          <h3>The approver</h3>
+          <p>
+            Gets a notification, opens the session, and decides right in the chat — with a
+            comment. Only the designated approver can resolve an approval.
+          </p>
+        </div>
+        <div class="role-card glass reveal">
+          <span class="avatar bot">✦</span>
+          <h3>The agent</h3>
+          <p>
+            Plans the task graph, requests approvals at the right moments, executes each
+            step per the Skill, and reports progress as it goes.
+          </p>
+        </div>
+      </div>
+      <div class="trust-row">
+        <div class="trust-card glass reveal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          <div>
+            <h4>Notifications that carry you to the decision</h4>
+            <p>
+              Approval requests and session completions land in each user's notification
+              bell and deep-link straight into the relevant conversation.
+            </p>
+          </div>
+        </div>
+        <div class="trust-card glass reveal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3H9a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V8l-2-5z"/><path d="M15 3v5h2"/><path d="m9.5 14 1.7 1.7L14.5 12"/></svg>
+          <div>
+            <h4>An audit trail on every approval</h4>
+            <p>
+              Who approved, what they wrote, and exactly when — persisted on the approval
+              record and browsable in the admin console.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================== features -->
+  <section class="section" id="features">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">Features</span>
+        <h2>Everything a workflow needs, <span class="grad-text">nothing it doesn't</span></h2>
+      </div>
+      <div class="features">
+        <div class="feature glass reveal">
+          <span class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></span>
+          <h3>Agent Skills in Git</h3>
+          <p>
+            Procedures live as <code>SKILL.md</code> files in Git repositories, cloned on
+            first run. Version them, review them, read them — like any other code.
+          </p>
+        </div>
+        <div class="feature glass reveal">
+          <span class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M6.5 7.5 10.5 16M17.5 7.5 13.5 16"/></svg></span>
+          <h3>A live task graph</h3>
+          <p>
+            Tasks form a real DAG — dependencies enforced, cycles rejected — and render as
+            a sortable table or an auto-laid-out graph, updating as the agent works.
+          </p>
+        </div>
+        <div class="feature glass reveal">
+          <span class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+          <h3>Approval gates mid-run</h3>
+          <p>
+            Before a destructive step, the agent requests approval from a specific user and
+            pauses. Approve / Reject buttons appear in the chat — for that user only.
+          </p>
+        </div>
+        <div class="feature glass reveal">
+          <span class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>
+          <h3>MCP tools, scoped per task</h3>
+          <p>
+            Register remote MCP servers, and the agent binds only the tools each task
+            needs at plan time. At run time, a task can call nothing but its own tools.
+          </p>
+        </div>
+        <div class="feature glass reveal">
+          <span class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3M7 9h4v4H7zM14 9h3M14 13h3"/></svg></span>
+          <h3>Rich UI inside the chat</h3>
+          <p>
+            Through the A2UI protocol the agent renders buttons, forms, and cards inline —
+            and your clicks flow back into the run as tool results.
+          </p>
+        </div>
+        <div class="feature glass reveal">
+          <span class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg></span>
+          <h3>Bring your own LLM</h3>
+          <p>
+            Gemini by default; OpenAI and Anthropic models via LiteLLM. Swapping providers
+            is one environment variable.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================== architecture -->
+  <section class="section" id="architecture">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">Under the hood</span>
+        <h2>An open-protocol <span class="grad-text">stack</span></h2>
+        <p>
+          A Next.js chat UI streams AG-UI events from a FastAPI backend that hosts a
+          Google ADK agent. Skills come from Git, tools come from MCP servers, and one
+          relational database holds it all.
+        </p>
+      </div>
+      <div class="arch glass reveal">
+        <div class="arch-flow">
+          <div class="arch-node glass-strong">
+            <b>Next.js 16 chat UI</b>
+            <span>React 19 · A2UI renderer</span>
+          </div>
+          <div class="arch-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+            AG-UI · SSE
+          </div>
+          <div class="arch-node glass-strong">
+            <b>FastAPI + Google ADK</b>
+            <span>plan-then-execute agent</span>
+          </div>
+          <div class="arch-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+            TOOLS
+          </div>
+          <div class="arch-side">
+            <div class="arch-node glass-strong">
+              <b>MCP servers</b>
+              <span>streamable HTTP</span>
+            </div>
+            <div class="arch-node glass-strong">
+              <b>Skills in Git</b>
+              <span>SKILL.md repos</span>
+            </div>
+            <div class="arch-node glass-strong">
+              <b>PostgreSQL / SQLite</b>
+              <span>sessions · tasks · approvals</span>
+            </div>
+          </div>
+        </div>
+        <div class="stack-chips">
+          <span class="tag">Next.js 16</span>
+          <span class="tag">React 19</span>
+          <span class="tag">Tailwind CSS 4</span>
+          <span class="tag">FastAPI</span>
+          <span class="tag">Google ADK</span>
+          <span class="tag">ag-ui-adk</span>
+          <span class="tag">LiteLLM</span>
+          <span class="tag">SQLModel</span>
+          <span class="tag">Docker Compose</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ cta -->
+  <section class="cta-final">
+    <div class="wrap">
+      <div class="reveal">
+        <span class="eyebrow">Get started</span>
+        <h2>Run it <span class="grad-text">on your machine</span></h2>
+        <p>
+          The whole stack — PostgreSQL, backend, frontend — comes up with Docker Compose.
+          Bring a Google API key and you're two commands away from your first workflow.
+        </p>
+      </div>
+      <div class="terminal reveal">
+        <div class="terminal-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <pre><code><span class="p">$</span> git clone https://github.com/kaitoy/a2flow.git &amp;&amp; cd a2flow
+<span class="p">$</span> echo GOOGLE_API_KEY=your_google_api_key_here &gt; .env
+<span class="p">$</span> docker compose up --build
+<span class="c"># open http://localhost:3000</span></code></pre>
+      </div>
+      <div class="reveal">
+        <a class="btn btn-primary" href="https://github.com/kaitoy/a2flow">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.24 2.76.12 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.2.67.79.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <img src="assets/logo.png" alt="" width="28" height="28">
+      <span class="grad-text">A2Flow</span>
+    </a>
+    <a href="https://github.com/kaitoy/a2flow">GitHub</a>
+    <span>Agent as Workflow</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  document.documentElement.classList.add("js");
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* Theme toggle (persisted, mirrors the app). */
+  document.getElementById("themeToggle").addEventListener("click", function () {
+    var root = document.documentElement;
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("a2flow-home.theme", next); } catch (e) {}
+  });
+
+  /* Scroll reveal. */
+  var revealed = document.querySelectorAll(".reveal");
+  if ("IntersectionObserver" in window && !reducedMotion) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in");
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: "0px 0px -5% 0px" });
+    revealed.forEach(function (el) { io.observe(el); });
+  } else {
+    revealed.forEach(function (el) { el.classList.add("in"); });
+  }
+
+  /* Self-playing hero demo: plan -> approve -> execute, on a loop. */
+  var demo = document.getElementById("demo");
+  var msgs = demo.querySelectorAll(".dmsg");
+  var planTasks = document.getElementById("planList").children;
+  var planChip = document.getElementById("planChip");
+  var approvalCard = document.getElementById("approvalCard");
+
+  function setFinalState() {
+    planChip.textContent = "Plan approved";
+    planChip.classList.add("ok");
+    approvalCard.classList.add("approved");
+    for (var i = 0; i < planTasks.length; i++) {
+      planTasks[i].classList.remove("doing");
+      planTasks[i].classList.add("done");
+    }
+  }
+
+  if (reducedMotion) {
+    setFinalState();
+  } else {
+    var script = [
+      function () { msgs[0].classList.add("on"); },                       /* request */
+      function () { msgs[1].classList.add("on"); },                       /* plan */
+      function () {                                                        /* plan approved */
+        msgs[2].classList.add("on");
+        planChip.textContent = "Plan approved";
+        planChip.classList.add("ok");
+        planTasks[0].classList.add("doing");
+      },
+      function () {                                                        /* task 1 done, gate */
+        planTasks[0].classList.remove("doing");
+        planTasks[0].classList.add("done");
+        planTasks[1].classList.add("doing");
+        msgs[3].classList.add("on");
+      },
+      function () {                                                        /* approved */
+        approvalCard.classList.add("approved");
+        planTasks[1].classList.remove("doing");
+        planTasks[1].classList.add("done");
+        planTasks[2].classList.add("doing");
+      },
+      function () {                                                        /* done */
+        planTasks[2].classList.remove("doing");
+        planTasks[2].classList.add("done");
+        planTasks[3].classList.add("done");
+        msgs[4].classList.add("on");
+      }
+    ];
+    var stepDelay = 2300;
+    var holdAtEnd = 5200;
+    var idx = 0;
+    demo.classList.add("live");
+    function reset() {
+      for (var i = 0; i < msgs.length; i++) msgs[i].classList.remove("on");
+      for (var j = 0; j < planTasks.length; j++) planTasks[j].classList.remove("doing", "done");
+      planChip.textContent = "Waiting for plan approval…";
+      planChip.classList.remove("ok");
+      approvalCard.classList.remove("approved");
+      idx = 0;
+    }
+    function tick() {
+      script[idx]();
+      idx++;
+      if (idx < script.length) {
+        setTimeout(tick, stepDelay);
+      } else {
+        setTimeout(function () { reset(); setTimeout(tick, 600); }, holdAtEnd);
+      }
+    }
+    setTimeout(tick, 800);
+  }
+})();
+</script>
+</body>
+</html>
