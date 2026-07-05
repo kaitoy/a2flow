@@ -98,10 +98,40 @@ HttpUrl = Annotated[
     str, StringConstraints(min_length=1, max_length=2048, pattern=r"^https?://.+")
 ]
 
+
+def _reject_path_escape(value: str) -> str:
+    """Reject repo-relative paths that could escape the skill cache directory.
+
+    Args:
+        value: The candidate repo-relative path.
+
+    Returns:
+        The unchanged value when it stays within the repository tree.
+
+    Raises:
+        ValueError: If the value is an absolute path (leading ``/``, or a
+            drive-letter prefix like ``C:``) or contains a ``..``
+            parent-directory segment.
+    """
+    if value.startswith("/") or (
+        len(value) >= 2 and value[1] == ":" and value[0].isalpha()
+    ):
+        raise ValueError("must be a relative path within the repository")
+    if any(segment == ".." for segment in value.split("/")):
+        raise ValueError("must not contain '..' parent-directory segments")
+    return value
+
+
 #: Path within a repository: up to 1024 characters, any character except a
 #: backslash and the control characters (C0 ``\x00-\x1f``, DEL/C1 ``\x7f-\x9f``).
+#: Must also stay relative to the repository root: :func:`_reject_path_escape`
+#: rejects a leading ``/``, a drive-letter prefix (``C:``), and any ``..``
+#: parent-directory segment, since this value is joined onto the skill cache
+#: directory in :class:`infrastructure.skill_manager.SkillManager`.
 RepoPath = Annotated[
-    str, StringConstraints(max_length=1024, pattern=r"^[^\x00-\x1f\x7f-\x9f\\]*$")
+    str,
+    StringConstraints(max_length=1024, pattern=r"^[^\x00-\x1f\x7f-\x9f\\]*$"),
+    AfterValidator(_reject_path_escape),
 ]
 
 #: Short free-text label such as a task or notification title: 1–200 characters.

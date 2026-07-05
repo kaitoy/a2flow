@@ -24,13 +24,32 @@ class SkillManager:
 
         Returns the path containing SKILL.md: `cache_dir/<skill_id>/<repo_path>`.
         Re-clone is skipped when the target directory already exists.
+
+        Raises:
+            SkillCloneError: If cloning fails, the resolved skill directory
+                does not exist, or `skill.repo_path` resolves outside the
+                per-skill cache directory. The last case is a defense-in-depth
+                check: `models.constraints.RepoPath` already rejects `..`
+                segments and absolute paths at the API boundary, but
+                `table=True` SQLModel classes skip Pydantic validation, so a
+                row inserted before that check existed (or constructed
+                directly rather than through the API) could otherwise still
+                reach here.
         """
         skill_lock = await self._get_lock(skill.id)
         async with skill_lock:
             target = self._cache_dir / skill.id
             if not target.exists():
                 await self._clone(skill.repo_url, target)
-        skill_dir = target / skill.repo_path if skill.repo_path else target
+        resolved_target = target.resolve()
+        skill_dir = (
+            (target / skill.repo_path).resolve() if skill.repo_path else resolved_target
+        )
+        if not skill_dir.is_relative_to(resolved_target):
+            raise SkillCloneError(
+                f"repo_path {skill.repo_path!r} escapes the cache directory "
+                f"for skill {skill.id}"
+            )
         if not skill_dir.exists():
             raise SkillCloneError(
                 f"Skill directory {skill_dir} not found after cloning {skill.repo_url}"

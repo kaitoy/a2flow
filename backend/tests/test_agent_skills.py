@@ -367,3 +367,48 @@ async def test_create_skill_rejects_non_http_repo_url(
         json={"name": "ok-name", "repo_url": "ftp://example.com/repo"},
     )
     assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_repo_path_with_parent_segment(
+    skill_client: AsyncClient,
+) -> None:
+    """A repo_path containing a '..' segment could escape the skill cache dir, so it returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={
+            "name": "ok-name",
+            "repo_url": "https://github.com/x/y",
+            "repo_path": "../../etc",
+        },
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_absolute_repo_path(
+    skill_client: AsyncClient,
+) -> None:
+    """A repo_path that is an absolute path returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={
+            "name": "ok-name",
+            "repo_url": "https://github.com/x/y",
+            "repo_path": "/etc/passwd",
+        },
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_accepts_nested_repo_path(
+    skill_client: AsyncClient,
+) -> None:
+    """A normal nested repo_path is still accepted."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={
+            "name": "ok-name",
+            "repo_url": "https://github.com/x/y",
+            "repo_path": "skills/my-skill",
+        },
+    )
+    assert assert_ok(response, status=201)["repoPath"] == "skills/my-skill"

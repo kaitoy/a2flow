@@ -193,6 +193,8 @@ Sessions are created lazily: the backend ADK session is materialized on the firs
 
 Agent skills are reusable skill definitions that can be attached to workflows. Each record stores a unique `name`, a Git `repoUrl`, an optional `repoPath` (default `""`), and an optional `description`. Deleting a skill that is still referenced by one or more workflows returns `409 CONFLICT_REFERENCED`. CRUD endpoints are in the [API reference](http://localhost:3000/api-doc).
 
+The content at `repoUrl`/`repoPath` (e.g. `SKILL.md`) is loaded directly into the workflow agent's LLM prompt, unsandboxed — only register repositories you trust, since their content is effectively an instruction to the agent, not inert data.
+
 ---
 
 ### MCP servers
