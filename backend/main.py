@@ -73,9 +73,32 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+def _validate_cors_origins(origins: list[str]) -> None:
+    """Raise if ``origins`` combines a wildcard with credentialed CORS requests.
+
+    ``allow_credentials=True`` is unconditional below, and the CORS spec
+    forbids pairing a wildcard origin with credentialed requests — browsers
+    enforce this, but not every non-browser client does, so a wildcard here
+    would silently disable the origin check for those callers. Fail at import
+    time instead of shipping that misconfiguration.
+    """
+    if "*" in origins:
+        raise ValueError(
+            "CORS_ORIGINS must not include '*' because allow_credentials=True "
+            "is enabled; list explicit origins instead."
+        )
+
+
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+]
+_validate_cors_origins(_cors_origins)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000").split(","),
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

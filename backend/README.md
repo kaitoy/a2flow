@@ -147,6 +147,8 @@ Comma-separated list of origins allowed to call `/chat` and `/sessions`. Default
 CORS_ORIGINS=https://app.example.com,http://localhost:3000
 ```
 
+`*` is rejected at startup — `allow_credentials=True` is always enabled, and pairing it with a wildcard origin is invalid per the CORS spec.
+
 ## Development
 
 For conventions on adding new models, repositories, services, and routers, see [.claude/rules/backend-patterns.md](../.claude/rules/backend-patterns.md).
