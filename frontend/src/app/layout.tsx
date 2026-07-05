@@ -4,6 +4,7 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/toast";
+import { NO_FLASH_THEME_SCRIPT } from "@/lib/no-flash-theme-script";
 import { StoreProvider } from "@/store/provider";
 import "./globals.css";
 
@@ -19,17 +20,6 @@ export const metadata: Metadata = {
   description: "AI chat powered by Google ADK",
 };
 
-const NO_FLASH_SCRIPT = `(() => {
-  try {
-    const stored = localStorage.getItem('a2flow.theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = stored === 'light' || stored === 'dark' ? stored : prefersDark ? 'dark' : 'light';
-    document.documentElement.dataset.theme = theme;
-  } catch (_) {
-    document.documentElement.dataset.theme = 'light';
-  }
-})();`;
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={spaceGrotesk.variable}>
@@ -38,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           id="no-flash-theme"
           strategy="beforeInteractive"
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline script for FOUC prevention
-          dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }}
+          dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME_SCRIPT }}
         />
         <ThemeProvider>
           <StoreProvider>

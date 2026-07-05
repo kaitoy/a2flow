@@ -15,14 +15,9 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
-import {
-  TASK_TIMELINE_ASIDE_CLASS,
-  TASK_TIMELINE_HEADER_CLASS,
-  TASK_TIMELINE_LIST_CLASS,
-  WorkflowTaskTimeline,
-} from "@/components/WorkflowTaskTimeline";
+import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
+import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import { A2UI_SOURCE_TOOL_CALL_ID_KEY } from "@/lib/agentActivity";
 import { formatUserName, getWorkflowSession, type User, type WorkflowSession } from "@/lib/api";
@@ -173,60 +168,6 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           onApprovalResolved={sendApprovalResult}
         />
         <ChatInput onSend={sendMessage} disabled={isRunning} />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Placeholder chat layout shown while the WorkflowSession record loads, so the
- * page presents the header shell and a few message-bubble skeletons instead of
- * flashing a blank screen. Shares its sidebar chrome classes with
- * {@link WorkflowTaskTimeline} so this loading state can't silently drift from
- * the real layout it stands in for.
- */
-function WorkflowSessionSkeleton() {
-  return (
-    <div role="status" aria-label="Loading" className="flex h-screen overflow-hidden">
-      <div className={TASK_TIMELINE_ASIDE_CLASS}>
-        <div className={TASK_TIMELINE_HEADER_CLASS}>
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-4 rounded" />
-        </div>
-        <div className={TASK_TIMELINE_LIST_CLASS}>
-          <div className="flex items-start gap-2.5 px-2 py-2">
-            <Skeleton className="size-5 shrink-0 rounded-full" />
-            <Skeleton className="h-4 w-full rounded" />
-          </div>
-          <div className="flex items-start gap-2.5 px-2 py-2">
-            <Skeleton className="size-5 shrink-0 rounded-full" />
-            <Skeleton className="h-4 w-full rounded" />
-          </div>
-          <div className="flex items-start gap-2.5 px-2 py-2">
-            <Skeleton className="size-5 shrink-0 rounded-full" />
-            <Skeleton className="h-4 w-full rounded" />
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-col flex-1 min-w-0">
-        <AppHeader>
-          <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />
-          <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-accent shadow-glow animate-pulse" />
-          <Skeleton className="h-5 w-40" />
-        </AppHeader>
-
-        <div className="flex-1 overflow-y-auto px-4 py-6">
-          <div className="mx-auto flex max-w-3xl flex-col">
-            <Skeleton className="ml-auto mb-3 h-16 w-2/3 rounded-2xl rounded-tr-md" />
-            <Skeleton className="mb-3 h-24 w-3/4 rounded-2xl rounded-tl-md" />
-            <Skeleton className="ml-auto mb-3 h-12 w-1/2 rounded-2xl rounded-tr-md" />
-            <Skeleton className="mb-3 h-20 w-2/3 rounded-2xl rounded-tl-md" />
-          </div>
-        </div>
-
-        <div className="shrink-0 px-4 pb-6 pt-2">
-          <Skeleton className="mx-auto h-14 w-full max-w-3xl rounded-2xl" />
-        </div>
       </div>
     </div>
   );

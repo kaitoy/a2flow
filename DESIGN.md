@@ -204,6 +204,7 @@ The shape language is **Soft Modern**.
 - **A2UI surfaces:** `customCard` is rendered as `glass-panel-strong`. `customChoicePicker` chips use the same primary-gradient when selected and `glass-panel` when not, and scale up slightly (~1.03) on hover (motion-safe).
 - **Theme Toggle:** A 36×36 round glass button in the chat header / admin sidebar bottom. Sun/Moon SVG icons; scales up slightly (~1.05) and emits accent glow on hover. Icons cross-fade with a 90° rotation on toggle.
 - **EmptyState:** Centered placeholder for empty regions (no messages, no rows, no sessions). Pairs an `AnimatedIcon` inside a frosted-glass tile with an optional title and description. Has a `compact` variant for tight containers (session sidebar, table empty cell). See `@/components/ui/empty-state.tsx`.
+- **Route loading/error boundaries:** Every route segment has a `loading.tsx` built from the same shared skeleton the page's own post-mount loading state uses (`FormSkeleton`, `AdminListSkeleton`, `WorkflowSessionSkeleton`, `ChatPanelSkeleton`) so the Suspense fallback and the page's own loading state are visually identical. Shells with persistent chrome (root, `/admin`, `(chat)`, `/account`) each have an `error.tsx` built on `RouteErrorFallback` (`EmptyState` + `Button reset`) so a render crash doesn't unmount the section's sidebar/header; `global-error.tsx` is the last-resort fallback for a crash in the root layout itself. A single root `not-found.tsx` handles unmatched URLs.
 
 ### Iconography
 
