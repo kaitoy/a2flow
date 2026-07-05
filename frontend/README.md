@@ -49,7 +49,7 @@ pnpm build
 pnpm start
 ```
 
-`pnpm dev` and `pnpm build` automatically run `scripts/download-a2ui-schema.mjs` first, which downloads the A2UI Basic Catalog schema from `https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json` into `src/generated/basic_catalog.json`.
+`pnpm dev` and `pnpm build` automatically run `scripts/download-a2ui-schema.mjs` first, which downloads the A2UI Basic Catalog schema from `https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json` into `src/generated/basic_catalog.json`, verifying its SHA-256 against a pinned constant in the script and failing the build on mismatch.
 
 Open [http://localhost:3000](http://localhost:3000).
 
