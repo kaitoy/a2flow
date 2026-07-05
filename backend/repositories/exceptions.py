@@ -79,9 +79,9 @@ class UniqueViolationError(RepositoryError):
 class McpConnectionError(Exception):
     """Raised when a registered remote MCP server cannot be reached or errors out.
 
-    Carries the ``server`` (name or URL) and a human-readable ``reason`` so the
-    HTTP layer can surface them in the error envelope's ``details`` block when
-    returning HTTP 502.
+    Carries the ``server`` (name or URL, already known to the caller) and a
+    ``reason`` string. The HTTP layer logs ``reason`` server-side but never
+    returns it to the client, since it echoes the raw caught exception text.
     """
 
     def __init__(self, server: str, reason: str) -> None:
@@ -93,8 +93,9 @@ class McpConnectionError(Exception):
 class RegistryUnavailableError(Exception):
     """Raised when the official MCP registry cannot be reached or errors out.
 
-    Carries a human-readable ``reason`` so the HTTP layer can surface it in the
-    error envelope's ``details`` block when returning HTTP 502.
+    Carries a ``reason`` string. The HTTP layer logs ``reason`` server-side
+    but never returns it to the client, since it echoes the raw caught
+    exception text.
     """
 
     def __init__(self, reason: str) -> None:

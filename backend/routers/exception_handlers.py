@@ -176,12 +176,13 @@ async def mcp_connection_exception_handler(
 ) -> JSONResponse:
     """Return HTTP 502 with MCP_UNREACHABLE code when a remote MCP server cannot be reached."""
     assert isinstance(exc, McpConnectionError)
+    logger.warning("MCP server %s unreachable: %s", exc.server, exc.reason)
     return _envelope_error(
         request,
         code="MCP_UNREACHABLE",
-        message=str(exc),
+        message=f"MCP server {exc.server!r} unreachable",
         status_code=502,
-        details={"server": exc.server, "reason": exc.reason},
+        details={"server": exc.server},
     )
 
 
@@ -190,12 +191,12 @@ async def registry_unavailable_exception_handler(
 ) -> JSONResponse:
     """Return HTTP 502 with REGISTRY_UNREACHABLE code when the MCP registry fails."""
     assert isinstance(exc, RegistryUnavailableError)
+    logger.warning("MCP registry unavailable: %s", exc.reason)
     return _envelope_error(
         request,
         code="REGISTRY_UNREACHABLE",
-        message=str(exc),
+        message="MCP registry unavailable",
         status_code=502,
-        details={"reason": exc.reason},
     )
 
 

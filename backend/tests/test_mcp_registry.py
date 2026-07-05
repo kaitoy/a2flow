@@ -215,9 +215,8 @@ async def test_search_endpoint_502_on_registry_error(
 
     monkeypatch.setattr(mcp_registry_client, "search_servers", fake_search)
 
-    err = assert_err(
-        await registry_client.get("/api/v1/mcp-registry"),
-        code="REGISTRY_UNREACHABLE",
-        status=502,
-    )
-    assert err["details"]["reason"] == "connection refused"
+    response = await registry_client.get("/api/v1/mcp-registry")
+    err = assert_err(response, code="REGISTRY_UNREACHABLE", status=502)
+    assert err["message"] == "MCP registry unavailable"
+    assert err["details"] is None
+    assert "connection refused" not in response.text

@@ -294,7 +294,9 @@ async def test_list_server_tools_unreachable_returns_502(
         "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
     )
     response = await mcp_client.get(f"/api/v1/mcp-servers/{created['id']}/tools")
-    assert_err(response, code="MCP_UNREACHABLE", status=502)
+    err = assert_err(response, code="MCP_UNREACHABLE", status=502)
+    assert err["details"] == {"server": _CREATE_BODY["url"]}
+    assert "connection refused" not in response.text
 
 
 async def test_list_server_tools_unknown_id_returns_404(

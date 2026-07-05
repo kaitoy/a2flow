@@ -261,8 +261,8 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `ForbiddenError` | 403 | `FORBIDDEN` | Authenticated user lacks permission for the resource (e.g. not an approval's designated approver) |
 | `AvatarValidationError` | 422 | `INVALID_AVATAR` | Uploaded avatar has an unsupported type or exceeds the size limit; `details` carries `reason` |
 | `RequestValidationError` | 422 | `VALIDATION_ERROR` | FastAPI body/query validation; `details.errors` from Pydantic |
-| `McpConnectionError` | 502 | `MCP_UNREACHABLE` | Remote MCP server unreachable; `details` carries `server` and `reason` |
-| `RegistryUnavailableError` | 502 | `REGISTRY_UNREACHABLE` | Official MCP registry unreachable; `details` carries `reason` |
+| `McpConnectionError` | 502 | `MCP_UNREACHABLE` | Remote MCP server unreachable; `details` carries `server` only — the raw failure reason is logged server-side, never returned to the client |
+| `RegistryUnavailableError` | 502 | `REGISTRY_UNREACHABLE` | Official MCP registry unreachable; no `details` — the raw failure reason is logged server-side only |
 | `HTTPException` (any other raise) | passthrough | `HTTP_<status>` | Fallback for callers still raising `HTTPException` |
 | Uncaught `Exception` | 500 | `INTERNAL_ERROR` | Logged with `request_id` |
 
