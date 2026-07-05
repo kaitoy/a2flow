@@ -48,9 +48,11 @@ ENV NODE_ENV=production \
 WORKDIR /app
 # outputFileTracingRoot is the frontend dir itself, so the standalone bundle
 # places server.js at its top level.
-COPY --from=build /app/frontend/.next/standalone ./
-COPY --from=build /app/frontend/.next/static ./.next/static
-COPY --from=build /app/frontend/public ./public
+COPY --from=build --chown=node:node /app/frontend/.next/standalone ./
+COPY --from=build --chown=node:node /app/frontend/.next/static ./.next/static
+COPY --from=build --chown=node:node /app/frontend/public ./public
+
+USER node
 
 EXPOSE 3000
 
