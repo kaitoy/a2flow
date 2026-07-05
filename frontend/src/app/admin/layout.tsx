@@ -42,7 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={() => setCollapsed((c) => !c)}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-expanded={!collapsed}
-              className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
+              className="cursor-pointer rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
             >
               {collapsed ? (
                 <Menu size={20} strokeWidth={1.8} aria-hidden="true" />
