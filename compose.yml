@@ -38,6 +38,10 @@ services:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Password for the seeded 'admin' user. Optional: if left unset, a
+      # random password is generated and printed once to `docker compose
+      # logs backend` on first startup.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       CORS_ORIGINS: http://localhost:3000
       SKILLS_CACHE_DIR: /var/cache/a2flow/skills
     volumes:

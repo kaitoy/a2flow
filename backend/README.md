@@ -100,13 +100,13 @@ On startup the backend seeds two users:
 - A hidden **system user** that owns the bootstrap records (it cannot log in and is excluded from the user list).
 - An initial **`admin`** user, created only on the very first startup — that is, while the database has no real (non-system) user yet. Once any real user exists it is never re-created.
 
-The `admin` user's password is read from the `ADMIN_PASSWORD` environment variable, falling back to `admin12345678` when unset:
+The `admin` user's password is read from the `ADMIN_PASSWORD` environment variable:
 
 ```env
 ADMIN_PASSWORD=change-me-now-123
 ```
 
-The username is fixed to `admin`. Set `ADMIN_PASSWORD` before the first run, or change the password through the user API afterwards.
+If unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when the admin user is created — it is tied to the same first-startup-only bootstrap, so it is never regenerated on a later restart, and it cannot be recovered once the log line has scrolled past. Set `ADMIN_PASSWORD` explicitly before the first run for anything beyond local experimentation, or capture the generated password from the startup logs immediately and change it through the user API afterwards. The username is fixed to `admin`.
 
 ### Authentication
 

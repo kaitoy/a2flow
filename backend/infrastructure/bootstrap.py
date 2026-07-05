@@ -1,5 +1,6 @@
 """Bootstrap helpers that seed required baseline records on application startup."""
 
+import logging
 import os
 import secrets
 
@@ -9,9 +10,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.password import hash_password
 from models.user import SYSTEM_USER_ID, User
 
-#: Fallback password for the seeded ``admin`` user when ``ADMIN_PASSWORD`` is
-#: unset. Twelve characters to satisfy the model's minimum password length.
-DEFAULT_ADMIN_PASSWORD = "admin12345678"
+logger = logging.getLogger(__name__)
+
+#: Bytes of entropy for the admin password generated when ``ADMIN_PASSWORD`` is
+#: unset. ``token_urlsafe`` renders ~1.3 chars/byte, so 16 bytes yields a
+#: ~22-character password: comfortably above the model's 12-character minimum
+#: and short enough to copy out of a log line.
+_GENERATED_ADMIN_PASSWORD_BYTES = 16
 
 
 async def seed_system_user(session: AsyncSession) -> None:
@@ -49,10 +54,11 @@ async def seed_admin_user(session: AsyncSession) -> None:
 
     Skipped when any real (non-system) user already exists, so it runs only on
     the very first startup. The password is read from the ``ADMIN_PASSWORD``
-    environment variable, falling back to :data:`DEFAULT_ADMIN_PASSWORD` when
-    unset. The user is created with ``created_by`` / ``updated_by`` pointing at
-    the seeded system user (:data:`SYSTEM_USER_ID`); its own ``id`` is an
-    auto-generated UUID7.
+    environment variable; if unset (or empty), a random password is generated
+    and logged once at ``WARNING`` level, since it cannot be recovered
+    afterwards. The user is created with ``created_by`` / ``updated_by``
+    pointing at the seeded system user (:data:`SYSTEM_USER_ID`); its own ``id``
+    is an auto-generated UUID7.
 
     Args:
         session: Database session used to read and insert the user.
@@ -60,7 +66,15 @@ async def seed_admin_user(session: AsyncSession) -> None:
     stmt = select(User).where(col(User.id) != SYSTEM_USER_ID).limit(1)
     if (await session.exec(stmt)).first() is not None:
         return
-    password = os.getenv("ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
+    password = os.getenv("ADMIN_PASSWORD")
+    if not password:
+        password = secrets.token_urlsafe(_GENERATED_ADMIN_PASSWORD_BYTES)
+        logger.warning(
+            "ADMIN_PASSWORD not set; generated a random password for the "
+            "'admin' user. This is logged once and cannot be recovered "
+            "afterwards - copy it now, then change it after logging in: %s",
+            password,
+        )
     admin = User(
         username="admin",
         first_name="Admin",
