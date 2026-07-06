@@ -17,6 +17,8 @@ from typing import Annotated
 
 from pydantic import AfterValidator, Field, StringConstraints
 
+from infrastructure.url_safety import assert_public_http_url
+
 #: Character set for slug-style identifiers: ASCII letters, digits, ``.``,
 #: ``_`` and ``-``. No whitespace or other punctuation.
 SLUG_PATTERN = r"^[a-zA-Z0-9._-]+$"
@@ -93,9 +95,36 @@ PersonName = Annotated[str, StringConstraints(min_length=1, max_length=100)]
 #: cap, beyond which extra input is silently truncated by the hasher.
 Password = Annotated[str, StringConstraints(min_length=12, max_length=72)]
 
-#: HTTP(S) URL: 1–2048 characters, must start with ``http://`` or ``https://``.
+
+def _reject_unsafe_url(value: str) -> str:
+    """Reject a URL whose host resolves to a disallowed (SSRF-relevant) address.
+
+    Args:
+        value: The candidate URL, already known to start with ``http://``/``https://``.
+
+    Returns:
+        The unchanged value when its host resolves only to public addresses.
+
+    Raises:
+        ValueError: If the host is missing/unresolvable or resolves to a
+            loopback/private/link-local/reserved/multicast/unspecified address.
+            See :func:`infrastructure.url_safety.assert_public_http_url`.
+    """
+    assert_public_http_url(value)
+    return value
+
+
+#: HTTP(S) URL: 1–2048 characters, must start with ``http://`` or ``https://``,
+#: and its host must resolve only to public, routable addresses —
+#: :func:`_reject_unsafe_url` blocks SSRF against loopback/private/link-local
+#: (including the 169.254.169.254 cloud metadata address)/reserved/multicast
+#: targets. Composed once here so every field using this alias — currently
+#: ``AgentSkillCreate/Update.repo_url`` and ``MCPServerCreate/Update.url`` —
+#: gets the check without duplicating it per model.
 HttpUrl = Annotated[
-    str, StringConstraints(min_length=1, max_length=2048, pattern=r"^https?://.+")
+    str,
+    StringConstraints(min_length=1, max_length=2048, pattern=r"^https?://.+"),
+    AfterValidator(_reject_unsafe_url),
 ]
 
 

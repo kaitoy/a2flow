@@ -51,6 +51,22 @@ def _install_auth_overrides(app: Any) -> None:
     app.dependency_overrides[verify_csrf] = _override_verify_csrf
 
 
+@pytest.fixture(autouse=True)
+def _fake_dns_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub DNS resolution used by SSRF host validation for all tests by default.
+
+    Existing fixtures use placeholder hostnames (``example.com``, ``x``, ``y``,
+    ``mcp.example.com``) that aren't expected to resolve over real DNS. This
+    makes every non-literal hostname resolve to a fixed public IP so existing
+    MCPServer/AgentSkill create/update tests keep passing without network
+    access. Tests exercising SSRF rejection re-patch this within the test body
+    (monkeypatch stacks per-test, so the later call wins for that test).
+    """
+    monkeypatch.setattr(
+        "infrastructure.url_safety.resolve_host", lambda host: ["93.184.216.34"]
+    )
+
+
 @pytest.fixture()
 def real_session_service() -> InMemorySessionService:
     return InMemorySessionService()  # type: ignore[no-untyped-call]

@@ -1,14 +1,39 @@
 import asyncio
 from pathlib import Path
 
+import urllib3
 from dulwich import porcelain
+from dulwich.client import AuthCallbackPoolManager, default_urllib3_manager
 from dulwich.errors import GitProtocolError, NotGitRepository
 
+from infrastructure.url_safety import UnsafeUrlError, assert_public_http_url
 from models.agent_skill import AgentSkill
+from repositories.exceptions import SkillCloneError
 
 
-class SkillCloneError(Exception):
-    """Raised when an AgentSkill repository cannot be cloned."""
+def _build_no_redirect_pool_manager(
+    base_url: str,
+) -> urllib3.PoolManager | urllib3.ProxyManager | AuthCallbackPoolManager:
+    """Build the urllib3 pool manager dulwich uses for one clone, redirects disabled.
+
+    Mirrors dulwich's own default construction (``default_urllib3_manager``,
+    which honours proxy environment variables and TLS verification) but
+    replaces its retry policy so a 3xx response is returned as-is instead of
+    being followed. ``AbstractHttpGitClient`` treats any non-200 response as a
+    ``GitProtocolError``, so a redirect to an internal address surfaces as a
+    clone failure instead of being silently fetched.
+
+    Args:
+        base_url: The repository URL being cloned (used for proxy-bypass detection).
+
+    Returns:
+        A urllib3 pool/proxy manager with redirect-following disabled.
+    """
+    manager = default_urllib3_manager(config=None, base_url=base_url)
+    manager.connection_pool_kw["retries"] = urllib3.util.Retry(
+        redirect=0, raise_on_redirect=False
+    )
+    return manager
 
 
 class SkillManager:
@@ -47,12 +72,12 @@ class SkillManager:
         )
         if not skill_dir.is_relative_to(resolved_target):
             raise SkillCloneError(
-                f"repo_path {skill.repo_path!r} escapes the cache directory "
-                f"for skill {skill.id}"
+                skill.id,
+                f"repo_path {skill.repo_path!r} escapes the cache directory",
             )
         if not skill_dir.exists():
             raise SkillCloneError(
-                f"Skill directory {skill_dir} not found after cloning {skill.repo_url}"
+                skill.id, f"skill directory {skill_dir} not found after cloning"
             )
         return skill_dir
 
@@ -65,6 +90,7 @@ class SkillManager:
     async def _clone(self, repo_url: str, target: Path) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
         try:
+            await asyncio.to_thread(assert_public_http_url, repo_url)
             # porcelain.clone is synchronous; run in a worker thread so the
             # event loop is not blocked while pack data is fetched.
             await asyncio.to_thread(
@@ -72,6 +98,9 @@ class SkillManager:
                 repo_url,
                 str(target),
                 depth=1,
+                pool_manager=_build_no_redirect_pool_manager(repo_url),  # type: ignore[arg-type]
             )
-        except (GitProtocolError, NotGitRepository, OSError) as exc:
-            raise SkillCloneError(f"dulwich clone of {repo_url} failed: {exc}") from exc
+        except (GitProtocolError, NotGitRepository, OSError, UnsafeUrlError) as exc:
+            raise SkillCloneError(
+                target.name, f"clone of {repo_url} failed: {exc}"
+            ) from exc

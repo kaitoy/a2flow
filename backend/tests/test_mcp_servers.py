@@ -100,6 +100,29 @@ async def test_create_server_missing_url_returns_422(mcp_client: AsyncClient) ->
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
+async def test_create_server_rejects_loopback_url(mcp_client: AsyncClient) -> None:
+    """A url whose host is the loopback address returns 422 (SSRF guard)."""
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers",
+        json={"name": "Bad", "url": "http://127.0.0.1/mcp"},
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_server_rejects_url_resolving_to_private_ip(
+    mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A url whose host resolves to a private IP returns 422 (SSRF guard)."""
+    monkeypatch.setattr(
+        "infrastructure.url_safety.resolve_host", lambda host: ["10.1.2.3"]
+    )
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers",
+        json={"name": "Bad", "url": "http://internal.example.com/mcp"},
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
 async def test_create_server_duplicate_name_returns_409(
     mcp_client: AsyncClient,
 ) -> None:
@@ -174,6 +197,23 @@ async def test_update_server_unknown_id_returns_404(mcp_client: AsyncClient) -> 
         "/api/v1/mcp-servers/nonexistent", json={"name": "X"}
     )
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_update_server_rejects_url_resolving_to_private_ip(
+    mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Patching url to a host resolving to a private IP returns 422 (SSRF guard)."""
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_CREATE_BODY), status=201
+    )
+    monkeypatch.setattr(
+        "infrastructure.url_safety.resolve_host", lambda host: ["10.1.2.3"]
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}",
+        json={"url": "http://internal.example.com/mcp"},
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
 # ---------- delete ----------

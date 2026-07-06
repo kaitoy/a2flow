@@ -30,6 +30,7 @@ from repositories.exceptions import (
     QueryValidationError,
     ReferencedError,
     RegistryUnavailableError,
+    SkillCloneError,
     UnauthorizedError,
     UniqueViolationError,
 )
@@ -46,6 +47,7 @@ from routers.exception_handlers import (
     query_validation_exception_handler,
     referenced_exception_handler,
     registry_unavailable_exception_handler,
+    skill_clone_exception_handler,
     unauthorized_exception_handler,
     unhandled_exception_handler,
     unique_violation_exception_handler,
@@ -115,6 +117,7 @@ app.add_exception_handler(ReferencedError, referenced_exception_handler)
 app.add_exception_handler(UniqueViolationError, unique_violation_exception_handler)
 app.add_exception_handler(DependencyCycleError, dependency_cycle_exception_handler)
 app.add_exception_handler(McpConnectionError, mcp_connection_exception_handler)
+app.add_exception_handler(SkillCloneError, skill_clone_exception_handler)
 app.add_exception_handler(
     RegistryUnavailableError, registry_unavailable_exception_handler
 )

@@ -23,14 +23,48 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
 from mcp import ClientSession, types
 from mcp.client.streamable_http import streamablehttp_client
 
+from infrastructure.url_safety import assert_public_http_url
 from repositories.exceptions import McpConnectionError
 
 #: Upper bound, in seconds, for one whole MCP operation (connect + initialize +
 #: the list/call round-trip).
 MCP_TIMEOUT_SECONDS = 30.0
+
+
+def _create_no_redirect_http_client(
+    headers: dict[str, str] | None = None,
+    timeout: httpx.Timeout | None = None,
+    auth: httpx.Auth | None = None,
+) -> httpx.AsyncClient:
+    """Build the httpx client MCP sessions use, with redirect-following disabled.
+
+    The MCP SDK's own factory (``mcp.shared._httpx_utils.create_mcp_http_client``)
+    hardcodes ``follow_redirects=True``. Without this override, a server URL
+    that passed host validation could 30x-redirect a request to a
+    private/internal address and the client would silently follow it. The
+    streamable-HTTP MCP protocol has no legitimate need for redirects, so
+    following them is simply turned off.
+
+    Args:
+        headers: Extra headers to send with every request.
+        timeout: Request timeout; httpx's own default is applied if omitted.
+        auth: Optional authentication handler.
+
+    Returns:
+        A configured, non-redirect-following ``httpx.AsyncClient``.
+    """
+    kwargs: dict[str, Any] = {"follow_redirects": False}
+    if timeout is not None:
+        kwargs["timeout"] = timeout
+    if headers is not None:
+        kwargs["headers"] = headers
+    if auth is not None:
+        kwargs["auth"] = auth
+    return httpx.AsyncClient(**kwargs)
 
 
 @asynccontextmanager
@@ -47,9 +81,21 @@ async def mcp_session(
     Yields:
         An initialized :class:`mcp.ClientSession`; the connection is closed when
         the context exits.
+
+    Raises:
+        infrastructure.url_safety.UnsafeUrlError: If ``url``'s host resolves to
+            a loopback/private/link-local/reserved/multicast/unspecified
+            address. Rechecked here (in addition to the ``HttpUrl`` Pydantic
+            validation at API-input time) as defense-in-depth against
+            DNS-rebinding-after-validation and rows that bypass Pydantic.
     """
+    await asyncio.to_thread(assert_public_http_url, url)
     async with (
-        streamablehttp_client(url, headers=headers or None) as (
+        streamablehttp_client(
+            url,
+            headers=headers or None,
+            httpx_client_factory=_create_no_redirect_http_client,
+        ) as (
             read_stream,
             write_stream,
             _get_session_id,

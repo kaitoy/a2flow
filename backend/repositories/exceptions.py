@@ -90,6 +90,21 @@ class McpConnectionError(Exception):
         super().__init__(f"MCP server {server!r} unreachable: {reason}")
 
 
+class SkillCloneError(Exception):
+    """Raised when an AgentSkill repository cannot be cloned or its directory resolved.
+
+    Carries the ``skill_id`` and a ``reason`` string. The HTTP layer logs
+    ``reason`` server-side but never returns it to the client, mirroring
+    :class:`McpConnectionError`, since it can embed raw git/network failure
+    text.
+    """
+
+    def __init__(self, skill_id: str, reason: str) -> None:
+        self.skill_id = skill_id
+        self.reason = reason
+        super().__init__(f"failed to prepare skill {skill_id!r}: {reason}")
+
+
 class RegistryUnavailableError(Exception):
     """Raised when the official MCP registry cannot be reached or errors out.
 

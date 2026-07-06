@@ -2,6 +2,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
@@ -365,6 +366,48 @@ async def test_create_skill_rejects_non_http_repo_url(
     response = await skill_client.post(
         "/api/v1/agent-skills",
         json={"name": "ok-name", "repo_url": "ftp://example.com/repo"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_loopback_repo_url(
+    skill_client: AsyncClient,
+) -> None:
+    """A repo_url whose host is the loopback address returns 422 (SSRF guard)."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={"name": "ok-name", "repo_url": "http://127.0.0.1/x"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_repo_url_resolving_to_private_ip(
+    skill_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A repo_url whose host resolves to a private IP returns 422 (SSRF guard)."""
+    monkeypatch.setattr(
+        "infrastructure.url_safety.resolve_host", lambda host: ["10.1.2.3"]
+    )
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={"name": "ok-name", "repo_url": "http://internal.example.com/repo"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_update_skill_rejects_repo_url_resolving_to_private_ip(
+    skill_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Patching repo_url to a host resolving to a private IP returns 422 (SSRF guard)."""
+    created = assert_ok(
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
+    )
+    monkeypatch.setattr(
+        "infrastructure.url_safety.resolve_host", lambda host: ["10.1.2.3"]
+    )
+    response = await skill_client.patch(
+        f"/api/v1/agent-skills/{created['id']}",
+        json={"repo_url": "http://internal.example.com/repo"},
     )
     assert_err(response, "VALIDATION_ERROR", 422)
 

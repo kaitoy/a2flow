@@ -26,6 +26,7 @@ from repositories.exceptions import (
     QueryValidationError,
     ReferencedError,
     RegistryUnavailableError,
+    SkillCloneError,
     UnauthorizedError,
     UniqueViolationError,
 )
@@ -168,6 +169,21 @@ async def dependency_cycle_exception_handler(
         message=str(exc),
         status_code=409,
         details={"taskId": exc.task_id, "dependsOnId": exc.depends_on_id},
+    )
+
+
+async def skill_clone_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 502 with SKILL_CLONE_FAILED code when a skill repository cannot be cloned."""
+    assert isinstance(exc, SkillCloneError)
+    logger.warning("Skill %s clone failed: %s", exc.skill_id, exc.reason)
+    return _envelope_error(
+        request,
+        code="SKILL_CLONE_FAILED",
+        message=f"Failed to prepare skill {exc.skill_id!r}",
+        status_code=502,
+        details={"skillId": exc.skill_id},
     )
 
 

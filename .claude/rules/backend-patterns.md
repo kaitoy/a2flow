@@ -262,6 +262,7 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `AvatarValidationError` | 422 | `INVALID_AVATAR` | Uploaded avatar has an unsupported type or exceeds the size limit; `details` carries `reason` |
 | `RequestValidationError` | 422 | `VALIDATION_ERROR` | FastAPI body/query validation; `details.errors` from Pydantic |
 | `McpConnectionError` | 502 | `MCP_UNREACHABLE` | Remote MCP server unreachable; `details` carries `server` only — the raw failure reason is logged server-side, never returned to the client |
+| `SkillCloneError` | 502 | `SKILL_CLONE_FAILED` | Skill repository could not be cloned; `details` carries `skillId` only — the raw failure reason is logged server-side, never returned to the client |
 | `RegistryUnavailableError` | 502 | `REGISTRY_UNREACHABLE` | Official MCP registry unreachable; no `details` — the raw failure reason is logged server-side only |
 | `HTTPException` (any other raise) | passthrough | `HTTP_<status>` | Fallback for callers still raising `HTTPException` |
 | Uncaught `Exception` | 500 | `INTERNAL_ERROR` | Logged with `request_id` |
