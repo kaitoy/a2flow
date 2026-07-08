@@ -121,6 +121,11 @@ function NewMcpServerForm() {
                 />
               )}
             />
+            <p className="mt-1 text-xs text-on-surface-variant">
+              Values may reference registered secrets as{" "}
+              {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
+              {"${secret:name}"}, resolved when connecting.
+            </p>
           </FormField>
 
           <ErrorBanner error={apiError} />

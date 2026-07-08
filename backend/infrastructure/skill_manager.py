@@ -44,11 +44,19 @@ class SkillManager:
         self._locks: dict[str, asyncio.Lock] = {}
         self._locks_guard = asyncio.Lock()
 
-    async def ensure_cloned(self, skill: AgentSkill) -> Path:
+    async def ensure_cloned(
+        self, skill: AgentSkill, auth: tuple[str, str] | None = None
+    ) -> Path:
         """Ensure the skill's repository exists locally and return the skill directory.
 
         Returns the path containing SKILL.md: `cache_dir/<skill_id>/<repo_path>`.
         Re-clone is skipped when the target directory already exists.
+
+        Args:
+            skill: The AgentSkill whose repository to clone.
+            auth: Optional ``(username, password)`` pair sent as HTTP basic
+                auth with the clone, for private repositories. Ignored when
+                the repository is already cached.
 
         Raises:
             SkillCloneError: If cloning fails, the resolved skill directory
@@ -65,7 +73,7 @@ class SkillManager:
         async with skill_lock:
             target = self._cache_dir / skill.id
             if not target.exists():
-                await self._clone(skill.repo_url, target)
+                await self._clone(skill.repo_url, target, auth)
         resolved_target = target.resolve()
         skill_dir = (
             (target / skill.repo_path).resolve() if skill.repo_path else resolved_target
@@ -87,19 +95,46 @@ class SkillManager:
                 self._locks[skill_id] = asyncio.Lock()
             return self._locks[skill_id]
 
-    async def _clone(self, repo_url: str, target: Path) -> None:
+    async def _clone(
+        self, repo_url: str, target: Path, auth: tuple[str, str] | None = None
+    ) -> None:
+        """Shallow-clone the repository, optionally with HTTP basic-auth credentials.
+
+        Args:
+            repo_url: The repository URL to clone.
+            target: The directory to clone into.
+            auth: Optional ``(username, password)`` pair forwarded to
+                ``porcelain.clone`` for private repositories.
+
+        Raises:
+            SkillCloneError: If the URL is unsafe or the clone fails.
+        """
         target.parent.mkdir(parents=True, exist_ok=True)
+
+        def _do_clone() -> None:
+            pool_manager = _build_no_redirect_pool_manager(repo_url)
+            if auth is None:
+                porcelain.clone(
+                    repo_url,
+                    str(target),
+                    depth=1,
+                    pool_manager=pool_manager,  # type: ignore[arg-type]
+                )
+            else:
+                porcelain.clone(
+                    repo_url,
+                    str(target),
+                    depth=1,
+                    pool_manager=pool_manager,  # type: ignore[arg-type]
+                    username=auth[0],
+                    password=auth[1],
+                )
+
         try:
             await asyncio.to_thread(assert_public_http_url, repo_url)
             # porcelain.clone is synchronous; run in a worker thread so the
             # event loop is not blocked while pack data is fetched.
-            await asyncio.to_thread(
-                porcelain.clone,
-                repo_url,
-                str(target),
-                depth=1,
-                pool_manager=_build_no_redirect_pool_manager(repo_url),  # type: ignore[arg-type]
-            )
+            await asyncio.to_thread(_do_clone)
         except (GitProtocolError, NotGitRepository, OSError, UnsafeUrlError) as exc:
             raise SkillCloneError(
                 target.name, f"clone of {repo_url} failed: {exc}"

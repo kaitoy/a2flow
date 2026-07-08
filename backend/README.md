@@ -70,6 +70,22 @@ SKILLS_CACHE_DIR=.skills_cache
 
 Directory where Agent Skill repositories are shallow-cloned for ADK Skill loading. Defaults to `backend/.skills_cache` (relative to the working directory). Under `docker compose` it is set to `/var/cache/a2flow/skills` and backed by the `skills_cache` named volume, so clones persist across container recreation instead of being re-cloned on every start.
 
+### Secret management
+
+```env
+# SECRET_ENCRYPTION_KEY=
+# SECRET_KEY_FILE=.secret_key
+# VAULT_ADDR=https://vault.example.com
+# VAULT_TOKEN=hvs.xxxxxxxx
+# VAULT_ROLE_ID=...
+# VAULT_SECRET_ID=...
+# VAULT_APPROLE_MOUNT=approle
+```
+
+`local`-type [secrets](#secrets) are Fernet-encrypted before storage. The key is resolved at first use: `SECRET_ENCRYPTION_KEY` (must be a valid Fernet key) takes precedence; otherwise the key file at `SECRET_KEY_FILE` (default `.secret_key` next to the SQLite database file) is read; otherwise a key is generated, saved to that file, and a WARNING is logged. Back the key up — losing it makes every stored local secret undecryptable.
+
+`vault`-type secrets are read live from a single HashiCorp Vault (KV v2 only) selected by `VAULT_ADDR`. Authentication uses AppRole (`VAULT_ROLE_ID` + `VAULT_SECRET_ID`, login mount from `VAULT_APPROLE_MOUNT`) when set, else the static `VAULT_TOKEN`. `VAULT_ADDR` is deliberately exempt from the SSRF URL checks applied to user-supplied URLs: it is operator-set deployment configuration and typically points at a private address.
+
 ### Application database
 
 ```env
@@ -83,8 +99,9 @@ Database URL for REST API data and ADK session storage — both live in the same
 |---|---|
 | `users` | Application users (soft-deleted via `deleted_at`); see [Admin user](#admin-user) |
 | `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](#authentication) |
-| `agent_skills` | Agent skill definitions |
-| `mcp_servers` | Registered remote MCP servers (name, streamable HTTP URL, plaintext request headers) |
+| `agent_skills` | Agent skill definitions (incl. optional `repo_auth_secret` / `repo_auth_username` for private-repo clones) |
+| `mcp_servers` | Registered remote MCP servers (name, streamable HTTP URL, request headers — values may embed `${secret:NAME}` placeholders) |
+| `secrets` | Named credentials: Fernet-encrypted local values or HashiCorp Vault KV v2 references; see [Secrets](#secrets) |
 | `workflows` | Workflow definitions |
 | `workflow_tasks` | Individual tasks belonging to a `WorkflowSession` (`workflow_session_id` FK with `ON DELETE CASCADE`) |
 | `workflow_task_tool_bindings` | MCP tools bound to a task (`task_id` FK `ON DELETE CASCADE`, `mcp_server_id` FK `ON DELETE RESTRICT`) |
@@ -193,17 +210,27 @@ Sessions are created lazily: the backend ADK session is materialized on the firs
 
 Agent skills are reusable skill definitions that can be attached to workflows. Each record stores a unique `name`, a Git `repoUrl`, an optional `repoPath` (default `""`), and an optional `description`. Deleting a skill that is still referenced by one or more workflows returns `409 CONFLICT_REFERENCED`. CRUD endpoints are in the [API reference](http://localhost:3000/api-doc).
 
+Private repositories are supported through the optional `repoAuthSecret` field — the **name** of a registered [secret](#secrets) whose value is used as the HTTP basic-auth password for the clone — plus `repoAuthUsername` (default `x-access-token`, which suits GitHub PATs). Create/update validates that the named secret exists (`422 FOREIGN_KEY_VIOLATION` otherwise), but the reference is by name and resolved lazily at clone time: a later rename or delete of the secret makes the next clone fail with `502 SECRET_RESOLUTION_FAILED`.
+
 The content at `repoUrl`/`repoPath` (e.g. `SKILL.md`) is loaded directly into the workflow agent's LLM prompt, unsandboxed — only register repositories you trust, since their content is effectively an instruction to the agent, not inert data.
 
 ---
 
 ### MCP servers
 
-A registry of remote [MCP](https://modelcontextprotocol.io/) servers whose tools the workflow agent can bind to WorkflowTasks. Connections use **streamable HTTP** only (SSE-transport servers are not supported). The optional `headers` map (e.g. `{"Authorization": "Bearer …"}`) is sent verbatim with every request to the server and is stored **in plaintext**.
+A registry of remote [MCP](https://modelcontextprotocol.io/) servers whose tools the workflow agent can bind to WorkflowTasks. Connections use **streamable HTTP** only (SSE-transport servers are not supported). The optional `headers` map (e.g. `{"Authorization": "Bearer …"}`) is sent with every request to the server. Literal header values are stored in plaintext; to keep a credential out of the record, embed a `${secret:NAME}` placeholder referencing a registered [secret](#secrets) — placeholders are expanded only when connecting, and a reference that no longer resolves fails the connection attempt (`502 SECRET_RESOLUTION_FAILED` on the REST path; a per-server `error` entry for the agent's `list_mcp_tools`/`call_mcp_tool` proxies).
 
 The CRUD endpoints are in the [API reference](http://localhost:3000/api-doc). On create, `name` and `url` are required and `headers` defaults to `{}`; a duplicate name returns `409 CONFLICT_UNIQUE`. On update, sending `headers` replaces the full map while omitting it leaves it unchanged. Two behaviors are worth calling out: `GET /api/v1/mcp-servers/{id}/tools` connects to the remote server live and returns its advertised tools (`name`, `description`, `inputSchema`), or `502 MCP_UNREACHABLE` if it cannot be reached within the 30-second timeout; and a server cannot be deleted while WorkflowTask tool bindings still reference it (`409 CONFLICT_REFERENCED`).
 
 `GET /api/v1/mcp-registry` proxies the official [MCP registry](https://registry.modelcontextprotocol.io/) for server discovery. It accepts `search` (substring matched against server names) and `cursor` (pagination) query params and returns `{ servers, nextCursor }`, where each server is flattened to the fields A2Flow can use — only servers exposing a streamable-HTTP remote are included, since that is the only transport supported. The registry base URL is configurable via the `MCP_REGISTRY_URL` env var (default `https://registry.modelcontextprotocol.io`); a registry that cannot be reached returns `502 REGISTRY_UNREACHABLE`. Registration itself reuses the ordinary `POST /api/v1/mcp-servers` create flow from a pre-filled admin form.
+
+---
+
+### Secrets
+
+Named credentials consumed by MCP server header placeholders and agent-skill repository clones. Each secret is either `local` — the submitted `value` is Fernet-encrypted with the key described in [Secret management](#secret-management) and stored in the `secrets` table — or `vault` — only a KV v2 reference (`vaultMount`, `vaultPath`, `vaultKey`) is stored and the value is read from HashiCorp Vault at resolution time.
+
+The API is **write-only for values**: create/update accept a plaintext `value`, but every response uses a read view with no `value` field at all, so neither the plaintext nor the ciphertext is ever serialized to clients. On update, omitting `value` keeps the stored ciphertext; switching `type` clears the other shape's fields, and a PATCH that would leave an invalid merged shape (e.g. a `vault` secret with a `value`) returns `422 INVALID_SECRET`. Names are unique (`409 CONFLICT_UNIQUE`), use the slug charset (letters, digits, `.`, `_`, `-`), and are what placeholders and `repoAuthSecret` reference — deletion is never blocked by references; dangling ones fail at their next resolution with `502 SECRET_RESOLUTION_FAILED` (the failure reason is logged server-side only). CRUD endpoints are in the [API reference](http://localhost:3000/api-doc).
 
 ---
 

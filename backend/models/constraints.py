@@ -76,6 +76,54 @@ Username = Annotated[
     str, StringConstraints(min_length=3, max_length=64, pattern=SLUG_PATTERN)
 ]
 
+#: Secret identifier: slug charset, 1–128 characters. Deliberately restricted to
+#: :data:`SLUG_PATTERN` (not :data:`ENTITY_NAME_PATTERN`) because secret names
+#: appear inside ``${secret:NAME}`` placeholders in MCP server header values;
+#: the slug charset keeps the placeholder regex unambiguous (``}`` or whitespace
+#: inside a name would break it).
+SecretName = Annotated[
+    str, StringConstraints(min_length=1, max_length=128, pattern=SLUG_PATTERN)
+]
+
+#: Plaintext secret value as submitted to the API: 1–8192 characters. Stored
+#: only in encrypted form (see :class:`models.secret.Secret`).
+SecretValue = Annotated[str, StringConstraints(min_length=1, max_length=8192)]
+
+#: Character rule shared by the Vault reference fields: no C0 controls or
+#: DEL/C1 controls (they cannot appear in a URL path segment or JSON key).
+_VAULT_FIELD_PATTERN = r"^[^\x00-\x1f\x7f-\x9f]+$"
+
+#: Vault KV v2 mount point (e.g. ``secret``): 1–256 characters.
+VaultMount = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=256, pattern=_VAULT_FIELD_PATTERN),
+]
+
+#: Path of a secret below a Vault KV v2 mount (e.g. ``myapp/github``): 1–1024
+#: characters, slashes allowed.
+VaultPath = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=1024, pattern=_VAULT_FIELD_PATTERN),
+]
+
+#: Key within the Vault secret's data object: 1–256 characters.
+VaultKey = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=256, pattern=_VAULT_FIELD_PATTERN),
+]
+
+#: Username sent as the HTTP basic-auth user when cloning a private skill
+#: repository: 1–128 characters, no control characters. Looser than
+#: :data:`Username` (which requires a 3+-character slug) because git hosts
+#: accept a wide range of values here — e.g. ``x-access-token`` for GitHub PATs
+#: or an email-like account name on Azure DevOps.
+GitUsername = Annotated[
+    str,
+    StringConstraints(
+        min_length=1, max_length=128, pattern=r"^[^\x00-\x1f\x7f-\x9f]+$"
+    ),
+]
+
 #: Human-readable resource identifier (agent skill / workflow / MCP server name):
 #: 1–256 characters. Permits any printable character (unicode letters, digits,
 #: punctuation, symbols, emoji) plus the half-width (U+0020) and full-width

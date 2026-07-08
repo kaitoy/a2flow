@@ -18,12 +18,14 @@ from repositories import (
     MCPServerRepository,
     MessageMetaRepository,
     NotificationRepository,
+    SecretRepository,
     SqlAgentSkillRepository,
     SqlApprovalRepository,
     SqlAuthSessionRepository,
     SqlMCPServerRepository,
     SqlMessageMetaRepository,
     SqlNotificationRepository,
+    SqlSecretRepository,
     SqlUserAvatarRepository,
     SqlUserRepository,
     SqlWorkflowRepository,
@@ -77,6 +79,14 @@ def get_notification_repository(db: DBSessionDep) -> NotificationRepository:
 NotificationRepositoryDep = Annotated[
     NotificationRepository, Depends(get_notification_repository)
 ]
+
+
+def get_secret_repository(db: DBSessionDep) -> SecretRepository:
+    """Create a SecretRepository backed by the current database session."""
+    return SqlSecretRepository(db)
+
+
+SecretRepositoryDep = Annotated[SecretRepository, Depends(get_secret_repository)]
 
 
 def get_user_repository(db: DBSessionDep) -> UserRepository:

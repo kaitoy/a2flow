@@ -1,6 +1,7 @@
 /** @module admin-nav — Shared admin navigation item list used by the admin sidebar and the welcome page. */
 import {
   CheckCircle2,
+  KeyRound,
   ListChecks,
   type LucideIcon,
   Server,
@@ -39,6 +40,12 @@ export const adminNavItems: AdminNavItem[] = [
     label: "MCP Servers",
     icon: Server,
     description: "Register tool servers",
+  },
+  {
+    href: "/admin/secrets",
+    label: "Secrets",
+    icon: KeyRound,
+    description: "Store credentials for tools and repos",
   },
   {
     href: "/admin/workflows",

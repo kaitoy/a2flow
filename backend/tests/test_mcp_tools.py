@@ -20,7 +20,9 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
+from infrastructure.secret_cipher import get_secret_cipher
 from models.mcp_server import MCPServer
+from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
 from models.workflow_session import WorkflowSession
 from models.workflow_task import (
@@ -344,3 +346,110 @@ async def test_list_mcp_tools_aggregates_and_isolates_failures(
         }
     ]
     assert "unreachable" in by_id[bad_id]["error"]
+
+
+# ---------- secret placeholder resolution ----------
+
+
+async def _seed_local_secret(eng: AsyncEngine, name: str, value: str) -> None:
+    """Insert a local Secret whose value is encrypted with the process cipher."""
+    async with AsyncSession(eng) as db:
+        db.add(
+            Secret(
+                name=name,
+                type=SecretType.local,
+                value=get_secret_cipher().encrypt(value),
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await db.commit()
+
+
+async def test_call_resolves_secret_placeholder_in_headers(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _seed_local_secret(engine, "api-token", "tok-xyz")
+    server_id = await _seed_server(
+        engine, headers={"Authorization": "Bearer ${secret:api-token}"}
+    )
+    ws_id = await _seed_session(engine)
+    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    seen: dict[str, Any] = {}
+
+    async def fake_call_server_tool(
+        url: str,
+        headers: dict[str, str] | None,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> types.CallToolResult:
+        seen["headers"] = headers
+        return _tool_result()
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
+    )
+    result = await call_mcp_tool(server_id, "search", {}, _ctx())
+    assert "error" not in result
+    assert seen["headers"] == {"Authorization": "Bearer tok-xyz"}
+
+
+async def test_call_with_missing_secret_returns_error(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    server_id = await _seed_server(
+        engine, headers={"Authorization": "Bearer ${secret:nope}"}
+    )
+    ws_id = await _seed_session(engine)
+    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    called: list[str] = []
+
+    async def fake_call_server_tool(
+        url: str,
+        headers: dict[str, str] | None,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> types.CallToolResult:
+        called.append(url)
+        return _tool_result()
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
+    )
+    result = await call_mcp_tool(server_id, "search", {}, _ctx())
+    assert "cannot resolve secret 'nope'" in result["error"]
+    assert called == []
+
+
+async def test_list_mcp_tools_isolates_secret_resolution_failure(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _seed_local_secret(engine, "good-token", "tok-1")
+    good_id = await _seed_server(
+        engine,
+        name="good",
+        url="https://good/mcp",
+        headers={"Authorization": "Bearer ${secret:good-token}"},
+    )
+    bad_id = await _seed_server(
+        engine,
+        name="bad",
+        url="https://bad/mcp",
+        headers={"Authorization": "Bearer ${secret:missing}"},
+    )
+    seen: dict[str, Any] = {}
+
+    async def fake_list_server_tools(
+        url: str, headers: dict[str, str] | None = None
+    ) -> list[Any]:
+        seen[url] = headers
+        return []
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    result = await list_mcp_tools(_ctx())
+    by_id = {entry["server_id"]: entry for entry in result["servers"]}
+    assert by_id[good_id]["tools"] == []
+    assert "cannot resolve secret 'missing'" in by_id[bad_id]["error"]
+    assert seen == {"https://good/mcp": {"Authorization": "Bearer tok-1"}}

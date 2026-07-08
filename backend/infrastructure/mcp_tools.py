@@ -31,16 +31,38 @@ from mcp import types
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database, mcp_client
-from models.mcp_server import MCPServer
+from infrastructure.secret_cipher import get_secret_cipher
+from infrastructure.secret_resolver import SecretResolver
+from infrastructure.vault_client import get_vault_client
 from models.workflow_task import WorkflowTaskRead, WorkflowTaskStatus
 from repositories import (
     SqlMCPServerRepository,
+    SqlSecretRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
 )
-from repositories.exceptions import McpConnectionError
+from repositories.exceptions import McpConnectionError, SecretResolutionError
 
 logger = logging.getLogger(__name__)
+
+
+def _build_resolver(db: AsyncSession) -> SecretResolver:
+    """Build a SecretResolver on the given session and the process singletons.
+
+    The agent tools run outside FastAPI's request scope, so they cannot use the
+    ``SecretResolverDep`` dependency; they compose the resolver from the same
+    factory functions the dependency wiring uses.
+
+    Args:
+        db: The open database session.
+
+    Returns:
+        A resolver backed by the session's secret repository.
+    """
+    return SecretResolver(
+        SqlSecretRepository(db), get_secret_cipher(), get_vault_client()
+    )
+
 
 _NO_SESSION = "no workflow session is bound to the current run; cannot use MCP tools"
 _NO_TASK_IN_PROGRESS = (
@@ -160,15 +182,37 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
         "description", "input_schema"}, ...]} | {"server_id", "server_name",
         "error"}, ...]}``. An empty registry yields ``{"servers": []}``.
     """
+    # Resolve ${secret:NAME} placeholders while the session is open (the
+    # resolver needs the secrets table); the network fan-out happens after.
+    prepared: list[tuple[dict[str, Any], str, dict[str, str] | None, str | None]] = []
     async with _db_session() as db:
         servers = await SqlMCPServerRepository(db).list(limit=1000, offset=0)
+        resolver = _build_resolver(db)
+        for server in servers:
+            base = {"server_id": server.id, "server_name": server.name}
+            try:
+                headers = await resolver.resolve_headers(server.headers)
+            except SecretResolutionError as exc:
+                logger.warning(
+                    "Secret %s resolution failed for MCP server %s: %s",
+                    exc.secret_name,
+                    server.name,
+                    exc.reason,
+                )
+                error = f"cannot resolve secret {exc.secret_name!r} in headers"
+                prepared.append((base, server.url, None, error))
+                continue
+            prepared.append((base, server.url, headers, None))
 
-    async def _query(server: MCPServer) -> dict[str, Any]:
-        base = {"server_id": server.id, "server_name": server.name}
+    async def _query(
+        base: dict[str, Any], url: str, headers: dict[str, str]
+    ) -> dict[str, Any]:
         try:
-            tools = await mcp_client.list_server_tools(server.url, server.headers)
+            tools = await mcp_client.list_server_tools(url, headers)
         except McpConnectionError as exc:
-            logger.warning("MCP server %s unreachable: %s", server.name, exc.reason)
+            logger.warning(
+                "MCP server %s unreachable: %s", base["server_name"], exc.reason
+            )
             return {**base, "error": f"unreachable: {exc.reason}"}
         return {
             **base,
@@ -182,7 +226,17 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
             ],
         }
 
-    return {"servers": list(await asyncio.gather(*(_query(s) for s in servers)))}
+    async def _entry(
+        base: dict[str, Any],
+        url: str,
+        headers: dict[str, str] | None,
+        error: str | None,
+    ) -> dict[str, Any]:
+        if error is not None or headers is None:
+            return {**base, "error": error or "secret resolution failed"}
+        return await _query(base, url, headers)
+
+    return {"servers": list(await asyncio.gather(*(_entry(*p) for p in prepared)))}
 
 
 async def call_mcp_tool(
@@ -236,9 +290,24 @@ async def call_mcp_tool(
         server = await SqlMCPServerRepository(db).get(server_id)
         if server is None:
             return {"error": f"MCP server {server_id!r} is not registered"}
+        try:
+            resolved_headers = await _build_resolver(db).resolve_headers(server.headers)
+        except SecretResolutionError as exc:
+            logger.warning(
+                "Secret %s resolution failed for MCP server %s: %s",
+                exc.secret_name,
+                server.name,
+                exc.reason,
+            )
+            return {
+                "error": (
+                    f"cannot resolve secret {exc.secret_name!r} in the headers "
+                    f"of MCP server {server.name!r}"
+                )
+            }
         server_url, server_headers, server_name = (
             server.url,
-            server.headers,
+            resolved_headers,
             server.name,
         )
     try:

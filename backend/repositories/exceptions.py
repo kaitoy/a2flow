@@ -148,6 +148,37 @@ class AvatarValidationError(RepositoryError):
         super().__init__(reason)
 
 
+class SecretValidationError(RepositoryError):
+    """Raised when a Secret create/update would leave an invalid per-type shape.
+
+    ``SecretCreate`` enforces the shape at the request boundary, but a PATCH
+    body alone cannot: the rule applies to the merged result of the stored
+    record and the partial update, which only the service can compute. Carries
+    a human-readable ``reason`` surfaced in the error envelope's ``details``
+    block when returning HTTP 422.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
+class SecretResolutionError(Exception):
+    """Raised when a ``${secret:NAME}`` reference cannot be resolved to a value.
+
+    Covers a missing secret name, a ciphertext that cannot be decrypted, a
+    Vault read failure, and a ``vault``-type secret with no Vault connection
+    configured. Carries the ``secret_name`` (already known to the caller) and a
+    ``reason`` string; the HTTP layer logs ``reason`` server-side but never
+    returns it to the client, mirroring :class:`McpConnectionError`.
+    """
+
+    def __init__(self, secret_name: str, reason: str) -> None:
+        self.secret_name = secret_name
+        self.reason = reason
+        super().__init__(f"failed to resolve secret {secret_name!r}: {reason}")
+
+
 class QueryValidationError(RepositoryError):
     """Raised when a sort or filter query parameter is malformed or references an unknown field.
 

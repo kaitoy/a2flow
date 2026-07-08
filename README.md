@@ -144,6 +144,8 @@ Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/adm
 
 Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, and description.
 
+Private repositories are supported through the optional **Auth Secret** field: set it to the name of a registered [Secret](#secrets) and its value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name. The secret is resolved at clone time, so deleting or renaming it later makes the next clone fail with `SECRET_RESOLUTION_FAILED`.
+
 ### MCP Servers
 
 Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admin/mcp-servers) to manage the registry of remote [MCP](https://modelcontextprotocol.io/) servers whose tools the workflow agent can bind to WorkflowTasks (see [MCP tools for tasks](#mcp-tools-for-tasks)).
@@ -154,11 +156,45 @@ Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admi
 | Register a new server | `GET /admin/mcp-servers/new` |
 | Edit / delete a server | `GET /admin/mcp-servers/{id}` |
 
-Each record stores a unique name, the server's **streamable HTTP** endpoint URL (SSE-only servers are not supported), and an optional set of HTTP headers sent with every request — typically `Authorization: Bearer …` for servers that require auth. ⚠️ Header values are stored **in plaintext** in `a2flow.db` and returned by the API; this is acceptable for the app's local single-operator deployment model, but don't store credentials you can't afford to expose to other users of the same instance.
+Each record stores a unique name, the server's **streamable HTTP** endpoint URL (SSE-only servers are not supported), and an optional set of HTTP headers sent with every request — typically `Authorization: Bearer …` for servers that require auth. ⚠️ Literal header values are stored **in plaintext** in `a2flow.db` and returned by the API; instead of embedding a credential directly, reference a registered [Secret](#secrets) with the `${secret:name}` placeholder syntax (e.g. `Authorization: Bearer ${secret:github-token}`) — placeholders are expanded only at connect time and the credential never appears in the stored record or any API response.
 
 The list page's **Browse registry** button opens a search dialog backed by the official [MCP registry](https://registry.modelcontextprotocol.io/) (`GET /api/v1/mcp-registry`). It searches servers by name and lists only those reachable over streamable HTTP (the only transport A2Flow supports). Picking a result opens the create form pre-filled with the server's name, URL, and required header keys, so you only fill in secret header values before saving. The registry base URL is configurable via the `MCP_REGISTRY_URL` env var; an unreachable registry yields HTTP 502 (`REGISTRY_UNREACHABLE`).
 
 `GET /api/v1/mcp-servers/{id}/tools` queries the live server and returns the tools it advertises (name, description, input schema); the admin task forms use it to populate the tool picker. An unreachable server yields HTTP 502 (`MCP_UNREACHABLE`). A server cannot be deleted while WorkflowTask tool bindings still reference it (HTTP 409 `CONFLICT_REFERENCED`).
+
+### Secrets
+
+Navigate to [http://localhost:3000/admin/secrets](http://localhost:3000/admin/secrets) to manage named credentials used for authentication elsewhere in the app:
+
+- **MCP server headers** — any header value may embed `${secret:name}` placeholders, expanded when connecting (see [MCP Servers](#mcp-servers)).
+- **Agent Skill repository clones** — a skill's **Auth Secret** names the secret whose value is used as the git basic-auth password (see [Agent Skills](#agent-skills)).
+
+| Operation | Path |
+|-----------|------|
+| List all secrets | `GET /admin/secrets` |
+| Register a new secret | `GET /admin/secrets/new` |
+| Edit / delete a secret | `GET /admin/secrets/{id}` |
+
+A secret has one of two types:
+
+- **Local (encrypted)** — the value is submitted once and stored in `a2flow.db` encrypted with [Fernet](https://cryptography.io/en/latest/fernet/) (AES-128-CBC + HMAC). The API is **write-only**: no response ever contains the value (neither plaintext nor ciphertext); the edit form leaves the value blank, and leaving it blank on save keeps the stored value.
+- **HashiCorp Vault** — only a [KV v2](https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2) reference (mount, path, key) is stored; the value is read live from Vault each time the secret is resolved.
+
+Secrets are referenced **by name** and resolved lazily: renaming or deleting a secret that something still references does not fail at edit time, but the next use fails with HTTP 502 (`SECRET_RESOLUTION_FAILED`) naming the missing secret.
+
+#### Encryption key
+
+The Fernet key for local secrets is resolved at first use with the following precedence:
+
+1. `SECRET_ENCRYPTION_KEY` env var (must be a valid Fernet key; generate one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`).
+2. The key file at `SECRET_KEY_FILE` (default: `.secret_key` next to the SQLite database file, or the working directory for other databases).
+3. A fresh key is generated, saved to that file, and a WARNING is logged.
+
+⚠️ Back the key up — losing it makes every stored local secret undecryptable.
+
+#### HashiCorp Vault connection
+
+A single global Vault connection is configured through env vars (see `backend/.env.example`): `VAULT_ADDR` selects the server, and either a static `VAULT_TOKEN` or **AppRole** credentials (`VAULT_ROLE_ID` + `VAULT_SECRET_ID`, login mount configurable via `VAULT_APPROLE_MOUNT`, default `approle`) authenticate. AppRole takes precedence when both are set; its client token is cached and refreshed automatically when its lease expires. Only the KV v2 secrets engine is supported. When Vault is not configured, `vault`-type secrets fail to resolve with `SECRET_RESOLUTION_FAILED`.
 
 ### Workflows
 

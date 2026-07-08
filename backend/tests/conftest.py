@@ -52,6 +52,19 @@ def _install_auth_overrides(app: Any) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _isolated_secret_key_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Point the secret-encryption key file at a per-test temp path.
+
+    Without this, the first test that touches the LRU-cached
+    ``get_secret_cipher`` singleton would generate a ``.secret_key`` file next
+    to the developer's working directory. Tests that exercise the key-loading
+    precedence re-patch these variables within the test body.
+    """
+    monkeypatch.setenv("SECRET_KEY_FILE", str(tmp_path / "secret.key"))
+    monkeypatch.delenv("SECRET_ENCRYPTION_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _fake_dns_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub DNS resolution used by SSRF host validation for all tests by default.
 

@@ -4,6 +4,7 @@ from .auth import AuthService
 from .mcp_registry import MCPRegistryService
 from .mcp_server import MCPServerService
 from .notification import NotificationService
+from .secret import SecretService
 from .user import UserService
 from .user_avatar import UserAvatarService
 from .workflow import WorkflowService
@@ -17,6 +18,7 @@ __all__ = [
     "MCPRegistryService",
     "MCPServerService",
     "NotificationService",
+    "SecretService",
     "UserAvatarService",
     "UserService",
     "WorkflowService",

@@ -26,6 +26,8 @@ from repositories.exceptions import (
     QueryValidationError,
     ReferencedError,
     RegistryUnavailableError,
+    SecretResolutionError,
+    SecretValidationError,
     SkillCloneError,
     UnauthorizedError,
     UniqueViolationError,
@@ -141,6 +143,39 @@ async def avatar_validation_exception_handler(
         message=str(exc),
         status_code=422,
         details={"reason": exc.reason},
+    )
+
+
+async def secret_validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 422 with INVALID_SECRET code when a merged secret shape is invalid."""
+    assert isinstance(exc, SecretValidationError)
+    return _envelope_error(
+        request,
+        code="INVALID_SECRET",
+        message=str(exc),
+        status_code=422,
+        details={"reason": exc.reason},
+    )
+
+
+async def secret_resolution_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 502 with SECRET_RESOLUTION_FAILED code when a secret reference cannot be resolved.
+
+    The raw ``reason`` is logged server-side only, mirroring the MCP and skill
+    clone handlers, since it can embed decryption or Vault failure internals.
+    """
+    assert isinstance(exc, SecretResolutionError)
+    logger.warning("Secret %s resolution failed: %s", exc.secret_name, exc.reason)
+    return _envelope_error(
+        request,
+        code="SECRET_RESOLUTION_FAILED",
+        message=f"Failed to resolve secret {exc.secret_name!r}",
+        status_code=502,
+        details={"secret": exc.secret_name},
     )
 
 

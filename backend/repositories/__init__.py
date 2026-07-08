@@ -13,6 +13,7 @@ from .exceptions import (
 from .mcp_server import MCPServerRepository, SqlMCPServerRepository
 from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
 from .notification import NotificationRepository, SqlNotificationRepository
+from .secret import SecretRepository, SqlSecretRepository
 from .user import SqlUserRepository, UserRepository
 from .user_avatar import SqlUserAvatarRepository, UserAvatarRepository
 from .workflow import SqlWorkflowRepository, WorkflowRepository
@@ -31,12 +32,14 @@ __all__ = [
     "NotificationRepository",
     "ReferencedError",
     "RepositoryError",
+    "SecretRepository",
     "SqlAgentSkillRepository",
     "SqlApprovalRepository",
     "SqlAuthSessionRepository",
     "SqlMCPServerRepository",
     "SqlMessageMetaRepository",
     "SqlNotificationRepository",
+    "SqlSecretRepository",
     "SqlUserAvatarRepository",
     "SqlUserRepository",
     "SqlWorkflowRepository",

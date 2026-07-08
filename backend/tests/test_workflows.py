@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from httpx import AsyncClient
 
+from models.secret import Secret as _Secret  # noqa: F401 — registers model
 from tests._envelope import assert_err, assert_ok
 
 _SKILL_BODY = {"name": "skill-a", "repo_url": "https://github.com/x/y"}
@@ -371,7 +372,7 @@ async def test_execute_workflow_clones_skill_repo(
 
     captured_ids: list[str] = []
 
-    async def _capture(s: Any) -> Any:
+    async def _capture(s: Any, auth: Any = None) -> Any:
         captured_ids.append(s.id)
         return Path("/tmp/skill")
 
@@ -380,6 +381,69 @@ async def test_execute_workflow_clones_skill_repo(
     await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute")
     mock_skill_manager.ensure_cloned.assert_awaited_once()
     assert captured_ids[0] == skill["id"]
+
+
+async def test_execute_workflow_passes_repo_auth_to_clone(
+    workflow_client: AsyncClient,
+    mock_skill_manager: MagicMock,
+) -> None:
+    """A skill with repo_auth_secret resolves it and clones with credentials."""
+    assert_ok(
+        await workflow_client.post(
+            "/api/v1/secrets",
+            json={"name": "git-token", "type": "local", "value": "tok-123"},
+        ),
+        status=201,
+    )
+    skill = assert_ok(
+        await workflow_client.post(
+            "/api/v1/agent-skills",
+            json={**_SKILL_BODY, "repo_auth_secret": "git-token"},
+        ),
+        status=201,
+    )
+    wf = await _create_workflow(workflow_client, skill["id"])
+
+    captured_auth: list[Any] = []
+
+    async def _capture(s: Any, auth: Any = None) -> Any:
+        captured_auth.append(auth)
+        return Path("/tmp/skill")
+
+    mock_skill_manager.ensure_cloned.side_effect = _capture
+
+    response = await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute")
+    assert_ok(response, status=201)
+    assert captured_auth == [("x-access-token", "tok-123")]
+
+
+async def test_execute_workflow_with_missing_auth_secret_returns_502(
+    workflow_client: AsyncClient,
+    mock_skill_manager: MagicMock,
+) -> None:
+    """A dangling repo_auth_secret fails lazily at execute time with 502."""
+    assert_ok(
+        await workflow_client.post(
+            "/api/v1/secrets",
+            json={"name": "doomed", "type": "local", "value": "tok"},
+        ),
+        status=201,
+    )
+    skill = assert_ok(
+        await workflow_client.post(
+            "/api/v1/agent-skills",
+            json={**_SKILL_BODY, "repo_auth_secret": "doomed"},
+        ),
+        status=201,
+    )
+    wf = await _create_workflow(workflow_client, skill["id"])
+    secrets = assert_ok(await workflow_client.get("/api/v1/secrets"))
+    await workflow_client.delete(f"/api/v1/secrets/{secrets[0]['id']}")
+
+    response = await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute")
+    err = assert_err(response, code="SECRET_RESOLUTION_FAILED", status=502)
+    assert err["details"] == {"secret": "doomed"}
+    mock_skill_manager.ensure_cloned.assert_not_awaited()
 
 
 async def test_execute_workflow_snapshot_contains_skill_info(

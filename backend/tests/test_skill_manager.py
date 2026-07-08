@@ -33,7 +33,7 @@ async def test_ensure_cloned_returns_target_dir_for_empty_repo_path(
     manager = SkillManager(cache_dir=tmp_path)
     skill = _make_skill("")
     manager._clone = AsyncMock(  # type: ignore[method-assign]
-        side_effect=lambda _url, target: target.mkdir(parents=True)
+        side_effect=lambda _url, target, _auth: target.mkdir(parents=True)
     )
 
     skill_dir = await manager.ensure_cloned(skill)
@@ -45,7 +45,9 @@ async def test_ensure_cloned_returns_nested_subdir(tmp_path: Path) -> None:
     manager = SkillManager(cache_dir=tmp_path)
     skill = _make_skill("skills/my-skill")
 
-    async def _fake_clone(_url: str, target: Path) -> None:
+    async def _fake_clone(
+        _url: str, target: Path, _auth: tuple[str, str] | None
+    ) -> None:
         (target / "skills" / "my-skill").mkdir(parents=True)
 
     manager._clone = AsyncMock(side_effect=_fake_clone)  # type: ignore[method-assign]
@@ -68,7 +70,7 @@ async def test_ensure_cloned_rejects_repo_path_escaping_cache_dir(
     manager = SkillManager(cache_dir=tmp_path)
     skill = _make_skill("..")
     manager._clone = AsyncMock(  # type: ignore[method-assign]
-        side_effect=lambda _url, target: target.mkdir(parents=True)
+        side_effect=lambda _url, target, _auth: target.mkdir(parents=True)
     )
 
     with pytest.raises(SkillCloneError, match="escapes the cache directory"):
@@ -104,6 +106,40 @@ async def test_clone_rejects_repo_url_resolving_to_private_ip(
         await manager._clone("http://internal.example.com/x", tmp_path / "out")
 
     fake_clone.assert_not_called()
+
+
+async def test_clone_passes_basic_auth_credentials_to_dulwich(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An auth pair is forwarded to porcelain.clone as username/password kwargs."""
+    manager = SkillManager(cache_dir=tmp_path)
+    fake_clone = MagicMock()
+    monkeypatch.setattr("infrastructure.skill_manager.porcelain.clone", fake_clone)
+
+    await manager._clone(
+        "https://github.com/example/private.git",
+        tmp_path / "out",
+        ("x-access-token", "tok-123"),
+    )
+
+    kwargs = fake_clone.call_args.kwargs
+    assert kwargs["username"] == "x-access-token"
+    assert kwargs["password"] == "tok-123"
+
+
+async def test_clone_without_auth_omits_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without an auth pair, no username/password kwargs reach porcelain.clone."""
+    manager = SkillManager(cache_dir=tmp_path)
+    fake_clone = MagicMock()
+    monkeypatch.setattr("infrastructure.skill_manager.porcelain.clone", fake_clone)
+
+    await manager._clone("https://github.com/example/repo.git", tmp_path / "out")
+
+    kwargs = fake_clone.call_args.kwargs
+    assert "username" not in kwargs
+    assert "password" not in kwargs
 
 
 class _RedirectToInternalHandler(http.server.BaseHTTPRequestHandler):

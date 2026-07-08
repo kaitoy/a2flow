@@ -107,6 +107,33 @@ export const MCP_TOOL_1 = {
   inputSchema: { type: "object" },
 };
 
+// Note: secret responses never carry a `value` field — the API is write-only.
+export const SECRET_1 = {
+  id: "secret-1",
+  name: "github-token",
+  type: "local",
+  vaultMount: null,
+  vaultPath: null,
+  vaultKey: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+export const SECRET_VAULT_1 = {
+  id: "secret-2",
+  name: "vault-token",
+  type: "vault",
+  vaultMount: "secret",
+  vaultPath: "myapp/github",
+  vaultKey: "token",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 export const handlers = [
   http.get(`${BASE}/api/v1/sessions`, () =>
     envelope([
@@ -225,6 +252,16 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(MCP_SERVER_1)),
 
   http.delete(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/secrets`, () => envelope([SECRET_1, SECRET_VAULT_1])),
+
+  http.get(`${BASE}/api/v1/secrets/:secretId`, () => envelope(SECRET_1)),
+
+  http.post(`${BASE}/api/v1/secrets`, () => envelope({ ...SECRET_1, id: "new-secret-id" }, 201)),
+
+  http.patch(`${BASE}/api/v1/secrets/:secretId`, () => envelope(SECRET_1)),
+
+  http.delete(`${BASE}/api/v1/secrets/:secretId`, () => envelope(null)),
 
   http.get(`${BASE}/api/v1/approvals`, () => envelope([APPROVAL_1])),
 

@@ -30,6 +30,8 @@ from repositories.exceptions import (
     QueryValidationError,
     ReferencedError,
     RegistryUnavailableError,
+    SecretResolutionError,
+    SecretValidationError,
     SkillCloneError,
     UnauthorizedError,
     UniqueViolationError,
@@ -47,6 +49,8 @@ from routers.exception_handlers import (
     query_validation_exception_handler,
     referenced_exception_handler,
     registry_unavailable_exception_handler,
+    secret_resolution_exception_handler,
+    secret_validation_exception_handler,
     skill_clone_exception_handler,
     unauthorized_exception_handler,
     unhandled_exception_handler,
@@ -123,6 +127,8 @@ app.add_exception_handler(
 )
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
 app.add_exception_handler(AvatarValidationError, avatar_validation_exception_handler)
+app.add_exception_handler(SecretValidationError, secret_validation_exception_handler)
+app.add_exception_handler(SecretResolutionError, secret_resolution_exception_handler)
 app.add_exception_handler(UnauthorizedError, unauthorized_exception_handler)
 app.add_exception_handler(CsrfError, csrf_exception_handler)
 app.add_exception_handler(ForbiddenError, forbidden_exception_handler)

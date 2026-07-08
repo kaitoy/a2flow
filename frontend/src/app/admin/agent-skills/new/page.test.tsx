@@ -10,7 +10,7 @@ import NewAgentSkillPage from "./page";
 describe("NewAgentSkillPage", () => {
   it("renders name input", () => {
     render(<NewAgentSkillPage />);
-    expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
   });
 
   it("renders repo url input", () => {
@@ -39,11 +39,89 @@ describe("NewAgentSkillPage", () => {
     server.use(http.post("http://localhost:8000/api/v1/agent-skills", createSpy));
 
     render(<NewAgentSkillPage />);
-    await user.type(screen.getByLabelText(/name/i), "Test");
+    await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(createSpy).toHaveBeenCalled());
+  });
+
+  it("submits auth secret and username when provided", async () => {
+    const user = userEvent.setup();
+    let receivedBody: unknown;
+    server.use(
+      http.post("http://localhost:8000/api/v1/agent-skills", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope(
+          {
+            id: "new-id",
+            name: "Test",
+            repoUrl: "https://x.com",
+            repoPath: "",
+            description: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+          201
+        );
+      })
+    );
+
+    render(<NewAgentSkillPage />);
+    await user.type(screen.getByLabelText(/^name/i), "Test");
+    await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
+    await user.type(screen.getByLabelText(/auth secret/i), "git-token");
+    await user.type(screen.getByLabelText(/auth username/i), "oauth2");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "Test",
+        repoUrl: "https://x.com",
+        description: null,
+        repoAuthSecret: "git-token",
+        repoAuthUsername: "oauth2",
+      })
+    );
+  });
+
+  it("omits auth fields from the request when left blank", async () => {
+    const user = userEvent.setup();
+    let receivedBody: unknown;
+    server.use(
+      http.post("http://localhost:8000/api/v1/agent-skills", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope(
+          {
+            id: "new-id",
+            name: "Test",
+            repoUrl: "https://x.com",
+            repoPath: "",
+            description: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+          201
+        );
+      })
+    );
+
+    render(<NewAgentSkillPage />);
+    await user.type(screen.getByLabelText(/^name/i), "Test");
+    await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "Test",
+        repoUrl: "https://x.com",
+        description: null,
+      })
+    );
   });
 
   it("navigates to list on success", async () => {
@@ -59,7 +137,7 @@ describe("NewAgentSkillPage", () => {
     });
 
     render(<NewAgentSkillPage />);
-    await user.type(screen.getByLabelText(/name/i), "Test");
+    await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -69,7 +147,7 @@ describe("NewAgentSkillPage", () => {
   it("shows validation error on blur when required field is empty", async () => {
     const user = userEvent.setup();
     render(<NewAgentSkillPage />);
-    const nameInput = screen.getByLabelText(/name/i);
+    const nameInput = screen.getByLabelText(/^name/i);
     await user.click(nameInput);
     await user.tab();
     await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
@@ -80,7 +158,7 @@ describe("NewAgentSkillPage", () => {
     render(<NewAgentSkillPage />);
     // A no-break space (U+00A0) is non-printable and rejected; an ordinary
     // space would be accepted.
-    await user.type(screen.getByLabelText(/name/i), "bad\u00a0name");
+    await user.type(screen.getByLabelText(/^name/i), "bad\u00a0name");
     await user.tab();
     await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
   });
@@ -104,7 +182,7 @@ describe("NewAgentSkillPage", () => {
     );
 
     render(<NewAgentSkillPage />);
-    await user.type(screen.getByLabelText(/name/i), "Test");
+    await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     await user.click(screen.getByRole("button", { name: /save/i }));
 

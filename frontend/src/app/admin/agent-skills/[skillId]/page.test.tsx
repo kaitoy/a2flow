@@ -43,6 +43,40 @@ describe("EditAgentSkillPage", () => {
     await waitFor(() => expect(patchSpy).toHaveBeenCalled());
   });
 
+  it("prefills auth fields and sends null when cleared", async () => {
+    setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/agent-skills/:skillId", () =>
+        envelope({ ...FULL_SKILL, repoAuthSecret: "git-token", repoAuthUsername: "oauth2" })
+      )
+    );
+    let receivedBody: unknown;
+    server.use(
+      http.patch("http://localhost:8000/api/v1/agent-skills/:skillId", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope(FULL_SKILL);
+      })
+    );
+
+    render(<EditAgentSkillPage />);
+    await waitFor(() => expect(screen.getByDisplayValue("git-token")).toBeInTheDocument());
+    expect(screen.getByDisplayValue("oauth2")).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText(/auth secret/i));
+    await userEvent.clear(screen.getByLabelText(/auth username/i));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "my-skill",
+        repoUrl: "https://github.com/example/repo",
+        repoPath: "",
+        description: null,
+        repoAuthSecret: null,
+        repoAuthUsername: null,
+      })
+    );
+  });
+
   it("navigates to list after save", async () => {
     setup();
     const pushMock = vi.fn();
@@ -91,7 +125,7 @@ describe("EditAgentSkillPage", () => {
     const user = userEvent.setup();
     render(<EditAgentSkillPage />);
     await waitFor(() => screen.getByDisplayValue("my-skill"));
-    const nameInput = screen.getByLabelText(/name/i);
+    const nameInput = screen.getByLabelText(/^name/i);
     await user.clear(nameInput);
     await user.tab();
     await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());

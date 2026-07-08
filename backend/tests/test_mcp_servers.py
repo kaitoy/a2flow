@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.secret import Secret as _Secret  # noqa: F401 — registers model
 from models.user import SYSTEM_USER_ID
 from repositories.exceptions import McpConnectionError
 from tests._envelope import assert_err, assert_ok
@@ -344,3 +345,72 @@ async def test_list_server_tools_unknown_id_returns_404(
 ) -> None:
     response = await mcp_client.get("/api/v1/mcp-servers/nonexistent/tools")
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_list_server_tools_resolves_secret_placeholders(
+    mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """${secret:NAME} placeholders in headers are expanded before connecting."""
+    assert_ok(
+        await mcp_client.post(
+            "/api/v1/secrets",
+            json={"name": "api-token", "type": "local", "value": "tok-xyz"},
+        ),
+        status=201,
+    )
+    created = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers",
+            json={
+                "name": "with-secret",
+                "url": "https://mcp.example.com/mcp",
+                "headers": {"Authorization": "Bearer ${secret:api-token}"},
+            },
+        ),
+        status=201,
+    )
+    seen: dict[str, Any] = {}
+
+    async def fake_list_server_tools(
+        url: str, headers: dict[str, str] | None = None
+    ) -> list[Any]:
+        seen["headers"] = headers
+        return []
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    assert_ok(await mcp_client.get(f"/api/v1/mcp-servers/{created['id']}/tools"))
+    assert seen["headers"] == {"Authorization": "Bearer tok-xyz"}
+
+
+async def test_list_server_tools_missing_secret_returns_502(
+    mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dangling placeholder fails resolution without leaking the reason."""
+    created = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers",
+            json={
+                "name": "dangling",
+                "url": "https://mcp.example.com/mcp",
+                "headers": {"Authorization": "Bearer ${secret:nope}"},
+            },
+        ),
+        status=201,
+    )
+    connected: list[str] = []
+
+    async def fake_list_server_tools(
+        url: str, headers: dict[str, str] | None = None
+    ) -> list[Any]:
+        connected.append(url)
+        return []
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    response = await mcp_client.get(f"/api/v1/mcp-servers/{created['id']}/tools")
+    err = assert_err(response, code="SECRET_RESOLUTION_FAILED", status=502)
+    assert err["details"] == {"secret": "nope"}
+    assert connected == []

@@ -8,6 +8,7 @@ WorkflowSession) that previously lived inline in the router.
 import uuid
 from collections.abc import Sequence
 
+from infrastructure.secret_resolver import SecretResolver
 from infrastructure.skill_manager import SkillManager
 from models.workflow import Workflow, WorkflowCreate, WorkflowUpdate
 from models.workflow_session import WorkflowSession, WorkflowSessionCreate
@@ -19,6 +20,11 @@ from repositories import (
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec
 
+#: Basic-auth username used for a skill clone when the skill names an auth
+#: secret but no explicit ``repo_auth_username``. Works for GitHub PATs, where
+#: the username is ignored as long as the token is the password.
+_DEFAULT_GIT_USERNAME = "x-access-token"
+
 
 class WorkflowService:
     """Application service orchestrating Workflow operations."""
@@ -29,6 +35,7 @@ class WorkflowService:
         skills: AgentSkillRepository,
         skill_manager: SkillManager,
         ws_repo: WorkflowSessionRepository,
+        resolver: SecretResolver,
     ) -> None:
         """Initialize the service.
 
@@ -37,11 +44,14 @@ class WorkflowService:
             skills: Repository providing AgentSkill persistence.
             skill_manager: Manager that clones skill repositories locally.
             ws_repo: Repository providing WorkflowSession persistence.
+            resolver: Resolver turning a skill's ``repo_auth_secret`` into the
+                clone credential.
         """
         self._workflows = workflows
         self._skills = skills
         self._skill_manager = skill_manager
         self._ws_repo = ws_repo
+        self._resolver = resolver
 
     async def get(self, workflow_id: str) -> Workflow:
         """Return the Workflow with the given ID.
@@ -141,13 +151,19 @@ class WorkflowService:
 
         Raises:
             NotFoundError: If the workflow or its skill does not exist.
+            SecretResolutionError: If the skill's ``repo_auth_secret`` cannot
+                be resolved.
         """
         workflow = await self.get(workflow_id)
         skill = await self._skills.get(workflow.agent_skill_id)
         if skill is None:
             raise NotFoundError("AgentSkill", workflow.agent_skill_id)
 
-        skill_dir = await self._skill_manager.ensure_cloned(skill)
+        auth: tuple[str, str] | None = None
+        if skill.repo_auth_secret is not None:
+            token = await self._resolver.resolve_value(skill.repo_auth_secret)
+            auth = (skill.repo_auth_username or _DEFAULT_GIT_USERNAME, token)
+        skill_dir = await self._skill_manager.ensure_cloned(skill, auth=auth)
         user = user_id or "user"
         session_id = str(uuid.uuid4())
 

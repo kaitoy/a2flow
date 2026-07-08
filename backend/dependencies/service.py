@@ -9,6 +9,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from infrastructure.secret_resolver import SecretResolver
 from services import (
     AgentSkillService,
     ApprovalService,
@@ -16,6 +17,7 @@ from services import (
     MCPRegistryService,
     MCPServerService,
     NotificationService,
+    SecretService,
     UserAvatarService,
     UserService,
     WorkflowService,
@@ -31,18 +33,27 @@ from .repository import (
     MCPServerRepositoryDep,
     MessageMetaRepositoryDep,
     NotificationRepositoryDep,
+    SecretRepositoryDep,
     UserAvatarRepositoryDep,
     UserRepositoryDep,
     WorkflowRepositoryDep,
     WorkflowSessionRepositoryDep,
     WorkflowTaskRepositoryDep,
 )
-from .singletons import AgentRegistryDep, SessionServiceDep, SkillManagerDep
+from .singletons import (
+    AgentRegistryDep,
+    SecretCipherDep,
+    SessionServiceDep,
+    SkillManagerDep,
+    VaultClientDep,
+)
 
 
-def get_agent_skill_service(repo: AgentSkillRepositoryDep) -> AgentSkillService:
-    """Create an AgentSkillService backed by the request's repository."""
-    return AgentSkillService(repo)
+def get_agent_skill_service(
+    repo: AgentSkillRepositoryDep, secrets: SecretRepositoryDep
+) -> AgentSkillService:
+    """Create an AgentSkillService backed by the request's repositories."""
+    return AgentSkillService(repo, secrets)
 
 
 AgentSkillServiceDep = Annotated[AgentSkillService, Depends(get_agent_skill_service)]
@@ -59,9 +70,33 @@ def get_auth_service(
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 
 
-def get_mcp_server_service(repo: MCPServerRepositoryDep) -> MCPServerService:
-    """Create an MCPServerService backed by the request's repository."""
-    return MCPServerService(repo)
+def get_secret_service(
+    repo: SecretRepositoryDep, cipher: SecretCipherDep
+) -> SecretService:
+    """Create a SecretService wiring the repository and the cipher singleton."""
+    return SecretService(repo, cipher)
+
+
+SecretServiceDep = Annotated[SecretService, Depends(get_secret_service)]
+
+
+def get_secret_resolver(
+    repo: SecretRepositoryDep,
+    cipher: SecretCipherDep,
+    vault: VaultClientDep,
+) -> SecretResolver:
+    """Create a SecretResolver wiring the repository, cipher, and optional Vault client."""
+    return SecretResolver(repo, cipher, vault)
+
+
+SecretResolverDep = Annotated[SecretResolver, Depends(get_secret_resolver)]
+
+
+def get_mcp_server_service(
+    repo: MCPServerRepositoryDep, resolver: SecretResolverDep
+) -> MCPServerService:
+    """Create an MCPServerService backed by the request's repository and resolver."""
+    return MCPServerService(repo, resolver)
 
 
 MCPServerServiceDep = Annotated[MCPServerService, Depends(get_mcp_server_service)]
@@ -106,9 +141,10 @@ def get_workflow_service(
     skills: AgentSkillRepositoryDep,
     skill_manager: SkillManagerDep,
     ws_repo: WorkflowSessionRepositoryDep,
+    resolver: SecretResolverDep,
 ) -> WorkflowService:
-    """Create a WorkflowService wiring the repositories and SkillManager."""
-    return WorkflowService(workflows, skills, skill_manager, ws_repo)
+    """Create a WorkflowService wiring the repositories, SkillManager, and resolver."""
+    return WorkflowService(workflows, skills, skill_manager, ws_repo, resolver)
 
 
 WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]

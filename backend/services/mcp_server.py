@@ -9,6 +9,7 @@ server to list the tools it advertises.
 from collections.abc import Sequence
 
 from infrastructure import mcp_client
+from infrastructure.secret_resolver import SecretResolver
 from models.mcp_server import MCPServer, MCPServerCreate, MCPServerUpdate, McpToolInfo
 from repositories import MCPServerRepository
 from repositories.exceptions import NotFoundError
@@ -24,13 +25,16 @@ _McpToolInfoList = list[McpToolInfo]
 class MCPServerService:
     """Application service orchestrating MCPServer operations."""
 
-    def __init__(self, repo: MCPServerRepository) -> None:
+    def __init__(self, repo: MCPServerRepository, resolver: SecretResolver) -> None:
         """Initialize the service.
 
         Args:
             repo: Repository providing MCPServer persistence.
+            resolver: Resolver expanding ``${secret:NAME}`` placeholders in
+                header values before connecting to a server.
         """
         self._repo = repo
+        self._resolver = resolver
 
     async def get(self, server_id: str) -> MCPServer:
         """Return the MCPServer with the given ID.
@@ -126,9 +130,12 @@ class MCPServerService:
         Raises:
             NotFoundError: If no server exists with the given ID.
             McpConnectionError: If the server cannot be reached.
+            SecretResolutionError: If a ``${secret:NAME}`` placeholder in the
+                server's headers cannot be resolved.
         """
         server = await self.get(server_id)
-        tools = await mcp_client.list_server_tools(server.url, server.headers)
+        headers = await self._resolver.resolve_headers(server.headers)
+        tools = await mcp_client.list_server_tools(server.url, headers)
         return [
             McpToolInfo(
                 name=tool.name,

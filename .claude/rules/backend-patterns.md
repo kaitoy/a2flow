@@ -260,6 +260,8 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `ForeignKeyViolationError` | 422 | `FOREIGN_KEY_VIOLATION` | Referenced entity not found; `details` carries `entity` and `id` |
 | `ForbiddenError` | 403 | `FORBIDDEN` | Authenticated user lacks permission for the resource (e.g. not an approval's designated approver) |
 | `AvatarValidationError` | 422 | `INVALID_AVATAR` | Uploaded avatar has an unsupported type or exceeds the size limit; `details` carries `reason` |
+| `SecretValidationError` | 422 | `INVALID_SECRET` | A Secret PATCH would leave an invalid per-type shape (merged-result check in `SecretService`); `details` carries `reason` |
+| `SecretResolutionError` | 502 | `SECRET_RESOLUTION_FAILED` | A `${secret:NAME}` reference or skill `repo_auth_secret` could not be resolved; `details` carries `secret` only — the raw failure reason is logged server-side, never returned to the client |
 | `RequestValidationError` | 422 | `VALIDATION_ERROR` | FastAPI body/query validation; `details.errors` from Pydantic |
 | `McpConnectionError` | 502 | `MCP_UNREACHABLE` | Remote MCP server unreachable; `details` carries `server` only — the raw failure reason is logged server-side, never returned to the client |
 | `SkillCloneError` | 502 | `SKILL_CLONE_FAILED` | Skill repository could not be cloned; `details` carries `skillId` only — the raw failure reason is logged server-side, never returned to the client |

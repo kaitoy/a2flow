@@ -1,9 +1,9 @@
-"""LRU-cached singleton dependencies for ADK and skill management services.
+"""LRU-cached singleton dependencies for ADK, skill, and secret services.
 
 Provides process-wide singletons (ADK session service, agent registry, skill
-manager) created lazily on first resolution and cached for the lifetime of the
-process. Tests override the underlying factory functions via
-``app.dependency_overrides``.
+manager, secret cipher, Vault client) created lazily on first resolution and
+cached for the lifetime of the process. Tests override the underlying factory
+functions via ``app.dependency_overrides``.
 """
 
 import os
@@ -16,11 +16,15 @@ from google.adk.sessions import BaseSessionService
 
 from infrastructure.agent import AgentRegistry
 from infrastructure.database import ASYNC_DB_URL, DB_URL, is_sqlite_url
+from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_cipher import get_secret_cipher as get_secret_cipher
 from infrastructure.session_service import (
     StaleTolerantDatabaseSessionService,
     StaleTolerantSqliteSessionService,
 )
 from infrastructure.skill_manager import SkillManager
+from infrastructure.vault_client import VaultClient
+from infrastructure.vault_client import get_vault_client as get_vault_client
 
 from .context import APP_NAME
 
@@ -63,3 +67,5 @@ def get_skill_manager() -> SkillManager:
 SessionServiceDep = Annotated[BaseSessionService, Depends(get_session_service)]
 AgentRegistryDep = Annotated[AgentRegistry, Depends(get_agent_registry)]
 SkillManagerDep = Annotated[SkillManager, Depends(get_skill_manager)]
+SecretCipherDep = Annotated[SecretCipher, Depends(get_secret_cipher)]
+VaultClientDep = Annotated[VaultClient | None, Depends(get_vault_client)]

@@ -6,7 +6,7 @@ import { Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import type { z } from "zod";
+import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
@@ -22,7 +22,13 @@ import { createAgentSkill } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
-const schema = zAgentSkillCreate;
+// The generated auth fields are nullish with min-length 1, so a blank input
+// would fail validation; the form allows the empty string ("no auth") and
+// maps it to an omitted field on submit.
+const schema = zAgentSkillCreate.omit({ repoAuthSecret: true, repoAuthUsername: true }).extend({
+  repoAuthSecret: z.literal("").or(zAgentSkillCreate.shape.repoAuthSecret.unwrap().unwrap()),
+  repoAuthUsername: z.literal("").or(zAgentSkillCreate.shape.repoAuthUsername.unwrap().unwrap()),
+});
 
 type FormValues = z.infer<typeof schema>;
 
@@ -39,7 +45,14 @@ export default function NewAgentSkillPage() {
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: { name: "", repoUrl: "", repoPath: "", description: "" },
+    defaultValues: {
+      name: "",
+      repoUrl: "",
+      repoPath: "",
+      description: "",
+      repoAuthSecret: "",
+      repoAuthUsername: "",
+    },
   });
 
   async function onSubmit(values: FormValues) {
@@ -51,6 +64,8 @@ export default function NewAgentSkillPage() {
           repoUrl: values.repoUrl,
           repoPath: values.repoPath || undefined,
           description: values.description || null,
+          repoAuthSecret: values.repoAuthSecret || undefined,
+          repoAuthUsername: values.repoAuthUsername || undefined,
         });
         dispatch(showToast({ message: "Agent skill created" }));
         router.push("/admin/agent-skills");
@@ -102,6 +117,33 @@ export default function NewAgentSkillPage() {
               rows={4}
               placeholder="What this skill does (optional)"
               {...register("description")}
+            />
+          </FormField>
+
+          <FormField
+            htmlFor="repoAuthSecret"
+            label="Auth Secret"
+            error={errors.repoAuthSecret?.message}
+          >
+            <Input
+              id="repoAuthSecret"
+              placeholder="Secret name for private repos (optional)"
+              {...register("repoAuthSecret")}
+            />
+            <p className="mt-1 text-xs text-on-surface-variant">
+              Name of a registered Secret used as the clone token for a private repository.
+            </p>
+          </FormField>
+
+          <FormField
+            htmlFor="repoAuthUsername"
+            label="Auth Username"
+            error={errors.repoAuthUsername?.message}
+          >
+            <Input
+              id="repoAuthUsername"
+              placeholder="x-access-token (default)"
+              {...register("repoAuthUsername")}
             />
           </FormField>
 

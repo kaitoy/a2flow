@@ -23,6 +23,10 @@ import type {
   McpToolInfo,
   Notification as NotificationModel,
   NotificationType,
+  SecretCreate,
+  SecretRead as SecretModel,
+  SecretType,
+  SecretUpdate,
   Session as SessionModel,
   ToolBinding,
   UserCreate,
@@ -40,12 +44,14 @@ import type {
 import {
   zCreateAgentSkillApiV1AgentSkillsPostResponse,
   zCreateMcpServerApiV1McpServersPostResponse,
+  zCreateSecretApiV1SecretsPostResponse,
   zCreateUserApiV1UsersPostResponse,
   zCreateWorkflowApiV1WorkflowsPostResponse,
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse,
   zDeleteMcpServerApiV1McpServersServerIdDeleteResponse,
   zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse,
+  zDeleteSecretApiV1SecretsSecretIdDeleteResponse,
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
   zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse,
@@ -56,6 +62,7 @@ import {
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
+  zGetSecretApiV1SecretsSecretIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
   zGetUserApiV1UsersUserIdGetResponse,
@@ -68,6 +75,7 @@ import {
   zListMcpServersApiV1McpServersGetResponse,
   zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse,
   zListNotificationsApiV1NotificationsGetResponse,
+  zListSecretsApiV1SecretsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
   zListUsersApiV1UsersGetResponse,
   zListWorkflowSessionsApiV1WorkflowSessionsGetResponse,
@@ -82,6 +90,7 @@ import {
   zSearchMcpRegistryApiV1McpRegistryGetResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
+  zUpdateSecretApiV1SecretsSecretIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
   zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
@@ -214,6 +223,7 @@ export type AgentSkill = WithAudit<AgentSkillModel>;
 export type Approval = WithAudit<ApprovalModel>;
 export type McpServer = WithAudit<McpServerModel>;
 export type Notification = WithAudit<NotificationModel>;
+export type Secret = WithAudit<SecretModel>;
 export type User = WithAudit<UserReadModel>;
 export type Workflow = WithAudit<WorkflowModel>;
 export type WorkflowSession = WithAudit<WorkflowSessionModel>;
@@ -233,6 +243,9 @@ export type {
   McpServerUpdate,
   McpToolInfo,
   NotificationType,
+  SecretCreate,
+  SecretType,
+  SecretUpdate,
   ToolBinding,
   UserCreate,
   UserUpdate,
@@ -450,6 +463,46 @@ export async function searchMcpRegistry(
     apiClient.get("/api/v1/mcp-registry", { params }),
     zSearchMcpRegistryApiV1McpRegistryGetResponse
   ) as Promise<McpRegistrySearchResult>;
+}
+
+/** List secrets with optional pagination, sort, and filters. Values are never returned. */
+export async function listSecrets(query: ListQuery = {}): Promise<Secret[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/secrets", listConfig(query)),
+    zListSecretsApiV1SecretsGetResponse
+  ) as Promise<Secret[]>;
+}
+
+/** Fetch a single secret by ID. The stored value is never returned. */
+export async function getSecret(id: string): Promise<Secret> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/secrets/${encodeURIComponent(id)}`),
+    zGetSecretApiV1SecretsSecretIdGetResponse
+  ) as Promise<Secret>;
+}
+
+/** Register a new secret: a `local` encrypted value or a `vault` KV v2 reference. */
+export async function createSecret(body: SecretCreate): Promise<Secret> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/secrets", body),
+    zCreateSecretApiV1SecretsPostResponse
+  ) as Promise<Secret>;
+}
+
+/** Apply a partial update to a secret. Omitting `value` keeps the stored value unchanged. */
+export async function updateSecret(id: string, body: SecretUpdate): Promise<Secret> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/secrets/${encodeURIComponent(id)}`, body),
+    zUpdateSecretApiV1SecretsSecretIdPatchResponse
+  ) as Promise<Secret>;
+}
+
+/** Delete a secret by ID. References to it fail lazily at their next resolution. */
+export async function deleteSecret(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/secrets/${encodeURIComponent(id)}`),
+    zDeleteSecretApiV1SecretsSecretIdDeleteResponse
+  );
 }
 
 /** List users with optional pagination, sort, and filters. */
