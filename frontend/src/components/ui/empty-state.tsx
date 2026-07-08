@@ -64,7 +64,7 @@ export function EmptyState({
         (compact ? (
           <p className="text-xs font-medium text-on-surface">{title}</p>
         ) : (
-          <h2 className="mb-1 text-2xl font-semibold tracking-tight text-gradient-accent">
+          <h2 className="font-display mb-1 text-2xl font-semibold tracking-tight text-gradient-accent">
             {title}
           </h2>
         ))}

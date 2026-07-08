@@ -43,7 +43,9 @@ export function AdminPageHeader({
             <AnimatedIcon icon={icon} animation="spin-occasional" size={22} />
           </span>
         )}
-        <h1 className="text-3xl font-semibold tracking-tight text-gradient-accent">{title}</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-gradient-accent">
+          {title}
+        </h1>
       </div>
       <div className="flex items-center gap-2">
         {onRefresh && (

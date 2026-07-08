@@ -131,7 +131,7 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-3xl font-semibold tracking-tight text-gradient-accent">
+      <h1 className="font-display text-3xl font-semibold tracking-tight text-gradient-accent">
         Customize Avatar
       </h1>
 

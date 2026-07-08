@@ -1,6 +1,6 @@
 /** @module RootLayout — Applies fonts, theme flash-prevention script, and global providers. */
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/toast";
@@ -14,6 +14,11 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
   weight: ["400", "500", "600", "700"],
 });
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  weight: ["400", "700"],
+});
 
 export const metadata: Metadata = {
   title: "A2Flow",
@@ -22,7 +27,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={spaceGrotesk.variable}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+    >
       <body className={inter.className}>
         <Script
           id="no-flash-theme"

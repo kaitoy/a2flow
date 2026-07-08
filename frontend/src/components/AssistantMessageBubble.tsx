@@ -32,7 +32,13 @@ export function AssistantMessageBubble({
           "max-w-[75%] rounded-2xl rounded-tl-md px-4 py-2.5",
           "text-sm leading-relaxed whitespace-pre-wrap break-words",
           "glass-panel text-on-surface",
-        ].join(" ")}
+          // Signature "live edge": accent light circles the bubble border
+          // while the agent is streaming (static accent ring under
+          // prefers-reduced-motion — see the utility in globals.css).
+          isStreaming ? "live-edge" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         {textContent || (isStreaming ? null : " ")}
         {isStreaming && (

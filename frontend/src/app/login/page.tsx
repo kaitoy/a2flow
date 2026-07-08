@@ -69,10 +69,7 @@ export default function LoginPage() {
             className="h-12 w-auto"
             priority
           />
-          <h1
-            className="text-xl font-semibold tracking-tight text-gradient-accent"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
+          <h1 className="font-display text-xl font-semibold tracking-tight text-gradient-accent">
             Sign in to A2Flow
           </h1>
         </div>

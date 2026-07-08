@@ -3,8 +3,8 @@ name: A2Flow
 themes: [light, dark]
 colors:
   light:
-    surface: '#f4f7ff'
-    surface-dim: '#d8e2f4'
+    surface: 'oklch(0.975 0.008 240)'
+    surface-dim: 'oklch(0.9 0.02 250)'
     glass: 'rgba(255, 255, 255, 0.55)'
     glass-strong: 'rgba(255, 255, 255, 0.72)'
     glass-overlay: 'rgba(255, 255, 255, 0.45)'
@@ -14,24 +14,23 @@ colors:
     on-surface-variant: '#475569'
     outline: 'rgba(15, 23, 42, 0.18)'
     outline-variant: 'rgba(15, 23, 42, 0.10)'
-    primary: '#0e7c7b'
+    primary: 'oklch(0.56 0.12 183)'
     on-primary: '#ffffff'
-    primary-container: '#14b8a6'
+    primary-container: 'oklch(0.72 0.14 178)'
     on-primary-container: '#ffffff'
-    secondary: '#6366f1'
+    secondary: 'oklch(0.58 0.17 292)'
     on-secondary: '#ffffff'
-    accent: '#0e7c7b'
-    accent-soft: 'rgba(20, 184, 166, 0.18)'
+    accent: 'oklch(0.56 0.12 183)'
+    accent-soft: 'oklch(0.72 0.14 178 / 0.18)'
     error: '#dc2626'
     on-error-container: '#7f1d1d'
     success: '#10b981'
-    bg-blob-1: 'rgba(94, 234, 212, 0.50)'
-    bg-blob-2: 'rgba(165, 180, 252, 0.55)'
-    bg-blob-3: 'rgba(252, 211, 170, 0.48)'
-    bg-blob-4: 'rgba(186, 230, 253, 0.45)'
+    bg-aurora-1: 'oklch(0.85 0.13 178 / 0.55)'
+    bg-aurora-2: 'oklch(0.75 0.15 292 / 0.40)'
+    bg-aurora-3: 'oklch(0.88 0.06 210 / 0.50)'
   dark:
-    surface: '#050912'
-    surface-dim: '#0a1224'
+    surface: 'oklch(0.13 0.025 262)'
+    surface-dim: 'oklch(0.18 0.03 262)'
     glass: 'rgba(15, 23, 42, 0.45)'
     glass-strong: 'rgba(15, 23, 42, 0.65)'
     glass-overlay: 'rgba(15, 23, 42, 0.38)'
@@ -41,30 +40,29 @@ colors:
     on-surface-variant: '#94a3b8'
     outline: 'rgba(148, 163, 184, 0.28)'
     outline-variant: 'rgba(148, 163, 184, 0.14)'
-    primary: '#5eead4'
-    on-primary: '#022c22'
-    primary-container: 'rgba(94, 234, 212, 0.18)'
-    on-primary-container: '#99f6e4'
-    secondary: '#a78bfa'
-    on-secondary: '#1e1b4b'
-    accent: '#5eead4'
-    accent-soft: 'rgba(94, 234, 212, 0.18)'
+    primary: 'oklch(0.87 0.16 170)'
+    on-primary: 'oklch(0.24 0.05 175)'
+    primary-container: 'oklch(0.87 0.16 170 / 0.16)'
+    on-primary-container: 'oklch(0.93 0.10 170)'
+    secondary: 'oklch(0.72 0.16 295)'
+    on-secondary: 'oklch(0.30 0.12 295)'
+    accent: 'oklch(0.87 0.16 170)'
+    accent-soft: 'oklch(0.87 0.16 170 / 0.16)'
     error: '#fb7185'
     on-error-container: '#fecdd3'
     success: '#34d399'
-    bg-blob-1: 'rgba(45, 212, 191, 0.32)'
-    bg-blob-2: 'rgba(167, 139, 250, 0.32)'
-    bg-blob-3: 'rgba(244, 114, 182, 0.26)'
-    bg-blob-4: 'rgba(56, 189, 248, 0.24)'
+    bg-aurora-1: 'oklch(0.80 0.15 172 / 0.30)'
+    bg-aurora-2: 'oklch(0.60 0.19 295 / 0.32)'
+    bg-aurora-3: 'oklch(0.75 0.10 220 / 0.16)'
 typography:
   h1:
-    fontFamily: Inter
-    fontSize: 24px
+    fontFamily: Space Grotesk
+    fontSize: 30px
     fontWeight: '600'
-    lineHeight: 32px
+    lineHeight: 38px
     letterSpacing: -0.02em
   h2:
-    fontFamily: Inter
+    fontFamily: Space Grotesk
     fontSize: 18px
     fontWeight: '600'
     lineHeight: 28px
@@ -86,7 +84,7 @@ typography:
     fontWeight: '400'
     lineHeight: 20px
   mono-log:
-    fontFamily: monospace
+    fontFamily: JetBrains Mono
     fontSize: 12px
     fontWeight: '400'
     lineHeight: 18px
@@ -125,7 +123,7 @@ glass:
   inner-highlight: 'inset 0 1px 0 rgba(255, 255, 255, 0.6)'
   shadow-sm: '0 10px 32px rgba(15, 23, 42, 0.08)'
   shadow-lg: '0 28px 60px -16px rgba(15, 23, 42, 0.18)'
-  shadow-glow: '0 0 36px rgba(20, 184, 166, 0.32)'
+  shadow-glow: '0 0 36px oklch(0.72 0.14 178 / 0.35)'
 motion:
   duration-fast: 150ms
   duration-base: 240ms
@@ -133,6 +131,7 @@ motion:
   ease-standard: 'cubic-bezier(0.2, 0, 0, 1)'
   ease-emphasized: 'cubic-bezier(0.3, 0, 0, 1)'
   ease-exit: 'cubic-bezier(0.3, 0, 0.8, 0.15)'
+  live-sweep: '2.4s linear infinite'
   spring-gentle: '{ tension: 220, friction: 28 }'
   spring-snappy: '{ tension: 320, friction: 26 }'
   spring-bouncy: '{ tension: 260, friction: 18 }'
@@ -140,24 +139,30 @@ motion:
 
 ## Brand & Style
 
-A2Flow's interface is engineered for AI-driven workflow automation. The visual language pairs **frosted-glass surfaces** with a vibrant, gently-animated mesh-gradient canvas — evoking **Depth, Clarity, and Forward Motion**.
+A2Flow's interface is engineered for AI-driven workflow automation. The visual language pairs **frosted-glass surfaces** with a single **aurora ribbon** — one band of light flowing diagonally across the canvas — evoking **Depth, Clarity, and Forward Motion**.
 
-The personality is futuristic-yet-trustworthy: glassmorphism gives the UI a sense of layered transparency without sacrificing legibility. Bright accent gradients (teal → indigo) signal interactivity and AI presence, while neutral text and high-contrast type keep the experience grounded for power users.
+The personality is futuristic-yet-trustworthy: glassmorphism gives the UI a sense of layered transparency without sacrificing legibility, and the palette is deliberately concentrated. One accent (aurora mint) carries every interactive signal; the violet in the aurora's body exists only as light for the glass to refract, never as a competing UI accent. All brand hues are defined in `oklch()` rather than framework presets. Space Grotesk headings and JetBrains Mono data text keep the experience grounded for power users, and the signature **live edge** — accent light circling a panel's border while an agent works — makes "the system is flowing" visible.
 
 The system supports **light** and **dark** themes via a `data-theme` attribute on `<html>`, with all tokens cascading via CSS variables. The user's preference is persisted in `localStorage` (`a2flow.theme`) and falls back to `prefers-color-scheme`.
 
 ## Colors
 
-The palette has two roles: a saturated **accent** (teal in light, neon mint in dark) for actions and highlights, and a **glass** family (translucent whites in light, translucent slates in dark) for surfaces.
+The palette is a **single-accent system** defined in `oklch()`: one saturated **accent** (deep aquamarine in light, luminous aurora mint in dark) for every action and highlight, a supporting **aurora violet** confined to gradients and the background canvas, and a **glass** family (translucent whites in light, translucent slates in dark) for surfaces. Concentrating the visible hues into one mint-to-violet family is what gives the UI its impact — status colors aside, nothing else on screen competes with the accent.
 
-- **Accent (`--color-accent`)** — Used for primary buttons, links, focus rings, active states, and the streaming caret. Pairs with the secondary indigo/violet for gradient fills (`from-accent to-secondary`).
+- **Accent (`--color-accent`)** — Used for primary buttons, links, focus rings, active states, the streaming caret, and the live edge. Pairs with the secondary aurora violet for gradient fills (`from-accent to-secondary`); the violet never appears alone as a UI accent.
 - **Glass surfaces** — Tiers: `glass`, `glass-strong`, `glass-overlay` (more translucent fill for floating popovers), plus `glass-highlight` for inner edges. Always rendered with a `backdrop-filter` blur + saturate (applied via Tailwind's `backdrop-blur`/`backdrop-saturate` utilities — see [Elevation & Depth](#elevation--depth)).
-- **Background blobs** — Four soft radial gradients painted on `body::before` provide the colored "light" that the glass refracts. Blob colors differ between light and dark to match each theme's mood.
+- **Aurora ribbon** — A single diagonal band of light painted on `body::before` (`bg-aurora-1` mint head, `bg-aurora-2` violet body, `bg-aurora-3` soft-cyan tail) provides the colored "light" that the glass refracts. Aurora colors differ between light and dark to match each theme's mood.
 - **Semantic** — `error`, `success`, `alert` retained for status indication. `error-container` is rendered as translucent red.
 
 ## Typography
 
-**Inter** remains the primary typeface for body text, labels, and most headings. **Space Grotesk** (`--font-space-grotesk`) is a secondary display typeface reserved for the "A2Flow" wordmark in `AppHeader`, giving the brand name a distinct geometric character while the rest of the UI stays on Inter. Heading sizes are unchanged from earlier MD3 baselines, but **letter-spacing tightens** (`tracking-tight`) for headings to lean into the futuristic feel. Label-caps now use `0.08em` tracking and 11px size for a sharper, more compressed look. The `badge` scale (11px / 700 / 12px line-height) is implemented as the `text-badge` utility — used for small numeric/tag chips (`NotificationBell`'s unread count, `ToolActivityBubble`'s "MCP" tag) that need the same compact weight as label-caps but without its forced uppercase/tracking/color, since badge color and case vary by call site.
+Three typefaces, three jobs — the pairing itself is part of the identity:
+
+- **Space Grotesk** (`--font-display`, the `font-display` utility) is the display face for **all h1/h2 headings** and the "A2Flow" wordmark, giving titles a geometric, technical character. h1 grows to 30px so the scale contrast between a page title and its body is unmistakable.
+- **Inter** remains the body face for text, labels, and small headings (h3 and below).
+- **JetBrains Mono** (`--font-jetbrains-mono`, resolved by Tailwind's `font-mono` utility) is the data face — logs (`mono-log`), timestamps, session/tool IDs, and tag chips. Agent activity is A2Flow's raw material, and rendering it in a designed monospace instead of the generic system stack makes that material part of the brand.
+
+Headings keep **tight letter-spacing** (`tracking-tight`) to lean into the futuristic feel. Label-caps use `0.08em` tracking and 11px size for a sharper, more compressed look. The `badge` scale (11px / 700 / 12px line-height) is implemented as the `text-badge` utility — used for small numeric/tag chips (`NotificationBell`'s unread count, `ToolActivityBubble`'s "MCP" tag) that need the same compact weight as label-caps but without its forced uppercase/tracking/color, since badge color and case vary by call site.
 
 ## Layout & Spacing
 
@@ -169,7 +174,7 @@ The 8px base spacing unit is preserved. Padding inside glass cards is 24px (`p-6
 
 Depth is achieved through **layered translucency** rather than hard borders or heavy shadows.
 
-- **Layer 0 (Canvas)** — `body::before` paints a fixed mesh of four radial gradients, slowly drifting via `float-slow` keyframes. `body::after` overlays a subtle SVG film-grain to break up banding.
+- **Layer 0 (Canvas)** — `body::before` paints the fixed **aurora ribbon**: a single band of radial gradients flowing diagonally from the upper-left (mint head) through the center (violet body) to the lower-right (soft-cyan tail), with a faint counter-glow in the opposite corner for balance. It drifts very slowly along its own flow direction via the `aurora-drift` keyframes — ambient weather, not an animation. `body::after` overlays a subtle SVG film-grain to break up banding.
 - **Layer 1 (Glass)** — `.glass-panel`: 55–65% translucent fill, 20px blur + 150% saturate, 1px white-tinted border, soft drop shadow + inner-top highlight.
 - **Layer 2 (Glass-Strong)** — `.glass-panel-strong`: 72% translucent fill, 24px blur, larger drop shadow. Used for floating chat input and admin form cards.
 - **Layer 2b (Glass-Overlay)** — `.glass-panel-overlay`: large shadow like glass-strong but a more translucent fill (light 45%, dark 38%) and a lighter 16px blur, so content reads through floating popovers more clearly. Used for tooltips, dropdown/list menus (user menu, notification panel), and modal dialogs (`ConfirmDialog`, `RegistrySearchDialog`).
@@ -205,7 +210,7 @@ The shape language is **Soft Modern**.
 - **Status Badges:** Pill-shaped, gradient or glass per state.
 - **Chat bubbles:**
   - *User:* Accent gradient fill, asymmetric corner (`rounded-tr-md`), inner-top highlight.
-  - *Assistant:* `glass-panel`, asymmetric corner (`rounded-tl-md`), accent-colored streaming caret.
+  - *Assistant:* `glass-panel`, asymmetric corner (`rounded-tl-md`), accent-colored streaming caret. While streaming, the bubble carries the signature **live edge** (see Motion → Patterns).
 - **A2UI surfaces:** `customCard` is rendered as `glass-panel-strong`. `customChoicePicker` chips use the same primary-gradient when selected and `glass-panel` when not, and scale up slightly (~1.03) on hover (motion-safe).
 - **Theme Toggle:** A 36×36 round glass button in the chat header / admin sidebar bottom. Sun/Moon SVG icons; scales up slightly (~1.05) and emits accent glow on hover. Icons cross-fade with a 90° rotation on toggle.
 - **EmptyState:** Centered placeholder for empty regions (no messages, no rows, no sessions). Pairs an `AnimatedIcon` inside a frosted-glass tile with an optional title and description. Has a `compact` variant for tight containers (session sidebar, table empty cell). See `@/components/ui/empty-state.tsx`.
@@ -246,6 +251,7 @@ Choose presets by intent (`useMotionConfig("gentle")`) rather than tuning tensio
 - **List staggering** — Session list rows use React Spring `useTransition` with `trail: 40` to ripple in horizontally on first load.
 - **Modal** — `ConfirmDialog` cross-fades the backdrop and `scale(0.94)→1` the body with a gentle spring. The scrim carries only a light `backdrop-blur-sm` (4px) — most of the frosted look comes from the panel's own `glass-panel-overlay` blur, so the scrim stays light enough that colorful content is still visible for the panel to refract.
 - **Buttons** — All variants share `active:scale-[0.97]` for tactile press feedback and lift 2px on hover (`motion-safe`-guarded). Server-submitting buttons additionally use **optimistic UI** via `useAsyncAction`: the button disables immediately on click (preventing double-submits), and the `pending` label ("Saving…") only appears if the response takes longer than 200ms — fast responses skip straight to the `done` label, so quick saves never flash a transient "Saving…". On success the button stays non-interactive and celebrates with a green fill, checkmark, and one-shot `wiggle` (see Components → Buttons → Success state). The label width is fixed (see Components → Buttons) so none of these transitions reflow the button.
+- **Live edge (signature)** — While an agent is streaming (assistant bubble) or a tool is running, the `live-edge` utility sends a comet of accent light around the panel's border: a conic gradient whose `from` angle (`@property --live-angle`) rotates via the `live-sweep` keyframes (2.4s linear), masked down to a thin ring on an overlay pseudo-element. This is the one place the UI spends continuous motion — it means "the flow is live", so never apply it decoratively to idle surfaces. Reduced-motion swaps the sweep for a static translucent accent ring.
 - **Streaming caret** — Assistant bubble caret uses both `animate-blink` (the original step-start blink, preserved for tests) and `motion-safe:animate-pulse-cursor` (a softer opacity + scaleY pulse) so motion-safe users get the richer effect.
 - **Theme toggle** — Scales up slightly on hover (motion-safe); Sun/Moon icons cross-fade with a 90° rotation via `useTransition`.
 - **Decorative icons** — Accent icons in empty states and page headers loop through small-amplitude keyframes, all `motion-safe`-gated: `bob` (gentle ±4px float, chat/sidebar empty states), `breathe` (subtle scale + opacity swell, chat empty state), `spin-slow` (9s continuous rotation), `spin-occasional` (a quick full turn around the Y/vertical axis — a coin-like flip with `perspective` depth — every ~8s on a long rest, used by admin header and admin empty-table icons), `wiggle` (one-shot ±10° shake), and `attention` (a brief wiggle on a long rest, used by the notification bell when there are unread items). Kept deliberately distinct from the large-amplitude background drifts (`float-slow`/`float-slower`).
