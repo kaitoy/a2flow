@@ -45,10 +45,7 @@ export function AppHeader({ children }: AppHeaderProps) {
             className="h-10 w-auto"
             priority
           />
-          <h1
-            className="text-[22px] leading-[32px] font-semibold tracking-tight text-gradient-accent"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
+          <h1 className="font-display text-[22px] leading-[32px] font-semibold tracking-tight text-gradient-accent">
             A2Flow
           </h1>
         </Link>

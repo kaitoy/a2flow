@@ -3,8 +3,8 @@ import { TextApi } from "@a2ui/web_core/v0_9/basic_catalog";
 import { useEffect, useState } from "react";
 
 const VARIANT_CLASS: Record<string, string> = {
-  h1: "text-[24px] leading-[32px] font-semibold tracking-tight text-on-surface mt-1",
-  h2: "text-[18px] leading-[28px] font-semibold tracking-tight text-on-surface mt-1",
+  h1: "font-display text-[30px] leading-[38px] font-semibold tracking-tight text-on-surface mt-1",
+  h2: "font-display text-[18px] leading-[28px] font-semibold tracking-tight text-on-surface mt-1",
   h3: "text-[14px] leading-[20px] font-semibold tracking-[0.04em] text-on-surface",
   h4: "text-[14px] leading-[22px] font-semibold text-on-surface",
   h5: "text-[13px] leading-[20px] font-semibold text-on-surface",

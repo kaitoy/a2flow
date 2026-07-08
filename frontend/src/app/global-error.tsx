@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,11 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-space-grotesk",
   weight: ["400", "500", "600", "700"],
+});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  weight: ["400", "700"],
 });
 
 /**
@@ -59,7 +64,11 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="en" suppressHydrationWarning className={spaceGrotesk.variable}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+    >
       <body className={inter.className}>
         <Script
           id="no-flash-theme"
