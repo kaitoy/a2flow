@@ -35,7 +35,7 @@ export function AssistantMessageBubble({
       {avatar}
       <div
         className={[
-          "max-w-[75%] rounded-2xl rounded-tl-md px-4 py-2.5",
+          "flex-1 min-w-0 rounded-2xl rounded-tl-md px-4 py-2.5",
           "text-sm leading-relaxed break-words",
           "glass-panel text-on-surface",
           // Signature "live edge": accent light circles the bubble border

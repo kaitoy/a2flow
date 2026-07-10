@@ -11,6 +11,15 @@ describe("AssistantMessageBubble", () => {
     expect(container.firstChild).toHaveClass("justify-start");
   });
 
+  it("fills the full row width instead of capping to a fraction", () => {
+    const { container } = render(
+      <AssistantMessageBubble message={{ id: "1", role: "assistant", content: "hi there" }} />
+    );
+    const bubble = container.querySelector(".markdown-body")?.parentElement;
+    expect(bubble).toHaveClass("flex-1");
+    expect(bubble).not.toHaveClass("max-w-[75%]");
+  });
+
   it("renders Markdown content as formatted HTML", () => {
     const { container } = render(
       <AssistantMessageBubble
