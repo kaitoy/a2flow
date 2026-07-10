@@ -226,7 +226,7 @@ export function Tooltip({
                     zIndex: 9999,
                     boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
                   }}
-                  className="glass-panel-overlay max-w-xs whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[13px] leading-5 text-on-surface"
+                  className="glass-panel-overlay max-w-xs whitespace-normal break-words rounded-lg px-2.5 py-1.5 text-[13px] leading-5 text-on-surface"
                 >
                   {label}
                 </animated.div>
