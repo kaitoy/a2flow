@@ -40,7 +40,7 @@ export const customChoicePicker = createComponentImplementation(
             placeholder="Filter options..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="rounded-xl glass-panel px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-accent/50"
+            className="rounded-xl glass-panel px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
         )}
         <div className={isChips ? "flex flex-row flex-wrap gap-2" : "flex flex-col gap-2"}>
