@@ -33,7 +33,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         >
           <div
             className={[
-              "flex h-16 items-center border-b border-glass-border px-3",
+              "flex h-16 items-center px-3",
               collapsed ? "justify-center" : "justify-end",
             ].join(" ")}
           >
