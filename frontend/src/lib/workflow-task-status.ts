@@ -19,7 +19,7 @@ export const WORKFLOW_TASK_STATUSES: WorkflowTaskStatus[] = [
 export const STATUS_DOT_CLASS: Record<WorkflowTaskStatus, string> = {
   pending: "bg-on-surface-variant",
   in_progress: "bg-accent",
-  completed: "bg-green-500/80",
+  completed: "bg-success/80",
   failed: "bg-error",
   skipped: "bg-on-surface-variant/50",
 };
@@ -32,7 +32,7 @@ export const STATUS_DOT_CLASS: Record<WorkflowTaskStatus, string> = {
 export const STATUS_RAIL_CLASS: Record<WorkflowTaskStatus, string> = {
   pending: "border-on-surface-variant",
   in_progress: "border-accent",
-  completed: "border-green-500/80",
+  completed: "border-success/80",
   failed: "border-error",
   skipped: "border-on-surface-variant/50",
 };

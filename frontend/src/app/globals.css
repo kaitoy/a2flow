@@ -581,6 +581,13 @@ body::after {
   box-shadow: var(--shadow-glass-lg);
 }
 
+/* Edge-to-edge chrome (app header, sidebars): flat glass fill + blur, no
+   border/shadow of its own — call sites add their own edge border. */
+@utility glass-chrome {
+  @apply backdrop-blur-xl backdrop-saturate-[1.5];
+  background-color: var(--color-glass);
+}
+
 @utility text-gradient-accent {
   background: linear-gradient(135deg, var(--color-accent), var(--color-secondary));
   -webkit-background-clip: text;
@@ -598,6 +605,7 @@ body::after {
 }
 
 @utility text-badge {
+  font-family: var(--font-mono);
   font-size: 11px;
   line-height: 12px;
   font-weight: 700;

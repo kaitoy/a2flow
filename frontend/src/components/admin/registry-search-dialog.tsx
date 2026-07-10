@@ -141,7 +141,7 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
               >
                 <h2
                   id="registry-search-title"
-                  className="mb-1 text-lg font-semibold text-on-surface"
+                  className="mb-1 font-display text-lg font-semibold tracking-tight text-on-surface"
                 >
                   Browse MCP Registry
                 </h2>
@@ -182,7 +182,7 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                           <div className="min-w-0">
                             <p className="truncate font-medium text-on-surface">
                               {server.title || server.name}
-                              <span className="ml-2 text-xs text-on-surface-variant">
+                              <span className="ml-2 font-mono text-xs text-on-surface-variant">
                                 v{server.version}
                               </span>
                             </p>
@@ -191,7 +191,7 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                                 {server.description}
                               </p>
                             )}
-                            <p className="mt-0.5 truncate text-xs text-on-surface-variant">
+                            <p className="mt-0.5 truncate font-mono text-xs text-on-surface-variant">
                               {server.url}
                             </p>
                           </div>

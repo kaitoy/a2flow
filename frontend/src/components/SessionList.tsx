@@ -98,7 +98,7 @@ export function SessionList({
   }
 
   return (
-    <aside className="relative flex h-full w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl">
+    <aside className="relative flex h-full w-64 shrink-0 flex-col border-r border-glass-border glass-chrome">
       <div className="shrink-0 px-3 py-4 border-b border-glass-border">
         <Button
           variant="primary"

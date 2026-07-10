@@ -54,10 +54,10 @@ function StatusDot({ status }: { status: WorkflowTaskStatus }) {
   );
 }
 
-/** Pill showing a single related item (dependency or bound tool) by label. */
+/** Pill showing a single related item (dependency or bound tool) by label, in the mono data face. */
 function Chip({ label }: { label: string }) {
   return (
-    <span className="inline-block rounded-full glass-panel px-2 py-0.5 text-xs text-on-surface-variant">
+    <span className="inline-block rounded-full glass-panel px-2 py-0.5 font-mono text-xs text-on-surface-variant">
       {label}
     </span>
   );
@@ -73,7 +73,7 @@ function buildColumns(
   return [
     {
       header: "#",
-      className: "w-12 text-on-surface-variant",
+      className: "w-12 font-mono text-on-surface-variant",
       sortField: "position",
       cell: (t) => t.position ?? 0,
     },

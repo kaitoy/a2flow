@@ -142,7 +142,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
         <AppHeader>
           <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />
           <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-accent shadow-glow animate-pulse" />
-          <span className="truncate text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">
+          <span className="font-display truncate text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">
             {ws.workflowName}
           </span>
         </AppHeader>

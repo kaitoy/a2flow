@@ -36,12 +36,14 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
     header: "Repo URL",
     sortField: "repoUrl",
     filterField: "repoUrl",
+    className: "font-mono",
     cell: (s) => s.repoUrl,
   },
   {
     header: "Repo Path",
     sortField: "repoPath",
     filterField: "repoPath",
+    className: "font-mono",
     cell: (s) => s.repoPath || "—",
   },
   {

@@ -6,7 +6,7 @@ import { formatStatusLabel, STATUS_RAIL_CLASS } from "@/lib/workflow-task-status
 
 /** Expanded panel's outer `aside` class, shared with {@link WorkflowSessionSkeleton} so its loading chrome can't drift from the real sidebar. */
 export const TASK_TIMELINE_ASIDE_CLASS =
-  "flex w-64 shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl";
+  "flex w-64 shrink-0 flex-col border-r border-glass-border glass-chrome";
 
 /** Expanded panel's header row class, shared with {@link WorkflowSessionSkeleton}. */
 export const TASK_TIMELINE_HEADER_CLASS = "flex items-center justify-between px-4 py-3";
@@ -58,7 +58,7 @@ export function WorkflowTaskTimeline({
 }: WorkflowTaskTimelineProps) {
   if (collapsed) {
     return (
-      <div className="flex w-12 shrink-0 flex-col items-center border-r border-glass-border bg-glass py-3 backdrop-blur-xl">
+      <div className="flex w-12 shrink-0 flex-col items-center border-r border-glass-border glass-chrome py-3">
         <button
           type="button"
           onClick={onToggle}
@@ -75,9 +75,7 @@ export function WorkflowTaskTimeline({
   return (
     <aside className={TASK_TIMELINE_ASIDE_CLASS}>
       <div className={TASK_TIMELINE_HEADER_CLASS}>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-          Tasks
-        </h2>
+        <h2 className="text-label-caps">Tasks</h2>
         <button
           type="button"
           onClick={onToggle}

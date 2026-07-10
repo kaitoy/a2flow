@@ -40,25 +40,28 @@ export interface DateTimeProps {
   value: string;
   /** Side of the trigger the tooltip should appear on. Defaults to `top`. */
   placement?: TooltipPlacement;
-  /** Extra classes applied to the rendered `<time>` element. */
+  /** Extra classes merged after the built-in `font-mono` on the `<time>` element. */
   className?: string;
 }
 
 /**
  * Render a timestamp showing the date down to the minute, with a hover/focus
  * tooltip revealing the full timestamp including seconds and time zone. Invalid
- * values render an em dash with no tooltip.
+ * values render an em dash with no tooltip. Timestamps are machine-formatted
+ * data, so they render in the mono data face (JetBrains Mono) per DESIGN.md;
+ * the size is inherited from the caller.
  */
 export function DateTime({ value, placement = "top", className }: DateTimeProps) {
+  const cls = ["font-mono", className].filter(Boolean).join(" ");
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return <span className={className}>—</span>;
+    return <span className={cls}>—</span>;
   }
   const display = date.toLocaleString(undefined, DISPLAY_FORMAT);
   const full = formatFullTimestamp(value);
   return (
     <Tooltip label={full} placement={placement}>
-      <time dateTime={date.toISOString()} className={className}>
+      <time dateTime={date.toISOString()} className={cls}>
         {display}
       </time>
     </Tooltip>

@@ -20,7 +20,7 @@ export function WorkflowTaskNode({ data }: NodeProps<WorkflowTaskFlowNode>) {
     <div className="glass-panel w-[220px] rounded-lg px-3 py-2 text-on-surface shadow-sm">
       <Handle type="target" position={Position.Left} className="!bg-on-surface-variant" />
       <div className="flex items-start gap-2">
-        <span className="mt-1 inline-block w-5 shrink-0 text-xs text-on-surface-variant tabular-nums">
+        <span className="mt-1 inline-block w-5 shrink-0 font-mono text-xs text-on-surface-variant">
           #{task.position ?? 0}
         </span>
         <span className="line-clamp-2 flex-1 font-medium text-sm leading-snug">{task.title}</span>

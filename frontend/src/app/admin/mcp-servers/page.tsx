@@ -45,6 +45,7 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
     header: "URL",
     sortField: "url",
     filterField: "url",
+    className: "font-mono",
     cell: (s) => s.url,
   },
   {

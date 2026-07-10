@@ -27,7 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex h-screen overflow-hidden">
         <nav
           className={[
-            "relative flex shrink-0 flex-col border-r border-glass-border bg-glass backdrop-blur-xl",
+            "relative flex shrink-0 flex-col border-r border-glass-border glass-chrome",
             collapsed ? "w-16" : "w-64",
           ].join(" ")}
         >

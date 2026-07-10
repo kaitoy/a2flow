@@ -139,7 +139,9 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
         <AvatarField user={user} onChange={(updated) => dispatch(setUser(updated))} />
 
         <div className="flex flex-col gap-1 border-t border-glass-border pt-6">
-          <h2 className="text-sm font-semibold text-on-surface">Generated avatar</h2>
+          <h2 className="font-display text-sm font-semibold tracking-tight text-on-surface">
+            Generated avatar
+          </h2>
           <p className="text-xs text-on-surface-variant">Used when no image is uploaded.</p>
         </div>
 
