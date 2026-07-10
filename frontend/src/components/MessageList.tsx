@@ -5,7 +5,12 @@ import type { Message } from "@ag-ui/core";
 import { animated, useSpring } from "@react-spring/web";
 import { Sparkles } from "lucide-react";
 import { Fragment, type ReactNode, type UIEvent, useEffect, useMemo, useRef } from "react";
-import { TOOL_CALL_ACTIVITY_TYPE, type ToolCallActivityContent } from "@/lib/agentActivity";
+import {
+  REASONING_ACTIVITY_TYPE,
+  type ReasoningActivityContent,
+  TOOL_CALL_ACTIVITY_TYPE,
+  type ToolCallActivityContent,
+} from "@/lib/agentActivity";
 import type { WorkflowTask } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 import { MessageBubble } from "./MessageBubble";
@@ -27,7 +32,8 @@ interface MessageRun {
 /**
  * Whether the agent is working but has nothing on screen yet — true when a run
  * is in progress, no text is streaming, and the latest message is not already a
- * running tool line (which shows its own spinner).
+ * running tool line (which shows its own spinner) or a live reasoning panel
+ * (which carries its own "thinking" affordance via the live edge).
  */
 function shouldShowWorkingIndicator(
   messages: Message[],
@@ -36,21 +42,33 @@ function shouldShowWorkingIndicator(
 ): boolean {
   if (!isRunning || isStreaming) return false;
   const last = messages[messages.length - 1];
-  if (
-    last?.role === "activity" &&
-    last.activityType === TOOL_CALL_ACTIVITY_TYPE &&
-    (last.content as unknown as ToolCallActivityContent).status === "running"
-  ) {
-    return false;
+  if (last?.role === "activity") {
+    if (
+      last.activityType === TOOL_CALL_ACTIVITY_TYPE &&
+      (last.content as unknown as ToolCallActivityContent).status === "running"
+    ) {
+      return false;
+    }
+    if (
+      last.activityType === REASONING_ACTIVITY_TYPE &&
+      (last.content as unknown as ReasoningActivityContent).text
+    ) {
+      return false;
+    }
   }
   return true;
 }
 
-/** Subtle "agent is thinking" pulse shown at the bottom of the list while a run is in flight. */
+/**
+ * Subtle "agent is thinking" pulse shown at the bottom of the list while a run
+ * is in flight and no other surface (streaming text, a running tool line, a
+ * live reasoning panel) is already covering that signal. Since it only ever
+ * renders while genuinely live, it carries the signature live edge unconditionally.
+ */
 function WorkingIndicator() {
   return (
     <div className="mb-3 flex justify-start animate-message-in" aria-live="polite">
-      <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs glass-panel text-on-surface-variant">
+      <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs glass-panel text-on-surface-variant live-edge">
         <span className="inline-block h-2 w-2 rounded-full bg-accent shadow-glow animate-pulse" />
         <span>Agent is thinking…</span>
       </div>
@@ -201,12 +219,17 @@ export function MessageList({
     return () => observer.disconnect();
   }, [runs, onVisibleTaskChange]);
 
-  /** Render a message bubble, marking the global last message as streaming. */
+  /**
+   * Render a message bubble, marking the global last message as streaming (or,
+   * absent a text stream, as still-thinking so a trailing reasoning panel gets
+   * the live edge).
+   */
   const renderBubble = (msg: Message): ReactNode => (
     <MessageBubble
       key={msg.id}
       message={msg}
       isStreaming={isStreaming && msg.id === lastMessageId}
+      isThinking={isRunning && !isStreaming && msg.id === lastMessageId}
       avatar={renderAvatar?.(msg)}
       onAction={onAction}
       onApprovalResolved={onApprovalResolved}

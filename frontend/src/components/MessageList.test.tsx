@@ -23,10 +23,12 @@ vi.mock("./MessageBubble", () => ({
   MessageBubble: ({
     message,
     isStreaming,
+    isThinking,
     avatar,
   }: {
     message: Message;
     isStreaming: boolean;
+    isThinking?: boolean;
     avatar?: ReactNode;
   }) => {
     // Mount-only (empty deps), mirroring how ApprovalControls fetches on mount —
@@ -36,7 +38,11 @@ vi.mock("./MessageBubble", () => ({
       mountSpy(message.id);
     }, []);
     return (
-      <div data-testid={`bubble-${message.id}`} data-streaming={String(isStreaming)}>
+      <div
+        data-testid={`bubble-${message.id}`}
+        data-streaming={String(isStreaming)}
+        data-thinking={String(isThinking)}
+      >
         {avatar}
       </div>
     );
@@ -117,10 +123,12 @@ describe("MessageList", () => {
     expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 
-  it("shows the working indicator while running and not streaming", () => {
+  it("shows the working indicator with the live edge while running and not streaming", () => {
     const messages: Message[] = [{ id: "m1", role: "user", content: "hi" }];
-    render(<MessageList messages={messages} isRunning={true} />);
+    const { container } = render(<MessageList messages={messages} isRunning={true} />);
     expect(screen.getByText("Agent is thinking…")).toBeInTheDocument();
+    expect(screen.getByText("Agent is thinking…").closest(".live-edge")).not.toBeNull();
+    expect(container.querySelectorAll(".live-edge")).toHaveLength(1);
   });
 
   it("hides the working indicator while streaming text", () => {
@@ -140,6 +148,49 @@ describe("MessageList", () => {
     ];
     render(<MessageList messages={messages} isRunning={true} />);
     expect(screen.queryByText("Agent is thinking…")).not.toBeInTheDocument();
+  });
+
+  it("hides the working indicator when the last message is a live reasoning panel", () => {
+    const messages: Message[] = [
+      {
+        id: "r-1",
+        role: "activity",
+        activityType: "reasoning",
+        content: { text: "Planning the steps." },
+      } as Message,
+    ];
+    render(<MessageList messages={messages} isRunning={true} />);
+    expect(screen.queryByText("Agent is thinking…")).not.toBeInTheDocument();
+  });
+
+  it("only the last message receives isThinking=true while running and not streaming", () => {
+    const messages: Message[] = [
+      { id: "m1", role: "user", content: "hi" },
+      {
+        id: "r-1",
+        role: "activity",
+        activityType: "reasoning",
+        content: { text: "Planning the steps." },
+      } as Message,
+    ];
+    render(<MessageList messages={messages} isRunning={true} />);
+    expect(screen.getByTestId("bubble-m1")).toHaveAttribute("data-thinking", "false");
+    expect(screen.getByTestId("bubble-r-1")).toHaveAttribute("data-thinking", "true");
+  });
+
+  it("does not mark the last message as thinking once text is streaming", () => {
+    const messages: Message[] = [
+      {
+        id: "r-1",
+        role: "activity",
+        activityType: "reasoning",
+        content: { text: "Planning the steps." },
+      } as Message,
+      { id: "m2", role: "assistant", content: "" },
+    ];
+    render(<MessageList messages={messages} isRunning={true} isStreaming={true} />);
+    expect(screen.getByTestId("bubble-r-1")).toHaveAttribute("data-thinking", "false");
+    expect(screen.getByTestId("bubble-m2")).toHaveAttribute("data-thinking", "false");
   });
 
   it("wraps each task's messages in a group where the active task changes", () => {

@@ -26,16 +26,19 @@ type Decision = "approved" | "rejected";
  *
  * `avatar` is used by the A2UI branch (the user who resolved the surface's
  * pending action) and the approval branch (the user who decided the approval);
- * other branches ignore it.
+ * other branches ignore it. `isThinking` is used only by the reasoning branch,
+ * to drive its live edge while the agent is still actively reasoning.
  */
 export function ActivityMessageBubble({
   message,
   avatar,
+  isThinking,
   onAction,
   onApprovalResolved,
 }: {
   message: ActivityMessage;
   avatar?: ReactNode;
+  isThinking?: boolean;
   onAction?: (action: A2UIUserAction) => void;
   onApprovalResolved?: (toolCallId: string, decision: Decision) => void;
 }) {
@@ -43,7 +46,12 @@ export function ActivityMessageBubble({
     return <ToolActivityBubble content={message.content as unknown as ToolCallActivityContent} />;
   }
   if (message.activityType === REASONING_ACTIVITY_TYPE) {
-    return <ReasoningBubble content={message.content as unknown as ReasoningActivityContent} />;
+    return (
+      <ReasoningBubble
+        content={message.content as unknown as ReasoningActivityContent}
+        isThinking={isThinking}
+      />
+    );
   }
   if (message.activityType === A2UIActivityType) {
     // The middleware also emits lifecycle snapshots (e.g. { status: "building" })

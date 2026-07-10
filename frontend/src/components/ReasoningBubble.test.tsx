@@ -13,4 +13,18 @@ describe("ReasoningBubble", () => {
     const { container } = render(<ReasoningBubble content={{ text: "" }} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("carries the live edge while still thinking", () => {
+    const { container } = render(
+      <ReasoningBubble content={{ text: "Planning the steps." }} isThinking={true} />
+    );
+    expect(container.querySelector(".live-edge")).toBeInTheDocument();
+  });
+
+  it("has no live edge once thinking has stopped", () => {
+    const { container } = render(
+      <ReasoningBubble content={{ text: "Planning the steps." }} isThinking={false} />
+    );
+    expect(container.querySelector(".live-edge")).not.toBeInTheDocument();
+  });
 });

@@ -164,6 +164,21 @@ describe("ActivityMessageBubble", () => {
     expect(screen.getByText("Let me think about this.")).toBeInTheDocument();
   });
 
+  it("forwards isThinking to the reasoning bubble's live edge", () => {
+    const { container } = render(
+      <ActivityMessageBubble
+        message={{
+          id: "r-1",
+          role: "activity",
+          activityType: REASONING_ACTIVITY_TYPE,
+          content: { text: "Let me think about this." },
+        }}
+        isThinking={true}
+      />
+    );
+    expect(container.querySelector(".live-edge")).toBeInTheDocument();
+  });
+
   it("renders null for an approval activity missing approvalId", () => {
     const { container } = render(
       <ActivityMessageBubble
