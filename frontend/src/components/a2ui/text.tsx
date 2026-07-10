@@ -42,7 +42,7 @@ export const customText = createComponentImplementation(TextApi, ({ props }) => 
   }
   return (
     <div
-      className={`${cls} prose prose-sm max-w-none`}
+      className={`${cls} markdown-body`}
       {...(html ? { dangerouslySetInnerHTML: { __html: html } } : {})}
     >
       {html ? undefined : text}

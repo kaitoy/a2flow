@@ -11,6 +11,18 @@ describe("AssistantMessageBubble", () => {
     expect(container.firstChild).toHaveClass("justify-start");
   });
 
+  it("renders Markdown content as formatted HTML", () => {
+    const { container } = render(
+      <AssistantMessageBubble
+        message={{ id: "1", role: "assistant", content: "**bold** and a\n\n## Heading" }}
+      />
+    );
+    const strong = container.querySelector("strong");
+    expect(strong).toHaveTextContent("bold");
+    const heading = container.querySelector("h2");
+    expect(heading).toHaveTextContent("Heading");
+  });
+
   it("renders null for empty content when not streaming", () => {
     const { container } = render(
       <AssistantMessageBubble

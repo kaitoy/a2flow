@@ -14,6 +14,12 @@ const markdownRenderer = (text: string) => Promise.resolve(marked(text) as strin
  * Process a raw A2UI payload and render the resulting surfaces using the tailwind catalog.
  * Surfaces are re-processed from scratch whenever the payload reference changes.
  * Nullish payloads (e.g. middleware lifecycle snapshots without operations) render nothing.
+ *
+ * The payload is deep-cloned before processing: it comes out of the Redux
+ * store, which freezes state objects, while `MessageProcessor` adopts the
+ * payload's data model by reference and mutates it when the user edits input
+ * components (TextField, ChoicePicker). Without the clone every edit throws
+ * "Cannot assign to read only property" and the surface never captures input.
  */
 export function A2uiRenderer({
   payload,
@@ -45,7 +51,9 @@ export function A2uiRenderer({
       setSurfaces((prev) => [...prev, surface]);
     });
 
-    processor.processMessages(payload as Parameters<typeof processor.processMessages>[0]);
+    processor.processMessages(
+      structuredClone(payload) as Parameters<typeof processor.processMessages>[0]
+    );
     sub.unsubscribe();
 
     return () => {

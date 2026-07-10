@@ -211,7 +211,8 @@ The shape language is **Soft Modern**.
 - **Status Badges:** Pill-shaped, gradient or glass per state.
 - **Chat bubbles:**
   - *User:* Accent gradient fill, asymmetric corner (`rounded-tr-md`), inner-top highlight.
-  - *Assistant:* `glass-panel`, asymmetric corner (`rounded-tl-md`), accent-colored streaming caret. While streaming, the bubble carries the signature **live edge** (see Motion → Patterns).
+  - *Assistant:* `glass-panel`, asymmetric corner (`rounded-tl-md`), accent-colored streaming caret. Content is rendered as **Markdown** (see Markdown content below). While streaming, the bubble carries the signature **live edge** (see Motion → Patterns).
+- **Markdown content:** Agent-generated Markdown (assistant chat bubbles and the A2UI `Text` component) is rendered to HTML by `marked` and styled by the `markdown-body` utility (globals.css) — the single source of truth restoring what Tailwind preflight strips: heading scale (display face for h1/h2, tight tracking), list bullets, mono `code`/`pre` blocks on a `surface-container-high` tint with `overflow-x` scrolling, accent-colored links, `divider` rules, and outline-bordered tables, all sized to the 14px body scale.
 - **A2UI surfaces:** `customCard` is rendered as `glass-panel-strong`. `customChoicePicker` chips use the same primary-gradient when selected and `glass-panel` when not, and scale up slightly (~1.03) on hover (motion-safe).
 - **Theme Toggle:** A 36×36 round glass button in the chat header / admin sidebar bottom. Sun/Moon SVG icons; scales up slightly (~1.05) and emits accent glow on hover. Icons cross-fade with a 90° rotation on toggle.
 - **EmptyState:** Centered placeholder for empty regions (no messages, no rows, no sessions). Pairs an `AnimatedIcon` inside a frosted-glass tile with an optional title and description. Has a `compact` variant for tight containers (session sidebar, table empty cell). See `@/components/ui/empty-state.tsx`.

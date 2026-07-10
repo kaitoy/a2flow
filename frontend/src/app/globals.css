@@ -611,6 +611,148 @@ body::after {
   font-weight: 700;
 }
 
+/* Typography for agent-generated Markdown (assistant chat bubbles and A2UI
+   Text components). Tailwind's preflight strips heading sizes, list bullets,
+   and paragraph margins, so rendered Markdown HTML needs them restored here —
+   sized to match the DESIGN.md type scale (display face for h1/h2, body face
+   at 14px, mono for code). Single source of truth: both Markdown surfaces use
+   this class instead of hand-rolled element styles. A plain `@layer
+   components` class, not an `@utility`: Tailwind v4 silently drops any
+   `@utility` containing descendant element selectors (`& p`, `& h1`, ...),
+   the same way it drops raw `backdrop-filter` declarations. */
+@layer components {
+  .markdown-body {
+    & > :first-child {
+      margin-top: 0;
+    }
+
+    & > :last-child {
+      margin-bottom: 0;
+    }
+
+    & p {
+      margin: 0.5em 0;
+    }
+
+    & h1 {
+      font-family: var(--font-display);
+      font-size: 30px;
+      line-height: 38px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      margin: 0.75em 0 0.35em;
+    }
+
+    & h2 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      line-height: 28px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      margin: 0.75em 0 0.35em;
+    }
+
+    & h3 {
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin: 0.75em 0 0.35em;
+    }
+
+    & h4,
+    & h5,
+    & h6 {
+      font-size: 13px;
+      line-height: 20px;
+      font-weight: 600;
+      margin: 0.75em 0 0.35em;
+    }
+
+    & ul,
+    & ol {
+      margin: 0.5em 0;
+      padding-left: 1.4em;
+    }
+
+    & ul {
+      list-style: disc;
+    }
+
+    & ol {
+      list-style: decimal;
+    }
+
+    & li {
+      margin: 0.2em 0;
+    }
+
+    & code {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      background-color: var(--color-surface-container-high);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: 4px;
+      padding: 0.1em 0.35em;
+    }
+
+    & pre {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      background-color: var(--color-surface-container-high);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: 8px;
+      padding: 0.75em 1em;
+      margin: 0.5em 0;
+      overflow-x: auto;
+    }
+
+    & pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    & a {
+      color: var(--color-accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    & blockquote {
+      border-left: 3px solid var(--color-outline);
+      color: var(--color-on-surface-variant);
+      margin: 0.5em 0;
+      padding-left: 0.9em;
+    }
+
+    & table {
+      border-collapse: collapse;
+      margin: 0.5em 0;
+      display: block;
+      overflow-x: auto;
+    }
+
+    & th,
+    & td {
+      border: 1px solid var(--color-outline-variant);
+      padding: 0.3em 0.7em;
+      text-align: left;
+    }
+
+    & th {
+      font-weight: 600;
+    }
+
+    & hr {
+      border: none;
+      border-top: 1px solid var(--color-divider);
+      margin: 0.75em 0;
+    }
+  }
+}
+
 /* Shimmering placeholder surface for skeleton loading states. A tinted base
    block (--skeleton-base) gives the placeholder visible body against the glass
    panel in both themes, while a brighter band (--skeleton-sheen) sweeps across

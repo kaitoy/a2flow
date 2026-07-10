@@ -167,6 +167,14 @@ WORKFLOW_AGENT_INSTRUCTION = (
 
 
 class A2UIInstructionProvider:
+    """Instruction provider that appends the shared A2UI usage rules.
+
+    Wraps a base role instruction and composes the final agent instruction as
+    ``# Role`` + the A2UI rules (input requests go through ``render_a2ui``
+    input components; informational messages stay as streamed plain text) +
+    any context entries stored in session state.
+    """
+
     def __init__(self, base_instruction: str) -> None:
         self._base = base_instruction
 
@@ -174,11 +182,18 @@ class A2UIInstructionProvider:
         context_entries = ctx.state.get(CONTEXT_STATE_KEY, [])
         a2ui_rules = (
             "# A2UI Rules\n"
-            "When creating responses or requesting input from the user, use A2UI as appropriate.\n\n"
-            "IMPORTANT: When your response contains Markdown (headings, lists, code blocks, bold, italic, etc.), "
-            "you MUST render it via A2UI using Text components. Plain text messages do not render Markdown "
-            "formatting, so users will see raw symbols (e.g. **bold**, ## Heading) instead of formatted text. "
-            "Always use render_a2ui with Text components (with appropriate variant) to deliver any Markdown content."
+            "A2UI (`render_a2ui`) is for collecting input from the user, not for prose.\n\n"
+            "When you need input from the user (a question, a choice between options, "
+            "parameters, a confirmation), ALWAYS call `render_a2ui` and present input "
+            "components so the user can see exactly what to provide:\n"
+            "- `TextField` for free-form values (use the `longText` variant for multi-line input),\n"
+            "- `ChoicePicker` for selecting among known options (`mutuallyExclusive` for a single choice),\n"
+            "- a `Button` that submits the action,\n"
+            "- short `Text` components inside the surface for labels and context only.\n\n"
+            "When you are only conveying information (status updates, explanations, results, "
+            "summaries), reply with plain streamed text and do NOT call `render_a2ui`. Plain "
+            "messages render Markdown, and text streams token-by-token so the user sees your "
+            "output immediately instead of waiting for a tool call to finish."
         )
         parts = [f"# Role\n{self._base}", a2ui_rules]
         if context_entries:
