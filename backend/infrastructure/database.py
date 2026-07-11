@@ -13,7 +13,6 @@ from typing import Any
 
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
@@ -85,12 +84,6 @@ def _set_sqlite_pragmas(dbapi_conn: Any, _: object) -> None:
 
 if engine.dialect.name == "sqlite":
     sa_event.listen(engine.sync_engine, "connect", _set_sqlite_pragmas)
-
-
-async def init_db() -> None:
-    """Create all SQLModel-defined tables if they do not already exist."""
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

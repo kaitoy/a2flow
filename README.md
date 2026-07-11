@@ -92,7 +92,7 @@ All persistent data — REST API records and ADK session storage — lives in on
 | SQLite (default) | `sqlite:///a2flow.db` | Zero-config local file |
 | PostgreSQL | `postgresql://user:password@host:5432/a2flow` | Used by the Docker Compose stack |
 
-The async driver suffix (`aiosqlite` / `asyncpg`) is added automatically. Tables are created on startup; no migration step is needed.
+The async driver suffix (`aiosqlite` / `asyncpg`) is added automatically. Schema changes are tracked as versioned [Alembic](https://alembic.sqlalchemy.org/) migrations (`backend/alembic/versions/`) and applied automatically on startup — redeploying the app (a container restart) is what runs any pending migrations, so no separate migration step is needed.
 
 ## Authentication
 

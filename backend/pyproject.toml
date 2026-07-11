@@ -23,6 +23,7 @@ dependencies = [
     "httpx>=0.27.0",
     "cryptography>=42.0.0",
     "python-multipart>=0.0.26",
+    "alembic>=1.13.0",
 ]
 
 [project.scripts]
@@ -58,3 +59,8 @@ indent-style = "space"
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+# Alembic autogenerates these; they aren't hand-typed application code, and
+# they have no __init__.py (adding one would risk shadowing the real
+# installed `alembic` package once backend/ is on sys.path), so a dotted
+# [[tool.mypy.overrides]] module pattern can't target them — exclude by path.
+exclude = ["^alembic/versions/"]

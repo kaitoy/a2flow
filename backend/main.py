@@ -16,8 +16,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import get_settings
 from dependencies import APP_NAME
 from infrastructure.bootstrap import seed_admin_user, seed_system_user
-from infrastructure.database import engine, init_db
+from infrastructure.database import engine
 from infrastructure.logging_context import setup_logging
+from infrastructure.migrations import run_migrations
 from middleware.envelope import RequestContextMiddleware
 from repositories.exceptions import (
     AvatarValidationError,
@@ -71,8 +72,8 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Initialize the schema and seed the system and admin users on startup."""
-    await init_db()
+    """Apply pending migrations and seed the system and admin users on startup."""
+    await run_migrations()
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
         await seed_admin_user(session)
