@@ -98,7 +98,7 @@ Database URL for REST API data and ADK session storage — both live in the same
 
 | Table | Description |
 |---|---|
-| `users` | Application users (soft-deleted via `deleted_at`); see [Admin user](#admin-user) |
+| `users` | Application users (soft-deleted via `deleted_at`; `roles` holds their granted roles); see [Admin user](#admin-user) and [Authorization](#authorization-roles) |
 | `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](#authentication) |
 | `agent_skills` | Agent skill definitions (incl. optional `repo_auth_secret` / `repo_auth_username` for private-repo clones) |
 | `mcp_servers` | Registered remote MCP servers (name, streamable HTTP URL, request headers — values may embed `${secret:NAME}` placeholders) |
@@ -116,7 +116,7 @@ Database URL for REST API data and ADK session storage — both live in the same
 On startup the backend seeds two users:
 
 - A hidden **system user** that owns the bootstrap records (it cannot log in and is excluded from the user list).
-- An initial **`admin`** user, created only on the very first startup — that is, while the database has no real (non-system) user yet. Once any real user exists it is never re-created.
+- An initial **`admin`** user holding the **`super_admin`** role (see [Authorization](#authorization-roles)), created only on the very first startup — that is, while the database has no real (non-system) user yet. Once any real user exists it is never re-created.
 
 The `admin` user's password is read from the `ADMIN_PASSWORD` environment variable:
 
@@ -152,6 +152,17 @@ SESSION_COOKIE_SECURE=false
 ```
 
 The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `admin` user (see [Admin user](#admin-user)) on first run.
+
+### Authorization (roles)
+
+Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every check; the seeded `admin` user holds it. See the [Roles and authorization](../README.md#roles-and-authorization) section of the root README for the full matrix.
+
+Two enforcement points:
+
+- **Route dependency** — `require_roles(...)` (`dependencies/authz.py`) is attached per route (e.g. `dependencies=[Depends(require_roles(Role.developer))]`) on the create/update/delete handlers and on `POST /workflows/{id}/execute`. `GET` routes are not gated.
+- **Service layer** — ownership rules that a role cannot express: self-service user/avatar edits (`services/user.py`, `services/user_avatar.py`), the `super_admin` grant/revoke guard, the designated-approver check (`services/approval.py`), and the workflow-session access policy (`services/workflow_session_access.py`: owner, a designated approver of the session, or a super admin; deletion is owner-only).
+
+Both raise `ForbiddenError` → HTTP 403 `FORBIDDEN`.
 
 ### CORS
 

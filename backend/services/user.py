@@ -2,16 +2,24 @@
 
 Wraps the :class:`UserRepository` with the business rules the routers need:
 hashing passwords before persistence (so the repository only ever stores a
-bcrypt hash) and raising :class:`NotFoundError` when a user is missing.
+bcrypt hash), raising :class:`NotFoundError` when a user is missing, and
+authorizing writes — admins may edit anyone, a non-admin may only edit their
+own ``avatar_config`` (the self-service account page), and only a super admin
+may grant or revoke the ``super_admin`` role.
 """
 
 from collections.abc import Sequence
 
 from infrastructure.password import hash_password
-from models.user import User, UserCreate, UserUpdate
+from models.user import Role, User, UserCreate, UserUpdate, has_role
 from repositories import UserRepository
-from repositories.exceptions import NotFoundError
+from repositories.exceptions import ForbiddenError, NotFoundError
 from repositories.query import FilterSpec, SortSpec
+
+#: Fields a non-admin user may update on their own record via ``PATCH``.
+#: Matches what the self-service ``/account`` page sends (avatar customization
+#: only); everything else requires the ``admin`` role.
+_SELF_SERVICE_FIELDS = frozenset({"avatar_config"})
 
 
 class UserService:
@@ -65,21 +73,42 @@ class UserService:
             limit=limit, offset=offset, sort=sort, filters=filters
         )
 
-    async def create(self, data: UserCreate, *, user_id: str) -> User:
+    async def create(self, data: UserCreate, *, acting_user: User) -> User:
         """Create a new User, hashing the supplied password before persistence.
+
+        The route itself is gated behind the ``admin`` role; this method adds
+        the escalation guard: only a super admin may create a user that holds
+        the ``super_admin`` role.
 
         Args:
             data: Fields for the new user (with a plaintext password).
-            user_id: ID of the user creating the record.
+            acting_user: The authenticated user creating the record.
 
         Returns:
             The created User.
-        """
-        hashed = data.model_copy(update={"password": hash_password(data.password)})
-        return await self._repo.create(hashed, user_id=user_id)
 
-    async def update(self, target_id: str, data: UserUpdate, *, user_id: str) -> User:
-        """Apply a partial update to a User.
+        Raises:
+            ForbiddenError: If the new user would hold ``super_admin`` and the
+                acting user is not a super admin.
+        """
+        if Role.super_admin in data.roles and not has_role(
+            acting_user, Role.super_admin
+        ):
+            raise ForbiddenError("Only a super admin can grant the super_admin role")
+        hashed = data.model_copy(update={"password": hash_password(data.password)})
+        return await self._repo.create(hashed, user_id=acting_user.id)
+
+    async def update(
+        self, target_id: str, data: UserUpdate, *, acting_user: User
+    ) -> User:
+        """Apply a partial update to a User, authorizing the acting user.
+
+        An ``admin`` (or ``super_admin``) may update any user and any field,
+        except that granting or revoking the ``super_admin`` role requires the
+        acting user to be a super admin. Any other caller may update only
+        their own record, and only its self-service fields
+        (:data:`_SELF_SERVICE_FIELDS` — the avatar customization edited from
+        the ``/account`` page).
 
         A blank or omitted password leaves the stored password unchanged; a
         non-empty password is hashed before persistence.
@@ -87,21 +116,39 @@ class UserService:
         Args:
             target_id: Identifier of the user to update.
             data: Fields to update (password optional).
-            user_id: ID of the user performing the update.
+            acting_user: The authenticated user performing the update.
 
         Returns:
             The updated User.
 
         Raises:
             NotFoundError: If no user exists with the given ID.
+            ForbiddenError: If the acting user is not allowed to apply this
+                update (non-admin editing another user or a non-self-service
+                field, or a non-super-admin changing ``super_admin``).
         """
+        target = await self.get(target_id)
         update = data.model_dump(exclude_unset=True)
+        if has_role(acting_user, Role.admin):
+            if data.roles is not None and not has_role(acting_user, Role.super_admin):
+                had_super = Role.super_admin in (target.roles or [])
+                gets_super = Role.super_admin in data.roles
+                if had_super != gets_super:
+                    raise ForbiddenError(
+                        "Only a super admin can grant or revoke the super_admin role"
+                    )
+        elif target_id != acting_user.id or not set(update) <= _SELF_SERVICE_FIELDS:
+            raise ForbiddenError(
+                "Only admins can update other users or non-self-service fields"
+            )
         password = update.get("password")
         if password:
             update["password"] = hash_password(password)
         else:
             update.pop("password", None)
-        return await self._repo.update(target_id, UserUpdate(**update), user_id=user_id)
+        return await self._repo.update(
+            target_id, UserUpdate(**update), user_id=acting_user.id
+        )
 
     async def delete(self, user_id: str) -> None:
         """Delete a User.

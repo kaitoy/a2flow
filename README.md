@@ -104,6 +104,26 @@ The app requires sign-in. Visiting any page while logged out redirects to `/logi
 
 See [backend/README.md](backend/README.md#authentication) for the endpoint and cookie details.
 
+## Roles and authorization
+
+Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy, and a user may hold any combination of them — with one exception: **Super Admin bypasses every check**. A user with **no roles at all** is valid: they can still use the regular chat and manage their own [account](#users) (avatar), but nothing else.
+
+| Role | Grants |
+|---|---|
+| `super_admin` | Everything (bypasses every role and ownership check) |
+| `admin` | User CRUD, secrets CRUD |
+| `developer` | MCP server CRUD, workflow CRUD, agent-skill CRUD |
+| `requester` | Running workflows (`POST /workflows/{id}/execute`) |
+| `approver` | Eligibility to be a workflow approval's designated approver, and resolving their own approvals |
+
+**Reads stay open.** Only writes, workflow execution, and approvals are role-gated; every authenticated user may `GET` the collections (the UI needs them to resolve names, pick approvers, and list workflows). Secret *values* are never returned by the API regardless of role. Roles are assigned from the [Users](#users) admin page; only a Super Admin may grant or revoke `super_admin`. A rejected request returns HTTP 403 (`FORBIDDEN`), and the admin UI hides the actions and nav entries a user's roles do not allow.
+
+The initial seeded **`admin`** user holds `super_admin`. Upgrading an existing deployment grants `super_admin` to that user automatically (Alembic data migration); every other existing user starts with no roles.
+
+**Workflow session access.** Beyond roles, each operation on a workflow session — reading it, loading its chat history, listing or editing its tasks, and driving its agent — requires the caller to be the session's **owner** (the user who ran the workflow) or a **designated approver of one of its approvals** (see [Human approval](#human-approval)); unrelated users get HTTP 403. This preserves the approver-sharing design (the approver joins the owner's chat) while keeping third parties out. **Deleting** a session is stricter still: owner (or Super Admin) only.
+
+⚠️ Approver eligibility is validated when the approval is created: the agent's `list_users` tool only offers users holding `approver`, and `request_approval` rejects anyone else. Revoking the `approver` role later does **not** invalidate approvals already addressed to that user — they can still resolve them, so an in-flight workflow never gets stuck.
+
 ## Admin UI
 
 The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admin).
@@ -124,7 +144,9 @@ Navigate to [http://localhost:3000/admin/users](http://localhost:3000/admin/user
 | Create a new user | `GET /admin/users/new` |
 | Edit / delete a user | `GET /admin/users/{id}` |
 
-Each user record stores a username (unique), first name, last name, email, an `enabled` flag, and an `emailVerified` flag. Passwords are hashed with [bcrypt](https://pypi.org/project/bcrypt/) before persistence and are never returned by the API. On edit, leaving the password field blank keeps the existing password. Users are persisted in `a2flow.db`.
+Each user record stores a username (unique), first name, last name, email, an `enabled` flag, an `emailVerified` flag, and the user's [roles](#roles-and-authorization). Passwords are hashed with [bcrypt](https://pypi.org/project/bcrypt/) before persistence and are never returned by the API. On edit, leaving the password field blank keeps the existing password. Users are persisted in `a2flow.db`.
+
+**Roles.** The create and edit forms include a roles picker (one checkbox per role); the list shows each user's roles in a **Roles** column. Roles are stored as a JSON list, so they cannot be sorted or filtered server-side via the list API's `s` / `q` parameters. The **Super Admin** checkbox is disabled unless the signed-in user is a Super Admin — the backend rejects granting or revoking it otherwise.
 
 **Avatars.** Every user has an avatar shown on the toolbar account button and in the admin user list and editor. By default it is a deterministic illustration generated client-side from the username with [Humation](https://github.com/humation-labs/humation) — no image is stored and no network call is made. A signed-in user manages their own avatar from the self-service account page (toolbar account menu → **Account**, at `/account`): **upload** a custom image (PNG, JPEG, WebP, or GIF, up to 2 MB) or remove it, and **customize** the generated avatar by picking a part per group, overriding colors, and choosing a background. The customization is stored as `UserRead.avatarConfig` (part `selections`, `colors`, and `background`) and applied wherever the avatar renders; unspecified parts stay seeded from the username. Avatar editing is self-service only — the admin user editor shows the avatar read-only, with no upload or customization controls. An uploaded image is stored in a dedicated `user_avatars` table and served from `GET /api/v1/users/{id}/avatar`, with `UserRead.avatarUpdatedAt` acting as a presence marker and cache-busting key; uploading or removing it refreshes the signed-in user everywhere, so the toolbar account button updates immediately. Precedence is **uploaded image → customized Humation → username-seeded Humation**; removing the image or resetting the customization falls back to the next option.
 
@@ -248,14 +270,14 @@ Tasks form a **directed acyclic graph (DAG)** rather than a flat list: each task
 
 When a task needs the user's explicit go-ahead before the agent acts (for example a destructive or irreversible operation), the agent asks for an **approval** mid-execution:
 
-1. The agent calls the `request_approval` backend tool, which persists a `pending` **Approval** record for the current session (optionally linked to a `WorkflowTask`) addressed to a specific **`approver`** user — the agent looks one up with the `list_users` tool, and the approver is **required**. It raises an **approval-request notification** addressed to that approver, so only they are alerted.
+1. The agent calls the `request_approval` backend tool, which persists a `pending` **Approval** record for the current session (optionally linked to a `WorkflowTask`) addressed to a specific **`approver`** user — the agent looks one up with the `list_users` tool (which lists only users holding the [`approver` role](#roles-and-authorization)), and the approver is **required**. It raises an **approval-request notification** addressed to that approver, so only they are alerted.
 2. The agent explains the request in plain text and then calls **`render_approval`** — an AG-UI **frontend tool** (declared by the client via `RunAgentInput.tools`, distinct from A2UI). Like `render_a2ui`, the bridge exposes it as a long-running client tool: the run pauses and the frontend renders **Approve / Reject** controls, plus an optional **comment** field, in the chat. The controls are shown **only to the designated approver**; everyone else sees a read-only "waiting for the approver" message.
-3. Clicking a button writes the decision (and any comment) **directly** to the backend via `PATCH /api/v1/approvals/{id}` (recording the resolving user in the audit fields), then returns the decision as the tool result so the agent run resumes. Only the designated approver may resolve a request — a `PATCH` from any other user is rejected with HTTP 403 (`FORBIDDEN`).
+3. Clicking a button writes the decision (and any comment) **directly** to the backend via `PATCH /api/v1/approvals/{id}` (recording the resolving user in the audit fields), then returns the decision as the tool result so the agent run resumes. Only the designated approver (or a Super Admin) may resolve a request — a `PATCH` from any other user is rejected with HTTP 403 (`FORBIDDEN`).
 4. On `approved` the agent proceeds; on `rejected` it marks the task `failed` (or `skipped`). The agent can re-check a decision with the `get_approval` tool.
 
 Approvals are persisted in `a2flow.db` and cascade-delete with their `WorkflowSession` (the optional `WorkflowTask` link is set to `NULL` when that task is deleted). Browse them in the [Approvals](#approvals) admin view.
 
-A workflow session's underlying ADK chat session is keyed by the session's **owner** (the user who started it), not by whoever is currently viewing it. So when a designated approver — a different user — opens the workflow session chat, they share the **same** ADK session: they see the owner's full conversation and state, and approving resumes the original run rather than starting a fresh, empty session. Both the agent stream (`POST /workflow-sessions/{id}/agent`) and the history load (`GET /workflow-sessions/{id}/messages`) resolve the owner from the `WorkflowSession` record. (Regular, non-workflow chat sessions remain keyed per user.)
+A workflow session's underlying ADK chat session is keyed by the session's **owner** (the user who started it), not by whoever is currently viewing it. So when a designated approver — a different user — opens the workflow session chat, they share the **same** ADK session: they see the owner's full conversation and state, and approving resumes the original run rather than starting a fresh, empty session. Both the agent stream (`POST /workflow-sessions/{id}/agent`) and the history load (`GET /workflow-sessions/{id}/messages`) resolve the owner from the `WorkflowSession` record. (Regular, non-workflow chat sessions remain keyed per user.) Sharing is limited to those participants: any other user is rejected with HTTP 403 — see [Roles and authorization](#roles-and-authorization).
 
 Because that one chat is shared, several people (the **applicant**/owner, designated **approvers**, and the **agent**) post into it, so each message carries a **sender avatar** to show who sent it — the applicant's or approver's avatar beside their messages, and an agent badge (hover shows the workflow name) beside the agent's. Clicking a button inside a rendered A2UI surface is attributed the same way: it shows the acting user's avatar beside that surface once resolved. ADK records every human message under the author `user`, and A2UI action acknowledgements as tool-response (function-response) events, so the backend attributes both to their real sender: the agent run endpoint snapshots the session's existing `user` events and tool-response `tool_call_id`s, then records the current user as the sender of any new ones once the run completes, and `GET /workflow-sessions/{id}/messages` returns each message's `senderUserId`. Tool-response messages are keyed by `tool_call_id` rather than their own id, since the AG-UI/ADK bridge regenerates a fresh id for them on every read. Messages with no recorded sender (history sent before attribution existed) fall back to the owner. Hovering an avatar reveals the sender's name.
 

@@ -15,6 +15,7 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteUser, listUsers, type User } from "@/lib/api";
+import { ROLE_LABELS } from "@/lib/roles";
 
 const LIMIT = 20;
 
@@ -59,6 +60,12 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
     sortField: "email",
     filterField: "email",
     cell: (u) => u.email,
+  },
+  {
+    // Roles are stored as a JSON list, which the list API's sort/filter params
+    // cannot address, so this column is display-only.
+    header: "Roles",
+    cell: (u) => (u.roles?.length ? u.roles.map((r) => ROLE_LABELS[r]).join(", ") : "—"),
   },
   {
     header: "Enabled",

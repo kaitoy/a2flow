@@ -6,9 +6,10 @@ serialized to clients.
 """
 
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from pydantic import EmailStr, field_serializer, model_validator
+from pydantic import EmailStr, field_serializer, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import Column, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
@@ -18,6 +19,49 @@ from models.base import BaseEntity, JSONColumn, TZDateTime
 from models.constraints import Password, PersonName, Username
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
+
+
+class Role(StrEnum):
+    """Application roles grantable to a user.
+
+    Roles are independent grants (no inheritance): a user holds any subset of
+    them, and each role unlocks a specific group of operations. The single
+    exception is :attr:`super_admin`, which bypasses every authorization check.
+    """
+
+    #: All operations; bypasses every role and ownership check.
+    super_admin = "super_admin"
+    #: User CRUD and secrets CRUD.
+    admin = "admin"
+    #: MCP server CRUD, workflow CRUD, and agent-skill CRUD.
+    developer = "developer"
+    #: Workflow execution (``POST /workflows/{id}/execute``).
+    requester = "requester"
+    #: Eligibility as a designated approver of workflow approvals.
+    approver = "approver"
+
+
+def has_role(user: "User | UserRead", *allowed: Role) -> bool:
+    """Return whether ``user`` holds any of the ``allowed`` roles.
+
+    ``super_admin`` always passes, regardless of ``allowed`` — it bypasses
+    every authorization check. This helper is the single source of truth for
+    role checks, shared by the ``require_roles`` router dependency and the
+    service-layer ownership checks.
+
+    Args:
+        user: The user whose roles to inspect.
+        allowed: Roles that grant access. May be empty, in which case only a
+            ``super_admin`` passes.
+
+    Returns:
+        ``True`` if the user holds ``super_admin`` or any role in ``allowed``.
+    """
+    roles = set(user.roles or [])
+    if Role.super_admin in roles:
+        return True
+    return bool(roles & set(allowed))
+
 
 #: Maximum number of part selections or color overrides allowed in an avatar config.
 _MAX_AVATAR_ENTRIES = 50
@@ -113,9 +157,19 @@ class UserUpdate(SQLModel):
     email: EmailStr | None = None
     enabled: bool | None = None
     email_verified: bool | None = None
+    #: Roles to assign; ``None`` leaves the target's roles unchanged on update.
+    roles: list[Role] | None = None
     #: Customization for the generated avatar; ``None`` leaves it unchanged on
     #: update, and an explicit ``null`` from the client clears it.
     avatar_config: AvatarConfig | None = None
+
+    @field_validator("roles")
+    @classmethod
+    def _dedupe_roles(cls, roles: list[Role] | None) -> list[Role] | None:
+        """Drop duplicate roles while preserving their first-seen order."""
+        if roles is None:
+            return None
+        return list(dict.fromkeys(roles))
 
 
 class UserCreate(UserUpdate):
@@ -128,6 +182,8 @@ class UserCreate(UserUpdate):
     email: EmailStr
     enabled: bool = True
     email_verified: bool = False
+    #: Roles granted to the new user; defaults to no roles (chat-only account).
+    roles: list[Role] = Field(default_factory=list)
 
 
 class User(UserCreate, BaseEntity, table=True):
@@ -150,6 +206,12 @@ class User(UserCreate, BaseEntity, table=True):
     #: and cleared when it is removed. Acts as a presence marker plus cache-busting
     #: timestamp so read views report a custom avatar without loading its blob.
     avatar_updated_at: datetime | None = Field(default=None, sa_type=TZDateTime)
+    #: Roles granted to the user, stored as a JSON list of :class:`Role` values.
+    #: Overrides the typed ``list[Role]`` inherited from :class:`UserCreate` so
+    #: it persists as a plain JSON column.
+    roles: list[str] = Field(  # type: ignore[assignment]
+        default_factory=list, sa_column=Column(JSONColumn, nullable=False)
+    )
     #: Generated-avatar customization, stored as a JSON blob. Overrides the
     #: typed :class:`AvatarConfig` inherited from :class:`UserUpdate` so it
     #: persists as a plain dict column.
@@ -173,6 +235,8 @@ class UserRead(BaseEntity):
     email: str
     enabled: bool
     email_verified: bool
+    #: Roles granted to the user; empty for a chat-only account.
+    roles: list[Role] = []
     deleted_at: datetime | None = None
     #: ISO-8601 timestamp of the last custom-avatar change, or ``None`` when the
     #: user has no uploaded avatar (the client then renders a generated default).

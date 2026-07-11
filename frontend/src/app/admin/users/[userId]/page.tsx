@@ -14,6 +14,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { RolesField } from "@/components/admin/roles-field";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AvatarConfig, deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
+import type { Role } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -59,6 +61,9 @@ export default function EditUserPage() {
   // matches their generated avatar elsewhere in the app.
   const [avatarUpdatedAt, setAvatarUpdatedAt] = useState<string | null>(null);
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
+  // Roles live outside the form state: the picker is a controlled multi-select
+  // rather than a registered input.
+  const [roles, setRoles] = useState<Role[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -85,6 +90,7 @@ export default function EditUserPage() {
         setUsername(user.username);
         setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
         setAvatarConfig(user.avatarConfig ?? null);
+        setRoles(user.roles ?? []);
         reset({
           firstName: user.firstName,
           lastName: user.lastName,
@@ -114,6 +120,7 @@ export default function EditUserPage() {
       email: values.email,
       enabled: values.enabled,
       emailVerified: values.emailVerified,
+      roles,
     };
     if (values.password) {
       body.password = values.password;
@@ -205,6 +212,8 @@ export default function EditUserPage() {
               {...register("password")}
             />
           </FormField>
+
+          <RolesField value={roles} onChange={setRoles} />
 
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />

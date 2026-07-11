@@ -2,9 +2,10 @@
 
 Approvals are created by the workflow agent (via the ``request_approval`` tool)
 and resolved here by the approver: ``PATCH /approvals/{id}`` moves a request to
-``approved`` or ``rejected``. The approver's identity (``CurrentUserIdDep``) is
-recorded in the approval's audit fields. List and get are unscoped so the admin
-UI can browse every approval, mirroring the workflow-sessions router.
+``approved`` or ``rejected``. Only the designated approver (or a super admin)
+may resolve a request; the resolver's identity is recorded in the approval's
+audit fields. List and get are unscoped so the admin UI can browse every
+approval, mirroring the workflow-sessions router.
 """
 
 from fastapi import APIRouter
@@ -12,7 +13,7 @@ from fastapi import APIRouter
 from dependencies import (
     ApiMetaDep,
     ApprovalServiceDep,
-    CurrentUserIdDep,
+    CurrentUserDep,
     FilterDep,
     PaginationDep,
     SortDep,
@@ -57,12 +58,14 @@ async def resolve_approval(
     approval_id: str,
     data: ApprovalUpdate,
     service: ApprovalServiceDep,
-    user_id: CurrentUserIdDep,
+    acting_user: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Approval]:
     """Resolve an approval, recording the requesting user as the approver.
 
-    Raises HTTP 404 if the approval does not exist.
+    Only the designated approver or a super admin may resolve; anyone else
+    receives HTTP 403 (``FORBIDDEN``). Raises HTTP 404 if the approval does
+    not exist.
     """
-    approval = await service.resolve(approval_id, data, user_id=user_id)
+    approval = await service.resolve(approval_id, data, acting_user=acting_user)
     return ApiResponse(meta=meta, data=approval)

@@ -1,26 +1,27 @@
 /** @module AdminPage — Welcome landing page: greeting plus quick-action cards for chat and admin sections. */
+"use client";
+
 import { type LucideIcon, MessageSquare } from "lucide-react";
 import Link from "next/link";
-import { type AdminNavItem, adminNavItems } from "@/lib/admin-nav";
+import { type AdminNavItem, useVisibleAdminNavItems } from "@/lib/admin-nav";
 
-/** Quick-action cards: start a chat first, then every admin destination. */
-const CARDS: AdminNavItem[] = [
-  {
-    href: "/sessions/new",
-    label: "Start chat",
-    icon: MessageSquare,
-    description: "Open a new agent conversation",
-  },
-  ...adminNavItems,
-];
+/** The chat card, always shown first; the admin destinations follow it. */
+const CHAT_CARD: AdminNavItem = {
+  href: "/sessions/new",
+  label: "Start chat",
+  icon: MessageSquare,
+  description: "Open a new agent conversation",
+};
 
 /**
  * Welcome page shown at `/admin`. Renders inside the admin shell (sidebar +
  * app bar) and greets the user with quick-action cards that link to the chat
- * and each admin section. This is the landing page reached from `/`, after
- * login, and by clicking the A2Flow logo.
+ * and each admin section the user's roles allow. This is the landing page
+ * reached from `/`, after login, and by clicking the A2Flow logo.
  */
 export default function AdminPage() {
+  const cards: AdminNavItem[] = [CHAT_CARD, ...useVisibleAdminNavItems()];
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-8">
@@ -33,7 +34,7 @@ export default function AdminPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {CARDS.map((card) => (
+        {cards.map((card) => (
           <WelcomeCard key={card.href} {...card} />
         ))}
       </div>

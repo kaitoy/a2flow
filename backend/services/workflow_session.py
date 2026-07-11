@@ -15,6 +15,7 @@ from ag_ui_adk import ADKAgent, adk_events_to_messages
 from google.adk.sessions import BaseSessionService
 
 from infrastructure.agent import AgentRegistry
+from models.user import User
 from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTaskRead
 from repositories import (
@@ -24,6 +25,7 @@ from repositories import (
 )
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec
+from services.workflow_session_access import WorkflowSessionAccessPolicy
 
 #: Tool-response payload of the frontend's no-op ``render_a2ui``
 #: acknowledgement (``RENDER_ACK_CONTENT`` in ``frontend/src/lib/a2uiAction.ts``,
@@ -44,6 +46,7 @@ class WorkflowSessionService:
         registry: AgentRegistry,
         session_service: BaseSessionService,
         app_name: str,
+        access: WorkflowSessionAccessPolicy,
     ) -> None:
         """Initialize the service.
 
@@ -57,6 +60,8 @@ class WorkflowSessionService:
             session_service: ADK session store, used to delete the underlying
                 chat session when a WorkflowSession is removed.
             app_name: ADK application name keying sessions in the store.
+            access: Policy restricting session-scoped operations to the owner,
+                the session's designated approvers, and super admins.
         """
         self._ws_repo = ws_repo
         self._tasks = tasks
@@ -64,9 +69,15 @@ class WorkflowSessionService:
         self._registry = registry
         self._session_service = session_service
         self._app_name = app_name
+        self._access = access
 
-    async def get(self, ws_id: str) -> WorkflowSession:
-        """Return the WorkflowSession with the given ID.
+    async def _get(self, ws_id: str) -> WorkflowSession:
+        """Return the WorkflowSession with the given ID, without authorization.
+
+        Used internally by run-completion bookkeeping (which executes after
+        the caller was already authorized by :meth:`resolve_agent`) and as the
+        fetch step of the authorized public methods — the missing-session case
+        must surface as 404 before any 403.
 
         Args:
             ws_id: Identifier of the session to fetch.
@@ -80,6 +91,25 @@ class WorkflowSessionService:
         ws = await self._ws_repo.get(ws_id)
         if ws is None:
             raise NotFoundError("WorkflowSession", ws_id)
+        return ws
+
+    async def get(self, ws_id: str, *, caller: User) -> WorkflowSession:
+        """Return the WorkflowSession with the given ID, authorizing the caller.
+
+        Args:
+            ws_id: Identifier of the session to fetch.
+            caller: The authenticated user requesting the session.
+
+        Returns:
+            The matching WorkflowSession.
+
+        Raises:
+            NotFoundError: If no session exists with the given ID.
+            ForbiddenError: If the caller is neither the session owner, a
+                designated approver of the session, nor a super admin.
+        """
+        ws = await self._get(ws_id)
+        await self._access.assert_access(ws_id, ws.user_id, caller)
         return ws
 
     async def list(
@@ -109,6 +139,7 @@ class WorkflowSessionService:
         self,
         ws_id: str,
         *,
+        caller: User,
         limit: int,
         offset: int,
         sort: Sequence[SortSpec] = (),
@@ -118,6 +149,7 @@ class WorkflowSessionService:
 
         Args:
             ws_id: Identifier of the parent session.
+            caller: The authenticated user requesting the tasks.
             limit: Maximum number of records to return.
             offset: Number of records to skip.
             sort: Ordering instructions applied to the query.
@@ -129,8 +161,10 @@ class WorkflowSessionService:
         Raises:
             NotFoundError: If the parent session does not exist, so callers can
                 distinguish "no such session" from "session has no tasks".
+            ForbiddenError: If the caller is neither the session owner, a
+                designated approver of the session, nor a super admin.
         """
-        await self.get(ws_id)
+        await self.get(ws_id, caller=caller)
         return await self._tasks.list(
             limit=limit,
             offset=offset,
@@ -139,18 +173,21 @@ class WorkflowSessionService:
             filters=filters,
         )
 
-    async def resolve_agent(self, ws_id: str) -> tuple[ADKAgent, WorkflowSession]:
+    async def resolve_agent(
+        self, ws_id: str, *, caller: User
+    ) -> tuple[ADKAgent, WorkflowSession]:
         """Resolve the ADK agent bound to a WorkflowSession and the session record.
 
         The skill and skill directory are read from the session record so the
         correct ADK tools are loaded regardless of global agent state. The record
         is returned alongside the agent so the caller can key the ADK run by the
         session's owner (``WorkflowSession.user_id``) rather than the current user,
-        letting every viewer (for example a designated approver) share the same
-        ADK session.
+        letting every authorized viewer (for example a designated approver) share
+        the same ADK session.
 
         Args:
             ws_id: Identifier of the session whose agent to resolve.
+            caller: The authenticated user driving the agent run.
 
         Returns:
             A ``(agent, workflow_session)`` tuple: the ADK agent configured for
@@ -158,22 +195,28 @@ class WorkflowSessionService:
 
         Raises:
             NotFoundError: If no session exists with the given ID.
+            ForbiddenError: If the caller is neither the session owner, a
+                designated approver of the session, nor a super admin.
         """
-        ws = await self.get(ws_id)
+        ws = await self.get(ws_id, caller=caller)
         skill_dir = Path(ws.skill_dir)
         return self._registry.get(ws.agent_skill_id, skill_dir), ws
 
-    async def get_messages(self, ws_id: str) -> builtins.list[dict[str, Any]]:
+    async def get_messages(
+        self, ws_id: str, *, caller: User
+    ) -> builtins.list[dict[str, Any]]:
         """Return the chat history of a WorkflowSession's ADK session.
 
         The ADK session is looked up by the WorkflowSession's owner
-        (``ws.user_id``), so the same history is returned regardless of which user
-        requests it — a designated approver opening the chat sees the owner's
-        conversation instead of starting a fresh session. Returns an empty list
-        when the ADK session does not exist yet (before the first agent run).
+        (``ws.user_id``), so the same history is returned regardless of which
+        authorized user requests it — a designated approver opening the chat
+        sees the owner's conversation instead of starting a fresh session.
+        Returns an empty list when the ADK session does not exist yet (before
+        the first agent run).
 
         Args:
             ws_id: Identifier of the WorkflowSession whose messages to fetch.
+            caller: The authenticated user requesting the history.
 
         Returns:
             The session's messages as plain JSON-serializable dicts (the same
@@ -181,8 +224,10 @@ class WorkflowSessionService:
 
         Raises:
             NotFoundError: If no WorkflowSession exists with the given ID.
+            ForbiddenError: If the caller is neither the session owner, a
+                designated approver of the session, nor a super admin.
         """
-        ws = await self.get(ws_id)
+        ws = await self.get(ws_id, caller=caller)
         session = await self._session_service.get_session(
             app_name=self._app_name,
             user_id=ws.user_id,
@@ -228,7 +273,7 @@ class WorkflowSessionService:
         Raises:
             NotFoundError: If no WorkflowSession exists with the given ID.
         """
-        ws = await self.get(ws_id)
+        ws = await self._get(ws_id)
         session = await self._session_service.get_session(
             app_name=self._app_name,
             user_id=ws.user_id,
@@ -271,7 +316,7 @@ class WorkflowSessionService:
             NotFoundError: If no WorkflowSession exists with the given ID.
             ForeignKeyViolationError: If ``sender_user_id`` does not match a user.
         """
-        ws = await self.get(ws_id)
+        ws = await self._get(ws_id)
         session = await self._session_service.get_session(
             app_name=self._app_name,
             user_id=ws.user_id,
@@ -316,7 +361,7 @@ class WorkflowSessionService:
         Raises:
             NotFoundError: If no WorkflowSession exists with the given ID.
         """
-        ws = await self.get(ws_id)
+        ws = await self._get(ws_id)
         session = await self._session_service.get_session(
             app_name=self._app_name,
             user_id=ws.user_id,
@@ -346,8 +391,12 @@ class WorkflowSessionService:
                     user_id=owner_id,
                 )
 
-    async def delete(self, ws_id: str) -> None:
+    async def delete(self, ws_id: str, *, caller: User) -> None:
         """Delete a WorkflowSession and its underlying ADK chat session.
+
+        Deletion is stricter than the shared-chat access rule: only the
+        session owner or a super admin may delete a session — a designated
+        approver may participate in the chat but not destroy it.
 
         Removes, in order: the ADK chat session keyed by the record's
         ``session_id`` (best effort — skipped if it no longer exists), then the
@@ -357,11 +406,15 @@ class WorkflowSessionService:
 
         Args:
             ws_id: Identifier of the session to delete.
+            caller: The authenticated user requesting the deletion.
 
         Raises:
             NotFoundError: If no WorkflowSession exists with the given ID.
+            ForbiddenError: If the caller is neither the session owner nor a
+                super admin.
         """
-        ws = await self.get(ws_id)
+        ws = await self._get(ws_id)
+        self._access.assert_owner(ws.user_id, caller)
         existing = await self._session_service.get_session(
             app_name=self._app_name,
             user_id=ws.user_id,

@@ -21,6 +21,7 @@ from .auth import (
     get_current_user_id,
     verify_csrf,
 )
+from .authz import require_roles
 from .context import (
     APP_NAME,
     ApiMetaDep,
@@ -71,6 +72,7 @@ from .service import (
     UserAvatarServiceDep,
     UserServiceDep,
     WorkflowServiceDep,
+    WorkflowSessionAccessPolicyDep,
     WorkflowSessionServiceDep,
     WorkflowTaskServiceDep,
     get_agent_skill_service,
@@ -84,6 +86,7 @@ from .service import (
     get_user_avatar_service,
     get_user_service,
     get_workflow_service,
+    get_workflow_session_access_policy,
     get_workflow_session_service,
     get_workflow_task_service,
 )
@@ -143,6 +146,7 @@ __all__ = [
     "UserServiceDep",
     "WorkflowRepositoryDep",
     "WorkflowServiceDep",
+    "WorkflowSessionAccessPolicyDep",
     "WorkflowSessionRepositoryDep",
     "WorkflowSessionServiceDep",
     "WorkflowTaskRepositoryDep",
@@ -176,11 +180,13 @@ __all__ = [
     "get_user_service",
     "get_workflow_repository",
     "get_workflow_service",
+    "get_workflow_session_access_policy",
     "get_workflow_session_repository",
     "get_workflow_session_service",
     "get_workflow_task_repository",
     "get_workflow_task_service",
     "parse_filters",
     "parse_sort",
+    "require_roles",
     "verify_csrf",
 ]

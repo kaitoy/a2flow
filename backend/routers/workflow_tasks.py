@@ -3,12 +3,14 @@
 A WorkflowTask is a single actionable item belonging to a WorkflowSession.
 Listing the tasks of a particular session is exposed on the WorkflowSession
 router as ``GET /workflow-sessions/{session_id}/workflow-tasks``; this router
-focuses on the create-and-act-on-a-single-task operations.
+focuses on the create-and-act-on-a-single-task operations. Every operation is
+restricted to the parent session's owner, its designated approvers, and super
+admins (enforced by :class:`~services.workflow_task.WorkflowTaskService`).
 """
 
 from fastapi import APIRouter
 
-from dependencies import ApiMetaDep, CurrentUserIdDep, WorkflowTaskServiceDep
+from dependencies import ApiMetaDep, CurrentUserDep, WorkflowTaskServiceDep
 from models.response import ApiResponse
 from models.workflow_task import (
     WorkflowTaskCreate,
@@ -23,11 +25,11 @@ router = APIRouter(prefix="/workflow-tasks", tags=["workflow-tasks"])
 async def create_workflow_task(
     body: WorkflowTaskCreate,
     service: WorkflowTaskServiceDep,
-    user_id: CurrentUserIdDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowTaskRead]:
     """Create a new WorkflowTask belonging to the session named in ``body``."""
-    task = await service.create(body, user_id=user_id)
+    task = await service.create(body, caller=caller)
     return ApiResponse(meta=meta, data=task)
 
 
@@ -35,10 +37,11 @@ async def create_workflow_task(
 async def get_workflow_task(
     task_id: str,
     service: WorkflowTaskServiceDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowTaskRead]:
     """Return the WorkflowTask with the given ID, or HTTP 404 if missing."""
-    task = await service.get(task_id)
+    task = await service.get(task_id, caller=caller)
     return ApiResponse(meta=meta, data=task)
 
 
@@ -47,11 +50,11 @@ async def update_workflow_task(
     task_id: str,
     body: WorkflowTaskUpdate,
     service: WorkflowTaskServiceDep,
-    user_id: CurrentUserIdDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowTaskRead]:
     """Apply a partial update to the WorkflowTask with the given ID."""
-    task = await service.update(task_id, body, user_id=user_id)
+    task = await service.update(task_id, body, caller=caller)
     return ApiResponse(meta=meta, data=task)
 
 
@@ -59,8 +62,9 @@ async def update_workflow_task(
 async def delete_workflow_task(
     task_id: str,
     service: WorkflowTaskServiceDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
     """Delete the WorkflowTask with the given ID, raising 404 if it does not exist."""
-    await service.delete(task_id)
+    await service.delete(task_id, caller=caller)
     return ApiResponse(meta=meta, data=None)

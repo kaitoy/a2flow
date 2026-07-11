@@ -35,7 +35,7 @@ from infrastructure.workflow_task_tools import (
 )
 from models.approval import ApprovalCreate
 from models.notification import NotificationType
-from models.user import User
+from models.user import Role, User, has_role
 from repositories import (
     ApprovalRepository,
     NotificationRepository,
@@ -45,6 +45,7 @@ from repositories import (
     SqlUserRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
+    UserRepository,
     WorkflowSessionRepository,
     WorkflowTaskRepository,
 )
@@ -60,19 +61,20 @@ async def _repos() -> AsyncIterator[
         ApprovalRepository,
         WorkflowTaskRepository,
         NotificationRepository,
+        UserRepository,
     ]
 ]:
     """Open a database session and yield the repositories the approval tools need.
 
     Opens a fresh ``AsyncSession`` on the module-level engine (referenced through
     the ``database`` module so tests can monkeypatch ``database.engine``) and
-    wires the WorkflowSession, Approval, WorkflowTask, and Notification
+    wires the WorkflowSession, Approval, WorkflowTask, Notification, and User
     repositories to it.
 
     Yields:
         A ``(workflow_session_repository, approval_repository,
-        workflow_task_repository, notification_repository)`` tuple bound to the
-        same session.
+        workflow_task_repository, notification_repository, user_repository)``
+        tuple bound to the same session.
     """
     async with AsyncSession(database.engine) as db:
         ws_repo = SqlWorkflowSessionRepository(db)
@@ -81,7 +83,29 @@ async def _repos() -> AsyncIterator[
             SqlApprovalRepository(db, ws_repo),
             SqlWorkflowTaskRepository(db, ws_repo, SqlMCPServerRepository(db)),
             SqlNotificationRepository(db),
+            SqlUserRepository(db),
         )
+
+
+def _is_eligible_approver(user: User | None) -> bool:
+    """Return whether a user may be designated as an approval's approver.
+
+    Eligible approvers are enabled, not soft-deleted, and hold the
+    ``approver`` role (``super_admin`` also qualifies, since it bypasses every
+    role check).
+
+    Args:
+        user: The candidate user, or ``None`` when the lookup found nobody.
+
+    Returns:
+        ``True`` if the user exists and may receive approval requests.
+    """
+    return (
+        user is not None
+        and user.enabled
+        and user.deleted_at is None
+        and has_role(user, Role.approver)
+    )
 
 
 async def request_approval(
@@ -108,7 +132,8 @@ async def request_approval(
             to the model.
         approver: Id of the user the request is addressed to (required). Only this
             user receives the notification and may resolve the request; it must
-            match an existing user. Use :func:`list_users` to discover valid ids.
+            match an existing, enabled user holding the ``approver`` role. Use
+            :func:`list_users` to discover eligible ids.
         description: Optional longer explanation of the request.
         workflow_task_id: Optional id of the WorkflowTask this approval concerns;
             must belong to the current session.
@@ -120,7 +145,7 @@ async def request_approval(
     """
     if not approver:
         return {"error": "approver is required"}
-    async with _repos() as (ws_repo, approval_repo, task_repo, notif_repo):
+    async with _repos() as (ws_repo, approval_repo, task_repo, notif_repo, user_repo):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
             return {"error": _NO_SESSION}
@@ -131,6 +156,12 @@ async def request_approval(
                     "error": f"WorkflowTask {workflow_task_id!r} "
                     "not found in the current session"
                 }
+        if not _is_eligible_approver(await user_repo.get(approver)):
+            return {
+                "error": f"User {approver!r} cannot be designated as an approver: "
+                "the user must exist, be enabled, and hold the approver role. "
+                "Use list_users to discover eligible approvers."
+            }
         data = ApprovalCreate(
             workflow_session_id=ws_id,
             title=title,
@@ -169,12 +200,13 @@ def _user_to_dict(user: User) -> dict[str, Any]:
 
 
 async def list_users() -> dict[str, Any]:
-    """List the registered users who can be addressed as an approval's ``approver``.
+    """List the users eligible to be addressed as an approval's ``approver``.
 
     Call this before :func:`request_approval` to discover valid ``approver`` ids:
     pick the intended person from the returned list and pass their ``id`` as the
-    ``approver`` argument. Soft-deleted accounts and the internal system user are
-    excluded.
+    ``approver`` argument. Only enabled users holding the ``approver`` role (or
+    ``super_admin``) are returned; soft-deleted accounts and the internal system
+    user are excluded.
 
     Returns:
         ``{"users": [{"id", "username", "first_name", "last_name", "email"}, ...]}``
@@ -183,7 +215,7 @@ async def list_users() -> dict[str, Any]:
     async with AsyncSession(database.engine) as db:
         user_repo = SqlUserRepository(db)
         users = await user_repo.list(limit=1000, offset=0)
-        return {"users": [_user_to_dict(u) for u in users]}
+        return {"users": [_user_to_dict(u) for u in users if _is_eligible_approver(u)]}
 
 
 async def get_approval(approval_id: str, tool_context: ToolContext) -> dict[str, Any]:
@@ -202,7 +234,7 @@ async def get_approval(approval_id: str, tool_context: ToolContext) -> dict[str,
         "workflow_task_id"}``. On failure ``{"error": <message>}`` if the session
         cannot be resolved or the approval does not belong to it.
     """
-    async with _repos() as (ws_repo, approval_repo, _task_repo, _notif_repo):
+    async with _repos() as (ws_repo, approval_repo, _task_repo, _notif_repo, _users):
         ws_id = await _resolve_ws_id(tool_context, ws_repo)
         if ws_id is None:
             return {"error": _NO_SESSION}

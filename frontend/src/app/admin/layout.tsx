@@ -14,12 +14,13 @@ import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { Tooltip } from "@/components/ui/tooltip";
-import { adminNavItems } from "@/lib/admin-nav";
+import { useVisibleAdminNavItems } from "@/lib/admin-nav";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const itemMap = useRef<Map<string, HTMLElement | null>>(new Map());
-  const activeKey = adminNavItems.find((n) => pathname?.startsWith(n.href))?.href ?? null;
+  const navItems = useVisibleAdminNavItems();
+  const activeKey = navItems.find((n) => pathname?.startsWith(n.href))?.href ?? null;
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -52,7 +53,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
           </div>
           <ul className="relative flex flex-col gap-1 px-3 py-3">
-            {adminNavItems.map((item) => {
+            {navItems.map((item) => {
               const isActive = pathname?.startsWith(item.href);
               return (
                 <li

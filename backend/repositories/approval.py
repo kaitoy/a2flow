@@ -36,6 +36,10 @@ class ApprovalRepository(Protocol):
 
     async def exists(self, approval_id: str) -> bool: ...
 
+    async def exists_for_approver(
+        self, workflow_session_id: str, user_id: str
+    ) -> bool: ...
+
 
 class SqlApprovalRepository:
     """SQLModel-backed implementation of ApprovalRepository."""
@@ -132,5 +136,31 @@ class SqlApprovalRepository:
     async def exists(self, approval_id: str) -> bool:
         """Return whether an Approval with the given ID exists."""
         stmt = select(Approval.id).where(Approval.id == approval_id).limit(1)
+        result = await self._db.exec(stmt)
+        return result.first() is not None
+
+    async def exists_for_approver(self, workflow_session_id: str, user_id: str) -> bool:
+        """Return whether the session has any Approval addressed to the user.
+
+        Backs the workflow-session access check: a user designated as the
+        approver of any approval in a session may view and participate in that
+        session's shared chat.
+
+        Args:
+            workflow_session_id: Identifier of the workflow session.
+            user_id: The candidate approver's user ID.
+
+        Returns:
+            ``True`` if at least one Approval in the session names the user as
+            its ``approver``.
+        """
+        stmt = (
+            select(Approval.id)
+            .where(
+                Approval.workflow_session_id == workflow_session_id,
+                Approval.approver == user_id,
+            )
+            .limit(1)
+        )
         result = await self._db.exec(stmt)
         return result.first() is not None

@@ -22,6 +22,7 @@ from infrastructure.approval_tools import get_approval, list_users, request_appr
 from infrastructure.workflow_task_tools import create_workflow_task
 from models.approval import ApprovalStatus
 from models.notification import Notification, NotificationType
+from models.user import Role
 from models.workflow_session import WorkflowSession
 from repositories import SqlApprovalRepository, SqlNotificationRepository
 from tests._seed import seed_users
@@ -219,3 +220,39 @@ def _ws_repo(db: AsyncSession) -> Any:
     from repositories import SqlWorkflowSessionRepository
 
     return SqlWorkflowSessionRepository(db)
+
+
+# ---------- approver eligibility (roles) ----------
+
+
+async def test_request_approval_rejects_approver_without_role(
+    engine: AsyncEngine,
+) -> None:
+    """A user without the approver role cannot be designated as an approver."""
+    await seed_users(engine, ids=("norole",), roles=())
+    await _seed_session(engine)
+    result = await request_approval("Approve me", _ctx(), approver="norole")
+    assert "error" in result
+    assert "approver role" in result["error"]
+
+
+async def test_request_approval_accepts_super_admin_approver(
+    engine: AsyncEngine,
+) -> None:
+    """A super admin is approver-eligible even without the approver role."""
+    await seed_users(engine, ids=("boss",), roles=(Role.super_admin,))
+    await _seed_session(engine)
+    result = await request_approval("Approve me", _ctx(), approver="boss")
+    assert "error" not in result
+
+
+async def test_list_users_excludes_users_without_approver_role(
+    engine: AsyncEngine,
+) -> None:
+    """The approver-selection tool omits users lacking the approver role."""
+    await seed_users(engine, ids=("norole",), roles=())
+    result = await list_users()
+    usernames = {u["username"] for u in result["users"]}
+    assert "norole" not in usernames
+    # The default seeded actors hold the approver role and stay listed.
+    assert {"alice", "bob", "carol", "owner", "tester"} <= usernames

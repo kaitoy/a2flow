@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import * as api from "@/lib/api";
 import { __resetApprovalCacheForTests } from "@/lib/approvalCache";
+import type { Role } from "@/lib/roles";
 import type { RootState } from "@/store";
 import { render, screen, waitFor } from "@/test/test-utils";
 import { ApprovalControls } from "./ApprovalControls";
@@ -12,9 +13,9 @@ vi.mock("@/lib/api", () => ({
   resolveApproval: vi.fn(),
 }));
 
-/** Build a preloaded auth slice for the signed-in user with the given id. */
-function authState(userId: string): Partial<RootState> {
-  return { auth: { user: { id: userId } as User, status: "authenticated" } };
+/** Build a preloaded auth slice for the signed-in user with the given id and roles. */
+function authState(userId: string, roles: Role[] = []): Partial<RootState> {
+  return { auth: { user: { id: userId, roles } as User, status: "authenticated" } };
 }
 
 beforeEach(() => {
@@ -94,6 +95,19 @@ describe("ApprovalControls", () => {
     );
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+  });
+
+  it("shows the controls to a super admin who is not the designated approver", async () => {
+    vi.mocked(api.getApproval).mockResolvedValue({
+      status: "pending",
+      approver: "someone-else",
+    } as never);
+    render(<ApprovalControls approvalId="a1" title="Deploy?" toolCallId="tc1" />, {
+      preloadedState: authState("u1", ["super_admin"]),
+    });
+
+    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for the approver's decision.")).not.toBeInTheDocument();
   });
 
   it("shows the resolved state and prior comment when already decided", async () => {

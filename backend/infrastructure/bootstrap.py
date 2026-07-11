@@ -8,7 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
 from infrastructure.password import hash_password
-from models.user import SYSTEM_USER_ID, User
+from models.user import SYSTEM_USER_ID, Role, User
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +50,10 @@ async def seed_system_user(session: AsyncSession) -> None:
 
 
 async def seed_admin_user(session: AsyncSession) -> None:
-    """Create the initial ``admin`` user on first bootstrap.
+    """Create the initial ``admin`` user, holding ``super_admin``, on first bootstrap.
 
+    The user is granted the :attr:`Role.super_admin` role so a fresh deployment
+    always has an account able to manage users and roles.
     Skipped when any real (non-system) user already exists, so it runs only on
     the very first startup. The password is read from
     ``config.Settings.admin_password`` (the ``ADMIN_PASSWORD`` environment
@@ -84,6 +86,7 @@ async def seed_admin_user(session: AsyncSession) -> None:
         email="admin@localhost",
         enabled=True,
         email_verified=False,
+        roles=[Role.super_admin.value],
         created_by=SYSTEM_USER_ID,
         updated_by=SYSTEM_USER_ID,
     )

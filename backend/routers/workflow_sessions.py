@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from dependencies import (
     ApiMetaDep,
-    CurrentUserIdDep,
+    CurrentUserDep,
     FilterDep,
     PaginationDep,
     SortDep,
@@ -46,10 +46,15 @@ async def list_workflow_sessions(
 async def get_workflow_session(
     ws_id: str,
     service: WorkflowSessionServiceDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowSession]:
-    """Return the WorkflowSession record for the given ID."""
-    ws = await service.get(ws_id)
+    """Return the WorkflowSession record for the given ID.
+
+    Only the session owner, a designated approver of the session, or a super
+    admin may access it; anyone else receives HTTP 403 (``FORBIDDEN``).
+    """
+    ws = await service.get(ws_id, caller=caller)
     return ApiResponse(meta=meta, data=ws)
 
 
@@ -59,6 +64,7 @@ async def get_workflow_session(
 async def list_workflow_session_tasks(
     ws_id: str,
     service: WorkflowSessionServiceDep,
+    caller: CurrentUserDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -66,12 +72,14 @@ async def list_workflow_session_tasks(
 ) -> ApiResponse[list[WorkflowTaskRead]]:
     """Return the WorkflowTasks belonging to the given WorkflowSession.
 
-    Raises HTTP 404 (``NotFoundError``) if the parent session does not exist,
-    so callers can distinguish "no such session" from "session exists but has
-    no tasks".
+    Restricted to the session owner, its designated approvers, and super
+    admins. Raises HTTP 404 (``NotFoundError``) if the parent session does not
+    exist, so callers can distinguish "no such session" from "session exists
+    but has no tasks".
     """
     items = await service.list_tasks(
         ws_id,
+        caller=caller,
         limit=pagination.limit,
         offset=pagination.offset,
         sort=sort.sort,
@@ -84,13 +92,16 @@ async def list_workflow_session_tasks(
 async def delete_workflow_session(
     ws_id: str,
     service: WorkflowSessionServiceDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
     """Delete a WorkflowSession, its WorkflowTasks, and its ADK chat session.
 
-    Raises HTTP 404 (``NotFoundError``) if no session exists with the given ID.
+    Restricted to the session owner and super admins (stricter than the
+    shared-chat access rule). Raises HTTP 404 (``NotFoundError``) if no
+    session exists with the given ID.
     """
-    await service.delete(ws_id)
+    await service.delete(ws_id, caller=caller)
     return ApiResponse(meta=meta, data=None)
 
 
@@ -100,25 +111,28 @@ async def workflow_session_agent(
     input_data: RunAgentInput,
     request: Request,
     service: WorkflowSessionServiceDep,
-    current_user_id: CurrentUserIdDep,
+    caller: CurrentUserDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent bound to a specific workflow session.
 
-    The skill and skill directory are resolved from the WorkflowSession record so
-    the correct ADK tools are loaded regardless of the global agent state.
-    SystemMessages are stripped to prevent prompt injection.
+    Restricted to the session owner, its designated approvers, and super
+    admins. The skill and skill directory are resolved from the
+    WorkflowSession record so the correct ADK tools are loaded regardless of
+    the global agent state. SystemMessages are stripped to prevent prompt
+    injection.
 
     Because the run is keyed by the session owner, the new messages are
-    attributed to the actual sender (``current_user_id``) after streaming
-    completes: the session's attributable keys present before the run are
-    snapshotted (``"user"`` event ids and tool-response tool_call_ids -- the
-    latter covers A2UI user-action acknowledgements), and any that appear
-    afterwards are recorded as the current user's -- except no-op render
-    acknowledgements, which merely unblock surfaces nobody acted on (see
+    attributed to the actual sender (the caller) after streaming completes:
+    the session's attributable keys present before the run are snapshotted
+    (``"user"`` event ids and tool-response tool_call_ids -- the latter covers
+    A2UI user-action acknowledgements), and any that appear afterwards are
+    recorded as the current user's -- except no-op render acknowledgements,
+    which merely unblock surfaces nobody acted on (see
     ``WorkflowSessionService.record_new_senders``).
     """
-    adk_agent, ws = await service.resolve_agent(ws_id)
+    adk_agent, ws = await service.resolve_agent(ws_id, caller=caller)
     prior_keys = await service.attributable_keys(ws_id)
+    current_user_id = caller.id
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
@@ -142,14 +156,16 @@ async def workflow_session_agent(
 async def get_workflow_session_messages(
     ws_id: str,
     service: WorkflowSessionServiceDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[dict[str, Any]]]:
     """Return the chat history of a WorkflowSession's ADK session.
 
-    The history is keyed by the session's owner, so a designated approver (or any
-    other viewer) opening the chat sees the owner's conversation rather than an
+    Restricted to the session owner, its designated approvers, and super
+    admins. The history is keyed by the session's owner, so a designated
+    approver opening the chat sees the owner's conversation rather than an
     empty, separate session. Returns an empty list when the ADK session has not
     been created yet. Raises HTTP 404 if the WorkflowSession does not exist.
     """
-    messages = await service.get_messages(ws_id)
+    messages = await service.get_messages(ws_id, caller=caller)
     return ApiResponse(meta=meta, data=messages)
