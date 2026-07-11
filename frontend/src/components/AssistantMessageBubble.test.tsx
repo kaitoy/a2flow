@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AssistantMessageBubble } from "./AssistantMessageBubble";
 
@@ -20,14 +20,14 @@ describe("AssistantMessageBubble", () => {
     expect(bubble).not.toHaveClass("max-w-[75%]");
   });
 
-  it("renders Markdown content as formatted HTML", () => {
+  it("renders Markdown content as formatted HTML", async () => {
     const { container } = render(
       <AssistantMessageBubble
         message={{ id: "1", role: "assistant", content: "**bold** and a\n\n## Heading" }}
       />
     );
-    const strong = container.querySelector("strong");
-    expect(strong).toHaveTextContent("bold");
+    const strong = await screen.findByText("bold");
+    expect(strong.tagName).toBe("STRONG");
     const heading = container.querySelector("h2");
     expect(heading).toHaveTextContent("Heading");
   });
@@ -62,6 +62,22 @@ describe("AssistantMessageBubble", () => {
     );
     expect(screen.getByText("hello")).toBeInTheDocument();
     expect(container.querySelector(".animate-blink")).toBeInTheDocument();
+  });
+
+  it("sanitizes HTML embedded in agent-generated Markdown", async () => {
+    const { container } = render(
+      <AssistantMessageBubble
+        message={{
+          id: "1",
+          role: "assistant",
+          content: "<script>window.__xss=1</script>safe text",
+        }}
+      />
+    );
+    await waitFor(() => {
+      expect(container.querySelector(".markdown-body p")).toBeInTheDocument();
+    });
+    expect(container.querySelector("script")).not.toBeInTheDocument();
   });
 
   it("renders the agent avatar beside the bubble when provided", () => {

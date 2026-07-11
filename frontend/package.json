@@ -20,6 +20,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@a2ui/markdown-it": "0.0.4",
     "@a2ui/react": "0.10.1",
     "@a2ui/web_core": "0.10.3",
     "@ag-ui/a2ui-middleware": "^0.0.10",
@@ -36,7 +37,6 @@
     "@xyflow/react": "^12.11.0",
     "axios": "^1.16.0",
     "lucide-react": "^1.21.0",
-    "marked": "^18.0.3",
     "next": "^16.2.4",
     "pino": "^10.3.1",
     "react": "^19.2.7",

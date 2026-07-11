@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@a2ui/markdown-it':
+        specifier: 0.0.4
+        version: 0.0.4(@a2ui/web_core@0.10.3)
       '@a2ui/react':
         specifier: 0.10.1
         version: 0.10.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(zod@3.25.76)
@@ -56,9 +59,6 @@ importers:
       lucide-react:
         specifier: ^1.21.0
         version: 1.21.0(react@19.2.7)
-      marked:
-        specifier: ^18.0.3
-        version: 18.0.3
       next:
         specifier: ^16.2.4
         version: 16.2.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -1665,9 +1665,6 @@ packages:
     resolution: {integrity: sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ==}
     engines: {node: '>= 12.0.0'}
 
-  linkify-it@5.0.0:
-    resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
-
   linkify-it@5.0.1:
     resolution: {integrity: sha512-wVoTjP4Q6R0NW5hiZkVJaFZPWgtXfoGF+6LucL3/FtiNjmcHhYjEr5f1Kqjirc1nBW07J/ZuRFumqr2oqccEWg==}
 
@@ -1694,17 +1691,8 @@ packages:
     resolution: {integrity: sha512-hXdUTZYIVOt1Ex//jAQi+wTZZpUpwBj/0QsOzqegb3rGMMeJiSEu5xLHnYfBrRV4RH2+OCSOO95Is/7x1WJ4bw==}
     engines: {node: '>=10'}
 
-  markdown-it@14.1.1:
-    resolution: {integrity: sha512-BuU2qnTti9YKgK5N+IeMubp14ZUKUUw7yeJbkjtosvHiP0AZ5c8IAgEMk79D0eC8F23r4Ac/q8cAIFdm2FtyoA==}
-    hasBin: true
-
   markdown-it@14.2.0:
     resolution: {integrity: sha512-1TGiQiJVRQ3NPmZH6sx5Cfnmg6GQm9jvC1ch4TK511NjSJvjzKLzn5pPfZRNZkRPZP0HqCioSndqH8v2nRaWVQ==}
-    hasBin: true
-
-  marked@18.0.3:
-    resolution: {integrity: sha512-7VT90JOkDeaRWpfjOReRGPEKn0ecdARBkDGL+tT1wZY0efPPqkUxLUSmzy/C7TIylQYJC9STISEsCHrqb/7VIA==}
-    engines: {node: '>= 20'}
     hasBin: true
 
   math-intrinsics@1.1.0:
@@ -2304,7 +2292,7 @@ snapshots:
     dependencies:
       '@a2ui/web_core': 0.10.3
       dompurify: 3.4.0
-      markdown-it: 14.1.1
+      markdown-it: 14.2.0
 
   '@a2ui/react@0.10.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(zod@3.25.76)':
     dependencies:
@@ -3631,10 +3619,6 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.32.0
       lightningcss-win32-x64-msvc: 1.32.0
 
-  linkify-it@5.0.0:
-    dependencies:
-      uc.micro: 2.1.0
-
   linkify-it@5.0.1:
     dependencies:
       uc.micro: 2.1.0
@@ -3661,15 +3645,6 @@ snapshots:
     dependencies:
       semver: 7.7.4
 
-  markdown-it@14.1.1:
-    dependencies:
-      argparse: 2.0.1
-      entities: 4.5.0
-      linkify-it: 5.0.0
-      mdurl: 2.0.0
-      punycode.js: 2.3.1
-      uc.micro: 2.1.0
-
   markdown-it@14.2.0:
     dependencies:
       argparse: 2.0.1
@@ -3678,8 +3653,6 @@ snapshots:
       mdurl: 2.0.0
       punycode.js: 2.3.1
       uc.micro: 2.1.0
-
-  marked@18.0.3: {}
 
   math-intrinsics@1.1.0: {}
 

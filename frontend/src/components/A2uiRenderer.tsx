@@ -1,15 +1,13 @@
 "use client";
 
+import { renderMarkdown } from "@a2ui/markdown-it";
 import { A2uiSurface, MarkdownContext, type ReactComponentImplementation } from "@a2ui/react/v0_9";
 import type { SurfaceModel } from "@a2ui/web_core/v0_9";
 import { MessageProcessor } from "@a2ui/web_core/v0_9";
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
-import { marked } from "marked";
 import { useEffect, useRef, useState } from "react";
 import { SurfaceResolvedContext } from "./a2ui/surfaceResolvedContext";
 import { tailwindCatalog } from "./a2uiCatalog";
-
-const markdownRenderer = (text: string) => Promise.resolve(marked(text) as string);
 
 /**
  * Process a raw A2UI payload and render the resulting surfaces using the tailwind catalog.
@@ -26,6 +24,10 @@ const markdownRenderer = (text: string) => Promise.resolve(marked(text) as strin
  * after a page reload, or immediately after the user acts on it): interactive
  * catalog components read it via {@link SurfaceResolvedContext} and render inert,
  * so an already-answered surface can never be resubmitted.
+ *
+ * Text components render Markdown via `@a2ui/markdown-it`'s `renderMarkdown`
+ * (supplied through {@link MarkdownContext}), which sanitizes with DOMPurify —
+ * A2UI payloads originate from the agent and must be treated as untrusted HTML.
  */
 export function A2uiRenderer({
   payload,
@@ -75,7 +77,7 @@ export function A2uiRenderer({
   if (surfaces.length === 0) return null;
 
   return (
-    <MarkdownContext.Provider value={markdownRenderer}>
+    <MarkdownContext.Provider value={renderMarkdown}>
       <SurfaceResolvedContext.Provider value={resolved}>
         <div className="mt-1 space-y-2">
           {surfaces.map((surface) => (

@@ -1,14 +1,16 @@
 "use client";
 
+import { renderMarkdown } from "@a2ui/markdown-it";
 import type { AssistantMessage } from "@ag-ui/core";
-import { marked } from "marked";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 /**
  * Render an assistant message as a left-aligned glass bubble with an optional streaming cursor.
  *
- * The message content is rendered as Markdown (via `marked`, same as the A2UI
- * Text component), re-parsed on every streaming delta so formatting appears as
+ * The message content is rendered as Markdown and sanitized via
+ * `@a2ui/markdown-it` (same renderer as the A2UI Text component, which wraps
+ * DOMPurify — message content originates from the agent and must be treated
+ * as untrusted), re-parsed on every streaming delta so formatting appears as
  * tokens arrive.
  *
  * When `avatar` is provided (workflow sessions) it is shown on the outer (left)
@@ -25,11 +27,26 @@ export function AssistantMessageBubble({
   avatar?: ReactNode;
 }) {
   const textContent = message.content ?? "";
+  const [html, setHtml] = useState("");
+
+  useEffect(() => {
+    if (!textContent) {
+      setHtml("");
+      return;
+    }
+    let active = true;
+    renderMarkdown(textContent).then((result) => {
+      if (active) setHtml(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [textContent]);
+
   if (!textContent && !isStreaming) return null;
   const rowClass = avatar
     ? "flex justify-start items-end gap-2 mb-3 animate-message-in"
     : "flex justify-start mb-3 animate-message-in";
-  const html = textContent ? (marked(textContent) as string) : "";
   return (
     <div className={rowClass}>
       {avatar}
@@ -49,9 +66,11 @@ export function AssistantMessageBubble({
         {html ? (
           <div
             className="markdown-body"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: agent-generated Markdown, same trust model as A2uiRenderer
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized via @a2ui/markdown-it (DOMPurify) before render
             dangerouslySetInnerHTML={{ __html: html }}
           />
+        ) : textContent ? (
+          <div className="markdown-body">{textContent}</div>
         ) : isStreaming ? null : (
           " "
         )}
