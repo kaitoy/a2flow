@@ -1,9 +1,11 @@
+import asyncio
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 from google.adk.sessions import InMemorySessionService
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 
 from dependencies import APP_NAME
 from models.user import SYSTEM_USER_ID
@@ -125,6 +127,66 @@ async def test_workflow_session_agent_returns_200(
         json=_make_run_agent_input(),
     )
     assert response.status_code == 200
+
+
+async def test_workflow_session_agent_rejects_a_concurrent_run(
+    workflow_client: AsyncClient,
+    mock_agent_registry: MagicMock,
+    mock_adk_agent: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A second run of a session already streaming is refused with HTTP 409.
+
+    The owner and their approvers share one ADK session here, so two people
+    hitting send at once is an ordinary collision — no client-side "already
+    running" guard can see across users. The second run would reason over an
+    in-memory session the first has moved past, and its messages would be
+    misattributed by the sender snapshot.
+    """
+    from infrastructure import locks
+
+    monkeypatch.setattr(locks, "_DEFAULT_WAIT_SECONDS", 0.05)
+
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+    url = f"/api/v1/workflow-sessions/{ws['id']}/agent"
+
+    streaming = asyncio.Event()
+
+    async def _slow_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
+        streaming.set()
+        await asyncio.sleep(0.3)
+        return
+        yield
+
+    mock_adk_agent.run = _slow_run
+
+    async def _second_run() -> Response:
+        await streaming.wait()
+        return await workflow_client.post(url, json=_make_run_agent_input())
+
+    first, second = await asyncio.gather(
+        workflow_client.post(url, json=_make_run_agent_input()),
+        _second_run(),
+    )
+
+    assert first.status_code == 200
+    error = assert_err(second, code="SESSION_RUN_IN_PROGRESS", status=409)
+    assert error["details"]["threadId"] == "thread-001"
+
+
+async def test_workflow_session_agent_allows_a_later_run(
+    workflow_client: AsyncClient,
+    mock_agent_registry: MagicMock,
+) -> None:
+    """The run lock is released with the stream, so the next turn is not refused."""
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+    url = f"/api/v1/workflow-sessions/{ws['id']}/agent"
+
+    first = await workflow_client.post(url, json=_make_run_agent_input())
+    second = await workflow_client.post(url, json=_make_run_agent_input())
+    assert (first.status_code, second.status_code) == (200, 200)
 
 
 async def test_workflow_session_agent_unknown_id_returns_404(

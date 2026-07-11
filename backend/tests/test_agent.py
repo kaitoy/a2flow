@@ -1,12 +1,14 @@
+import asyncio
 import json
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 import pytest_asyncio
 from ag_ui.core import EventType, RunAgentInput, RunFinishedEvent, RunStartedEvent
 from google.adk.sessions import InMemorySessionService
-from httpx import ASGITransport, AsyncClient
+from httpx import ASGITransport, AsyncClient, Response
 
 from tests.conftest import _install_auth_overrides
 
@@ -64,6 +66,57 @@ async def test_agent_endpoint_returns_200(
     client, _ = agent_client
     response = await client.post("/api/v1/agent", json=_make_run_agent_input())
     assert response.status_code == 200
+
+
+async def test_agent_endpoint_rejects_a_concurrent_run_of_the_same_thread(
+    agent_client: tuple[AsyncClient, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A second run of a thread already streaming is refused with HTTP 409.
+
+    The run lock keeps one ADK session to one driver: a second concurrent run
+    would spend itself reasoning over an in-memory session the first run's
+    appends have already moved past.
+    """
+    from infrastructure import locks
+
+    client, mock_agent = agent_client
+    monkeypatch.setattr(locks, "_DEFAULT_WAIT_SECONDS", 0.05)
+
+    streaming = asyncio.Event()
+
+    async def _slow_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
+        streaming.set()
+        await asyncio.sleep(0.3)
+        return
+        yield
+
+    mock_agent.run = _slow_run
+
+    async def _second_run() -> Response:
+        await streaming.wait()
+        return await client.post("/api/v1/agent", json=_make_run_agent_input())
+
+    first, second = await asyncio.gather(
+        client.post("/api/v1/agent", json=_make_run_agent_input()),
+        _second_run(),
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    error = second.json()["error"]
+    assert error["code"] == "SESSION_RUN_IN_PROGRESS"
+    assert error["details"]["threadId"] == "thread-001"
+
+
+async def test_agent_endpoint_allows_a_later_run_of_the_same_thread(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    """The run lock is released with the stream, so the next turn is not refused."""
+    client, _ = agent_client
+    first = await client.post("/api/v1/agent", json=_make_run_agent_input())
+    second = await client.post("/api/v1/agent", json=_make_run_agent_input())
+    assert (first.status_code, second.status_code) == (200, 200)
 
 
 async def test_agent_endpoint_content_type_is_event_stream(

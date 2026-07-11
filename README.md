@@ -94,6 +94,8 @@ All persistent data — REST API records and ADK session storage — lives in on
 
 The async driver suffix (`aiosqlite` / `asyncpg`) is added automatically. Schema changes are tracked as versioned [Alembic](https://alembic.sqlalchemy.org/) migrations (`backend/alembic/versions/`) and applied automatically on startup — redeploying the app (a container restart) is what runs any pending migrations, so no separate migration step is needed.
 
+The database is also what coordinates a multi-replica backend: an agent run holds a PostgreSQL advisory lock on its ADK session for the length of its SSE stream, so one conversation is never driven by two replicas at once. See [Horizontal scaling](backend/README.md#horizontal-scaling) for what that protects and the constraint it places on connection pooling.
+
 ## Authentication
 
 The app requires sign-in. Visiting any page while logged out redirects to `/login`. On first run, log in with the seeded **`admin`** user: set `ADMIN_PASSWORD` before the first startup, or, if left unset, read the randomly generated password from `docker compose logs backend` (printed once and not recoverable afterwards). Manage additional users from the [admin UI](#users). After signing in the user lands on the [welcome page](#welcome-page).

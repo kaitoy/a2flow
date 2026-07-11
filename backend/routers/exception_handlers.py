@@ -28,6 +28,7 @@ from repositories.exceptions import (
     RegistryUnavailableError,
     SecretResolutionError,
     SecretValidationError,
+    SessionRunInProgressError,
     SkillCloneError,
     UnauthorizedError,
     UniqueViolationError,
@@ -248,6 +249,20 @@ async def registry_unavailable_exception_handler(
         code="REGISTRY_UNREACHABLE",
         message="MCP registry unavailable",
         status_code=502,
+    )
+
+
+async def session_run_in_progress_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with SESSION_RUN_IN_PROGRESS code when a session is already running."""
+    assert isinstance(exc, SessionRunInProgressError)
+    return _envelope_error(
+        request,
+        code="SESSION_RUN_IN_PROGRESS",
+        message=str(exc),
+        status_code=409,
+        details={"threadId": exc.thread_id},
     )
 
 

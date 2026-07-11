@@ -1,6 +1,7 @@
 """Endpoints for retrieving WorkflowSession details and streaming the workflow agent."""
 
 from collections.abc import AsyncGenerator
+from contextlib import AsyncExitStack
 from typing import Any
 
 from ag_ui.core import RunAgentInput, SystemMessage
@@ -9,6 +10,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from dependencies import (
+    APP_NAME,
     ApiMetaDep,
     CurrentUserDep,
     FilterDep,
@@ -17,9 +19,11 @@ from dependencies import (
     WorkflowSessionServiceDep,
 )
 from infrastructure.agent import with_user_id
+from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
 from models.response import ApiResponse
 from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTaskRead
+from repositories.exceptions import SessionRunInProgressError
 
 router = APIRouter(prefix="/workflow-sessions", tags=["workflow-sessions"])
 
@@ -129,9 +133,17 @@ async def workflow_session_agent(
     recorded as the current user's -- except no-op render acknowledgements,
     which merely unblock surfaces nobody acted on (see
     ``WorkflowSessionService.record_new_senders``).
+
+    The run is serialized per ADK session by a cross-process lock, so neither two
+    replicas nor two people sharing the session (owner and approver) can drive it
+    at once — the second run would reason over an in-memory session the first has
+    already moved past, and its messages would be misattributed. A run already in
+    progress surfaces as HTTP 409, before any SSE headers go out (see
+    ``infrastructure/locks.py``).
     """
+    # Resolve (and authorize) before locking, so a caller with no business here
+    # gets their 403/404 rather than queueing behind someone else's run.
     adk_agent, ws = await service.resolve_agent(ws_id, caller=caller)
-    prior_keys = await service.attributable_keys(ws_id)
     current_user_id = caller.id
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
@@ -141,13 +153,33 @@ async def workflow_session_agent(
     input_data = with_user_id(input_data, ws.user_id)
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
+    async with AsyncExitStack() as stack:
+        # Lock on the owner's id, matching how the ADK session is keyed above:
+        # the owner and their approvers share one session, so two of them hitting
+        # send at once is an ordinary collision here, not an edge case — and no
+        # client-side "already running" guard can see across users.
+        try:
+            await stack.enter_async_context(
+                advisory_lock(agent_run_key(APP_NAME, ws.user_id, input_data.thread_id))
+            )
+        except LockNotAcquiredError as exc:
+            raise SessionRunInProgressError(input_data.thread_id) from exc
+
+        # Snapshot inside the lock: this is the "before" half of a read-then-diff
+        # over session state, and a concurrent run appending between the two
+        # halves would misattribute its messages to this caller.
+        prior_keys = await service.attributable_keys(ws_id)
+
+        run_stack = stack.pop_all()
+
     async def event_generator() -> AsyncGenerator[str, None]:
-        async for event in adk_agent.run(input_data):
-            yield encoder.encode(event)
-        # Attribute the messages this run appended to the user who sent them.
-        await service.record_new_senders(ws_id, prior_keys, current_user_id)
-        # Associate each message with the workflow task in progress at the time.
-        await service.record_message_tasks(ws_id)
+        async with run_stack:
+            async for event in adk_agent.run(input_data):
+                yield encoder.encode(event)
+            # Attribute the messages this run appended to the user who sent them.
+            await service.record_new_senders(ws_id, prior_keys, current_user_id)
+            # Associate each message with the workflow task in progress at the time.
+            await service.record_message_tasks(ws_id)
 
     return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
 

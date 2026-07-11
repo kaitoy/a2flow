@@ -1,6 +1,7 @@
 """General-purpose agent streaming endpoint that serves AG-UI events over SSE."""
 
 from collections.abc import AsyncGenerator
+from contextlib import AsyncExitStack
 from pathlib import Path
 
 from ag_ui.core import RunAgentInput, SystemMessage
@@ -17,6 +18,8 @@ from infrastructure.agent import (
     first_user_message_text,
     with_user_id,
 )
+from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from repositories.exceptions import SessionRunInProgressError
 
 router = APIRouter()
 
@@ -35,45 +38,67 @@ async def agent_endpoint(
     (ag_ui_adk appends their content directly to agent instructions).
     The agent and skill are resolved from the ADK session state, falling back
     to the default skill-less agent when no session exists.
+
+    The whole run is serialized per ADK session by a cross-process lock, so a
+    horizontally scaled deployment never has two replicas driving one session at
+    once — the second would spend its run reasoning over an in-memory session the
+    first has already moved past (see ``infrastructure/locks.py``). A run already
+    in progress for this thread surfaces as HTTP 409, before any SSE headers go
+    out.
     """
     # Exclude SystemMessage to prevent prompt injection: ag_ui_adk appends its content directly to agent instructions
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
-    session = await session_service.get_session(
-        app_name=APP_NAME,
-        user_id=user_id,
-        session_id=input_data.thread_id,
-    )
-    skill_id: str | None = None
-    skill_dir: Path | None = None
-    if session is not None:
-        state = session.state or {}
-        raw_skill_id = state.get(AGENT_SKILL_ID_KEY)
-        raw_skill_dir = state.get(SKILL_DIR_KEY)
-        if raw_skill_id:
-            skill_id = str(raw_skill_id)
-        if raw_skill_dir:
-            skill_dir = Path(str(raw_skill_dir))
-    else:
-        first_text = first_user_message_text(filtered)
-        title = derive_session_title(first_text) if first_text is not None else None
-        if title is not None:
-            await session_service.create_session(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=input_data.thread_id,
-                state={SESSION_TITLE_KEY: title},
+    async with AsyncExitStack() as stack:
+        try:
+            await stack.enter_async_context(
+                advisory_lock(agent_run_key(APP_NAME, user_id, input_data.thread_id))
             )
-    adk_agent = registry.get(skill_id, skill_dir)
+        except LockNotAcquiredError as exc:
+            raise SessionRunInProgressError(input_data.thread_id) from exc
 
-    # Override forwarded_props.userId with the trusted X-User-Id header so the
-    # agent run is keyed by the same user the skill lookup above resolved.
-    input_data = with_user_id(input_data, user_id)
+        session = await session_service.get_session(
+            app_name=APP_NAME,
+            user_id=user_id,
+            session_id=input_data.thread_id,
+        )
+        skill_id: str | None = None
+        skill_dir: Path | None = None
+        if session is not None:
+            state = session.state or {}
+            raw_skill_id = state.get(AGENT_SKILL_ID_KEY)
+            raw_skill_dir = state.get(SKILL_DIR_KEY)
+            if raw_skill_id:
+                skill_id = str(raw_skill_id)
+            if raw_skill_dir:
+                skill_dir = Path(str(raw_skill_dir))
+        else:
+            first_text = first_user_message_text(filtered)
+            title = derive_session_title(first_text) if first_text is not None else None
+            if title is not None:
+                await session_service.create_session(
+                    app_name=APP_NAME,
+                    user_id=user_id,
+                    session_id=input_data.thread_id,
+                    state={SESSION_TITLE_KEY: title},
+                )
+        adk_agent = registry.get(skill_id, skill_dir)
+
+        # Override forwarded_props.userId with the trusted X-User-Id header so the
+        # agent run is keyed by the same user the skill lookup above resolved.
+        input_data = with_user_id(input_data, user_id)
+
+        # The run outlives this handler, so the lock has to as well: pop_all()
+        # hands its release to the generator below, leaving the `async with` here
+        # to unwind empty. Until that hand-off the stack still owns the lock, so
+        # anything that raises above releases it instead of stranding the session.
+        run_stack = stack.pop_all()
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        async for event in adk_agent.run(input_data):
-            yield encoder.encode(event)
+        async with run_stack:
+            async for event in adk_agent.run(input_data):
+                yield encoder.encode(event)
 
     return StreamingResponse(event_generator(), media_type=encoder.get_content_type())

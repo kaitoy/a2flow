@@ -179,6 +179,23 @@ class SecretResolutionError(Exception):
         super().__init__(f"failed to resolve secret {secret_name!r}: {reason}")
 
 
+class SessionRunInProgressError(RepositoryError):
+    """Raised when an agent run is requested for a session already being run.
+
+    Only one process may drive a given ADK session at a time (see
+    ``infrastructure/locks.py``): a second concurrent run would reason over an
+    in-memory session that the first run's appends have already left behind.
+    Carries the ``thread_id`` so the HTTP layer can surface it in the error
+    envelope's ``details`` block when returning HTTP 409.
+    """
+
+    def __init__(self, thread_id: str) -> None:
+        self.thread_id = thread_id
+        super().__init__(
+            f"An agent run is already in progress for session {thread_id!r}"
+        )
+
+
 class QueryValidationError(RepositoryError):
     """Raised when a sort or filter query parameter is malformed or references an unknown field.
 
