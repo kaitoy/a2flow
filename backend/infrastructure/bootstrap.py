@@ -1,12 +1,12 @@
 """Bootstrap helpers that seed required baseline records on application startup."""
 
 import logging
-import os
 import secrets
 
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from infrastructure.password import hash_password
 from models.user import SYSTEM_USER_ID, User
 
@@ -53,12 +53,13 @@ async def seed_admin_user(session: AsyncSession) -> None:
     """Create the initial ``admin`` user on first bootstrap.
 
     Skipped when any real (non-system) user already exists, so it runs only on
-    the very first startup. The password is read from the ``ADMIN_PASSWORD``
-    environment variable; if unset (or empty), a random password is generated
-    and logged once at ``WARNING`` level, since it cannot be recovered
-    afterwards. The user is created with ``created_by`` / ``updated_by``
-    pointing at the seeded system user (:data:`SYSTEM_USER_ID`); its own ``id``
-    is an auto-generated UUID7.
+    the very first startup. The password is read from
+    ``config.Settings.admin_password`` (the ``ADMIN_PASSWORD`` environment
+    variable); if unset (or empty), a random password is generated and logged
+    once at ``WARNING`` level, since it cannot be recovered afterwards. The
+    user is created with ``created_by`` / ``updated_by`` pointing at the seeded
+    system user (:data:`SYSTEM_USER_ID`); its own ``id`` is an auto-generated
+    UUID7.
 
     Args:
         session: Database session used to read and insert the user.
@@ -66,7 +67,7 @@ async def seed_admin_user(session: AsyncSession) -> None:
     stmt = select(User).where(col(User.id) != SYSTEM_USER_ID).limit(1)
     if (await session.exec(stmt)).first() is not None:
         return
-    password = os.getenv("ADMIN_PASSWORD")
+    password = get_settings().admin_password
     if not password:
         password = secrets.token_urlsafe(_GENERATED_ADMIN_PASSWORD_BYTES)
         logger.warning(

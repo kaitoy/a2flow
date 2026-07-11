@@ -11,11 +11,11 @@ Any network, HTTP-status, or parse failure is normalized to
 single error shape (HTTP 502).
 """
 
-import os
 from typing import Any
 
 import httpx
 
+from config import get_settings
 from models.mcp_registry import (
     McpRegistryHeader,
     McpRegistrySearchResult,
@@ -24,9 +24,7 @@ from models.mcp_registry import (
 from repositories.exceptions import RegistryUnavailableError
 
 #: Base URL of the MCP registry; overridable via the ``MCP_REGISTRY_URL`` env var.
-REGISTRY_BASE_URL = os.environ.get(
-    "MCP_REGISTRY_URL", "https://registry.modelcontextprotocol.io"
-)
+REGISTRY_BASE_URL = get_settings().mcp_registry_url
 
 #: Upper bound, in seconds, for a single registry round-trip.
 REGISTRY_TIMEOUT_SECONDS = 10.0

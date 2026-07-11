@@ -4,7 +4,6 @@ Configures middleware, exception handlers, and the API router,
 then starts the application with Uvicorn when run directly.
 """
 
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -14,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from dependencies import APP_NAME
 from infrastructure.bootstrap import seed_admin_user, seed_system_user
 from infrastructure.database import engine, init_db
@@ -58,9 +58,15 @@ from routers.exception_handlers import (
     validation_exception_handler,
 )
 
+# Populates os.environ from backend/.env so vendor SDKs (litellm, google-genai)
+# that read GOOGLE_API_KEY/OPENAI_API_KEY/ANTHROPIC_API_KEY/AWS_BEARER_TOKEN_BEDROCK
+# straight out of the environment still see them. config.Settings loads the
+# same file independently for A2Flow's own typed configuration below.
 load_dotenv()
 
 setup_logging()
+
+settings = get_settings()
 
 
 @asynccontextmanager
@@ -96,10 +102,7 @@ def _validate_cors_origins(origins: list[str]) -> None:
         )
 
 
-_cors_origins = [
-    origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-]
+_cors_origins = settings.cors_origins
 _validate_cors_origins(_cors_origins)
 
 app.add_middleware(
@@ -141,8 +144,12 @@ app.include_router(api_router)
 if __name__ == "__main__":
     import uvicorn
 
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
     # log_config=None keeps uvicorn from re-applying its default logging config
     # after import, so the timestamped setup from setup_logging() stays in effect.
-    uvicorn.run("backend.main:app", host=host, port=port, reload=True, log_config=None)
+    uvicorn.run(
+        "backend.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.reload,
+        log_config=None,
+    )

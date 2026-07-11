@@ -1,4 +1,3 @@
-import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -14,6 +13,7 @@ from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.base_toolset import BaseToolset
 from google.adk.tools.skill_toolset import SkillToolset
 
+from config import get_settings
 from infrastructure.approval_tools import get_approval, list_users, request_approval
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.workflow_task_tools import (
@@ -208,7 +208,7 @@ class A2UIInstructionProvider:
 
 def create_agent(skill_dir: Path | None = None) -> LlmAgent:
     """
-    Create an agent based on LLM_MODEL in .env.
+    Create an agent based on ``config.Settings.llm_model``.
 
     - Gemini model name (e.g. "gemini-*"): uses Google AI / Vertex AI directly
     - "litellm:<provider>/<model>" format: uses any LLM via LiteLLM
@@ -221,8 +221,9 @@ def create_agent(skill_dir: Path | None = None) -> LlmAgent:
     the MCP proxy tools (`list_mcp_tools` / `call_mcp_tool`), and the agent runs
     under the plan-then-execute workflow instruction.
     """
-    model_env = os.getenv("LLM_MODEL", "gemini-2.0-flash")
-    role_description = os.getenv("ROLE_DESCRIPTION", "You are a helpful assistant.")
+    settings = get_settings()
+    model_env = settings.llm_model
+    role_description = settings.role_description
 
     model: LiteLlm | str
     if model_env.startswith(LITELLM_PREFIX):

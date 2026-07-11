@@ -1,13 +1,13 @@
 """SQLAlchemy/SQLModel database engine and session management.
 
-The database is selected by the ``DB_URL`` environment variable. SQLite is the
-zero-config default; pointing ``DB_URL`` at a PostgreSQL database (e.g.
+The database is selected by ``config.Settings.db_url`` (the ``DB_URL``
+environment variable). SQLite is the zero-config default; pointing ``DB_URL``
+at a PostgreSQL database (e.g.
 ``postgresql://user:pass@host:5432/a2flow``) switches the whole application —
 including the ADK session store — to PostgreSQL. Sync-style URLs are
 normalized to their async-driver variants by :func:`to_async_url`.
 """
 
-import os
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -16,7 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-DB_URL = os.getenv("DB_URL", "sqlite:///a2flow.db")
+from config import get_settings
+
+DB_URL = get_settings().db_url
 
 
 def to_async_url(url: str) -> str:

@@ -2,23 +2,21 @@
 
 Sessions are server-side: a random opaque token is handed to the browser in a
 cookie and only its hash is stored. Validity is governed by a sliding idle
-timeout read from ``SESSION_IDLE_TIMEOUT_SECONDS`` (default 8 hours): every
-successful :meth:`AuthService.authenticate` refreshes the session's last-active
-time, and a session left idle past the window is revoked and rejected.
+timeout (``config.Settings.session_idle_timeout_seconds``, default 8 hours):
+every successful :meth:`AuthService.authenticate` refreshes the session's
+last-active time, and a session left idle past the window is revoked and
+rejected.
 """
 
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from config import get_settings
 from infrastructure.auth_tokens import generate_token, hash_token
 from infrastructure.password import verify_password
 from models.user import User
 from repositories import AuthSessionRepository, UserRepository
 from repositories.exceptions import UnauthorizedError
-
-#: Fallback idle timeout (8 hours) when ``SESSION_IDLE_TIMEOUT_SECONDS`` is unset.
-DEFAULT_IDLE_TIMEOUT_SECONDS = 28800
 
 
 @dataclass
@@ -51,11 +49,7 @@ class AuthService:
 
     def _idle_timeout(self) -> timedelta:
         """Return the configured sliding idle timeout as a ``timedelta``."""
-        raw = os.getenv("SESSION_IDLE_TIMEOUT_SECONDS")
-        try:
-            seconds = int(raw) if raw else DEFAULT_IDLE_TIMEOUT_SECONDS
-        except ValueError:
-            seconds = DEFAULT_IDLE_TIMEOUT_SECONDS
+        seconds = get_settings().session_idle_timeout_seconds
         return timedelta(seconds=max(seconds, 1))
 
     async def login(self, username: str, password: str) -> LoginResult:

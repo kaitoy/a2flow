@@ -7,13 +7,13 @@ cookies (no ``Max-Age``/``Expires``), so they are cleared when the browser
 closes; server-side validity is governed by the sliding idle timeout.
 """
 
-import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
+from config import get_settings
 from dependencies import (
     CSRF_COOKIE_NAME,
     SESSION_COOKIE_NAME,
@@ -39,10 +39,11 @@ class LoginRequest(BaseModel):
 def _cookie_secure() -> bool:
     """Return whether auth cookies should carry the ``Secure`` attribute.
 
-    Controlled by ``SESSION_COOKIE_SECURE`` (default ``false`` for local HTTP
-    development); set it to ``true`` when serving over HTTPS.
+    Controlled by ``config.Settings.session_cookie_secure`` (the
+    ``SESSION_COOKIE_SECURE`` environment variable, default ``false`` for
+    local HTTP development); set it to ``true`` when serving over HTTPS.
     """
-    return os.getenv("SESSION_COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
+    return get_settings().session_cookie_secure
 
 
 def _set_auth_cookies(

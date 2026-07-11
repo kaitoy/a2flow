@@ -58,9 +58,10 @@ AGENT_INSTRUCTION=You are a helpful assistant. Answer concisely and clearly.
 ```env
 HOST=0.0.0.0
 PORT=8000
+# RELOAD=true
 ```
 
-Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted.
+Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted. `RELOAD` (default `false`) enables uvicorn autoreload; it only affects `python -m backend.main` — the `uv run uvicorn main:app --reload` command below and the Dockerfile's startup path are unaffected either way.
 
 ### Agent skill cache
 

@@ -14,12 +14,13 @@ on a private address that the SSRF check would reject.
 
 import asyncio
 import logging
-import os
 import time
 from functools import lru_cache
 from typing import Protocol
 
 import httpx
+
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -269,15 +270,17 @@ def get_vault_client() -> VaultClient | None:
     importing the dependencies package, which would create an import cycle
     through :mod:`infrastructure.agent`.
     """
-    addr = os.getenv("VAULT_ADDR")
+    settings = get_settings()
+    addr = settings.vault_addr
     if not addr:
         return None
-    role_id = os.getenv("VAULT_ROLE_ID")
-    secret_id = os.getenv("VAULT_SECRET_ID")
+    role_id = settings.vault_role_id
+    secret_id = settings.vault_secret_id
     if role_id and secret_id:
-        mount = os.getenv("VAULT_APPROLE_MOUNT", "approle")
-        return VaultClient(addr, AppRoleAuth(role_id, secret_id, mount))
-    token = os.getenv("VAULT_TOKEN")
+        return VaultClient(
+            addr, AppRoleAuth(role_id, secret_id, settings.vault_approle_mount)
+        )
+    token = settings.vault_token
     if token:
         return VaultClient(addr, TokenAuth(token))
     logger.warning(

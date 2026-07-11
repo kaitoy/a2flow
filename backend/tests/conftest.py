@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -13,8 +13,32 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import Settings, get_settings
 from models.user import SYSTEM_USER_ID, User
 from tests._seed import seed_users
+
+
+@pytest.fixture(autouse=True)
+def _reset_settings_cache(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Clear the memoized ``Settings`` singleton and isolate it from ``.env``.
+
+    ``config.get_settings`` is process-wide ``@lru_cache``d; without clearing
+    it before and after every test, the first test that constructs it would
+    freeze every later test's view of env-driven config (``ADMIN_PASSWORD``,
+    ``SESSION_IDLE_TIMEOUT_SECONDS``, ``SECRET_ENCRYPTION_KEY``/
+    ``SECRET_KEY_FILE``, ...) regardless of ``monkeypatch.setenv``/``delenv``
+    calls made during the test.
+
+    ``Settings`` also reads ``backend/.env`` directly (independent of
+    ``os.environ``), so real values a developer has set there (e.g. a local
+    ``ADMIN_PASSWORD``) would otherwise leak into tests that expect the
+    variable to be unset and rely on ``monkeypatch.delenv`` to simulate that.
+    Disabling the dotenv source here keeps tests seeing only ``os.environ``.
+    """
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def _override_get_current_user_id(request: Request) -> str:

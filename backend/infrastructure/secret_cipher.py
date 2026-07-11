@@ -22,6 +22,7 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
 
+from config import get_settings
 from infrastructure.database import DB_URL, is_sqlite_url
 
 logger = logging.getLogger(__name__)
@@ -70,14 +71,15 @@ def load_or_create_key() -> bytes:
         ValueError: If ``SECRET_ENCRYPTION_KEY`` is set but not a valid Fernet
             key, or the key file exists but holds an invalid key.
     """
-    env_key = os.getenv("SECRET_ENCRYPTION_KEY")
+    settings = get_settings()
+    env_key = settings.secret_encryption_key
     if env_key:
         return _validate_key(
             env_key.encode("ascii", errors="replace"),
             "the SECRET_ENCRYPTION_KEY environment variable",
         )
 
-    key_file = Path(os.getenv("SECRET_KEY_FILE") or _default_key_file())
+    key_file = settings.secret_key_file or _default_key_file()
     if key_file.exists():
         return _validate_key(key_file.read_bytes().strip(), f"key file {key_file}")
 
