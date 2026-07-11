@@ -217,3 +217,49 @@ async def test_delete_avatar_without_upload_returns_404(
     user_id = await _create_user(avatar_client)
     response = await avatar_client.delete(f"/api/v1/users/{user_id}/avatar")
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+# ---------- self-service authorization ----------
+
+
+async def test_upload_avatar_for_other_user_is_forbidden(
+    avatar_client: AsyncClient,
+) -> None:
+    """A non-super-admin uploading another user's avatar is rejected."""
+    user_id = await _create_user(avatar_client)
+    response = await avatar_client.put(
+        f"/api/v1/users/{user_id}/avatar",
+        files={"file": ("avatar.png", _PNG_BYTES, "image/png")},
+        headers={"X-User-Id": "someone-else", "X-User-Roles": "admin"},
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
+
+
+async def test_upload_avatar_for_self_is_allowed_without_roles(
+    avatar_client: AsyncClient,
+) -> None:
+    """A role-less user may upload their own avatar."""
+    user_id = await _create_user(avatar_client)
+    response = await avatar_client.put(
+        f"/api/v1/users/{user_id}/avatar",
+        files={"file": ("avatar.png", _PNG_BYTES, "image/png")},
+        headers={"X-User-Id": user_id, "X-User-Roles": ""},
+    )
+    assert assert_ok(response)["avatarUpdatedAt"] is not None
+
+
+async def test_delete_avatar_for_other_user_is_forbidden(
+    avatar_client: AsyncClient,
+) -> None:
+    """A non-super-admin removing another user's avatar is rejected."""
+    user_id = await _create_user(avatar_client)
+    await avatar_client.put(
+        f"/api/v1/users/{user_id}/avatar",
+        files={"file": ("a.png", _PNG_BYTES, "image/png")},
+        headers={"X-User-Id": user_id, "X-User-Roles": ""},
+    )
+    response = await avatar_client.delete(
+        f"/api/v1/users/{user_id}/avatar",
+        headers={"X-User-Id": "someone-else", "X-User-Roles": "admin"},
+    )
+    assert_err(response, code="FORBIDDEN", status=403)

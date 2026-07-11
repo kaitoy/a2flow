@@ -1,6 +1,6 @@
 """CRUD endpoints for MCPServer resources plus remote tool discovery."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from dependencies import (
     ApiMetaDep,
@@ -9,14 +9,24 @@ from dependencies import (
     MCPServerServiceDep,
     PaginationDep,
     SortDep,
+    require_roles,
 )
 from models.mcp_server import MCPServer, MCPServerCreate, MCPServerUpdate, McpToolInfo
 from models.response import ApiResponse
+from models.user import Role
 
 router = APIRouter(prefix="/mcp-servers", tags=["mcp-servers"])
 
+#: Route dependency gating MCP server writes behind the ``developer`` role.
+_requires_developer = [Depends(require_roles(Role.developer))]
 
-@router.post("", response_model=ApiResponse[MCPServer], status_code=201)
+
+@router.post(
+    "",
+    response_model=ApiResponse[MCPServer],
+    status_code=201,
+    dependencies=_requires_developer,
+)
 async def create_mcp_server(
     body: MCPServerCreate,
     service: MCPServerServiceDep,
@@ -64,7 +74,11 @@ async def list_mcp_server_tools(
     return ApiResponse(meta=meta, data=tools)
 
 
-@router.patch("/{server_id}", response_model=ApiResponse[MCPServer])
+@router.patch(
+    "/{server_id}",
+    response_model=ApiResponse[MCPServer],
+    dependencies=_requires_developer,
+)
 async def update_mcp_server(
     server_id: str,
     body: MCPServerUpdate,
@@ -76,7 +90,11 @@ async def update_mcp_server(
     return ApiResponse(meta=meta, data=server)
 
 
-@router.delete("/{server_id}", response_model=ApiResponse[None])
+@router.delete(
+    "/{server_id}",
+    response_model=ApiResponse[None],
+    dependencies=_requires_developer,
+)
 async def delete_mcp_server(
     server_id: str,
     service: MCPServerServiceDep,

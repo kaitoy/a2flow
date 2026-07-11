@@ -5,6 +5,7 @@ description = "Google ADK agent with SSE streaming"
 requires-python = ">=3.11"
 dependencies = [
     "google-adk>=1.28.0",
+    "anyio>=4.0.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "python-dotenv>=1.0.0",

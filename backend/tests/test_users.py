@@ -464,3 +464,169 @@ async def test_create_user_rejects_username_with_bad_charset(
         "/api/v1/users", json={**_CREATE_BODY, "username": "has space"}
     )
     assert_err(response, "VALIDATION_ERROR", 422)
+
+
+# ---------- roles & self-service authorization ----------
+
+
+async def _create_user(
+    user_client: AsyncClient, headers: dict[str, str] | None = None, **overrides: Any
+) -> Any:
+    """Create a user (default: as super admin) and return the response body."""
+    body = {**_CREATE_BODY, **overrides}
+    return assert_ok(
+        await user_client.post("/api/v1/users", json=body, headers=headers or {}),
+        status=201,
+    )
+
+
+async def test_create_user_persists_roles(user_client: AsyncClient) -> None:
+    """Roles supplied at creation are stored and returned, deduplicated."""
+    body = await _create_user(
+        user_client, roles=["developer", "requester", "developer"]
+    )
+    assert body["roles"] == ["developer", "requester"]
+
+
+async def test_create_user_rejects_unknown_role(user_client: AsyncClient) -> None:
+    """A role outside the Role enum returns 422."""
+    response = await user_client.post(
+        "/api/v1/users", json={**_CREATE_BODY, "roles": ["wizard"]}
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_admin_cannot_create_super_admin(user_client: AsyncClient) -> None:
+    """An admin (non-super) creating a super_admin user is rejected."""
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "roles": ["super_admin"]},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_super_admin_can_create_super_admin(user_client: AsyncClient) -> None:
+    """A super admin may create another super_admin user."""
+    body = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, roles=["super_admin"]
+    )
+    assert body["roles"] == ["super_admin"]
+
+
+async def test_admin_cannot_grant_super_admin(user_client: AsyncClient) -> None:
+    """An admin (non-super) granting super_admin via PATCH is rejected."""
+    created = await _create_user(user_client)
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": ["super_admin"]},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_admin_cannot_revoke_super_admin(user_client: AsyncClient) -> None:
+    """An admin (non-super) revoking super_admin via PATCH is rejected."""
+    created = await _create_user(user_client, roles=["super_admin"])
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": []},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_admin_can_update_other_roles(user_client: AsyncClient) -> None:
+    """An admin may grant and revoke non-super roles freely."""
+    created = await _create_user(user_client, roles=["requester"])
+    body = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"roles": ["developer", "approver"]},
+            headers={"X-User-Roles": "admin"},
+        )
+    )
+    assert body["roles"] == ["developer", "approver"]
+
+
+async def test_admin_can_edit_super_admin_user_without_touching_roles(
+    user_client: AsyncClient,
+) -> None:
+    """An admin editing a super_admin's profile (roles unchanged) is allowed."""
+    created = await _create_user(user_client, roles=["super_admin"])
+    body = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"firstName": "Renamed"},
+            headers={"X-User-Roles": "admin"},
+        )
+    )
+    assert body["firstName"] == "Renamed"
+    assert body["roles"] == ["super_admin"]
+
+
+async def test_super_admin_can_grant_and_revoke_super_admin(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin may grant and then revoke the super_admin role."""
+    created = await _create_user(user_client)
+    granted = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"roles": ["super_admin"]},
+            headers={"X-User-Roles": "super_admin"},
+        )
+    )
+    assert granted["roles"] == ["super_admin"]
+    revoked = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"roles": []},
+            headers={"X-User-Roles": "super_admin"},
+        )
+    )
+    assert revoked["roles"] == []
+
+
+async def test_roleless_user_can_update_own_avatar_config(
+    user_client: AsyncClient,
+) -> None:
+    """A user without roles may PATCH their own avatar customization."""
+    created = await _create_user(user_client)
+    body = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"avatarConfig": {"selections": {"hair": "h1"}}},
+            headers={"X-User-Id": created["id"], "X-User-Roles": ""},
+        )
+    )
+    assert body["avatarConfig"]["selections"] == {"hair": "h1"}
+
+
+async def test_roleless_user_cannot_update_own_profile_fields(
+    user_client: AsyncClient,
+) -> None:
+    """A non-admin PATCHing their own non-self-service field is rejected."""
+    created = await _create_user(user_client)
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"firstName": "Hacked"},
+        headers={"X-User-Id": created["id"], "X-User-Roles": ""},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_roleless_user_cannot_update_other_user(
+    user_client: AsyncClient,
+) -> None:
+    """A non-admin PATCHing another user is rejected even for avatar_config."""
+    created = await _create_user(user_client)
+    other = await _create_user(
+        user_client, username="mallory", email="mallory@example.com"
+    )
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"avatarConfig": {"selections": {}}},
+        headers={"X-User-Id": other["id"], "X-User-Roles": "developer,approver"},
+    )
+    assert_err(response, "FORBIDDEN", 403)

@@ -167,11 +167,13 @@ async def test_resolve_by_non_approver_is_forbidden(
     ws_id = await _seed_session(eng)
     approval_id = await _insert_approval(eng, workflow_session_id=ws_id, approver="bob")
 
-    # alice is not the designated approver, so she cannot resolve it.
+    # alice is not the designated approver, so she cannot resolve it — even
+    # while holding the approver role (the test auth stub defaults to
+    # super_admin, which would bypass the check, so roles are set explicitly).
     res = await client.patch(
         f"/api/v1/approvals/{approval_id}",
         json={"status": "approved"},
-        headers={"X-User-Id": "alice"},
+        headers={"X-User-Id": "alice", "X-User-Roles": "approver"},
     )
     assert_err(res, "FORBIDDEN", 403)
 
@@ -180,6 +182,26 @@ async def test_resolve_by_non_approver_is_forbidden(
         f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}
     )
     assert assert_ok(res)["status"] == ApprovalStatus.pending.value
+
+
+async def test_resolve_by_super_admin_is_allowed(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A super admin may resolve an approval designated to someone else."""
+    client, eng = approval_env
+    ws_id = await _seed_session(eng)
+    approval_id = await _insert_approval(eng, workflow_session_id=ws_id, approver="bob")
+
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": "alice", "X-User-Roles": "super_admin"},
+    )
+    data = assert_ok(res)
+    assert data["status"] == ApprovalStatus.approved.value
+    # The designated approver field is preserved; only the audit trail records alice.
+    assert data["approver"] == "bob"
+    assert data["updatedBy"] == "alice"
 
 
 async def test_resolve_keeps_designated_approver(

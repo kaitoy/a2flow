@@ -53,8 +53,20 @@ def _override_get_current_user_id(request: Request) -> str:
 
 
 async def _override_get_current_user(request: Request) -> User:
-    """Test stand-in for the route guard; returns a synthetic user holding the id."""
-    return User.model_construct(id=request.headers.get("X-User-Id", ""))
+    """Test stand-in for the route guard; returns a synthetic user holding the id.
+
+    Roles are taken from the ``X-User-Roles`` header (comma-separated),
+    defaulting to ``super_admin`` so pre-RBAC tests keep passing every role
+    and ownership check. Role-specific tests opt in by setting the header
+    explicitly (e.g. ``X-User-Roles: requester`` or an empty value for a
+    role-less user).
+    """
+    roles_header = request.headers.get("X-User-Roles")
+    if roles_header is None:
+        roles = ["super_admin"]
+    else:
+        roles = [r.strip() for r in roles_header.split(",") if r.strip()]
+    return User.model_construct(id=request.headers.get("X-User-Id", ""), roles=roles)
 
 
 def _override_verify_csrf() -> None:

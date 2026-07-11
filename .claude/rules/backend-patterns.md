@@ -258,7 +258,8 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `ReferencedError` | 409 | `CONFLICT_REFERENCED` | Cannot delete a referenced resource |
 | `UniqueViolationError` | 409 | `CONFLICT_UNIQUE` | Unique constraint violated; `details` carries `field` and `value` |
 | `ForeignKeyViolationError` | 422 | `FOREIGN_KEY_VIOLATION` | Referenced entity not found; `details` carries `entity` and `id` |
-| `ForbiddenError` | 403 | `FORBIDDEN` | Authenticated user lacks permission for the resource (e.g. not an approval's designated approver) |
+| `ForbiddenError` | 403 | `FORBIDDEN` | Authenticated user lacks permission: missing role (`require_roles`) or failing an ownership check (see Authorization below) |
+| `SessionRunInProgressError` | 409 | `SESSION_RUN_IN_PROGRESS` | An agent run for this ADK session is already in flight (possibly on another replica); `details` carries `threadId`. Raised by `POST /agent` when the run lock (`infrastructure/locks.py`) is contended |
 | `AvatarValidationError` | 422 | `INVALID_AVATAR` | Uploaded avatar has an unsupported type or exceeds the size limit; `details` carries `reason` |
 | `SecretValidationError` | 422 | `INVALID_SECRET` | A Secret PATCH would leave an invalid per-type shape (merged-result check in `SecretService`); `details` carries `reason` |
 | `SecretResolutionError` | 502 | `SECRET_RESOLUTION_FAILED` | A `${secret:NAME}` reference or skill `repo_auth_secret` could not be resolved; `details` carries `secret` only — the raw failure reason is logged server-side, never returned to the client |
@@ -272,6 +273,13 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 ### User ID Extraction
 
 The caller's identity comes from the authenticated session cookie. `dependencies.auth.get_current_user` validates the `a2flow_session` cookie (sliding idle timeout) and returns the `User`; `CurrentUserIdDep` derives its `id`. Resource routers are guarded at include time with `dependencies=[Depends(get_current_user), Depends(verify_csrf)]` (see `routers/__init__.py`), so every endpoint requires a valid session and state-changing requests require a matching `X-CSRF-Token` header. The `auth` and `health` routers are unguarded. A missing/invalid session raises `UnauthorizedError` (401); a CSRF failure raises `CsrfError` (403).
+
+### Authorization
+
+Authentication (a valid session) is applied router-wide; **authorization** has two layers, both raising `ForbiddenError` (403 `FORBIDDEN`):
+
+1. **Role gates — router layer.** `dependencies/authz.py::require_roles(*roles)` builds a route dependency; attach it per route (`@router.post(..., dependencies=[Depends(require_roles(Role.developer))])`), never router-wide, because every router mixes open `GET`s with gated writes. Reads are deliberately open to all authenticated users. `Role` and the shared `has_role(user, *roles)` helper (with its `super_admin` bypass) live in `models/user.py` — always go through `has_role`, never compare `user.roles` directly.
+2. **Ownership rules — service layer.** Anything a role cannot express belongs in the service, alongside the business rules: `UserService.update` (self-service fields + the `super_admin` grant/revoke guard), `UserAvatarService` (self-only writes), `ApprovalService.resolve` (designated approver), and `WorkflowSessionAccessPolicy` (`services/workflow_session_access.py`), which `WorkflowSessionService` and `WorkflowTaskService` call with the `caller: User` their routers pass in. Fetch the entity first so a missing record still surfaces as 404, not 403.
 
 ### Path and Tag Naming
 
@@ -357,6 +365,7 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 - URL is read from the `DB_URL` environment variable (default: `sqlite:///a2flow.db`). PostgreSQL is selected by pointing it at a `postgresql://` URL — no code change needed.
 - `infrastructure/database.py` normalizes the URL to its async-driver variant via `to_async_url()` (`sqlite` → `aiosqlite`, `postgresql`/`postgres` → `asyncpg`; explicit drivers pass through) and exposes it as `ASYNC_DB_URL`.
 - SQLite pragmas (`PRAGMA foreign_keys=ON`, `PRAGMA journal_mode=WAL`) are registered only when the engine dialect is SQLite. Non-SQLite engines get `pool_pre_ping=True`.
+- `infrastructure/locks.py` owns a **second, private engine** (`NullPool`, `AUTOCOMMIT`) used only for PostgreSQL advisory locks. It is deliberately not the request-serving engine: an agent run holds its lock for minutes, which would starve the request pool, and `NullPool`'s real close guarantees the session-level lock is released even if the explicit unlock is missed. Do not route ordinary queries through it.
 - The ADK session service factory (`dependencies/singletons.py`) branches on `is_sqlite_url(DB_URL)`: SQLite keeps `StaleTolerantSqliteSessionService`; anything else uses `StaleTolerantDatabaseSessionService` (SQLAlchemy-based, same database).
 - `repositories/_integrity.py` classifies `IntegrityError`s by message markers for **both** dialects (`FOREIGN KEY constraint failed` / `violates foreign key constraint`, `UNIQUE constraint failed` / `duplicate key value violates unique constraint`). When adding constraint-translation logic, cover both.
 - Datetime table columns must use `sa_type=TZDateTime` (`models/base.py`) — asyncpg rejects tz-aware values on naive `TIMESTAMP` columns; `TZDateTime` maps to `timestamptz` on PostgreSQL and is a no-op on SQLite.

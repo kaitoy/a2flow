@@ -23,28 +23,42 @@ import {
   listWorkflows,
   type Workflow,
 } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
+
+/** Per-role capabilities driving which row actions the table renders. */
+interface WorkflowPermissions {
+  /** True when the viewer may execute workflows (`requester`). */
+  canRun: boolean;
+  /** True when the viewer may create, edit, and delete workflows (`developer`). */
+  canEdit: boolean;
+}
 
 function buildColumns(
   skillMap: Map<string, string>,
   onRun: (id: string) => void,
   runningId: string | null,
-  onDelete: (id: string, name: string) => void
+  onDelete: (id: string, name: string) => void,
+  permissions: WorkflowPermissions
 ): ColumnDef<Workflow>[] {
   return [
     {
       header: "Name",
       sortField: "name",
       filterField: "name",
-      cell: (w) => (
-        <Link
-          href={`/admin/workflows/${w.id}`}
-          className="font-medium text-accent transition-colors hover:underline"
-        >
-          {w.name}
-        </Link>
-      ),
+      // Only developers can open the edit form; everyone else sees a plain name.
+      cell: (w) =>
+        permissions.canEdit ? (
+          <Link
+            href={`/admin/workflows/${w.id}`}
+            className="font-medium text-accent transition-colors hover:underline"
+          >
+            {w.name}
+          </Link>
+        ) : (
+          <span className="font-medium text-on-surface">{w.name}</span>
+        ),
     },
     {
       header: "Prompt",
@@ -73,14 +87,16 @@ function buildColumns(
       noTruncate: true,
       cell: (w) => (
         <div className="flex gap-2">
-          <ActionIconButton
-            icon={runningId === w.id ? Loader2 : Play}
-            label="Run"
-            onClick={() => onRun(w.id)}
-            disabled={runningId !== null}
-            spinning={runningId === w.id}
-          />
-          <DeleteIconButton onClick={() => onDelete(w.id, w.name)} />
+          {permissions.canRun && (
+            <ActionIconButton
+              icon={runningId === w.id ? Loader2 : Play}
+              label="Run"
+              onClick={() => onRun(w.id)}
+              disabled={runningId !== null}
+              spinning={runningId === w.id}
+            />
+          )}
+          {permissions.canEdit && <DeleteIconButton onClick={() => onDelete(w.id, w.name)} />}
         </div>
       ),
     },
@@ -89,6 +105,8 @@ function buildColumns(
 
 export default function WorkflowsPage() {
   const router = useRouter();
+  const canRun = useHasRole(Role.REQUESTER);
+  const canEdit = useHasRole(Role.DEVELOPER);
   const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
     useTableQuery<Workflow>(listWorkflows, {
       limit: LIMIT,
@@ -143,8 +161,8 @@ export default function WorkflowsPage() {
       <AdminPageHeader
         title="Workflows"
         icon={WorkflowIcon}
-        addHref="/admin/workflows/new"
-        addLabel="+ Add workflow"
+        addHref={canEdit ? "/admin/workflows/new" : undefined}
+        addLabel={canEdit ? "+ Add workflow" : undefined}
         onRefresh={reload}
         refreshing={loading}
       />
@@ -152,7 +170,10 @@ export default function WorkflowsPage() {
         <ErrorBanner error={actionError ?? error} />
       </div>
       <DataTable
-        columns={buildColumns(skillMap, handleRun, runningId, handleDelete)}
+        columns={buildColumns(skillMap, handleRun, runningId, handleDelete, {
+          canRun,
+          canEdit,
+        })}
         rows={rows}
         loading={loading}
         emptyMessage="No workflows registered yet."

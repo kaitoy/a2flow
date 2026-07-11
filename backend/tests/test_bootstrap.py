@@ -20,7 +20,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.bootstrap import seed_admin_user, seed_system_user
 from infrastructure.password import verify_password
 from models.constraints import Password
-from models.user import SYSTEM_USER_ID, User
+from models.user import SYSTEM_USER_ID, Role, User
 
 _PASSWORD_CONSTRAINTS = get_args(Password)[1]
 
@@ -81,6 +81,15 @@ async def test_seed_admin_user_creates_admin(engine: AsyncEngine) -> None:
     assert users[0].username == "admin"
     assert users[0].enabled is True
     assert users[0].created_by == SYSTEM_USER_ID
+
+
+async def test_seed_admin_user_grants_super_admin_role(engine: AsyncEngine) -> None:
+    """The seeded admin holds super_admin so it can manage users and roles."""
+    async with AsyncSession(engine) as session:
+        await seed_admin_user(session)
+    async with AsyncSession(engine) as session:
+        admin = (await _real_users(session))[0]
+    assert admin.roles == [Role.super_admin.value]
 
 
 async def test_seed_admin_user_honours_env_password(

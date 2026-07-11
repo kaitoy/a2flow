@@ -1,6 +1,6 @@
 """CRUD endpoints for Workflow resources and the workflow execution action."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from dependencies import (
     ApiMetaDep,
@@ -9,15 +9,28 @@ from dependencies import (
     PaginationDep,
     SortDep,
     WorkflowServiceDep,
+    require_roles,
 )
 from models.response import ApiResponse
+from models.user import Role
 from models.workflow import Workflow, WorkflowCreate, WorkflowUpdate
 from models.workflow_session import WorkflowSession
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
+#: Route dependency gating workflow writes behind the ``developer`` role.
+_requires_developer = [Depends(require_roles(Role.developer))]
 
-@router.post("", response_model=ApiResponse[Workflow], status_code=201)
+#: Route dependency gating workflow execution behind the ``requester`` role.
+_requires_requester = [Depends(require_roles(Role.requester))]
+
+
+@router.post(
+    "",
+    response_model=ApiResponse[Workflow],
+    status_code=201,
+    dependencies=_requires_developer,
+)
 async def create_workflow(
     body: WorkflowCreate,
     service: WorkflowServiceDep,
@@ -55,7 +68,11 @@ async def get_workflow(
     return ApiResponse(meta=meta, data=workflow)
 
 
-@router.patch("/{workflow_id}", response_model=ApiResponse[Workflow])
+@router.patch(
+    "/{workflow_id}",
+    response_model=ApiResponse[Workflow],
+    dependencies=_requires_developer,
+)
 async def update_workflow(
     workflow_id: str,
     body: WorkflowUpdate,
@@ -67,7 +84,11 @@ async def update_workflow(
     return ApiResponse(meta=meta, data=workflow)
 
 
-@router.delete("/{workflow_id}", response_model=ApiResponse[None])
+@router.delete(
+    "/{workflow_id}",
+    response_model=ApiResponse[None],
+    dependencies=_requires_developer,
+)
 async def delete_workflow(
     workflow_id: str,
     service: WorkflowServiceDep,
@@ -81,6 +102,7 @@ async def delete_workflow(
     "/{workflow_id}/execute",
     response_model=ApiResponse[WorkflowSession],
     status_code=201,
+    dependencies=_requires_requester,
 )
 async def execute_workflow(
     workflow_id: str,

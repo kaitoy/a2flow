@@ -21,6 +21,7 @@ from services import (
     UserAvatarService,
     UserService,
     WorkflowService,
+    WorkflowSessionAccessPolicy,
     WorkflowSessionService,
     WorkflowTaskService,
 )
@@ -150,16 +151,29 @@ def get_workflow_service(
 WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
 
 
+def get_workflow_session_access_policy(
+    approvals: ApprovalRepositoryDep,
+) -> WorkflowSessionAccessPolicy:
+    """Create the access policy for workflow-session-scoped operations."""
+    return WorkflowSessionAccessPolicy(approvals)
+
+
+WorkflowSessionAccessPolicyDep = Annotated[
+    WorkflowSessionAccessPolicy, Depends(get_workflow_session_access_policy)
+]
+
+
 def get_workflow_session_service(
     ws_repo: WorkflowSessionRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     meta: MessageMetaRepositoryDep,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
+    access: WorkflowSessionAccessPolicyDep,
 ) -> WorkflowSessionService:
-    """Create a WorkflowSessionService wiring the repositories, agent registry, and session store."""
+    """Create a WorkflowSessionService wiring the repositories, agent registry, session store, and access policy."""
     return WorkflowSessionService(
-        ws_repo, tasks, meta, registry, session_service, APP_NAME
+        ws_repo, tasks, meta, registry, session_service, APP_NAME, access
     )
 
 
@@ -168,9 +182,13 @@ WorkflowSessionServiceDep = Annotated[
 ]
 
 
-def get_workflow_task_service(repo: WorkflowTaskRepositoryDep) -> WorkflowTaskService:
-    """Create a WorkflowTaskService backed by the request's repository."""
-    return WorkflowTaskService(repo)
+def get_workflow_task_service(
+    repo: WorkflowTaskRepositoryDep,
+    ws_repo: WorkflowSessionRepositoryDep,
+    access: WorkflowSessionAccessPolicyDep,
+) -> WorkflowTaskService:
+    """Create a WorkflowTaskService wiring the task and session repositories and the access policy."""
+    return WorkflowTaskService(repo, ws_repo, access)
 
 
 WorkflowTaskServiceDep = Annotated[

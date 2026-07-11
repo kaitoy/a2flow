@@ -6,7 +6,7 @@ Secret values are write-only: create and update accept a plaintext ``value``
 plaintext nor the stored ciphertext is ever serialized to clients.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from dependencies import (
     ApiMetaDep,
@@ -15,14 +15,24 @@ from dependencies import (
     PaginationDep,
     SecretServiceDep,
     SortDep,
+    require_roles,
 )
 from models.response import ApiResponse
 from models.secret import SecretCreate, SecretRead, SecretUpdate
+from models.user import Role
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 
+#: Route dependency gating secret writes behind the ``admin`` role.
+_requires_admin = [Depends(require_roles(Role.admin))]
 
-@router.post("", response_model=ApiResponse[SecretRead], status_code=201)
+
+@router.post(
+    "",
+    response_model=ApiResponse[SecretRead],
+    status_code=201,
+    dependencies=_requires_admin,
+)
 async def create_secret(
     body: SecretCreate,
     service: SecretServiceDep,
@@ -60,7 +70,11 @@ async def get_secret(
     return ApiResponse(meta=meta, data=SecretRead.model_validate(secret))
 
 
-@router.patch("/{secret_id}", response_model=ApiResponse[SecretRead])
+@router.patch(
+    "/{secret_id}",
+    response_model=ApiResponse[SecretRead],
+    dependencies=_requires_admin,
+)
 async def update_secret(
     secret_id: str,
     body: SecretUpdate,
@@ -72,7 +86,11 @@ async def update_secret(
     return ApiResponse(meta=meta, data=SecretRead.model_validate(secret))
 
 
-@router.delete("/{secret_id}", response_model=ApiResponse[None])
+@router.delete(
+    "/{secret_id}",
+    response_model=ApiResponse[None],
+    dependencies=_requires_admin,
+)
 async def delete_secret(
     secret_id: str,
     service: SecretServiceDep,

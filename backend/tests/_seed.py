@@ -12,14 +12,22 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_user
-from models.user import SYSTEM_USER_ID, User
+from models.user import SYSTEM_USER_ID, Role, User
 
 #: Named test actors seeded with ``id == username`` so ``X-User-Id: alice`` works.
 DEFAULT_TEST_USER_IDS: tuple[str, ...] = ("alice", "bob", "carol", "owner", "tester")
 
+#: Roles granted to every seeded test actor. ``approver`` keeps the pre-RBAC
+#: test semantics: any named actor can be designated as an approval's approver
+#: (the ``request_approval`` tool validates approver eligibility).
+DEFAULT_TEST_USER_ROLES: tuple[Role, ...] = (Role.approver,)
+
 
 async def seed_users(
-    engine: AsyncEngine, ids: Sequence[str] = DEFAULT_TEST_USER_IDS
+    engine: AsyncEngine,
+    ids: Sequence[str] = DEFAULT_TEST_USER_IDS,
+    *,
+    roles: Sequence[Role] = DEFAULT_TEST_USER_ROLES,
 ) -> None:
     """Seed the system user and the given named test actors into the database.
 
@@ -27,6 +35,8 @@ async def seed_users(
         engine: The async engine bound to the test database.
         ids: User ids to seed; each becomes a user whose ``id`` equals its
             ``username`` so it can be referenced by ``X-User-Id`` headers.
+        roles: Roles granted to each seeded actor; defaults to ``approver`` so
+            actors stay eligible as approval approvers.
     """
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
@@ -40,6 +50,7 @@ async def seed_users(
                         last_name="Test",
                         password="testpassword",
                         email=f"{uid}@test.local",
+                        roles=[role.value for role in roles],
                         created_by=SYSTEM_USER_ID,
                         updated_by=SYSTEM_USER_ID,
                     )

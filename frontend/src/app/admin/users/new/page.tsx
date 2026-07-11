@@ -12,6 +12,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
+import { RolesField } from "@/components/admin/roles-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ErrorBanner } from "@/components/ui/error-banner";
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createUser } from "@/lib/api";
+import type { Role } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -30,6 +32,9 @@ export default function NewUserPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [apiError, setApiError] = useState<string | null>(null);
+  // Roles live outside the form state: the picker is a controlled multi-select
+  // rather than a registered input.
+  const [roles, setRoles] = useState<Role[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -62,6 +67,7 @@ export default function NewUserPage() {
           email: values.email,
           enabled: values.enabled,
           emailVerified: values.emailVerified,
+          roles,
         });
         dispatch(showToast({ message: "User created" }));
         router.push("/admin/users");
@@ -116,6 +122,8 @@ export default function NewUserPage() {
               {...register("password")}
             />
           </FormField>
+
+          <RolesField value={roles} onChange={setRoles} />
 
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />

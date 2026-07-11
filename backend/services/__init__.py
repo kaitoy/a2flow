@@ -9,6 +9,7 @@ from .user import UserService
 from .user_avatar import UserAvatarService
 from .workflow import WorkflowService
 from .workflow_session import WorkflowSessionService
+from .workflow_session_access import WorkflowSessionAccessPolicy
 from .workflow_task import WorkflowTaskService
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "UserAvatarService",
     "UserService",
     "WorkflowService",
+    "WorkflowSessionAccessPolicy",
     "WorkflowSessionService",
     "WorkflowTaskService",
 ]

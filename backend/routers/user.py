@@ -6,32 +6,47 @@ stored credential is never serialized to clients.
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Response, UploadFile
 
 from dependencies import (
     ApiMetaDep,
-    CurrentUserIdDep,
+    CurrentUserDep,
     FilterDep,
     PaginationDep,
     SortDep,
     UserAvatarServiceDep,
     UserServiceDep,
+    require_roles,
 )
 from models.response import ApiResponse
-from models.user import UserCreate, UserRead, UserUpdate
+from models.user import Role, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+#: Route dependency gating user creation and deletion behind the ``admin`` role.
+#: ``PATCH`` is not listed here — it allows a limited self-service path and is
+#: authorized in :class:`~services.user.UserService` instead.
+_requires_admin = [Depends(require_roles(Role.admin))]
 
-@router.post("", response_model=ApiResponse[UserRead], status_code=201)
+
+@router.post(
+    "",
+    response_model=ApiResponse[UserRead],
+    status_code=201,
+    dependencies=_requires_admin,
+)
 async def create_user(
     body: UserCreate,
     service: UserServiceDep,
-    user_id: CurrentUserIdDep,
+    acting_user: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[UserRead]:
-    """Create a new user and return it without the password hash."""
-    user = await service.create(body, user_id=user_id)
+    """Create a new user and return it without the password hash.
+
+    Requires the ``admin`` role; creating a ``super_admin`` additionally
+    requires the acting user to be a super admin.
+    """
+    user = await service.create(body, acting_user=acting_user)
     return ApiResponse(meta=meta, data=UserRead.model_validate(user))
 
 
@@ -69,15 +84,24 @@ async def update_user(
     user_id: str,
     body: UserUpdate,
     service: UserServiceDep,
-    current_user_id: CurrentUserIdDep,
+    acting_user: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[UserRead]:
-    """Apply a partial update to a user and return it without the password hash."""
-    user = await service.update(user_id, body, user_id=current_user_id)
+    """Apply a partial update to a user and return it without the password hash.
+
+    Admins may update any user; other callers may update only their own
+    avatar customization (the self-service ``/account`` page). The
+    authorization rules live in :meth:`UserService.update`.
+    """
+    user = await service.update(user_id, body, acting_user=acting_user)
     return ApiResponse(meta=meta, data=UserRead.model_validate(user))
 
 
-@router.delete("/{user_id}", response_model=ApiResponse[None])
+@router.delete(
+    "/{user_id}",
+    response_model=ApiResponse[None],
+    dependencies=_requires_admin,
+)
 async def delete_user(
     user_id: str,
     service: UserServiceDep,
@@ -94,21 +118,22 @@ async def upload_user_avatar(
     file: Annotated[UploadFile, File(description="Avatar image file")],
     avatar_service: UserAvatarServiceDep,
     service: UserServiceDep,
-    current_user_id: CurrentUserIdDep,
+    acting_user: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[UserRead]:
     """Store or replace a user's custom avatar and return the updated user.
 
-    The image is validated (allowed type and size) by the service. The returned
-    user's ``avatarUpdatedAt`` reflects the new image so the client can refresh
-    its cached avatar.
+    Self-service only: the target must be the acting user themself (or the
+    acting user must be a super admin). The image is validated (allowed type
+    and size) by the service. The returned user's ``avatarUpdatedAt`` reflects
+    the new image so the client can refresh its cached avatar.
     """
     data = await file.read()
     await avatar_service.set(
         user_id,
         data=data,
         content_type=file.content_type or "",
-        acting_user_id=current_user_id,
+        acting_user=acting_user,
     )
     user = await service.get(user_id)
     return ApiResponse(meta=meta, data=UserRead.model_validate(user))
@@ -140,13 +165,16 @@ async def delete_user_avatar(
     user_id: str,
     avatar_service: UserAvatarServiceDep,
     service: UserServiceDep,
+    acting_user: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[UserRead]:
     """Remove a user's custom avatar and return the updated user.
 
-    After removal the returned user's ``avatarUpdatedAt`` is ``None`` so the
-    client falls back to the generated default avatar.
+    Self-service only: the target must be the acting user themself (or the
+    acting user must be a super admin). After removal the returned user's
+    ``avatarUpdatedAt`` is ``None`` so the client falls back to the generated
+    default avatar.
     """
-    await avatar_service.remove(user_id)
+    await avatar_service.remove(user_id, acting_user=acting_user)
     user = await service.get(user_id)
     return ApiResponse(meta=meta, data=UserRead.model_validate(user))
