@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack
 from typing import Any
 
+import anyio
 from ag_ui.core import RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Request
@@ -126,13 +127,16 @@ async def workflow_session_agent(
     injection.
 
     Because the run is keyed by the session owner, the new messages are
-    attributed to the actual sender (the caller) after streaming completes:
-    the session's attributable keys present before the run are snapshotted
+    attributed to the actual sender (the caller) once the run ends: the
+    session's attributable keys present before the run are snapshotted
     (``"user"`` event ids and tool-response tool_call_ids -- the latter covers
     A2UI user-action acknowledgements), and any that appear afterwards are
     recorded as the current user's -- except no-op render acknowledgements,
     which merely unblock surfaces nobody acted on (see
-    ``WorkflowSessionService.record_new_senders``).
+    ``WorkflowSessionService.record_new_senders``). "Ends" includes ending
+    badly: a run the client abandoned mid-stream has still appended its
+    messages, so the attribution runs on the cancellation path too, shielded
+    from it.
 
     The run is serialized per ADK session by a cross-process lock, so neither two
     replicas nor two people sharing the session (owner and approver) can drive it
@@ -174,12 +178,26 @@ async def workflow_session_agent(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         async with run_stack:
-            async for event in adk_agent.run(input_data):
-                yield encoder.encode(event)
-            # Attribute the messages this run appended to the user who sent them.
-            await service.record_new_senders(ws_id, prior_keys, current_user_id)
-            # Associate each message with the workflow task in progress at the time.
-            await service.record_message_tasks(ws_id)
+            try:
+                async for event in adk_agent.run(input_data):
+                    yield encoder.encode(event)
+            finally:
+                # A client that goes away mid-stream (tab closed, page reloaded)
+                # makes Starlette cancel this generator wherever it is suspended
+                # -- usually inside the run itself. Whatever the run already
+                # appended to the shared ADK session stays there, so the
+                # bookkeeping has to happen on the way out too, or an abandoned
+                # run's messages end up attributed to nobody. It also has to be
+                # shielded: without that, the cancellation unwinding us would
+                # abort it at its first await, which is the same silent loss.
+                with anyio.CancelScope(shield=True):
+                    # Attribute the messages this run appended to the user who
+                    # sent them. Still inside the run lock -- this is the "after"
+                    # half of the read-then-diff the snapshot above opened.
+                    await service.record_new_senders(ws_id, prior_keys, current_user_id)
+                    # Associate each message with the workflow task in progress
+                    # at the time.
+                    await service.record_message_tasks(ws_id)
 
     return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
 

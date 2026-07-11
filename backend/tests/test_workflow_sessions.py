@@ -1,5 +1,6 @@
 import asyncio
-from collections.abc import AsyncGenerator
+import json
+from collections.abc import AsyncGenerator, MutableMapping
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -39,6 +40,62 @@ def _make_run_agent_input() -> dict[str, Any]:
         "context": [],
         "forwardedProps": {},
     }
+
+
+async def _post_agent_and_disconnect(path: str, user_id: str) -> None:
+    """Drive an agent run over raw ASGI, disconnecting after the first SSE chunk.
+
+    Simulates a browser closing the tab mid-run. It has to speak ASGI directly:
+    ``httpx``'s ``ASGITransport`` buffers the whole response before handing it
+    back and only reports ``http.disconnect`` once the stream is complete, so no
+    client-level API can produce a *mid-stream* disconnect.
+
+    Args:
+        path: The agent endpoint to POST to.
+        user_id: The acting user, sent as the ``X-User-Id`` header the test auth
+            override reads.
+    """
+    from main import app
+
+    payload = json.dumps(_make_run_agent_input()).encode()
+    streaming = asyncio.Event()
+    body_sent = False
+
+    async def receive() -> dict[str, Any]:
+        nonlocal body_sent
+        if not body_sent:
+            body_sent = True
+            return {"type": "http.request", "body": payload, "more_body": False}
+        # Starlette's disconnect listener parks on this second call; releasing it
+        # only once a chunk is out is what makes the disconnect land mid-stream.
+        await streaming.wait()
+        return {"type": "http.disconnect"}
+
+    async def send(message: MutableMapping[str, Any]) -> None:
+        if message["type"] == "http.response.body" and message.get("body"):
+            streaming.set()
+
+    scope: dict[str, Any] = {
+        "type": "http",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "root_path": "",
+        "query_string": b"",
+        "headers": [
+            (b"host", b"test"),
+            (b"content-type", b"application/json"),
+            (b"content-length", str(len(payload)).encode()),
+            (b"accept", b"text/event-stream"),
+            (b"x-user-id", user_id.encode()),
+        ],
+        "client": ("127.0.0.1", 12345),
+        "server": ("test", 80),
+    }
+    await app(scope, receive, send)
 
 
 # ---------- GET /workflow-sessions (list) ----------
@@ -282,6 +339,70 @@ async def test_workflow_session_agent_keys_run_by_session_owner(
     )
     assert received_inputs[0].forwarded_props["userId"] == ws["userId"]
     assert ws["userId"] == SYSTEM_USER_ID
+
+
+async def test_workflow_session_agent_records_sender_on_client_disconnect(
+    workflow_client: AsyncClient,
+    mock_adk_agent: MagicMock,
+    real_session_service: InMemorySessionService,
+) -> None:
+    """A run the client abandons mid-stream still attributes what it appended.
+
+    Starlette cancels the SSE generator the moment the client goes away, so the
+    attribution has to survive that cancellation. Without it, the messages the
+    abandoned run already wrote to the shared ADK session belong to nobody, and
+    every viewer sees them as the session owner's.
+    """
+    from ag_ui.core import EventType, RunStartedEvent
+    from google.adk.events.event import Event
+    from google.genai import types
+
+    skill = await _create_skill(workflow_client)
+    ws = await _execute_workflow(workflow_client, skill["id"])
+
+    cancelled = asyncio.Event()
+
+    async def _appending_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
+        session = await real_session_service.create_session(
+            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+        )
+        await real_session_service.append_event(
+            session,
+            Event(
+                author="user",
+                content=types.Content(
+                    role="user", parts=[types.Part(text="hi from alice")]
+                ),
+            ),
+        )
+        # One chunk out the door is what lets the test disconnect mid-stream.
+        yield RunStartedEvent(
+            type=EventType.RUN_STARTED, thread_id="thread-001", run_id="run-001"
+        )
+        try:
+            # The run is still working (an LLM call, in production) when the
+            # client vanishes, so the cancellation lands here rather than at the
+            # yield above -- the case that used to skip the bookkeeping outright.
+            await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    mock_adk_agent.run = _appending_run
+
+    await _post_agent_and_disconnect(
+        f"/api/v1/workflow-sessions/{ws['id']}/agent", user_id="alice"
+    )
+
+    # Guard against a false pass: the run must really have been cut short.
+    assert cancelled.is_set()
+
+    response = await workflow_client.get(
+        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+    )
+    messages = assert_ok(response)
+    assert [m["content"] for m in messages] == ["hi from alice"]
+    assert messages[0]["senderUserId"] == "alice"
 
 
 # ---------- GET /workflow-sessions/{id}/messages ----------
