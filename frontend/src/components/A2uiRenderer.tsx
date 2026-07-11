@@ -6,6 +6,7 @@ import { MessageProcessor } from "@a2ui/web_core/v0_9";
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { marked } from "marked";
 import { useEffect, useRef, useState } from "react";
+import { SurfaceResolvedContext } from "./a2ui/surfaceResolvedContext";
 import { tailwindCatalog } from "./a2uiCatalog";
 
 const markdownRenderer = (text: string) => Promise.resolve(marked(text) as string);
@@ -20,13 +21,20 @@ const markdownRenderer = (text: string) => Promise.resolve(marked(text) as strin
  * payload's data model by reference and mutates it when the user edits input
  * components (TextField, ChoicePicker). Without the clone every edit throws
  * "Cannot assign to read only property" and the surface never captures input.
+ *
+ * `resolved` marks a surface whose `render_a2ui` call already has an answer (e.g.
+ * after a page reload, or immediately after the user acts on it): interactive
+ * catalog components read it via {@link SurfaceResolvedContext} and render inert,
+ * so an already-answered surface can never be resubmitted.
  */
 export function A2uiRenderer({
   payload,
   onAction,
+  resolved = false,
 }: {
   payload: unknown;
   onAction?: (action: A2UIUserAction) => void;
+  resolved?: boolean;
 }) {
   const [surfaces, setSurfaces] = useState<SurfaceModel<ReactComponentImplementation>[]>([]);
   const onActionRef = useRef(onAction);
@@ -68,11 +76,13 @@ export function A2uiRenderer({
 
   return (
     <MarkdownContext.Provider value={markdownRenderer}>
-      <div className="mt-1 space-y-2">
-        {surfaces.map((surface) => (
-          <A2uiSurface key={surface.id} surface={surface} />
-        ))}
-      </div>
+      <SurfaceResolvedContext.Provider value={resolved}>
+        <div className="mt-1 space-y-2">
+          {surfaces.map((surface) => (
+            <A2uiSurface key={surface.id} surface={surface} />
+          ))}
+        </div>
+      </SurfaceResolvedContext.Provider>
     </MarkdownContext.Provider>
   );
 }

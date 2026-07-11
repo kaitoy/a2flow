@@ -16,7 +16,9 @@ import { UserMessageBubble } from "./UserMessageBubble";
  * surface (the user who acted on it); other activity types ignore it.
  * `isThinking` is likewise forwarded to `ActivityMessageBubble`, which uses it
  * only for the reasoning branch (live edge while the agent is still
- * reasoning).
+ * reasoning). `pendingToolCallIds` and `toolResultContentByCallId` are
+ * forwarded to `ActivityMessageBubble` for its A2UI branch, which uses them to
+ * lock and pre-fill an already-answered surface; other activity types ignore them.
  */
 export function MessageBubble({
   message,
@@ -25,6 +27,8 @@ export function MessageBubble({
   avatar,
   onAction,
   onApprovalResolved,
+  pendingToolCallIds,
+  toolResultContentByCallId,
 }: {
   message: Message;
   isStreaming?: boolean;
@@ -32,6 +36,8 @@ export function MessageBubble({
   avatar?: ReactNode;
   onAction?: (action: A2UIUserAction) => void;
   onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected") => void;
+  pendingToolCallIds?: Set<string>;
+  toolResultContentByCallId?: Map<string, string>;
 }) {
   if (message.role === "user") return <UserMessageBubble message={message} avatar={avatar} />;
   if (message.role === "assistant")
@@ -44,6 +50,8 @@ export function MessageBubble({
         isThinking={isThinking}
         onAction={onAction}
         onApprovalResolved={onApprovalResolved}
+        pendingToolCallIds={pendingToolCallIds}
+        toolResultContentByCallId={toolResultContentByCallId}
       />
     );
   return null;

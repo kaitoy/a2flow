@@ -34,6 +34,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
     isRunning,
     isStreaming,
     error,
+    pendingRenderCalls,
     sendMessage,
     sendA2uiAction,
     sendApprovalResult,
@@ -166,6 +167,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           onHoverTask={setHoveredTaskId}
           onAction={sendA2uiAction}
           onApprovalResolved={sendApprovalResult}
+          pendingRenderCalls={pendingRenderCalls}
         />
         <ChatInput onSend={sendMessage} disabled={isRunning} />
       </div>

@@ -45,7 +45,9 @@ export function useChat(initialSessionId: string | null) {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
-  const { messages, sessionId, isRunning, isStreaming, error } = useAppSelector((s) => s.chat);
+  const { messages, sessionId, isRunning, isStreaming, error, pendingRenderCalls } = useAppSelector(
+    (s) => s.chat
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   useEffect(() => {
@@ -152,6 +154,7 @@ export function useChat(initialSessionId: string | null) {
     isRunning,
     isStreaming,
     error,
+    pendingRenderCalls,
     sendMessage,
     sendA2uiAction,
   };

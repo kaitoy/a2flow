@@ -10,13 +10,16 @@ vi.mock("@/hooks/useChat", () => ({
     isRunning: false,
     isStreaming: false,
     error: null,
+    pendingRenderCalls: [{ toolCallId: "tc-1", surfaceId: "s1" }],
     sendMessage: vi.fn(),
     sendA2uiAction: vi.fn(),
   })),
 }));
 
 vi.mock("./MessageList", () => ({
-  MessageList: () => <div data-testid="message-list-mock" />,
+  MessageList: ({ pendingRenderCalls }: { pendingRenderCalls?: unknown[] }) => (
+    <div data-testid="message-list-mock" data-pending-count={pendingRenderCalls?.length ?? 0} />
+  ),
 }));
 
 vi.mock("./ChatInput", () => ({
@@ -41,6 +44,11 @@ describe("Chat", () => {
     expect(screen.getByTestId("chat-input-mock")).toBeInTheDocument();
   });
 
+  it("forwards pendingRenderCalls to MessageList", () => {
+    render(<Chat sessionId="sess-1" />);
+    expect(screen.getByTestId("message-list-mock")).toHaveAttribute("data-pending-count", "1");
+  });
+
   it("ChatInput disabled prop reflects isRunning", () => {
     vi.mocked(useChat).mockReturnValueOnce({
       messages: [],
@@ -48,6 +56,7 @@ describe("Chat", () => {
       isRunning: true,
       isStreaming: false,
       error: null,
+      pendingRenderCalls: [],
       sendMessage: vi.fn(),
       sendA2uiAction: vi.fn(),
     });

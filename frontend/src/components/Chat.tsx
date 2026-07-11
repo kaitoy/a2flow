@@ -10,7 +10,7 @@ import { MessageList } from "./MessageList";
  * is the only part that re-mounts when navigating between sessions.
  */
 export function Chat({ sessionId: initialSessionId }: { sessionId: string | null }) {
-  const { messages, isRunning, isStreaming, sendMessage, sendA2uiAction } =
+  const { messages, isRunning, isStreaming, pendingRenderCalls, sendMessage, sendA2uiAction } =
     useChat(initialSessionId);
 
   return (
@@ -20,6 +20,7 @@ export function Chat({ sessionId: initialSessionId }: { sessionId: string | null
         isStreaming={isStreaming}
         isRunning={isRunning}
         onAction={sendA2uiAction}
+        pendingRenderCalls={pendingRenderCalls}
       />
       <ChatInput onSend={sendMessage} disabled={isRunning} />
     </>

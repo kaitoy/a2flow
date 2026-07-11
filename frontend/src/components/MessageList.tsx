@@ -5,6 +5,7 @@ import type { Message } from "@ag-ui/core";
 import { animated, useSpring } from "@react-spring/web";
 import { Sparkles } from "lucide-react";
 import { Fragment, type ReactNode, type UIEvent, useEffect, useMemo, useRef } from "react";
+import type { PendingRenderCall } from "@/lib/a2uiAction";
 import {
   REASONING_ACTIVITY_TYPE,
   type ReasoningActivityContent,
@@ -95,6 +96,7 @@ export function MessageList({
   onHoverTask,
   onAction,
   onApprovalResolved,
+  pendingRenderCalls,
 }: {
   messages: Message[];
   isStreaming?: boolean;
@@ -123,6 +125,13 @@ export function MessageList({
   onHoverTask?: (taskId: string | null) => void;
   onAction?: (action: A2UIUserAction) => void;
   onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected") => void;
+  /**
+   * `render_a2ui` calls still awaiting an acknowledging tool result. Drives
+   * which A2UI surfaces render as answered (locked and pre-filled) versus
+   * still interactive — see the `pendingToolCallIds`/`toolResultContentByCallId`
+   * derivation below.
+   */
+  pendingRenderCalls?: PendingRenderCall[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -169,6 +178,23 @@ export function MessageList({
     }
     return result;
   }, [messages, messageTasks]);
+
+  // Ids of render_a2ui calls still awaiting an answer, and the raw content of
+  // every tool-result message keyed by the call it answers (present in
+  // `messages` — see synthesizeActivityMessages — but never rendered directly).
+  // ActivityMessageBubble uses these to lock and pre-fill already-answered A2UI
+  // surfaces so they can never be resubmitted.
+  const pendingToolCallIds = useMemo(
+    () => new Set((pendingRenderCalls ?? []).map((call) => call.toolCallId)),
+    [pendingRenderCalls]
+  );
+  const toolResultContentByCallId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const msg of messages) {
+      if (msg.role === "tool" && msg.toolCallId) map.set(msg.toolCallId, msg.content ?? "");
+    }
+    return map;
+  }, [messages]);
 
   const lastMessageId = messages[messages.length - 1]?.id;
 
@@ -233,6 +259,8 @@ export function MessageList({
       avatar={renderAvatar?.(msg)}
       onAction={onAction}
       onApprovalResolved={onApprovalResolved}
+      pendingToolCallIds={pendingToolCallIds}
+      toolResultContentByCallId={toolResultContentByCallId}
     />
   );
 

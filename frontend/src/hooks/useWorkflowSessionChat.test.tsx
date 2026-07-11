@@ -52,6 +52,19 @@ describe("useWorkflowSessionChat", () => {
     await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalledWith("ws-1"));
   });
 
+  it("returns pendingRenderCalls mirroring the store", async () => {
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalled());
+    act(() => {
+      store.dispatch(addPendingRenderCall({ toolCallId: "tc-1", surfaceId: "s1" }));
+    });
+    expect(result.current.pendingRenderCalls).toEqual([{ toolCallId: "tc-1", surfaceId: "s1" }]);
+  });
+
   it("auto-sends workflowPrompt when messages are empty on mount", async () => {
     vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
     const store = makeStore();

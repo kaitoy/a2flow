@@ -137,6 +137,21 @@ describe("useChat", () => {
     expect(api.getSessionMessages).not.toHaveBeenCalled();
   });
 
+  it("returns pendingRenderCalls mirroring the store", () => {
+    const store = makeStore({
+      chat: {
+        messages: [],
+        sessionId: "sess-abc",
+        isRunning: false,
+        isStreaming: false,
+        error: null,
+        pendingRenderCalls: [{ toolCallId: "tc-1", surfaceId: "s1" }],
+      },
+    });
+    const { result } = renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
+    expect(result.current.pendingRenderCalls).toEqual([{ toolCallId: "tc-1", surfaceId: "s1" }]);
+  });
+
   it("sendMessage on /sessions/new generates uuid, sets sessionId, replaces URL, runs agent", async () => {
     const { useRouter } = await import("next/navigation");
     const replaceMock = vi.fn();

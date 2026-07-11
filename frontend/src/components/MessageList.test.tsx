@@ -25,11 +25,15 @@ vi.mock("./MessageBubble", () => ({
     isStreaming,
     isThinking,
     avatar,
+    pendingToolCallIds,
+    toolResultContentByCallId,
   }: {
     message: Message;
     isStreaming: boolean;
     isThinking?: boolean;
     avatar?: ReactNode;
+    pendingToolCallIds?: Set<string>;
+    toolResultContentByCallId?: Map<string, string>;
   }) => {
     // Mount-only (empty deps), mirroring how ApprovalControls fetches on mount —
     // lets tests detect an unwanted remount of a message bubble.
@@ -42,6 +46,8 @@ vi.mock("./MessageBubble", () => ({
         data-testid={`bubble-${message.id}`}
         data-streaming={String(isStreaming)}
         data-thinking={String(isThinking)}
+        data-pending={pendingToolCallIds ? Array.from(pendingToolCallIds).join(",") : ""}
+        data-tool-content={toolResultContentByCallId?.get("tc-1") ?? ""}
       >
         {avatar}
       </div>
@@ -339,6 +345,21 @@ describe("MessageList", () => {
     );
 
     expect(mountSpy).not.toHaveBeenCalledWith("appr-1");
+  });
+
+  it("derives pendingToolCallIds and toolResultContentByCallId for MessageBubble", () => {
+    const messages: Message[] = [
+      { id: "t1", role: "tool", toolCallId: "tc-1", content: "answered" } as Message,
+      { id: "m1", role: "user", content: "hi" },
+    ];
+    render(
+      <MessageList
+        messages={messages}
+        pendingRenderCalls={[{ toolCallId: "tc-2", surfaceId: "s2" }]}
+      />
+    );
+    expect(screen.getByTestId("bubble-m1")).toHaveAttribute("data-pending", "tc-2");
+    expect(screen.getByTestId("bubble-m1")).toHaveAttribute("data-tool-content", "answered");
   });
 
   it("renders no task groups when messageTasks is omitted", () => {

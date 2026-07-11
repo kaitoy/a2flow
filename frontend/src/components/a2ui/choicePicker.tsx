@@ -1,18 +1,25 @@
 import { createComponentImplementation } from "@a2ui/react/v0_9";
 import { ChoicePickerApi } from "@a2ui/web_core/v0_9/basic_catalog";
 import { useState } from "react";
+import { useSurfaceResolved } from "./surfaceResolvedContext";
 
-/** A2UI ChoicePicker implementation with chips and radio/checkbox display styles and optional filtering. */
+/**
+ * A2UI ChoicePicker implementation with chips and radio/checkbox display styles and optional
+ * filtering. Options are inert when the surface is already resolved (see
+ * {@link useSurfaceResolved}), so an already-answered surface's selection can never change.
+ */
 export const customChoicePicker = createComponentImplementation(
   ChoicePickerApi,
   ({ props, context }) => {
     const [filter, setFilter] = useState("");
+    const resolved = useSurfaceResolved();
     const values = Array.isArray(props.value) ? props.value : [];
     const isMutuallyExclusive = props.variant === "mutuallyExclusive";
     const isChips = props.displayStyle === "chips";
     const name = `choice-${context.componentModel.id}`;
 
     const onToggle = (val: string) => {
+      if (resolved) return;
       if (isMutuallyExclusive) {
         props.setValue([val] as string[]);
       } else {
@@ -51,9 +58,11 @@ export const customChoicePicker = createComponentImplementation(
                 <button
                   type="button"
                   key={String(opt.value)}
+                  disabled={resolved}
                   onClick={() => onToggle(String(opt.value))}
                   className={[
                     "cursor-pointer rounded-full px-3.5 py-1.5 text-sm tracking-tight transition-all duration-150 motion-safe:hover:scale-[1.03]",
+                    "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100",
                     isSelected
                       ? "bg-gradient-to-br from-accent to-secondary text-on-primary shadow-[inset_0_1px_0_var(--inner-top-highlight)]"
                       : "glass-panel text-on-surface hover:text-accent",
@@ -64,10 +73,17 @@ export const customChoicePicker = createComponentImplementation(
               );
             }
             return (
-              <label key={String(opt.value)} className="flex items-center gap-2 cursor-pointer">
+              <label
+                key={String(opt.value)}
+                className={[
+                  "flex items-center gap-2",
+                  resolved ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+                ].join(" ")}
+              >
                 <input
                   type={isMutuallyExclusive ? "radio" : "checkbox"}
                   checked={isSelected}
+                  disabled={resolved}
                   onChange={() => onToggle(String(opt.value))}
                   name={isMutuallyExclusive ? name : undefined}
                   className="h-4 w-4 accent-accent"

@@ -94,7 +94,9 @@ export function useWorkflowSessionChat(
 ) {
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
-  const { messages, isRunning, isStreaming, error } = useAppSelector((s) => s.chat);
+  const { messages, isRunning, isStreaming, error, pendingRenderCalls } = useAppSelector(
+    (s) => s.chat
+  );
   const autoSentRef = useRef(false);
   // Per-message sender attribution for the shared workflow chat: a map from
   // message id to the sender's user id, and the resolved sender User records
@@ -349,6 +351,7 @@ export function useWorkflowSessionChat(
     isRunning,
     isStreaming,
     error,
+    pendingRenderCalls,
     sendMessage,
     sendA2uiAction,
     sendApprovalResult,
