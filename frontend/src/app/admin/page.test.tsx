@@ -16,11 +16,11 @@ describe("AdminPage (welcome)", () => {
     expect(screen.getByRole("heading", { name: "Welcome to A2Flow" })).toBeInTheDocument();
   });
 
-  it("renders a chat card linking to /new-session", () => {
+  it("renders a chat card linking to /sessions/new", () => {
     render(<AdminPage />);
     expect(screen.getByRole("link", { name: /Start chat/ })).toHaveAttribute(
       "href",
-      "/new-session"
+      "/sessions/new"
     );
   });
 

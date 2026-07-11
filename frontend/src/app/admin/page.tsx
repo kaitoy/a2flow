@@ -6,7 +6,7 @@ import { type AdminNavItem, adminNavItems } from "@/lib/admin-nav";
 /** Quick-action cards: start a chat first, then every admin destination. */
 const CARDS: AdminNavItem[] = [
   {
-    href: "/new-session",
+    href: "/sessions/new",
     label: "Start chat",
     icon: MessageSquare,
     description: "Open a new agent conversation",

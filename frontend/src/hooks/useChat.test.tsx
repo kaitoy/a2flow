@@ -95,7 +95,7 @@ describe("useChat", () => {
     await waitFor(() => expect(store.getState().chat.error).not.toBeNull());
   });
 
-  it("init effect skips fetch when initialSessionId is null (/new-session route)", async () => {
+  it("init effect skips fetch when initialSessionId is null (/sessions/new route)", async () => {
     const store = makeStore();
     renderHook(() => useChat(null), { wrapper: makeWrapper(store) });
     // give the effect a tick — should not fetch and should not set sessionId
@@ -104,7 +104,7 @@ describe("useChat", () => {
     expect(store.getState().chat.sessionId).toBeNull();
   });
 
-  it("init effect clears leftover sessionId and messages when entering /new-session", async () => {
+  it("init effect clears leftover sessionId and messages when entering /sessions/new", async () => {
     const store = makeStore({
       chat: {
         messages: [{ id: "stale", role: "user", content: "previous" }],
@@ -137,7 +137,7 @@ describe("useChat", () => {
     expect(api.getSessionMessages).not.toHaveBeenCalled();
   });
 
-  it("sendMessage on /new-session generates uuid, sets sessionId, replaces URL, runs agent", async () => {
+  it("sendMessage on /sessions/new generates uuid, sets sessionId, replaces URL, runs agent", async () => {
     const { useRouter } = await import("next/navigation");
     const replaceMock = vi.fn();
     vi.mocked(useRouter).mockReturnValue({ push: vi.fn(), replace: replaceMock } as never);
@@ -155,7 +155,7 @@ describe("useChat", () => {
     uuidSpy.mockRestore();
   });
 
-  it("preserves a pending render_a2ui ack across a /new-session remount", async () => {
+  it("preserves a pending render_a2ui ack across a /sessions/new remount", async () => {
     let capturedSubscriber: AgentSubscriber | undefined;
     let resolveRunAgent: () => void = () => {};
     mockAgent.runAgent.mockImplementationOnce((_opts: unknown, subscriber: AgentSubscriber) => {

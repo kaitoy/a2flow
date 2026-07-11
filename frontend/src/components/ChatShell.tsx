@@ -34,12 +34,12 @@ export function ChatShell({ children }: { children: React.ReactNode }) {
 
   const newSession = useCallback(() => {
     if (isRunning) return;
-    router.push("/new-session");
+    router.push("/sessions/new");
   }, [isRunning, router]);
 
   const onSessionDeleted = useCallback(
     (deletedId: string) => {
-      if (deletedId === sessionId) router.push("/new-session");
+      if (deletedId === sessionId) router.push("/sessions/new");
     },
     [sessionId, router]
   );

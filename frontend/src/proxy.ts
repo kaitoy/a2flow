@@ -30,7 +30,7 @@ export function proxy(request: NextRequest): NextResponse {
   }
   if (hasSession && isLogin) {
     const url = request.nextUrl.clone();
-    url.pathname = "/new-session";
+    url.pathname = "/sessions/new";
     return NextResponse.redirect(url);
   }
   return NextResponse.next();

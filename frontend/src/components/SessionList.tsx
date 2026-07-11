@@ -164,7 +164,7 @@ export function SessionList({
               ].join(" ")}
             >
               <Tooltip
-                label={`${s.title ? `${s.title} — ` : ""}${s.id} — ${formatFullTimestamp(s.lastUpdateTime)}`}
+                label={`${s.title ?? label}\nLast Updated: ${formatFullTimestamp(s.lastUpdateTime)}`}
                 placement="right"
               >
                 <button

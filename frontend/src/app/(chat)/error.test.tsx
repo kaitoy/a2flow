@@ -16,7 +16,7 @@ describe("Chat RouteError", () => {
     render(<RouteError error={new Error("boom")} reset={vi.fn()} />);
     expect(screen.getByRole("link", { name: "Start a new chat" })).toHaveAttribute(
       "href",
-      "/new-session"
+      "/sessions/new"
     );
   });
 });

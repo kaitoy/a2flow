@@ -21,7 +21,7 @@ import { useMotionConfig } from "@/lib/motion";
 export type TooltipPlacement = "top" | "bottom" | "left" | "right";
 
 interface TooltipProps {
-  /** Text rendered inside the floating tooltip. */
+  /** Text rendered inside the floating tooltip. Use `\n` for line breaks. */
   label: string;
   /** Side of the trigger the tooltip should appear on. Defaults to `top`. */
   placement?: TooltipPlacement;
@@ -226,7 +226,7 @@ export function Tooltip({
                     zIndex: 9999,
                     boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
                   }}
-                  className="glass-panel-overlay max-w-xs whitespace-normal break-words rounded-lg px-2.5 py-1.5 text-[13px] leading-5 text-on-surface"
+                  className="glass-panel-overlay max-w-xs whitespace-pre-line break-words rounded-lg px-2.5 py-1.5 text-[13px] leading-5 text-on-surface"
                 >
                   {label}
                 </animated.div>

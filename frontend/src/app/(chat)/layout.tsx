@@ -1,6 +1,6 @@
 /**
  * @module ChatLayout — Persistent layout that wraps all chat routes (`/sessions/[id]`
- * and `/new-session`) with the shared shell so the sidebar and header are not
+ * and `/sessions/new`) with the shared shell so the sidebar and header are not
  * remounted on session switches.
  */
 import { AuthProvider } from "@/components/auth/auth-provider";

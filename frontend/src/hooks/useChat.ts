@@ -50,12 +50,12 @@ export function useChat(initialSessionId: string | null) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   useEffect(() => {
     if (initialSessionId === null) {
-      // /new-session route — clear any leftover state from a previous session
+      // /sessions/new route — clear any leftover state from a previous session
       // so the chat panel renders empty and sendMessage sees a null sessionId.
       dispatch(setSession(null));
       return;
     }
-    // After router.replace from /new-session, the page remounts with the same id
+    // After router.replace from /sessions/new, the page remounts with the same id
     // already in Redux from the optimistic sendMessage path — preserve the in-flight stream.
     if (store.getState().chat.sessionId === initialSessionId) return;
     dispatch(setSession(initialSessionId));

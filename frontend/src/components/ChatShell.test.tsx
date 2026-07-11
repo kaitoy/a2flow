@@ -145,7 +145,7 @@ describe("ChatShell", () => {
     expect(pushMock).toHaveBeenCalledWith("/sessions/sess-xyz");
   });
 
-  it("SessionList onNew navigates to /new-session", async () => {
+  it("SessionList onNew navigates to /sessions/new", async () => {
     pushMock.mockClear();
     render(
       <ChatShell>
@@ -153,7 +153,7 @@ describe("ChatShell", () => {
       </ChatShell>
     );
     await userEvent.click(screen.getByRole("button", { name: "new" }));
-    expect(pushMock).toHaveBeenCalledWith("/new-session");
+    expect(pushMock).toHaveBeenCalledWith("/sessions/new");
   });
 
   it("onSelect is a no-op while isRunning", async () => {
@@ -179,7 +179,7 @@ describe("ChatShell", () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it("onDeleted navigates to /new-session when active session is deleted", async () => {
+  it("onDeleted navigates to /sessions/new when active session is deleted", async () => {
     pushMock.mockClear();
     render(
       <ChatShell>
@@ -199,7 +199,7 @@ describe("ChatShell", () => {
       }
     );
     await userEvent.click(screen.getByRole("button", { name: "delete-active" }));
-    expect(pushMock).toHaveBeenCalledWith("/new-session");
+    expect(pushMock).toHaveBeenCalledWith("/sessions/new");
   });
 
   it("onDeleted does not navigate when a non-active session is deleted", async () => {

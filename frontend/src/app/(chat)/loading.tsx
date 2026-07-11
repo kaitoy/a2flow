@@ -1,7 +1,7 @@
 import { ChatPanelSkeleton } from "@/components/ChatPanelSkeleton";
 
 /**
- * Route loading fallback for `/new-session` and `/sessions/[sessionId]`.
+ * Route loading fallback for `/sessions/new` and `/sessions/[sessionId]`.
  * Renders inside `ChatShell` (the `(chat)` layout), so the sidebar/header
  * chrome stays mounted — this only covers the conversation panel.
  */
