@@ -21,7 +21,7 @@ def test_defaults_with_no_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert settings.cors_origins == ["http://localhost:3000"]
     assert settings.db_url == "sqlite:///a2flow.db"
-    assert settings.llm_model == "gemini-2.0-flash"
+    assert settings.llm_model == "gemini-3.5-flash"
     assert settings.session_cookie_secure is False
     assert settings.session_idle_timeout_seconds == 28800
     assert settings.mcp_registry_url == "https://registry.modelcontextprotocol.io"

@@ -107,7 +107,7 @@ class Settings(BaseSettings):
     skills_prune_grace_seconds: int = _DEFAULT_PRUNE_GRACE_SECONDS
     skills_clone_timeout_seconds: int = _DEFAULT_CLONE_TIMEOUT_SECONDS
 
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemini-3.5-flash"
     role_description: str = "You are a helpful assistant."
 
     admin_password: str | None = None

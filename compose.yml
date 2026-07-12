@@ -34,7 +34,7 @@ services:
     build: ./backend
     environment:
       DB_URL: postgresql://a2flow:a2flow@db:5432/a2flow
-      LLM_MODEL: ${LLM_MODEL:-gemini-2.0-flash}
+      LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
