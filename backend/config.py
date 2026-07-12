@@ -32,6 +32,15 @@ _DEFAULT_IDLE_TIMEOUT_SECONDS = 28800
 #: the revision the run just picked before the row naming it exists.
 _DEFAULT_PRUNE_GRACE_SECONDS = 3600
 
+#: Default per-request (connect/read) timeout, in seconds, for a skill clone's
+#: HTTP requests. Bounds how long a slow or hanging remote can keep the sync
+#: job stuck: the job holds the skill's advisory lock for the duration of the
+#: clone, so an unbounded clone leaves the skill ``pending`` forever and, on
+#: another replica, makes a pull of the same skill silently no-op (it skips
+#: rather than waits when the lock is held, see ``_LOCK_WAIT_SECONDS`` in
+#: ``services/agent_skill_sync.py``).
+_DEFAULT_CLONE_TIMEOUT_SECONDS = 120
+
 
 class Settings(BaseSettings):
     """Typed, environment-driven application configuration.
@@ -53,6 +62,8 @@ class Settings(BaseSettings):
             be a volume shared by every replica.
         skills_prune_grace_seconds: How long an unreferenced skill revision
             directory is kept before a pull may prune it.
+        skills_clone_timeout_seconds: Per-request timeout, in seconds, for a
+            skill clone's HTTP requests against its repository.
         llm_model: LLM selection, either a bare Gemini model name or a
             ``litellm:<provider>/<model>`` string.
         role_description: Base role text fed into the system prompt builder.
@@ -94,6 +105,7 @@ class Settings(BaseSettings):
         default_factory=lambda: Path(__file__).resolve().parent / ".skills"
     )
     skills_prune_grace_seconds: int = _DEFAULT_PRUNE_GRACE_SECONDS
+    skills_clone_timeout_seconds: int = _DEFAULT_CLONE_TIMEOUT_SECONDS
 
     llm_model: str = "gemini-2.0-flash"
     role_description: str = "You are a helpful assistant."

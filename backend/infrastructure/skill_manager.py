@@ -60,7 +60,7 @@ _SHA_LENGTH = 40
 
 
 def _build_no_redirect_pool_manager(
-    base_url: str,
+    base_url: str, timeout: float | None = None
 ) -> urllib3.PoolManager | urllib3.ProxyManager | AuthCallbackPoolManager:
     """Build the urllib3 pool manager dulwich uses for one clone, redirects disabled.
 
@@ -73,11 +73,15 @@ def _build_no_redirect_pool_manager(
 
     Args:
         base_url: The repository URL being cloned (used for proxy-bypass detection).
+        timeout: Per-request (connect/read) timeout in seconds, forwarded to
+            urllib3. Bounds how long a slow or hanging remote can stall the
+            clone; without it a single unresponsive request blocks the sync
+            job — and the advisory lock it holds — indefinitely.
 
     Returns:
         A urllib3 pool/proxy manager with redirect-following disabled.
     """
-    manager = default_urllib3_manager(config=None, base_url=base_url)
+    manager = default_urllib3_manager(config=None, base_url=base_url, timeout=timeout)
     manager.connection_pool_kw["retries"] = urllib3.util.Retry(
         redirect=0, raise_on_redirect=False
     )
@@ -101,7 +105,12 @@ def _is_revision_dir(path: Path) -> bool:
 class SkillManager:
     """Publishes and prunes immutable revision directories of AgentSkill repositories."""
 
-    def __init__(self, root: Path, prune_grace_seconds: int) -> None:
+    def __init__(
+        self,
+        root: Path,
+        prune_grace_seconds: int,
+        clone_timeout_seconds: float | None = None,
+    ) -> None:
         """Initialize the manager.
 
         Args:
@@ -111,9 +120,15 @@ class SkillManager:
             prune_grace_seconds: How long a revision directory is kept from
                 pruning regardless of whether anything references it. See
                 :meth:`prune`.
+            clone_timeout_seconds: Per-request (connect/read) timeout for a
+                clone's HTTP requests. ``None`` disables it, leaving a clone
+                against a slow or hanging remote free to block indefinitely —
+                and, with it, the sync advisory lock the caller holds for the
+                duration of :meth:`clone`.
         """
         self._root = root
         self._prune_grace_seconds = prune_grace_seconds
+        self._clone_timeout_seconds = clone_timeout_seconds
 
     def version_dir(self, skill_id: str, commit_sha: str) -> Path:
         """Return the directory holding one published revision of a skill's repository."""
@@ -184,7 +199,9 @@ class SkillManager:
         repo_url = skill.repo_url
 
         def _do_clone() -> str:
-            pool_manager = _build_no_redirect_pool_manager(repo_url)
+            pool_manager = _build_no_redirect_pool_manager(
+                repo_url, timeout=self._clone_timeout_seconds
+            )
             kwargs = {} if auth is None else {"username": auth[0], "password": auth[1]}
             repo = porcelain.clone(
                 repo_url,
@@ -308,4 +325,5 @@ def get_skill_manager() -> SkillManager:
     return SkillManager(
         root=settings.skills_dir,
         prune_grace_seconds=settings.skills_prune_grace_seconds,
+        clone_timeout_seconds=settings.skills_clone_timeout_seconds,
     )

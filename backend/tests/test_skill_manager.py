@@ -33,8 +33,16 @@ def _make_skill(
     )
 
 
-def _manager(root: Path, prune_grace_seconds: int = 3600) -> SkillManager:
-    return SkillManager(root=root, prune_grace_seconds=prune_grace_seconds)
+def _manager(
+    root: Path,
+    prune_grace_seconds: int = 3600,
+    clone_timeout_seconds: float | None = 30,
+) -> SkillManager:
+    return SkillManager(
+        root=root,
+        prune_grace_seconds=prune_grace_seconds,
+        clone_timeout_seconds=clone_timeout_seconds,
+    )
 
 
 def _fake_porcelain_clone(
@@ -218,6 +226,29 @@ async def test_clone_without_auth_omits_credentials(
     kwargs = fake_clone.call_args.kwargs
     assert "username" not in kwargs
     assert "password" not in kwargs
+
+
+async def test_clone_passes_configured_timeout_to_the_pool_manager(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A slow/hanging remote must not be able to block the clone forever.
+
+    ``AgentSkillSyncService.sync`` holds the skill's advisory lock for the
+    whole clone, so an unbounded request against a hanging remote would leave
+    the skill ``pending`` forever and make every other replica's pull of it
+    silently no-op (they skip a contended lock rather than wait for it).
+    """
+    _fake_porcelain_clone(monkeypatch)
+    fake_pool_manager_builder = MagicMock(wraps=_build_no_redirect_pool_manager)
+    monkeypatch.setattr(
+        "infrastructure.skill_manager._build_no_redirect_pool_manager",
+        fake_pool_manager_builder,
+    )
+    manager = _manager(tmp_path, clone_timeout_seconds=7)
+
+    await manager.clone(_make_skill())
+
+    assert fake_pool_manager_builder.call_args.kwargs["timeout"] == 7
 
 
 def test_skill_dir_resolves_a_nested_repo_path(tmp_path: Path) -> None:
