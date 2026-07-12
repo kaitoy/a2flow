@@ -139,6 +139,38 @@ Because the lock is session-level (not transaction-level), the deployment must n
 
 Human-in-the-loop is unaffected: a frontend tool call ends the run and closes the stream, releasing the lock, and the approval resumes as a *new* `POST /agent` that may land on any replica.
 
+### Reverse proxy / load balancer
+
+**Sticky sessions / session affinity are not required.** See "Horizontal
+scaling" above — the PostgreSQL advisory lock, not routing affinity, is what
+keeps one ADK session pinned to one driver at a time, and only for the
+duration of a single SSE stream.
+
+The two SSE routes (`POST /api/v1/agent`, `POST /api/v1/workflow-sessions/{id}/agent`)
+need the following at the reverse proxy / load balancer layer:
+
+- **Disable response buffering** for these paths. The app already sends
+  `X-Accel-Buffering: no` on both, which nginx honors per-response even if
+  buffering is enabled globally; other proxies/LBs need buffering disabled at
+  the config level instead (e.g. nginx's own `proxy_buffering off;`, since
+  `X-Accel-Buffering` only covers nginx).
+- **Disable gzip/compression for `text/event-stream`.** The app itself never
+  compresses responses (no `GZipMiddleware` is registered), so any
+  compression seen by the client can only come from the LB/proxy layer —
+  make sure it excludes `text/event-stream`.
+- **Size the read/idle timeout generously.** Agent runs have no server-side
+  time limit today (no `session_timeout_seconds`, nothing wraps the run in a
+  timeout), so a proxy-level read timeout is the only thing that can end a
+  stream, and it will silently cut off a legitimate long-running response if
+  set too low. Set it well above the longest run you expect, not a "typical"
+  request timeout.
+- **uvicorn's graceful-shutdown grace period is 30s** (`--timeout-graceful-shutdown`,
+  set in `Dockerfile`'s `CMD`). A rolling deploy forcibly ends any SSE stream
+  still open 30s after the container receives SIGTERM; this is safe because
+  the advisory lock releases with the connection and the client resumes with
+  a fresh request, the same way an abandoned/disconnected stream already
+  behaves.
+
 ### Admin user
 
 On startup the backend seeds two users:
@@ -417,9 +449,14 @@ curl -N -X POST http://localhost:8000/api/v1/agent \
 
 ### `GET /api/v1/health`
 
-Liveness probe — returns a minimal `{"status": "ok"}` outside the response envelope.
+Health check — checks database connectivity (`SELECT 1`) and returns `200
+{"status": "ok"}` or `503 {"status": "unavailable"}`, outside the response
+envelope. Used for both liveness and readiness gating (e.g. a Kubernetes
+probe, or `compose.yml`'s `backend` service `healthcheck:`). Polled
+frequently, so it's excluded from the uvicorn access log (see
+`infrastructure/logging_context.py`).
 
 ```bash
-curl http://localhost:8000/api/v1/health
-# {"status": "ok"}
+curl -i http://localhost:8000/api/v1/health
+# 200 {"status": "ok"}
 ```

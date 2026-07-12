@@ -199,7 +199,11 @@ async def workflow_session_agent(
                     # at the time.
                     await service.record_message_tasks(ws_id)
 
-    return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
+    return StreamingResponse(
+        event_generator(),
+        media_type=encoder.get_content_type(),
+        headers={"X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/{ws_id}/messages", response_model=ApiResponse[list[dict[str, Any]]])

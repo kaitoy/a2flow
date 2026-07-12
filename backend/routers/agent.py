@@ -91,4 +91,8 @@ async def agent_endpoint(
             async for event in adk_agent.run(input_data):
                 yield encoder.encode(event)
 
-    return StreamingResponse(event_generator(), media_type=encoder.get_content_type())
+    return StreamingResponse(
+        event_generator(),
+        media_type=encoder.get_content_type(),
+        headers={"X-Accel-Buffering": "no"},
+    )

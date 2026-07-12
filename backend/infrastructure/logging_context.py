@@ -15,6 +15,28 @@ class RequestIdFilter(logging.Filter):
         return True
 
 
+#: Path of the health check route (``routers/health.py``, mounted under the
+#: ``/api/v1`` prefix in ``routers/__init__.py``). Kept as a literal here
+#: rather than imported, since ``setup_logging()`` runs before routers are
+#: safe to import from an infrastructure-layer module.
+HEALTH_CHECK_PATH = "/api/v1/health"
+
+
+class HealthCheckAccessFilter(logging.Filter):
+    """Drop uvicorn access-log records for the health check endpoint.
+
+    It's polled every few seconds by load balancers and container
+    orchestrators, so logging every hit would just be noise.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        full_path = str(args[2]).split("?", 1)[0]
+        return full_path != HEALTH_CHECK_PATH
+
+
 class IsoTimeFormatter(logging.Formatter):
     """Format the record time as a timezone-aware ISO-8601 string.
 
@@ -56,3 +78,7 @@ def setup_logging() -> None:
         uvicorn_logger = logging.getLogger(name)
         uvicorn_logger.handlers.clear()
         uvicorn_logger.propagate = True
+
+    # Filtered on the logger itself (not the root handler) so a dropped
+    # record never reaches root and is never written at all.
+    logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())

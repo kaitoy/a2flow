@@ -324,7 +324,7 @@ All JSON responses share a uniform envelope. It is **not** applied by middleware
 Two endpoints intentionally skip the `ApiResponse` envelope by simply not using it:
 
 - `POST /agent` — SSE stream (must not be buffered)
-- `GET /health` — returns a minimal `{"status":"ok"}` for liveness probes
+- `GET /health` — returns `{"status":"ok"}` (200) or `{"status":"unavailable"}` (503), after checking database connectivity; used for both liveness and readiness gating. Excluded from the uvicorn access log (`infrastructure/logging_context.py`) since it's polled frequently.
 
 `RequestContextMiddleware` still runs for both (it has no path exclusions), so they receive a `request_id`, log under it, and get the `X-Request-Id` header like any other request.
 
