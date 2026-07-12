@@ -11,6 +11,8 @@ from typing import Annotated
 
 from fastapi import Depends
 from google.adk.sessions import BaseSessionService
+from google.adk.sessions.database_session_service import DatabaseSessionService
+from google.adk.sessions.sqlite_session_service import SqliteSessionService
 
 from config import Settings
 from config import get_settings as get_settings
@@ -18,10 +20,6 @@ from infrastructure.agent import AgentRegistry
 from infrastructure.database import ASYNC_DB_URL, DB_URL, is_sqlite_url
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.secret_cipher import get_secret_cipher as get_secret_cipher
-from infrastructure.session_service import (
-    StaleTolerantDatabaseSessionService,
-    StaleTolerantSqliteSessionService,
-)
 from infrastructure.skill_manager import SkillManager
 from infrastructure.skill_manager import get_skill_manager as get_skill_manager
 from infrastructure.vault_client import VaultClient
@@ -40,8 +38,8 @@ def get_session_service() -> BaseSessionService:
     REST API data.
     """
     if is_sqlite_url(DB_URL):
-        return StaleTolerantSqliteSessionService(DB_URL)
-    return StaleTolerantDatabaseSessionService(ASYNC_DB_URL)
+        return SqliteSessionService(DB_URL)
+    return DatabaseSessionService(ASYNC_DB_URL)
 
 
 @lru_cache(maxsize=1)

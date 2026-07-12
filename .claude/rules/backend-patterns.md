@@ -226,9 +226,9 @@ than called by name, so tests can replace it.
 
 `infrastructure/` holds concrete adapters for external systems and persistence
 that the service layer depends on but that contain no business rules — for
-example `StaleTolerantSqliteSessionService` (ADK session storage) and
-`SkillManager` (the git-backed skill store: one immutable directory per cloned
-revision, published by an atomic rename).
+example `SkillManager` (the git-backed skill store: one immutable directory per
+cloned revision, published by an atomic rename), `SecretCipher`, and the MCP
+clients.
 
 ---
 
@@ -377,7 +377,7 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 - `infrastructure/database.py` normalizes the URL to its async-driver variant via `to_async_url()` (`sqlite` → `aiosqlite`, `postgresql`/`postgres` → `asyncpg`; explicit drivers pass through) and exposes it as `ASYNC_DB_URL`.
 - SQLite pragmas (`PRAGMA foreign_keys=ON`, `PRAGMA journal_mode=WAL`) are registered only when the engine dialect is SQLite. Non-SQLite engines get `pool_pre_ping=True`.
 - `infrastructure/locks.py` owns a **second, private engine** (`NullPool`, `AUTOCOMMIT`) used only for PostgreSQL advisory locks. It is deliberately not the request-serving engine: an agent run holds its lock for minutes, which would starve the request pool, and `NullPool`'s real close guarantees the session-level lock is released even if the explicit unlock is missed. Do not route ordinary queries through it.
-- The ADK session service factory (`dependencies/singletons.py`) branches on `is_sqlite_url(DB_URL)`: SQLite keeps `StaleTolerantSqliteSessionService`; anything else uses `StaleTolerantDatabaseSessionService` (SQLAlchemy-based, same database).
+- The ADK session service factory (`dependencies/singletons.py`) branches on `is_sqlite_url(DB_URL)`: SQLite uses google-adk's `SqliteSessionService`; anything else uses its `DatabaseSessionService` (SQLAlchemy-based, same database). Both are used unwrapped — `ag-ui-adk` buffers session persistence producer-side, so the stale-writer conflict that once needed a `StaleTolerant*` subclass no longer arises.
 - `repositories/_integrity.py` classifies `IntegrityError`s by message markers for **both** dialects (`FOREIGN KEY constraint failed` / `violates foreign key constraint`, `UNIQUE constraint failed` / `duplicate key value violates unique constraint`). When adding constraint-translation logic, cover both.
 - Datetime table columns must use `sa_type=TZDateTime` (`models/base.py`) — asyncpg rejects tz-aware values on naive `TIMESTAMP` columns; `TZDateTime` maps to `timestamptz` on PostgreSQL and is a no-op on SQLite.
 - JSON table columns must use `JSONColumn` (`models/base.py`) — maps to `jsonb` on PostgreSQL and plain `JSON` on SQLite.
