@@ -32,6 +32,8 @@ class WorkflowSessionRepository(Protocol):
         self, data: WorkflowSessionCreate, *, workflow_id: str, user_id: str
     ) -> WorkflowSession: ...
 
+    async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]: ...
+
     async def delete(self, ws_id: str) -> None: ...
 
 
@@ -104,6 +106,27 @@ class SqlWorkflowSessionRepository:
         await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(ws)
         return ws
+
+    async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]:
+        """Return every skill revision that sessions of this skill are pinned to.
+
+        These are the revisions a prune of the skill store must keep: each one
+        is the code some WorkflowSession started against and will keep loading
+        on its next agent run. Rows predating the revisioned store have a NULL
+        sha and contribute nothing.
+
+        Args:
+            agent_skill_id: Identifier of the skill whose sessions to scan.
+
+        Returns:
+            The set of pinned commit shas.
+        """
+        stmt = select(WorkflowSession.agent_skill_commit_sha).where(
+            col(WorkflowSession.agent_skill_id) == agent_skill_id,
+            col(WorkflowSession.agent_skill_commit_sha).is_not(None),
+        )
+        result = await self._db.exec(stmt)
+        return {sha for sha in result.all() if sha is not None}
 
     async def delete(self, ws_id: str) -> None:
         """Delete the WorkflowSession with the given ID, raising NotFoundError if missing."""

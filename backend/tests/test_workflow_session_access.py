@@ -20,11 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.approval import Approval, ApprovalStatus
 from models.workflow_session import WorkflowSession
 from tests._envelope import assert_err, assert_ok
 from tests._seed import seed_users
-from tests.conftest import _install_auth_overrides
+from tests.conftest import FAKE_COMMIT_SHA, _install_auth_overrides
 
 #: Headers modeling the session owner without any role.
 OWNER = {"X-User-Id": "owner", "X-User-Roles": ""}
@@ -36,13 +37,40 @@ UNRELATED = {"X-User-Id": "bob", "X-User-Roles": "developer,requester,approver"}
 SUPER_ADMIN = {"X-User-Id": "alice", "X-User-Roles": "super_admin"}
 
 
+#: Id and published revision of the AgentSkill every seeded session references.
+SKILL_ID = "skill-1"
+
+
+async def _seed_skill(eng: AsyncEngine) -> None:
+    """Insert the AgentSkill the seeded sessions run on, with a published revision.
+
+    ``resolve_agent`` reads the skill to locate its revision directory, so the
+    agent-stream tests need a real row rather than a dangling id.
+    """
+    async with AsyncSession(eng) as db:
+        db.add(
+            AgentSkill(
+                id=SKILL_ID,
+                name="skill",
+                repo_url="https://example.com/repo",
+                repo_path="",
+                sync_status=SkillSyncStatus.ready,
+                commit_sha=FAKE_COMMIT_SHA,
+                created_by="owner",
+                updated_by="owner",
+            )
+        )
+        await db.commit()
+
+
 @pytest_asyncio.fixture()
 async def access_env(
     mock_agent_registry: MagicMock,
+    mock_skill_manager: MagicMock,
     real_session_service: InMemorySessionService,
 ) -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None]:
     """Yield an API client and its engine, with users seeded and agents mocked."""
-    from dependencies import get_agent_registry, get_session_service
+    from dependencies import get_agent_registry, get_session_service, get_skill_manager
     from infrastructure.database import get_session
     from main import app
 
@@ -55,6 +83,7 @@ async def access_env(
     async with mem_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(mem_engine)
+    await _seed_skill(mem_engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine, expire_on_commit=False) as session:
@@ -63,6 +92,7 @@ async def access_env(
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_agent_registry] = lambda: mock_agent_registry
     app.dependency_overrides[get_session_service] = lambda: real_session_service
+    app.dependency_overrides[get_skill_manager] = lambda: mock_skill_manager
     _install_auth_overrides(app)
     try:
         async with AsyncClient(
@@ -81,11 +111,11 @@ async def _seed_session(eng: AsyncEngine, *, user_id: str = "owner") -> str:
             session_id="sess-1",
             workflow_name="wf",
             workflow_prompt="do it",
-            agent_skill_id="skill-1",
+            agent_skill_id=SKILL_ID,
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",
-            agent_skill_repo_path=".",
-            skill_dir="/tmp/skill",
+            agent_skill_repo_path="",
+            agent_skill_commit_sha=FAKE_COMMIT_SHA,
             user_id=user_id,
             created_by=user_id,
             updated_by=user_id,

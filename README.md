@@ -166,9 +166,30 @@ Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/adm
 | Register a new skill | `GET /admin/agent-skills/new` |
 | Edit / delete a skill | `GET /admin/agent-skills/{id}` |
 
+| Pull a skill's repository | `POST /api/v1/agent-skills/{id}/pull` |
+
 Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, and description.
 
-Private repositories are supported through the optional **Auth Secret** field: set it to the name of a registered [Secret](#secrets) and its value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name. The secret is resolved at clone time, so deleting or renaming it later makes the next clone fail with `SECRET_RESOLUTION_FAILED`.
+#### The skill store
+
+Registering a skill returns immediately and **shallow-clones its repository in the background** using [Dulwich](https://www.dulwich.io/) — no external `git` CLI required. The clone is published into the skill store under `SKILLS_DIR` as one immutable directory per revision:
+
+```
+$SKILLS_DIR/<agent_skill_id>/<commit_sha>/
+```
+
+The clone is staged in a temporary sibling directory and moved into place with a single atomic rename, so a replica reading the store never sees a half-written revision. A published revision is then **never modified** — a pull only ever adds a sibling.
+
+The list and edit pages show each skill's **Status** (`Cloning` / `ready` / `failed`, with the failure reason) and the short **Revision** it has published. Two fields carry that state, and they mean different things:
+
+- **`commitSha`** — the published revision. A skill is runnable **only** once this is set; a workflow started against a skill with no revision is rejected with HTTP 409 (`SKILL_NOT_READY`).
+- **`syncStatus`** — how the *last* clone or pull went. A pull that fails does **not** clear `commitSha`, so a skill that was working keeps working at its previous revision; only the status and the error change.
+
+**Pull** re-clones the repository at its current remote HEAD. It is how a skill picks up upstream changes, and how a failed registration clone is retried after fixing the URL or the credentials. Concurrent clones of one skill are serialized across replicas by the advisory lock in `backend/infrastructure/locks.py`; a replica that finds another already cloning the skill skips the work instead of duplicating it. After a successful pull, revisions that no longer back any workflow session are pruned.
+
+Under `docker compose`, `SKILLS_DIR` is `/var/lib/a2flow/skills`, persisted in the `skills` Docker volume so the store survives container recreation. It is **durable state, not a cache**: a workflow session pins the revision it started with, so wiping the directory leaves existing sessions unable to load their skill until an admin pulls again. Scaling the backend past one replica requires every replica to mount this same volume.
+
+Private repositories are supported through the optional **Auth Secret** field: set it to the name of a registered [Secret](#secrets) and its value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name. The secret is resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill.
 
 ### MCP Servers
 
@@ -237,11 +258,11 @@ Each workflow record stores a name, prompt (instructions for the agent), a refer
 
 Clicking **Run** on a workflow creates a **WorkflowSession** — an independent entity that captures a snapshot of the workflow configuration at execution time:
 
-1. The backend shallow-clones the linked Agent Skill's repository into `backend/.skills_cache/<agent_skill_id>/` (only on first run) using [Dulwich](https://www.dulwich.io/) — no external `git` CLI required. The cache directory is configurable via the `SKILLS_CACHE_DIR` environment variable; under `docker compose` it is set to `/var/cache/a2flow/skills` and persisted in the `skills_cache` Docker volume so clones survive container recreation.
-2. A new ADK session is created with the skill binding stored in its state. A `WorkflowSession` record is persisted to the database, capturing the workflow name, prompt, skill details, and the ADK session ID.
+1. The backend checks that the linked [Agent Skill](#agent-skills) has a published revision (`commitSha`) — the repository was cloned when the skill was registered, so **nothing is cloned here**. A skill whose clone has not published a revision yet, or whose clone failed, is rejected with HTTP 409 (`SKILL_NOT_READY`).
+2. A `WorkflowSession` record is persisted to the database, capturing the workflow name, prompt, skill details, the ADK session ID, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). Because revision directories are immutable, a later pull of that skill cannot swap the code out from under a conversation already in progress — and because the store is shared, any replica resolves the same code. The ADK session itself is created lazily on the first agent call.
 3. The backend returns the `WorkflowSession` (HTTP 201). The frontend redirects to `/workflow-sessions/{workflowSession.id}`.
 4. On mount, the `/workflow-sessions/{id}` page fetches the `WorkflowSession`, and if no prior messages exist for the session, it automatically sends `workflow.prompt` as the first user message via `POST /workflow-sessions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](#welcome-page).
-5. The `/workflow-sessions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id`) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under a **plan-then-execute** workflow instruction and is equipped with WorkflowTask management tools (see below).
+5. The `/workflow-sessions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id` **and** the pinned revision) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under a **plan-then-execute** workflow instruction and is equipped with WorkflowTask management tools (see below).
 6. Subsequent user messages continue to flow through `POST /workflow-sessions/{id}/agent`, so A2UI rendering, A2UI user actions (e.g. clicking a rendered button), and the full chat experience work normally.
 
 ##### Agent-managed task DAG

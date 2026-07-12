@@ -63,13 +63,26 @@ PORT=8000
 
 Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted. `RELOAD` (default `false`) enables uvicorn autoreload; it only affects `python -m backend.main` — the `uv run uvicorn main:app --reload` command below and the Dockerfile's startup path are unaffected either way.
 
-### Agent skill cache
+### Agent skill store
 
 ```env
-SKILLS_CACHE_DIR=.skills_cache
+SKILLS_DIR=.skills
+# SKILLS_PRUNE_GRACE_SECONDS=3600
 ```
 
-Directory where Agent Skill repositories are shallow-cloned for ADK Skill loading. Defaults to `backend/.skills_cache` (relative to the working directory). Under `docker compose` it is set to `/var/cache/a2flow/skills` and backed by the `skills_cache` named volume, so clones persist across container recreation instead of being re-cloned on every start.
+Root of the store Agent Skill repositories are shallow-cloned into, laid out as one immutable directory per revision:
+
+```
+$SKILLS_DIR/<agent_skill_id>/<commit_sha>/
+```
+
+A clone is staged in a temporary sibling and published with a single atomic rename, so no reader ever observes a half-written revision; once published, a revision is never modified. Writers (the clone at registration, and every pull) serialize on the `skill-sync:<id>` advisory lock in `infrastructure/locks.py`. Readers take no lock at all — a pull only adds a sibling directory, so it cannot disturb an agent loading an existing revision.
+
+`SKILLS_PRUNE_GRACE_SECONDS` (default 3600) is how long a revision directory survives regardless of whether anything references it. A pull prunes revisions that no workflow session is pinned to, and the grace window covers the gap between a run reading the skill's current revision and inserting the session row that names it.
+
+Defaults to `backend/.skills` (relative to the working directory). Under `docker compose` it is `/var/lib/a2flow/skills`, backed by the `skills` named volume.
+
+This is **durable state, not a cache**: a `WorkflowSession` pins the revision it started with, so wiping the directory leaves existing sessions unable to load their skill (HTTP 409 `SKILL_NOT_READY`) until an admin pulls the skill again. Running more than one backend replica requires all of them to mount this same directory.
 
 ### Secret management
 

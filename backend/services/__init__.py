@@ -1,4 +1,5 @@
 from .agent_skill import AgentSkillService
+from .agent_skill_sync import AgentSkillSyncService, sync_agent_skill
 from .approval import ApprovalService
 from .auth import AuthService
 from .mcp_registry import MCPRegistryService
@@ -14,6 +15,7 @@ from .workflow_task import WorkflowTaskService
 
 __all__ = [
     "AgentSkillService",
+    "AgentSkillSyncService",
     "ApprovalService",
     "AuthService",
     "MCPRegistryService",
@@ -26,4 +28,5 @@ __all__ = [
     "WorkflowSessionAccessPolicy",
     "WorkflowSessionService",
     "WorkflowTaskService",
+    "sync_agent_skill",
 ]

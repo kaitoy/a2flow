@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -29,14 +30,17 @@ ToolUnion = Callable[..., Any] | BaseTool | BaseToolset
 
 LITELLM_PREFIX = "litellm:"
 
-AGENT_SKILL_ID_KEY = "agent_skill_id"
-SKILL_DIR_KEY = "skill_dir"
 SESSION_TITLE_KEY = "session_title"
 
 USER_ID_PROP_KEY = "userId"
 DEFAULT_USER_ID = "user"
 
 _SESSION_TITLE_MAX_LENGTH = 60
+
+#: Upper bound on cached ADKAgents in :class:`AgentRegistry`. One entry per
+#: skill revision actually run; pulling past a revision leaves its entry behind,
+#: so the cache is capped rather than left to grow with the pull count.
+_AGENT_CACHE_MAX_ENTRIES = 64
 
 
 def first_user_message_text(messages: Sequence[Message]) -> str | None:
@@ -264,28 +268,67 @@ def create_agent(skill_dir: Path | None = None) -> LlmAgent:
 
 
 class AgentRegistry:
-    """Caches one ADKAgent per agent_skill_id (None = default agent without skill).
+    """Caches one ADKAgent per ``(agent_skill_id, commit_sha)`` revision of a skill.
 
     Agents are stateless across sessions — per-session context lives in the ADK
-    session state — so a single ADKAgent can serve every session that uses the
-    same skill.
+    session state — so a single ADKAgent serves every session running the same
+    revision of the same skill. ``(None, None)`` keys the default agent that has
+    no skill loaded.
+
+    The revision has to be part of the key because ``create_agent`` reads the
+    skill directory eagerly (``load_skill_from_dir`` slurps every file into
+    memory) and never looks at it again. Keying on the skill alone would pin the
+    first revision loaded for the life of the process, so a ``pull`` would never
+    take effect; keying on the revision means a pull is picked up by the next
+    session while sessions already pinned to the old revision keep the agent
+    they started with.
+
+    Bounded by :data:`_AGENT_CACHE_MAX_ENTRIES` on a least-recently-used basis:
+    pruning keeps the number of live revisions small, but nothing else would
+    ever evict the entry for a revision that has been pulled past.
     """
 
     def __init__(self, session_service: BaseSessionService, app_name: str) -> None:
         self._session_service = session_service
         self._app_name = app_name
-        self._cache: dict[str | None, ADKAgent] = {}
+        self._cache: OrderedDict[tuple[str | None, str | None], ADKAgent] = (
+            OrderedDict()
+        )
 
-    def get(self, agent_skill_id: str | None, skill_dir: Path | None) -> ADKAgent:
-        if agent_skill_id not in self._cache:
-            llm_agent = create_agent(skill_dir=skill_dir)
-            self._cache[agent_skill_id] = ADKAgent(
-                adk_agent=llm_agent,
-                app_name=self._app_name,
-                user_id_extractor=extract_user_id,
-                session_service=self._session_service,
-                use_thread_id_as_session_id=True,
-                emit_messages_snapshot=True,
-                session_timeout_seconds=None,
-            )
-        return self._cache[agent_skill_id]
+    def get(
+        self,
+        agent_skill_id: str | None,
+        commit_sha: str | None,
+        skill_dir: Path | None,
+    ) -> ADKAgent:
+        """Return the ADKAgent for one revision of a skill, building it on first use.
+
+        Args:
+            agent_skill_id: Id of the skill, or ``None`` for the default
+                skill-less agent.
+            commit_sha: The published revision of that skill, or ``None`` for
+                the default agent.
+            skill_dir: Directory ADK loads the skill from; only read when the
+                agent is not already cached.
+
+        Returns:
+            The cached (or freshly built) agent for that revision.
+        """
+        key = (agent_skill_id, commit_sha)
+        cached = self._cache.get(key)
+        if cached is not None:
+            self._cache.move_to_end(key)
+            return cached
+        agent = ADKAgent(
+            adk_agent=create_agent(skill_dir=skill_dir),
+            app_name=self._app_name,
+            user_id_extractor=extract_user_id,
+            session_service=self._session_service,
+            use_thread_id_as_session_id=True,
+            emit_messages_snapshot=True,
+            session_timeout_seconds=None,
+        )
+        self._cache[key] = agent
+        if len(self._cache) > _AGENT_CACHE_MAX_ENTRIES:
+            self._cache.popitem(last=False)
+        return agent

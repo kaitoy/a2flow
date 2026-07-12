@@ -1,6 +1,6 @@
 from collections.abc import AsyncGenerator
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
@@ -19,8 +19,9 @@ from tests.conftest import _install_auth_overrides
 @pytest_asyncio.fixture()
 async def skill_client(
     mock_agent_registry: MagicMock,
+    mock_sync_job: AsyncMock,
 ) -> AsyncGenerator[AsyncClient, None]:
-    from dependencies import get_agent_registry
+    from dependencies import get_agent_registry, get_skill_sync_job
     from infrastructure.database import get_session
     from main import app
     from models.agent_skill import (
@@ -43,6 +44,10 @@ async def skill_client(
 
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_agent_registry] = lambda: mock_agent_registry
+    # Without this the router's BackgroundTasks would run the real clone job,
+    # which opens its own session on the *application* engine — the developer's
+    # database, not this in-memory one.
+    app.dependency_overrides[get_skill_sync_job] = lambda: mock_sync_job
     _install_auth_overrides(app)
     try:
         async with AsyncClient(
@@ -455,3 +460,73 @@ async def test_create_skill_accepts_nested_repo_path(
         },
     )
     assert assert_ok(response, status=201)["repoPath"] == "skills/my-skill"
+
+
+# ---------- clone / pull ----------
+
+
+async def test_create_skill_starts_out_unpublished(skill_client: AsyncClient) -> None:
+    """A fresh skill is not runnable: nothing has been cloned for it yet."""
+    body = assert_ok(
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
+    )
+    assert body["syncStatus"] == "pending"
+    assert body["commitSha"] is None
+    assert body["syncError"] is None
+
+
+async def test_create_skill_schedules_the_clone(
+    skill_client: AsyncClient, mock_sync_job: AsyncMock
+) -> None:
+    """Registration returns immediately and leaves the clone to the background."""
+    body = assert_ok(
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
+    )
+    mock_sync_job.assert_awaited_once_with(body["id"], user_id=SYSTEM_USER_ID)
+
+
+async def test_create_skill_does_not_accept_server_managed_sync_fields(
+    skill_client: AsyncClient,
+) -> None:
+    """A client must not be able to declare its own skill published."""
+    body = assert_ok(
+        await skill_client.post(
+            "/api/v1/agent-skills",
+            json={**_CREATE_BODY, "syncStatus": "ready", "commitSha": "a" * 40},
+        ),
+        status=201,
+    )
+    assert body["syncStatus"] == "pending"
+    assert body["commitSha"] is None
+
+
+async def test_pull_schedules_the_clone_and_marks_the_skill_pending(
+    skill_client: AsyncClient, mock_sync_job: AsyncMock
+) -> None:
+    skill = assert_ok(
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
+    )
+    mock_sync_job.reset_mock()
+
+    body = assert_ok(
+        await skill_client.post(f"/api/v1/agent-skills/{skill['id']}/pull"), status=202
+    )
+
+    assert body["syncStatus"] == "pending"
+    mock_sync_job.assert_awaited_once_with(skill["id"], user_id=SYSTEM_USER_ID)
+
+
+async def test_pull_unknown_skill_returns_404(skill_client: AsyncClient) -> None:
+    response = await skill_client.post("/api/v1/agent-skills/nonexistent/pull")
+    assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_pull_requires_the_developer_role(skill_client: AsyncClient) -> None:
+    skill = assert_ok(
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
+    )
+    response = await skill_client.post(
+        f"/api/v1/agent-skills/{skill['id']}/pull",
+        headers={"X-User-Roles": "requester"},
+    )
+    assert_err(response, code="FORBIDDEN", status=403)

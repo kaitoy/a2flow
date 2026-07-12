@@ -1,9 +1,10 @@
 /** @module AgentSkillsPage — Admin list page for managing agent skills. */
 "use client";
 
-import { Wand2 } from "lucide-react";
+import { RefreshCw, Wand2 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
@@ -13,10 +14,46 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { type AgentSkill, deleteAgentSkill, listAgentSkills } from "@/lib/api";
+import {
+  formatRevision,
+  formatSyncStatusLabel,
+  SYNC_STATUS_DOT_CLASS,
+} from "@/lib/agent-skill-sync-status";
+import {
+  type AgentSkill,
+  deleteAgentSkill,
+  listAgentSkills,
+  pullAgentSkill,
+  type SkillSyncStatus,
+} from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
+
+/**
+ * How often the list re-fetches while any skill is still cloning. The clone
+ * runs in the background on the server, so nothing pushes its result here.
+ */
+const POLL_INTERVAL_MS = 2000;
+
+/** Status dot plus label, matching the workflow-task table's status treatment. */
+function SyncStatus({ skill }: { skill: AgentSkill }) {
+  const status = (skill.syncStatus ?? "pending") as SkillSyncStatus;
+  const label = (
+    <span className="flex items-center gap-2">
+      <span
+        className={`inline-block size-2 rounded-full ${SYNC_STATUS_DOT_CLASS[status]}`}
+        aria-hidden
+      />
+      <span className="capitalize">{formatSyncStatusLabel(status)}</span>
+    </span>
+  );
+  // The failure reason is the whole point of the failed state, but it is a raw
+  // git/network message — too long for a cell, so it lives in the tooltip.
+  return skill.syncError ? <Tooltip label={skill.syncError}>{label}</Tooltip> : label;
+}
 
 const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
   {
@@ -47,10 +84,17 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
     cell: (s) => s.repoPath || "—",
   },
   {
-    header: "Description",
-    sortField: "description",
-    filterField: "description",
-    cell: (s) => s.description || "—",
+    header: "Status",
+    sortField: "syncStatus",
+    filterField: "syncStatus",
+    noTruncate: true,
+    cell: (s) => <SyncStatus skill={s} />,
+  },
+  {
+    header: "Revision",
+    sortField: "commitSha",
+    className: "font-mono",
+    cell: (s) => formatRevision(s.commitSha),
   },
   {
     header: "Created At",
@@ -60,6 +104,7 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
 ];
 
 export default function AgentSkillsPage() {
+  const canEdit = useHasRole(Role.DEVELOPER);
   const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
     useTableQuery<AgentSkill>(listAgentSkills, {
       limit: LIMIT,
@@ -67,6 +112,19 @@ export default function AgentSkillsPage() {
     });
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
+  const [pullingId, setPullingId] = useState<string | null>(null);
+
+  const anyPending = rows.some((s) => s.syncStatus === "pending");
+
+  // A clone settles server-side with nothing to notify us, so poll until every
+  // row has landed on ready or failed, then stop.
+  useEffect(() => {
+    if (!anyPending) return;
+    const timer = setInterval(() => {
+      void reload();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [anyPending, reload]);
 
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
@@ -85,17 +143,41 @@ export default function AgentSkillsPage() {
     }
   }
 
+  async function handlePull(id: string) {
+    setPullingId(id);
+    try {
+      await pullAgentSkill(id);
+      setActionError(null);
+      await reload();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Failed to pull agent skill");
+    } finally {
+      setPullingId(null);
+    }
+  }
+
   const columns: ColumnDef<AgentSkill>[] = [
     ...STATIC_COLUMNS,
-    {
-      header: "Actions",
-      noTruncate: true,
-      cell: (skill) => (
-        <div className="flex gap-2">
-          <DeleteIconButton onClick={() => handleDelete(skill.id, skill.name)} />
-        </div>
-      ),
-    },
+    ...(canEdit
+      ? [
+          {
+            header: "Actions",
+            noTruncate: true,
+            cell: (skill: AgentSkill) => (
+              <div className="flex gap-2">
+                <ActionIconButton
+                  icon={RefreshCw}
+                  label="Pull"
+                  onClick={() => handlePull(skill.id)}
+                  disabled={pullingId !== null || skill.syncStatus === "pending"}
+                  spinning={pullingId === skill.id || skill.syncStatus === "pending"}
+                />
+                <DeleteIconButton onClick={() => handleDelete(skill.id, skill.name)} />
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -104,7 +186,7 @@ export default function AgentSkillsPage() {
       <AdminPageHeader
         title="Agent Skills"
         icon={Wand2}
-        addHref="/admin/agent-skills/new"
+        addHref={canEdit ? "/admin/agent-skills/new" : undefined}
         addLabel="+ Add skill"
         onRefresh={reload}
         refreshing={loading}

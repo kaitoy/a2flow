@@ -337,16 +337,32 @@ def test_create_agent_with_skill_dir_loads_skill_toolset(tmp_path: Any) -> None:
     assert any(isinstance(t, SkillToolset) for t in agent.tools)
 
 
-def test_agent_registry_caches_by_skill_id() -> None:
+def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
     from google.adk.sessions import InMemorySessionService
 
     from infrastructure.agent import AgentRegistry
 
     service = InMemorySessionService()  # type: ignore[no-untyped-call]
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
-    first = registry.get(None, None)
-    second = registry.get(None, None)
-    assert first is second
+
+    assert registry.get(None, None, None) is registry.get(None, None, None)
+
+    def _skill_dir(name: str) -> Any:
+        path = tmp_path / name
+        path.mkdir()
+        (path / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: A test skill\n---\n\nInstructions.\n",
+            encoding="utf-8",
+        )
+        return path
+
+    old = registry.get("skill-1", "a" * 40, _skill_dir("old"))
+    assert registry.get("skill-1", "a" * 40, _skill_dir("ignored")) is old
+
+    # A pull publishes a new revision; the same skill at a different revision is
+    # a different agent, because create_agent reads the skill directory once and
+    # keeps its contents in memory forever after.
+    assert registry.get("skill-1", "b" * 40, _skill_dir("new")) is not old
 
 
 def test_create_agent_with_skill_uses_workflow_instruction(tmp_path: Any) -> None:

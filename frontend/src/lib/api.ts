@@ -28,6 +28,7 @@ import type {
   SecretType,
   SecretUpdate,
   Session as SessionModel,
+  SkillSyncStatus,
   ToolBinding,
   UserCreate,
   UserRead as UserReadModel,
@@ -86,6 +87,7 @@ import {
   zMarkAllNotificationsReadApiV1NotificationsReadAllPostResponse,
   zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse,
   zMeApiV1AuthMeGetResponse,
+  zPullAgentSkillApiV1AgentSkillsSkillIdPullPostResponse,
   zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
   zSearchMcpRegistryApiV1McpRegistryGetResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
@@ -246,6 +248,7 @@ export type {
   SecretCreate,
   SecretType,
   SecretUpdate,
+  SkillSyncStatus,
   ToolBinding,
   UserCreate,
   UserUpdate,
@@ -390,6 +393,21 @@ export async function updateAgentSkill(id: string, body: AgentSkillUpdate): Prom
   return fetchEnvelope(
     apiClient.patch(`/api/v1/agent-skills/${encodeURIComponent(id)}`, body),
     zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse
+  ) as Promise<AgentSkill>;
+}
+
+/**
+ * Re-clone an agent skill's repository at its current remote HEAD.
+ *
+ * How a skill picks up upstream changes, and how a failed registration clone is
+ * retried. The clone runs in the background: the returned skill is already
+ * marked `pending`, and the caller polls until it settles on `ready` or
+ * `failed`.
+ */
+export async function pullAgentSkill(id: string): Promise<AgentSkill> {
+  return fetchEnvelope(
+    apiClient.post(`/api/v1/agent-skills/${encodeURIComponent(id)}/pull`),
+    zPullAgentSkillApiV1AgentSkillsSkillIdPullPostResponse
   ) as Promise<AgentSkill>;
 }
 

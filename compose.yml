@@ -43,9 +43,13 @@ services:
       # logs backend` on first startup.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       CORS_ORIGINS: http://localhost:3000
-      SKILLS_CACHE_DIR: /var/cache/a2flow/skills
+      # Store of cloned skill repositories, one directory per published
+      # revision. Durable state, not a cache: a workflow session pins the
+      # revision it started with. Scaling the backend past one replica requires
+      # every replica to mount this same volume (ReadWriteMany).
+      SKILLS_DIR: /var/lib/a2flow/skills
     volumes:
-      - skills_cache:/var/cache/a2flow/skills
+      - skills:/var/lib/a2flow/skills
     depends_on:
       db:
         condition: service_healthy
@@ -63,4 +67,4 @@ services:
 
 volumes:
   pgdata:
-  skills_cache:
+  skills:

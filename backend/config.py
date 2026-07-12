@@ -1,7 +1,7 @@
 """Centralized application configuration.
 
 Collects every environment variable the running application reads (server
-bind settings, CORS, database, agent skill cache, LLM selection, admin
+bind settings, CORS, database, agent skill store, LLM selection, admin
 bootstrap, secret encryption, HashiCorp Vault, MCP registry, and session
 auth) into a single :class:`Settings` model instead of scattered
 ``os.getenv`` calls. Values with side-effecting fallback behavior (random
@@ -25,6 +25,13 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 #: ``SESSION_IDLE_TIMEOUT_SECONDS`` is unset or not a valid integer.
 _DEFAULT_IDLE_TIMEOUT_SECONDS = 28800
 
+#: How long (1 hour) a published skill revision directory is kept from pruning
+#: regardless of whether anything references it. A workflow run reads the
+#: skill's current ``commit_sha`` and inserts its WorkflowSession row a moment
+#: later; the grace window covers that gap, so a concurrent pull cannot delete
+#: the revision the run just picked before the row naming it exists.
+_DEFAULT_PRUNE_GRACE_SECONDS = 3600
+
 
 class Settings(BaseSettings):
     """Typed, environment-driven application configuration.
@@ -38,7 +45,14 @@ class Settings(BaseSettings):
         reload: Whether that same ``__main__`` block enables uvicorn autoreload.
         cors_origins: Allowed CORS origins for the API.
         db_url: Database URL selecting SQLite (default) or PostgreSQL.
-        skills_cache_dir: Directory where Agent Skill repositories are cloned.
+        skills_dir: Root of the Agent Skill store, laid out as
+            ``<skill_id>/<commit_sha>/``. This is durable state, not a cache:
+            a WorkflowSession pins the revision it started with, so wiping the
+            directory leaves existing sessions unable to load their skill until
+            an admin pulls again. In a horizontally scaled deployment it must
+            be a volume shared by every replica.
+        skills_prune_grace_seconds: How long an unreferenced skill revision
+            directory is kept before a pull may prune it.
         llm_model: LLM selection, either a bare Gemini model name or a
             ``litellm:<provider>/<model>`` string.
         role_description: Base role text fed into the system prompt builder.
@@ -76,9 +90,10 @@ class Settings(BaseSettings):
 
     db_url: str = "sqlite:///a2flow.db"
 
-    skills_cache_dir: Path = Field(
-        default_factory=lambda: Path(__file__).resolve().parent / ".skills_cache"
+    skills_dir: Path = Field(
+        default_factory=lambda: Path(__file__).resolve().parent / ".skills"
     )
+    skills_prune_grace_seconds: int = _DEFAULT_PRUNE_GRACE_SECONDS
 
     llm_model: str = "gemini-2.0-flash"
     role_description: str = "You are a helpful assistant."

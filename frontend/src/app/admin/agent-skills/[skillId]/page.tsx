@@ -2,9 +2,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Wand2 } from "lucide-react";
+import { RefreshCw, Wand2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
@@ -21,7 +21,20 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zAgentSkillCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { deleteAgentSkill, getAgentSkill, updateAgentSkill } from "@/lib/api";
+import {
+  formatRevision,
+  formatSyncStatusLabel,
+  SYNC_STATUS_DOT_CLASS,
+} from "@/lib/agent-skill-sync-status";
+import {
+  type AgentSkill,
+  deleteAgentSkill,
+  getAgentSkill,
+  pullAgentSkill,
+  type SkillSyncStatus,
+  updateAgentSkill,
+} from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -35,16 +48,29 @@ const schema = zAgentSkillCreate.omit({ repoAuthSecret: true, repoAuthUsername: 
 
 type FormValues = z.infer<typeof schema>;
 
+/** How often the page re-fetches the skill while its clone is still running. */
+const POLL_INTERVAL_MS = 2000;
+
+/** The server-managed clone/pull state of the skill being edited. */
+interface SyncState {
+  status: SkillSyncStatus;
+  error: string | null;
+  commitSha: string | null;
+}
+
 export default function EditAgentSkillPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const canEdit = useHasRole(Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
+  const [sync, setSync] = useState<SyncState | null>(null);
 
   const save = useAsyncAction({ showDone: false });
+  const pull = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -64,6 +90,14 @@ export default function EditAgentSkillPage() {
     },
   });
 
+  const applySync = useCallback((skill: AgentSkill) => {
+    setSync({
+      status: (skill.syncStatus ?? "pending") as SkillSyncStatus,
+      error: skill.syncError ?? null,
+      commitSha: skill.commitSha ?? null,
+    });
+  }, []);
+
   useEffect(() => {
     getAgentSkill(skillId)
       .then((skill) => {
@@ -75,6 +109,7 @@ export default function EditAgentSkillPage() {
           repoAuthSecret: skill.repoAuthSecret ?? "",
           repoAuthUsername: skill.repoAuthUsername ?? "",
         });
+        applySync(skill);
         setAudit({
           createdBy: skill.createdBy,
           updatedBy: skill.updatedBy,
@@ -86,7 +121,32 @@ export default function EditAgentSkillPage() {
         setApiError(e instanceof Error ? e.message : "Failed to load agent skill");
       })
       .finally(() => setLoading(false));
-  }, [skillId, reset]);
+  }, [skillId, reset, applySync]);
+
+  // The clone runs in the background on the server and nothing pushes its
+  // result here, so poll until it lands on ready or failed.
+  useEffect(() => {
+    if (sync?.status !== "pending") return;
+    const timer = setInterval(() => {
+      getAgentSkill(skillId)
+        .then(applySync)
+        .catch(() => {
+          // Non-fatal: the next tick retries, and the form itself still works.
+        });
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [sync?.status, skillId, applySync]);
+
+  async function handlePull() {
+    setApiError(null);
+    try {
+      await pull.run(async () => {
+        applySync(await pullAgentSkill(skillId));
+      });
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Failed to pull agent skill");
+    }
+  }
 
   async function onSubmit(values: FormValues) {
     setApiError(null);
@@ -146,6 +206,42 @@ export default function EditAgentSkillPage() {
       <AdminPageHeader title="Edit Agent Skill" icon={Wand2} />
 
       <FormColumn>
+        {sync && (
+          <section
+            aria-label="Repository sync"
+            className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4"
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-block size-2 rounded-full ${SYNC_STATUS_DOT_CLASS[sync.status]}`}
+                aria-hidden
+              />
+              <span className="capitalize">{formatSyncStatusLabel(sync.status)}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+              <span>Revision</span>
+              <span className="font-mono">{formatRevision(sync.commitSha)}</span>
+            </div>
+            {canEdit && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handlePull}
+                disabled={pull.inFlight || sync.status === "pending"}
+                status={pull.status}
+                pendingLabel="Pulling…"
+                className="ml-auto"
+              >
+                <RefreshCw aria-hidden="true" className="size-4" />
+                Pull
+              </Button>
+            )}
+            {sync.error && (
+              <p className="w-full break-words font-mono text-error text-xs">{sync.error}</p>
+            )}
+          </section>
+        )}
+
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
@@ -196,15 +292,17 @@ export default function EditAgentSkillPage() {
           <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={save.inFlight}
-              status={save.status}
-              pendingLabel="Saving…"
-            >
-              Save
-            </Button>
+            {canEdit && (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={save.inFlight}
+                status={save.status}
+                pendingLabel="Saving…"
+              >
+                Save
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -212,9 +310,11 @@ export default function EditAgentSkillPage() {
             >
               Cancel
             </Button>
-            <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-              Delete
-            </Button>
+            {canEdit && (
+              <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
+                Delete
+              </Button>
+            )}
           </div>
         </form>
         {audit && (

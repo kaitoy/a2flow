@@ -7,7 +7,12 @@ router layer never touches the repository directly.
 
 from collections.abc import Sequence
 
-from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
+from models.agent_skill import (
+    AgentSkill,
+    AgentSkillCreate,
+    AgentSkillUpdate,
+    SkillSyncStatus,
+)
 from repositories import AgentSkillRepository, SecretRepository
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 from repositories.query import FilterSpec, SortSpec
@@ -120,6 +125,31 @@ class AgentSkillService:
         """
         await self._check_auth_secret(data.repo_auth_secret)
         return await self._repo.update(skill_id, data, user_id=user_id)
+
+    async def mark_pending(self, skill_id: str, *, user_id: str) -> AgentSkill:
+        """Mark a skill as awaiting a clone/pull, before the job is scheduled.
+
+        Set synchronously by the pull route so the row the caller gets back --
+        and the next list the admin UI polls -- already reads ``pending``,
+        rather than briefly showing the previous outcome until the background
+        job gets around to starting.
+
+        This does not make a usable skill unusable: runnability is decided by
+        ``commit_sha``, which this leaves alone.
+
+        Args:
+            skill_id: Identifier of the skill about to be synced.
+            user_id: ID of the user requesting the sync.
+
+        Returns:
+            The updated AgentSkill.
+
+        Raises:
+            NotFoundError: If no skill exists with the given ID.
+        """
+        return await self._repo.set_sync_state(
+            skill_id, status=SkillSyncStatus.pending, user_id=user_id
+        )
 
     async def delete(self, skill_id: str) -> None:
         """Delete an AgentSkill.

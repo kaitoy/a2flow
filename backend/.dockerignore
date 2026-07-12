@@ -10,7 +10,7 @@ tests/
 *.db
 *.db-shm
 *.db-wal
-.skills_cache/
+.skills/
 openapi.yaml
 Dockerfile
 .dockerignore

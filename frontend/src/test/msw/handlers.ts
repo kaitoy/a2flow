@@ -9,6 +9,10 @@ const SKILL_1 = {
   repoUrl: "https://github.com/example/repo",
   repoPath: "",
   description: null,
+  syncStatus: "ready",
+  syncError: null,
+  commitSha: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  syncedAt: "2026-01-01T00:00:00Z",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -170,6 +174,10 @@ export const handlers = [
   http.get(`${BASE}/api/v1/agent-skills/:skillId`, () => envelope(SKILL_1)),
 
   http.post(`${BASE}/api/v1/agent-skills`, () => envelope({ ...SKILL_1, id: "new-skill-id" }, 201)),
+
+  http.post(`${BASE}/api/v1/agent-skills/:skillId/pull`, () =>
+    envelope({ ...SKILL_1, syncStatus: "pending" }, 202)
+  ),
 
   http.patch(`${BASE}/api/v1/agent-skills/:skillId`, () => envelope(SKILL_1)),
 

@@ -23,6 +23,7 @@ from infrastructure.session_service import (
     StaleTolerantSqliteSessionService,
 )
 from infrastructure.skill_manager import SkillManager
+from infrastructure.skill_manager import get_skill_manager as get_skill_manager
 from infrastructure.vault_client import VaultClient
 from infrastructure.vault_client import get_vault_client as get_vault_client
 
@@ -50,12 +51,6 @@ def get_agent_registry() -> AgentRegistry:
         session_service=get_session_service(),
         app_name=APP_NAME,
     )
-
-
-@lru_cache(maxsize=1)
-def get_skill_manager() -> SkillManager:
-    """Return the LRU-cached SkillManager singleton, using ``Settings.skills_cache_dir``."""
-    return SkillManager(cache_dir=get_settings().skills_cache_dir)
 
 
 SessionServiceDep = Annotated[BaseSessionService, Depends(get_session_service)]

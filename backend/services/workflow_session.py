@@ -7,25 +7,29 @@ and agent-resolution business rules.
 """
 
 import builtins
+import logging
 from collections.abc import Sequence
-from pathlib import Path
 from typing import Any
 
 from ag_ui_adk import ADKAgent, adk_events_to_messages
 from google.adk.sessions import BaseSessionService
 
 from infrastructure.agent import AgentRegistry
+from infrastructure.skill_manager import SkillManager
 from models.user import User
 from models.workflow_session import WorkflowSession
 from models.workflow_task import WorkflowTaskRead
 from repositories import (
+    AgentSkillRepository,
     MessageMetaRepository,
     WorkflowSessionRepository,
     WorkflowTaskRepository,
 )
-from repositories.exceptions import NotFoundError
+from repositories.exceptions import NotFoundError, SkillNotReadyError
 from repositories.query import FilterSpec, SortSpec
 from services.workflow_session_access import WorkflowSessionAccessPolicy
+
+logger = logging.getLogger(__name__)
 
 #: Tool-response payload of the frontend's no-op ``render_a2ui``
 #: acknowledgement (``RENDER_ACK_CONTENT`` in ``frontend/src/lib/a2uiAction.ts``,
@@ -43,6 +47,8 @@ class WorkflowSessionService:
         ws_repo: WorkflowSessionRepository,
         tasks: WorkflowTaskRepository,
         meta: MessageMetaRepository,
+        skills: AgentSkillRepository,
+        skills_store: SkillManager,
         registry: AgentRegistry,
         session_service: BaseSessionService,
         app_name: str,
@@ -56,7 +62,10 @@ class WorkflowSessionService:
             meta: Repository recording and reading per-message side-channel
                 metadata (sender attribution and task association) for the
                 shared workflow chat.
-            registry: Registry resolving ADK agents per skill.
+            skills: Repository providing AgentSkill persistence, read to resolve
+                the ``repo_path`` and fallback revision of a session's skill.
+            skills_store: Store locating a skill revision's directory on disk.
+            registry: Registry resolving ADK agents per skill revision.
             session_service: ADK session store, used to delete the underlying
                 chat session when a WorkflowSession is removed.
             app_name: ADK application name keying sessions in the store.
@@ -66,6 +75,8 @@ class WorkflowSessionService:
         self._ws_repo = ws_repo
         self._tasks = tasks
         self._meta = meta
+        self._skills = skills
+        self._skills_store = skills_store
         self._registry = registry
         self._session_service = session_service
         self._app_name = app_name
@@ -178,12 +189,17 @@ class WorkflowSessionService:
     ) -> tuple[ADKAgent, WorkflowSession]:
         """Resolve the ADK agent bound to a WorkflowSession and the session record.
 
-        The skill and skill directory are read from the session record so the
-        correct ADK tools are loaded regardless of global agent state. The record
-        is returned alongside the agent so the caller can key the ADK run by the
-        session's owner (``WorkflowSession.user_id``) rather than the current user,
-        letting every authorized viewer (for example a designated approver) share
-        the same ADK session.
+        The skill revision comes from the session record, so the run loads the
+        code it started against no matter which replica serves it and no matter
+        how many times the skill has been pulled since. Revision directories are
+        immutable and live in the shared skill store, so this needs no lock and
+        no clone — it only resolves a path that a pull can add siblings to but
+        never rewrite.
+
+        The record is returned alongside the agent so the caller can key the ADK
+        run by the session's owner (``WorkflowSession.user_id``) rather than the
+        current user, letting every authorized viewer (for example a designated
+        approver) share the same ADK session.
 
         Args:
             ws_id: Identifier of the session whose agent to resolve.
@@ -191,16 +207,50 @@ class WorkflowSessionService:
 
         Returns:
             A ``(agent, workflow_session)`` tuple: the ADK agent configured for
-            the session's skill, and the WorkflowSession record itself.
+            the session's skill revision, and the WorkflowSession record itself.
 
         Raises:
             NotFoundError: If no session exists with the given ID.
             ForbiddenError: If the caller is neither the session owner, a
                 designated approver of the session, nor a super admin.
+            SkillNotReadyError: If neither the revision the session pinned nor
+                the skill's current revision is present in the store — the skill
+                has never been cloned, or its store was wiped. An admin fixes it
+                by pulling the skill.
         """
         ws = await self.get(ws_id, caller=caller)
-        skill_dir = Path(ws.skill_dir)
-        return self._registry.get(ws.agent_skill_id, skill_dir), ws
+        skill = await self._skills.get(ws.agent_skill_id)
+        if skill is None:
+            raise SkillNotReadyError(ws.agent_skill_id)
+
+        # Sessions created before the store was revisioned pinned no revision;
+        # they get the skill's current one.
+        commit_sha = ws.agent_skill_commit_sha or skill.commit_sha
+        if commit_sha is None:
+            raise SkillNotReadyError(skill.id)
+
+        skill_dir = self._skills_store.skill_dir(skill, commit_sha)
+        if not skill_dir.exists():
+            # The pinned revision is gone (a wiped volume, or a prune that
+            # outran a session's insert). The skill's current revision is the
+            # only code left to run, so fall back to it rather than stranding
+            # the conversation -- loudly, because it is not the code the session
+            # started with.
+            logger.warning(
+                "Skill revision %s of skill %s is missing from the store; "
+                "falling back to its current revision %s.",
+                commit_sha,
+                skill.id,
+                skill.commit_sha,
+            )
+            if skill.commit_sha is None:
+                raise SkillNotReadyError(skill.id)
+            commit_sha = skill.commit_sha
+            skill_dir = self._skills_store.skill_dir(skill, commit_sha)
+            if not skill_dir.exists():
+                raise SkillNotReadyError(skill.id)
+
+        return self._registry.get(ws.agent_skill_id, commit_sha, skill_dir), ws
 
     async def get_messages(
         self, ws_id: str, *, caller: User

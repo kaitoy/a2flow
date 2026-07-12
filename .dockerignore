@@ -13,7 +13,7 @@ backend/.env
 backend/*.db
 backend/*.db-shm
 backend/*.db-wal
-backend/.skills_cache/
+backend/.skills/
 backend/openapi.yaml
 
 # Frontend artifacts

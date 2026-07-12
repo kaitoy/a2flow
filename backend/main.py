@@ -35,6 +35,7 @@ from repositories.exceptions import (
     SecretValidationError,
     SessionRunInProgressError,
     SkillCloneError,
+    SkillNotReadyError,
     UnauthorizedError,
     UniqueViolationError,
 )
@@ -55,6 +56,7 @@ from routers.exception_handlers import (
     secret_validation_exception_handler,
     session_run_in_progress_exception_handler,
     skill_clone_exception_handler,
+    skill_not_ready_exception_handler,
     unauthorized_exception_handler,
     unhandled_exception_handler,
     unique_violation_exception_handler,
@@ -131,6 +133,7 @@ app.add_exception_handler(UniqueViolationError, unique_violation_exception_handl
 app.add_exception_handler(DependencyCycleError, dependency_cycle_exception_handler)
 app.add_exception_handler(McpConnectionError, mcp_connection_exception_handler)
 app.add_exception_handler(SkillCloneError, skill_clone_exception_handler)
+app.add_exception_handler(SkillNotReadyError, skill_not_ready_exception_handler)
 app.add_exception_handler(
     RegistryUnavailableError, registry_unavailable_exception_handler
 )

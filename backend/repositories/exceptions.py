@@ -105,6 +105,27 @@ class SkillCloneError(Exception):
         super().__init__(f"failed to prepare skill {skill_id!r}: {reason}")
 
 
+class SkillNotReadyError(RepositoryError):
+    """Raised when an AgentSkill has no published revision to run against.
+
+    A skill becomes usable only once its clone has published a revision
+    directory and recorded the sha on ``AgentSkill.commit_sha``. Until then —
+    while the registration clone is still running, or after it failed — running
+    a workflow on it has nothing to load. Also raised when the revision a
+    WorkflowSession pinned is no longer on disk and the skill has no current
+    revision to fall back on, which an admin fixes by pulling the skill again.
+
+    Carries the ``skill_id`` so the HTTP layer can surface it in the error
+    envelope's ``details`` block when returning HTTP 409.
+    """
+
+    def __init__(self, skill_id: str) -> None:
+        self.skill_id = skill_id
+        super().__init__(
+            f"AgentSkill {skill_id!r} has no published revision; pull it first"
+        )
+
+
 class RegistryUnavailableError(Exception):
     """Raised when the official MCP registry cannot be reached or errors out.
 

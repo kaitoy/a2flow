@@ -30,6 +30,7 @@ from repositories.exceptions import (
     SecretValidationError,
     SessionRunInProgressError,
     SkillCloneError,
+    SkillNotReadyError,
     UnauthorizedError,
     UniqueViolationError,
 )
@@ -219,6 +220,20 @@ async def skill_clone_exception_handler(
         code="SKILL_CLONE_FAILED",
         message=f"Failed to prepare skill {exc.skill_id!r}",
         status_code=502,
+        details={"skillId": exc.skill_id},
+    )
+
+
+async def skill_not_ready_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with SKILL_NOT_READY code when a skill has no published revision."""
+    assert isinstance(exc, SkillNotReadyError)
+    return _envelope_error(
+        request,
+        code="SKILL_NOT_READY",
+        message=str(exc),
+        status_code=409,
         details={"skillId": exc.skill_id},
     )
 

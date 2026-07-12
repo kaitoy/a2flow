@@ -1,13 +1,19 @@
 """AgentSkill repository: Protocol interface and SQLModel-backed implementation."""
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Protocol
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
+from models.agent_skill import (
+    AgentSkill,
+    AgentSkillCreate,
+    AgentSkillUpdate,
+    SkillSyncStatus,
+)
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import NotFoundError, ReferencedError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
@@ -31,6 +37,16 @@ class AgentSkillRepository(Protocol):
 
     async def update(
         self, skill_id: str, data: AgentSkillUpdate, *, user_id: str
+    ) -> AgentSkill: ...
+
+    async def set_sync_state(
+        self,
+        skill_id: str,
+        *,
+        status: SkillSyncStatus,
+        user_id: str,
+        commit_sha: str | None = None,
+        error: str | None = None,
     ) -> AgentSkill: ...
 
     async def delete(self, skill_id: str) -> None: ...
@@ -85,6 +101,51 @@ class SqlAgentSkillRepository:
         if skill is None:
             raise NotFoundError("AgentSkill", skill_id)
         skill.sqlmodel_update(data.model_dump(exclude_unset=True))
+        skill.updated_by = user_id
+        self._db.add(skill)
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
+        await self._db.refresh(skill)
+        return skill
+
+    async def set_sync_state(
+        self,
+        skill_id: str,
+        *,
+        status: SkillSyncStatus,
+        user_id: str,
+        commit_sha: str | None = None,
+        error: str | None = None,
+    ) -> AgentSkill:
+        """Record the outcome of a clone/pull on the skill's server-managed fields.
+
+        ``commit_sha`` is only written when a revision was actually published,
+        so a failed pull leaves the previously published revision in place and
+        the skill keeps working at it — the failure shows up as ``status`` and
+        ``error`` alone.
+
+        Args:
+            skill_id: Identifier of the skill being synced.
+            status: The outcome to record.
+            user_id: ID of the user whose action triggered the sync.
+            commit_sha: The revision just published, if one was. Leave ``None``
+                to keep whatever revision is already current.
+            error: Failure reason, recorded when ``status`` is ``failed`` and
+                cleared otherwise.
+
+        Returns:
+            The updated AgentSkill.
+
+        Raises:
+            NotFoundError: If no skill exists with the given ID.
+        """
+        skill = await self._db.get(AgentSkill, skill_id)
+        if skill is None:
+            raise NotFoundError("AgentSkill", skill_id)
+        skill.sync_status = status
+        skill.sync_error = error
+        if commit_sha is not None:
+            skill.commit_sha = commit_sha
+            skill.synced_at = datetime.now(UTC)
         skill.updated_by = user_id
         self._db.add(skill)
         await commit_or_translate_user_fk(self._db, user_id=user_id)

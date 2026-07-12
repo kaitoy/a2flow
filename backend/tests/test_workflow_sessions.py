@@ -11,6 +11,7 @@ from httpx import AsyncClient, Response
 from dependencies import APP_NAME
 from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
+from tests.conftest import FAKE_COMMIT_SHA
 
 _SKILL_BODY = {"name": "skill-a", "repo_url": "https://github.com/x/y"}
 _WF_BODY = {"name": "my-workflow", "prompt": "Do the thing"}
@@ -273,8 +274,10 @@ async def test_workflow_session_agent_delegates_to_agent_registry(
         f"/api/v1/workflow-sessions/{ws['id']}/agent",
         json=_make_run_agent_input(),
     )
+    # The agent is keyed by the revision the session pinned, so a later pull of
+    # the skill cannot change which code this session's runs load.
     mock_agent_registry.get.assert_called_with(
-        skill["id"], mock_agent_registry.get.call_args.args[1]
+        skill["id"], FAKE_COMMIT_SHA, mock_agent_registry.get.call_args.args[2]
     )
 
 

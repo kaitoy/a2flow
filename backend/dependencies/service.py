@@ -5,6 +5,7 @@ plus any singletons it needs (the skill manager, the agent registry). These are
 the dependencies routers inject to invoke business logic.
 """
 
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from fastapi import Depends
@@ -24,6 +25,7 @@ from services import (
     WorkflowSessionAccessPolicy,
     WorkflowSessionService,
     WorkflowTaskService,
+    sync_agent_skill,
 )
 
 from .context import APP_NAME
@@ -58,6 +60,23 @@ def get_agent_skill_service(
 
 
 AgentSkillServiceDep = Annotated[AgentSkillService, Depends(get_agent_skill_service)]
+
+#: The background clone/pull job, as the agent-skills router hands it to
+#: ``BackgroundTasks``.
+SkillSyncJob = Callable[..., Awaitable[None]]
+
+
+def get_skill_sync_job() -> SkillSyncJob:
+    """Return the background job that clones a skill's repository into the store.
+
+    Injected rather than called by name so tests can override it: the real job
+    opens a database session of its own on the application engine, which a test
+    driving the router over an in-memory database has no way to redirect.
+    """
+    return sync_agent_skill
+
+
+SkillSyncJobDep = Annotated[SkillSyncJob, Depends(get_skill_sync_job)]
 
 
 def get_auth_service(
@@ -140,12 +159,10 @@ UserAvatarServiceDep = Annotated[UserAvatarService, Depends(get_user_avatar_serv
 def get_workflow_service(
     workflows: WorkflowRepositoryDep,
     skills: AgentSkillRepositoryDep,
-    skill_manager: SkillManagerDep,
     ws_repo: WorkflowSessionRepositoryDep,
-    resolver: SecretResolverDep,
 ) -> WorkflowService:
-    """Create a WorkflowService wiring the repositories, SkillManager, and resolver."""
-    return WorkflowService(workflows, skills, skill_manager, ws_repo, resolver)
+    """Create a WorkflowService wiring the repositories it orchestrates."""
+    return WorkflowService(workflows, skills, ws_repo)
 
 
 WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
@@ -167,13 +184,23 @@ def get_workflow_session_service(
     ws_repo: WorkflowSessionRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     meta: MessageMetaRepositoryDep,
+    skills: AgentSkillRepositoryDep,
+    skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
     access: WorkflowSessionAccessPolicyDep,
 ) -> WorkflowSessionService:
-    """Create a WorkflowSessionService wiring the repositories, agent registry, session store, and access policy."""
+    """Create a WorkflowSessionService wiring the repositories, skill store, agent registry, session store, and access policy."""
     return WorkflowSessionService(
-        ws_repo, tasks, meta, registry, session_service, APP_NAME, access
+        ws_repo,
+        tasks,
+        meta,
+        skills,
+        skills_store,
+        registry,
+        session_service,
+        APP_NAME,
+        access,
     )
 
 

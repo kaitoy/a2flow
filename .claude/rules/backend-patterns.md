@@ -209,8 +209,16 @@ class AgentSkillService:
 ```
 
 Services also host multi-collaborator orchestration. For example,
-`WorkflowService.execute` resolves a workflow and its skill, clones the skill
-repository via `SkillManager`, and records a new `WorkflowSession`.
+`WorkflowService.execute` resolves a workflow and its skill and records a new
+`WorkflowSession` pinned to the skill's published revision, and
+`AgentSkillSyncService.sync` takes the skill's advisory lock, resolves its auth
+secret, publishes a clone through `SkillManager`, and records the outcome.
+
+`services/agent_skill_sync.py` also exposes the module function
+`sync_agent_skill`, the background job the agent-skills router hands to
+`BackgroundTasks`. It opens a database session of its own — the request-scoped
+one is closed by the time it runs — and is injected as `SkillSyncJobDep` rather
+than called by name, so tests can replace it.
 
 ---
 
@@ -219,7 +227,8 @@ repository via `SkillManager`, and records a new `WorkflowSession`.
 `infrastructure/` holds concrete adapters for external systems and persistence
 that the service layer depends on but that contain no business rules — for
 example `StaleTolerantSqliteSessionService` (ADK session storage) and
-`SkillManager` (git-backed skill cloning).
+`SkillManager` (the git-backed skill store: one immutable directory per cloned
+revision, published by an atomic rename).
 
 ---
 
@@ -265,7 +274,8 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `SecretResolutionError` | 502 | `SECRET_RESOLUTION_FAILED` | A `${secret:NAME}` reference or skill `repo_auth_secret` could not be resolved; `details` carries `secret` only — the raw failure reason is logged server-side, never returned to the client |
 | `RequestValidationError` | 422 | `VALIDATION_ERROR` | FastAPI body/query validation; `details.errors` from Pydantic |
 | `McpConnectionError` | 502 | `MCP_UNREACHABLE` | Remote MCP server unreachable; `details` carries `server` only — the raw failure reason is logged server-side, never returned to the client |
-| `SkillCloneError` | 502 | `SKILL_CLONE_FAILED` | Skill repository could not be cloned; `details` carries `skillId` only — the raw failure reason is logged server-side, never returned to the client |
+| `SkillCloneError` | 502 | `SKILL_CLONE_FAILED` | Skill repository could not be cloned; `details` carries `skillId` only — the raw failure reason is logged server-side, never returned to the client. Only reaches HTTP from a synchronous caller; the background clone job (`services/agent_skill_sync.py`) catches it and records the reason on the skill row instead |
+| `SkillNotReadyError` | 409 | `SKILL_NOT_READY` | The skill has no published revision to run against (its clone is still in flight, or it failed); `details` carries `skillId`. Raised by `POST /workflows/{id}/execute` and by `WorkflowSessionService.resolve_agent` |
 | `RegistryUnavailableError` | 502 | `REGISTRY_UNREACHABLE` | Official MCP registry unreachable; no `details` — the raw failure reason is logged server-side only |
 | `HTTPException` (any other raise) | passthrough | `HTTP_<status>` | Fallback for callers still raising `HTTPException` |
 | Uncaught `Exception` | 500 | `INTERNAL_ERROR` | Logged with `request_id` |
@@ -347,10 +357,11 @@ DBSessionDep        # AsyncSession, per-request
 AgentSkillRepositoryDep   # SqlAgentSkillRepository, per-request
 WorkflowRepositoryDep     # SqlWorkflowRepository, per-request (injects AgentSkillRepository)
 AgentSkillServiceDep      # AgentSkillService, per-request (injects AgentSkillRepository)
-WorkflowServiceDep        # WorkflowService, per-request (injects repos + SkillManager)
+WorkflowServiceDep        # WorkflowService, per-request (injects repos)
 SessionServiceDep   # ADK BaseSessionService (SQLite- or DB-backed), singleton
 AgentRegistryDep    # AgentRegistry (wraps the session service), singleton
-SkillManagerDep     # SkillManager (git-backed skill clones), singleton
+SkillManagerDep     # SkillManager (the git-backed skill store), singleton
+SkillSyncJobDep     # sync_agent_skill, the background clone/pull job
 ```
 
 Routers inject the `*ServiceDep` aliases; the repository aliases exist so the

@@ -1,11 +1,11 @@
-from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from httpx import AsyncClient
 
 from models.secret import Secret as _Secret  # noqa: F401 — registers model
 from tests._envelope import assert_err, assert_ok
+from tests.conftest import FAKE_COMMIT_SHA
 
 _SKILL_BODY = {"name": "skill-a", "repo_url": "https://github.com/x/y"}
 _WF_BODY = {"name": "my-workflow", "prompt": "Do the thing"}
@@ -363,87 +363,52 @@ async def test_execute_workflow_unknown_id_returns_404(
     assert_err(response, code="NOT_FOUND", status=404)
 
 
-async def test_execute_workflow_clones_skill_repo(
+async def test_execute_workflow_does_not_clone(
     workflow_client: AsyncClient,
     mock_skill_manager: MagicMock,
 ) -> None:
+    """Cloning happens at registration and on pull, never on the hot path of a run."""
     skill = await _create_skill(workflow_client)
     wf = await _create_workflow(workflow_client, skill["id"])
 
-    captured_ids: list[str] = []
-
-    async def _capture(s: Any, auth: Any = None) -> Any:
-        captured_ids.append(s.id)
-        return Path("/tmp/skill")
-
-    mock_skill_manager.ensure_cloned.side_effect = _capture
-
-    await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute")
-    mock_skill_manager.ensure_cloned.assert_awaited_once()
-    assert captured_ids[0] == skill["id"]
-
-
-async def test_execute_workflow_passes_repo_auth_to_clone(
-    workflow_client: AsyncClient,
-    mock_skill_manager: MagicMock,
-) -> None:
-    """A skill with repo_auth_secret resolves it and clones with credentials."""
     assert_ok(
-        await workflow_client.post(
-            "/api/v1/secrets",
-            json={"name": "git-token", "type": "local", "value": "tok-123"},
-        ),
-        status=201,
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
-    skill = assert_ok(
-        await workflow_client.post(
-            "/api/v1/agent-skills",
-            json={**_SKILL_BODY, "repo_auth_secret": "git-token"},
-        ),
-        status=201,
-    )
+
+    mock_skill_manager.clone.assert_not_awaited()
+
+
+async def test_execute_workflow_pins_the_skills_published_revision(
+    workflow_client: AsyncClient,
+) -> None:
+    """The session records the revision it started against, not a local path.
+
+    That is what lets any replica resolve the same code later, and what keeps a
+    later pull of the skill from swapping the code out from under the run.
+    """
+    skill = await _create_skill(workflow_client)
     wf = await _create_workflow(workflow_client, skill["id"])
 
-    captured_auth: list[Any] = []
+    body = assert_ok(
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
+    )
 
-    async def _capture(s: Any, auth: Any = None) -> Any:
-        captured_auth.append(auth)
-        return Path("/tmp/skill")
-
-    mock_skill_manager.ensure_cloned.side_effect = _capture
-
-    response = await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute")
-    assert_ok(response, status=201)
-    assert captured_auth == [("x-access-token", "tok-123")]
+    assert body["agentSkillCommitSha"] == FAKE_COMMIT_SHA
+    assert "skillDir" not in body
 
 
-async def test_execute_workflow_with_missing_auth_secret_returns_502(
-    workflow_client: AsyncClient,
-    mock_skill_manager: MagicMock,
+async def test_execute_workflow_with_unpublished_skill_returns_409(
+    workflow_client: AsyncClient, mock_sync_job: AsyncMock
 ) -> None:
-    """A dangling repo_auth_secret fails lazily at execute time with 502."""
-    assert_ok(
-        await workflow_client.post(
-            "/api/v1/secrets",
-            json={"name": "doomed", "type": "local", "value": "tok"},
-        ),
-        status=201,
-    )
-    skill = assert_ok(
-        await workflow_client.post(
-            "/api/v1/agent-skills",
-            json={**_SKILL_BODY, "repo_auth_secret": "doomed"},
-        ),
-        status=201,
-    )
+    """A skill whose clone has not published a revision cannot back a run yet."""
+    mock_sync_job.side_effect = None  # the clone never publishes anything
+    skill = await _create_skill(workflow_client)
     wf = await _create_workflow(workflow_client, skill["id"])
-    secrets = assert_ok(await workflow_client.get("/api/v1/secrets"))
-    await workflow_client.delete(f"/api/v1/secrets/{secrets[0]['id']}")
 
     response = await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute")
-    err = assert_err(response, code="SECRET_RESOLUTION_FAILED", status=502)
-    assert err["details"] == {"secret": "doomed"}
-    mock_skill_manager.ensure_cloned.assert_not_awaited()
+
+    err = assert_err(response, code="SKILL_NOT_READY", status=409)
+    assert err["details"] == {"skillId": skill["id"]}
 
 
 async def test_execute_workflow_snapshot_contains_skill_info(

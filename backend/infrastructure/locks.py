@@ -91,6 +91,22 @@ def agent_run_key(app_name: str, user_id: str, session_id: str) -> str:
     return f"{app_name}:{user_id}:{session_id}"
 
 
+def skill_sync_key(skill_id: str) -> str:
+    """Build the lock key serializing clone/pull of one AgentSkill's repository.
+
+    Writers to the shared skill store contend on this; readers do not take it at
+    all, because a published revision directory is immutable and a pull only
+    adds a sibling (see ``infrastructure/skill_manager.py``).
+
+    Args:
+        skill_id: Id of the AgentSkill being cloned or pulled.
+
+    Returns:
+        The key to pass to :func:`advisory_lock`.
+    """
+    return f"skill-sync:{skill_id}"
+
+
 def lock_id(key: str) -> int:
     """Hash a lock key into the signed 64-bit integer ``pg_advisory_lock`` takes.
 
@@ -180,10 +196,20 @@ async def _in_process_lock(key: str, wait_seconds: float) -> AsyncIterator[None]
         _local_locks[map_key] = lock
     _local_waiters[map_key] = _local_waiters.get(map_key, 0) + 1
     try:
-        try:
-            await asyncio.wait_for(lock.acquire(), timeout=wait_seconds)
-        except TimeoutError as exc:
-            raise LockNotAcquiredError(key) from exc
+        if wait_seconds <= 0:
+            # `wait_for` with a non-positive timeout cancels before the wrapped
+            # coroutine gets to run, so it would report a *free* lock as
+            # contended. Mirror what a zero wait means on the PostgreSQL side --
+            # one `pg_try_advisory_lock` attempt, no waiting -- by testing the
+            # lock directly.
+            if lock.locked():
+                raise LockNotAcquiredError(key)
+            await lock.acquire()
+        else:
+            try:
+                await asyncio.wait_for(lock.acquire(), timeout=wait_seconds)
+            except TimeoutError as exc:
+                raise LockNotAcquiredError(key) from exc
         try:
             yield
         finally:

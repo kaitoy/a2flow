@@ -142,11 +142,41 @@ def mock_agent_registry(mock_adk_agent: MagicMock) -> MagicMock:
     return registry
 
 
+#: Commit sha the fake skill store reports for every clone, and that tests
+#: expect a WorkflowSession to be pinned to.
+FAKE_COMMIT_SHA = "a" * 40
+
+
 @pytest.fixture()
-def mock_skill_manager() -> MagicMock:
+def mock_skill_manager(tmp_path: Path) -> MagicMock:
+    """A skill store whose revision directories exist but are never really cloned.
+
+    ``skill_dir`` returns a real, existing path because ``resolve_agent`` checks
+    for it before handing the directory to ADK; the directory is empty, which is
+    fine since the agent registry is mocked too.
+    """
+    skill_dir = tmp_path / "skill"
+    skill_dir.mkdir()
     manager = MagicMock()
-    manager.ensure_cloned = AsyncMock(return_value=Path("/tmp/skill"))
+    manager.clone = AsyncMock(return_value=FAKE_COMMIT_SHA)
+    manager.skill_dir = MagicMock(return_value=skill_dir)
+    manager.prune = AsyncMock()
     return manager
+
+
+@pytest.fixture()
+def mock_sync_job() -> AsyncMock:
+    """Stand-in for the background clone job scheduled by the agent-skills router.
+
+    The real job opens a database session on the application engine, which a
+    test driving the router over an in-memory database cannot redirect — so it
+    is replaced wholesale. ``workflow_client`` gives it a side effect that
+    publishes :data:`FAKE_COMMIT_SHA` on the skill, standing in for a successful
+    clone, so a skill registered through the API ends up runnable exactly as it
+    would in production. Tests can still assert on the scheduling, or override
+    the side effect to simulate a clone that failed.
+    """
+    return AsyncMock()
 
 
 @pytest_asyncio.fixture()
@@ -176,12 +206,14 @@ async def client_with_real_sessions(
 async def workflow_client(
     mock_agent_registry: MagicMock,
     mock_skill_manager: MagicMock,
+    mock_sync_job: AsyncMock,
     real_session_service: InMemorySessionService,
 ) -> AsyncGenerator[AsyncClient, None]:
     from dependencies import (
         get_agent_registry,
         get_session_service,
         get_skill_manager,
+        get_skill_sync_job,
     )
     from infrastructure.database import get_session
     from main import app
@@ -210,10 +242,26 @@ async def workflow_client(
         async with AsyncSession(mem_engine) as session:
             yield session
 
+    async def fake_sync(skill_id: str, *, user_id: str) -> None:
+        """Publish a revision on the skill, as a successful clone would."""
+        from models.agent_skill import SkillSyncStatus
+        from repositories.agent_skill import SqlAgentSkillRepository
+
+        async with AsyncSession(mem_engine) as session:
+            await SqlAgentSkillRepository(session).set_sync_state(
+                skill_id,
+                status=SkillSyncStatus.ready,
+                commit_sha=FAKE_COMMIT_SHA,
+                user_id=user_id,
+            )
+
+    mock_sync_job.side_effect = fake_sync
+
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_agent_registry] = lambda: mock_agent_registry
     app.dependency_overrides[get_session_service] = lambda: real_session_service
     app.dependency_overrides[get_skill_manager] = lambda: mock_skill_manager
+    app.dependency_overrides[get_skill_sync_job] = lambda: mock_sync_job
     _install_auth_overrides(app)
     try:
         async with AsyncClient(

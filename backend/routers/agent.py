@@ -2,7 +2,6 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack
-from pathlib import Path
 
 from ag_ui.core import RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
@@ -11,9 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from dependencies import APP_NAME, AgentRegistryDep, CurrentUserIdDep, SessionServiceDep
 from infrastructure.agent import (
-    AGENT_SKILL_ID_KEY,
     SESSION_TITLE_KEY,
-    SKILL_DIR_KEY,
     derive_session_title,
     first_user_message_text,
     with_user_id,
@@ -36,8 +33,11 @@ async def agent_endpoint(
 
     SystemMessages are stripped from the input to prevent prompt injection
     (ag_ui_adk appends their content directly to agent instructions).
-    The agent and skill are resolved from the ADK session state, falling back
-    to the default skill-less agent when no session exists.
+
+    This is the general-purpose chat endpoint and always runs the default
+    skill-less agent. Skill-backed runs go through
+    ``POST /workflow-sessions/{ws_id}/agent``, which resolves the skill and its
+    pinned revision from the WorkflowSession record.
 
     The whole run is serialized per ADK session by a cross-process lock, so a
     horizontally scaled deployment never has two replicas driving one session at
@@ -64,17 +64,7 @@ async def agent_endpoint(
             user_id=user_id,
             session_id=input_data.thread_id,
         )
-        skill_id: str | None = None
-        skill_dir: Path | None = None
-        if session is not None:
-            state = session.state or {}
-            raw_skill_id = state.get(AGENT_SKILL_ID_KEY)
-            raw_skill_dir = state.get(SKILL_DIR_KEY)
-            if raw_skill_id:
-                skill_id = str(raw_skill_id)
-            if raw_skill_dir:
-                skill_dir = Path(str(raw_skill_dir))
-        else:
+        if session is None:
             first_text = first_user_message_text(filtered)
             title = derive_session_title(first_text) if first_text is not None else None
             if title is not None:
@@ -84,7 +74,7 @@ async def agent_endpoint(
                     session_id=input_data.thread_id,
                     state={SESSION_TITLE_KEY: title},
                 )
-        adk_agent = registry.get(skill_id, skill_dir)
+        adk_agent = registry.get(None, None, None)
 
         # Override forwarded_props.userId with the trusted X-User-Id header so the
         # agent run is keyed by the same user the skill lookup above resolved.

@@ -1,11 +1,14 @@
 """AgentSkill data models for create, update, and database persistence."""
 
+from datetime import datetime
+from enum import StrEnum
+
 from pydantic.alias_generators import to_camel
 from sqlalchemy import Index, UniqueConstraint
-from sqlmodel import SQLModel
+from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity
+from models.base import BaseEntity, TZDateTime
 from models.constraints import (
     DescText,
     EntityName,
@@ -16,6 +19,26 @@ from models.constraints import (
 )
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
+
+
+class SkillSyncStatus(StrEnum):
+    """Outcome of the most recent clone/pull of a skill's repository.
+
+    Deliberately separate from usability: whether a skill can back a workflow
+    run is decided by :attr:`AgentSkill.commit_sha`, not by this field. A pull
+    that fails leaves the previously published revision in place, so the skill
+    keeps working at the old revision while the UI surfaces ``failed`` and the
+    reason.
+    """
+
+    pending = "pending"
+    """A clone/pull is queued or in flight."""
+
+    ready = "ready"
+    """The last clone/pull published a revision successfully."""
+
+    failed = "failed"
+    """The last clone/pull failed; ``sync_error`` carries the reason."""
 
 
 class AgentSkillUpdate(SQLModel):
@@ -47,9 +70,28 @@ class AgentSkillCreate(AgentSkillUpdate):
 
 
 class AgentSkill(AgentSkillCreate, BaseEntity, table=True):
-    """Database-persisted agent skill referencing a Git repository of ADK tools."""
+    """Database-persisted agent skill referencing a Git repository of ADK tools.
+
+    The sync fields below are server-managed: they are declared on the table
+    class only, so they are absent from ``AgentSkillCreate`` /
+    ``AgentSkillUpdate`` and cannot be written through the API. They are set by
+    the clone/pull job (``services/agent_skill_sync.py``), which is scheduled
+    when the skill is registered and re-run on demand from
+    ``POST /agent-skills/{id}/pull``.
+
+    ``commit_sha`` is the contract with the rest of the system: it names the
+    revision directory published under ``Settings.skills_dir`` and, being
+    non-null only once a complete revision exists, is what gates whether a
+    workflow may run on this skill.
+    """
 
     __tablename__ = "agent_skills"
+
+    sync_status: SkillSyncStatus = Field(default=SkillSyncStatus.pending)
+    sync_error: str | None = None
+    commit_sha: str | None = None
+    synced_at: datetime | None = Field(default=None, sa_type=TZDateTime)
+
     __table_args__ = (
         UniqueConstraint("name", name="uq_agent_skills_name"),
         Index("ix_agent_skills_name", "name"),

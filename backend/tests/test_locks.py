@@ -18,6 +18,7 @@ from infrastructure.locks import (
     advisory_lock,
     agent_run_key,
     lock_id,
+    skill_sync_key,
 )
 
 
@@ -131,3 +132,28 @@ async def test_advisory_lock_does_not_leak_registry_entries() -> None:
 
     assert _local_locks == locks_before
     assert _local_waiters == waiters_before
+
+
+def test_skill_sync_key_namespaces_the_skill() -> None:
+    """The sync key must not collide with an agent-run key for the same id."""
+    assert skill_sync_key("skill-1") == "skill-sync:skill-1"
+    assert skill_sync_key("skill-1") != agent_run_key("A2Flow", "user", "skill-1")
+
+
+async def test_zero_wait_acquires_a_free_lock() -> None:
+    """A zero wait means "try once", not "fail even when nobody holds it".
+
+    The background skill-sync job takes its lock with no wait, so that it skips
+    a skill another replica is already cloning rather than queueing behind it.
+    Getting this wrong makes every clone a no-op on a SQLite deployment, where
+    `advisory_lock` takes its in-process branch.
+    """
+    async with advisory_lock("skill-sync:free", wait_seconds=0):
+        pass
+
+
+async def test_zero_wait_gives_up_immediately_on_a_held_lock() -> None:
+    async with advisory_lock("skill-sync:held"):
+        with pytest.raises(LockNotAcquiredError):
+            async with advisory_lock("skill-sync:held", wait_seconds=0):
+                pass

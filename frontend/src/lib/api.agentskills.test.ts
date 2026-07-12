@@ -6,6 +6,7 @@ import {
   deleteAgentSkill,
   getAgentSkill,
   listAgentSkills,
+  pullAgentSkill,
   updateAgentSkill,
 } from "./api";
 
@@ -80,5 +81,23 @@ describe("deleteAgentSkill", () => {
       )
     );
     await expect(deleteAgentSkill("missing")).rejects.toThrow("404");
+  });
+});
+
+describe("pullAgentSkill", () => {
+  it("POSTs to /pull and returns the skill marked pending", async () => {
+    const skill = await pullAgentSkill("skill-1");
+    expect(skill.id).toBe("skill-1");
+    expect(skill.syncStatus).toBe("pending");
+  });
+
+  it("throws on 404", async () => {
+    server.use(
+      http.post(
+        `${BASE}/api/v1/agent-skills/:skillId/pull`,
+        () => new HttpResponse(null, { status: 404 })
+      )
+    );
+    await expect(pullAgentSkill("missing")).rejects.toThrow("404");
   });
 });

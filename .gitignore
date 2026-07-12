@@ -30,7 +30,7 @@ Thumbs.db
 *.db-wal
 
 # Skill repos cloned at runtime
-backend/.skills_cache/
+backend/.skills/
 
 # Next.js
 frontend/.next/

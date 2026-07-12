@@ -10,16 +10,16 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 
-# Run as non-root. /var/cache/a2flow/skills is pre-created and chowned here
-# because it's the mount point for compose.yml's `skills_cache` named volume —
-# Docker seeds a new named volume's ownership from the image path it overlays,
-# so this is what makes the first skill clone (as `app`) succeed instead of
-# hitting a root-owned mount point.
+# Run as non-root. /var/lib/a2flow/skills is pre-created and chowned here
+# because it's the mount point for compose.yml's `skills` named volume — Docker
+# seeds a new named volume's ownership from the image path it overlays, so this
+# is what makes the first skill clone (as `app`) succeed instead of hitting a
+# root-owned mount point.
 RUN groupadd --gid 1000 app \
     && useradd --uid 1000 --gid app --no-create-home --home-dir /app \
         --shell /usr/sbin/nologin app \
-    && mkdir -p /var/cache/a2flow/skills \
-    && chown -R app:app /app /var/cache/a2flow/skills
+    && mkdir -p /var/lib/a2flow/skills \
+    && chown -R app:app /app /var/lib/a2flow/skills
 ENV HOME=/app \
     UV_CACHE_DIR=/app/.cache/uv
 USER app
