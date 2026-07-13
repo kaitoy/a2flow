@@ -42,6 +42,11 @@ def upgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("avatar_updated_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
+            "roles",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
+        sa.Column(
             "avatar_config",
             sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
             nullable=True,
@@ -69,6 +74,14 @@ def upgrade() -> None:
         sa.Column(
             "repo_auth_username", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
+        sa.Column(
+            "sync_status",
+            sa.Enum("pending", "ready", "failed", name="skillsyncstatus"),
+            nullable=False,
+        ),
+        sa.Column("sync_error", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("commit_sha", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("synced_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
@@ -195,7 +208,9 @@ def upgrade() -> None:
         sa.Column(
             "agent_skill_repo_path", sqlmodel.sql.sqltypes.AutoString(), nullable=False
         ),
-        sa.Column("skill_dir", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "agent_skill_commit_sha", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
         sa.Column("user_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
