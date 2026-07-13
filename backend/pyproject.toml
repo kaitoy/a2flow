@@ -4,14 +4,14 @@ version = "0.1.0"
 description = "Google ADK agent with SSE streaming"
 requires-python = ">=3.11"
 dependencies = [
-    "google-adk>=1.28.0",
+    "google-adk>=2.4.0,<3.0.0",
     "anyio>=4.0.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "python-dotenv>=1.0.0",
     "litellm>=1.50.0",
     "ag-ui-protocol>=0.1.15",
-    "ag-ui-adk>=0.6.0",
+    "ag-ui-adk>=0.6.5,<0.7.0",
     "pydantic[email]>=2.0.0",
     "pydantic-settings>=2.13.0",
     "sqlmodel>=0.0.22",

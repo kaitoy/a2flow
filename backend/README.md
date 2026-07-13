@@ -29,7 +29,7 @@ Specify the LLM to use in the `.env` file.
 ### Gemini (default)
 
 ```env
-LLM_MODEL=gemini-2.0-flash
+LLM_MODEL=gemini-3.5-flash
 GOOGLE_API_KEY=your_google_api_key
 ```
 

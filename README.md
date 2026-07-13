@@ -355,9 +355,10 @@ surfaced inline in the chat stream:
   tag. The `render_a2ui` / `render_approval` client tools keep their dedicated UI
   and are not shown as tool lines.
 - **Reasoning** — when a thinking-capable model emits `REASONING_*` events, the
-  streamed thoughts render as a muted "Thinking" panel. (The default
-  `gemini-2.0-flash` produces no thoughts, so this only appears with a model
-  configured for reasoning.)
+  streamed thoughts render as a muted "Thinking" panel. The default
+  `gemini-3.5-flash` reasons internally but does not stream thought summaries
+  unless they are enabled, so the panel only appears with a model configured to
+  emit them.
 
 On session resume, only **MCP tool calls** (`call_mcp_tool`) are reconstructed
 from history; internal A2Flow tool calls and reasoning are live-only.
@@ -406,7 +407,7 @@ Set `LLM_MODEL` in `backend/.env`:
 
 | Provider | Value |
 |---|---|
-| Google Gemini (default) | `gemini-2.0-flash` |
+| Google Gemini (default) | `gemini-3.5-flash` |
 | OpenAI via LiteLLM | `litellm:openai/gpt-4o` |
 | Anthropic via LiteLLM | `litellm:anthropic/claude-3-5-sonnet-20241022` |
 
