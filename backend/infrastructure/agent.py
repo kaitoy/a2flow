@@ -35,6 +35,15 @@ SESSION_TITLE_KEY = "session_title"
 USER_ID_PROP_KEY = "userId"
 DEFAULT_USER_ID = "user"
 
+#: ``forwarded_props`` flag that ``@ag-ui/a2ui-middleware`` sets on every request
+#: (see its ``injectToolAndFlag``). ``ag-ui-adk`` >= 0.7.0 reads it as the opt-in
+#: for server-side A2UI generation: it drops the frontend-injected ``render_a2ui``
+#: tool and injects its own ``generate_a2ui`` sub-agent instead. A2Flow renders
+#: A2UI on the frontend (see ``docs/a2ui-flow.md``) and its agent instruction
+#: tells the LLM to call ``render_a2ui``, so the flag is stripped to keep that
+#: tool in place.
+A2UI_INJECT_PROP_KEY = "injectA2UITool"
+
 _SESSION_TITLE_MAX_LENGTH = 60
 
 #: Upper bound on cached ADKAgents in :class:`AgentRegistry`. One entry per
@@ -104,10 +113,16 @@ def extract_user_id(input_data: RunAgentInput) -> str:
 
 
 def with_user_id(input_data: RunAgentInput, user_id: str) -> RunAgentInput:
-    """Return a copy of ``input_data`` with the trusted user id in ``forwarded_props``.
+    """Return a copy of ``input_data`` with ``forwarded_props`` sanitized.
 
-    Overrides any client-supplied ``userId`` so the agent's session is keyed by
-    the server-validated identity rather than untrusted client props.
+    ``forwarded_props`` is client-controlled, so both run endpoints funnel their
+    input through this before handing it to :class:`~ag_ui_adk.ADKAgent`:
+
+    - ``userId`` is overridden so the agent's session is keyed by the
+      server-validated identity rather than an untrusted client prop.
+    - :data:`A2UI_INJECT_PROP_KEY` is dropped so ``ag-ui-adk`` leaves the
+      frontend-injected ``render_a2ui`` tool alone instead of swapping in its own
+      server-side A2UI sub-agent.
 
     Args:
         input_data: The incoming AG-UI run input.
@@ -115,10 +130,12 @@ def with_user_id(input_data: RunAgentInput, user_id: str) -> RunAgentInput:
             :data:`DEFAULT_USER_ID` when empty.
 
     Returns:
-        A copy of ``input_data`` whose ``forwarded_props['userId']`` is set.
+        A copy of ``input_data`` whose ``forwarded_props['userId']`` is set and
+        whose A2UI injection flag is removed.
     """
     props = dict(input_data.forwarded_props or {})
     props[USER_ID_PROP_KEY] = user_id or DEFAULT_USER_ID
+    props.pop(A2UI_INJECT_PROP_KEY, None)
     return input_data.model_copy(update={"forwarded_props": props})
 
 

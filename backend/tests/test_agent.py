@@ -252,6 +252,37 @@ async def test_agent_endpoint_header_overrides_client_user_id(
     assert captured[0].forwarded_props["userId"] == "alice"
 
 
+async def test_agent_endpoint_strips_a2ui_inject_flag(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    """The flag ``@ag-ui/a2ui-middleware`` sends must not reach ``ADKAgent``.
+
+    ``ag-ui-adk`` >= 0.7.0 reads it as the opt-in for server-side A2UI
+    generation, which would drop the frontend's ``render_a2ui`` tool that the
+    agent instruction tells the LLM to call.
+    """
+    client, mock_agent = agent_client
+    captured: list[RunAgentInput] = []
+
+    async def _capturing_run(
+        input_data: RunAgentInput, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        captured.append(input_data)
+        return
+        yield
+
+    mock_agent.run = _capturing_run
+
+    body = {
+        **_make_run_agent_input(),
+        "forwardedProps": {"injectA2UITool": True, "userId": "spoofed"},
+    }
+    await client.post("/api/v1/agent", json=body, headers={"X-User-Id": "alice"})
+
+    assert "injectA2UITool" not in captured[0].forwarded_props
+    assert captured[0].forwarded_props["userId"] == "alice"
+
+
 async def test_agent_endpoint_encodes_events_as_sse(
     agent_client: tuple[AsyncClient, MagicMock],
 ) -> None:

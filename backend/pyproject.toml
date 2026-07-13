@@ -9,9 +9,12 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "python-dotenv>=1.0.0",
-    "litellm>=1.50.0",
+    # Capped below 1.92.0: that release replaced litellm's pure-Python
+    # `py3-none-any` wheel with manylinux-only wheels, so on Windows it falls
+    # back to the sdist and needs a Rust/maturin toolchain to build.
+    "litellm>=1.50.0,<1.92.0",
     "ag-ui-protocol>=0.1.15",
-    "ag-ui-adk>=0.6.5,<0.7.0",
+    "ag-ui-adk>=0.7.0,<0.8.0",
     "pydantic[email]>=2.0.0",
     "pydantic-settings>=2.13.0",
     "sqlmodel>=0.0.22",

@@ -11,6 +11,8 @@ A Google ADK agent with [A2UI](https://a2ui.org/) support. Accepts prompts via H
 
 A2UI rendering is handled entirely on the frontend by `@ag-ui/a2ui-middleware`. The middleware injects the `render_a2ui` tool into each `RunAgentInput` before it reaches the backend. The backend agent uses `AGUIToolset` (from `ag-ui-adk`) as a placeholder; the `ag-ui-adk` bridge replaces it at runtime with a `ClientProxyToolset` that exposes the frontend-injected tools to the LLM. When the LLM calls `render_a2ui`, the bridge streams `TOOL_CALL_*` events which the middleware converts into `ACTIVITY_SNAPSHOT` events on the client side.
 
+The middleware also sets `forwardedProps.injectA2UITool`, which `ag-ui-adk` 0.7.0+ treats as the opt-in for its own server-side A2UI generation (dropping `render_a2ui` in favour of a `generate_a2ui` sub-agent). A2Flow deliberately opts out: `with_user_id` (`infrastructure/agent.py`) strips the flag so the frontend-rendered path stays in effect. See [docs/a2ui-flow.md](../docs/a2ui-flow.md).
+
 ## Setup
 
 ```bash

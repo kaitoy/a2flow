@@ -43,6 +43,10 @@ useChat.sendMessage()
 
 The backend `ADKAgent` (`ag-ui-adk`) replaces the agent's `AGUIToolset` placeholder with a `ClientProxyToolset` built from `RunAgentInput.tools`. This makes `render_a2ui` callable by the LLM as if it were a native backend tool.
 
+> **Why the backend strips `injectA2UITool`**
+>
+> `A2UIMiddleware` also sets `forwardedProps.injectA2UITool: true` on every request. From `ag-ui-adk` 0.7.0 on, that flag is the opt-in for the library's own **server-side** A2UI generation: it drops the frontend-injected `render_a2ui` tool and injects a `generate_a2ui` sub-agent that produces the surface with an extra LLM call. A2Flow renders A2UI on the frontend and its agent instruction (`A2UIInstructionProvider`) tells the LLM to call `render_a2ui`, so `with_user_id` (`backend/infrastructure/agent.py`) removes the flag from `forwarded_props` before the input reaches `ADKAgent`. Without a runtime flag and without an `a2ui` config on `ADKAgent`, the library leaves the client's tools alone. Adopting the server-side path would mean rewriting the instruction around `generate_a2ui` and re-validating both surface restoration on reload (§7) and sender attribution.
+
 When the LLM decides to render rich UI, it calls `render_a2ui` with structured arguments:
 
 ```json
