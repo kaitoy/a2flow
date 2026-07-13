@@ -7,6 +7,7 @@ from ag_ui.core import Message, RunAgentInput, TextInputContent, UserMessage
 from ag_ui_adk import CONTEXT_STATE_KEY, ADKAgent, AGUIToolset
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
+from google.adk.apps import App, ResumabilityConfig
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.sessions import BaseSessionService
 from google.adk.skills import load_skill_from_dir
@@ -284,6 +285,36 @@ def create_agent(skill_dir: Path | None = None) -> LlmAgent:
     )
 
 
+def create_app(app_name: str, skill_dir: Path | None = None) -> App:
+    """Wrap :func:`create_agent` in a resumable ADK :class:`~google.adk.apps.App`.
+
+    Resumability is what makes ADK itself own the human-in-the-loop pause: the
+    Runner persists the long-running FunctionCall event and suspends the
+    invocation, so ``ag-ui-adk`` can drain its event stream to completion instead
+    of taking its deprecated "fire-and-forget" path. That path abandons ADK's
+    ``run_async`` async generator mid-iteration on the first long-running tool
+    call (``render_a2ui``, ``render_approval``); the generator is then finalized
+    by asyncio's async-generator hook in a *different* task, so the OpenTelemetry
+    context tokens its suspended spans hold get detached from a context they were
+    not created in — one ``Failed to detach context`` ERROR per long-running tool
+    call.
+
+    Args:
+        app_name: Name of the ADK app; ``ADKAgent.from_app`` adopts it as the
+            agent's ``app_name``, so it must match the one the routers use.
+        skill_dir: Directory ADK loads the skill from, or ``None`` for the
+            default skill-less agent.
+
+    Returns:
+        An App wrapping the agent, with resumability enabled.
+    """
+    return App(
+        name=app_name,
+        root_agent=create_agent(skill_dir=skill_dir),
+        resumability_config=ResumabilityConfig(is_resumable=True),
+    )
+
+
 class AgentRegistry:
     """Caches one ADKAgent per ``(agent_skill_id, commit_sha)`` revision of a skill.
 
@@ -303,6 +334,10 @@ class AgentRegistry:
     Bounded by :data:`_AGENT_CACHE_MAX_ENTRIES` on a least-recently-used basis:
     pruning keeps the number of live revisions small, but nothing else would
     ever evict the entry for a revision that has been pulled past.
+
+    Every agent is built through ``ADKAgent.from_app(create_app(...))`` rather
+    than the plain ``ADKAgent(...)`` constructor, so long-running tool calls pause
+    on ADK's own resumability machinery — see :func:`create_app`.
     """
 
     def __init__(self, session_service: BaseSessionService, app_name: str) -> None:
@@ -336,9 +371,8 @@ class AgentRegistry:
         if cached is not None:
             self._cache.move_to_end(key)
             return cached
-        agent = ADKAgent(
-            adk_agent=create_agent(skill_dir=skill_dir),
-            app_name=self._app_name,
+        agent = ADKAgent.from_app(
+            create_app(self._app_name, skill_dir=skill_dir),
             user_id_extractor=extract_user_id,
             session_service=self._session_service,
             use_thread_id_as_session_id=True,

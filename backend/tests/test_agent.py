@@ -368,6 +368,35 @@ def test_create_agent_with_skill_dir_loads_skill_toolset(tmp_path: Any) -> None:
     assert any(isinstance(t, SkillToolset) for t in agent.tools)
 
 
+def test_create_app_enables_resumability() -> None:
+    """The App must be resumable so ag-ui-adk lets ADK own the HITL pause.
+
+    Without it, ag-ui-adk takes its deprecated fire-and-forget path and abandons
+    ADK's ``run_async`` generator at the first long-running tool call, which the
+    OpenTelemetry context tokens of the suspended spans do not survive.
+    """
+    from infrastructure.agent import create_app
+
+    app = create_app("A2Flow")
+
+    assert app.name == "A2Flow"
+    assert app.resumability_config is not None
+    assert app.resumability_config.is_resumable is True
+
+
+def test_agent_registry_builds_resumable_agents() -> None:
+    from infrastructure.agent import AgentRegistry
+
+    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    registry = AgentRegistry(session_service=service, app_name="A2Flow")
+
+    agent = registry.get(None, None, None)
+
+    # Private to ag-ui-adk, but it is the exact predicate that decides whether an
+    # LRO tool call pauses through ADK or abandons the runner's generator.
+    assert agent._is_adk_resumable() is True
+
+
 def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
     from google.adk.sessions import InMemorySessionService
 
