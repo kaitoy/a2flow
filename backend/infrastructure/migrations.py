@@ -30,6 +30,16 @@ async def run_migrations() -> None:
 
 
 def _upgrade_to_head() -> None:
-    """Run ``alembic upgrade head`` synchronously against ``alembic.ini``."""
+    """Run ``alembic upgrade head`` synchronously against ``alembic.ini``.
+
+    ``configure_logger`` tells ``alembic/env.py`` to leave logging alone. The
+    app configured it at import (``logging_context.setup_logging``), and
+    ``env.py``'s default ``fileConfig()`` call would disable every existing
+    logger and replace root's handler with ``alembic.ini``'s, so the app would
+    log nothing for the rest of the process. The Alembic CLI passes no
+    attributes, so a standalone ``alembic upgrade head`` still configures
+    logging from the ini as usual.
+    """
     cfg = Config(str(BACKEND_DIR / "alembic.ini"))
+    cfg.attributes["configure_logger"] = False
     command.upgrade(cfg, "head")

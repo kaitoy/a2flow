@@ -19,7 +19,18 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-if config.config_file_name is not None:
+#
+# Skipped when the caller sets ``configure_logger`` to False -- the app runs
+# migrations from its startup hook (infrastructure/migrations.py), by which
+# point setup_logging() has already configured the root logger. fileConfig()
+# defaults to disable_existing_loggers=True, so letting it run there would
+# disable every logger that already exists (uvicorn's included, and they
+# propagate to root with no handlers of their own) and swap root's handler for
+# alembic.ini's WARNING-level console one -- silencing the app for the rest of
+# the process.
+if config.config_file_name is not None and config.attributes.get(
+    "configure_logger", True
+):
     fileConfig(config.config_file_name)
 
 # Import every model submodule so all table classes register onto
