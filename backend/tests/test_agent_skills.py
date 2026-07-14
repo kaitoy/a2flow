@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.agent_skill import AgentSkill
 from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
 from tests._seed import seed_users
@@ -530,3 +532,30 @@ async def test_pull_requires_the_developer_role(skill_client: AsyncClient) -> No
         headers={"X-User-Roles": "requester"},
     )
     assert_err(response, code="FORBIDDEN", status=403)
+
+
+# ---------- serialization ----------
+
+
+def test_synced_at_is_serialized_with_a_z_suffix() -> None:
+    """The frontend's generated Zod schema rejects Pydantic's default ``+00:00`` offset."""
+    skill = AgentSkill(
+        name="my-skill",
+        repo_url="https://github.com/example/repo",
+        created_by=SYSTEM_USER_ID,
+        updated_by=SYSTEM_USER_ID,
+        synced_at=datetime(2026, 7, 14, 12, 0, tzinfo=UTC),
+    )
+    assert skill.model_dump(mode="json", by_alias=True)["syncedAt"] == (
+        "2026-07-14T12:00:00.000Z"
+    )
+
+
+def test_synced_at_is_null_before_the_first_clone() -> None:
+    skill = AgentSkill(
+        name="my-skill",
+        repo_url="https://github.com/example/repo",
+        created_by=SYSTEM_USER_ID,
+        updated_by=SYSTEM_USER_ID,
+    )
+    assert skill.model_dump(mode="json", by_alias=True)["syncedAt"] is None

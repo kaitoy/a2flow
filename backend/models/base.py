@@ -31,6 +31,36 @@ instance across columns via ``sa_column=Column(JSONColumn, ...)`` — mirrors ho
 """
 
 
+def iso_z(dt: datetime) -> str:
+    """Serialize a datetime as ISO-8601 with milliseconds and a ``Z`` suffix.
+
+    Every datetime that leaves the API must go through this: the generated
+    frontend Zod schemas reject the ``+00:00`` offset that Pydantic emits by
+    default. Naive values are assumed to be UTC.
+
+    Args:
+        dt: The datetime to serialize.
+
+    Returns:
+        The ISO-8601 string with millisecond precision and a ``Z`` suffix.
+    """
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def iso_z_or_none(dt: datetime | None) -> str | None:
+    """Serialize an optional datetime with :func:`iso_z`, passing ``None`` through.
+
+    Args:
+        dt: The datetime to serialize, or ``None`` when unset.
+
+    Returns:
+        The ISO-8601 string with a ``Z`` suffix, or ``None``.
+    """
+    return None if dt is None else iso_z(dt)
+
+
 class BaseEntity(SQLModel):
     """Abstract SQLModel base providing a UUID7 primary key, audit timestamps, and camelCase aliases.
 
@@ -68,6 +98,4 @@ class BaseEntity(SQLModel):
     @field_serializer("created_at", "updated_at", when_used="json")
     def _serialize_audit_datetime(self, dt: datetime) -> str:
         """Serialize audit datetimes as ISO-8601 with a Z suffix, normalizing naive values to UTC."""
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-        return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        return iso_z(dt)

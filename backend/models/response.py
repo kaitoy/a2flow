@@ -13,6 +13,8 @@ from typing import Any, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, field_serializer
 from pydantic.alias_generators import to_camel
 
+from models.base import iso_z
+
 T = TypeVar("T")
 
 
@@ -27,7 +29,7 @@ class ApiMeta(BaseModel):
     @field_serializer("received_at", "responded_at")
     def _serialize_iso_z(self, value: datetime) -> str:
         """Serialize datetimes as ISO-8601 with milliseconds and a ``Z`` suffix."""
-        return value.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        return iso_z(value)
 
 
 class ApiError(BaseModel):

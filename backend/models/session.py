@@ -1,9 +1,11 @@
 """Session response model representing an ADK conversation session."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_serializer
 from pydantic.alias_generators import to_camel
+
+from models.base import iso_z
 
 
 class Session(BaseModel):
@@ -18,6 +20,4 @@ class Session(BaseModel):
     @field_serializer("last_update_time", when_used="json")
     def _serialize_last_update_time(self, dt: datetime) -> str:
         """Serialize last_update_time as ISO-8601 with a Z suffix, normalizing naive values to UTC."""
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-        return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        return iso_z(dt)

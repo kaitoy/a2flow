@@ -3,12 +3,13 @@
 from datetime import datetime
 from enum import StrEnum
 
+from pydantic import field_serializer
 from pydantic.alias_generators import to_camel
 from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity, TZDateTime
+from models.base import BaseEntity, TZDateTime, iso_z_or_none
 from models.constraints import (
     DescText,
     EntityName,
@@ -96,3 +97,8 @@ class AgentSkill(AgentSkillCreate, BaseEntity, table=True):
         UniqueConstraint("name", name="uq_agent_skills_name"),
         Index("ix_agent_skills_name", "name"),
     )
+
+    @field_serializer("synced_at", when_used="json")
+    def _serialize_synced_at(self, dt: datetime | None) -> str | None:
+        """Serialize the sync timestamp as ISO-8601 with a ``Z`` suffix, or ``None`` when unset."""
+        return iso_z_or_none(dt)
