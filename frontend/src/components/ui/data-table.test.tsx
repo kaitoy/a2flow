@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
-import { type ColumnDef, DataTable } from "./data-table";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type ColumnDef, DataTable, fitColumnWidths } from "./data-table";
 
 interface Row {
   id: string;
@@ -115,6 +115,14 @@ describe("DataTable", () => {
       <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} />
     );
     expect(container.firstChild).toHaveClass("glass-panel");
+  });
+
+  it("wrapper scrolls horizontally instead of clipping overflowing columns", () => {
+    const { container } = render(
+      <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} />
+    );
+    expect(container.firstChild).toHaveClass("overflow-x-auto");
+    expect(container.firstChild).not.toHaveClass("overflow-hidden");
   });
 
   it("wraps cells in a single-line clipping span by default", () => {
@@ -243,5 +251,182 @@ describe("DataTable", () => {
     const button = screen.getByRole("button", { name: "Filter Name" });
     expect(button.className).toContain("h-6");
     expect(button.className).toContain("w-6");
+  });
+});
+
+/**
+ * jsdom has no layout engine (`offsetWidth`/`clientWidth` are always 0), so the
+ * fitting cannot be driven through a render — it is exercised as a pure function.
+ */
+describe("fitColumnWidths", () => {
+  /** Mirrors MIN_WIDTH in data-table.tsx. */
+  const MIN_WIDTH = 60;
+
+  const cell = (r: Row) => r.name;
+  const FIT_COLUMNS: ColumnDef<Row>[] = [
+    { header: "Name", cell },
+    { header: "Prompt", cell },
+    { header: "Actions", noTruncate: true, cell },
+  ];
+
+  const sum = (widths: Record<string, number>) =>
+    Object.values(widths).reduce((total, w) => total + w, 0);
+
+  it("leaves widths untouched when they already fit", () => {
+    const natural = { Name: 200, Prompt: 300, Actions: 100 };
+    expect(fitColumnWidths(FIT_COLUMNS, natural, 800)).toEqual(natural);
+  });
+
+  it("leaves widths untouched before the container has been laid out", () => {
+    const natural = { Name: 200, Prompt: 800, Actions: 100 };
+    expect(fitColumnWidths(FIT_COLUMNS, natural, 0)).toEqual(natural);
+  });
+
+  it("takes the shortfall out of the oversized column, sparing the narrow one", () => {
+    const fitted = fitColumnWidths(FIT_COLUMNS, { Name: 200, Prompt: 800, Actions: 100 }, 600);
+    // Shrinking proportionally would drag Name down to 100px — narrow enough to
+    // clip its own header — purely to spare Prompt, which has width to burn.
+    expect(fitted).toEqual({ Name: 200, Prompt: 300, Actions: 100 });
+    expect(sum(fitted)).toBe(600);
+  });
+
+  it("shares one ceiling between the oversized columns", () => {
+    const columns: ColumnDef<Row>[] = [
+      { header: "Name", cell },
+      { header: "Prompt", cell },
+      { header: "Description", cell },
+      { header: "Actions", noTruncate: true, cell },
+    ];
+    const fitted = fitColumnWidths(
+      columns,
+      { Name: 100, Prompt: 600, Description: 500, Actions: 100 },
+      700
+    );
+    expect(fitted).toEqual({ Name: 100, Prompt: 250, Description: 250, Actions: 100 });
+    expect(sum(fitted)).toBe(700);
+  });
+
+  it("keeps noTruncate columns at their natural width", () => {
+    const fitted = fitColumnWidths(FIT_COLUMNS, { Name: 200, Prompt: 800, Actions: 100 }, 600);
+    expect(fitted.Actions).toBe(100);
+  });
+
+  it("keeps explicitly sized columns at their natural width", () => {
+    const columns: ColumnDef<Row>[] = [
+      { header: "Icon", width: 40, cell },
+      { header: "Name", cell },
+      { header: "Actions", noTruncate: true, cell },
+    ];
+    const fitted = fitColumnWidths(columns, { Icon: 40, Name: 800, Actions: 100 }, 500);
+    expect(fitted).toEqual({ Icon: 40, Name: 360, Actions: 100 });
+    expect(sum(fitted)).toBe(500);
+  });
+
+  it("floors every column and tolerates overflow when nothing can fit", () => {
+    const fitted = fitColumnWidths(FIT_COLUMNS, { Name: 100, Prompt: 900, Actions: 300 }, 200);
+    // The action buttons alone already overrun the panel, so the panel scrolls —
+    // but no column is ever squeezed to nothing, and the buttons stay clickable.
+    expect(fitted).toEqual({ Name: MIN_WIDTH, Prompt: MIN_WIDTH, Actions: 300 });
+  });
+});
+
+/**
+ * The fitting is driven by real measurements, which jsdom never produces
+ * (`offsetWidth`/`clientWidth` are always 0). Stub the layout so the measure →
+ * fit → refit path can be exercised end to end through the component.
+ */
+describe("DataTable column fitting", () => {
+  const cell = (r: Row) => r.name;
+  const COLS: ColumnDef<Row>[] = [
+    { header: "Name", cell },
+    { header: "Prompt", cell },
+    { header: "Actions", noTruncate: true, cell },
+  ];
+
+  /** Natural width each column reports, keyed by its header text. */
+  const NATURAL: Record<string, number> = { Name: 200, Prompt: 800, Actions: 100 };
+
+  let panelWidth = 600;
+  /** Every ResizeObserver the render creates, so a resize can be replayed. */
+  let observerCallbacks: ResizeObserverCallback[] = [];
+
+  class RecordingResizeObserver {
+    constructor(callback: ResizeObserverCallback) {
+      observerCallbacks.push(callback);
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLTableCellElement.prototype, "offsetWidth", {
+      configurable: true,
+      get(this: HTMLTableCellElement) {
+        return NATURAL[this.textContent?.trim() ?? ""] ?? 0;
+      },
+    });
+    Object.defineProperty(HTMLDivElement.prototype, "clientWidth", {
+      configurable: true,
+      get: () => panelWidth,
+    });
+    vi.stubGlobal("ResizeObserver", RecordingResizeObserver);
+  });
+
+  afterEach(() => {
+    // Drop the overrides so the inherited (always-zero) jsdom getters come back
+    // and the other suites in this file keep their unstubbed layout.
+    Reflect.deleteProperty(HTMLTableCellElement.prototype, "offsetWidth");
+    Reflect.deleteProperty(HTMLDivElement.prototype, "clientWidth");
+    vi.unstubAllGlobals();
+    observerCallbacks = [];
+    panelWidth = 600;
+  });
+
+  /** Column widths currently written into the table's `<colgroup>`. */
+  const colWidths = (container: HTMLElement) =>
+    [...container.querySelectorAll("colgroup col")].map((col) =>
+      Number.parseInt((col as HTMLElement).style.width, 10)
+    );
+
+  /** Replay a container resize, which the observer would deliver in a browser. */
+  const resizePanel = (width: number) => {
+    panelWidth = width;
+    act(() => {
+      for (const callback of observerCallbacks) {
+        callback([], {} as ResizeObserver);
+      }
+    });
+  };
+
+  it("fits the measured columns into the panel", () => {
+    const { container } = render(<DataTable columns={COLS} rows={ROWS} getRowKey={(r) => r.id} />);
+    // Natural widths total 1100 in a 600px panel: Prompt gives up the 200px
+    // shortfall, Name keeps its natural width, Actions is never touched.
+    expect(colWidths(container)).toEqual([200, 300, 100]);
+  });
+
+  it("refits the columns when the panel shrinks", () => {
+    const { container } = render(<DataTable columns={COLS} rows={ROWS} getRowKey={(r) => r.id} />);
+    resizePanel(400);
+    // Prompt alone can no longer absorb the shortfall, so Name joins it at the
+    // shared ceiling rather than the table overflowing.
+    expect(colWidths(container)).toEqual([150, 150, 100]);
+  });
+
+  it("refits from the natural widths rather than ratcheting down", () => {
+    const { container } = render(<DataTable columns={COLS} rows={ROWS} getRowKey={(r) => r.id} />);
+    resizePanel(400);
+    resizePanel(600);
+    // Widening again restores the original fit; the shrink is not cumulative.
+    expect(colWidths(container)).toEqual([200, 300, 100]);
+  });
+
+  it("does not measure until rows have arrived", () => {
+    const { container } = render(
+      <DataTable columns={COLS} rows={[]} loading getRowKey={(r) => r.id} />
+    );
+    // Skeleton rows are not representative, so no width is frozen from them.
+    expect(colWidths(container)).toEqual([Number.NaN, Number.NaN, Number.NaN]);
   });
 });
