@@ -38,8 +38,9 @@ type Decision = "approved" | "rejected";
  * `pendingToolCallIds` and `toolResultContentByCallId` (both derived from the full
  * session history by `MessageList`) drive the A2UI branch: a surface whose
  * `render_a2ui` call id is absent from `pendingToolCallIds` is already resolved and
- * renders inert (see {@link A2uiRenderer}'s `resolved` prop), pre-filled with
- * whatever values the resolving tool message's action recorded.
+ * renders inert (see {@link A2uiRenderer}'s `resolved` prop), pre-filled with the
+ * data model the resolving tool message recorded — so a reloaded session shows the
+ * values the user submitted rather than the agent's defaults.
  */
 export function ActivityMessageBubble({
   message,
@@ -53,7 +54,7 @@ export function ActivityMessageBubble({
   message: ActivityMessage;
   avatar?: ReactNode;
   isThinking?: boolean;
-  onAction?: (action: A2UIUserAction) => void;
+  onAction?: (action: A2UIUserAction, values: Record<string, unknown>) => void;
   onApprovalResolved?: (toolCallId: string, decision: Decision) => void;
   pendingToolCallIds?: Set<string>;
   toolResultContentByCallId?: Map<string, string>;
@@ -75,8 +76,8 @@ export function ActivityMessageBubble({
     // RENDER_ACK_CONTENT means the call was auto-acknowledged, not actually
     // answered by the user — nothing to recover.
     if (!resolvedContent || resolvedContent === RENDER_ACK_CONTENT) return payload;
-    const context = parseActionContent(resolvedContent)?.context;
-    return context ? mergeRecoveredValuesIntoPayload(payload, context) : payload;
+    const values = parseActionContent(resolvedContent)?.values;
+    return values ? mergeRecoveredValuesIntoPayload(payload, values) : payload;
   }, [payload, resolvedContent]);
 
   if (message.activityType === TOOL_CALL_ACTIVITY_TYPE) {

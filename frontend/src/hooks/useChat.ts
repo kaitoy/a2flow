@@ -115,7 +115,7 @@ export function useChat(initialSessionId: string | null) {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendA2uiAction = useCallback(
-    async (action: A2UIUserAction) => {
+    async (action: A2UIUserAction, values: Record<string, unknown>) => {
       if (!sessionId || isRunning) return;
 
       dispatch(startRun());
@@ -123,9 +123,10 @@ export function useChat(initialSessionId: string | null) {
       const agent = createChatAgent(sessionId);
 
       // The action rides as the tool result of the render call that produced
-      // the acted-on surface; other pending calls get the no-op ack.
+      // the acted-on surface, carrying `values` (the surface's data model) so
+      // the agent sees what the user entered; other pending calls get the no-op ack.
       const pending = store.getState().chat.pendingRenderCalls;
-      for (const ack of buildRenderAckMessages(pending, action)) {
+      for (const ack of buildRenderAckMessages(pending, action, values)) {
         agent.addMessage(ack);
       }
       if (pending.length > 0) dispatch(clearPendingRenderCalls());

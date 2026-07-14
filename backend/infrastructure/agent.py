@@ -193,8 +193,9 @@ class A2UIInstructionProvider:
 
     Wraps a base role instruction and composes the final agent instruction as
     ``# Role`` + the A2UI rules (input requests go through ``render_a2ui``
-    input components; informational messages stay as streamed plain text) +
-    any context entries stored in session state.
+    input components; informational messages stay as streamed plain text; the
+    user's input is read from the render call's ``values`` result, not from the
+    action ``context``) + any context entries stored in session state.
     """
 
     def __init__(self, base_instruction: str) -> None:
@@ -212,6 +213,13 @@ class A2UIInstructionProvider:
             "- `ChoicePicker` for selecting among known options (`mutuallyExclusive` for a single choice),\n"
             "- a `Button` that submits the action,\n"
             "- short `Text` components inside the surface for labels and context only.\n\n"
+            "The result of a `render_a2ui` call tells you what the user did with the surface. "
+            'When they submit it, the result is a JSON object with `status: "action"` whose '
+            "`values` field is the surface's entire data model — every value the user typed or "
+            "selected, keyed by the paths the input components bind to. Read the user's input "
+            "from `values`; do not rely on the action's `context`, which holds only the bindings "
+            'you declared on the acted-on component. A result of `{"status": "rendered"}` '
+            "means the surface was shown but the user has not acted on it.\n\n"
             "When you are only conveying information (status updates, explanations, results, "
             "summaries), reply with plain streamed text and do NOT call `render_a2ui`. Plain "
             "messages render Markdown, and text streams token-by-token so the user sees your "

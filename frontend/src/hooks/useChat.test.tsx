@@ -222,16 +222,23 @@ describe("useChat", () => {
     });
     await new Promise((r) => setTimeout(r, 0));
 
-    await result2.current.sendA2uiAction({
-      name: "click",
-      surfaceId: "s1",
-      sourceComponentId: "btn1",
-      context: {},
-    });
+    await result2.current.sendA2uiAction(
+      { name: "click", surfaceId: "s1", sourceComponentId: "btn1", context: {} },
+      { email: "a@b.c" }
+    );
 
     expect(mockAgent.addMessage).toHaveBeenCalledWith(
       expect.objectContaining({ role: "tool", toolCallId: "tc-a2ui-1" })
     );
+    // The submitted data model rides on the tool result, as valid JSON so
+    // ag-ui-adk stores it verbatim and a reload can recover it.
+    const toolMessage = mockAgent.addMessage.mock.calls
+      .map(([m]) => m as { role: string; content: string })
+      .find((m) => m.role === "tool");
+    expect(JSON.parse(toolMessage?.content ?? "null")).toMatchObject({
+      status: "action",
+      values: { email: "a@b.c" },
+    });
     expect(store.getState().chat.pendingRenderCalls).toEqual([]);
   });
 });
