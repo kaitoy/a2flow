@@ -5,7 +5,7 @@ use :class:`UserRead`, which omits ``password`` entirely so the hash is never
 serialized to clients.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -15,7 +15,7 @@ from sqlalchemy import Column, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity, JSONColumn, TZDateTime
+from models.base import BaseEntity, JSONColumn, TZDateTime, iso_z_or_none
 from models.constraints import Password, PersonName, Username
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -136,11 +136,7 @@ def _serialize_deleted_at(dt: datetime | None) -> str | None:
     Returns:
         The ISO-8601 string with a ``Z`` suffix, or ``None``.
     """
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return iso_z_or_none(dt)
 
 
 class UserUpdate(SQLModel):
