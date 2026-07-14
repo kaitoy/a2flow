@@ -89,11 +89,22 @@ function buildColumns(
 
 /** Admin list of WorkflowSessions ordered by most recent first. */
 export default function WorkflowSessionsPage() {
-  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
-    useTableQuery<WorkflowSession>(listWorkflowSessions, {
-      limit: LIMIT,
-      errorMessage: "Failed to load workflow sessions",
-    });
+  const {
+    rows,
+    loading,
+    refreshing,
+    error,
+    offset,
+    sort,
+    filters,
+    setOffset,
+    setSort,
+    setFilters,
+    reload,
+  } = useTableQuery<WorkflowSession>(listWorkflowSessions, {
+    limit: LIMIT,
+    errorMessage: "Failed to load workflow sessions",
+  });
   const [userMap, setUserMap] = useState<Map<string, string>>(new Map());
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
@@ -133,7 +144,7 @@ export default function WorkflowSessionsPage() {
         title="Workflow Sessions"
         icon={ListChecks}
         onRefresh={reload}
-        refreshing={loading}
+        refreshing={loading || refreshing}
       />
       <div className="mb-4">
         <ErrorBanner error={actionError ?? error} />

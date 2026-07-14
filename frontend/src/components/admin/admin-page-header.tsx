@@ -23,8 +23,9 @@ interface AdminPageHeaderProps {
  * optional "Add" link button.
  *
  * Pass `onRefresh` (typically the `reload` returned by `useTableQuery`) to show
- * a refresh control; pass `refreshing` (typically the hook's `loading` flag) so
- * the button disables and its icon spins while a fetch is in flight.
+ * a refresh control; pass `refreshing` (typically the hook's `loading ||
+ * refreshing`) so the button disables and its icon spins while a fetch is in
+ * flight. Silent background refreshes deliberately leave the button at rest.
  */
 export function AdminPageHeader({
   title,
@@ -52,7 +53,9 @@ export function AdminPageHeader({
           <Tooltip label="Refresh" placement="bottom">
             <button
               type="button"
-              onClick={onRefresh}
+              // Called with no argument on purpose: `reload` takes options, and
+              // the click event must not land in them.
+              onClick={() => onRefresh()}
               disabled={refreshing}
               aria-label="Refresh"
               className={[

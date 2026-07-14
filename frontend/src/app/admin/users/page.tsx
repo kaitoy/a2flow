@@ -86,8 +86,19 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
 ];
 
 export default function UsersPage() {
-  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
-    useTableQuery<User>(listUsers, { limit: LIMIT, errorMessage: "Failed to load users" });
+  const {
+    rows,
+    loading,
+    refreshing,
+    error,
+    offset,
+    sort,
+    filters,
+    setOffset,
+    setSort,
+    setFilters,
+    reload,
+  } = useTableQuery<User>(listUsers, { limit: LIMIT, errorMessage: "Failed to load users" });
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -130,7 +141,7 @@ export default function UsersPage() {
         addHref="/admin/users/new"
         addLabel="+ Add user"
         onRefresh={reload}
-        refreshing={loading}
+        refreshing={loading || refreshing}
       />
       <div className="mb-4">
         <ErrorBanner error={actionError ?? error} />

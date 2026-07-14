@@ -67,11 +67,22 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
 ];
 
 export default function McpServersPage() {
-  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
-    useTableQuery<McpServer>(listMcpServers, {
-      limit: LIMIT,
-      errorMessage: "Failed to load MCP servers",
-    });
+  const {
+    rows,
+    loading,
+    refreshing,
+    error,
+    offset,
+    sort,
+    filters,
+    setOffset,
+    setSort,
+    setFilters,
+    reload,
+  } = useTableQuery<McpServer>(listMcpServers, {
+    limit: LIMIT,
+    errorMessage: "Failed to load MCP servers",
+  });
   const router = useRouter();
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
@@ -132,7 +143,7 @@ export default function McpServersPage() {
           </Button>
         }
         onRefresh={reload}
-        refreshing={loading}
+        refreshing={loading || refreshing}
       />
       <div className="mb-4">
         <ErrorBanner error={actionError ?? error} />

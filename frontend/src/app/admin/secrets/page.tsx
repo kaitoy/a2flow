@@ -55,11 +55,22 @@ const STATIC_COLUMNS: ColumnDef<Secret>[] = [
 ];
 
 export default function SecretsPage() {
-  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
-    useTableQuery<Secret>(listSecrets, {
-      limit: LIMIT,
-      errorMessage: "Failed to load secrets",
-    });
+  const {
+    rows,
+    loading,
+    refreshing,
+    error,
+    offset,
+    sort,
+    filters,
+    setOffset,
+    setSort,
+    setFilters,
+    reload,
+  } = useTableQuery<Secret>(listSecrets, {
+    limit: LIMIT,
+    errorMessage: "Failed to load secrets",
+  });
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -102,7 +113,7 @@ export default function SecretsPage() {
         addHref="/admin/secrets/new"
         addLabel="+ Add secret"
         onRefresh={reload}
-        refreshing={loading}
+        refreshing={loading || refreshing}
       />
       <div className="mb-4">
         <ErrorBanner error={actionError ?? error} />

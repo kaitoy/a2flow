@@ -105,11 +105,22 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
 
 export default function AgentSkillsPage() {
   const canEdit = useHasRole(Role.DEVELOPER);
-  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
-    useTableQuery<AgentSkill>(listAgentSkills, {
-      limit: LIMIT,
-      errorMessage: "Failed to load agent skills",
-    });
+  const {
+    rows,
+    loading,
+    refreshing,
+    error,
+    offset,
+    sort,
+    filters,
+    setOffset,
+    setSort,
+    setFilters,
+    reload,
+  } = useTableQuery<AgentSkill>(listAgentSkills, {
+    limit: LIMIT,
+    errorMessage: "Failed to load agent skills",
+  });
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [pullingId, setPullingId] = useState<string | null>(null);
@@ -117,11 +128,13 @@ export default function AgentSkillsPage() {
   const anyPending = rows.some((s) => s.syncStatus === "pending");
 
   // A clone settles server-side with nothing to notify us, so poll until every
-  // row has landed on ready or failed, then stop.
+  // row has landed on ready or failed, then stop. Silently: the table stays on
+  // screen and only the cells that changed re-render, so a clone that takes a
+  // minute does not strobe the whole page.
   useEffect(() => {
     if (!anyPending) return;
     const timer = setInterval(() => {
-      void reload();
+      void reload({ silent: true });
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [anyPending, reload]);
@@ -189,7 +202,7 @@ export default function AgentSkillsPage() {
         addHref={canEdit ? "/admin/agent-skills/new" : undefined}
         addLabel="+ Add skill"
         onRefresh={reload}
-        refreshing={loading}
+        refreshing={loading || refreshing}
       />
       <div className="mb-4">
         <ErrorBanner error={actionError ?? error} />

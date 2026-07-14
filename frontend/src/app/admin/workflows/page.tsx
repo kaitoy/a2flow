@@ -107,11 +107,22 @@ export default function WorkflowsPage() {
   const router = useRouter();
   const canRun = useHasRole(Role.REQUESTER);
   const canEdit = useHasRole(Role.DEVELOPER);
-  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
-    useTableQuery<Workflow>(listWorkflows, {
-      limit: LIMIT,
-      errorMessage: "Failed to load workflows",
-    });
+  const {
+    rows,
+    loading,
+    refreshing,
+    error,
+    offset,
+    sort,
+    filters,
+    setOffset,
+    setSort,
+    setFilters,
+    reload,
+  } = useTableQuery<Workflow>(listWorkflows, {
+    limit: LIMIT,
+    errorMessage: "Failed to load workflows",
+  });
   const [skillMap, setSkillMap] = useState<Map<string, string>>(new Map());
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
@@ -164,7 +175,7 @@ export default function WorkflowsPage() {
         addHref={canEdit ? "/admin/workflows/new" : undefined}
         addLabel={canEdit ? "+ Add workflow" : undefined}
         onRefresh={reload}
-        refreshing={loading}
+        refreshing={loading || refreshing}
       />
       <div className="mb-4">
         <ErrorBanner error={actionError ?? error} />

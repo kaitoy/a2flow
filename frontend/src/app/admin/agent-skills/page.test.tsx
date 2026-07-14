@@ -6,7 +6,7 @@ import type { Role } from "@/lib/roles";
 import type { RootState } from "@/store";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { render, screen, waitFor, within } from "@/test/test-utils";
+import { act, render, screen, waitFor, within } from "@/test/test-utils";
 import AgentSkillsPage from "./page";
 
 vi.mock("next/link", () => ({
@@ -26,6 +26,34 @@ const FULL_ACCESS = authState(["developer"]);
 const READ_ONLY = authState(["requester"]);
 
 const SKILL_URL = "http://localhost:8000/api/v1/agent-skills";
+
+/** Matches the page's own poll interval. */
+const POLL_INTERVAL_MS = 2000;
+
+/** A skill whose clone is still running, so the page starts polling for it. */
+const CLONING_SKILL = {
+  id: "skill-1",
+  name: "my-skill",
+  repoUrl: "https://github.com/example/repo",
+  repoPath: "",
+  description: null,
+  syncStatus: "pending",
+  syncError: null,
+  commitSha: null,
+  syncedAt: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+/** The same skill once its clone has landed. */
+const CLONED_SKILL = {
+  ...CLONING_SKILL,
+  syncStatus: "ready",
+  commitSha: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  syncedAt: "2026-01-01T00:00:00Z",
+};
 
 describe("AgentSkillsPage", () => {
   it("shows loading state initially", () => {
@@ -55,27 +83,7 @@ describe("AgentSkillsPage", () => {
   });
 
   it("shows an em dash as the revision of a skill that has never published one", async () => {
-    server.use(
-      http.get(SKILL_URL, () =>
-        envelope([
-          {
-            id: "skill-1",
-            name: "my-skill",
-            repoUrl: "https://github.com/example/repo",
-            repoPath: "",
-            description: null,
-            syncStatus: "pending",
-            syncError: null,
-            commitSha: null,
-            syncedAt: null,
-            createdAt: "2026-01-01T00:00:00Z",
-            updatedAt: "2026-01-01T00:00:00Z",
-            createdBy: "",
-            updatedBy: "",
-          },
-        ])
-      )
-    );
+    server.use(http.get(SKILL_URL, () => envelope([CLONING_SKILL])));
     render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-skill"));
     expect(screen.getByText("Cloning")).toBeInTheDocument();
@@ -126,6 +134,45 @@ describe("AgentSkillsPage", () => {
     await waitFor(() => screen.getByText("my-skill"));
     await user.click(screen.getByRole("button", { name: "Pull" }));
     await waitFor(() => expect(pullSpy).toHaveBeenCalled());
+  });
+
+  it("keeps the cloning row on screen while the poll refetches it", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let resolvePoll!: () => void;
+      const pollReached = new Promise<void>((r) => {
+        resolvePoll = r;
+      });
+      let calls = 0;
+      server.use(
+        http.get(SKILL_URL, async () => {
+          calls += 1;
+          if (calls === 1) return envelope([CLONING_SKILL]);
+          // Hold the poll's response open so we can assert on the page while
+          // the refetch is still in flight.
+          await pollReached;
+          return envelope([CLONED_SKILL]);
+        })
+      );
+
+      render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+      await waitFor(() => expect(screen.getByText("Cloning")).toBeInTheDocument());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+      });
+      await waitFor(() => expect(calls).toBe(2));
+
+      // Mid-poll: the row stays put instead of flashing back to the skeleton.
+      expect(screen.getByText("my-skill")).toBeInTheDocument();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+      resolvePoll();
+      await waitFor(() => expect(screen.getByText("ready")).toBeInTheDocument());
+      expect(screen.getByText("my-skill")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("hides write actions from a user without the developer role", async () => {

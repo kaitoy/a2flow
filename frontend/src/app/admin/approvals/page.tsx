@@ -24,11 +24,22 @@ const STATUS_STYLES: Record<ApprovalStatus, string> = {
 
 /** Admin list of approval requests ordered by most recent first. */
 export default function ApprovalsPage() {
-  const { rows, loading, error, offset, sort, filters, setOffset, setSort, setFilters, reload } =
-    useTableQuery<Approval>(listApprovals, {
-      limit: LIMIT,
-      errorMessage: "Failed to load approvals",
-    });
+  const {
+    rows,
+    loading,
+    refreshing,
+    error,
+    offset,
+    sort,
+    filters,
+    setOffset,
+    setSort,
+    setFilters,
+    reload,
+  } = useTableQuery<Approval>(listApprovals, {
+    limit: LIMIT,
+    errorMessage: "Failed to load approvals",
+  });
 
   // Resolve the intended approvers' user IDs to display names (best-effort,
   // falling back to the raw ID), mirroring AuditMeta. The comma-joined key lets
@@ -110,7 +121,7 @@ export default function ApprovalsPage() {
         title="Approvals"
         icon={CheckCircle2}
         onRefresh={reload}
-        refreshing={loading}
+        refreshing={loading || refreshing}
       />
       <div className="mb-4">
         <ErrorBanner error={error} />

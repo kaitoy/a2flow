@@ -11,12 +11,31 @@ import {
 } from "react";
 import type { FilterSpec, ListQuery, SortSpec } from "@/lib/api";
 
+/** Options accepted by {@link UseTableQueryResult.reload}. */
+export interface ReloadOptions {
+  /**
+   * Refetch without any loading indicator, keeping the current rows on screen.
+   * Use for background polling, where a spinner on every tick reads as flicker.
+   */
+  silent?: boolean;
+}
+
 /** Everything a list page needs to render rows and drive its `DataTable`. */
 export interface UseTableQueryResult<T> {
   /** The current page of rows returned by the fetcher. */
   rows: T[];
-  /** True while a fetch is in flight. */
+  /**
+   * True while there are no rows to show for the current query — on mount and
+   * after an offset/sort/filter change. Drives the table skeleton. A `reload`
+   * leaves it false, so the table keeps rendering the rows it already has.
+   */
   loading: boolean;
+  /**
+   * True while a fetch the user should see is in flight — the query load or a
+   * plain {@link UseTableQueryResult.reload}, but never a silent one. Drives the
+   * header's refresh spinner.
+   */
+  refreshing: boolean;
   /** Human-readable error message from the last failed fetch, or null. */
   error: string | null;
   /** Current pagination offset. */
@@ -31,8 +50,11 @@ export interface UseTableQueryResult<T> {
   setSort: (sort: SortSpec | null) => void;
   /** Set the filter directives; resets the offset to the first page. */
   setFilters: (filters: FilterSpec[]) => void;
-  /** Re-run the fetch with the current query (e.g. after a delete). */
-  reload: () => Promise<void>;
+  /**
+   * Re-run the fetch with the current query (e.g. after a delete), keeping the
+   * current rows visible until the new ones land.
+   */
+  reload: (options?: ReloadOptions) => Promise<void>;
 }
 
 /** Tuning knobs for {@link useTableQuery}. */
@@ -52,6 +74,10 @@ export interface UseTableQueryOptions {
  * loops. Changing `sort` or `filters` resets the offset to the first page so the
  * user is never stranded on an out-of-range page.
  *
+ * Only a query change raises `loading`; a `reload` swaps the rows in place under
+ * the `refreshing` flag. That keeps a refresh — and especially a poll loop —
+ * from flashing the table back to its skeleton on every fetch.
+ *
  * @param fetcher - Resolves a page of rows for the given {@link ListQuery}.
  * @param options - Optional page size and fallback error message.
  * @returns Reactive list state plus setters wired for a `DataTable`.
@@ -61,7 +87,8 @@ export function useTableQuery<T>(
   { limit = 20, errorMessage = "Failed to load data" }: UseTableQueryOptions = {}
 ): UseTableQueryResult<T> {
   const [rows, setRows] = useState<T[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [sort, setSortState] = useState<SortSpec | null>(null);
@@ -72,19 +99,29 @@ export function useTableQuery<T>(
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setRows(await fetcherRef.current({ limit, offset, sort, filters }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [limit, offset, sort, filters, errorMessage]);
+  const load = useCallback(
+    async ({ silent = false }: ReloadOptions = {}) => {
+      if (!silent) setRefreshing(true);
+      setError(null);
+      try {
+        setRows(await fetcherRef.current({ limit, offset, sort, filters }));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : errorMessage);
+      } finally {
+        // The rows on screen now answer the current query, whichever way the
+        // fetch went: on failure the error banner explains the stale ones.
+        setLoading(false);
+        if (!silent) setRefreshing(false);
+      }
+    },
+    [limit, offset, sort, filters, errorMessage]
+  );
 
+  // `load` is recreated only when the query changes, so this effect fires on
+  // mount and on every query change — exactly when the rows on screen no longer
+  // answer the query and the skeleton is the honest thing to show.
   useEffect(() => {
+    setLoading(true);
     load();
   }, [load]);
 
@@ -101,6 +138,7 @@ export function useTableQuery<T>(
   return {
     rows,
     loading,
+    refreshing,
     error,
     offset,
     sort,
