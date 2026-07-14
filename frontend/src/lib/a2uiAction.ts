@@ -24,39 +24,146 @@ export interface PendingRenderCall {
   surfaceId: string | null;
 }
 
-/** Serialize an A2UIUserAction into a human-readable string sent as a tool result to the agent. */
-export function formatActionContent(action: A2UIUserAction): string {
-  const name = action.name ?? "unknown_action";
-  const surfaceId = action.surfaceId ?? "unknown_surface";
-  let text = `User performed action "${name}" on surface "${surfaceId}"`;
-  if (action.sourceComponentId) text += ` (component: ${action.sourceComponentId})`;
-  text += `. Context: ${action.context ? JSON.stringify(action.context) : "{}"}`;
-  return text;
-}
-
-/** Matches {@link formatActionContent}'s template so its output can be parsed back apart. */
-const ACTION_CONTENT_PATTERN =
-  /^User performed action "([^"]*)" on surface "([^"]*)"(?: \(component: ([^)]*)\))?\. Context: ([\s\S]*)$/;
+/**
+ * Discriminator marking a tool result as a genuine user action on a surface.
+ * Deliberately distinct from {@link RENDER_ACK_CONTENT}'s `"rendered"` so the
+ * backend's sender attribution keeps telling the two apart.
+ */
+const ACTION_STATUS = "action";
 
 /**
- * Parse {@link formatActionContent}'s output back into the `A2UIUserAction` it was built
- * from, so a resolved surface can recover what the user submitted. Returns `null` when
- * `content` doesn't match the format (e.g. it's {@link RENDER_ACK_CONTENT}, a no-op
- * acknowledgement with nothing to recover) or its trailing context isn't valid JSON.
+ * The tool result the frontend sends for a `render_a2ui` call the user acted on.
+ *
+ * Serialized as JSON rather than prose because `ag-ui-adk` wraps any tool result
+ * it cannot `json.loads` into `{success, result: <the string>, status: "completed"}`
+ * before persisting it to the ADK session. A JSON object survives that round trip
+ * byte-for-byte, so {@link parseActionContent} can still recover the submitted
+ * values from a reloaded history — a plain sentence cannot.
  */
-export function parseActionContent(content: string): A2UIUserAction | null {
-  const match = ACTION_CONTENT_PATTERN.exec(content);
+export interface A2uiActionResult {
+  /** Always {@link ACTION_STATUS}; distinguishes a real action from a no-op ack. */
+  status: typeof ACTION_STATUS;
+  /** The action's name, as declared on the acted-on component. */
+  name: string;
+  /** The surface the action was performed on. */
+  surfaceId: string;
+  /** The component that triggered the action, when known. */
+  sourceComponentId?: string;
+  /** The action context the agent declared in the component's `action.event.context`. */
+  context: Record<string, unknown>;
+  /**
+   * The surface's entire data model at submit time — every value the user typed
+   * or selected, keyed by the same paths the components bind to. Unlike
+   * {@link A2uiActionResult.context}, this does not depend on the agent having
+   * declared any bindings, so it is the only complete record of the input.
+   */
+  values: Record<string, unknown>;
+}
+
+/** What {@link parseActionContent} recovers from a stored action tool result. */
+export interface ParsedActionResult {
+  /** The action the user performed. */
+  action: A2UIUserAction;
+  /** The surface's data model at submit time (see {@link A2uiActionResult.values}). */
+  values: Record<string, unknown>;
+}
+
+/**
+ * Serialize a user action, plus the acted-on surface's full data model, into the
+ * JSON tool result sent to the agent for the `render_a2ui` call that rendered it.
+ *
+ * `values` gives the agent the values the user actually entered, which the
+ * declared `context` alone does not (it carries only the bindings the agent wrote
+ * onto the component).
+ */
+export function formatActionContent(
+  action: A2UIUserAction,
+  values: Record<string, unknown> = {}
+): string {
+  const result: A2uiActionResult = {
+    status: ACTION_STATUS,
+    name: action.name ?? "unknown_action",
+    surfaceId: action.surfaceId ?? "unknown_surface",
+    context: action.context ?? {},
+    values,
+  };
+  if (action.sourceComponentId) result.sourceComponentId = action.sourceComponentId;
+  return JSON.stringify(result);
+}
+
+/** Matches the legacy prose format {@link formatActionContent} used to emit. */
+const LEGACY_ACTION_CONTENT_PATTERN =
+  /^User performed action "([^"]*)" on surface "([^"]*)"(?: \(component: ([^)]*)\))?\. Context: ([\s\S]*)$/;
+
+/** Narrow an unknown to a plain (non-array, non-null) object. */
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+/** Parse a legacy prose action tool result. Returns `null` when it isn't one. */
+function parseLegacyActionContent(content: string): ParsedActionResult | null {
+  const match = LEGACY_ACTION_CONTENT_PATTERN.exec(content);
   if (!match) return null;
   const [, name, surfaceId, sourceComponentId, contextRaw] = match;
-  let context: Record<string, unknown> | undefined;
+  let context: Record<string, unknown> | null;
   try {
-    const parsed: unknown = JSON.parse(contextRaw);
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    context = parsed as Record<string, unknown>;
+    context = asRecord(JSON.parse(contextRaw));
   } catch {
     return null;
   }
-  return { name, surfaceId, sourceComponentId: sourceComponentId || undefined, context };
+  if (!context) return null;
+  return {
+    action: { name, surfaceId, sourceComponentId: sourceComponentId || undefined, context },
+    // The prose format never carried the data model, so the declared context is
+    // the most a session written before this format change can give back.
+    values: context,
+  };
+}
+
+/**
+ * Recover what the user submitted from a `render_a2ui` call's stored tool result,
+ * so a resolved surface can be redisplayed pre-filled.
+ *
+ * Accepts three shapes, in order:
+ *
+ * 1. The current JSON format ({@link A2uiActionResult}).
+ * 2. `ag-ui-adk`'s wrapper around a legacy prose result
+ *    (`{success, result: "<prose>", status: "completed"}`) — what sessions written
+ *    before the JSON format read back as after a reload.
+ * 3. The bare legacy prose string.
+ *
+ * Returns `null` for anything else, including {@link RENDER_ACK_CONTENT} — a no-op
+ * acknowledgement with nothing to recover.
+ */
+export function parseActionContent(content: string): ParsedActionResult | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return parseLegacyActionContent(content);
+  }
+
+  const record = asRecord(parsed);
+  if (!record) return null;
+
+  if (record.status === ACTION_STATUS) {
+    const { name, surfaceId, sourceComponentId } = record;
+    return {
+      action: {
+        name: typeof name === "string" ? name : "unknown_action",
+        surfaceId: typeof surfaceId === "string" ? surfaceId : "unknown_surface",
+        sourceComponentId: typeof sourceComponentId === "string" ? sourceComponentId : undefined,
+        context: asRecord(record.context) ?? {},
+      },
+      values: asRecord(record.values) ?? {},
+    };
+  }
+
+  // ag-ui-adk's fallback wrapper for a tool result it could not parse as JSON.
+  if (typeof record.result === "string") return parseLegacyActionContent(record.result);
+
+  return null;
 }
 
 /** A single A2UI v0.9 operation, as produced by `render_a2ui` tool-call args. */
@@ -107,15 +214,17 @@ export function mergeRecoveredValuesIntoPayload(
  * Without an `action`, every pending call gets the no-op
  * {@link RENDER_ACK_CONTENT}. With an `action`, the last pending call whose
  * `surfaceId` matches the acted-on surface carries
- * {@link formatActionContent} instead, so the backend attributes exactly that
- * response to the acting user; the rest still get the no-op acknowledgement.
- * When no pending call matches the action's surface (e.g. its arguments could
- * not be parsed), the last pending call carries the action so it is never
- * silently dropped.
+ * {@link formatActionContent} instead — including `values`, the acted-on
+ * surface's full data model — so the agent receives what the user entered and
+ * the backend attributes exactly that response to the acting user; the rest
+ * still get the no-op acknowledgement. When no pending call matches the action's
+ * surface (e.g. its arguments could not be parsed), the last pending call
+ * carries the action so it is never silently dropped.
  */
 export function buildRenderAckMessages(
   pending: PendingRenderCall[],
-  action?: A2UIUserAction
+  action?: A2UIUserAction,
+  values?: Record<string, unknown>
 ): Array<{ id: string; role: "tool"; toolCallId: string; content: string }> {
   let actionTargetIndex = -1;
   if (action && pending.length > 0) {
@@ -127,6 +236,8 @@ export function buildRenderAckMessages(
     role: "tool",
     toolCallId: call.toolCallId,
     content:
-      index === actionTargetIndex && action ? formatActionContent(action) : RENDER_ACK_CONTENT,
+      index === actionTargetIndex && action
+        ? formatActionContent(action, values ?? {})
+        : RENDER_ACK_CONTENT,
   }));
 }

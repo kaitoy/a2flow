@@ -59,6 +59,14 @@ $env:BACKEND_BASE_URL = "http://127.0.0.1:8099"
 pnpm dev --port 3099
 ```
 
+Open the UI at **`http://localhost:3099`**, never `http://127.0.0.1:3099`. Next's
+dev server blocks cross-origin access to its own dev resources, so on `127.0.0.1`
+the client chunks never load, the page never hydrates, and every form falls back
+to a native GET — the login form just bounces back to `/login?username=…&password=…`
+with no console error to explain it. The only clue is a
+`Cross-origin access to Next.js dev resources is blocked by default` line in the
+`pnpm dev` log.
+
 ## Drive the API
 
 Auth is a session cookie plus a CSRF header echoing the `a2flow_csrf` cookie:

@@ -25,6 +25,12 @@ import { tailwindCatalog } from "./a2uiCatalog";
  * catalog components read it via {@link SurfaceResolvedContext} and render inert,
  * so an already-answered surface can never be resubmitted.
  *
+ * `onAction` receives the surface's entire data model alongside the action. The
+ * action's own `context` carries only the bindings the agent declared on the
+ * acted-on component, so it is neither a complete nor a path-faithful record of
+ * what the user entered; the data model is both, and is what the agent reads and
+ * what a resumed session is redisplayed from.
+ *
  * Text components render Markdown via `@a2ui/markdown-it`'s `renderMarkdown`
  * (supplied through {@link MarkdownContext}), which sanitizes with DOMPurify —
  * A2UI payloads originate from the agent and must be treated as untrusted HTML.
@@ -35,7 +41,7 @@ export function A2uiRenderer({
   resolved = false,
 }: {
   payload: unknown;
-  onAction?: (action: A2UIUserAction) => void;
+  onAction?: (action: A2UIUserAction, values: Record<string, unknown>) => void;
   resolved?: boolean;
 }) {
   const [surfaces, setSurfaces] = useState<SurfaceModel<ReactComponentImplementation>[]>([]);
@@ -49,13 +55,23 @@ export function A2uiRenderer({
 
     const sub = processor.onSurfaceCreated((surface) => {
       const actionSub = surface.onAction.subscribe((action: A2UIUserAction) => {
-        onActionRef.current?.({
-          name: action.name,
-          surfaceId: surface.id,
-          sourceComponentId: action.sourceComponentId,
-          context: action.context,
-          timestamp: new Date().toISOString(),
-        });
+        // `get("/")` returns the data model root — every value the input
+        // components wrote, under the same paths they bind to.
+        const root: unknown = surface.dataModel.get("/");
+        const values =
+          root !== null && typeof root === "object" && !Array.isArray(root)
+            ? (root as Record<string, unknown>)
+            : {};
+        onActionRef.current?.(
+          {
+            name: action.name,
+            surfaceId: surface.id,
+            sourceComponentId: action.sourceComponentId,
+            context: action.context,
+            timestamp: new Date().toISOString(),
+          },
+          values
+        );
       });
       actionSubs.push(actionSub);
       setSurfaces((prev) => [...prev, surface]);

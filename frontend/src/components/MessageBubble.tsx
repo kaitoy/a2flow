@@ -34,7 +34,7 @@ export function MessageBubble({
   isStreaming?: boolean;
   isThinking?: boolean;
   avatar?: ReactNode;
-  onAction?: (action: A2UIUserAction) => void;
+  onAction?: (action: A2UIUserAction, values: Record<string, unknown>) => void;
   onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected") => void;
   pendingToolCallIds?: Set<string>;
   toolResultContentByCallId?: Map<string, string>;

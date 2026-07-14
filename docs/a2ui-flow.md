@@ -171,11 +171,16 @@ render call so the `addActivityMessage` upsert logic in the reducer matches corr
 same surface is re-synthesized. (Live streaming uses `a2ui-surface-{toolCallId}`; the two paths
 never coexist for the same surface because a resume rebuilds the whole message list.)
 
+The `render_a2ui` args carry only the surface's *initial* data model (the `data` argument), so a
+surface rebuilt from them alone would redisplay the agent's defaults, not what the user entered.
+The values the user submitted are recovered separately, from the render call's tool result — see
+§7.
+
 ---
 
 ## 7. User action — feedback loop
 
-When the user interacts with a rendered surface (e.g. clicks a `Button`), `useChat` sends the action as the **tool result for the preceding `render_a2ui` call**:
+When the user interacts with a rendered surface (e.g. clicks a `Button`), `useChat` sends the action as the **tool result for the preceding `render_a2ui` call**, carrying the surface's entire data model:
 
 ```
 Button click
@@ -188,21 +193,53 @@ Button click
               context:           { userName: "Alice" },
               timestamp:         "2026-04-25T..."
             }
-            └─ A2uiRenderer.onAction callback → sendA2uiAction()
+            └─ A2uiRenderer reads surface.dataModel.get("/") — the full data
+               model — and calls onAction(action, values) → sendA2uiAction()
                  └─ agent.addMessage({
                       role:       "tool",
                       toolCallId: <render_a2ui tool call ID>,
-                      content:    'User performed action "confirm" on surface
-                                   "result" (component: btn). Context: {"userName":"Alice"}'
+                      content:    '{"status":"action","name":"confirm",
+                                    "surfaceId":"result","sourceComponentId":"btn",
+                                    "context":{"userName":"Alice"},
+                                    "values":{"userName":"Alice","plan":["pro"]}}'
                     })
                  └─ HttpAgent.runAgent({ forwardedProps: { userId } })
                       └─ POST /agent
                            └─ backend matches tool result against pending
-                              render_a2ui call → LLM reads action context
+                              render_a2ui call → LLM reads `values`
                               and responds
 ```
 
-The `render_a2ui` tool call ID used above is captured by `onToolCallEndEvent` during the previous turn and stored in `pendingRenderToolCallIds` ref in `useChat`.
+The `render_a2ui` tool call ID used above is captured by `onToolCallEndEvent` during the previous turn and stored in `pendingRenderCalls` in `chatSlice`.
+
+### Why the tool result is JSON, and why it carries the whole data model
+
+Both properties are load-bearing. The codec lives in `src/lib/a2uiAction.ts`.
+
+**JSON, not prose.** `ADKAgent._convert_tool_results` tries `json.loads` on every incoming tool
+result and, when that fails, wraps the string:
+`{"success": true, "result": "<the string>", "status": "completed"}`. That wrapper is what gets
+persisted, and `adk_events_to_messages` hands it back on resume. A prose tool result therefore
+comes back in a different shape than it went out, so the parser §6's restore depends on never
+matched and every reloaded surface fell back to the agent's defaults. A JSON **object**
+round-trips through ADK byte-for-byte. (This is also why `RENDER_ACK_CONTENT` —
+`{"status":"rendered"}` — always worked: it was already valid JSON.) `status: "action"` is
+deliberately distinct from `"rendered"` so `record_new_senders`
+(`backend/services/workflow_session.py`) keeps telling a real action apart from a no-op ack.
+
+**The whole data model, not just `context`.** `SurfaceModel.dispatchAction` populates `context`
+from the acted-on component's `action.event.context` — i.e. only the bindings *the agent chose to
+declare*. Nothing requires the agent to declare any, and nothing makes its context keys agree with
+the paths the input components bind to. `surface.dataModel.get("/")` is the only complete,
+path-faithful record of what the user typed and selected, so that is what `values` carries — both
+so the agent can read the input at all, and so `mergeRecoveredValuesIntoPayload` can drop it
+straight back into the surface's `updateDataModel` op on resume.
+
+`parseActionContent` still accepts the legacy prose format (bare, and inside ADK's wrapper), so
+sessions recorded before this change recover whatever their `context` held.
+
+Input the user typed but never submitted is **not** persisted: nothing triggers an agent run until
+the surface is acted on, and AG-UI state only travels with a run.
 
 ---
 

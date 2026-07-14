@@ -125,13 +125,16 @@ describe("useWorkflowSessionChat", () => {
     vi.mocked(api.getWorkflowSessionMessages).mockClear();
 
     const action = { name: "click", surfaceId: "s1", sourceComponentId: "btn1", context: {} };
-    await result.current.sendA2uiAction(action);
+    const values = { email: "a@b.c" };
+    await result.current.sendA2uiAction(action, values);
 
+    // The surface's data model rides along, so the agent sees what the user
+    // entered and a reloaded session can be redisplayed pre-filled.
     expect(mockAgent.addMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         role: "tool",
         toolCallId: "tc-a2ui-1",
-        content: formatActionContent(action),
+        content: formatActionContent(action, values),
       })
     );
     expect(store.getState().chat.pendingRenderCalls).toEqual([]);
@@ -162,7 +165,8 @@ describe("useWorkflowSessionChat", () => {
     mockAgent.addMessage.mockClear();
 
     const action = { name: "click", surfaceId: "s-acted", sourceComponentId: "btn1", context: {} };
-    await result.current.sendA2uiAction(action);
+    const values = { email: "a@b.c" };
+    await result.current.sendA2uiAction(action, values);
 
     // Only the acted-on call carries the action; the display-only surface gets
     // the no-op ack the backend skips when attributing senders.
@@ -170,7 +174,10 @@ describe("useWorkflowSessionChat", () => {
       expect.objectContaining({ toolCallId: "tc-display", content: RENDER_ACK_CONTENT })
     );
     expect(mockAgent.addMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ toolCallId: "tc-acted", content: formatActionContent(action) })
+      expect.objectContaining({
+        toolCallId: "tc-acted",
+        content: formatActionContent(action, values),
+      })
     );
   });
 
@@ -208,13 +215,14 @@ describe("useWorkflowSessionChat", () => {
     mockAgent.addMessage.mockClear();
 
     const action = { name: "click", surfaceId: "s1", sourceComponentId: "btn1", context: {} };
-    await result.current.sendA2uiAction(action);
+    const values = { email: "a@b.c" };
+    await result.current.sendA2uiAction(action, values);
 
     expect(mockAgent.addMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         role: "tool",
         toolCallId: "tc-from-history",
-        content: formatActionContent(action),
+        content: formatActionContent(action, values),
       })
     );
   });
@@ -262,12 +270,10 @@ describe("useWorkflowSessionChat", () => {
       },
     ]);
 
-    await result.current.sendA2uiAction({
-      name: "click",
-      surfaceId: "s1",
-      sourceComponentId: "btn1",
-      context: {},
-    });
+    await result.current.sendA2uiAction(
+      { name: "click", surfaceId: "s1", sourceComponentId: "btn1", context: {} },
+      {}
+    );
 
     await waitFor(() =>
       expect(store.getState().chat.pendingRenderCalls).toEqual([

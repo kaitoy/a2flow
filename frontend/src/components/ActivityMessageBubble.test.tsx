@@ -247,13 +247,49 @@ describe("ActivityMessageBubble", () => {
     expect(el).toHaveAttribute("data-has-action", "false");
   });
 
-  it("augments the payload with recovered context for a resolved surface with a real answer", () => {
+  it("pre-fills a resolved surface with the data model the user submitted", () => {
+    const payload = [
+      { version: "v0.9", createSurface: { surfaceId: "s1" } },
+      { version: "v0.9", updateDataModel: { surfaceId: "s1", value: { plan: [] } } },
+    ];
+    // The submitted data model carries every input the user made — not just the
+    // `context` bindings the agent happened to declare on the button.
+    const content = formatActionContent(
+      { name: "confirm", surfaceId: "s1", sourceComponentId: "btn", context: {} },
+      { userName: "Alice", plan: ["pro"] }
+    );
+    render(
+      <ActivityMessageBubble
+        message={{
+          id: "1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { [A2UI_OPERATIONS_KEY]: payload, [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
+        }}
+        pendingToolCallIds={new Set()}
+        toolResultContentByCallId={new Map([["tc-1", content]])}
+      />
+    );
+    const rendered = JSON.parse(
+      screen.getByTestId("a2ui-renderer-mock").getAttribute("data-payload") ?? "null"
+    );
+    expect(rendered).toEqual([
+      payload[0],
+      {
+        version: "v0.9",
+        updateDataModel: { surfaceId: "s1", value: { userName: "Alice", plan: ["pro"] } },
+      },
+    ]);
+  });
+
+  it("pre-fills from a legacy prose tool result wrapped by ag-ui-adk", () => {
     const payload = [{ version: "v0.9", createSurface: { surfaceId: "s1" } }];
-    const content = formatActionContent({
-      name: "confirm",
-      surfaceId: "s1",
-      sourceComponentId: "btn",
-      context: { userName: "Alice" },
+    // How a session written before the JSON format reads back after a reload.
+    const content = JSON.stringify({
+      success: true,
+      result:
+        'User performed action "confirm" on surface "s1" (component: btn). Context: {"userName":"Alice"}',
+      status: "completed",
     });
     render(
       <ActivityMessageBubble
