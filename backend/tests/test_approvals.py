@@ -184,10 +184,10 @@ async def test_resolve_by_non_approver_is_forbidden(
     assert assert_ok(res)["status"] == ApprovalStatus.pending.value
 
 
-async def test_resolve_by_super_admin_is_allowed(
+async def test_resolve_by_super_admin_who_is_not_approver_is_forbidden(
     approval_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """A super admin may resolve an approval designated to someone else."""
+    """A super admin who is not the designated approver still cannot resolve it."""
     client, eng = approval_env
     ws_id = await _seed_session(eng)
     approval_id = await _insert_approval(eng, workflow_session_id=ws_id, approver="bob")
@@ -197,11 +197,13 @@ async def test_resolve_by_super_admin_is_allowed(
         json={"status": "approved"},
         headers={"X-User-Id": "alice", "X-User-Roles": "super_admin"},
     )
-    data = assert_ok(res)
-    assert data["status"] == ApprovalStatus.approved.value
-    # The designated approver field is preserved; only the audit trail records alice.
-    assert data["approver"] == "bob"
-    assert data["updatedBy"] == "alice"
+    assert_err(res, "FORBIDDEN", 403)
+
+    # The approval remains pending.
+    res = await client.get(
+        f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}
+    )
+    assert assert_ok(res)["status"] == ApprovalStatus.pending.value
 
 
 async def test_resolve_keeps_designated_approver(
@@ -217,10 +219,13 @@ async def test_resolve_keeps_designated_approver(
     assert assert_ok(res)["approver"] == "bob"
 
     # The designated approver resolves it; the approver field is preserved.
+    # Roles are set explicitly (rather than relying on the test auth stub's
+    # default super_admin) so this proves designated-approver access works
+    # with no role-based bypass in play.
     res = await client.patch(
         f"/api/v1/approvals/{approval_id}",
         json={"status": "approved"},
-        headers={"X-User-Id": "bob"},
+        headers={"X-User-Id": "bob", "X-User-Roles": "approver"},
     )
     data = assert_ok(res)
     assert data["approver"] == "bob"

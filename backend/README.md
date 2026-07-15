@@ -217,12 +217,12 @@ The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`
 
 ### Authorization (roles)
 
-Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every check; the seeded `admin` user holds it. See the [Roles and authorization](../README.md#roles-and-authorization) section of the root README for the full matrix.
+Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every route-level role gate; the seeded `admin` user holds it. Two ownership-layer checks are a deliberate exception — see the bullet below. See the [Roles and authorization](../README.md#roles-and-authorization) section of the root README for the full matrix.
 
 Two enforcement points:
 
 - **Route dependency** — `require_roles(...)` (`dependencies/authz.py`) is attached per route (e.g. `dependencies=[Depends(require_roles(Role.developer))]`) on the create/update/delete handlers and on `POST /workflows/{id}/execute`. `GET` routes are not gated.
-- **Service layer** — ownership rules that a role cannot express: self-service user/avatar edits (`services/user.py`, `services/user_avatar.py`), the `super_admin` grant/revoke guard, the designated-approver check (`services/approval.py`), and the workflow-session access policy (`services/workflow_session_access.py`: owner, a designated approver of the session, or a super admin; deletion is owner-only).
+- **Service layer** — ownership rules that a role cannot express: self-service user/avatar edits (`services/user.py`, `services/user_avatar.py`), the `super_admin` grant/revoke guard, the designated-approver check (`services/approval.py`), `WorkflowTaskService.update`'s status-change guard (`services/workflow_task.py`: changing a task's `status` is restricted to the session owner or, when the task has a linked `Approval`, that Approval's designated approver), and the workflow-session access policy (`services/workflow_session_access.py`: owner, a designated approver of the session, or a super admin; deletion is owner-only). The designated-approver and status-change checks intentionally exclude `super_admin` — no exception, not even for a super admin who isn't the addressee.
 
 Both raise `ForbiddenError` → HTTP 403 `FORBIDDEN`.
 

@@ -6,6 +6,9 @@ router as ``GET /workflow-sessions/{session_id}/workflow-tasks``; this router
 focuses on the create-and-act-on-a-single-task operations. Every operation is
 restricted to the parent session's owner, its designated approvers, and super
 admins (enforced by :class:`~services.workflow_task.WorkflowTaskService`).
+Changing a task's ``status`` is further restricted when the task has a linked
+Approval: only the session owner or that Approval's designated approver may
+do so.
 """
 
 from fastapi import APIRouter

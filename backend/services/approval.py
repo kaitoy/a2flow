@@ -6,7 +6,7 @@ so the router never repeats the null check.
 """
 
 from models.approval import Approval, ApprovalUpdate
-from models.user import Role, User, has_role
+from models.user import User
 from repositories import ApprovalRepository
 from repositories.exceptions import ForbiddenError, NotFoundError
 from repositories.query import FilterSpec, SortSpec
@@ -68,28 +68,25 @@ class ApprovalService:
     ) -> Approval:
         """Resolve a pending approval to ``approved`` or ``rejected``.
 
-        Only the approval's designated ``approver`` — or a super admin — may
-        resolve it; any other user is rejected so an approval request can be
+        Only the approval's designated ``approver`` may resolve it — with no
+        exception, not even for a super admin — so an approval request can be
         acted on solely by its addressee.
 
         Args:
             approval_id: Identifier of the approval to update.
             data: The new status and optional response comment.
-            acting_user: The acting user; must be the approval's ``approver``
-                or a super admin, and is recorded in the audit fields.
+            acting_user: The acting user; must be the approval's ``approver``,
+                and is recorded in the audit fields.
 
         Returns:
             The updated approval.
 
         Raises:
             NotFoundError: If the approval does not exist.
-            ForbiddenError: If the acting user is neither the designated
-                approver nor a super admin.
+            ForbiddenError: If the acting user is not the designated approver.
         """
         approval = await self.get(approval_id)
-        if approval.approver != acting_user.id and not has_role(
-            acting_user, Role.super_admin
-        ):
+        if approval.approver != acting_user.id:
             raise ForbiddenError(
                 "Only the designated approver can resolve this approval"
             )

@@ -213,9 +213,10 @@ def get_workflow_task_service(
     repo: WorkflowTaskRepositoryDep,
     ws_repo: WorkflowSessionRepositoryDep,
     access: WorkflowSessionAccessPolicyDep,
+    approvals: ApprovalRepositoryDep,
 ) -> WorkflowTaskService:
-    """Create a WorkflowTaskService wiring the task and session repositories and the access policy."""
-    return WorkflowTaskService(repo, ws_repo, access)
+    """Create a WorkflowTaskService wiring the task, session, and approval repositories and the access policy."""
+    return WorkflowTaskService(repo, ws_repo, access, approvals)
 
 
 WorkflowTaskServiceDep = Annotated[

@@ -5,7 +5,6 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type Approval, type ApprovalStatus, resolveApproval } from "@/lib/api";
 import { getApprovalCached } from "@/lib/approvalCache";
 import logger from "@/lib/logger";
-import { Role, useHasRole } from "@/lib/roles";
 import { useAppSelector } from "@/store/hooks";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -17,9 +16,10 @@ type Decision = Extract<ApprovalStatus, "approved" | "rejected">;
  * In-chat approve/reject controls for a pending approval request.
  *
  * Rendered from a `render_approval` frontend tool call. Only the approval's
- * designated approver (or a super admin) sees the approve/reject controls;
- * everyone else gets a read-only "waiting" view, mirroring the backend rule that
- * only the approver — or a super admin — may resolve the request. On click it writes the decision directly to the backend
+ * designated approver sees the approve/reject controls; everyone else
+ * (including a super admin who isn't the designated approver) gets a
+ * read-only "waiting" view, mirroring the backend rule that only the
+ * approver may resolve the request — with no exception. On click it writes the decision directly to the backend
  * (`PATCH /approvals/{id}`) and then notifies the chat via {@link onResolved} so
  * the agent run can resume with the outcome. On mount it fetches the approval to
  * reflect a decision already made (for example after reloading the session) and
@@ -39,7 +39,6 @@ export function ApprovalControls({
   onResolved?: (toolCallId: string, decision: Decision) => void;
 }) {
   const currentUserId = useAppSelector((s) => s.auth.user?.id ?? null);
-  const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   const [status, setStatus] = useState<ApprovalStatus>("pending");
   const [approver, setApprover] = useState<string | null>(null);
   const [comment, setComment] = useState("");
@@ -69,11 +68,8 @@ export function ApprovalControls({
     };
   }, [approvalId]);
 
-  /**
-   * Whether the current viewer may resolve this approval: the designated
-   * approver, or a super admin (who bypasses the backend's approver check).
-   */
-  const isApprover = (currentUserId != null && currentUserId === approver) || isSuperAdmin;
+  /** Whether the current viewer is this approval's designated approver. */
+  const isApprover = currentUserId != null && currentUserId === approver;
 
   /** Approve/reject controls, shown only to the approver while still pending. */
   const pendingControls = isApprover ? (

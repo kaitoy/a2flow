@@ -4,8 +4,37 @@ import itertools
 from typing import Any
 
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.approval import Approval, ApprovalStatus
 from tests._envelope import assert_err, assert_ok
+
+
+async def _insert_approval(
+    eng: AsyncEngine,
+    *,
+    workflow_session_id: str,
+    workflow_task_id: str | None = None,
+    approver: str,
+    user_id: str = "owner",
+) -> str:
+    """Insert an Approval row directly (no POST endpoint exists for creation)."""
+    async with AsyncSession(eng) as db:
+        approval = Approval(
+            workflow_session_id=workflow_session_id,
+            workflow_task_id=workflow_task_id,
+            title="Approve me",
+            status=ApprovalStatus.pending,
+            approver=approver,
+            created_by=user_id,
+            updated_by=user_id,
+        )
+        db.add(approval)
+        await db.commit()
+        await db.refresh(approval)
+        return approval.id
+
 
 _WF_PROMPT = "Do the thing"
 _uniq = itertools.count()
@@ -739,3 +768,149 @@ async def test_create_task_rejects_negative_position(
         json={"workflowSessionId": ws["id"], "title": "Step 1", "position": -1},
     )
     assert_err(response, "VALIDATION_ERROR", 422)
+
+
+# ---------- status change authorization (linked approval) ----------
+
+
+async def test_update_status_forbidden_for_unrelated_session_approver(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """An approver of a *different* approval in the session cannot resolve this one via status."""
+    client, eng = workflow_client_with_engine
+    ws = await _create_workflow_session(client)
+    task = await _create_task(client, ws["id"])
+    await _insert_approval(
+        eng, workflow_session_id=ws["id"], workflow_task_id=task["id"], approver="bob"
+    )
+    # alice is a designated approver of a different, unlinked approval in the
+    # same session, so she passes the general session-access check but must
+    # still be rejected by the linked-approval check.
+    await _insert_approval(eng, workflow_session_id=ws["id"], approver="alice")
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"status": "completed"},
+        headers={"X-User-Id": "alice", "X-User-Roles": "approver"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+    unchanged = await client.get(f"/api/v1/workflow-tasks/{task['id']}")
+    assert assert_ok(unchanged)["status"] == "pending"
+
+
+async def test_update_status_allowed_for_linked_approval_approver(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = workflow_client_with_engine
+    ws = await _create_workflow_session(client)
+    task = await _create_task(client, ws["id"])
+    await _insert_approval(
+        eng, workflow_session_id=ws["id"], workflow_task_id=task["id"], approver="bob"
+    )
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"status": "completed"},
+        headers={"X-User-Id": "bob", "X-User-Roles": "approver"},
+    )
+    assert assert_ok(response)["status"] == "completed"
+
+
+async def test_update_status_allowed_for_session_owner_despite_linked_approval(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = workflow_client_with_engine
+    ws = await _create_workflow_session(client)
+    task = await _create_task(client, ws["id"])
+    await _insert_approval(
+        eng, workflow_session_id=ws["id"], workflow_task_id=task["id"], approver="bob"
+    )
+
+    # No header override: uses workflow_client_with_engine's default identity
+    # (SYSTEM_USER_ID), which owns the session created above.
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}", json={"status": "completed"}
+    )
+    assert assert_ok(response)["status"] == "completed"
+
+
+async def test_update_status_allowed_when_no_linked_approval(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A task with no linked approval keeps the broader any-session-participant rule."""
+    client, eng = workflow_client_with_engine
+    ws = await _create_workflow_session(client)
+    task = await _create_task(client, ws["id"])
+    # alice is an approver of an unrelated approval in the session; the task
+    # itself has no linked approval, so there is nothing to protect.
+    await _insert_approval(eng, workflow_session_id=ws["id"], approver="alice")
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"status": "completed"},
+        headers={"X-User-Id": "alice", "X-User-Roles": "approver"},
+    )
+    assert assert_ok(response)["status"] == "completed"
+
+
+async def test_update_non_status_field_allowed_despite_linked_approval(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Non-status edits stay open to any session participant even on a linked task."""
+    client, eng = workflow_client_with_engine
+    ws = await _create_workflow_session(client)
+    task = await _create_task(client, ws["id"])
+    await _insert_approval(
+        eng, workflow_session_id=ws["id"], workflow_task_id=task["id"], approver="bob"
+    )
+    await _insert_approval(eng, workflow_session_id=ws["id"], approver="alice")
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"title": "renamed"},
+        headers={"X-User-Id": "alice", "X-User-Roles": "approver"},
+    )
+    assert assert_ok(response)["title"] == "renamed"
+
+
+async def test_update_status_unchanged_value_not_treated_as_a_transition(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Resubmitting the task's current status alongside another field is not a transition."""
+    client, eng = workflow_client_with_engine
+    ws = await _create_workflow_session(client)
+    task = await _create_task(client, ws["id"])
+    assert task["status"] == "pending"
+    await _insert_approval(
+        eng, workflow_session_id=ws["id"], workflow_task_id=task["id"], approver="bob"
+    )
+    await _insert_approval(eng, workflow_session_id=ws["id"], approver="alice")
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"status": "pending", "title": "renamed"},
+        headers={"X-User-Id": "alice", "X-User-Roles": "approver"},
+    )
+    body = assert_ok(response)
+    assert body["status"] == "pending"
+    assert body["title"] == "renamed"
+
+
+async def test_update_status_forbidden_for_super_admin_who_is_not_owner_or_approver(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A super_admin with no other claim is still forbidden — consistent with ApprovalService.resolve."""
+    client, eng = workflow_client_with_engine
+    ws = await _create_workflow_session(client)
+    task = await _create_task(client, ws["id"])
+    await _insert_approval(
+        eng, workflow_session_id=ws["id"], workflow_task_id=task["id"], approver="bob"
+    )
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"status": "completed"},
+        headers={"X-User-Id": "alice", "X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)

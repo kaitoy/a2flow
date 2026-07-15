@@ -108,11 +108,11 @@ See [backend/README.md](backend/README.md#authentication) for the endpoint and c
 
 ## Roles and authorization
 
-Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy, and a user may hold any combination of them — with one exception: **Super Admin bypasses every check**. A user with **no roles at all** is valid: they can still use the regular chat and manage their own [account](#users) (avatar), but nothing else.
+Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy, and a user may hold any combination of them — with one exception: **Super Admin bypasses every role-based check**. Two ownership-layer checks are a deliberate exception to that bypass — see [Human approval](#human-approval). A user with **no roles at all** is valid: they can still use the regular chat and manage their own [account](#users) (avatar), but nothing else.
 
 | Role | Grants |
 |---|---|
-| `super_admin` | Everything (bypasses every role and ownership check) |
+| `super_admin` | Everything (bypasses every role gate; does **not** bypass the designated-approver checks described under [Human approval](#human-approval)) |
 | `admin` | User CRUD, secrets CRUD |
 | `developer` | MCP server CRUD, workflow CRUD, agent-skill CRUD |
 | `requester` | Running workflows (`POST /workflows/{id}/execute`) |
@@ -122,7 +122,7 @@ Every user holds a set of **roles** granting the operations they may perform. Ro
 
 The initial seeded **`admin`** user holds `super_admin`. Upgrading an existing deployment grants `super_admin` to that user automatically (Alembic data migration); every other existing user starts with no roles.
 
-**Workflow session access.** Beyond roles, each operation on a workflow session — reading it, loading its chat history, listing or editing its tasks, and driving its agent — requires the caller to be the session's **owner** (the user who ran the workflow) or a **designated approver of one of its approvals** (see [Human approval](#human-approval)); unrelated users get HTTP 403. This preserves the approver-sharing design (the approver joins the owner's chat) while keeping third parties out. **Deleting** a session is stricter still: owner (or Super Admin) only.
+**Workflow session access.** Beyond roles, each operation on a workflow session — reading it, loading its chat history, listing or editing its tasks, and driving its agent — requires the caller to be the session's **owner** (the user who ran the workflow) or a **designated approver of one of its approvals** (see [Human approval](#human-approval)); unrelated users get HTTP 403. This preserves the approver-sharing design (the approver joins the owner's chat) while keeping third parties out. **Deleting** a session is stricter still: owner (or Super Admin) only. Changing a task's **status** specifically is further restricted when that task has a linked approval: only the session owner or that approval's designated approver may do so — not merely any approver of the session (see [Human approval](#human-approval)).
 
 ⚠️ Approver eligibility is validated when the approval is created: the agent's `list_users` tool only offers users holding `approver`, and `request_approval` rejects anyone else. Revoking the `approver` role later does **not** invalidate approvals already addressed to that user — they can still resolve them, so an in-flight workflow never gets stuck.
 
@@ -295,10 +295,12 @@ When a task needs the user's explicit go-ahead before the agent acts (for exampl
 
 1. The agent calls the `request_approval` backend tool, which persists a `pending` **Approval** record for the current session (optionally linked to a `WorkflowTask`) addressed to a specific **`approver`** user — the agent looks one up with the `list_users` tool (which lists only users holding the [`approver` role](#roles-and-authorization)), and the approver is **required**. It raises an **approval-request notification** addressed to that approver, so only they are alerted.
 2. The agent explains the request in plain text and then calls **`render_approval`** — an AG-UI **frontend tool** (declared by the client via `RunAgentInput.tools`, distinct from A2UI). Like `render_a2ui`, the bridge exposes it as a long-running client tool: the run pauses and the frontend renders **Approve / Reject** controls, plus an optional **comment** field, in the chat. The controls are shown **only to the designated approver**; everyone else sees a read-only "waiting for the approver" message.
-3. Clicking a button writes the decision (and any comment) **directly** to the backend via `PATCH /api/v1/approvals/{id}` (recording the resolving user in the audit fields), then returns the decision as the tool result so the agent run resumes. Only the designated approver (or a Super Admin) may resolve a request — a `PATCH` from any other user is rejected with HTTP 403 (`FORBIDDEN`).
+3. Clicking a button writes the decision (and any comment) **directly** to the backend via `PATCH /api/v1/approvals/{id}` (recording the resolving user in the audit fields), then returns the decision as the tool result so the agent run resumes. Only the designated approver may resolve a request, with **no exception — not even a Super Admin** who isn't the addressee; a `PATCH` from any other user is rejected with HTTP 403 (`FORBIDDEN`).
 4. On `approved` the agent proceeds; on `rejected` it marks the task `failed` (or `skipped`). The agent can re-check a decision with the `get_approval` tool.
 
 Approvals are persisted in `a2flow.db` and cascade-delete with their `WorkflowSession` (the optional `WorkflowTask` link is set to `NULL` when that task is deleted). Browse them in the [Approvals](#approvals) admin view.
+
+The same no-exception rule extends to a linked task's **status**: since flipping a `WorkflowTask`'s `status` straight to `completed` would otherwise let any approver of the session stand in for the addressee, `PATCH /api/v1/workflow-tasks/{id}` restricts a `status` change to the session owner or, when the task has a linked `Approval`, that Approval's designated approver — tasks with no linked approval keep the broader any-session-participant rule.
 
 A workflow session's underlying ADK chat session is keyed by the session's **owner** (the user who started it), not by whoever is currently viewing it. So when a designated approver — a different user — opens the workflow session chat, they share the **same** ADK session: they see the owner's full conversation and state, and approving resumes the original run rather than starting a fresh, empty session. Both the agent stream (`POST /workflow-sessions/{id}/agent`) and the history load (`GET /workflow-sessions/{id}/messages`) resolve the owner from the `WorkflowSession` record. (Regular, non-workflow chat sessions remain keyed per user.) Sharing is limited to those participants: any other user is rejected with HTTP 403 — see [Roles and authorization](#roles-and-authorization).
 

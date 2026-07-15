@@ -6,7 +6,7 @@ from typing import Protocol
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from models.approval import Approval, ApprovalCreate, ApprovalUpdate
+from models.approval import Approval, ApprovalCreate, ApprovalStatus, ApprovalUpdate
 from models.user import User
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
@@ -39,6 +39,8 @@ class ApprovalRepository(Protocol):
     async def exists_for_approver(
         self, workflow_session_id: str, user_id: str
     ) -> bool: ...
+
+    async def get_for_task(self, workflow_task_id: str) -> Approval | None: ...
 
 
 class SqlApprovalRepository:
@@ -164,3 +166,30 @@ class SqlApprovalRepository:
         )
         result = await self._db.exec(stmt)
         return result.first() is not None
+
+    async def get_for_task(self, workflow_task_id: str) -> Approval | None:
+        """Return the Approval linked to a WorkflowTask, or ``None`` if it has none.
+
+        Backs WorkflowTaskService's designated-approver check on ``status``
+        transitions. A task may in principle have more than one linked Approval
+        (e.g. re-requested after a rejection); an unresolved (``pending``) one
+        is preferred as the currently active request, falling back to the most
+        recently created Approval otherwise.
+
+        Args:
+            workflow_task_id: Identifier of the WorkflowTask.
+
+        Returns:
+            The task's active linked Approval, or ``None`` if it has none.
+        """
+        stmt = (
+            select(Approval)
+            .where(Approval.workflow_task_id == workflow_task_id)
+            .order_by(col(Approval.created_at).desc())
+        )
+        result = await self._db.exec(stmt)
+        approvals = list(result.all())
+        for approval in approvals:
+            if approval.status == ApprovalStatus.pending:
+                return approval
+        return approvals[0] if approvals else None

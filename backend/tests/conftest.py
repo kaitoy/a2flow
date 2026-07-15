@@ -1,4 +1,5 @@
-from collections.abc import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Iterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -9,7 +10,7 @@ from fastapi import Request
 from google.adk.sessions import InMemorySessionService
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -202,13 +203,19 @@ async def client_with_real_sessions(
         app.dependency_overrides.clear()
 
 
-@pytest_asyncio.fixture()
-async def workflow_client(
+@asynccontextmanager
+async def _workflow_client_env(
     mock_agent_registry: MagicMock,
     mock_skill_manager: MagicMock,
     mock_sync_job: AsyncMock,
     real_session_service: InMemorySessionService,
-) -> AsyncGenerator[AsyncClient, None]:
+) -> AsyncIterator[tuple[AsyncClient, AsyncEngine]]:
+    """Set up the workflow API client and its backing in-memory engine.
+
+    Shared by the ``workflow_client`` fixture (client only) and
+    ``workflow_client_with_engine`` (client plus engine, for tests that need to
+    seed rows — e.g. an Approval — directly via the database).
+    """
     from dependencies import (
         get_agent_registry,
         get_session_service,
@@ -269,10 +276,42 @@ async def workflow_client(
             base_url="http://test",
             headers={"X-User-Id": SYSTEM_USER_ID},
         ) as ac:
-            yield ac
+            yield ac, mem_engine
     finally:
         app.dependency_overrides.clear()
         await mem_engine.dispose()
+
+
+@pytest_asyncio.fixture()
+async def workflow_client(
+    mock_agent_registry: MagicMock,
+    mock_skill_manager: MagicMock,
+    mock_sync_job: AsyncMock,
+    real_session_service: InMemorySessionService,
+) -> AsyncGenerator[AsyncClient, None]:
+    async with _workflow_client_env(
+        mock_agent_registry, mock_skill_manager, mock_sync_job, real_session_service
+    ) as (ac, _engine):
+        yield ac
+
+
+@pytest_asyncio.fixture()
+async def workflow_client_with_engine(
+    mock_agent_registry: MagicMock,
+    mock_skill_manager: MagicMock,
+    mock_sync_job: AsyncMock,
+    real_session_service: InMemorySessionService,
+) -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None]:
+    """Like ``workflow_client``, but also yields the backing engine.
+
+    For tests that need to seed rows directly via the database (e.g. an
+    Approval, which has no ``POST`` create endpoint — only the agent's
+    ``request_approval`` tool creates them).
+    """
+    async with _workflow_client_env(
+        mock_agent_registry, mock_skill_manager, mock_sync_job, real_session_service
+    ) as (ac, eng):
+        yield ac, eng
 
 
 #: Credentials of the enabled user seeded for the real-auth ``auth_client``.

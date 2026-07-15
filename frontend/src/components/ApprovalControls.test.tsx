@@ -97,7 +97,7 @@ describe("ApprovalControls", () => {
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
-  it("shows the controls to a super admin who is not the designated approver", async () => {
+  it("hides the controls from a super admin who is not the designated approver", async () => {
     vi.mocked(api.getApproval).mockResolvedValue({
       status: "pending",
       approver: "someone-else",
@@ -106,8 +106,11 @@ describe("ApprovalControls", () => {
       preloadedState: authState("u1", ["super_admin"]),
     });
 
-    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
-    expect(screen.queryByText("Waiting for the approver's decision.")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("Waiting for the approver's decision.")).toBeInTheDocument()
+    );
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
   it("shows the resolved state and prior comment when already decided", async () => {
