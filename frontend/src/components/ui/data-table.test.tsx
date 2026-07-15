@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type ColumnDef, DataTable, fitColumnWidths } from "./data-table";
@@ -163,10 +163,15 @@ describe("DataTable", () => {
     expect(container.querySelectorAll("[data-resize-handle]")).toHaveLength(COLUMNS.length);
   });
 
-  it("cycles a column's sort asc → desc → none on header click", async () => {
+  it("sorts ascending, descending, and clears through the header menu", async () => {
     const user = userEvent.setup();
     const onSortChange = vi.fn();
     const cols: ColumnDef<Row>[] = [{ header: "Name", sortField: "name", cell: (r) => r.name }];
+    /** Wait out the closing menu's exit animation so reopening never sees two panels. */
+    const menuClosed = () =>
+      waitFor(() =>
+        expect(screen.queryByRole("button", { name: "Sort ascending" })).not.toBeInTheDocument()
+      );
     const { rerender } = render(
       <DataTable
         columns={cols}
@@ -176,8 +181,10 @@ describe("DataTable", () => {
         onSortChange={onSortChange}
       />
     );
-    await user.click(screen.getByRole("button", { name: /Name/ }));
+    await user.click(screen.getByRole("button", { name: "Name" }));
+    await user.click(await screen.findByRole("button", { name: "Sort ascending" }));
     expect(onSortChange).toHaveBeenLastCalledWith({ field: "name", descending: false });
+    await menuClosed();
 
     rerender(
       <DataTable
@@ -188,8 +195,10 @@ describe("DataTable", () => {
         onSortChange={onSortChange}
       />
     );
-    await user.click(screen.getByRole("button", { name: /Name/ }));
+    await user.click(screen.getByRole("button", { name: "Name" }));
+    await user.click(await screen.findByRole("button", { name: "Sort descending" }));
     expect(onSortChange).toHaveBeenLastCalledWith({ field: "name", descending: true });
+    await menuClosed();
 
     rerender(
       <DataTable
@@ -200,7 +209,9 @@ describe("DataTable", () => {
         onSortChange={onSortChange}
       />
     );
-    await user.click(screen.getByRole("button", { name: /Name/ }));
+    // Clicking the already-active direction clears the sort.
+    await user.click(screen.getByRole("button", { name: "Name" }));
+    await user.click(await screen.findByRole("button", { name: "Sort descending" }));
     expect(onSortChange).toHaveBeenLastCalledWith(null);
   });
 
@@ -231,13 +242,13 @@ describe("DataTable", () => {
         onFilterChange={onFilterChange}
       />
     );
-    await user.click(screen.getByRole("button", { name: "Filter Name" }));
+    await user.click(screen.getByRole("button", { name: "Name" }));
     const select = await screen.findByRole("combobox");
     await user.selectOptions(select, "alpha");
     expect(onFilterChange).toHaveBeenCalledWith([{ field: "name", op: "eq", value: "alpha" }]);
   });
 
-  it("renders the filter trigger as a square icon button", () => {
+  it("renders one full-width menu trigger per interactive header", () => {
     const cols: ColumnDef<Row>[] = [{ header: "Name", filterField: "name", cell: (r) => r.name }];
     render(
       <DataTable
@@ -248,9 +259,90 @@ describe("DataTable", () => {
         onFilterChange={vi.fn()}
       />
     );
-    const button = screen.getByRole("button", { name: "Filter Name" });
-    expect(button.className).toContain("h-6");
-    expect(button.className).toContain("w-6");
+    const triggers = screen.getAllByRole("button");
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0]).toHaveAccessibleName("Name");
+    expect(triggers[0]).toHaveAttribute("aria-haspopup", "dialog");
+    expect(triggers[0].className).toContain("w-full");
+  });
+
+  it("offers no sort actions on a filter-only column", async () => {
+    const user = userEvent.setup();
+    const cols: ColumnDef<Row>[] = [{ header: "Name", filterField: "name", cell: (r) => r.name }];
+    render(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        filters={[]}
+        onFilterChange={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: "Name" }));
+    expect(await screen.findByRole("textbox")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sort ascending" })).not.toBeInTheDocument();
+  });
+
+  it("shows the active sort direction on the header trigger", () => {
+    const cols: ColumnDef<Row>[] = [{ header: "Name", sortField: "name", cell: (r) => r.name }];
+    const { container, rerender } = render(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        sort={{ field: "name", descending: false }}
+        onSortChange={vi.fn()}
+      />
+    );
+    expect(container.querySelector("th .lucide-arrow-up")).toBeInTheDocument();
+
+    rerender(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        sort={{ field: "name", descending: true }}
+        onSortChange={vi.fn()}
+      />
+    );
+    expect(container.querySelector("th .lucide-arrow-down")).toBeInTheDocument();
+
+    rerender(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        sort={null}
+        onSortChange={vi.fn()}
+      />
+    );
+    // Unsorted headers show the subtle menu chevron instead.
+    expect(container.querySelector("th .lucide-chevron-down")).toBeInTheDocument();
+  });
+
+  it("shows the filter indicator on the header trigger only while a filter is applied", () => {
+    const cols: ColumnDef<Row>[] = [{ header: "Name", filterField: "name", cell: (r) => r.name }];
+    const { container, rerender } = render(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        filters={[]}
+        onFilterChange={vi.fn()}
+      />
+    );
+    expect(container.querySelector('[data-filter-indicator="idle"]')).toBeInTheDocument();
+
+    rerender(
+      <DataTable
+        columns={cols}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        filters={[{ field: "name", op: "like", value: "a" }]}
+        onFilterChange={vi.fn()}
+      />
+    );
+    expect(container.querySelector('[data-filter-indicator="active"]')).toBeInTheDocument();
   });
 });
 
@@ -328,6 +420,42 @@ describe("fitColumnWidths", () => {
     // but no column is ever squeezed to nothing, and the buttons stay clickable.
     expect(fitted).toEqual({ Name: MIN_WIDTH, Prompt: MIN_WIDTH, Actions: 300 });
   });
+
+  it("raises a narrow column to its header width even when everything fits", () => {
+    // A full-width header trigger contributes nothing to the browser's natural
+    // table layout, so a noTruncate column with short body content (a status
+    // chip) can measure narrower than its own header. The fit raises it.
+    const fitted = fitColumnWidths(FIT_COLUMNS, { Name: 200, Prompt: 300, Actions: 100 }, 800, {
+      Actions: 140,
+    });
+    expect(fitted).toEqual({ Name: 200, Prompt: 300, Actions: 140 });
+  });
+
+  it("floors a column at its header width instead of the absolute minimum", () => {
+    const fitted = fitColumnWidths(FIT_COLUMNS, { Name: 100, Prompt: 900, Actions: 300 }, 200, {
+      Name: 120,
+    });
+    // Name stops at its own header width — never ellipsizing the label — while
+    // Prompt, whose header is narrow, still falls back to the absolute floor.
+    expect(fitted).toEqual({ Name: 120, Prompt: MIN_WIDTH, Actions: 300 });
+  });
+
+  it("ignores header minima below the absolute floor", () => {
+    const fitted = fitColumnWidths(FIT_COLUMNS, { Name: 100, Prompt: 900, Actions: 300 }, 200, {
+      Name: 30,
+      Prompt: 30,
+    });
+    expect(fitted).toEqual({ Name: MIN_WIDTH, Prompt: MIN_WIDTH, Actions: 300 });
+  });
+
+  it("overflows rather than shrinking below the header floors", () => {
+    const fitted = fitColumnWidths(FIT_COLUMNS, { Name: 300, Prompt: 300, Actions: 100 }, 250, {
+      Name: 150,
+      Prompt: 150,
+    });
+    // The floors alone (150 + 150 + 100) exceed the panel, so the panel scrolls.
+    expect(fitted).toEqual({ Name: 150, Prompt: 150, Actions: 100 });
+  });
 });
 
 /**
@@ -346,6 +474,15 @@ describe("DataTable column fitting", () => {
   /** Natural width each column reports, keyed by its header text. */
   const NATURAL: Record<string, number> = { Name: 200, Prompt: 800, Actions: 100 };
 
+  /** Label width each hidden header sizer reports, keyed by its text. */
+  const SIZER: Record<string, number> = { Name: 80 };
+
+  /**
+   * Chrome the component adds around a measured sizer on a non-interactive
+   * header. Mirrors TH_PADDING_X + RESIZE_HANDLE_ALLOWANCE in data-table.tsx.
+   */
+  const HEADER_CHROME = 42;
+
   let panelWidth = 600;
   /** Every ResizeObserver the render creates, so a resize can be replayed. */
   let observerCallbacks: ResizeObserverCallback[] = [];
@@ -363,7 +500,20 @@ describe("DataTable column fitting", () => {
     Object.defineProperty(HTMLTableCellElement.prototype, "offsetWidth", {
       configurable: true,
       get(this: HTMLTableCellElement) {
-        return NATURAL[this.textContent?.trim() ?? ""] ?? 0;
+        // Header cells carry their label on the hidden sizer; body cells fall
+        // back to their text content.
+        const label =
+          this.querySelector("[data-header-sizer]")?.getAttribute("data-label") ??
+          this.textContent ??
+          "";
+        return NATURAL[label.trim()] ?? 0;
+      },
+    });
+    Object.defineProperty(HTMLSpanElement.prototype, "offsetWidth", {
+      configurable: true,
+      get(this: HTMLSpanElement) {
+        if (!this.hasAttribute("data-header-sizer")) return 0;
+        return SIZER[this.getAttribute("data-label") ?? ""] ?? 0;
       },
     });
     Object.defineProperty(HTMLDivElement.prototype, "clientWidth", {
@@ -377,6 +527,7 @@ describe("DataTable column fitting", () => {
     // Drop the overrides so the inherited (always-zero) jsdom getters come back
     // and the other suites in this file keep their unstubbed layout.
     Reflect.deleteProperty(HTMLTableCellElement.prototype, "offsetWidth");
+    Reflect.deleteProperty(HTMLSpanElement.prototype, "offsetWidth");
     Reflect.deleteProperty(HTMLDivElement.prototype, "clientWidth");
     vi.unstubAllGlobals();
     observerCallbacks = [];
@@ -428,5 +579,14 @@ describe("DataTable column fitting", () => {
     );
     // Skeleton rows are not representative, so no width is frozen from them.
     expect(colWidths(container)).toEqual([Number.NaN, Number.NaN, Number.NaN]);
+  });
+
+  it("never fits a column below its header content width", () => {
+    const { container } = render(<DataTable columns={COLS} rows={ROWS} getRowKey={(r) => r.id} />);
+    resizePanel(300);
+    // The shared ceiling lands at 100, but Name's floor is its measured header
+    // label (80) plus the header chrome = 122, so it stops there and the panel
+    // overflows slightly; Prompt's header is narrow, so the ceiling takes it.
+    expect(colWidths(container)).toEqual([SIZER.Name + HEADER_CHROME, 100, 100]);
   });
 });
