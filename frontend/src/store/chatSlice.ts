@@ -27,6 +27,18 @@ function parseToolArgs(args: unknown): Record<string, unknown> | null {
 }
 
 /**
+ * Derive a stable comparison key for a user message's content.
+ *
+ * `syncPolledMessages` matches an optimistically-rendered user message to its
+ * persisted twin by content (their ids differ). Plain-text prompts compare
+ * directly; content-part arrays (media inputs) are serialized so the same
+ * comparison works for them too.
+ */
+function userContentKey(content: unknown): string {
+  return typeof content === "string" ? content : JSON.stringify(content);
+}
+
+/**
  * Reconstruct an approval activity message from a `render_approval` tool call.
  *
  * Mirrors the live-streaming path (which dispatches an activity message keyed by
@@ -210,11 +222,66 @@ const chatSlice = createSlice({
       state.isStreaming = false;
       state.error = null;
       // The persisted history is the source of truth for unacknowledged render
-      // calls: re-deriving them keeps calls still pending across polls, and
+      // calls: re-deriving them keeps calls still pending across a resume, and
       // restores calls this browser never streamed (page reload, or a surface
       // rendered by another participant's run) so a later user action can
       // still be delivered as the acted-on call's tool result.
       state.pendingRenderCalls = derivePendingRenderCalls(action.payload.messages);
+    },
+    /**
+     * Merge a freshly polled history into the rendered messages without
+     * remounting the current viewer's optimistic sends.
+     *
+     * The poll's `/messages` response is authoritative for everything it
+     * contains, so it is the base of the merged list (run through
+     * `synthesizeActivityMessages`, exactly like {@link resumeSession}). But a
+     * message this viewer just sent is rendered optimistically under a
+     * client-generated id that never matches the id ADK assigns the persisted
+     * event. Replacing the whole array (`resumeSession`) therefore swaps that
+     * message's React key, remounting the bubble and replaying its enter
+     * animation — the prompt visibly "disappears" on the first poll after a run.
+     * This reducer instead keeps the already-rendered message object (stable
+     * key, no remount): when a polled user message carries the same content as
+     * an optimistic one, the optimistic message takes its place; optimistic
+     * messages the backend has not surfaced yet stay at the tail until a later
+     * poll reconciles them.
+     */
+    syncPolledMessages(state, action: PayloadAction<{ sessionId: string; messages: Message[] }>) {
+      state.sessionId = action.payload.sessionId;
+      const polled = action.payload.messages;
+      const polledIds = new Set(polled.map((m) => m.id));
+      // The shared chat is append-only, so the only user messages missing from
+      // the polled snapshot by id are this viewer's un-echoed optimistic sends.
+      const optimistic = state.messages.filter((m) => m.role === "user" && !polledIds.has(m.id));
+      const byContent = new Map<string, Message[]>();
+      for (const m of optimistic) {
+        const key = userContentKey(m.content);
+        const bucket = byContent.get(key);
+        if (bucket) bucket.push(m);
+        else byContent.set(key, [m]);
+      }
+      const consumed = new Set<Message>();
+      const merged: Message[] = [];
+      for (const m of synthesizeActivityMessages(polled)) {
+        if (m.role === "user") {
+          const twin = byContent.get(userContentKey(m.content))?.shift();
+          if (twin) {
+            // Reuse the rendered object so its key is unchanged — no remount.
+            merged.push(twin);
+            consumed.add(twin);
+            continue;
+          }
+        }
+        merged.push(m);
+      }
+      // Optimistic sends with no persisted twin yet (the just-sent prompt on a
+      // brand-new session, or a lagging snapshot) stay visible, in send order.
+      for (const m of optimistic) if (!consumed.has(m)) merged.push(m);
+      state.messages = merged;
+      state.isRunning = false;
+      state.isStreaming = false;
+      state.error = null;
+      state.pendingRenderCalls = derivePendingRenderCalls(polled);
     },
     addUserMessage(state, action: PayloadAction<{ id: string; content: string }>) {
       state.messages.push({
@@ -284,6 +351,7 @@ const chatSlice = createSlice({
 export const {
   setSession,
   resumeSession,
+  syncPolledMessages,
   addUserMessage,
   startAssistantMessage,
   appendDelta,

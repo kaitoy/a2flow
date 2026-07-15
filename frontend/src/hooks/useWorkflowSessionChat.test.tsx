@@ -1,6 +1,6 @@
 import { RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { type ReactNode, StrictMode } from "react";
 import { Provider } from "react-redux";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { formatActionContent, RENDER_ACK_CONTENT } from "@/lib/a2uiAction";
@@ -341,6 +341,31 @@ describe("useWorkflowSessionChat", () => {
     await waitFor(() => expect(store.getState().chat.error).not.toBeNull());
   });
 
+  it("keeps the auto-sent prompt when the mount effect re-runs (StrictMode)", async () => {
+    // StrictMode mounts, unmounts, then remounts in development, re-invoking the
+    // mount effect. Its second run must not clear the freshly auto-sent prompt,
+    // so the workflow prompt does not vanish before the first poll.
+    // beforeEach does not clear this mock's call count, so reset it here to
+    // count only this test's history loads.
+    vi.mocked(api.getWorkflowSessionMessages).mockClear().mockResolvedValue([]);
+    const store = makeStore();
+    renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <StrictMode>
+          <Provider store={store}>{children}</Provider>
+        </StrictMode>
+      ),
+    });
+    await waitFor(() => expect(mockAgent.runAgent).toHaveBeenCalledTimes(1));
+    // The guard makes the repeat mount run a no-op: only one history load, and
+    // the optimistic prompt survives (exactly one bubble, not wiped).
+    expect(vi.mocked(api.getWorkflowSessionMessages)).toHaveBeenCalledTimes(1);
+    const prompts = store
+      .getState()
+      .chat.messages.filter((m) => m.role === "user" && m.content === "Do the thing");
+    expect(prompts).toHaveLength(1);
+  });
+
   describe("polling", () => {
     it("re-fetches messages on the polling interval", async () => {
       vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([
@@ -453,6 +478,50 @@ describe("useWorkflowSessionChat", () => {
           await vi.advanceTimersByTimeAsync(10_000);
         });
         expect(vi.mocked(api.getWorkflowSessionMessages).mock.calls.length).toBe(fetchesBefore);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("keeps the auto-sent prompt in place (stable id) across the first poll", async () => {
+      // Mount finds an empty history (auto-sends the prompt); the first poll then
+      // returns the persisted prompt under a different, ADK-assigned id. The
+      // optimistic bubble must not be remounted, so its id stays put and it is
+      // not duplicated.
+      vi.mocked(api.getWorkflowSessionMessages)
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([
+          { id: "adk-u", role: "user", content: "Do the thing" },
+          { id: "adk-a", role: "assistant", content: "on it" },
+        ]);
+      vi.useFakeTimers();
+      try {
+        const store = makeStore();
+        renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", "Do the thing", "owner-1"), {
+          wrapper: makeWrapper(store),
+        });
+        // Flush the mount load + auto-send + (immediately resolving) run.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        const optimistic = store
+          .getState()
+          .chat.messages.find((m) => m.role === "user" && m.content === "Do the thing");
+        expect(optimistic).toBeDefined();
+        const optimisticId = optimistic?.id;
+        expect(optimisticId).not.toBe("adk-u");
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(10_000);
+        });
+
+        const messages = store.getState().chat.messages;
+        // Exactly one prompt bubble, still under its optimistic id (no remount).
+        const prompts = messages.filter((m) => m.role === "user" && m.content === "Do the thing");
+        expect(prompts).toHaveLength(1);
+        expect(prompts[0].id).toBe(optimisticId);
+        // The polled assistant reply is now shown too.
+        expect(messages.some((m) => m.role === "assistant" && m.content === "on it")).toBe(true);
       } finally {
         vi.useRealTimers();
       }

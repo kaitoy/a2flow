@@ -25,6 +25,7 @@ import chatReducer, {
   setError,
   setSession,
   startAssistantMessage,
+  syncPolledMessages,
 } from "./chatSlice";
 
 const emptyState = chatReducer(undefined, { type: "@@INIT" });
@@ -206,6 +207,104 @@ describe("chatSlice", () => {
       const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
       expect(state.messages).toHaveLength(1);
       expect(state.messages.some((m) => m.role === "activity")).toBe(false);
+    });
+  });
+
+  describe("syncPolledMessages", () => {
+    it("reuses an optimistic user message's id when a polled twin has the same content", () => {
+      // The optimistic send carries a client id that never matches the persisted
+      // ADK event id; merging by content must keep the rendered object (stable
+      // React key) so its bubble is not remounted and re-animated out of view.
+      const stateWithOptimistic = {
+        ...emptyState,
+        sessionId: "sess-1",
+        messages: [{ id: "opt-1", role: "user", content: "Do the thing" }] as Message[],
+      };
+      const polled: Message[] = [
+        { id: "adk-u", role: "user", content: "Do the thing" },
+        { id: "adk-a", role: "assistant", content: "done" },
+      ];
+      const state = chatReducer(
+        stateWithOptimistic,
+        syncPolledMessages({ sessionId: "sess-1", messages: polled })
+      );
+      expect(state.messages).toHaveLength(2);
+      // Stable identity: the prompt keeps the optimistic id, not the polled one.
+      expect(state.messages[0].id).toBe("opt-1");
+      expect(state.messages[0].content).toBe("Do the thing");
+      // No duplicate prompt bubble.
+      expect(
+        state.messages.filter((m) => m.role === "user" && m.content === "Do the thing")
+      ).toHaveLength(1);
+      // The polled assistant reply is included (backend stays authoritative).
+      expect(state.messages[1].id).toBe("adk-a");
+    });
+
+    it("keeps an optimistic user message with no persisted twin visible", () => {
+      const stateWithOptimistic = {
+        ...emptyState,
+        sessionId: "sess-1",
+        messages: [{ id: "opt-1", role: "user", content: "just sent" }] as Message[],
+      };
+      // Brand-new session: the poll's snapshot lags and does not include it yet.
+      const state = chatReducer(
+        stateWithOptimistic,
+        syncPolledMessages({ sessionId: "sess-1", messages: [] })
+      );
+      expect(state.messages).toHaveLength(1);
+      expect(state.messages[0].id).toBe("opt-1");
+      expect(state.messages[0].content).toBe("just sent");
+    });
+
+    it("appends the un-echoed optimistic send after the polled history", () => {
+      const stateWithOptimistic = {
+        ...emptyState,
+        sessionId: "sess-1",
+        messages: [
+          { id: "m1", role: "user", content: "earlier" },
+          { id: "opt-1", role: "user", content: "just sent" },
+        ] as Message[],
+      };
+      // Poll returns the persisted earlier message but not the just-sent one.
+      const polled: Message[] = [{ id: "m1", role: "user", content: "earlier" }];
+      const state = chatReducer(
+        stateWithOptimistic,
+        syncPolledMessages({ sessionId: "sess-1", messages: polled })
+      );
+      expect(state.messages).toHaveLength(2);
+      expect(state.messages[0].id).toBe("m1");
+      // The un-echoed optimistic send survives at the tail.
+      expect(state.messages[1].id).toBe("opt-1");
+    });
+
+    it("with no optimistic messages, applies the polled history and derives pending calls", () => {
+      const polled: Message[] = [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-pending",
+              type: "function",
+              function: {
+                name: RENDER_A2UI_TOOL_NAME,
+                arguments: JSON.stringify({ surfaceId: "surf-new", components: [] }),
+              },
+            },
+          ],
+        },
+      ];
+      const state = chatReducer(
+        { ...emptyState, sessionId: "sess-1" },
+        syncPolledMessages({ sessionId: "sess-1", messages: polled })
+      );
+      // Assistant message plus its synthesized A2UI activity (same as resumeSession).
+      expect(state.messages).toHaveLength(2);
+      expect(state.messages.some((m) => m.role === "activity")).toBe(true);
+      expect(state.pendingRenderCalls).toEqual([
+        { toolCallId: "tc-pending", surfaceId: "surf-new" },
+      ]);
     });
   });
 

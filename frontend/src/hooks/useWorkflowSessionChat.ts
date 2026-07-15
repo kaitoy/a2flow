@@ -28,6 +28,7 @@ import {
   setError,
   setSession,
   startRun,
+  syncPolledMessages,
 } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
@@ -98,6 +99,13 @@ export function useWorkflowSessionChat(
     (s) => s.chat
   );
   const autoSentRef = useRef(false);
+  // The session the mount effect has already initialized. React StrictMode (and
+  // Fast Refresh) mount, unmount, then remount in development, re-invoking the
+  // mount effect for the same session; guarding on this stops the repeat run
+  // from calling setSession again — which would clear the just-auto-sent prompt
+  // while autoSentRef (already set) suppressed re-sending it, so the workflow
+  // prompt vanished moments after appearing (before the first poll).
+  const initializedSessionRef = useRef<string | null>(null);
   // Per-message sender attribution for the shared workflow chat: a map from
   // message id to the sender's user id, and the resolved sender User records
   // (always including the owner, for the fallback below).
@@ -147,8 +155,9 @@ export function useWorkflowSessionChat(
   }, [workflowSessionId]);
 
   const refreshMessages = useCallback(async () => {
-    // Never clobber an in-flight run: resumeSession replaces the whole message
-    // array and resets the streaming flags, so polling is only safe between runs.
+    // Never merge mid-run: syncPolledMessages rebuilds the message array from the
+    // fetched history and resets the streaming flags, which would clobber a live
+    // stream, so polling is only safe between runs.
     if (isRunningRef.current || isStreamingRef.current) return;
     try {
       const loaded = await getWorkflowSessionMessages(workflowSessionId);
@@ -159,7 +168,10 @@ export function useWorkflowSessionChat(
       const signature = `${loaded.length}:${loaded.at(-1)?.id ?? ""}`;
       if (signature === appliedSignatureRef.current) return;
       appliedSignatureRef.current = signature;
-      dispatch(resumeSession({ sessionId, messages: loaded }));
+      // Merge (don't replace): keep this viewer's optimistically-rendered sends
+      // in place so the auto-sent prompt's bubble isn't remounted and re-animated
+      // out of view when the poll returns its persisted (differently-id'd) twin.
+      dispatch(syncPolledMessages({ sessionId, messages: loaded }));
       // Keep sender avatars and the task timeline/groups in sync with the newly
       // visible messages.
       await Promise.all([refreshSenders(), refreshTasks()]);
@@ -306,8 +318,15 @@ export function useWorkflowSessionChat(
     [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and autoSentRef guards against double-sends
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and the init guard below prevents double-sends
   useEffect(() => {
+    // Initialize each session exactly once. A repeat run for the same session
+    // (StrictMode/Fast Refresh remount) is a no-op, so it can't clear the
+    // optimistically-rendered prompt; a genuine session change re-initializes.
+    if (initializedSessionRef.current === sessionId) return;
+    initializedSessionRef.current = sessionId;
+    autoSentRef.current = false;
+    appliedSignatureRef.current = null;
     dispatch(setSession(sessionId));
     void refreshSenders();
     void refreshTasks();
