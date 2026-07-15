@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { WorkflowTask } from "@/lib/api";
 import { WorkflowTaskGroup } from "./WorkflowTaskGroup";
 
-const task = {
+const task: WorkflowTask = {
   id: "t1",
   workflowSessionId: "ws",
   title: "Draft the report",
@@ -12,7 +12,11 @@ const task = {
   position: 0,
   dependsOnIds: [],
   toolBindings: [],
-} as WorkflowTask;
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
 
 describe("WorkflowTaskGroup", () => {
   it("shows the task title, status, and ordinal badge", () => {

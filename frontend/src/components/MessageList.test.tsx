@@ -6,16 +6,19 @@ import { describe, expect, it, vi } from "vitest";
 import type { WorkflowTask } from "@/lib/api";
 import { MessageList } from "./MessageList";
 
-const makeTask = (id: string, title: string): WorkflowTask =>
-  ({
-    id,
-    workflowSessionId: "ws",
-    title,
-    status: "in_progress",
-    position: 0,
-    dependsOnIds: [],
-    toolBindings: [],
-  }) as WorkflowTask;
+const makeTask = (id: string, title: string): WorkflowTask => ({
+  id,
+  workflowSessionId: "ws",
+  title,
+  status: "in_progress",
+  position: 0,
+  dependsOnIds: [],
+  toolBindings: [],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+});
 
 const { mountSpy } = vi.hoisted(() => ({ mountSpy: vi.fn() }));
 

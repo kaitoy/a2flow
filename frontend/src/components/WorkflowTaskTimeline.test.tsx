@@ -9,16 +9,19 @@ const makeTask = (
   title: string,
   status: WorkflowTask["status"] = "pending",
   position = 0
-): WorkflowTask =>
-  ({
-    id,
-    workflowSessionId: "ws",
-    title,
-    status,
-    position,
-    dependsOnIds: [],
-    toolBindings: [],
-  }) as WorkflowTask;
+): WorkflowTask => ({
+  id,
+  workflowSessionId: "ws",
+  title,
+  status,
+  position,
+  dependsOnIds: [],
+  toolBindings: [],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+});
 
 const tasks = [
   makeTask("t1", "Gather sources", "completed", 0),

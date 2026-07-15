@@ -36,6 +36,7 @@ describe("LoginPage", () => {
       push: vi.fn(),
       replace: replaceMock,
       back: vi.fn(),
+      forward: vi.fn(),
       prefetch: vi.fn(),
       refresh: vi.fn(),
     });

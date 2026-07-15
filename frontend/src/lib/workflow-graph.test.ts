@@ -15,6 +15,10 @@ function task(id: string, dependsOnIds: string[] = [], position = 0): WorkflowTa
     status: "pending",
     position,
     dependsOnIds,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    createdBy: "",
+    updatedBy: "",
   };
 }
 

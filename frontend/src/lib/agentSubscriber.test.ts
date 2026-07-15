@@ -46,6 +46,7 @@ describe("createAgentSubscriber", () => {
       toolCallArgs: { tool_name: "search_web" },
     } as never);
     const msg = lastActivity(store);
+    if (msg.role !== "activity") throw new Error("expected activity message");
     expect(msg.activityType).toBe(TOOL_CALL_ACTIVITY_TYPE);
     expect(msg.content).toMatchObject({ name: "search_web", status: "done", isMcp: true });
   });
