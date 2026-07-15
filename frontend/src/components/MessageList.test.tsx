@@ -58,6 +58,29 @@ vi.mock("./MessageBubble", () => ({
   },
 }));
 
+/**
+ * Records every constructed observer's callback and observed targets so a
+ * test can manually fire the callback jsdom never invokes for real — the
+ * global stub in `src/test/setup.ts` is an inert no-op for the whole suite.
+ */
+class FakeIntersectionObserver {
+  static instances: FakeIntersectionObserver[] = [];
+  callback: IntersectionObserverCallback;
+  observed: Element[] = [];
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback;
+    FakeIntersectionObserver.instances.push(this);
+  }
+  observe(el: Element) {
+    this.observed.push(el);
+  }
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+
 describe("MessageList", () => {
   it("shows empty state when messages is empty", () => {
     render(<MessageList messages={[]} />);
@@ -372,5 +395,53 @@ describe("MessageList", () => {
     ];
     const { container } = render(<MessageList messages={messages} />);
     expect(container.querySelector('[id^="wf-task-group-"]')).toBeNull();
+  });
+
+  it("reports the last task as active once the bottom sentinel is reached", () => {
+    // The last task's own group may be too short to ever cross the scroll-spy's
+    // 30%-of-viewport line, so reaching the bottom must force it active via the
+    // separate observer watching the trailing sentinel.
+    const realIntersectionObserver = window.IntersectionObserver;
+    FakeIntersectionObserver.instances = [];
+    window.IntersectionObserver =
+      FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+    try {
+      const messages: Message[] = [
+        { id: "m1", role: "assistant", content: "on task A" },
+        { id: "m2", role: "assistant", content: "on task B" },
+      ];
+      const messageTasks = new Map([
+        ["m1", "task-a"],
+        ["m2", "task-b"],
+      ]);
+      const tasksById = new Map<string, WorkflowTask>([
+        ["task-a", makeTask("task-a", "Task A")],
+        ["task-b", makeTask("task-b", "Task B")],
+      ]);
+      const onVisibleTaskChange = vi.fn();
+      render(
+        <MessageList
+          messages={messages}
+          messageTasks={messageTasks}
+          tasksById={tasksById}
+          onVisibleTaskChange={onVisibleTaskChange}
+        />
+      );
+
+      // The bottom-sentinel observer is the one watching a single, non-task
+      // element (bottomRef), unlike the section observer watching both groups.
+      const bottomObserver = FakeIntersectionObserver.instances.find(
+        (o) => o.observed.length === 1 && !(o.observed[0] as HTMLElement).dataset.taskId
+      );
+      expect(bottomObserver).toBeDefined();
+      bottomObserver?.callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        bottomObserver as unknown as IntersectionObserver
+      );
+
+      expect(onVisibleTaskChange).toHaveBeenCalledWith("task-b");
+    } finally {
+      window.IntersectionObserver = realIntersectionObserver;
+    }
   });
 });

@@ -219,7 +219,22 @@ export function MessageList({
     if (sections.length === 0) return;
 
     let lastReported: string | null = null;
+    // The trailing sentinel (bottomRef) is a zero-height marker pinned at the
+    // very end of the scrollable content, so it enters the viewport at
+    // essentially the same moment scrollTop reaches its max. That's the only
+    // reliable way to know the last group is "active": its own top may never
+    // cross the 30% line below if there isn't enough trailing content to push
+    // it there (e.g. a short final task with no WorkingIndicator after it).
+    let atBottom = false;
     const recompute = () => {
+      if (atBottom) {
+        const active = sections[sections.length - 1].dataset.taskId ?? null;
+        if (active !== lastReported) {
+          lastReported = active;
+          onVisibleTaskChange(active);
+        }
+        return;
+      }
       const rootRect = root.getBoundingClientRect();
       // The "active" group is the last one whose top has scrolled above a line
       // 30% down from the top of the viewport.
@@ -236,13 +251,26 @@ export function MessageList({
       }
     };
 
-    const observer = new IntersectionObserver(recompute, {
+    const sectionObserver = new IntersectionObserver(recompute, {
       root,
       rootMargin: "0px 0px -70% 0px",
       threshold: 0,
     });
-    for (const section of sections) observer.observe(section);
-    return () => observer.disconnect();
+    for (const section of sections) sectionObserver.observe(section);
+
+    const bottomObserver = new IntersectionObserver(
+      ([entry]) => {
+        atBottom = entry.isIntersecting;
+        recompute();
+      },
+      { root, threshold: 0 }
+    );
+    if (bottomRef.current) bottomObserver.observe(bottomRef.current);
+
+    return () => {
+      sectionObserver.disconnect();
+      bottomObserver.disconnect();
+    };
   }, [runs, onVisibleTaskChange]);
 
   /**
