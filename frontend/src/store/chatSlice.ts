@@ -154,15 +154,35 @@ function derivePendingRenderCalls(messages: Message[]): PendingRenderCall[] {
  * assistant messages, not as standalone activity messages. This generator re-synthesizes the
  * activity messages — A2UI surfaces (``render_a2ui``), approval controls (``render_approval``),
  * and user-added MCP tool calls (``call_mcp_tool``) — so resumed sessions display them
- * identically to live sessions. Internal A2Flow tool calls are intentionally not reproduced.
+ * identically to live sessions. Internal A2Flow tool calls are intentionally not reproduced
+ * this way: their live-only chip normally has no persisted representation to rebuild from.
+ *
+ * When {@link existingToolActivityById} is supplied, a tool call whose name doesn't match any
+ * of the three known names instead re-yields the already-rendered chip for that call id, if one
+ * exists — this is how {@link syncPolledMessages} keeps a live internal-tool chip on screen
+ * across a poll instead of losing it in the rebuild. {@link resumeSession} omits the map, so a
+ * fresh resume still shows nothing for internal tool calls, unchanged.
+ *
  * The synthesized message IDs mirror the ones used during live streaming so
  * ``addActivityMessage``'s upsert logic works.
  */
-function* synthesizeActivityMessages(messages: Message[]): Generator<Message> {
+function* synthesizeActivityMessages(
+  messages: Message[],
+  existingToolActivityById?: Map<string, Message>
+): Generator<Message> {
   for (const msg of messages) {
     yield msg;
     if (msg.role !== "assistant" || !msg.toolCalls) continue;
     for (const tc of msg.toolCalls) {
+      if (
+        tc.function.name !== RENDER_A2UI_TOOL_NAME &&
+        tc.function.name !== RENDER_APPROVAL_TOOL_NAME &&
+        tc.function.name !== CALL_MCP_TOOL_NAME
+      ) {
+        const preserved = existingToolActivityById?.get(tc.id);
+        if (preserved) yield preserved;
+        continue;
+      }
       const args = parseToolArgs(tc.function.arguments);
       if (args === null) continue;
       let synthesized: Message | null = null;
@@ -260,9 +280,20 @@ const chatSlice = createSlice({
         if (bucket) bucket.push(m);
         else byContent.set(key, [m]);
       }
+      // Internal A2Flow tool-call chips have no persisted representation to
+      // resynthesize (see synthesizeActivityMessages) — without this, every poll
+      // would silently drop any such chip still on screen even though nothing in
+      // the transcript changed. Keep the exact rendered object (stable React key,
+      // no remount), mirroring how optimistic user messages are preserved below.
+      const existingToolActivityById = new Map<string, Message>();
+      for (const m of state.messages) {
+        if (m.role === "activity" && m.activityType === TOOL_CALL_ACTIVITY_TYPE) {
+          existingToolActivityById.set(m.id, m);
+        }
+      }
       const consumed = new Set<Message>();
       const merged: Message[] = [];
-      for (const m of synthesizeActivityMessages(polled)) {
+      for (const m of synthesizeActivityMessages(polled, existingToolActivityById)) {
         if (m.role === "user") {
           const twin = byContent.get(userContentKey(m.content))?.shift();
           if (twin) {

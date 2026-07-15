@@ -306,6 +306,55 @@ describe("chatSlice", () => {
         { toolCallId: "tc-pending", surfaceId: "surf-new" },
       ]);
     });
+
+    it("preserves a live tool-call activity chip for an internal tool call across a poll", () => {
+      // Reproduces the bug: onToolCallEndEvent (agentSubscriber.ts) adds a live
+      // TOOL_CALL_ACTIVITY_TYPE chip for every non-hidden tool call, including
+      // internal A2Flow tools that synthesizeActivityMessages intentionally does
+      // not reconstruct from history (see the "does NOT synthesize activity for
+      // an internal tool call" test above). Without preservation, this poll's
+      // wholesale rebuild would silently drop the still-rendered chip.
+      const assistantMsg: Message = {
+        id: "m1",
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "tc-internal",
+            type: "function",
+            function: {
+              name: "create_workflow_task",
+              arguments: JSON.stringify({ title: "do it" }),
+            },
+          },
+        ],
+      };
+      const liveChip: Message = {
+        id: "tc-internal",
+        role: "activity",
+        activityType: TOOL_CALL_ACTIVITY_TYPE,
+        content: { name: "create_workflow_task", status: "done" },
+      };
+      const stateWithLiveChip = {
+        ...emptyState,
+        sessionId: "sess-1",
+        messages: [assistantMsg, liveChip],
+      };
+      const polled: Message[] = [assistantMsg];
+      const state = chatReducer(
+        stateWithLiveChip,
+        syncPolledMessages({ sessionId: "sess-1", messages: polled })
+      );
+      expect(state.messages).toHaveLength(2);
+      const activityMsg = state.messages[1];
+      expect(activityMsg.role).toBe("activity");
+      if (activityMsg.role !== "activity") throw new Error("expected activity message");
+      expect(activityMsg.activityType).toBe(TOOL_CALL_ACTIVITY_TYPE);
+      expect(activityMsg.id).toBe("tc-internal");
+      // Stable identity: same object as the live chip, so its React key is
+      // unchanged and the bubble is not remounted.
+      expect(activityMsg).toBe(liveChip);
+    });
   });
 
   describe("addUserMessage", () => {
