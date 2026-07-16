@@ -15,6 +15,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { Tooltip } from "@/components/ui/tooltip";
 import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
@@ -46,6 +47,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
     tasks,
   } = useWorkflowSessionChat(ws.id, ws.sessionId, EXECUTION_KICKOFF_PROMPT, ws.userId);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
+  const [timelineDrawerOpen, setTimelineDrawerOpen] = useState(false);
   // Focus state shared by the timeline and chat: a hovered entry wins over the
   // scroll-spy position so a deliberate hover always drives the highlight.
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
@@ -139,9 +141,28 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
         onHoverTask={setHoveredTaskId}
         collapsed={timelineCollapsed}
         onToggle={() => setTimelineCollapsed((c) => !c)}
+        className="max-md:hidden"
       />
+      <SidebarDrawer
+        open={timelineDrawerOpen}
+        onClose={() => setTimelineDrawerOpen(false)}
+        label="Workflow tasks"
+      >
+        <WorkflowTaskTimeline
+          tasks={tasks}
+          activeTaskId={activeTaskId}
+          taskIndexById={taskIndexById}
+          highlightedTaskId={highlightedTaskId}
+          onSelectTask={(taskId) => {
+            setTimelineDrawerOpen(false);
+            handleSelectTask(taskId);
+          }}
+          collapsed={false}
+          onToggle={() => setTimelineDrawerOpen(false)}
+        />
+      </SidebarDrawer>
       <div className="flex flex-col flex-1 min-w-0">
-        <AppHeader>
+        <AppHeader onMenuClick={() => setTimelineDrawerOpen(true)}>
           <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />
           <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-accent shadow-glow animate-pulse" />
           <span className="font-display truncate text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">

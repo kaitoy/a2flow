@@ -51,6 +51,8 @@ export interface WorkflowTaskTimelineProps {
   collapsed: boolean;
   /** Toggles the collapsed state. */
   onToggle: () => void;
+  /** Extra classes for the root element (e.g. `max-md:hidden` for the static desktop sidebar). */
+  className?: string;
 }
 
 /**
@@ -69,10 +71,13 @@ export function WorkflowTaskTimeline({
   onHoverTask,
   collapsed,
   onToggle,
+  className,
 }: WorkflowTaskTimelineProps) {
   if (collapsed) {
     return (
-      <div className="flex w-12 shrink-0 flex-col items-center border-r border-glass-border glass-chrome py-3">
+      <div
+        className={`flex w-12 shrink-0 flex-col items-center border-r border-glass-border glass-chrome py-3 ${className ?? ""}`}
+      >
         <button
           type="button"
           onClick={onToggle}
@@ -87,7 +92,7 @@ export function WorkflowTaskTimeline({
   }
 
   return (
-    <aside className={TASK_TIMELINE_ASIDE_CLASS}>
+    <aside className={`${TASK_TIMELINE_ASIDE_CLASS} ${className ?? ""}`}>
       <div className={TASK_TIMELINE_HEADER_CLASS}>
         <h2 className="text-label-caps">Tasks</h2>
         <button

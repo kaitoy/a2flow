@@ -1,6 +1,7 @@
 /** @module AppHeader — Shared top bar with logo, title, and account actions. */
 "use client";
 
+import { Menu } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -17,18 +18,35 @@ export interface AppHeaderProps {
    * convey which record is being viewed.
    */
   children?: ReactNode;
+  /**
+   * When provided, renders a hamburger button (visible only below the `md`
+   * breakpoint) that shells use to open their sidebar as a mobile drawer.
+   */
+  onMenuClick?: () => void;
 }
 
 /**
  * Application top bar shared by the chat, admin, and standalone shells. Renders
  * the A2Flow logo and title (linking to the welcome page) on the left and the
  * notification, theme, and account profile controls on the right. Any
- * `children` render next to the title as contextual content.
+ * `children` render next to the title as contextual content. Shells with a
+ * sidebar pass `onMenuClick` to expose it as a drawer on mobile.
  */
-export function AppHeader({ children }: AppHeaderProps) {
+export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
   return (
-    <header className="shrink-0 flex h-16 items-center justify-between px-6 border-b border-glass-border glass-chrome">
+    <header className="shrink-0 flex h-16 items-center justify-between px-4 sm:px-6 border-b border-glass-border glass-chrome">
       <div className="flex min-w-0 items-center gap-3">
+        {onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            aria-label="Open menu"
+            aria-haspopup="dialog"
+            className="md:hidden -ml-1 shrink-0 cursor-pointer rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
+          >
+            <Menu size={20} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+        )}
         <Link
           href="/admin"
           aria-label="A2Flow home"

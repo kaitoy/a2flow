@@ -12,6 +12,7 @@ import { MessageList } from "@/components/MessageList";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
@@ -49,6 +50,7 @@ function PlanningSessionView({ ps, workflow }: { ps: PlanningSession; workflow: 
     sendApprovalResult,
   } = useWorkflowSessionChat(ps.id, ps.sessionId, null, ps.userId, "planning");
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
+  const [timelineDrawerOpen, setTimelineDrawerOpen] = useState(false);
   const [templates, setTemplates] = useState<WorkflowTaskTemplate[]>([]);
 
   const refreshTemplates = useCallback(async () => {
@@ -81,9 +83,24 @@ function PlanningSessionView({ ps, workflow }: { ps: PlanningSession; workflow: 
         onSelectTask={() => {}}
         collapsed={timelineCollapsed}
         onToggle={() => setTimelineCollapsed((c) => !c)}
+        className="max-md:hidden"
       />
+      <SidebarDrawer
+        open={timelineDrawerOpen}
+        onClose={() => setTimelineDrawerOpen(false)}
+        label="Plan tasks"
+      >
+        <WorkflowTaskTimeline
+          tasks={templates}
+          activeTaskId={null}
+          taskIndexById={taskIndexById}
+          onSelectTask={() => {}}
+          collapsed={false}
+          onToggle={() => setTimelineDrawerOpen(false)}
+        />
+      </SidebarDrawer>
       <div className="flex flex-col flex-1 min-w-0">
-        <AppHeader>
+        <AppHeader onMenuClick={() => setTimelineDrawerOpen(true)}>
           <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />
           <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-accent shadow-glow animate-pulse" />
           <span className="font-display truncate text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">

@@ -22,6 +22,8 @@ interface SessionListProps {
   onNew: () => void;
   onDeleted?: (sessionId: string) => void;
   disabled?: boolean;
+  /** Extra classes for the root `aside` (e.g. `max-md:hidden` for the static desktop sidebar). */
+  className?: string;
 }
 
 /** Sidebar listing past sessions with controls to create a new session or delete an existing one. */
@@ -32,6 +34,7 @@ export function SessionList({
   onNew,
   onDeleted,
   disabled,
+  className,
 }: SessionListProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
@@ -98,7 +101,9 @@ export function SessionList({
   }
 
   return (
-    <aside className="relative flex h-full w-64 shrink-0 flex-col border-r border-glass-border glass-chrome">
+    <aside
+      className={`relative flex h-full w-64 shrink-0 flex-col border-r border-glass-border glass-chrome ${className ?? ""}`}
+    >
       <div className="shrink-0 px-3 py-4">
         <Button
           variant="primary"
