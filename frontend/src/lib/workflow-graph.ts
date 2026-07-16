@@ -9,17 +9,35 @@
 
 import dagre from "@dagrejs/dagre";
 import { type Edge, type Node, Position } from "@xyflow/react";
-import type { WorkflowTask } from "@/lib/api";
+import type { WorkflowTaskStatus } from "@/lib/api";
 
 /** Width, in pixels, used for every workflow-task node during layout. */
 export const NODE_WIDTH = 220;
 /** Height, in pixels, used for every workflow-task node during layout. */
 export const NODE_HEIGHT = 72;
 
+/**
+ * One vertex of the DAG: a session's WorkflowTask, or a workflow's task
+ * template, which has no status (the lifecycle belongs to a run, not the
+ * plan). Both satisfy this shape structurally.
+ */
+export interface GraphTask {
+  /** Node identifier; dependency edges reference these. */
+  id: string;
+  /** Title shown inside the node. */
+  title: string;
+  /** Layout/order hint shown as the node's ordinal. */
+  position?: number | null;
+  /** Ids of the tasks this one depends on (incoming edges). */
+  dependsOnIds?: string[] | null;
+  /** Lifecycle status, or absent for status-less entries (task templates). */
+  status?: WorkflowTaskStatus | null;
+}
+
 /** Data carried by a workflow-task React Flow node. */
 export interface WorkflowTaskNodeData extends Record<string, unknown> {
   /** The task this node represents. */
-  task: WorkflowTask;
+  task: GraphTask;
 }
 
 /** React Flow node specialized to the workflow-task custom node type. */
@@ -38,10 +56,10 @@ export type WorkflowTaskFlowNode = Node<WorkflowTaskNodeData, "workflowTask">;
  * Returned nodes are positioned at the origin; call {@link layoutWorkflowGraph}
  * to assign real coordinates.
  *
- * @param tasks - The tasks belonging to a single workflow session.
+ * @param tasks - The tasks of a single workflow session or plan.
  * @returns The unpositioned nodes and the dependency edges between them.
  */
-export function buildWorkflowGraph(tasks: WorkflowTask[]): {
+export function buildWorkflowGraph(tasks: GraphTask[]): {
   nodes: WorkflowTaskFlowNode[];
   edges: Edge[];
 } {
@@ -114,10 +132,10 @@ export function layoutWorkflowGraph(
 /**
  * Convenience wrapper that builds the graph and lays it out in one call.
  *
- * @param tasks - The tasks belonging to a single workflow session.
+ * @param tasks - The tasks of a single workflow session or plan.
  * @returns Positioned nodes and dependency edges ready for `<ReactFlow>`.
  */
-export function buildLayoutedWorkflowGraph(tasks: WorkflowTask[]): {
+export function buildLayoutedWorkflowGraph(tasks: GraphTask[]): {
   nodes: WorkflowTaskFlowNode[];
   edges: Edge[];
 } {

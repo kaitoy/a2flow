@@ -18,13 +18,17 @@ from services import (
     MCPRegistryService,
     MCPServerService,
     NotificationService,
+    PlanningSessionService,
     SecretService,
     UserAvatarService,
     UserService,
+    WorkflowPlanningService,
     WorkflowService,
     WorkflowSessionAccessPolicy,
     WorkflowSessionService,
     WorkflowTaskService,
+    WorkflowTaskTemplateService,
+    generate_workflow_plan,
     sync_agent_skill,
 )
 
@@ -36,12 +40,14 @@ from .repository import (
     MCPServerRepositoryDep,
     MessageMetaRepositoryDep,
     NotificationRepositoryDep,
+    PlanningSessionRepositoryDep,
     SecretRepositoryDep,
     UserAvatarRepositoryDep,
     UserRepositoryDep,
     WorkflowRepositoryDep,
     WorkflowSessionRepositoryDep,
     WorkflowTaskRepositoryDep,
+    WorkflowTaskTemplateRepositoryDep,
 )
 from .singletons import (
     AgentRegistryDep,
@@ -160,12 +166,87 @@ def get_workflow_service(
     workflows: WorkflowRepositoryDep,
     skills: AgentSkillRepositoryDep,
     ws_repo: WorkflowSessionRepositoryDep,
+    templates: WorkflowTaskTemplateRepositoryDep,
+    tasks: WorkflowTaskRepositoryDep,
 ) -> WorkflowService:
     """Create a WorkflowService wiring the repositories it orchestrates."""
-    return WorkflowService(workflows, skills, ws_repo)
+    return WorkflowService(workflows, skills, ws_repo, templates, tasks)
 
 
 WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
+
+
+def get_workflow_planning_service(
+    workflows: WorkflowRepositoryDep,
+    skills: AgentSkillRepositoryDep,
+    ps_repo: PlanningSessionRepositoryDep,
+    templates: WorkflowTaskTemplateRepositoryDep,
+    session_service: SessionServiceDep,
+) -> WorkflowPlanningService:
+    """Create a WorkflowPlanningService wiring the repositories and the session store."""
+    return WorkflowPlanningService(
+        workflows, skills, ps_repo, templates, session_service, APP_NAME
+    )
+
+
+WorkflowPlanningServiceDep = Annotated[
+    WorkflowPlanningService, Depends(get_workflow_planning_service)
+]
+
+#: The background plan-generation job, as the agent-skills router hands it to
+#: ``BackgroundTasks``.
+WorkflowGenerationJob = Callable[..., Awaitable[None]]
+
+
+def get_workflow_generation_job(
+    registry: AgentRegistryDep,
+    session_service: SessionServiceDep,
+    skills_store: SkillManagerDep,
+) -> WorkflowGenerationJob:
+    """Return the background job that generates a workflow's initial plan.
+
+    Injected rather than called by name so tests can override it: the real job
+    runs a full agent turn against an LLM and opens database sessions of its
+    own on the application engine. The process-wide singletons the job needs
+    are captured here, where DI can resolve them, because the job itself runs
+    after the request scope is gone.
+    """
+
+    async def job(workflow_id: str, prompt: str, *, user_id: str) -> None:
+        await generate_workflow_plan(
+            workflow_id,
+            prompt,
+            user_id=user_id,
+            registry=registry,
+            session_service=session_service,
+            skills_store=skills_store,
+            app_name=APP_NAME,
+        )
+
+    return job
+
+
+WorkflowGenerationJobDep = Annotated[
+    WorkflowGenerationJob, Depends(get_workflow_generation_job)
+]
+
+
+def get_planning_session_service(
+    ps_repo: PlanningSessionRepositoryDep,
+    skills: AgentSkillRepositoryDep,
+    skills_store: SkillManagerDep,
+    registry: AgentRegistryDep,
+    session_service: SessionServiceDep,
+) -> PlanningSessionService:
+    """Create a PlanningSessionService wiring the repositories, skill store, agent registry, and session store."""
+    return PlanningSessionService(
+        ps_repo, skills, skills_store, registry, session_service, APP_NAME
+    )
+
+
+PlanningSessionServiceDep = Annotated[
+    PlanningSessionService, Depends(get_planning_session_service)
+]
 
 
 def get_workflow_session_access_policy(
@@ -221,6 +302,19 @@ def get_workflow_task_service(
 
 WorkflowTaskServiceDep = Annotated[
     WorkflowTaskService, Depends(get_workflow_task_service)
+]
+
+
+def get_workflow_task_template_service(
+    repo: WorkflowTaskTemplateRepositoryDep,
+    workflows: WorkflowRepositoryDep,
+) -> WorkflowTaskTemplateService:
+    """Create a WorkflowTaskTemplateService wiring the template and workflow repositories."""
+    return WorkflowTaskTemplateService(repo, workflows)
+
+
+WorkflowTaskTemplateServiceDep = Annotated[
+    WorkflowTaskTemplateService, Depends(get_workflow_task_template_service)
 ]
 
 

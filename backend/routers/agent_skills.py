@@ -10,11 +10,14 @@ from dependencies import (
     PaginationDep,
     SkillSyncJobDep,
     SortDep,
+    WorkflowGenerationJobDep,
+    WorkflowPlanningServiceDep,
     require_roles,
 )
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from models.response import ApiResponse
 from models.user import Role
+from models.workflow import GenerateWorkflowRequest, Workflow
 
 router = APIRouter(prefix="/agent-skills", tags=["agent-skills"])
 
@@ -78,6 +81,37 @@ async def pull_agent_skill(
     skill = await service.mark_pending(skill_id, user_id=user_id)
     background.add_task(sync_job, skill.id, user_id=user_id)
     return ApiResponse(meta=meta, data=skill)
+
+
+@router.post(
+    "/{skill_id}/workflows",
+    response_model=ApiResponse[Workflow],
+    status_code=201,
+    dependencies=_requires_developer,
+)
+async def generate_workflow(
+    skill_id: str,
+    body: GenerateWorkflowRequest,
+    background: BackgroundTasks,
+    service: WorkflowPlanningServiceDep,
+    generation_job: WorkflowGenerationJobDep,
+    user_id: CurrentUserIdDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[Workflow]:
+    """Generate a draft Workflow from this skill ("Generate workflow").
+
+    Registers the workflow (``status: "generating"``) and its planning session
+    immediately, then breaks ``prompt`` into the workflow's task templates in a
+    background agent run rather than holding the request open for an LLM
+    round trip. The outcome lands on the row, which the admin UI polls:
+    success leaves a ``draft`` with templates and a summarized description,
+    failure leaves ``failed`` with the reason — the planning chat stays usable
+    to fix the plan by hand. Requires the skill to have a published revision
+    (HTTP 409 ``SKILL_NOT_READY`` otherwise).
+    """
+    workflow = await service.generate(skill_id, body.name, user_id=user_id)
+    background.add_task(generation_job, workflow.id, body.prompt, user_id=user_id)
+    return ApiResponse(meta=meta, data=workflow)
 
 
 @router.get("", response_model=ApiResponse[list[AgentSkill]])

@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalStatus
 from tests._envelope import assert_err, assert_ok
+from tests._workflow import create_published_workflow, create_skill
 
 
 async def _insert_approval(
@@ -46,7 +47,11 @@ def _next_suffix() -> int:
 
 
 async def _create_workflow_session(client: AsyncClient) -> Any:
-    """Create a fresh skill + workflow and execute it to produce a WorkflowSession.
+    """Create a published workflow and execute it to produce a WorkflowSession.
+
+    Runs the full lifecycle (skill → generate → template → publish → execute),
+    then deletes the task copied from the template so tests start from a
+    session with no tasks, as they did when planning happened inside the run.
 
     A monotonic suffix is appended to the skill and workflow names so callers can
     invoke this multiple times within a single test (e.g., to verify per-session
@@ -54,27 +59,21 @@ async def _create_workflow_session(client: AsyncClient) -> Any:
     ``workflows.name``.
     """
     n = _next_suffix()
-    skill = assert_ok(
-        await client.post(
-            "/api/v1/agent-skills",
-            json={"name": f"skill-{n}", "repo_url": f"https://github.com/x/y{n}"},
-        ),
-        status=201,
+    skill = await create_skill(
+        client, name=f"skill-{n}", repo_url=f"https://github.com/x/y{n}"
     )
-    wf = assert_ok(
-        await client.post(
-            "/api/v1/workflows",
-            json={
-                "name": f"workflow-{n}",
-                "prompt": _WF_PROMPT,
-                "agent_skill_id": skill["id"],
-            },
-        ),
-        status=201,
+    wf = await create_published_workflow(
+        client, skill["id"], name=f"workflow-{n}", prompt=_WF_PROMPT
     )
-    return assert_ok(
+    ws = assert_ok(
         await client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
+    seeded = assert_ok(
+        await client.get(f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks")
+    )
+    for task in seeded:
+        assert_ok(await client.delete(f"/api/v1/workflow-tasks/{task['id']}"))
+    return ws
 
 
 async def _create_task(

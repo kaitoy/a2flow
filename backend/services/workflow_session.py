@@ -14,7 +14,7 @@ from typing import Any
 from ag_ui_adk import ADKAgent, adk_events_to_messages
 from google.adk.sessions import BaseSessionService
 
-from infrastructure.agent import AgentRegistry
+from infrastructure.agent import AgentKind, AgentRegistry
 from infrastructure.skill_manager import SkillManager
 from models.user import User
 from models.workflow_session import WorkflowSession
@@ -250,7 +250,10 @@ class WorkflowSessionService:
             if not skill_dir.exists():
                 raise SkillNotReadyError(skill.id)
 
-        return self._registry.get(ws.agent_skill_id, commit_sha, skill_dir), ws
+        agent = self._registry.get(
+            ws.agent_skill_id, commit_sha, skill_dir, kind=AgentKind.execution
+        )
+        return agent, ws
 
     async def get_messages(
         self, ws_id: str, *, caller: User

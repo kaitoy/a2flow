@@ -98,14 +98,22 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
   });
 
   const onSelect = useCallback(
-    (id: string, workflowSessionId: string | null | undefined) => {
+    (
+      id: string,
+      workflowSessionId: string | null | undefined,
+      workflowId: string | null | undefined
+    ) => {
       dispatch(markReadLocal(id));
-      markNotificationRead(id).catch((error) => {
-        logger.error({ error, id }, "failed to mark notification read");
+      markNotificationRead(id).catch((err) => {
+        logger.error({ err, id }, "failed to mark notification read");
       });
       onClose();
+      // Run-scoped notifications (approvals, completion) deep-link to the
+      // session chat; workflow-scoped ones (a generated draft) to the workflow.
       if (workflowSessionId) {
         router.push(`/workflow-sessions/${encodeURIComponent(workflowSessionId)}`);
+      } else if (workflowId) {
+        router.push(`/admin/workflows/${encodeURIComponent(workflowId)}`);
       }
     },
     [dispatch, router, onClose]
@@ -114,8 +122,8 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
   const onDismiss = useCallback(
     (id: string) => {
       dispatch(removeLocal(id));
-      deleteNotification(id).catch((error) => {
-        logger.error({ error, id }, "failed to delete notification");
+      deleteNotification(id).catch((err) => {
+        logger.error({ err, id }, "failed to delete notification");
       });
     },
     [dispatch]
@@ -123,8 +131,8 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
 
   const onMarkAllRead = useCallback(() => {
     dispatch(markAllReadLocal());
-    markAllNotificationsRead().catch((error) => {
-      logger.error({ error }, "failed to mark all notifications read");
+    markAllNotificationsRead().catch((err) => {
+      logger.error({ err }, "failed to mark all notifications read");
     });
   }, [dispatch]);
 
@@ -179,7 +187,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                   <li key={n.id} className="flex items-start gap-1">
                     <button
                       type="button"
-                      onClick={() => onSelect(n.id, n.workflowSessionId)}
+                      onClick={() => onSelect(n.id, n.workflowSessionId, n.workflowId)}
                       className="flex min-w-0 flex-1 items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                     >
                       <span

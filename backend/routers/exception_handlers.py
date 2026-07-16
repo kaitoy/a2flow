@@ -33,6 +33,7 @@ from repositories.exceptions import (
     SkillNotReadyError,
     UnauthorizedError,
     UniqueViolationError,
+    WorkflowNotRunnableError,
 )
 
 logger = logging.getLogger(__name__)
@@ -235,6 +236,20 @@ async def skill_not_ready_exception_handler(
         message=str(exc),
         status_code=409,
         details={"skillId": exc.skill_id},
+    )
+
+
+async def workflow_not_runnable_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with WORKFLOW_NOT_RUNNABLE code when a workflow cannot run or publish."""
+    assert isinstance(exc, WorkflowNotRunnableError)
+    return _envelope_error(
+        request,
+        code="WORKFLOW_NOT_RUNNABLE",
+        message=str(exc),
+        status_code=409,
+        details={"workflowId": exc.workflow_id, "reason": exc.reason},
     )
 
 

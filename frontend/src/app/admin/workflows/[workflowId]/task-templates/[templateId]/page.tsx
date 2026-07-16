@@ -1,4 +1,4 @@
-/** @module EditWorkflowTaskPage — Admin form to edit or delete an existing WorkflowTask. */
+/** @module EditWorkflowTaskTemplatePage — Admin form to edit or delete a task template. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,17 +19,16 @@ import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { zWorkflowTaskCreate } from "@/generated/api/zod.gen";
+import { zWorkflowTaskTemplateCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
-  deleteWorkflowTask,
-  getWorkflowTask,
-  listWorkflowTasks,
+  deleteWorkflowTaskTemplate,
+  getWorkflowTaskTemplate,
+  listWorkflowTaskTemplates,
   type ToolBinding,
-  updateWorkflowTask,
-  type WorkflowTask,
+  updateWorkflowTaskTemplate,
+  type WorkflowTaskTemplate,
 } from "@/lib/api";
 import {
   bindingToValue,
@@ -41,13 +40,13 @@ import {
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
-// Generated schema carries the title/description/status/position constraints.
-// The parent session id comes from the URL, and the form edits dependencies and
-// tool bindings as plain string arrays (encoded values), so omit those and
-// re-add them in the form's shape. Position is coerced from the number input.
-const schema = zWorkflowTaskCreate
+// Generated schema carries the title/description constraints. The parent
+// workflow id comes from the URL, and the form edits dependencies and tool
+// bindings as plain string arrays (encoded values), so omit those and re-add
+// them in the form's shape. Position is coerced from the number input.
+const schema = zWorkflowTaskTemplateCreate
   .omit({
-    workflowSessionId: true,
+    workflowId: true,
     position: true,
     dependsOnIds: true,
     toolBindings: true,
@@ -60,25 +59,25 @@ const schema = zWorkflowTaskCreate
 
 type FormValues = z.infer<typeof schema>;
 
-/** Form page that loads, updates, and deletes a single WorkflowTask. */
-export default function EditWorkflowTaskPage() {
-  const { wsId, taskId } = useParams<{ wsId: string; taskId: string }>();
+/** Form page that loads, updates, and deletes a single task template. */
+export default function EditWorkflowTaskTemplatePage() {
+  const { workflowId, templateId } = useParams<{ workflowId: string; templateId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [candidates, setCandidates] = useState<WorkflowTask[]>([]);
+  const [candidates, setCandidates] = useState<WorkflowTaskTemplate[]>([]);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
-  const [taskBindings, setTaskBindings] = useState<ToolBinding[]>([]);
+  const [templateBindings, setTemplateBindings] = useState<ToolBinding[]>([]);
   const [toolCatalog, setToolCatalog] = useState<McpToolCatalog>({
     options: [],
     serverNames: new Map(),
   });
 
   const toolOptions = useMemo(
-    () => mergeBindingOptions(toolCatalog.options, taskBindings, toolCatalog.serverNames),
-    [toolCatalog, taskBindings]
+    () => mergeBindingOptions(toolCatalog.options, templateBindings, toolCatalog.serverNames),
+    [toolCatalog, templateBindings]
   );
 
   const save = useAsyncAction({ showDone: false });
@@ -95,7 +94,6 @@ export default function EditWorkflowTaskPage() {
     defaultValues: {
       title: "",
       description: "",
-      status: "pending" as const,
       position: 0,
       dependsOnIds: [] as string[],
       toolBindings: [] as string[],
@@ -103,37 +101,36 @@ export default function EditWorkflowTaskPage() {
   });
 
   useEffect(() => {
-    getWorkflowTask(taskId)
-      .then((task) => {
+    getWorkflowTaskTemplate(templateId)
+      .then((template) => {
         reset({
-          title: task.title,
-          description: task.description ?? "",
-          status: task.status ?? "pending",
-          position: task.position ?? 0,
-          dependsOnIds: task.dependsOnIds ?? [],
-          toolBindings: (task.toolBindings ?? []).map(bindingToValue),
+          title: template.title,
+          description: template.description ?? "",
+          position: template.position ?? 0,
+          dependsOnIds: template.dependsOnIds ?? [],
+          toolBindings: (template.toolBindings ?? []).map(bindingToValue),
         });
-        setTaskBindings(task.toolBindings ?? []);
+        setTemplateBindings(template.toolBindings ?? []);
         setAudit({
-          createdBy: task.createdBy,
-          updatedBy: task.updatedBy,
-          createdAt: task.createdAt,
-          updatedAt: task.updatedAt,
+          createdBy: template.createdBy,
+          updatedBy: template.updatedBy,
+          createdAt: template.createdAt,
+          updatedAt: template.updatedAt,
         });
       })
       .catch((e: unknown) => {
-        setApiError(e instanceof Error ? e.message : "Failed to load task");
+        setApiError(e instanceof Error ? e.message : "Failed to load template");
       })
       .finally(() => setLoading(false));
-  }, [taskId, reset]);
+  }, [templateId, reset]);
 
   useEffect(() => {
-    listWorkflowTasks(wsId, { limit: 100 })
+    listWorkflowTaskTemplates(workflowId, { limit: 100 })
       .then(setCandidates)
       .catch(() => {
         // Candidate list is non-essential; the picker simply renders empty.
       });
-  }, [wsId]);
+  }, [workflowId]);
 
   useEffect(() => {
     loadMcpToolOptions()
@@ -147,40 +144,35 @@ export default function EditWorkflowTaskPage() {
     setApiError(null);
     try {
       await save.run(async () => {
-        await updateWorkflowTask(taskId, {
+        await updateWorkflowTaskTemplate(templateId, {
           title: values.title,
           description: values.description || null,
-          status: values.status,
           position: values.position,
           dependsOnIds: values.dependsOnIds,
           toolBindings: values.toolBindings.map(valueToBinding),
         });
-        dispatch(showToast({ message: "Task updated" }));
-        router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
+        dispatch(showToast({ message: "Template updated" }));
+        router.push(`/admin/workflows/${workflowId}/task-templates`);
       });
     } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to update task");
+      setApiError(err instanceof Error ? err.message : "Failed to update template");
     }
-  }
-
-  function handleDelete() {
-    setConfirmOpen(true);
   }
 
   async function executeDelete() {
     setConfirmOpen(false);
     try {
-      await deleteWorkflowTask(taskId);
-      router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
+      await deleteWorkflowTaskTemplate(templateId);
+      router.push(`/admin/workflows/${workflowId}/task-templates`);
     } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to delete task");
+      setApiError(err instanceof Error ? err.message : "Failed to delete template");
     }
   }
 
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
-    { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
-    { label: "Workflow Tasks", href: `/admin/workflow-sessions/${wsId}/workflow-tasks` },
+    { label: "Workflows", href: "/admin/workflows" },
+    { label: "Task Templates", href: `/admin/workflows/${workflowId}/task-templates` },
     { label: "Edit" },
   ];
 
@@ -188,9 +180,9 @@ export default function EditWorkflowTaskPage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <AdminPageHeader title="Edit Workflow Task" icon={ListTree} />
+        <AdminPageHeader title="Edit Task Template" icon={ListTree} />
         <FormColumn>
-          <FormSkeleton fields={6} />
+          <FormSkeleton fields={5} />
         </FormColumn>
       </AdminPageContainer>
     );
@@ -199,7 +191,7 @@ export default function EditWorkflowTaskPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="Edit Workflow Task" icon={ListTree} />
+      <AdminPageHeader title="Edit Task Template" icon={ListTree} />
 
       <FormColumn>
         <form
@@ -207,7 +199,7 @@ export default function EditWorkflowTaskPage() {
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
           <div className="text-xs text-on-surface-variant">
-            Session ID: <span className="font-mono">{wsId}</span>
+            Workflow ID: <span className="font-mono">{workflowId}</span>
           </div>
 
           <FormField htmlFor="title" label="Title" required error={errors.title?.message}>
@@ -216,16 +208,6 @@ export default function EditWorkflowTaskPage() {
 
           <FormField htmlFor="description" label="Description">
             <Textarea id="description" rows={4} {...register("description")} />
-          </FormField>
-
-          <FormField htmlFor="status" label="Status" required error={errors.status?.message}>
-            <Select id="status" {...register("status")}>
-              <option value="pending">pending</option>
-              <option value="in_progress">in progress</option>
-              <option value="completed">completed</option>
-              <option value="failed">failed</option>
-              <option value="skipped">skipped</option>
-            </Select>
           </FormField>
 
           <FormField htmlFor="position" label="Position" required error={errors.position?.message}>
@@ -240,11 +222,11 @@ export default function EditWorkflowTaskPage() {
                 <CheckboxGroup
                   name="dependsOnIds"
                   options={candidates
-                    .filter((t) => t.id !== taskId)
+                    .filter((t) => t.id !== templateId)
                     .map((t) => ({ value: t.id, label: t.title }))}
                   value={field.value}
                   onChange={field.onChange}
-                  emptyMessage="No other tasks in this session to depend on."
+                  emptyMessage="No other templates in this workflow to depend on."
                 />
               )}
             />
@@ -281,11 +263,16 @@ export default function EditWorkflowTaskPage() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`)}
+              onClick={() => router.push(`/admin/workflows/${workflowId}/task-templates`)}
             >
               Cancel
             </Button>
-            <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => setConfirmOpen(true)}
+              className="ml-auto"
+            >
               Delete
             </Button>
           </div>
@@ -298,7 +285,7 @@ export default function EditWorkflowTaskPage() {
       </FormColumn>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Workflow Task"
+        title="Delete Task Template"
         description={`Delete "${getValues("title")}"?`}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}

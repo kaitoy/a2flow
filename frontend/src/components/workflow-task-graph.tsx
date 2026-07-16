@@ -3,8 +3,7 @@
 import { Background, BackgroundVariant, Controls, type NodeTypes, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useMemo } from "react";
-import type { WorkflowTask } from "@/lib/api";
-import { buildLayoutedWorkflowGraph } from "@/lib/workflow-graph";
+import { buildLayoutedWorkflowGraph, type GraphTask } from "@/lib/workflow-graph";
 import { useTheme } from "./ThemeProvider";
 import { WorkflowTaskNode } from "./workflow-task-node";
 
@@ -14,8 +13,8 @@ const NODE_TYPES: NodeTypes = { workflowTask: WorkflowTaskNode };
 
 /** Props for {@link WorkflowTaskGraph}. */
 export interface WorkflowTaskGraphProps {
-  /** Tasks of a single workflow session to visualize as a DAG. */
-  tasks: WorkflowTask[];
+  /** Tasks of a single workflow session (or a plan's templates) to visualize as a DAG. */
+  tasks: GraphTask[];
 }
 
 /**

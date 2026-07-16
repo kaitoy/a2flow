@@ -1,4 +1,4 @@
-/** @module NewWorkflowTaskPage — Admin form for creating a new WorkflowTask under a session. */
+/** @module NewWorkflowTaskTemplatePage — Admin form for adding a task template to a workflow. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,22 +16,25 @@ import { Button } from "@/components/ui/button";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { zWorkflowTaskCreate } from "@/generated/api/zod.gen";
+import { zWorkflowTaskTemplateCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { createWorkflowTask, listWorkflowTasks, type WorkflowTask } from "@/lib/api";
+import {
+  createWorkflowTaskTemplate,
+  listWorkflowTaskTemplates,
+  type WorkflowTaskTemplate,
+} from "@/lib/api";
 import { loadMcpToolOptions, type McpToolOption, valueToBinding } from "@/lib/mcp-tool-options";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
-// Generated schema carries the title/description/status/position constraints.
-// The parent session id comes from the URL, and the form edits dependencies and
-// tool bindings as plain string arrays (encoded values), so omit those and
-// re-add them in the form's shape. Position is coerced from the number input.
-const schema = zWorkflowTaskCreate
+// Generated schema carries the title/description constraints. The parent
+// workflow id comes from the URL, and the form edits dependencies and tool
+// bindings as plain string arrays (encoded values), so omit those and re-add
+// them in the form's shape. Position is coerced from the number input.
+const schema = zWorkflowTaskTemplateCreate
   .omit({
-    workflowSessionId: true,
+    workflowId: true,
     position: true,
     dependsOnIds: true,
     toolBindings: true,
@@ -44,13 +47,13 @@ const schema = zWorkflowTaskCreate
 
 type FormValues = z.infer<typeof schema>;
 
-/** Form page that creates a new WorkflowTask belonging to the session in the URL. */
-export default function NewWorkflowTaskPage() {
-  const { wsId } = useParams<{ wsId: string }>();
+/** Form page that adds a new task template to the workflow in the URL. */
+export default function NewWorkflowTaskTemplatePage() {
+  const { workflowId } = useParams<{ workflowId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [apiError, setApiError] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<WorkflowTask[]>([]);
+  const [candidates, setCandidates] = useState<WorkflowTaskTemplate[]>([]);
   const [toolOptions, setToolOptions] = useState<McpToolOption[]>([]);
 
   const save = useAsyncAction({ showDone: false });
@@ -65,7 +68,6 @@ export default function NewWorkflowTaskPage() {
     defaultValues: {
       title: "",
       description: "",
-      status: "pending" as const,
       position: 0,
       dependsOnIds: [] as string[],
       toolBindings: [] as string[],
@@ -73,12 +75,12 @@ export default function NewWorkflowTaskPage() {
   });
 
   useEffect(() => {
-    listWorkflowTasks(wsId, { limit: 100 })
+    listWorkflowTaskTemplates(workflowId, { limit: 100 })
       .then(setCandidates)
       .catch(() => {
         // Candidate list is non-essential; the picker simply renders empty.
       });
-  }, [wsId]);
+  }, [workflowId]);
 
   useEffect(() => {
     loadMcpToolOptions()
@@ -92,20 +94,19 @@ export default function NewWorkflowTaskPage() {
     setApiError(null);
     try {
       await save.run(async () => {
-        await createWorkflowTask({
-          workflowSessionId: wsId,
+        await createWorkflowTaskTemplate({
+          workflowId,
           title: values.title,
           description: values.description || null,
-          status: values.status,
           position: values.position,
           dependsOnIds: values.dependsOnIds,
           toolBindings: values.toolBindings.map(valueToBinding),
         });
-        dispatch(showToast({ message: "Task created" }));
-        router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`);
+        dispatch(showToast({ message: "Template created" }));
+        router.push(`/admin/workflows/${workflowId}/task-templates`);
       });
     } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to create task");
+      setApiError(err instanceof Error ? err.message : "Failed to create template");
     }
   }
 
@@ -114,12 +115,12 @@ export default function NewWorkflowTaskPage() {
       <Breadcrumbs
         items={[
           { label: "Admin", href: "/admin" },
-          { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
-          { label: "Workflow Tasks", href: `/admin/workflow-sessions/${wsId}/workflow-tasks` },
+          { label: "Workflows", href: "/admin/workflows" },
+          { label: "Task Templates", href: `/admin/workflows/${workflowId}/task-templates` },
           { label: "New" },
         ]}
       />
-      <AdminPageHeader title="New Workflow Task" icon={ListTree} />
+      <AdminPageHeader title="New Task Template" icon={ListTree} />
 
       <FormColumn>
         <form
@@ -139,16 +140,6 @@ export default function NewWorkflowTaskPage() {
             />
           </FormField>
 
-          <FormField htmlFor="status" label="Status" required error={errors.status?.message}>
-            <Select id="status" {...register("status")}>
-              <option value="pending">pending</option>
-              <option value="in_progress">in progress</option>
-              <option value="completed">completed</option>
-              <option value="failed">failed</option>
-              <option value="skipped">skipped</option>
-            </Select>
-          </FormField>
-
           <FormField htmlFor="position" label="Position" required error={errors.position?.message}>
             <Input id="position" type="number" min={0} step={1} {...register("position")} />
           </FormField>
@@ -163,7 +154,7 @@ export default function NewWorkflowTaskPage() {
                   options={candidates.map((t) => ({ value: t.id, label: t.title }))}
                   value={field.value}
                   onChange={field.onChange}
-                  emptyMessage="No other tasks in this session yet."
+                  emptyMessage="No other templates in this workflow yet."
                 />
               )}
             />
@@ -200,7 +191,7 @@ export default function NewWorkflowTaskPage() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`)}
+              onClick={() => router.push(`/admin/workflows/${workflowId}/task-templates`)}
             >
               Cancel
             </Button>

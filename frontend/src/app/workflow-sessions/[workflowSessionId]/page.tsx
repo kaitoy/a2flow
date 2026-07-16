@@ -23,6 +23,7 @@ import { A2UI_SOURCE_TOOL_CALL_ID_KEY } from "@/lib/agentActivity";
 import { formatUserName, getWorkflowSession, type User, type WorkflowSession } from "@/lib/api";
 import { APPROVAL_ACTIVITY_TYPE } from "@/lib/approvalTool";
 import logger from "@/lib/logger";
+import { EXECUTION_KICKOFF_PROMPT } from "@/lib/workflowKickoff";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
@@ -43,7 +44,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
     locallySentMessageIds,
     messageTasks,
     tasks,
-  } = useWorkflowSessionChat(ws.id, ws.sessionId, ws.workflowPrompt, ws.userId);
+  } = useWorkflowSessionChat(ws.id, ws.sessionId, EXECUTION_KICKOFF_PROMPT, ws.userId);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   // Focus state shared by the timeline and chat: a hovered entry wins over the
   // scroll-spy position so a deliberate hover always drives the highlight.

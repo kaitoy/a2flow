@@ -1,9 +1,10 @@
 from collections import OrderedDict
 from collections.abc import Callable, Sequence
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from ag_ui.core import Message, RunAgentInput, TextInputContent, UserMessage
+from ag_ui.core import Context, Message, RunAgentInput, TextInputContent, UserMessage
 from ag_ui_adk import CONTEXT_STATE_KEY, ADKAgent, AGUIToolset
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
@@ -18,18 +19,42 @@ from google.adk.tools.skill_toolset import SkillToolset
 from config import get_settings
 from infrastructure.approval_tools import get_approval, list_users, request_approval
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
+from infrastructure.planning_task_tools import (
+    create_planning_task,
+    delete_planning_task,
+    get_planning_task,
+    list_planning_tasks,
+    register_planning_tasks,
+    update_planning_task,
+)
 from infrastructure.workflow_task_tools import (
     create_workflow_task,
     delete_workflow_task,
     get_workflow_task,
     list_workflow_tasks,
-    register_workflow_tasks,
     update_workflow_task,
 )
 
 ToolUnion = Callable[..., Any] | BaseTool | BaseToolset
 
 LITELLM_PREFIX = "litellm:"
+
+
+class AgentKind(StrEnum):
+    """Role a skill-backed agent plays, selecting its instruction and toolset.
+
+    ``initial_planning`` is the unattended background run that turns a
+    "Generate workflow" prompt into the workflow's first task templates; it
+    carries no A2UI toolset because no client is connected to execute frontend
+    tools. ``planning`` is the interactive planning-session chat used to refine
+    the templates. ``execution`` drives a WorkflowSession created from a
+    published workflow.
+    """
+
+    initial_planning = "initial_planning"
+    planning = "planning"
+    execution = "execution"
+
 
 SESSION_TITLE_KEY = "session_title"
 
@@ -44,6 +69,26 @@ DEFAULT_USER_ID = "user"
 #: tells the LLM to call ``render_a2ui``, so the flag is stripped to keep that
 #: tool in place.
 A2UI_INJECT_PROP_KEY = "injectA2UITool"
+
+#: Descriptions of the two ``context`` entries ``@ag-ui/a2ui-middleware`` injects
+#: on every request (see its ``injectSchemaContext`` / ``injectToolGuidelines``):
+#: the component catalog, and the argument format for ``render_a2ui``. Neither is
+#: derivable from the tool's own JSON schema, which types ``components`` as a bare
+#: array of objects — without them the LLM guesses the component shape (``type``
+#: instead of ``component``) and invents component names, and every surface it
+#: renders dies in the client's ``MessageProcessor``.
+#:
+#: Both strings must stay byte-identical to the middleware's: it matches them by
+#: exact equality to replace its own entries, and so does :func:`keep_a2ui_context`.
+#: The guide's description embeds the tool name, which is ``render_a2ui`` because
+#: A2Flow passes ``injectA2UITool: true`` (a bool, not a custom name).
+A2UI_SCHEMA_CONTEXT_DESCRIPTION = (
+    "A2UI Component Schema — available components for generating UI surfaces. "
+    "Use these component names and properties when creating A2UI operations."
+)
+A2UI_GUIDE_CONTEXT_DESCRIPTION = (
+    "A2UI render tool usage guide — how to call render_a2ui with valid arguments."
+)
 
 _SESSION_TITLE_MAX_LENGTH = 60
 
@@ -140,22 +185,81 @@ def with_user_id(input_data: RunAgentInput, user_id: str) -> RunAgentInput:
     return input_data.model_copy(update={"forwarded_props": props})
 
 
-WORKFLOW_AGENT_INSTRUCTION = (
-    "You are a workflow execution agent. You have a Skill that defines how to do "
-    "the work, plus tools to manage a list of WorkflowTasks for this run.\n\n"
-    "Phase 1 - Plan: Follow the Skill's instructions to break the user's request "
-    "into concrete steps. Before registering the plan, call `list_mcp_tools` to "
-    "see the MCP tools available on the registered MCP servers. If a step needs "
-    "an external tool, bind it by adding a `tools` entry "
-    '(`[{"server_id": ..., "tool_name": ...}]`) to that task in '
-    "`register_workflow_tasks`. Only bind tools a task actually needs. Express "
-    "the steps as a DAG and register them in ONE call to "
-    "`register_workflow_tasks`, using each task's `key` and `depends_on` to "
-    "encode ordering. Every task starts as `pending`. Then present the registered "
-    "plan to the user and ask for approval. Do NOT start executing until the user "
-    "approves.\n\n"
-    "Phase 2 - Execute (only after the user approves): loop until no `pending` "
-    "tasks remain:\n"
+def keep_a2ui_context(context: Sequence[Context]) -> list[Context]:
+    """Return only the A2UI entries of a client-sent ``context``.
+
+    ``context`` feeds the agent's system instruction (via ``CONTEXT_STATE_KEY``),
+    so an endpoint that shares one ADK session across users cannot pass the
+    client's through wholesale. It cannot drop it wholesale either: the A2UI
+    component catalog and ``render_a2ui`` call format reach the LLM *only* as
+    context entries the frontend middleware injects, so discarding them leaves it
+    inventing an A2UI dialect the client cannot render.
+
+    This keeps the two entries A2Flow's own middleware config produces — matched
+    by :data:`A2UI_SCHEMA_CONTEXT_DESCRIPTION` / :data:`A2UI_GUIDE_CONTEXT_DESCRIPTION`
+    — and drops everything else, including any extra entry a client invents. Their
+    *values* are still client-supplied, so this is an allowlist of purpose, not a
+    proof of provenance; a caller who forges one only reaches an LLM they can
+    already send chat messages to.
+
+    Args:
+        context: The client-sent context entries.
+
+    Returns:
+        The subset carrying A2UI instructions, in their original order.
+    """
+    allowed = {A2UI_SCHEMA_CONTEXT_DESCRIPTION, A2UI_GUIDE_CONTEXT_DESCRIPTION}
+    return [entry for entry in context if entry.description in allowed]
+
+
+#: Shared description of the plan-registration call, used by both planning
+#: instructions so the DAG/tool-binding rules stay identical.
+_PLAN_REGISTRATION_RULES = (
+    "Before registering the plan, call `list_mcp_tools` to see the MCP tools "
+    "available on the registered MCP servers. If a step needs an external tool, "
+    'bind it by adding a `tools` entry (`[{"server_id": ..., "tool_name": ...}]`) '
+    "to that task in `register_planning_tasks`. Only bind tools a task actually "
+    "needs. Express the steps as a DAG and register them in ONE call to "
+    "`register_planning_tasks`, using each task's `key` and `depends_on` to "
+    "encode ordering."
+)
+
+INITIAL_PLANNING_AGENT_INSTRUCTION = (
+    "You are a workflow planning agent running unattended in the background: "
+    "nobody is watching this run and nobody can answer questions. A draft "
+    "Workflow was just created from the user's request (the first message). "
+    "Your only job is to turn that request into the workflow's task templates.\n\n"
+    "Follow the Skill's instructions to break the request into concrete steps. "
+    + _PLAN_REGISTRATION_RULES
+    + "\n\n"
+    "After registering, reply with a concise plain-text summary of the plan. "
+    "Do NOT execute any task, do NOT ask questions, and do NOT wait for input — "
+    "finish in this single run."
+)
+
+PLANNING_AGENT_INSTRUCTION = (
+    "You are a workflow planning agent. This chat is the planning session of a "
+    "Workflow: the task templates you manage here are the workflow's reusable "
+    "plan, executed later (and possibly many times) in separate workflow "
+    "sessions once the workflow is published.\n\n"
+    "Use `list_planning_tasks` to see the current plan. Refine it as the user "
+    "asks with `create_planning_task`, `update_planning_task`, and "
+    "`delete_planning_task`; when the plan is still empty (or the user asks to "
+    "rebuild it from scratch), follow the Skill's instructions to break the "
+    "request into concrete steps. " + _PLAN_REGISTRATION_RULES + "\n\n"
+    "After changing the plan, present the result and ask whether further "
+    "adjustments are needed. Never execute a task: this session only shapes the "
+    "plan. Publishing the workflow and running it happen outside this chat."
+)
+
+EXECUTION_AGENT_INSTRUCTION = (
+    "You are a workflow execution agent. You have a Skill that defines how to "
+    "do the work, plus tools to manage this run's WorkflowTasks. The plan was "
+    "prepared and approved in advance: this session already contains its tasks, "
+    "copied from the workflow's published templates (the workflow's description "
+    "is provided as context). Begin executing immediately — do NOT re-plan and "
+    "do NOT ask for approval of the plan.\n\n"
+    "Execute: loop until no `pending` tasks remain:\n"
     "1. Call `list_workflow_tasks` to see the current tasks and their statuses.\n"
     "2. Pick the next runnable task: a `pending` task whose `depends_on_ids` are "
     "all `completed`. If several are runnable, pick the lowest `position`.\n"
@@ -236,53 +340,91 @@ class A2UIInstructionProvider:
         return instruction
 
 
-def create_agent(skill_dir: Path | None = None) -> LlmAgent:
+def resolve_model() -> LiteLlm | str:
+    """Resolve ``config.Settings.llm_model`` into an ADK model selection.
+
+    - Gemini model name (e.g. "gemini-*"): returned as-is, so ADK uses
+      Google AI / Vertex AI directly.
+    - "litellm:<provider>/<model>" format: wrapped in :class:`LiteLlm` so any
+      LLM can be used via LiteLLM, e.g. ``litellm:openai/gpt-4o``.
+
+    Shared by :func:`create_agent` and the one-shot summarizer
+    (:mod:`infrastructure.summarizer`) so model selection is defined once.
     """
-    Create an agent based on ``config.Settings.llm_model``.
+    model_env = get_settings().llm_model
+    if model_env.startswith(LITELLM_PREFIX):
+        return LiteLlm(model=model_env[len(LITELLM_PREFIX) :])
+    return model_env
 
-    - Gemini model name (e.g. "gemini-*"): uses Google AI / Vertex AI directly
-    - "litellm:<provider>/<model>" format: uses any LLM via LiteLLM
-      e.g. litellm:openai/gpt-4o
-           litellm:anthropic/claude-3-5-sonnet-20241022
 
-    When `skill_dir` is provided, the directory is loaded as an ADK Skill and
-    exposed to the agent via SkillToolset alongside the A2UI tools, the
-    WorkflowTask management tools (register/create/list/get/update/delete), and
-    the MCP proxy tools (`list_mcp_tools` / `call_mcp_tool`), and the agent runs
-    under the plan-then-execute workflow instruction.
+#: Task-management toolset per skill-backed agent kind. Planning kinds edit the
+#: workflow's task templates through the planning tools; the execution kind
+#: manages the run's WorkflowTasks (with no bulk registration — the plan comes
+#: pre-copied from the templates) plus the approval and MCP invocation tools.
+_KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
+    AgentKind.initial_planning: [
+        register_planning_tasks,
+        list_planning_tasks,
+        list_mcp_tools,
+    ],
+    AgentKind.planning: [
+        register_planning_tasks,
+        create_planning_task,
+        list_planning_tasks,
+        get_planning_task,
+        update_planning_task,
+        delete_planning_task,
+        list_mcp_tools,
+    ],
+    AgentKind.execution: [
+        create_workflow_task,
+        list_workflow_tasks,
+        get_workflow_task,
+        update_workflow_task,
+        delete_workflow_task,
+        request_approval,
+        get_approval,
+        list_users,
+        list_mcp_tools,
+        call_mcp_tool,
+    ],
+}
+
+
+def create_agent(
+    skill_dir: Path | None = None, kind: AgentKind = AgentKind.execution
+) -> LlmAgent:
+    """Create an agent based on ``config.Settings.llm_model``.
+
+    When ``skill_dir`` is provided, the directory is loaded as an ADK Skill and
+    exposed to the agent via SkillToolset, and ``kind`` selects the instruction
+    and task toolset: planning kinds manage the workflow's task templates
+    (``*_planning_task`` tools), while the execution kind manages the run's
+    WorkflowTasks plus the approval and MCP invocation tools. The
+    ``initial_planning`` kind is built without the A2UI toolset (and without
+    the A2UI instruction rules) because its run happens in the background with
+    no client connected to execute frontend tools. Without ``skill_dir`` the
+    default skill-less chat agent is returned and ``kind`` is ignored.
     """
     settings = get_settings()
-    model_env = settings.llm_model
     role_description = settings.role_description
+    model = resolve_model()
 
-    model: LiteLlm | str
-    if model_env.startswith(LITELLM_PREFIX):
-        model_name = model_env[len(LITELLM_PREFIX) :]
-        model = LiteLlm(model=model_name)
-    else:
-        model = model_env
-
-    tools: list[ToolUnion] = [AGUIToolset()]
+    instruction: str | A2UIInstructionProvider
+    tools: list[ToolUnion]
     if skill_dir is not None:
         skill = load_skill_from_dir(skill_dir)
+        tools = [] if kind is AgentKind.initial_planning else [AGUIToolset()]
         tools.append(SkillToolset(skills=[skill]))
-        tools.extend(
-            [
-                register_workflow_tasks,
-                create_workflow_task,
-                list_workflow_tasks,
-                get_workflow_task,
-                update_workflow_task,
-                delete_workflow_task,
-                request_approval,
-                get_approval,
-                list_users,
-                list_mcp_tools,
-                call_mcp_tool,
-            ]
-        )
-        instruction = A2UIInstructionProvider(WORKFLOW_AGENT_INSTRUCTION)
+        tools.extend(_KIND_TOOLS[kind])
+        if kind is AgentKind.initial_planning:
+            instruction = INITIAL_PLANNING_AGENT_INSTRUCTION
+        elif kind is AgentKind.planning:
+            instruction = A2UIInstructionProvider(PLANNING_AGENT_INSTRUCTION)
+        else:
+            instruction = A2UIInstructionProvider(EXECUTION_AGENT_INSTRUCTION)
     else:
+        tools = [AGUIToolset()]
         instruction = A2UIInstructionProvider(role_description)
 
     return LlmAgent(
@@ -293,7 +435,11 @@ def create_agent(skill_dir: Path | None = None) -> LlmAgent:
     )
 
 
-def create_app(app_name: str, skill_dir: Path | None = None) -> App:
+def create_app(
+    app_name: str,
+    skill_dir: Path | None = None,
+    kind: AgentKind = AgentKind.execution,
+) -> App:
     """Wrap :func:`create_agent` in a resumable ADK :class:`~google.adk.apps.App`.
 
     Resumability is what makes ADK itself own the human-in-the-loop pause: the
@@ -312,24 +458,26 @@ def create_app(app_name: str, skill_dir: Path | None = None) -> App:
             agent's ``app_name``, so it must match the one the routers use.
         skill_dir: Directory ADK loads the skill from, or ``None`` for the
             default skill-less agent.
+        kind: Role of the skill-backed agent (see :class:`AgentKind`); ignored
+            when ``skill_dir`` is ``None``.
 
     Returns:
         An App wrapping the agent, with resumability enabled.
     """
     return App(
         name=app_name,
-        root_agent=create_agent(skill_dir=skill_dir),
+        root_agent=create_agent(skill_dir=skill_dir, kind=kind),
         resumability_config=ResumabilityConfig(is_resumable=True),
     )
 
 
 class AgentRegistry:
-    """Caches one ADKAgent per ``(agent_skill_id, commit_sha)`` revision of a skill.
+    """Caches one ADKAgent per ``(agent_skill_id, commit_sha, kind)`` combination.
 
     Agents are stateless across sessions — per-session context lives in the ADK
     session state — so a single ADKAgent serves every session running the same
-    revision of the same skill. ``(None, None)`` keys the default agent that has
-    no skill loaded.
+    revision of the same skill in the same role. ``(None, None, execution)``
+    keys the default agent that has no skill loaded.
 
     The revision has to be part of the key because ``create_agent`` reads the
     skill directory eagerly (``load_skill_from_dir`` slurps every file into
@@ -351,7 +499,7 @@ class AgentRegistry:
     def __init__(self, session_service: BaseSessionService, app_name: str) -> None:
         self._session_service = session_service
         self._app_name = app_name
-        self._cache: OrderedDict[tuple[str | None, str | None], ADKAgent] = (
+        self._cache: OrderedDict[tuple[str | None, str | None, AgentKind], ADKAgent] = (
             OrderedDict()
         )
 
@@ -360,6 +508,7 @@ class AgentRegistry:
         agent_skill_id: str | None,
         commit_sha: str | None,
         skill_dir: Path | None,
+        kind: AgentKind = AgentKind.execution,
     ) -> ADKAgent:
         """Return the ADKAgent for one revision of a skill, building it on first use.
 
@@ -370,17 +519,20 @@ class AgentRegistry:
                 the default agent.
             skill_dir: Directory ADK loads the skill from; only read when the
                 agent is not already cached.
+            kind: Role of the skill-backed agent (see :class:`AgentKind`);
+                part of the cache key because each kind bakes a different
+                instruction and toolset into its agent.
 
         Returns:
-            The cached (or freshly built) agent for that revision.
+            The cached (or freshly built) agent for that revision and kind.
         """
-        key = (agent_skill_id, commit_sha)
+        key = (agent_skill_id, commit_sha, kind)
         cached = self._cache.get(key)
         if cached is not None:
             self._cache.move_to_end(key)
             return cached
         agent = ADKAgent.from_app(
-            create_app(self._app_name, skill_dir=skill_dir),
+            create_app(self._app_name, skill_dir=skill_dir, kind=kind),
             user_id_extractor=extract_user_id,
             session_service=self._session_service,
             use_thread_id_as_session_id=True,

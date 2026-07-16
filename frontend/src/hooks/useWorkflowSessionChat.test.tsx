@@ -10,7 +10,9 @@ import { makeStore } from "@/test/test-utils";
 import { useWorkflowSessionChat } from "./useWorkflowSessionChat";
 
 vi.mock("@/lib/api", () => ({
+  createPlanningSessionAgent: vi.fn(),
   createWorkflowSessionAgent: vi.fn(),
+  getPlanningSessionMessages: vi.fn(),
   getWorkflowSessionMessages: vi.fn(),
   getWorkflowSessionMessageSenders: vi.fn(),
   getWorkflowSessionMessageTasks: vi.fn(),
@@ -34,7 +36,11 @@ function makeWrapper(store: ReturnType<typeof makeStore>) {
 beforeEach(() => {
   vi.mocked(api.createWorkflowSessionAgent).mockClear();
   vi.mocked(api.createWorkflowSessionAgent).mockReturnValue(mockAgent as never);
+  vi.mocked(api.createPlanningSessionAgent).mockClear();
+  vi.mocked(api.createPlanningSessionAgent).mockReturnValue(mockAgent as never);
   vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
+  vi.mocked(api.getPlanningSessionMessages).mockClear();
+  vi.mocked(api.getPlanningSessionMessages).mockResolvedValue([]);
   vi.mocked(api.getWorkflowSessionMessageSenders).mockResolvedValue(new Map());
   vi.mocked(api.getWorkflowSessionMessageTasks).mockResolvedValue(new Map());
   vi.mocked(api.listWorkflowTasks).mockResolvedValue([]);
@@ -77,6 +83,51 @@ describe("useWorkflowSessionChat", () => {
     await waitFor(() => expect(mockAgent.runAgent).toHaveBeenCalled());
     const messages = store.getState().chat.messages;
     expect(messages.some((m) => m.role === "user" && m.content === "Do the thing")).toBe(true);
+  });
+
+  it("does NOT auto-send when kickoffPrompt is null (planning sessions)", async () => {
+    vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
+    const store = makeStore();
+    renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", null, "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
+    await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalled());
+    expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
+    expect(store.getState().chat.messages).toHaveLength(0);
+  });
+
+  it("planning variant reads and sends through the planning-session endpoints", async () => {
+    vi.mocked(api.getWorkflowSessionMessages).mockClear();
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ps-1", "plan-sess", null, "owner-1", "planning"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(api.getPlanningSessionMessages).toHaveBeenCalledWith("ps-1"));
+    expect(api.getWorkflowSessionMessages).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.sendMessage("add a step");
+    });
+    expect(api.createPlanningSessionAgent).toHaveBeenCalledWith("ps-1", "plan-sess");
+    expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
+  });
+
+  it("planning variant skips task and sender-attribution fetches", async () => {
+    vi.mocked(api.listWorkflowTasks).mockClear();
+    vi.mocked(api.getWorkflowSessionMessageTasks).mockClear();
+    vi.mocked(api.getWorkflowSessionMessageSenders).mockClear();
+    vi.mocked(api.getUsersByIds).mockClear();
+    const store = makeStore();
+    renderHook(() => useWorkflowSessionChat("ps-1", "plan-sess", null, "owner-1", "planning"), {
+      wrapper: makeWrapper(store),
+    });
+    await waitFor(() => expect(api.getPlanningSessionMessages).toHaveBeenCalled());
+    expect(api.listWorkflowTasks).not.toHaveBeenCalled();
+    expect(api.getWorkflowSessionMessageTasks).not.toHaveBeenCalled();
+    expect(api.getWorkflowSessionMessageSenders).not.toHaveBeenCalled();
+    // The owner is still resolved, for the avatar fallback.
+    await waitFor(() => expect(api.getUsersByIds).toHaveBeenCalledWith(["owner-1"]));
   });
 
   it("does NOT auto-send when messages already exist", async () => {

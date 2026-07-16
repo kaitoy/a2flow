@@ -1,28 +1,22 @@
-/** @module WorkflowTasksPage — Admin list page for WorkflowTasks belonging to a single WorkflowSession. */
+/** @module WorkflowTasksPage — Read-only admin view of a WorkflowSession's tasks. */
 "use client";
 
 import { ListTree } from "lucide-react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Select } from "@/components/ui/select";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import {
-  deleteWorkflowTask,
   type FilterSpec,
   listMcpServers,
   listWorkflowTasks,
   type SortSpec,
-  updateWorkflowTask,
   type WorkflowTask,
   type WorkflowTaskStatus,
 } from "@/lib/api";
@@ -47,7 +41,7 @@ const VIEW_OPTIONS = [
   { value: "graph" as const, label: "Graph" },
 ];
 
-/** Small colored dot used next to the status select for quick visual scanning. */
+/** Small colored dot shown next to the status label for quick visual scanning. */
 function StatusDot({ status }: { status: WorkflowTaskStatus }) {
   return (
     <span className={`inline-block size-2 rounded-full ${STATUS_DOT_CLASS[status]}`} aria-hidden />
@@ -64,11 +58,8 @@ function Chip({ label }: { label: string }) {
 }
 
 function buildColumns(
-  wsId: string,
   titleById: Map<string, string>,
-  serverNameById: Map<string, string>,
-  onStatusChange: (taskId: string, status: WorkflowTaskStatus) => void,
-  onDelete: (id: string, title: string) => void
+  serverNameById: Map<string, string>
 ): ColumnDef<WorkflowTask>[] {
   return [
     {
@@ -81,14 +72,7 @@ function buildColumns(
       header: "Title",
       sortField: "title",
       filterField: "title",
-      cell: (t) => (
-        <Link
-          href={`/admin/workflow-sessions/${wsId}/workflow-tasks/${t.id}`}
-          className="font-medium text-accent transition-colors hover:underline"
-        >
-          {t.title}
-        </Link>
-      ),
+      cell: (t) => <span className="font-medium text-on-surface">{t.title}</span>,
     },
     {
       header: "Description",
@@ -143,36 +127,25 @@ function buildColumns(
         label: formatStatusLabel(s),
         value: s,
       })),
-      cell: (t) => (
-        <div className="flex items-center gap-2">
-          <StatusDot status={t.status ?? "pending"} />
-          <Select
-            value={t.status ?? "pending"}
-            onChange={(e) => onStatusChange(t.id, e.target.value as WorkflowTaskStatus)}
-            aria-label={`Status for ${t.title}`}
-          >
-            {WORKFLOW_TASK_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {formatStatusLabel(s)}
-              </option>
-            ))}
-          </Select>
-        </div>
-      ),
-    },
-    {
-      header: "Actions",
-      noTruncate: true,
-      cell: (t) => (
-        <div className="flex gap-2">
-          <DeleteIconButton onClick={() => onDelete(t.id, t.title)} />
-        </div>
-      ),
+      cell: (t) => {
+        const status = t.status ?? "pending";
+        return (
+          <div className="flex items-center gap-2">
+            <StatusDot status={status} />
+            <span className="capitalize">{formatStatusLabel(status)}</span>
+          </div>
+        );
+      },
     },
   ];
 }
 
-/** Admin list of WorkflowTasks for the WorkflowSession in the URL parameters. */
+/**
+ * Read-only admin list of a WorkflowSession's tasks. The tasks are copies of
+ * the workflow's published templates, advanced by the execution agent (and
+ * the approval flow) — the plan itself is edited on the workflow's task
+ * templates, not here, so a run's history stays faithful to what actually ran.
+ */
 export default function WorkflowTasksPage() {
   const { wsId } = useParams<{ wsId: string }>();
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
@@ -182,7 +155,6 @@ export default function WorkflowTasksPage() {
   const [sort, setSort] = useState<SortSpec | null>(null);
   const [filters, setFilters] = useState<FilterSpec[]>([]);
   const [view, setView] = useState<View>("table");
-  const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
 
   const load = useCallback(async () => {
@@ -227,32 +199,6 @@ export default function WorkflowTasksPage() {
       });
   }, []);
 
-  async function handleStatusChange(taskId: string, status: WorkflowTaskStatus) {
-    setError(null);
-    try {
-      const updated = await updateWorkflowTask(taskId, { status });
-      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update status");
-    }
-  }
-
-  function handleDelete(id: string, title: string) {
-    setConfirmTarget({ id, title });
-  }
-
-  async function executeDelete() {
-    if (!confirmTarget) return;
-    try {
-      await deleteWorkflowTask(confirmTarget.id);
-      setConfirmTarget(null);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete task");
-      setConfirmTarget(null);
-    }
-  }
-
   return (
     <AdminPageContainer>
       <Breadcrumbs
@@ -265,8 +211,6 @@ export default function WorkflowTasksPage() {
       <AdminPageHeader
         title="Workflow Tasks"
         icon={ListTree}
-        addHref={`/admin/workflow-sessions/${wsId}/workflow-tasks/new`}
-        addLabel="+ Add task"
         onRefresh={load}
         refreshing={loading}
       />
@@ -286,13 +230,7 @@ export default function WorkflowTasksPage() {
       ) : (
         <>
           <DataTable
-            columns={buildColumns(
-              wsId,
-              new Map(tasks.map((t) => [t.id, t.title])),
-              serverNameById,
-              handleStatusChange,
-              handleDelete
-            )}
+            columns={buildColumns(new Map(tasks.map((t) => [t.id, t.title])), serverNameById)}
             rows={tasks}
             loading={loading}
             emptyMessage="No tasks for this session yet."
@@ -312,13 +250,6 @@ export default function WorkflowTasksPage() {
           />
         </>
       )}
-      <ConfirmDialog
-        open={confirmTarget !== null}
-        title="Delete Workflow Task"
-        description={confirmTarget ? `Delete "${confirmTarget.title}"?` : ""}
-        onConfirm={executeDelete}
-        onCancel={() => setConfirmTarget(null)}
-      />
     </AdminPageContainer>
   );
 }

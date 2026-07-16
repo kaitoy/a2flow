@@ -24,7 +24,6 @@ from infrastructure.workflow_task_tools import (
     delete_workflow_task,
     get_workflow_task,
     list_workflow_tasks,
-    register_workflow_tasks,
     update_workflow_task,
 )
 from models.notification import Notification, NotificationType
@@ -61,12 +60,10 @@ async def _seed_session(
         ws = WorkflowSession(
             session_id=session_id,
             workflow_name="wf",
-            workflow_prompt="do it",
             agent_skill_id="skill-1",
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
-            skill_dir="/tmp/skill",
             user_id=user_id,
             created_by=user_id,
             updated_by=user_id,
@@ -80,73 +77,6 @@ async def _seed_session(
 def _ctx(session_id: str = "sess-abc", user_id: str = "tester") -> Any:
     """Build a fake ToolContext exposing ``session.id`` and ``user_id``."""
     return SimpleNamespace(session=SimpleNamespace(id=session_id), user_id=user_id)
-
-
-async def test_register_workflow_tasks_creates_dag(engine: AsyncEngine) -> None:
-    await _seed_session(engine)
-    result = await register_workflow_tasks(
-        [
-            {"key": "t0", "title": "First"},
-            {"key": "t1", "title": "Second", "depends_on": ["t0"]},
-            {"key": "t2", "title": "Third", "depends_on": ["t0", "t1"]},
-        ],
-        _ctx(),
-    )
-    assert "error" not in result
-    created = result["created"]
-    assert [c["key"] for c in created] == ["t0", "t1", "t2"]
-    ids = {c["key"]: c["id"] for c in created}
-
-    listed = await list_workflow_tasks(_ctx())
-    tasks = {t["title"]: t for t in listed["tasks"]}
-    assert tasks["Second"]["depends_on_ids"] == [ids["t0"]]
-    assert sorted(tasks["Third"]["depends_on_ids"]) == sorted([ids["t0"], ids["t1"]])
-    # Positions follow dependency order when not declared.
-    assert [t["title"] for t in listed["tasks"]] == ["First", "Second", "Third"]
-
-
-async def test_register_rejects_unknown_dependency(engine: AsyncEngine) -> None:
-    await _seed_session(engine)
-    result = await register_workflow_tasks(
-        [{"key": "a", "title": "A", "depends_on": ["missing"]}], _ctx()
-    )
-    assert "error" in result
-    listed = await list_workflow_tasks(_ctx())
-    assert listed["tasks"] == []
-
-
-async def test_register_rejects_duplicate_key(engine: AsyncEngine) -> None:
-    await _seed_session(engine)
-    result = await register_workflow_tasks(
-        [{"key": "a", "title": "A"}, {"key": "a", "title": "B"}], _ctx()
-    )
-    assert "error" in result
-
-
-async def test_register_rejects_cycle(engine: AsyncEngine) -> None:
-    await _seed_session(engine)
-    result = await register_workflow_tasks(
-        [
-            {"key": "a", "title": "A", "depends_on": ["b"]},
-            {"key": "b", "title": "B", "depends_on": ["a"]},
-        ],
-        _ctx(),
-    )
-    assert "error" in result
-    assert "cycle" in result["error"]
-
-
-async def test_register_rejects_missing_title(engine: AsyncEngine) -> None:
-    await _seed_session(engine)
-    result = await register_workflow_tasks([{"key": "a"}], _ctx())
-    assert "error" in result
-
-
-async def test_register_without_session_errors(engine: AsyncEngine) -> None:
-    result = await register_workflow_tasks(
-        [{"key": "a", "title": "A"}], _ctx("unknown-session")
-    )
-    assert "error" in result
 
 
 async def test_create_workflow_task(engine: AsyncEngine) -> None:
@@ -266,21 +196,6 @@ async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notificatio
         return await repo.list(user_id=user_id, limit=100, offset=0)
 
 
-async def test_register_creates_approval_notification(engine: AsyncEngine) -> None:
-    await _seed_session(engine, user_id="owner")
-    await register_workflow_tasks(
-        [{"key": "t0", "title": "First"}, {"key": "t1", "title": "Second"}],
-        _ctx(),
-    )
-    notifs = await _notifications_for(engine, "owner")
-    assert len(notifs) == 1
-    assert notifs[0].type is NotificationType.approval_request
-    assert notifs[0].read is False
-    # The notification is addressed to the session owner, not the tool's user_id.
-    assert notifs[0].user_id == "owner"
-    assert "2 tasks" in (notifs[0].body or "")
-
-
 async def test_session_completed_notification_emitted_once(
     engine: AsyncEngine,
 ) -> None:
@@ -335,51 +250,6 @@ async def _seed_mcp_server(eng: AsyncEngine, *, name: str = "srv") -> str:
         await db.commit()
         await db.refresh(server)
         return server.id
-
-
-async def test_register_with_tools_binds_them(engine: AsyncEngine) -> None:
-    await _seed_session(engine)
-    server_id = await _seed_mcp_server(engine)
-    result = await register_workflow_tasks(
-        [
-            {
-                "key": "t0",
-                "title": "Search",
-                "tools": [{"server_id": server_id, "tool_name": "search"}],
-            }
-        ],
-        _ctx(),
-    )
-    assert "error" not in result
-    listed = await list_workflow_tasks(_ctx())
-    assert listed["tasks"][0]["tool_bindings"] == [
-        {"server_id": server_id, "tool_name": "search"}
-    ]
-
-
-async def test_register_with_malformed_tools_errors(engine: AsyncEngine) -> None:
-    await _seed_session(engine)
-    result = await register_workflow_tasks(
-        [{"key": "t0", "title": "Bad", "tools": [{"server_id": "only"}]}], _ctx()
-    )
-    assert "error" in result
-    listed = await list_workflow_tasks(_ctx())
-    assert listed["tasks"] == []
-
-
-async def test_register_with_unknown_server_errors(engine: AsyncEngine) -> None:
-    await _seed_session(engine)
-    result = await register_workflow_tasks(
-        [
-            {
-                "key": "t0",
-                "title": "Bad",
-                "tools": [{"server_id": "ghost", "tool_name": "search"}],
-            }
-        ],
-        _ctx(),
-    )
-    assert "error" in result
 
 
 async def test_create_workflow_task_with_tool_bindings(engine: AsyncEngine) -> None:

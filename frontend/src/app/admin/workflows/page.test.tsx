@@ -77,6 +77,36 @@ describe("WorkflowsPage", () => {
     expect(deleteSpy).toHaveBeenCalled();
   });
 
+  it("shows the workflow status", async () => {
+    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-workflow"));
+    expect(screen.getByText("published")).toBeInTheDocument();
+  });
+
+  it("disables Run for a workflow that is not published", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows", () =>
+        envelope([
+          {
+            id: "wf-1",
+            name: "my-workflow",
+            description: null,
+            agentSkillId: "skill-1",
+            status: "draft",
+            generationError: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-workflow"));
+    expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
+  });
+
   it("hides the Run button from a user without the requester role", async () => {
     render(<WorkflowsPage />, { preloadedState: authState(["developer"]) });
     await waitFor(() => screen.getByText("my-workflow"));

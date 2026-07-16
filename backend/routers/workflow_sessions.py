@@ -5,7 +5,7 @@ from contextlib import AsyncExitStack
 from typing import Any
 
 import anyio
-from ag_ui.core import RunAgentInput, SystemMessage
+from ag_ui.core import Context, RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
@@ -19,7 +19,7 @@ from dependencies import (
     SortDep,
     WorkflowSessionServiceDep,
 )
-from infrastructure.agent import with_user_id
+from infrastructure.agent import keep_a2ui_context, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
 from models.response import ApiResponse
 from models.workflow_session import WorkflowSession
@@ -151,7 +151,20 @@ async def workflow_session_agent(
     current_user_id = caller.id
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
-    input_data = input_data.model_copy(update={"messages": filtered})
+    # The context feeds the system instruction (via CONTEXT_STATE_KEY), so the
+    # client-sent one is stripped to the A2UI entries the frontend middleware
+    # injects — the LLM has no other source for the component catalog or the
+    # render_a2ui argument format — and the workflow description is prepended
+    # from the server-trusted record rather than taken from the client.
+    context = keep_a2ui_context(input_data.context or [])
+    if ws.workflow_description:
+        context.insert(
+            0,
+            Context(description="Workflow description", value=ws.workflow_description),
+        )
+    input_data = input_data.model_copy(
+        update={"messages": filtered, "context": context}
+    )
     # Key the ADK run by the WorkflowSession's owner rather than the current user
     # so every viewer (e.g. a designated approver) shares the same ADK session.
     input_data = with_user_id(input_data, ws.user_id)

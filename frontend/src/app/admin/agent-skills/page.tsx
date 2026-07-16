@@ -1,8 +1,9 @@
 /** @module AgentSkillsPage — Admin list page for managing agent skills. */
 "use client";
 
-import { RefreshCw, Wand2 } from "lucide-react";
+import { RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
@@ -104,6 +105,7 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
 ];
 
 export default function AgentSkillsPage() {
+  const router = useRouter();
   const canEdit = useHasRole(Role.DEVELOPER);
   const {
     rows,
@@ -178,6 +180,14 @@ export default function AgentSkillsPage() {
             noTruncate: true,
             cell: (skill: AgentSkill) => (
               <div className="flex gap-2">
+                <ActionIconButton
+                  icon={Sparkles}
+                  label="Generate workflow"
+                  onClick={() => router.push(`/admin/agent-skills/${skill.id}/generate-workflow`)}
+                  // A skill can only back a planning run once its clone has
+                  // published a revision.
+                  disabled={skill.syncStatus !== "ready"}
+                />
                 <ActionIconButton
                   icon={RefreshCw}
                   label="Pull"

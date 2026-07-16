@@ -275,7 +275,8 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `RequestValidationError` | 422 | `VALIDATION_ERROR` | FastAPI body/query validation; `details.errors` from Pydantic |
 | `McpConnectionError` | 502 | `MCP_UNREACHABLE` | Remote MCP server unreachable; `details` carries `server` only — the raw failure reason is logged server-side, never returned to the client |
 | `SkillCloneError` | 502 | `SKILL_CLONE_FAILED` | Skill repository could not be cloned; `details` carries `skillId` only — the raw failure reason is logged server-side, never returned to the client. Only reaches HTTP from a synchronous caller; the background clone job (`services/agent_skill_sync.py`) catches it and records the reason on the skill row instead |
-| `SkillNotReadyError` | 409 | `SKILL_NOT_READY` | The skill has no published revision to run against (its clone is still in flight, or it failed); `details` carries `skillId`. Raised by `POST /workflows/{id}/execute` and by `WorkflowSessionService.resolve_agent` |
+| `SkillNotReadyError` | 409 | `SKILL_NOT_READY` | The skill has no published revision to run against (its clone is still in flight, or it failed); `details` carries `skillId`. Raised by `POST /agent-skills/{id}/workflows`, `POST /workflows/{id}/execute`, and the `resolve_agent` methods |
+| `WorkflowNotRunnableError` | 409 | `WORKFLOW_NOT_RUNNABLE` | The workflow cannot be executed or published in its current state (not `published` on execute; still `generating` or without task templates on publish); `details` carries `workflowId` and `reason` |
 | `RegistryUnavailableError` | 502 | `REGISTRY_UNREACHABLE` | Official MCP registry unreachable; no `details` — the raw failure reason is logged server-side only |
 | `HTTPException` (any other raise) | passthrough | `HTTP_<status>` | Fallback for callers still raising `HTTPException` |
 | Uncaught `Exception` | 500 | `INTERNAL_ERROR` | Logged with `request_id` |

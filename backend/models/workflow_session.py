@@ -23,7 +23,6 @@ class WorkflowSessionCreate(SQLModel):
 
     session_id: str
     workflow_name: str
-    workflow_prompt: str
     workflow_description: str | None = None
     agent_skill_id: str
     agent_skill_name: str

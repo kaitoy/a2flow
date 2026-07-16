@@ -154,6 +154,43 @@ describe("chatSlice", () => {
       expect(ops[0].createSurface?.catalogId).toBe(A2UI_CATALOG_ID);
     });
 
+    it("overrides a catalogId the agent put in the render_a2ui args", () => {
+      // `render_a2ui` has no catalogId parameter and its usage guide tells the
+      // agent not to pass one, but the guide's own examples show this id, so the
+      // LLM copies it in. A2UIMiddleware's live path discards it in favour of the
+      // configured defaultCatalogId; honouring it here instead would rebuild the
+      // surface against a catalog this app never registered, and MessageProcessor
+      // would throw "Catalog not found" on every poll and reload.
+      const messages: Message[] = [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-1",
+              type: "function",
+              function: {
+                name: RENDER_A2UI_TOOL_NAME,
+                arguments: JSON.stringify({
+                  surfaceId: "surface-1",
+                  catalogId: "https://a2ui.org/specification/v0_9/basic_catalog.json",
+                  components: [{ id: "btn1" }],
+                }),
+              },
+            },
+          ],
+        },
+      ];
+      const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
+      const activityMsg = state.messages[1];
+      if (activityMsg.role !== "activity") throw new Error("expected activity message");
+      const ops = activityMsg.content[A2UI_OPERATIONS_KEY] as {
+        createSurface?: { catalogId?: string };
+      }[];
+      expect(ops[0].createSurface?.catalogId).toBe(A2UI_CATALOG_ID);
+    });
+
     it("synthesizes a done MCP tool activity from a call_mcp_tool tool call", () => {
       const messages: Message[] = [
         {

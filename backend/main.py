@@ -38,6 +38,7 @@ from repositories.exceptions import (
     SkillNotReadyError,
     UnauthorizedError,
     UniqueViolationError,
+    WorkflowNotRunnableError,
 )
 from routers import api_router
 from routers.exception_handlers import (
@@ -61,6 +62,7 @@ from routers.exception_handlers import (
     unhandled_exception_handler,
     unique_violation_exception_handler,
     validation_exception_handler,
+    workflow_not_runnable_exception_handler,
 )
 
 # Populates os.environ from backend/.env so vendor SDKs (litellm, google-genai)
@@ -134,6 +136,9 @@ app.add_exception_handler(DependencyCycleError, dependency_cycle_exception_handl
 app.add_exception_handler(McpConnectionError, mcp_connection_exception_handler)
 app.add_exception_handler(SkillCloneError, skill_clone_exception_handler)
 app.add_exception_handler(SkillNotReadyError, skill_not_ready_exception_handler)
+app.add_exception_handler(
+    WorkflowNotRunnableError, workflow_not_runnable_exception_handler
+)
 app.add_exception_handler(
     RegistryUnavailableError, registry_unavailable_exception_handler
 )

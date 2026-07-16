@@ -25,7 +25,9 @@ from infrastructure.vault_client import get_vault_client
 from models.agent_skill import SkillSyncStatus
 from repositories import (
     AgentSkillRepository,
+    PlanningSessionRepository,
     SqlAgentSkillRepository,
+    SqlPlanningSessionRepository,
     SqlSecretRepository,
     SqlWorkflowSessionRepository,
     WorkflowSessionRepository,
@@ -54,6 +56,7 @@ class AgentSkillSyncService:
         self,
         skills: AgentSkillRepository,
         sessions: WorkflowSessionRepository,
+        planning_sessions: PlanningSessionRepository,
         resolver: SecretResolver,
         skill_manager: SkillManager,
     ) -> None:
@@ -63,12 +66,15 @@ class AgentSkillSyncService:
             skills: Repository providing AgentSkill persistence.
             sessions: Repository used to find which revisions workflow sessions
                 still pin, so a prune does not delete code a session needs.
+            planning_sessions: Repository used to find which revisions planning
+                sessions still pin, for the same reason.
             resolver: Resolver turning a skill's ``repo_auth_secret`` into the
                 clone credential.
             skill_manager: Store that publishes and prunes revision directories.
         """
         self._skills = skills
         self._sessions = sessions
+        self._planning_sessions = planning_sessions
         self._resolver = resolver
         self._skill_manager = skill_manager
 
@@ -115,6 +121,7 @@ class AgentSkillSyncService:
                     user_id=user_id,
                 )
                 pinned = await self._sessions.commit_shas_for_skill(skill_id)
+                pinned |= await self._planning_sessions.commit_shas_for_skill(skill_id)
                 await self._skill_manager.prune(skill_id, pinned | {commit_sha})
         except LockNotAcquiredError:
             logger.info(
@@ -154,6 +161,7 @@ async def sync_agent_skill(skill_id: str, *, user_id: str) -> None:
             service = AgentSkillSyncService(
                 skills=SqlAgentSkillRepository(db),
                 sessions=SqlWorkflowSessionRepository(db),
+                planning_sessions=SqlPlanningSessionRepository(db),
                 resolver=SecretResolver(
                     secrets, get_secret_cipher(), get_vault_client()
                 ),

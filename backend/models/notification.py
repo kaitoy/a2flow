@@ -30,6 +30,7 @@ class NotificationType(StrEnum):
 
     approval_request = "approval_request"
     session_completed = "session_completed"
+    workflow_draft_ready = "workflow_draft_ready"
 
 
 class NotificationUpdate(SQLModel):
@@ -47,8 +48,11 @@ class NotificationCreate(NotificationUpdate):
     """Creation payload for a Notification.
 
     Adds the required recipient ``user_id``, the event ``type``, the ``title``,
-    and the optional ``body`` / ``workflow_session_id`` link, and defaults
-    ``read`` to ``False`` so new notifications start unread.
+    and the optional ``body`` / ``workflow_session_id`` / ``workflow_id``
+    links, and defaults ``read`` to ``False`` so new notifications start
+    unread. ``workflow_session_id`` deep-links run-scoped notifications
+    (approvals, completion) while ``workflow_id`` deep-links workflow-scoped
+    ones (``workflow_draft_ready``).
     """
 
     user_id: str
@@ -56,6 +60,7 @@ class NotificationCreate(NotificationUpdate):
     title: ShortText
     body: BodyText | None = None
     workflow_session_id: str | None = None
+    workflow_id: str | None = None
     read: bool = False
 
 
@@ -63,14 +68,16 @@ class Notification(NotificationCreate, BaseEntity, table=True):
     """Database-persisted Notification addressed to a single recipient user.
 
     ``user_id`` references the recipient (``ON DELETE CASCADE``); the optional
-    ``workflow_session_id`` references the workflow session the notification is
-    about (``ON DELETE CASCADE``), so deleting either removes the notification.
+    ``workflow_session_id`` / ``workflow_id`` reference the workflow session or
+    workflow the notification is about (``ON DELETE CASCADE``), so deleting any
+    of them removes the notification.
     """
 
     __tablename__ = "notifications"
     __table_args__ = (
         Index("ix_notifications_user_id", "user_id"),
         Index("ix_notifications_workflow_session_id", "workflow_session_id"),
+        Index("ix_notifications_workflow_id", "workflow_id"),
         ForeignKeyConstraint(
             ["user_id"],
             ["users.id"],
@@ -82,5 +89,11 @@ class Notification(NotificationCreate, BaseEntity, table=True):
             ["workflow_sessions.id"],
             ondelete="CASCADE",
             name="fk_notifications_workflow_session_id",
+        ),
+        ForeignKeyConstraint(
+            ["workflow_id"],
+            ["workflows.id"],
+            ondelete="CASCADE",
+            name="fk_notifications_workflow_id",
         ),
     )

@@ -18,6 +18,7 @@ from repositories import (
     MCPServerRepository,
     MessageMetaRepository,
     NotificationRepository,
+    PlanningSessionRepository,
     SecretRepository,
     SqlAgentSkillRepository,
     SqlApprovalRepository,
@@ -25,17 +26,20 @@ from repositories import (
     SqlMCPServerRepository,
     SqlMessageMetaRepository,
     SqlNotificationRepository,
+    SqlPlanningSessionRepository,
     SqlSecretRepository,
     SqlUserAvatarRepository,
     SqlUserRepository,
     SqlWorkflowRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
+    SqlWorkflowTaskTemplateRepository,
     UserAvatarRepository,
     UserRepository,
     WorkflowRepository,
     WorkflowSessionRepository,
     WorkflowTaskRepository,
+    WorkflowTaskTemplateRepository,
 )
 
 DBSessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -154,6 +158,35 @@ def get_workflow_task_repository(
 
 WorkflowTaskRepositoryDep = Annotated[
     WorkflowTaskRepository, Depends(get_workflow_task_repository)
+]
+
+
+def get_workflow_task_template_repository(
+    db: DBSessionDep,
+    workflows: WorkflowRepositoryDep,
+    mcp_repo: MCPServerRepositoryDep,
+) -> WorkflowTaskTemplateRepository:
+    """Create a WorkflowTaskTemplateRepository backed by the current database session.
+
+    The injected WorkflowRepository is used to validate that the parent
+    workflow exists when creating templates; the MCPServerRepository validates
+    the servers referenced by tool bindings.
+    """
+    return SqlWorkflowTaskTemplateRepository(db, workflows, mcp_repo)
+
+
+WorkflowTaskTemplateRepositoryDep = Annotated[
+    WorkflowTaskTemplateRepository, Depends(get_workflow_task_template_repository)
+]
+
+
+def get_planning_session_repository(db: DBSessionDep) -> PlanningSessionRepository:
+    """Create a PlanningSessionRepository backed by the current database session."""
+    return SqlPlanningSessionRepository(db)
+
+
+PlanningSessionRepositoryDep = Annotated[
+    PlanningSessionRepository, Depends(get_planning_session_repository)
 ]
 
 

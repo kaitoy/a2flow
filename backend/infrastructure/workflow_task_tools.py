@@ -1,8 +1,11 @@
 """ADK agent tools for managing the current workflow session's WorkflowTasks.
 
-These callables are attached to the skill-driven workflow agent (see
-:func:`infrastructure.agent.create_agent`) so it can register a plan as a
-WorkflowTask DAG and then iterate the tasks, updating their status as it works.
+These callables are attached to the skill-driven execution agent (see
+:func:`infrastructure.agent.create_agent`) so it can iterate the run's tasks —
+copied from the workflow's published templates at execute time — updating
+their status as it works, and adjust the plan mid-run when needed. Bulk plan
+registration lives in :mod:`infrastructure.planning_task_tools`, which the
+planning agents use to write the workflow's templates.
 
 Two facts shape the implementation:
 
@@ -319,127 +322,6 @@ def _topo_sort(keys: list[str], by_key: dict[str, dict[str, Any]]) -> list[str] 
             if indegree[child] == 0:
                 queue.append(child)
     return order if len(order) == len(keys) else None
-
-
-async def register_workflow_tasks(
-    tasks: list[dict[str, Any]], tool_context: ToolContext
-) -> dict[str, Any]:
-    """Register a plan of WorkflowTasks (a DAG) for the current session at once.
-
-    Call this once, right after building the plan from the skill's steps. Each
-    entry describes one task and may declare dependencies on other tasks *in the
-    same batch* by their ``key``::
-
-        {
-          "key": "t1",                 # required, unique within this batch
-          "title": "Gather sources",   # required
-          "description": "...",        # optional
-          "position": 0,               # optional layout/order hint
-          "depends_on": ["t0"],        # optional, other entries' "key" values
-          "tools": [                   # optional MCP tools this task will use
-            {"server_id": "<registered MCP server id>", "tool_name": "<tool>"}
-          ]
-        }
-
-    Tasks are created in dependency order; ``depends_on`` keys are resolved to the
-    real task ids before edges are written, and every task starts as ``pending``.
-    When ``position`` is omitted a task is positioned by its dependency order.
-    ``tools`` binds MCP tools to the task: while the task is in progress those
-    tools (and only those) can be invoked via ``call_mcp_tool``. Discover the
-    available servers and tools with ``list_mcp_tools`` first, and only bind
-    tools the task actually needs.
-
-    Args:
-        tasks: The plan entries described above.
-        tool_context: Injected by ADK; identifies the current session. Not shown
-            to the model.
-
-    Returns:
-        On success ``{"created": [{"key", "id", "title"}, ...]}``. On failure
-        ``{"error": <message>}`` (unknown dependency key, duplicate key, cycle,
-        missing title, or unresolved session); no tasks are created when the
-        failure is detected before writing. If an unexpected repository error
-        occurs mid-batch, the partial ``created`` list is also returned.
-    """
-    if not tasks:
-        return {"error": "tasks must be a non-empty list"}
-
-    by_key: dict[str, dict[str, Any]] = {}
-    keys: list[str] = []
-    for index, entry in enumerate(tasks):
-        if not isinstance(entry, dict):
-            return {"error": f"task at index {index} must be an object"}
-        key = entry.get("key")
-        if not isinstance(key, str) or not key:
-            return {"error": f"task at index {index} is missing a string 'key'"}
-        if key in by_key:
-            return {"error": f"duplicate task key {key!r}"}
-        title = entry.get("title")
-        if not isinstance(title, str) or not title:
-            return {"error": f"task {key!r} is missing a string 'title'"}
-        by_key[key] = entry
-        keys.append(key)
-
-    bindings_by_key: dict[str, list[ToolBinding]] = {}
-    for key in keys:
-        deps = by_key[key].get("depends_on") or []
-        if not isinstance(deps, list):
-            return {"error": f"task {key!r} 'depends_on' must be a list"}
-        for dep in deps:
-            if dep == key:
-                return {"error": f"task {key!r} cannot depend on itself"}
-            if dep not in by_key:
-                return {"error": f"task {key!r} depends on unknown key {dep!r}"}
-        bindings = _parse_tool_bindings(by_key[key].get("tools") or [])
-        if bindings is None:
-            return _invalid_tools_error(f"task {key!r} 'tools'")
-        bindings_by_key[key] = bindings
-
-    order = _topo_sort(keys, by_key)
-    if order is None:
-        return {"error": "tasks contain a dependency cycle"}
-
-    async with _repos() as (ws_repo, task_repo, notif_repo):
-        ws_id = await _resolve_ws_id(tool_context, ws_repo)
-        if ws_id is None:
-            return {"error": _NO_SESSION}
-        user_id = _user_id(tool_context)
-        key_to_id: dict[str, str] = {}
-        created: list[dict[str, Any]] = []
-        for position, key in enumerate(order):
-            entry = by_key[key]
-            dep_ids = [key_to_id[d] for d in (entry.get("depends_on") or [])]
-            declared_position = entry.get("position")
-            data = WorkflowTaskCreate(
-                workflow_session_id=ws_id,
-                title=entry["title"],
-                description=entry.get("description"),
-                position=declared_position
-                if declared_position is not None
-                else position,
-                depends_on_ids=dep_ids,
-                tool_bindings=bindings_by_key[key],
-            )
-            try:
-                task = await task_repo.create(data, user_id=user_id)
-            except (ForeignKeyViolationError, DependencyCycleError) as exc:
-                return {
-                    "error": f"failed to create task {key!r}: {exc}",
-                    "created": created,
-                }
-            key_to_id[key] = task.id
-            created.append({"key": key, "id": task.id, "title": task.title})
-        count = len(created)
-        await _notify(
-            ws_repo,
-            notif_repo,
-            ws_id,
-            NotificationType.approval_request,
-            "Plan ready for approval",
-            f"The agent registered a plan of {count} "
-            f"task{'s' if count != 1 else ''} and is waiting for your approval.",
-        )
-        return {"created": created}
 
 
 async def create_workflow_task(

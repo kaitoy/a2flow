@@ -1,24 +1,24 @@
-import { Workflow as WorkflowIcon } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 
-/** Route-transition fallback for the new-workflow page. */
+/** Route-transition fallback for the generate-workflow form, matching its field count. */
 export default function Loading() {
   return (
     <AdminPageContainer>
       <Breadcrumbs
         items={[
           { label: "Admin", href: "/admin" },
-          { label: "Workflows", href: "/admin/workflows" },
-          { label: "New" },
+          { label: "Agent Skills", href: "/admin/agent-skills" },
+          { label: "Generate Workflow" },
         ]}
       />
-      <AdminPageHeader title="New Workflow" icon={WorkflowIcon} />
+      <AdminPageHeader title="Generate Workflow" icon={Sparkles} />
       <FormColumn>
-        <FormSkeleton fields={4} />
+        <FormSkeleton fields={2} />
       </FormColumn>
     </AdminPageContainer>
   );

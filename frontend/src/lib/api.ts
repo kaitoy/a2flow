@@ -13,6 +13,7 @@ import type {
   ApprovalStatus,
   ApprovalUpdate,
   AvatarConfig,
+  GenerateWorkflowRequest,
   LoginRequest,
   McpRegistryHeader,
   McpRegistrySearchResult,
@@ -23,6 +24,7 @@ import type {
   McpToolInfo,
   Notification as NotificationModel,
   NotificationType,
+  PlanningSession as PlanningSessionModel,
   SecretCreate,
   SecretRead as SecretModel,
   SecretType,
@@ -33,12 +35,15 @@ import type {
   UserCreate,
   UserRead as UserReadModel,
   UserUpdate,
-  WorkflowCreate,
   Workflow as WorkflowModel,
   WorkflowSession as WorkflowSessionModel,
+  WorkflowStatus,
   WorkflowTaskCreate,
   WorkflowTaskRead as WorkflowTaskModel,
   WorkflowTaskStatus,
+  WorkflowTaskTemplateCreate,
+  WorkflowTaskTemplateRead as WorkflowTaskTemplateModel,
+  WorkflowTaskTemplateUpdate,
   WorkflowTaskUpdate,
   WorkflowUpdate,
 } from "@/generated/api/types.gen";
@@ -47,8 +52,8 @@ import {
   zCreateMcpServerApiV1McpServersPostResponse,
   zCreateSecretApiV1SecretsPostResponse,
   zCreateUserApiV1UsersPostResponse,
-  zCreateWorkflowApiV1WorkflowsPostResponse,
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
+  zCreateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPostResponse,
   zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse,
   zDeleteMcpServerApiV1McpServersServerIdDeleteResponse,
   zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse,
@@ -59,18 +64,24 @@ import {
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
   zDeleteWorkflowSessionApiV1WorkflowSessionsWsIdDeleteResponse,
   zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
+  zDeleteWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdDeleteResponse,
   zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse,
+  zGenerateWorkflowApiV1AgentSkillsSkillIdWorkflowsPostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
+  zGetPlanningSessionApiV1PlanningSessionsPsIdGetResponse,
+  zGetPlanningSessionMessagesApiV1PlanningSessionsPsIdMessagesGetResponse,
   zGetSecretApiV1SecretsSecretIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
   zGetUserApiV1UsersUserIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
+  zGetWorkflowPlanningSessionApiV1WorkflowsWorkflowIdPlanningSessionGetResponse,
   zGetWorkflowSessionApiV1WorkflowSessionsWsIdGetResponse,
   zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse,
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
+  zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
   zListApprovalsApiV1ApprovalsGetResponse,
   zListMcpServersApiV1McpServersGetResponse,
@@ -82,11 +93,13 @@ import {
   zListWorkflowSessionsApiV1WorkflowSessionsGetResponse,
   zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse,
   zListWorkflowsApiV1WorkflowsGetResponse,
+  zListWorkflowTaskTemplatesApiV1WorkflowsWorkflowIdTaskTemplatesGetResponse,
   zLoginApiV1AuthLoginPostResponse,
   zLogoutApiV1AuthLogoutPostResponse,
   zMarkAllNotificationsReadApiV1NotificationsReadAllPostResponse,
   zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse,
   zMeApiV1AuthMeGetResponse,
+  zPublishWorkflowApiV1WorkflowsWorkflowIdPublishPostResponse,
   zPullAgentSkillApiV1AgentSkillsSkillIdPullPostResponse,
   zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
   zSearchMcpRegistryApiV1McpRegistryGetResponse,
@@ -96,6 +109,7 @@ import {
   zUpdateUserApiV1UsersUserIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
   zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
+  zUpdateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdPatchResponse,
   zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse,
 } from "@/generated/api/zod.gen";
 import basicCatalogJson from "../generated/basic_catalog.json";
@@ -227,9 +241,11 @@ export type McpServer = WithAudit<McpServerModel>;
 export type Notification = WithAudit<NotificationModel>;
 export type Secret = WithAudit<SecretModel>;
 export type User = WithAudit<UserReadModel>;
+export type PlanningSession = WithAudit<PlanningSessionModel>;
 export type Workflow = WithAudit<WorkflowModel>;
 export type WorkflowSession = WithAudit<WorkflowSessionModel>;
 export type WorkflowTask = WithAudit<WorkflowTaskModel>;
+export type WorkflowTaskTemplate = WithAudit<WorkflowTaskTemplateModel>;
 export type Session = SessionModel;
 export type {
   AgentSkillCreate,
@@ -237,6 +253,7 @@ export type {
   ApprovalStatus,
   ApprovalUpdate,
   AvatarConfig,
+  GenerateWorkflowRequest,
   LoginRequest,
   McpRegistryHeader,
   McpRegistrySearchResult,
@@ -252,9 +269,11 @@ export type {
   ToolBinding,
   UserCreate,
   UserUpdate,
-  WorkflowCreate,
+  WorkflowStatus,
   WorkflowTaskCreate,
   WorkflowTaskStatus,
+  WorkflowTaskTemplateCreate,
+  WorkflowTaskTemplateUpdate,
   WorkflowTaskUpdate,
   WorkflowUpdate,
 };
@@ -666,11 +685,33 @@ export async function getWorkflow(id: string): Promise<Workflow> {
   ) as Promise<Workflow>;
 }
 
-/** Create a new workflow. */
-export async function createWorkflow(body: WorkflowCreate): Promise<Workflow> {
+/**
+ * Generate a draft workflow from an agent skill ("Generate workflow").
+ *
+ * Registers the workflow immediately (`status: "generating"`) and breaks the
+ * prompt into its task templates in a background planning run; callers poll
+ * the workflow until it settles on `draft` (or `failed`).
+ */
+export async function generateWorkflow(
+  skillId: string,
+  body: GenerateWorkflowRequest
+): Promise<Workflow> {
+  const workflow = (await fetchEnvelope(
+    apiClient.post(`/api/v1/agent-skills/${encodeURIComponent(skillId)}/workflows`, body),
+    zGenerateWorkflowApiV1AgentSkillsSkillIdWorkflowsPostResponse
+  )) as Workflow;
+  logger.info({ workflowId: workflow.id, skillId }, "workflow generation started");
+  return workflow;
+}
+
+/**
+ * Publish a workflow, making it executable. Re-summarizes the planning
+ * conversation into the workflow's description on the backend.
+ */
+export async function publishWorkflow(id: string): Promise<Workflow> {
   return fetchEnvelope(
-    apiClient.post("/api/v1/workflows", body),
-    zCreateWorkflowApiV1WorkflowsPostResponse
+    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/publish`),
+    zPublishWorkflowApiV1WorkflowsWorkflowIdPublishPostResponse
   ) as Promise<Workflow>;
 }
 
@@ -698,6 +739,91 @@ export async function executeWorkflow(id: string): Promise<WorkflowSession> {
   )) as WorkflowSession;
   logger.info({ workflowSessionId: session.id, workflowId: id }, "workflow executed");
   return session;
+}
+
+/**
+ * List the task templates belonging to a workflow (position ASC by default)
+ * with optional pagination, sort, and filters.
+ */
+export async function listWorkflowTaskTemplates(
+  workflowId: string,
+  query: ListQuery = {}
+): Promise<WorkflowTaskTemplate[]> {
+  return fetchEnvelope(
+    apiClient.get(
+      `/api/v1/workflows/${encodeURIComponent(workflowId)}/task-templates`,
+      listConfig(query)
+    ),
+    zListWorkflowTaskTemplatesApiV1WorkflowsWorkflowIdTaskTemplatesGetResponse
+  ) as Promise<WorkflowTaskTemplate[]>;
+}
+
+/** Fetch a single WorkflowTaskTemplate by ID. */
+export async function getWorkflowTaskTemplate(templateId: string): Promise<WorkflowTaskTemplate> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/workflow-task-templates/${encodeURIComponent(templateId)}`),
+    zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse
+  ) as Promise<WorkflowTaskTemplate>;
+}
+
+/** Create a new task template under the workflow given in ``body.workflowId``. */
+export async function createWorkflowTaskTemplate(
+  body: WorkflowTaskTemplateCreate
+): Promise<WorkflowTaskTemplate> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/workflow-task-templates", body),
+    zCreateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPostResponse
+  ) as Promise<WorkflowTaskTemplate>;
+}
+
+/** Apply a partial update to a task template. ``workflowId`` is not updatable. */
+export async function updateWorkflowTaskTemplate(
+  templateId: string,
+  body: WorkflowTaskTemplateUpdate
+): Promise<WorkflowTaskTemplate> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/workflow-task-templates/${encodeURIComponent(templateId)}`, body),
+    zUpdateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdPatchResponse
+  ) as Promise<WorkflowTaskTemplate>;
+}
+
+/** Delete a task template by ID. */
+export async function deleteWorkflowTaskTemplate(templateId: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/workflow-task-templates/${encodeURIComponent(templateId)}`),
+    zDeleteWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdDeleteResponse
+  );
+}
+
+/** Fetch the planning session belonging to a workflow (every generated workflow has one). */
+export async function getWorkflowPlanningSession(workflowId: string): Promise<PlanningSession> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/planning-session`),
+    zGetWorkflowPlanningSessionApiV1WorkflowsWorkflowIdPlanningSessionGetResponse
+  ) as Promise<PlanningSession>;
+}
+
+/** Fetch a PlanningSession record by ID. */
+export async function getPlanningSession(id: string): Promise<PlanningSession> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/planning-sessions/${encodeURIComponent(id)}`),
+    zGetPlanningSessionApiV1PlanningSessionsPsIdGetResponse
+  ) as Promise<PlanningSession>;
+}
+
+/**
+ * Fetch the chat history of a PlanningSession's ADK session.
+ *
+ * Returns an empty list while the background generation run has not started
+ * yet. The records carry ``senderUserId``/``workflowTaskId`` as ``null`` so
+ * the payload shape matches {@link getWorkflowSessionMessages} and the chat
+ * components can be reused unchanged.
+ */
+export async function getPlanningSessionMessages(psId: string): Promise<Message[]> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/planning-sessions/${encodeURIComponent(psId)}/messages`),
+    zGetPlanningSessionMessagesApiV1PlanningSessionsPsIdMessagesGetResponse
+  ) as Promise<Message[]>;
 }
 
 /** Fetch a WorkflowSession record by ID. */
@@ -964,6 +1090,29 @@ export function createWorkflowSessionAgent(
 ): HttpAgent {
   const agent = new CredentialedHttpAgent({
     url: `${API_BASE}/api/v1/workflow-sessions/${encodeURIComponent(workflowSessionId)}/agent`,
+    threadId: sessionId,
+  });
+  agent.use(
+    new A2UIMiddleware({
+      injectA2UITool: true,
+      schema: basicCatalogJson as unknown as A2UIInlineCatalogSchema,
+      defaultCatalogId: A2UI_CATALOG_ID,
+    })
+  );
+  return agent;
+}
+
+/**
+ * Create an HttpAgent scoped to a specific planning session endpoint, pre-configured
+ * with the A2UI middleware so the planning agent can render interactive surfaces
+ * while the user refines the workflow's task templates.
+ */
+export function createPlanningSessionAgent(
+  planningSessionId: string,
+  sessionId: string
+): HttpAgent {
+  const agent = new CredentialedHttpAgent({
+    url: `${API_BASE}/api/v1/planning-sessions/${encodeURIComponent(planningSessionId)}/agent`,
     threadId: sessionId,
   });
   agent.use(

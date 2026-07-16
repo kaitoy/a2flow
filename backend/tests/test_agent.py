@@ -424,30 +424,80 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
     # keeps its contents in memory forever after.
     assert registry.get("skill-1", "b" * 40, _skill_dir("new")) is not old
 
+    # The same revision in a different role is a different agent too: each kind
+    # bakes its own instruction and toolset into the built agent.
+    from infrastructure.agent import AgentKind
 
-def test_create_agent_with_skill_uses_workflow_instruction(tmp_path: Any) -> None:
+    planning = registry.get(
+        "skill-1", "a" * 40, _skill_dir("planning"), kind=AgentKind.planning
+    )
+    assert planning is not old
+    assert (
+        registry.get("skill-1", "a" * 40, _skill_dir("x"), kind=AgentKind.planning)
+        is planning
+    )
+
+
+def _write_skill_md(tmp_path: Any, name: str = "test-skill") -> Any:
+    """Create a minimal skill directory with a SKILL.md and return its path."""
+    skill_dir = tmp_path / name
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        f"---\nname: {name}\ndescription: A test skill\n---\n\nTest instructions.\n",
+        encoding="utf-8",
+    )
+    return skill_dir
+
+
+def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> None:
     from unittest.mock import MagicMock
 
     from infrastructure.agent import A2UIInstructionProvider, create_agent
 
-    skill_dir = tmp_path / "test-skill"
-    skill_dir.mkdir()
-    (skill_dir / "SKILL.md").write_text(
-        "---\nname: test-skill\ndescription: A test skill\n---\n\nTest instructions.\n",
-        encoding="utf-8",
-    )
-
-    agent = create_agent(skill_dir=skill_dir)
+    agent = create_agent(skill_dir=_write_skill_md(tmp_path))
     provider = agent.instruction
     assert isinstance(provider, A2UIInstructionProvider)
 
     ctx = MagicMock()
     ctx.state.get.return_value = []
     rendered = provider(ctx)
-    assert "register_workflow_tasks" in rendered
+    assert "Begin executing immediately" in rendered
     assert "runnable" in rendered
     assert "A2UI Rules" in rendered
     assert "render_a2ui" in rendered
+    assert "register_planning_tasks" not in rendered
+
+
+def test_create_agent_planning_kind_uses_planning_instruction(tmp_path: Any) -> None:
+    from unittest.mock import MagicMock
+
+    from infrastructure.agent import A2UIInstructionProvider, AgentKind, create_agent
+
+    agent = create_agent(skill_dir=_write_skill_md(tmp_path), kind=AgentKind.planning)
+    provider = agent.instruction
+    assert isinstance(provider, A2UIInstructionProvider)
+
+    ctx = MagicMock()
+    ctx.state.get.return_value = []
+    rendered = provider(ctx)
+    assert "register_planning_tasks" in rendered
+    assert "Never execute a task" in rendered
+    assert "A2UI Rules" in rendered
+
+
+def test_create_agent_initial_planning_kind_has_no_a2ui(tmp_path: Any) -> None:
+    """The background run has no client, so no A2UI toolset and no A2UI rules."""
+    from ag_ui_adk import AGUIToolset
+
+    from infrastructure.agent import AgentKind, create_agent
+
+    agent = create_agent(
+        skill_dir=_write_skill_md(tmp_path), kind=AgentKind.initial_planning
+    )
+    assert isinstance(agent.instruction, str)
+    assert "register_planning_tasks" in agent.instruction
+    assert "unattended" in agent.instruction
+    assert not any(isinstance(t, AGUIToolset) for t in agent.tools)
 
 
 def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
@@ -458,20 +508,11 @@ def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
         delete_workflow_task,
         get_workflow_task,
         list_workflow_tasks,
-        register_workflow_tasks,
         update_workflow_task,
     )
 
-    skill_dir = tmp_path / "test-skill"
-    skill_dir.mkdir()
-    (skill_dir / "SKILL.md").write_text(
-        "---\nname: test-skill\ndescription: A test skill\n---\n\nTest instructions.\n",
-        encoding="utf-8",
-    )
-
-    agent = create_agent(skill_dir=skill_dir)
+    agent = create_agent(skill_dir=_write_skill_md(tmp_path))
     for tool in (
-        register_workflow_tasks,
         create_workflow_task,
         list_workflow_tasks,
         get_workflow_task,
@@ -484,10 +525,38 @@ def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
         assert tool in agent.tools
 
 
+def test_create_agent_planning_kind_attaches_planning_tools(tmp_path: Any) -> None:
+    from infrastructure.agent import AgentKind, create_agent
+    from infrastructure.approval_tools import request_approval
+    from infrastructure.mcp_tools import call_mcp_tool
+    from infrastructure.planning_task_tools import (
+        create_planning_task,
+        delete_planning_task,
+        get_planning_task,
+        list_planning_tasks,
+        register_planning_tasks,
+        update_planning_task,
+    )
+
+    agent = create_agent(skill_dir=_write_skill_md(tmp_path), kind=AgentKind.planning)
+    for tool in (
+        register_planning_tasks,
+        create_planning_task,
+        list_planning_tasks,
+        get_planning_task,
+        update_planning_task,
+        delete_planning_task,
+    ):
+        assert tool in agent.tools
+    # Planning never executes: no MCP invocation and no approval flow.
+    assert call_mcp_tool not in agent.tools
+    assert request_approval not in agent.tools
+
+
 def test_register_tool_excludes_tool_context_from_declaration() -> None:
     from google.adk.tools.function_tool import FunctionTool
 
-    from infrastructure.workflow_task_tools import register_workflow_tasks
+    from infrastructure.planning_task_tools import register_planning_tasks
 
-    tool = FunctionTool(func=register_workflow_tasks)
+    tool = FunctionTool(func=register_planning_tasks)
     assert tool._context_param_name == "tool_context"

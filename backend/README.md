@@ -121,8 +121,10 @@ Database URL for REST API data and ADK session storage — both live in the same
 | `agent_skills` | Agent skill definitions (incl. optional `repo_auth_secret` / `repo_auth_username` for private-repo clones) |
 | `mcp_servers` | Registered remote MCP servers (name, streamable HTTP URL, request headers — values may embed `${secret:NAME}` placeholders) |
 | `secrets` | Named credentials: Fernet-encrypted local values or HashiCorp Vault KV v2 references; see [Secrets](#secrets) |
-| `workflows` | Workflow definitions |
-| `workflow_tasks` | Individual tasks belonging to a `WorkflowSession` (`workflow_session_id` FK with `ON DELETE CASCADE`) |
+| `workflows` | Workflow definitions (name, skill reference, lifecycle `status`, summarized description) |
+| `workflow_task_templates` | The pre-planned task list of a workflow (`workflow_id` FK with `ON DELETE CASCADE`; dependency edges and MCP tool bindings live in their own `workflow_task_template_*` join tables) |
+| `planning_sessions` | One per workflow: the chat in which its task templates are produced and refined |
+| `workflow_tasks` | Individual tasks belonging to a `WorkflowSession`, copied from the templates at execute time (`workflow_session_id` FK with `ON DELETE CASCADE`) |
 | `workflow_task_tool_bindings` | MCP tools bound to a task (`task_id` FK `ON DELETE CASCADE`, `mcp_server_id` FK `ON DELETE RESTRICT`) |
 | `sessions` | Session metadata and session-level state |
 | `events` | Full event history per session (JSON) |
@@ -310,15 +312,29 @@ The API is **write-only for values**: create/update accept a plaintext `value`, 
 
 ### Workflows
 
-A workflow pairs a prompt with an agent skill. Each workflow references exactly one agent skill; a single agent skill may be used by multiple workflows.
+A workflow pairs an agent skill with a **pre-planned task list** (its task templates). Each workflow references exactly one agent skill; a single agent skill may be used by multiple workflows. There is no bare `POST /workflows`: a workflow is born from `POST /api/v1/agent-skills/{skill_id}/workflows` ("Generate workflow", body `{name, prompt}`, developer-gated), which registers the row in `status: "generating"` together with its [planning session](#planning-sessions), then runs the prompt through an unattended planning agent in a background job (`services/workflow_planning.py`). Success summarizes the conversation into `description` (one LLM call via `infrastructure/summarizer.py`, falling back to the transcript head), sets `status: "draft"`, and raises a `workflow_draft_ready` notification; any failure lands as `status: "failed"` plus `generationError`. `status` and `generationError` are server-managed and cannot be written through `PATCH` (which edits only `name` and `description`).
 
-A workflow requires a unique `name`, a `prompt`, and an `agentSkillId`; `description` is optional. The CRUD endpoints are in the [API reference](http://localhost:3000/api-doc). Executing a workflow — `POST /api/v1/workflows/{id}/execute` — snapshots its configuration into a new `WorkflowSession` (see below).
+`POST /api/v1/workflows/{id}/publish` (developer-gated) makes a workflow executable: it requires at least one task template and no generation in flight (`409 WORKFLOW_NOT_RUNNABLE` otherwise), re-summarizes the planning conversation into `description`, and sets `status: "published"`. Executing a workflow — `POST /api/v1/workflows/{id}/execute`, requester-gated — accepts only published workflows (`409 WORKFLOW_NOT_RUNNABLE` otherwise), snapshots its configuration into a new `WorkflowSession`, and copies its templates into the session's tasks (see below). The remaining endpoints (list/get/patch/delete, `GET /{id}/task-templates`, `GET /{id}/planning-session`) are in the [API reference](http://localhost:3000/api-doc).
+
+---
+
+### Workflow task templates
+
+A workflow task template is one step of a workflow's pre-planned task list, owned by the workflow (`workflow_id` FK, `ON DELETE CASCADE`). Templates mirror [workflow tasks](#workflow-tasks) structurally — `title`, optional `description`, `position`, DAG edges (`workflow_task_template_dependencies`, cycle-checked exactly like task edges), and MCP tool bindings (`workflow_task_template_tool_bindings`, server side `ON DELETE RESTRICT`) — but carry **no status**: the lifecycle belongs to a run. They are written by the planning agent's tools (`infrastructure/planning_task_tools.py`) and by the developer-gated manual CRUD endpoints (`POST /workflow-task-templates`, `GET`/`PATCH`/`DELETE /workflow-task-templates/{id}`, listing on `GET /workflows/{id}/task-templates`), all in the [API reference](http://localhost:3000/api-doc). At execute time the templates are copied into the new session as `pending` WorkflowTasks in dependency order, ids remapped, bindings included — so template edits never affect runs already started.
+
+---
+
+### Planning sessions
+
+A `PlanningSession` is the chat in which a workflow's task templates are produced and refined — a separate entity from `WorkflowSession`, created 1:1 with its workflow by the generation flow and pinned to the skill revision published at that moment (`agentSkillCommitSha`). The background generation run posts the prompt as its first message, so opening the chat later shows the full conversation. Unlike workflow sessions, planning sessions are **owner-only** (plus Super Admins): there is no approver sharing and no sender-attribution bookkeeping.
+
+Endpoints: `GET /planning-sessions/{id}`, `GET /planning-sessions/{id}/messages` (empty until the generation run starts), and the streaming `POST /planning-sessions/{id}/agent` (excluded from the spec like the other agent endpoints). The agent resolved for this chat runs with the interactive **planning** instruction and toolset — it edits the workflow's templates and never executes anything. The session cascade-deletes with its workflow, and the skill-store prune keeps every revision a planning session still pins.
 
 ---
 
 ### Workflow sessions
 
-A `WorkflowSession` is the snapshot record created when a workflow is executed via `POST /workflows/{id}/execute`. The chat experience is exposed at `POST /workflow-sessions/{id}/agent` (streaming) and the session metadata is fetched via `GET /workflow-sessions/{id}`. A list endpoint enables the admin UI to browse all executed sessions ordered by most recent first.
+A `WorkflowSession` is the snapshot record created when a published workflow is executed via `POST /workflows/{id}/execute`, pre-filled with `pending` WorkflowTasks copied from the workflow's templates. The chat experience is exposed at `POST /workflow-sessions/{id}/agent` (streaming) and the session metadata is fetched via `GET /workflow-sessions/{id}`. A list endpoint enables the admin UI to browse all executed sessions ordered by most recent first. The run endpoint overwrites the AG-UI `context` with the workflow's summarized `description` server-side, so the execution agent receives the planning intent as trusted context (and a client can never inject its own).
 
 The list (ordered most-recent-first) and get endpoints are in the [API reference](http://localhost:3000/api-doc).
 
@@ -326,7 +342,7 @@ The list (ordered most-recent-first) and get endpoints are in the [API reference
 
 ### Workflow tasks
 
-A workflow task is a single actionable item belonging to a `WorkflowSession`. The skill-driven workflow agent registers and drives these tasks itself via [agent tools](#agent-task-tools); they are also exposed through the REST endpoints below. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`) and an integer `position` used for stable layout ordering within a session. Deleting the parent `WorkflowSession` cascades to its tasks.
+A workflow task is a single actionable item belonging to a `WorkflowSession`, copied from the workflow's task templates at execute time and driven by the execution agent via [agent tools](#agent-task-tools); they are also exposed through the REST endpoints below. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`) and an integer `position` used for stable layout ordering within a session. Deleting the parent `WorkflowSession` cascades to its tasks.
 
 Tasks form a **directed acyclic graph (DAG)**: each task may depend on other tasks in the same session through its `dependsOnIds` list (persisted as `(task_id, depends_on_id)` rows in the `workflow_task_dependencies` join table, where `depends_on_id` must precede `task_id`). Read responses include the resolved `dependsOnIds`. Dependency targets must exist and belong to the same session, otherwise the write fails with `422 FOREIGN_KEY_VIOLATION`; edges that would introduce a cycle — including a self-dependency — fail with `409 DEPENDENCY_CYCLE`. Deleting a task cascade-deletes the edges that reference it in either direction.
 
@@ -334,23 +350,28 @@ Tasks may additionally bind **MCP tools** from [registered MCP servers](#mcp-ser
 
 #### Agent task tools
 
-When a workflow runs, the skill-bound agent is given function tools so it can plan and drive the task DAG itself, request human approval, and call MCP tools, in addition to the REST endpoints below. The agent runs a **plan-then-execute** flow: it registers the plan, waits for the user's approval, then iterates the tasks updating their status.
+Skill-bound agents are built in one of three roles (`AgentKind` in `infrastructure/agent.py`), each with its own instruction and toolset, and the `AgentRegistry` caches one agent per `(skill_id, commit_sha, kind)`:
 
-| Tool | Purpose |
-|---|---|
-| `register_workflow_tasks` | Register a whole plan as a DAG in one call (each entry has a `key`, `title`, optional `depends_on` referencing other keys, optional `tools` binding MCP tools) |
-| `create_workflow_task` | Add a single task, optionally referencing existing task ids as dependencies and binding MCP tools |
-| `list_workflow_tasks` | List the current session's tasks (id, title, status, `dependsOnIds`, position, `tool_bindings`) |
-| `get_workflow_task` | Fetch one task in the current session |
-| `update_workflow_task` | Change a task's title / description / status / position / dependencies / tool bindings |
-| `delete_workflow_task` | Delete a task |
-| `request_approval` | Create a `pending` [Approval](#approvals) for the current session (optionally linked to a task) and raise an `approval_request` notification; returns the `approval_id` to pass to the client-side `render_approval` tool |
-| `get_approval` | Fetch the current state of an approval in the current session (to re-check a decision) |
-| `list_users` | List the registered users (id, username, name, email; system and soft-deleted users excluded) so the agent can choose an `approver` id for `request_approval` |
-| `list_mcp_tools` | Discover the tools advertised by every [registered MCP server](#mcp-servers) (queried live and concurrently; per-server failures are isolated) |
-| `call_mcp_tool` | Invoke an MCP tool bound to the task currently `in_progress`; calls to unbound tools are rejected with an error listing the allowed tools |
+- **`initial_planning`** — the unattended background run of "Generate workflow". No A2UI toolset (no client is connected); tools: `register_planning_tasks`, `list_planning_tasks`, `list_mcp_tools`.
+- **`planning`** — the interactive [planning session](#planning-sessions) chat. Tools: the full planning-task set plus `list_mcp_tools`; never executes, and has no approval or MCP-invocation tools.
+- **`execution`** — a workflow session run. The plan comes pre-copied from the templates, so there is no bulk registration and no plan-approval wait: the instruction says to **begin executing immediately**. Tools: single-task CRUD, the approval tools, and the MCP proxies.
 
-The tools resolve the current session by mapping the ADK session id (the AG-UI thread id, stored on `WorkflowSession.session_id`) back to the `WorkflowSession` primary key, and they reject access to records belonging to other sessions. They live in `infrastructure/workflow_task_tools.py`, `infrastructure/approval_tools.py`, and `infrastructure/mcp_tools.py` and are attached to the agent in `infrastructure/agent.py` only when a skill is bound. `call_mcp_tool` opens one streamable HTTP connection per call (30-second timeout) through the shared adapter in `infrastructure/mcp_client.py`.
+| Tool | Kind | Purpose |
+|---|---|---|
+| `register_planning_tasks` | planning | Register a whole plan as template DAG in one call (each entry has a `key`, `title`, optional `depends_on` referencing other keys, optional `tools` binding MCP tools) |
+| `create_planning_task` / `list_planning_tasks` / `get_planning_task` / `update_planning_task` / `delete_planning_task` | planning | Refine the workflow's task templates (no status field) |
+| `create_workflow_task` | execution | Add a single task mid-run, optionally referencing existing task ids as dependencies and binding MCP tools |
+| `list_workflow_tasks` | execution | List the current session's tasks (id, title, status, `dependsOnIds`, position, `tool_bindings`) |
+| `get_workflow_task` | execution | Fetch one task in the current session |
+| `update_workflow_task` | execution | Change a task's title / description / status / position / dependencies / tool bindings |
+| `delete_workflow_task` | execution | Delete a task |
+| `request_approval` | execution | Create a `pending` [Approval](#approvals) for the current session (optionally linked to a task) and raise an `approval_request` notification; returns the `approval_id` to pass to the client-side `render_approval` tool |
+| `get_approval` | execution | Fetch the current state of an approval in the current session (to re-check a decision) |
+| `list_users` | execution | List the registered users (id, username, name, email; system and soft-deleted users excluded) so the agent can choose an `approver` id for `request_approval` |
+| `list_mcp_tools` | planning + execution | Discover the tools advertised by every [registered MCP server](#mcp-servers) (queried live and concurrently; per-server failures are isolated) |
+| `call_mcp_tool` | execution | Invoke an MCP tool bound to the task currently `in_progress`; calls to unbound tools are rejected with an error listing the allowed tools |
+
+The task tools resolve the current session by mapping the ADK session id (the AG-UI thread id) back to the owning record — the `WorkflowSession` primary key for execution tools, the `PlanningSession` (and through it the workflow) for planning tools — and reject access to records belonging to other sessions. They live in `infrastructure/workflow_task_tools.py`, `infrastructure/planning_task_tools.py`, `infrastructure/approval_tools.py`, and `infrastructure/mcp_tools.py` and are attached to the agent in `infrastructure/agent.py` only when a skill is bound. `call_mcp_tool` opens one streamable HTTP connection per call (30-second timeout) through the shared adapter in `infrastructure/mcp_client.py`.
 
 The approver's actual approve/reject decision is written from the frontend via `PATCH /api/v1/approvals/{id}` (not an agent tool), and surfaces to the agent as the result of the client-side `render_approval` tool. See [Approvals](#approvals).
 
@@ -360,9 +381,9 @@ The task CRUD endpoints — create, list-for-a-session (ordered `position` ASC t
 
 ### Notifications
 
-Per-user notifications surfaced in the frontend's toolbar bell. Notifications are generated as a side effect of the agent's task tools — `register_workflow_tasks` raises an `approval_request`, and the final `update_workflow_task` that drives every task to a terminal state raises a one-shot `session_completed` — and are addressed to the user who started the workflow session. Both endpoints below are scoped to the authenticated user; the list never accepts a `user_id`, and reading or marking another user's notification returns `404 NOT_FOUND`.
+Per-user notifications surfaced in the frontend's toolbar bell. Notifications are generated as side effects of workflow activity — the generation job raises a `workflow_draft_ready` when the initial plan lands, `request_approval` raises an `approval_request` addressed to the designated approver, and the final `update_workflow_task` that drives every task to a terminal state raises a one-shot `session_completed` addressed to the user who started the session. Both endpoints below are scoped to the authenticated user; the list never accepts a `user_id`, and reading or marking another user's notification returns `404 NOT_FOUND`.
 
-Each notification stores a `type` (`approval_request` / `session_completed`), `title`, optional `body`, the linked `workflowSessionId`, and a `read` flag. Rows cascade-delete with their recipient user and their linked `WorkflowSession`.
+Each notification stores a `type` (`workflow_draft_ready` / `approval_request` / `session_completed`), `title`, optional `body`, the linked `workflowSessionId` or `workflowId`, and a `read` flag. Rows cascade-delete with their recipient user and their linked `WorkflowSession` or `Workflow`.
 
 ---
 

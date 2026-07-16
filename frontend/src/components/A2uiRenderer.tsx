@@ -6,6 +6,7 @@ import type { SurfaceModel } from "@a2ui/web_core/v0_9";
 import { MessageProcessor } from "@a2ui/web_core/v0_9";
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { useEffect, useRef, useState } from "react";
+import logger from "@/lib/logger";
 import { SurfaceResolvedContext } from "./a2ui/surfaceResolvedContext";
 import { tailwindCatalog } from "./a2uiCatalog";
 
@@ -13,6 +14,10 @@ import { tailwindCatalog } from "./a2uiCatalog";
  * Process a raw A2UI payload and render the resulting surfaces using the tailwind catalog.
  * Surfaces are re-processed from scratch whenever the payload reference changes.
  * Nullish payloads (e.g. middleware lifecycle snapshots without operations) render nothing.
+ *
+ * A payload `MessageProcessor` rejects (invalid A2UI from the agent) renders nothing
+ * and is logged, rather than throwing and taking the surrounding message history
+ * down with it — the payload is LLM output, so it can be malformed at any time.
  *
  * The payload is deep-cloned before processing: it comes out of the Redux
  * store, which freezes state objects, while `MessageProcessor` adopts the
@@ -52,6 +57,7 @@ export function A2uiRenderer({
     if (payload == null) return;
     const processor = new MessageProcessor<ReactComponentImplementation>([tailwindCatalog]);
     const actionSubs: { unsubscribe: () => void }[] = [];
+    const created: SurfaceModel<ReactComponentImplementation>[] = [];
 
     const sub = processor.onSurfaceCreated((surface) => {
       const actionSub = surface.onAction.subscribe((action: A2UIUserAction) => {
@@ -74,12 +80,23 @@ export function A2uiRenderer({
         );
       });
       actionSubs.push(actionSub);
-      setSurfaces((prev) => [...prev, surface]);
+      created.push(surface);
     });
 
-    processor.processMessages(
-      structuredClone(payload) as Parameters<typeof processor.processMessages>[0]
-    );
+    // The payload is an LLM's tool-call arguments, so it can be invalid A2UI (an
+    // unknown component, a component missing its type). MessageProcessor throws
+    // on those, and an uncaught throw here takes down the whole session view —
+    // the surrounding history included. Commit the surfaces only once the whole
+    // payload processed, so a throw drops the unrenderable surface rather than
+    // leaving behind the half-built one `createSurface` had already created.
+    try {
+      processor.processMessages(
+        structuredClone(payload) as Parameters<typeof processor.processMessages>[0]
+      );
+      setSurfaces(created);
+    } catch (err) {
+      logger.error({ err }, "failed to process A2UI payload");
+    }
     sub.unsubscribe();
 
     return () => {

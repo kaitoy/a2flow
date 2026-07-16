@@ -126,6 +126,24 @@ class SkillNotReadyError(RepositoryError):
         )
 
 
+class WorkflowNotRunnableError(RepositoryError):
+    """Raised when a Workflow cannot be executed or published in its current state.
+
+    Executing requires a ``published`` workflow, and publishing requires at
+    least one task template — a workflow still ``generating``, left in
+    ``draft``/``failed``, or holding an empty plan has nothing runnable.
+
+    Carries the ``workflow_id`` and a human-readable ``reason`` so the HTTP
+    layer can surface them in the error envelope's ``details`` block when
+    returning HTTP 409.
+    """
+
+    def __init__(self, workflow_id: str, reason: str) -> None:
+        self.workflow_id = workflow_id
+        self.reason = reason
+        super().__init__(f"Workflow {workflow_id!r} is not runnable: {reason}")
+
+
 class RegistryUnavailableError(Exception):
     """Raised when the official MCP registry cannot be reached or errors out.
 

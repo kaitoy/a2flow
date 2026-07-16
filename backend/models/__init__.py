@@ -9,9 +9,16 @@ from .notification import (
     NotificationType,
     NotificationUpdate,
 )
+from .planning_session import PlanningSession, PlanningSessionCreate
 from .session import Session
 from .user_avatar import UserAvatar
-from .workflow import Workflow, WorkflowCreate, WorkflowUpdate
+from .workflow import (
+    GenerateWorkflowRequest,
+    Workflow,
+    WorkflowCreate,
+    WorkflowStatus,
+    WorkflowUpdate,
+)
 from .workflow_session import WorkflowSession, WorkflowSessionCreate
 from .workflow_task import (
     ToolBinding,
@@ -22,6 +29,14 @@ from .workflow_task import (
     WorkflowTaskStatus,
     WorkflowTaskToolBinding,
     WorkflowTaskUpdate,
+)
+from .workflow_task_template import (
+    WorkflowTaskTemplate,
+    WorkflowTaskTemplateCreate,
+    WorkflowTaskTemplateDependency,
+    WorkflowTaskTemplateRead,
+    WorkflowTaskTemplateToolBinding,
+    WorkflowTaskTemplateUpdate,
 )
 
 __all__ = [
@@ -38,15 +53,19 @@ __all__ = [
     "MCPServerUpdate",
     "McpToolInfo",
     "MessageMeta",
+    "GenerateWorkflowRequest",
     "Notification",
     "NotificationCreate",
     "NotificationType",
     "NotificationUpdate",
+    "PlanningSession",
+    "PlanningSessionCreate",
     "Session",
     "ToolBinding",
     "UserAvatar",
     "Workflow",
     "WorkflowCreate",
+    "WorkflowStatus",
     "WorkflowUpdate",
     "WorkflowSession",
     "WorkflowSessionCreate",
@@ -56,5 +75,11 @@ __all__ = [
     "WorkflowTaskRead",
     "WorkflowTaskStatus",
     "WorkflowTaskToolBinding",
+    "WorkflowTaskTemplate",
+    "WorkflowTaskTemplateCreate",
+    "WorkflowTaskTemplateDependency",
+    "WorkflowTaskTemplateRead",
+    "WorkflowTaskTemplateToolBinding",
+    "WorkflowTaskTemplateUpdate",
     "WorkflowTaskUpdate",
 ]

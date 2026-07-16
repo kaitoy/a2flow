@@ -1,8 +1,22 @@
 "use client";
 
 import { ChevronLeft, ListTree } from "lucide-react";
-import type { WorkflowTask } from "@/lib/api";
+import type { WorkflowTaskStatus } from "@/lib/api";
 import { formatStatusLabel, STATUS_RAIL_CLASS } from "@/lib/workflow-task-status";
+
+/**
+ * One entry of the timeline: a session's WorkflowTask, or — in a planning
+ * session — a workflow task template, which has no status (the lifecycle
+ * belongs to a run, not the plan).
+ */
+export interface TimelineTask {
+  /** Identifier used for selection, hover linkage, and chat-group anchors. */
+  id: string;
+  /** Title shown as the entry's label. */
+  title: string;
+  /** Lifecycle status, or absent for status-less entries (task templates). */
+  status?: WorkflowTaskStatus | null;
+}
 
 /** Expanded panel's outer `aside` class, shared with {@link WorkflowSessionSkeleton} so its loading chrome can't drift from the real sidebar. */
 export const TASK_TIMELINE_ASIDE_CLASS =
@@ -18,8 +32,8 @@ export const TASK_TIMELINE_LIST_CLASS = "relative flex-1 overflow-y-auto px-3 pb
  * Props for {@link WorkflowTaskTimeline}.
  */
 export interface WorkflowTaskTimelineProps {
-  /** The session's workflow tasks, in position order. */
-  tasks: WorkflowTask[];
+  /** The session's workflow tasks (or a plan's templates), in position order. */
+  tasks: TimelineTask[];
   /** Id of the task currently in progress, highlighted in the list. */
   activeTaskId: string | null;
   /**
@@ -91,7 +105,7 @@ export function WorkflowTaskTimeline({
           <li className="px-2 py-3 text-sm text-on-surface-variant">No tasks yet.</li>
         ) : (
           tasks.map((task, i) => {
-            const status = task.status ?? "pending";
+            const status = task.status ?? null;
             const isActive = task.id === activeTaskId;
             const isHighlighted = task.id === highlightedTaskId;
             const index = taskIndexById?.get(task.id) ?? i + 1;
@@ -118,7 +132,7 @@ export function WorkflowTaskTimeline({
                   } ${isHighlighted ? "ring-2 ring-inset ring-accent/50" : ""}`}
                 >
                   <span
-                    className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-2 bg-surface text-[11px] font-semibold leading-none text-on-surface ${STATUS_RAIL_CLASS[status]} ${
+                    className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-2 bg-surface text-[11px] font-semibold leading-none text-on-surface ${STATUS_RAIL_CLASS[status ?? "pending"]} ${
                       isActive ? "shadow-glow" : ""
                     }`}
                     aria-hidden="true"
@@ -129,9 +143,11 @@ export function WorkflowTaskTimeline({
                     <span className="block truncate text-sm font-medium leading-snug">
                       {task.title}
                     </span>
-                    <span className="block text-xs text-on-surface-variant">
-                      {formatStatusLabel(status)}
-                    </span>
+                    {status !== null && (
+                      <span className="block text-xs text-on-surface-variant">
+                        {formatStatusLabel(status)}
+                      </span>
+                    )}
                   </span>
                 </button>
               </li>

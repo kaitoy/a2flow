@@ -15,6 +15,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteWorkflow,
@@ -22,10 +23,44 @@ import {
   listAgentSkills,
   listWorkflows,
   type Workflow,
+  type WorkflowStatus,
 } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
+import {
+  formatWorkflowStatusLabel,
+  WORKFLOW_STATUS_DOT_CLASS,
+  WORKFLOW_STATUSES,
+} from "@/lib/workflow-status";
 
 const LIMIT = 20;
+
+/**
+ * How often the list re-fetches while any workflow is still generating its
+ * plan. Generation runs in the background on the server, so nothing pushes
+ * its result here.
+ */
+const POLL_INTERVAL_MS = 2000;
+
+/** Status dot plus label, matching the agent-skill table's status treatment. */
+function StatusCell({ workflow }: { workflow: Workflow }) {
+  const status = (workflow.status ?? "draft") as WorkflowStatus;
+  const label = (
+    <span className="flex items-center gap-2">
+      <span
+        className={`inline-block size-2 rounded-full ${WORKFLOW_STATUS_DOT_CLASS[status]}`}
+        aria-hidden
+      />
+      <span className="capitalize">{formatWorkflowStatusLabel(status)}</span>
+    </span>
+  );
+  // The failure reason is the whole point of the failed state, but it is a raw
+  // error message — too long for a cell, so it lives in the tooltip.
+  return workflow.generationError ? (
+    <Tooltip label={workflow.generationError}>{label}</Tooltip>
+  ) : (
+    label
+  );
+}
 
 /** Per-role capabilities driving which row actions the table renders. */
 interface WorkflowPermissions {
@@ -61,15 +96,21 @@ function buildColumns(
         ),
     },
     {
-      header: "Prompt",
-      sortField: "prompt",
-      filterField: "prompt",
-      cell: (w) => w.prompt,
-    },
-    {
       // Resolved from agentSkillId to a display name; not a real column, so no sort/filter.
       header: "Agent Skill",
       cell: (w) => skillMap.get(w.agentSkillId) ?? w.agentSkillId,
+    },
+    {
+      header: "Status",
+      sortField: "status",
+      filterField: "status",
+      filterOp: "eq",
+      filterOptions: WORKFLOW_STATUSES.map((s) => ({
+        label: formatWorkflowStatusLabel(s),
+        value: s,
+      })),
+      noTruncate: true,
+      cell: (w) => <StatusCell workflow={w} />,
     },
     {
       header: "Description",
@@ -92,7 +133,9 @@ function buildColumns(
               icon={runningId === w.id ? Loader2 : Play}
               label="Run"
               onClick={() => onRun(w.id)}
-              disabled={runningId !== null}
+              // Only published workflows are executable; drafts are still
+              // being planned or awaiting review.
+              disabled={runningId !== null || w.status !== "published"}
               spinning={runningId === w.id}
             />
           )}
@@ -137,6 +180,19 @@ export default function WorkflowsPage() {
       });
   }, []);
 
+  const anyGenerating = rows.some((w) => w.status === "generating");
+
+  // Plan generation settles server-side with nothing to notify us, so poll
+  // until every row has landed on draft or failed, then stop. Silently: only
+  // the cells that changed re-render.
+  useEffect(() => {
+    if (!anyGenerating) return;
+    const timer = setInterval(() => {
+      void reload({ silent: true });
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [anyGenerating, reload]);
+
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
   }
@@ -172,8 +228,6 @@ export default function WorkflowsPage() {
       <AdminPageHeader
         title="Workflows"
         icon={WorkflowIcon}
-        addHref={canEdit ? "/admin/workflows/new" : undefined}
-        addLabel={canEdit ? "+ Add workflow" : undefined}
         onRefresh={reload}
         refreshing={loading || refreshing}
       />

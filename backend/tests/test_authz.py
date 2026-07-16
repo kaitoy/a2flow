@@ -13,6 +13,7 @@ from typing import Any
 from httpx import AsyncClient
 
 from tests._envelope import assert_err, assert_ok
+from tests._workflow import create_published_workflow
 
 _SKILL_BODY = {"name": "authz-skill", "repo_url": "https://github.com/x/y"}
 _SECRET_BODY = {"name": "authz-secret", "type": "local", "value": "s3cr3t"}
@@ -32,12 +33,13 @@ def _roles(roles: str) -> dict[str, str]:
 
 
 async def _create_workflow(client: AsyncClient) -> Any:
-    """Create a skill and a workflow (as super admin) and return the workflow."""
+    """Create a published workflow (as super admin) and return it."""
     skill = assert_ok(
         await client.post("/api/v1/agent-skills", json=_SKILL_BODY), status=201
     )
-    body = {"name": "authz-wf", "prompt": "do it", "agent_skill_id": skill["id"]}
-    return assert_ok(await client.post("/api/v1/workflows", json=body), status=201)
+    return await create_published_workflow(
+        client, skill["id"], name="authz-wf", prompt="do it"
+    )
 
 
 # ---------- users: admin ----------
@@ -141,16 +143,39 @@ async def test_create_agent_skill_allowed_for_developer(
     assert_ok(res, status=201)
 
 
-async def test_create_workflow_requires_developer_role(
+async def test_generate_workflow_requires_developer_role(
     workflow_client: AsyncClient,
 ) -> None:
     skill = assert_ok(
         await workflow_client.post("/api/v1/agent-skills", json=_SKILL_BODY),
         status=201,
     )
-    body = {"name": "authz-wf", "prompt": "do it", "agent_skill_id": skill["id"]}
     res = await workflow_client.post(
-        "/api/v1/workflows", json=body, headers=_roles("requester")
+        f"/api/v1/agent-skills/{skill['id']}/workflows",
+        json={"name": "authz-wf", "prompt": "do it"},
+        headers=_roles("requester"),
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_publish_workflow_requires_developer_role(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/publish", headers=_roles("requester")
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_create_workflow_task_template_requires_developer_role(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_workflow(workflow_client)
+    res = await workflow_client.post(
+        "/api/v1/workflow-task-templates",
+        json={"workflow_id": wf["id"], "title": "Step"},
+        headers=_roles("requester"),
     )
     assert_err(res, "FORBIDDEN", 403)
 

@@ -30,8 +30,8 @@ export function useNotifications(): { refresh: () => Promise<void> } {
     try {
       const items = await listNotifications();
       dispatch(setNotifications(items));
-    } catch (error) {
-      logger.error({ error }, "failed to fetch notifications");
+    } catch (err) {
+      logger.error({ err }, "failed to fetch notifications");
       dispatch(notificationsError());
     }
   }, [dispatch]);

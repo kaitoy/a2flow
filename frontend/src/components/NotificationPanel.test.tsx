@@ -99,6 +99,32 @@ describe("NotificationPanel", () => {
     expect(store.getState().notifications.unreadCount).toBe(0);
   });
 
+  it("navigates to the workflow for a workflow-scoped notification", async () => {
+    const onClose = vi.fn();
+    pushMock.mockClear();
+    render(<Harness onClose={onClose} />, {
+      preloadedState: {
+        notifications: {
+          items: [
+            makeNotification({
+              type: "workflow_draft_ready",
+              title: "Workflow draft ready",
+              workflowSessionId: null,
+              workflowId: "wf-1",
+            }),
+          ],
+          unreadCount: 1,
+          status: "idle",
+        },
+      },
+    });
+    await waitFor(() => screen.getByText("Workflow draft ready"));
+    await screen.getByText("Workflow draft ready").click();
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows/wf-1"));
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("dismisses a single notification, removing it from the store", async () => {
     const { store } = render(<Harness onClose={vi.fn()} />, {
       preloadedState: {

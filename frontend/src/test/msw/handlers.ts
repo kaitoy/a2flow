@@ -36,9 +36,10 @@ const USER_1 = {
 const WORKFLOW_1 = {
   id: "wf-1",
   name: "my-workflow",
-  prompt: "Do the thing",
   description: null,
   agentSkillId: "skill-1",
+  status: "published",
+  generationError: null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -50,7 +51,6 @@ const WORKFLOW_SESSION_1 = {
   sessionId: "executed-session-id",
   workflowId: "wf-1",
   workflowName: "My Workflow",
-  workflowPrompt: "Do the thing",
   workflowDescription: null,
   agentSkillId: "skill-1",
   agentSkillName: "My Skill",
@@ -58,6 +58,33 @@ const WORKFLOW_SESSION_1 = {
   agentSkillRepoPath: "",
   skillDir: "/tmp/skill",
   userId: "user",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+const PLANNING_SESSION_1 = {
+  id: "ps-1",
+  sessionId: "planning-session-id",
+  workflowId: "wf-1",
+  agentSkillId: "skill-1",
+  agentSkillCommitSha: "a".repeat(40),
+  userId: "user",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+const WORKFLOW_TASK_TEMPLATE_1 = {
+  id: "tmpl-1",
+  workflowId: "wf-1",
+  title: "Template Step 1",
+  description: null,
+  position: 0,
+  dependsOnIds: [],
+  toolBindings: [],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -197,11 +224,41 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/workflows/:id`, () => envelope(WORKFLOW_1)),
 
-  http.post(`${BASE}/api/v1/workflows`, () => envelope({ ...WORKFLOW_1, id: "new-wf-id" }, 201)),
+  http.post(`${BASE}/api/v1/agent-skills/:skillId/workflows`, () =>
+    envelope({ ...WORKFLOW_1, id: "new-wf-id", status: "generating" }, 201)
+  ),
 
   http.patch(`${BASE}/api/v1/workflows/:id`, () => envelope(WORKFLOW_1)),
 
   http.delete(`${BASE}/api/v1/workflows/:id`, () => envelope(null)),
+
+  http.post(`${BASE}/api/v1/workflows/:id/publish`, () =>
+    envelope({ ...WORKFLOW_1, status: "published" })
+  ),
+
+  http.get(`${BASE}/api/v1/workflows/:id/planning-session`, () => envelope(PLANNING_SESSION_1)),
+
+  http.get(`${BASE}/api/v1/workflows/:id/task-templates`, () =>
+    envelope([WORKFLOW_TASK_TEMPLATE_1])
+  ),
+
+  http.post(`${BASE}/api/v1/workflow-task-templates`, () =>
+    envelope({ ...WORKFLOW_TASK_TEMPLATE_1, id: "new-tmpl-id" }, 201)
+  ),
+
+  http.get(`${BASE}/api/v1/workflow-task-templates/:templateId`, () =>
+    envelope(WORKFLOW_TASK_TEMPLATE_1)
+  ),
+
+  http.patch(`${BASE}/api/v1/workflow-task-templates/:templateId`, () =>
+    envelope(WORKFLOW_TASK_TEMPLATE_1)
+  ),
+
+  http.delete(`${BASE}/api/v1/workflow-task-templates/:templateId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/planning-sessions/:psId`, () => envelope(PLANNING_SESSION_1)),
+
+  http.get(`${BASE}/api/v1/planning-sessions/:psId/messages`, () => envelope([])),
 
   http.post(`${BASE}/api/v1/workflows/:id/execute`, () =>
     envelope(
@@ -210,7 +267,6 @@ export const handlers = [
         sessionId: "executed-session-id",
         workflowId: "wf-1",
         workflowName: "My Workflow",
-        workflowPrompt: "Do the thing",
         workflowDescription: null,
         agentSkillId: "skill-1",
         agentSkillName: "My Skill",

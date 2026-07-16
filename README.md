@@ -4,7 +4,7 @@
 
 A chat application that connects a [Google ADK](https://google.github.io/adk-docs/) agent to a Next.js UI using the [AG-UI protocol](https://docs.ag-ui.com/concepts/events). The agent supports [A2UI](https://a2ui.org/) — when it needs input from the user it renders interactive A2UI input components (text fields, choice pickers, buttons) so the user can see exactly what to provide, while purely informational replies stream token-by-token as Markdown-rendered text so the user never waits on a tool call.
 
-The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference. A **notification center** in the top toolbar surfaces workflow events such as plan approval requests (see [Notifications](#notifications)).
+The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference. A **notification center** in the top toolbar surfaces workflow events such as generated drafts and approval requests (see [Notifications](#notifications)).
 
 ```
 ┌──────────────────────────────────┐    AG-UI RunAgentInput (JSON)    ┌──────────────────────┐
@@ -114,7 +114,7 @@ Every user holds a set of **roles** granting the operations they may perform. Ro
 |---|---|
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the designated-approver checks described under [Human approval](#human-approval)) |
 | `admin` | User CRUD, secrets CRUD |
-| `developer` | MCP server CRUD, workflow CRUD, agent-skill CRUD |
+| `developer` | MCP server CRUD, agent-skill CRUD, workflow generation/editing/publishing, task-template CRUD, planning-session chat |
 | `requester` | Running workflows (`POST /workflows/{id}/execute`) |
 | `approver` | Eligibility to be a workflow approval's designated approver, and resolving their own approvals |
 
@@ -243,51 +243,70 @@ A single global Vault connection is configured through env vars (see `backend/.e
 
 ### Workflows
 
-Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/workflows) to manage Workflows — named configurations that pair a prompt with an Agent Skill.
+Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/workflows) to manage Workflows — reusable units of work that pair an Agent Skill with a **pre-planned task list** (the workflow's *task templates*). A workflow's lifecycle is **generate → adjust → publish → execute**: the plan is produced and settled *before* any run, so executing a workflow starts working immediately instead of re-planning every time.
 
 | Operation | Path |
 |-----------|------|
+| Generate a workflow from a skill | "Generate workflow" button on [Agent Skills](#agent-skills) (calls `POST /agent-skills/{id}/workflows`) |
 | List all workflows | `GET /admin/workflows` |
-| Create a new workflow | `GET /admin/workflows/new` |
-| Edit / delete a workflow | `GET /admin/workflows/{id}` |
+| Edit a workflow / publish / open its planning session | `GET /admin/workflows/{id}` |
+| Manage its task templates | `GET /admin/workflows/{id}/task-templates` |
 | Run a workflow | "Run" button in the list (calls `POST /workflows/{id}/execute`) |
 
-Each workflow record stores a name, prompt (instructions for the agent), a reference to an Agent Skill, and an optional description. Workflows are also persisted in `a2flow.db`.
+Each workflow record stores a name, a reference to an Agent Skill, a lifecycle **status** (`generating` / `draft` / `failed` / `published`), and a description that is **summarized from the planning conversation** at publish time and handed to the execution agent as run context. Workflows are persisted in `a2flow.db`; there is no bare `POST /workflows` — generation is the only way a workflow is born.
+
+#### Generating a workflow
+
+Clicking **Generate workflow** on an Agent Skill opens a small form: the workflow **name** (prefilled with the skill name) and the **prompt** describing the work. Submitting it:
+
+1. Checks that the skill has a published revision (`commitSha`); otherwise HTTP 409 (`SKILL_NOT_READY`). The new workflow (`status: "generating"`) and its **PlanningSession** — pinned to that revision — are registered immediately (HTTP 201), and the frontend navigates to the workflow's detail page, which polls while generation runs.
+2. A **background planning run** sends the prompt as the planning session's first chat message and drives an *initial-planning* agent: following the skill, it breaks the request into steps and registers them as the workflow's **task templates** in one `register_planning_tasks` call (a DAG — each step declares a `key` and its `depends_on` predecessors, plus optional MCP `tools` bindings).
+3. When the run finishes, the planning conversation is summarized (one LLM call) into the workflow's `description`, the status becomes **`draft`**, and a **workflow-draft-ready notification** deep-links back to the workflow. Any failure — including a run that registered no templates — lands on the row as **`failed`** with the reason; the planning chat stays usable to fix the plan by hand.
+
+The prompt itself is not stored on the workflow: it lives on as the first message of the planning conversation, and the publish-time summary carries the intent forward.
+
+#### Adjusting the plan
+
+A draft's task templates can be refined in two ways, in any mix:
+
+- **By chat** — the workflow detail page's **Open planning session** button opens `/planning-sessions/{id}`: the same chat UI as a run, with the template list down the left edge, driven by an interactive *planning* agent whose tools (`register_planning_tasks`, `create_planning_task`, `list_planning_tasks`, `get_planning_task`, `update_planning_task`, `delete_planning_task`) edit the workflow's templates directly. The planning agent never executes anything. The planning session is owner-only (plus Super Admins) and reuses the shared chat plumbing (history poll, A2UI surfaces).
+- **By hand** — the **Task Templates** admin pages (`/admin/workflows/{id}/task-templates`) offer the familiar Table / Graph views plus create/edit/delete forms with **Depends on** and **MCP Tools** pickers, backed by `GET /workflows/{id}/task-templates` and the `POST`/`PATCH`/`DELETE /workflow-task-templates` endpoints (developer-gated).
+
+Templates mirror session tasks structurally — title, description, `position`, DAG edges (`workflow_task_template_dependencies`), and MCP tool bindings (`workflow_task_template_tool_bindings`, server side `RESTRICT`) — but carry **no status**: the lifecycle belongs to a run, not the plan. The same DAG rules apply (same-workflow targets, cycles rejected with HTTP 409 `DEPENDENCY_CYCLE`).
+
+#### Publishing
+
+**Publish** (on the workflow detail page, `POST /workflows/{id}/publish`, developer-gated) is what makes a workflow executable. It requires at least one template (and no generation in flight) — otherwise HTTP 409 (`WORKFLOW_NOT_RUNNABLE`) — and **re-summarizes the planning conversation** into the workflow's description so the latest intent reaches future runs. Re-adjust → re-publish is allowed at any time; runs already started are unaffected because they copied the plan (below).
 
 #### Running a workflow
 
-Clicking **Run** on a workflow creates a **WorkflowSession** — an independent entity that captures a snapshot of the workflow configuration at execution time:
+Clicking **Run** on a **published** workflow creates a **WorkflowSession** — an independent entity that captures a snapshot of the workflow configuration at execution time:
 
-1. The backend checks that the linked [Agent Skill](#agent-skills) has a published revision (`commitSha`) — the repository was cloned when the skill was registered, so **nothing is cloned here**. A skill whose clone has not published a revision yet, or whose clone failed, is rejected with HTTP 409 (`SKILL_NOT_READY`).
-2. A `WorkflowSession` record is persisted to the database, capturing the workflow name, prompt, skill details, the ADK session ID, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). Because revision directories are immutable, a later pull of that skill cannot swap the code out from under a conversation already in progress — and because the store is shared, any replica resolves the same code. The ADK session itself is created lazily on the first agent call.
+1. The backend rejects non-`published` workflows with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`) and re-checks the skill's published revision (`SKILL_NOT_READY` otherwise) — the repository was cloned when the skill was registered, so **nothing is cloned here**.
+2. A `WorkflowSession` record is persisted, capturing the workflow name, its summarized description, skill details, the ADK session ID, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). The workflow's task templates are **copied into the session as `pending` WorkflowTasks** (dependency edges and tool bindings included, ids remapped), so later template edits never affect this run. The ADK session itself is created lazily on the first agent call.
 3. The backend returns the `WorkflowSession` (HTTP 201). The frontend redirects to `/workflow-sessions/{workflowSession.id}`.
-4. On mount, the `/workflow-sessions/{id}` page fetches the `WorkflowSession`, and if no prior messages exist for the session, it automatically sends `workflow.prompt` as the first user message via `POST /workflow-sessions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](#welcome-page).
-5. The `/workflow-sessions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id` **and** the pinned revision) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under a **plan-then-execute** workflow instruction and is equipped with WorkflowTask management tools (see below).
+4. On mount, the `/workflow-sessions/{id}` page fetches the `WorkflowSession`, and if no prior messages exist it auto-sends a fixed kickoff message via `POST /workflow-sessions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](#welcome-page).
+5. The `/workflow-sessions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id`, the pinned revision, **and the agent role**) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under an **execute-only** instruction — the plan was approved by publishing, so it **begins immediately**, with the workflow's description injected server-side as trusted run context.
 6. Subsequent user messages continue to flow through `POST /workflow-sessions/{id}/agent`, so A2UI rendering, A2UI user actions (e.g. clicking a rendered button), and the full chat experience work normally.
 
-##### Agent-managed task DAG
+##### Agent-managed execution
 
-The skill-driven agent does not just *suggest* steps — it **manages the WorkflowTasks itself** through dedicated agent tools, in two phases:
-
-1. **Plan** — following the skill's instructions, the agent breaks the request into concrete steps and registers them as a DAG in a single `register_workflow_tasks` call (each step declares a `key` and its `depends_on` predecessors). It then presents the plan and **waits for your approval** before doing any work. Registering the plan also raises an **approval-request notification** (see [Notifications](#notifications)).
-2. **Execute** — once approved, the agent loops: it lists the tasks, picks the next runnable one (a `pending` task whose dependencies are all `completed`), marks it `in_progress`, does the work per the skill, and marks it `completed` (or `failed` / `skipped`). When every task reaches a terminal state, a **session-completed notification** is raised.
-
-Six tools back this — `register_workflow_tasks`, `create_workflow_task`, `list_workflow_tasks`, `get_workflow_task`, `update_workflow_task`, and `delete_workflow_task` — which resolve the current session from the ADK session id and operate on the same `WorkflowTask` records exposed by the REST API. You can watch the statuses update live in the **Workflow Tasks** admin view (Table or Graph). See [backend/README.md](backend/README.md#agent-task-tools) for the tool reference.
+The execution agent works through the pre-copied WorkflowTasks: it lists the tasks, picks the next runnable one (a `pending` task whose dependencies are all `completed`), marks it `in_progress`, does the work per the skill, and marks it `completed` (or `failed` / `skipped`). When every task reaches a terminal state, a **session-completed notification** is raised. Five tools back this — `create_workflow_task`, `list_workflow_tasks`, `get_workflow_task`, `update_workflow_task`, and `delete_workflow_task` — which resolve the current session from the ADK session id and operate on the same `WorkflowTask` records exposed by the REST API (so the agent can still adjust the run's plan mid-flight when needed). You can watch the statuses update live in the read-only **Workflow Tasks** admin view (Table or Graph). See [backend/README.md](backend/README.md#agent-task-tools) for the tool reference.
 
 ##### MCP tools for tasks
 
 WorkflowTasks can use tools from remote MCP servers registered in the [MCP Servers](#mcp-servers) admin page:
 
-1. **Bind at plan time** — during the Plan phase the agent calls `list_mcp_tools`, which queries every registered server concurrently and returns each server's advertised tools (unreachable servers are reported per-server without failing the listing). Steps that need an external tool get a `tools` entry (`[{"server_id": …, "tool_name": …}]`) in `register_workflow_tasks`; bindings are persisted in the `workflow_task_tool_bindings` join table and surfaced as `toolBindings` on the REST read model.
+1. **Bind at plan time** — while planning, the agent calls `list_mcp_tools`, which queries every registered server concurrently and returns each server's advertised tools (unreachable servers are reported per-server without failing the listing). Steps that need an external tool get a `tools` entry (`[{"server_id": …, "tool_name": …}]`) in `register_planning_tasks`; bindings are persisted on the templates and copied onto the run's tasks at execute time, surfaced as `toolBindings` on the REST read models.
 2. **Enforce at execution time** — the agent invokes bound tools through the `call_mcp_tool(server_id, tool_name, arguments)` proxy. The backend validates that the pair is bound to a task currently `in_progress` in the session (the union of bindings when several are in progress) before opening a per-call streamable HTTP connection to the server and forwarding the call. Calls to unbound tools are rejected with an error listing the allowed tools, so a shared, skill-cached agent can never use tools a task wasn't granted.
 
-Bound tools appear as chips in the **Tools** column of the Workflow Tasks list, and the task create/edit forms include an **MCP Tools** picker populated live from the registered servers (already-bound tools stay visible even if their server is unreachable).
+Bound tools appear as chips in the **Tools** column of the Task Templates and Workflow Tasks lists, and the template forms include an **MCP Tools** picker populated live from the registered servers (already-bound tools stay visible even if their server is unreachable).
 
-Workflow sessions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowSession` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains).
+Workflow sessions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowSession` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains). Deleting a workflow **does** delete its planning session and task templates (cascade).
 
-The individual tasks produced during a workflow session are persisted as `WorkflowTask` records and managed via dedicated CRUD endpoints. Each task carries a status (`pending` / `in_progress` / `completed` / `failed` / `skipped`) and an integer `position` for stable layout ordering. See [backend/README.md](backend/README.md#workflow-tasks) for the API reference. Deleting a `WorkflowSession` cascades to its tasks.
+The individual tasks of a run are persisted as `WorkflowTask` records. Each task carries a status (`pending` / `in_progress` / `completed` / `failed` / `skipped`) and an integer `position` for stable layout ordering. See [backend/README.md](backend/README.md#workflow-tasks) for the API reference. Deleting a `WorkflowSession` cascades to its tasks.
 
-Tasks form a **directed acyclic graph (DAG)** rather than a flat list: each task may depend on zero or more other tasks in the same session via its `dependsOnIds` field (`(task, dependsOn)` edges are stored in the `workflow_task_dependencies` join table). A task's edges can be set at creation time or replaced on update by sending the full `dependsOnIds` list; omitting the field on update leaves edges unchanged. Dependency targets must exist and belong to the same session (otherwise HTTP 422 `FOREIGN_KEY_VIOLATION`), and edges that would introduce a cycle — including a self-dependency — are rejected with HTTP 409 `DEPENDENCY_CYCLE`. Deleting a task cascades to the dependency edges that reference it in either direction.
+Tasks form a **directed acyclic graph (DAG)** rather than a flat list: each task may depend on zero or more other tasks in the same session via its `dependsOnIds` field (`(task, dependsOn)` edges are stored in the `workflow_task_dependencies` join table). Dependency targets must exist and belong to the same session (otherwise HTTP 422 `FOREIGN_KEY_VIOLATION`), and edges that would introduce a cycle — including a self-dependency — are rejected with HTTP 409 `DEPENDENCY_CYCLE`. Deleting a task cascades to the dependency edges that reference it in either direction.
 
 ##### Human approval
 
@@ -314,15 +333,13 @@ The chat screen also shows a collapsible **task timeline** down the left edge: t
 
 ### Workflow Sessions
 
-Navigate to [http://localhost:3000/admin/workflow-sessions](http://localhost:3000/admin/workflow-sessions) to browse every executed `WorkflowSession`. Each row links to the chat UI (`/workflow-sessions/{id}`) and to the nested **Workflow Tasks** admin page (`/admin/workflow-sessions/{id}/workflow-tasks`) where individual tasks belonging to that session can be created, edited, deleted, and have their status updated inline. A row's **Delete** action removes the `WorkflowSession` after a confirmation prompt: the record, its tasks (cascade), and the underlying ADK chat session are all deleted. The create and edit forms include a **Depends on** picker for selecting which other tasks in the same session a task depends on (its DAG edges); dependencies are shown as a column on the list, and edges that would form a cycle are rejected by the server. The Workflow Tasks page offers a **Table / Graph** toggle: the Graph view renders the task DAG with [React Flow](https://reactflow.dev/), auto-laid-out top-to-bottom with [dagre](https://github.com/dagrejs/dagre) so prerequisites sit above the tasks that depend on them. The graph is read-only (pan / zoom / fit) — dependencies are edited from the task forms.
+Navigate to [http://localhost:3000/admin/workflow-sessions](http://localhost:3000/admin/workflow-sessions) to browse every executed `WorkflowSession`. Each row links to the chat UI (`/workflow-sessions/{id}`) and to the nested **Workflow Tasks** admin page (`/admin/workflow-sessions/{id}/workflow-tasks`), a **read-only** view of the run's tasks — the plan is edited on the workflow's [task templates](#adjusting-the-plan), and a run's statuses are advanced by the execution agent (and the approval flow), so a run's history stays faithful to what actually ran. A row's **Delete** action removes the `WorkflowSession` after a confirmation prompt: the record, its tasks (cascade), and the underlying ADK chat session are all deleted. The Workflow Tasks page offers a **Table / Graph** toggle: the Graph view renders the task DAG with [React Flow](https://reactflow.dev/), auto-laid-out with [dagre](https://github.com/dagrejs/dagre) so prerequisites sit before the tasks that depend on them (pan / zoom / fit).
 
 | Operation | Path |
 |-----------|------|
 | List all sessions | `GET /admin/workflow-sessions` |
 | Delete a session | `DELETE /api/v1/workflow-sessions/{id}` |
-| List a session's tasks | `GET /admin/workflow-sessions/{id}/workflow-tasks` |
-| Create a task | `GET /admin/workflow-sessions/{id}/workflow-tasks/new` |
-| Edit / delete a task | `GET /admin/workflow-sessions/{id}/workflow-tasks/{taskId}` |
+| View a session's tasks | `GET /admin/workflow-sessions/{id}/workflow-tasks` |
 
 ### Approvals
 
@@ -332,16 +349,17 @@ Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/
 
 A **bell icon** in the top toolbar (present on both the chat header and the admin sidebar) opens a notification center with an unread-count badge. Notifications are **per-user**, persisted in `a2flow.db`, and delivered by **polling** (the frontend refreshes every 30 seconds).
 
-Two workflow events generate a notification, both raised by the agent's task tools. The recipient depends on the event: a `request_approval` notification is addressed to that approval's **designated approver**, while a `register_workflow_tasks` plan-approval notification and the `session_completed` notification are addressed to the **user who started the session**:
+Three workflow events generate a notification. The recipient depends on the event: a `request_approval` notification is addressed to that approval's **designated approver**, while the others are addressed to the **user who started the session or generation**:
 
 | Type | Raised when |
 |---|---|
-| `approval_request` | The agent registers a plan (`register_workflow_tasks`) and waits for the session owner's approval, or requests a mid-execution decision (`request_approval`) and waits for the designated approver. |
+| `workflow_draft_ready` | The background planning run of ["Generate workflow"](#generating-a-workflow) finished and the draft's initial task templates are ready for review. |
+| `approval_request` | The agent requests a mid-execution decision (`request_approval`) and waits for the designated approver. |
 | `session_completed` | Every `WorkflowTask` in the session has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per session. |
 
-Clicking a notification marks it read and deep-links to the relevant `/workflow-sessions/{id}` chat. Each row also has a **dismiss (✕)** button that permanently deletes that notification, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once.
+Clicking a notification marks it read and deep-links to the relevant place: run-scoped events to the `/workflow-sessions/{id}` chat, `workflow_draft_ready` to the workflow's detail page. Each row also has a **dismiss (✕)** button that permanently deletes that notification, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once.
 
-The list (`?unreadOnly=true` for unread), mark-read, mark-all-read, and delete endpoints are documented in the [API reference](http://localhost:3000/api-doc); all are scoped to the authenticated user, so reading, updating, or deleting another user's notification returns HTTP 404. Notifications cascade-delete with their recipient user and their linked `WorkflowSession`.
+The list (`?unreadOnly=true` for unread), mark-read, mark-all-read, and delete endpoints are documented in the [API reference](http://localhost:3000/api-doc); all are scoped to the authenticated user, so reading, updating, or deleting another user's notification returns HTTP 404. Notifications cascade-delete with their recipient user and their linked `WorkflowSession` or `Workflow`.
 
 ## Agent activity in the chat
 

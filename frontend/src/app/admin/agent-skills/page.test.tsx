@@ -125,6 +125,32 @@ describe("AgentSkillsPage", () => {
     expect(deleteSpy).toHaveBeenCalled();
   });
 
+  it("navigates to the generate-workflow form", async () => {
+    const user = userEvent.setup();
+    const pushMock = vi.fn();
+    const { useRouter } = await import("next/navigation");
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+      forward: vi.fn(),
+    });
+
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    await user.click(screen.getByRole("button", { name: "Generate workflow" }));
+    expect(pushMock).toHaveBeenCalledWith("/admin/agent-skills/skill-1/generate-workflow");
+  });
+
+  it("disables Generate workflow while the skill has no published revision", async () => {
+    server.use(http.get(SKILL_URL, () => envelope([CLONING_SKILL])));
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getByRole("button", { name: "Generate workflow" })).toBeDisabled();
+  });
+
   it("calls the pull api", async () => {
     const user = userEvent.setup();
     const pullSpy = vi.fn(() => envelope({ id: "skill-1" }, 202));

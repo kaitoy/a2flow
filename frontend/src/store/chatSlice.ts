@@ -67,19 +67,23 @@ function synthesizeA2UIActivityMessage(
   toolCallId: string,
   args: Record<string, unknown>
 ): Message | null {
-  const { surfaceId, catalogId, components, data } = args as {
+  const { surfaceId, components, data } = args as {
     surfaceId?: string;
-    catalogId?: string;
     components?: unknown[];
     data?: unknown;
   };
   if (!surfaceId) return null;
-  // The message processor resolves catalogId strictly against registered catalog
-  // ids. Mirror A2UIMiddleware's live-path behavior: the alias "basic" (or a
-  // missing catalogId) maps to the app's registered catalog.
-  const resolvedCatalogId = catalogId && catalogId !== "basic" ? catalogId : A2UI_CATALOG_ID;
+  // The catalog is the host's to choose, never the agent's: A2UIMiddleware is
+  // configured with `defaultCatalogId`, and its live path lets that win over any
+  // `catalogId` in the tool-call args. Mirror that here rather than reading the
+  // args back. `render_a2ui` has no `catalogId` parameter and its usage guide
+  // says not to pass one, but the guide's own examples show a `catalogId` of
+  // "https://a2ui.org/specification/v0_9/basic_catalog.json", so the LLM copies
+  // it into the args anyway. Honoring it would resolve against a catalog id this
+  // app never registered — the live surface renders, then this rebuild (a poll or
+  // a reload) throws `Catalog not found` and the surface vanishes.
   const ops: Record<string, unknown>[] = [
-    { version: "v0.9", createSurface: { surfaceId, catalogId: resolvedCatalogId } },
+    { version: "v0.9", createSurface: { surfaceId, catalogId: A2UI_CATALOG_ID } },
     { version: "v0.9", updateComponents: { surfaceId, components: components ?? [] } },
   ];
   if (data != null) ops.push({ version: "v0.9", updateDataModel: { surfaceId, value: data } });

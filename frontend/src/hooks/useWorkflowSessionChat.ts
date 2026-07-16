@@ -6,7 +6,9 @@ import { useStore } from "react-redux";
 import { buildRenderAckMessages, type PendingRenderCall } from "@/lib/a2uiAction";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
+  createPlanningSessionAgent,
   createWorkflowSessionAgent,
+  getPlanningSessionMessages,
   getUsersByIds,
   getWorkflowSessionMessageSenders,
   getWorkflowSessionMessages,
@@ -76,23 +78,40 @@ function makeEventHandlers(
 }
 
 /**
- * Manage the agent interaction for a workflow session.
+ * Which session-scoped chat backend the hook talks to: a workflow session
+ * (execution run, shared with approvers) or a planning session (the owner-only
+ * chat that refines a workflow's task templates).
+ */
+export type SessionChatVariant = "workflow" | "planning";
+
+/**
+ * Manage the agent interaction for a workflow or planning session.
  *
- * On mount, loads prior message history and auto-sends the workflow prompt if the session is new.
- * Subsequent user messages and A2UI user actions (e.g. a button click inside a
- * rendered surface) are routed to the workflow session's dedicated agent endpoint.
+ * On mount, loads prior message history and — when `kickoffPrompt` is non-null
+ * and the session is new — auto-sends it to start the run; planning sessions
+ * pass `null` because their first exchange happened in the background
+ * generation run (or the user types it). Subsequent user messages and A2UI
+ * user actions (e.g. a button click inside a rendered surface) are routed to
+ * the session's dedicated agent endpoint, selected by `variant`.
  *
- * Because the chat is shared (owner, approvers, and the agent all post into it),
- * the history is also re-fetched every {@link POLL_INTERVAL_MS} so messages from
- * other participants appear without a reload. Polling pauses while the current
- * viewer's own run is in flight and skips re-applying an unchanged history.
+ * Because the workflow chat is shared (owner, approvers, and the agent all
+ * post into it), the history is also re-fetched every {@link POLL_INTERVAL_MS}
+ * so messages from other participants appear without a reload. Polling pauses
+ * while the current viewer's own run is in flight and skips re-applying an
+ * unchanged history. Planning sessions keep the same polling (the background
+ * generation run's messages appear the same way) but have no sender
+ * attribution or task association — the chat belongs to its owner alone.
  */
 export function useWorkflowSessionChat(
   workflowSessionId: string,
   sessionId: string,
-  workflowPrompt: string,
-  ownerUserId: string
+  kickoffPrompt: string | null,
+  ownerUserId: string,
+  variant: SessionChatVariant = "workflow"
 ) {
+  const isPlanning = variant === "planning";
+  const fetchMessages = isPlanning ? getPlanningSessionMessages : getWorkflowSessionMessages;
+  const buildAgent = isPlanning ? createPlanningSessionAgent : createWorkflowSessionAgent;
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
   const { messages, isRunning, isStreaming, error, pendingRenderCalls } = useAppSelector(
@@ -132,16 +151,23 @@ export function useWorkflowSessionChat(
 
   const refreshSenders = useCallback(async () => {
     try {
-      const senders = await getWorkflowSessionMessageSenders(workflowSessionId);
+      // Planning sessions have no sender attribution (the owner is the only
+      // human in the chat); resolve just the owner for the avatar fallback.
+      const senders = isPlanning
+        ? new Map<string, string>()
+        : await getWorkflowSessionMessageSenders(workflowSessionId);
       const users = await getUsersByIds([ownerUserId, ...senders.values()]);
       setMessageSenders(senders);
       setSenderUsers(users);
     } catch (err) {
       logger.error(err, "failed to load message senders");
     }
-  }, [workflowSessionId, ownerUserId]);
+  }, [workflowSessionId, ownerUserId, isPlanning]);
 
   const refreshTasks = useCallback(async () => {
+    // Planning sessions edit the workflow's task templates, which the page
+    // fetches itself; there are no status-ful session tasks to track here.
+    if (isPlanning) return;
     try {
       const [taskList, taskMap] = await Promise.all([
         listWorkflowTasks(workflowSessionId),
@@ -152,7 +178,7 @@ export function useWorkflowSessionChat(
     } catch (err) {
       logger.error(err, "failed to load workflow tasks");
     }
-  }, [workflowSessionId]);
+  }, [workflowSessionId, isPlanning]);
 
   const refreshMessages = useCallback(async () => {
     // Never merge mid-run: syncPolledMessages rebuilds the message array from the
@@ -160,7 +186,7 @@ export function useWorkflowSessionChat(
     // stream, so polling is only safe between runs.
     if (isRunningRef.current || isStreamingRef.current) return;
     try {
-      const loaded = await getWorkflowSessionMessages(workflowSessionId);
+      const loaded = await fetchMessages(workflowSessionId);
       // A run may have started while the fetch was in flight; re-check the guard.
       if (isRunningRef.current || isStreamingRef.current) return;
       // The shared chat is append-only, so length + last id uniquely identify the
@@ -176,9 +202,9 @@ export function useWorkflowSessionChat(
       // visible messages.
       await Promise.all([refreshSenders(), refreshTasks()]);
     } catch (err) {
-      logger.error(err, "failed to poll workflow session messages");
+      logger.error(err, "failed to poll session messages");
     }
-  }, [workflowSessionId, sessionId, dispatch, refreshSenders, refreshTasks]);
+  }, [workflowSessionId, sessionId, dispatch, refreshSenders, refreshTasks, fetchMessages]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
@@ -189,7 +215,7 @@ export function useWorkflowSessionChat(
       dispatch(addUserMessage({ id: msgId, content: prompt }));
       locallySentIds.current.add(msgId);
 
-      const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
+      const agent = buildAgent(workflowSessionId, sessionId);
 
       const pending = store.getState().chat.pendingRenderCalls;
       for (const ack of buildRenderAckMessages(pending)) {
@@ -219,7 +245,7 @@ export function useWorkflowSessionChat(
       // Refresh task state and the per-message task association the run produced.
       void refreshTasks();
     },
-    [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
+    [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks, buildAgent]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -229,7 +255,7 @@ export function useWorkflowSessionChat(
 
       dispatch(startRun());
 
-      const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
+      const agent = buildAgent(workflowSessionId, sessionId);
 
       // The action rides as the tool result of the render call that produced
       // the acted-on surface, carrying `values` (the surface's data model) so
@@ -267,7 +293,7 @@ export function useWorkflowSessionChat(
       // the same resumed-history path keeps it consistent with the sender map.
       void refreshMessages();
     },
-    [workflowSessionId, sessionId, isRunning, dispatch, refreshMessages]
+    [workflowSessionId, sessionId, isRunning, dispatch, refreshMessages, buildAgent]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -330,21 +356,21 @@ export function useWorkflowSessionChat(
     dispatch(setSession(sessionId));
     void refreshSenders();
     void refreshTasks();
-    getWorkflowSessionMessages(workflowSessionId)
+    fetchMessages(workflowSessionId)
       .then((loadedMessages) => {
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
         // Record the loaded history so the first poll doesn't re-apply it.
         appliedSignatureRef.current = `${loadedMessages.length}:${loadedMessages.at(-1)?.id ?? ""}`;
-        if (loadedMessages.length === 0 && !autoSentRef.current) {
+        if (kickoffPrompt !== null && loadedMessages.length === 0 && !autoSentRef.current) {
           autoSentRef.current = true;
-          sendMessage(workflowPrompt);
+          sendMessage(kickoffPrompt);
         }
       })
       .catch(() => {
         // ADK session not yet created (first run) — auto-send to kick off the workflow
-        if (!autoSentRef.current) {
+        if (kickoffPrompt !== null && !autoSentRef.current) {
           autoSentRef.current = true;
-          sendMessage(workflowPrompt);
+          sendMessage(kickoffPrompt);
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
