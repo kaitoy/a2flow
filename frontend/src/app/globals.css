@@ -572,10 +572,12 @@ body::after {
 }
 
 /* Floating popover surfaces (tooltips, dropdown/list menus, modal dialogs). Same
-   large shadow as `glass-panel-strong` but a lighter blur and a more translucent
-   fill so the content behind the overlay reads through more clearly. */
+   large shadow as `glass-panel-strong` but a much lighter blur (8px) and a more
+   translucent fill so the content behind the overlay stays readable. The full
+   saturate is kept: it carries the glass character that the softened blur gives
+   up, without obscuring what is underneath. */
 @utility glass-panel-overlay {
-  @apply backdrop-blur-[16px] backdrop-saturate-[1.6];
+  @apply backdrop-blur-[8px] backdrop-saturate-[1.6];
   background-color: var(--color-glass-overlay);
   border: 1px solid var(--color-glass-border);
   box-shadow: var(--shadow-glass-lg);

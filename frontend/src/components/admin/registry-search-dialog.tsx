@@ -117,7 +117,7 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
             <animated.button
               type="button"
               style={{ opacity: style.opacity }}
-              className="absolute inset-0 h-full w-full cursor-default border-0 bg-black/25 backdrop-blur-sm"
+              className="absolute inset-0 h-full w-full cursor-default border-0 bg-black/25 backdrop-blur-[2px]"
               onClick={onClose}
               // Stop the backdrop itself from taking focus on click, so the
               // a11y hook's close handler always restores focus to the

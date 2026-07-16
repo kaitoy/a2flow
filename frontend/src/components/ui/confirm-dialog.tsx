@@ -42,7 +42,7 @@ export function ConfirmDialog({
             <animated.button
               type="button"
               style={{ opacity: style.opacity }}
-              className="absolute inset-0 bg-black/25 backdrop-blur-sm cursor-default"
+              className="absolute inset-0 bg-black/25 backdrop-blur-[2px] cursor-default"
               onClick={onCancel}
               // Stop the backdrop itself from taking focus on click, so the
               // a11y hook's close handler always restores focus to the
