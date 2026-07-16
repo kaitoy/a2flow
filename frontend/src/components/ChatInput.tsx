@@ -2,6 +2,7 @@
 
 import { animated, useSpring } from "@react-spring/web";
 import { type KeyboardEvent, useRef, useState } from "react";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMotionConfig } from "@/lib/motion";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -11,8 +12,14 @@ interface Props {
   disabled: boolean;
 }
 
-/** Auto-resizing textarea input that sends on Enter and inserts a newline on Shift+Enter. */
+/**
+ * Auto-resizing textarea input that sends on Enter and inserts a newline on
+ * Shift+Enter. On coarse-pointer (touch) devices Enter inserts a newline
+ * instead — soft keyboards have no Shift+Enter, so Enter must stay usable
+ * for line breaks and sending happens through the Send button.
+ */
 export function ChatInput({ onSend, disabled }: Props) {
+  const coarsePointer = useMediaQuery("(pointer: coarse)");
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const config = useMotionConfig("snappy");
@@ -37,7 +44,7 @@ export function ChatInput({ onSend, disabled }: Props) {
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !coarsePointer) {
       e.preventDefault();
       handleSend();
     }
@@ -51,7 +58,7 @@ export function ChatInput({ onSend, disabled }: Props) {
   };
 
   return (
-    <div className="shrink-0 px-4 pb-6 pt-2">
+    <div className="shrink-0 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2">
       <animated.div
         style={{
           boxShadow: glow.glow.to(
@@ -67,7 +74,9 @@ export function ChatInput({ onSend, disabled }: Props) {
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
-          placeholder="Message…  (Enter to send · Shift+Enter for newline)"
+          placeholder={
+            coarsePointer ? "Message…" : "Message…  (Enter to send · Shift+Enter for newline)"
+          }
           disabled={disabled}
           rows={1}
           className="flex-1 resize-none max-h-40 overflow-y-auto !border-transparent !bg-transparent !shadow-none focus:!ring-0"

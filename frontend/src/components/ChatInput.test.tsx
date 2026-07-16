@@ -3,6 +3,23 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ChatInput } from "./ChatInput";
 
+/** Make `(pointer: coarse)` match, emulating a touch device; other queries stay false. */
+function stubCoarsePointer() {
+  return vi.spyOn(window, "matchMedia").mockImplementation(
+    (query: string) =>
+      ({
+        matches: query === "(pointer: coarse)",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }) as unknown as MediaQueryList
+  );
+}
+
 describe("ChatInput", () => {
   it("renders textarea with placeholder", () => {
     render(<ChatInput onSend={vi.fn()} disabled={false} />);
@@ -54,5 +71,28 @@ describe("ChatInput", () => {
     render(<ChatInput onSend={onSend} disabled={false} />);
     await userEvent.type(screen.getByRole("textbox"), "   {Enter}");
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("on a touch device, Enter inserts a newline instead of sending", async () => {
+    const spy = stubCoarsePointer();
+    try {
+      const onSend = vi.fn();
+      render(<ChatInput onSend={onSend} disabled={false} />);
+      await userEvent.type(screen.getByRole("textbox"), "hello{Enter}world");
+      expect(onSend).not.toHaveBeenCalled();
+      expect(screen.getByRole("textbox")).toHaveValue("hello\nworld");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("on a touch device, the placeholder omits the Enter-to-send hint", () => {
+    const spy = stubCoarsePointer();
+    try {
+      render(<ChatInput onSend={vi.fn()} disabled={false} />);
+      expect(screen.getByPlaceholderText("Message…")).toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

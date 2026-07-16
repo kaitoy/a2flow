@@ -1,5 +1,5 @@
 /** @module RootLayout — Applies fonts, theme flash-prevention script, and global providers. */
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -23,6 +23,15 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "A2Flow",
   description: "AI chat powered by Google ADK",
+};
+
+/**
+ * Viewport configuration. `viewportFit: "cover"` lets the app paint behind
+ * notches/home indicators so `env(safe-area-inset-*)` paddings (e.g. on the
+ * chat input) take effect on devices with them.
+ */
+export const viewport: Viewport = {
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
