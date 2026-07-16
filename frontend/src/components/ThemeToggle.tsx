@@ -28,7 +28,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     config,
   });
   const cls = [
-    "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full relative overflow-hidden",
+    "inline-flex h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11 cursor-pointer items-center justify-center rounded-full relative overflow-hidden",
     "glass-panel text-on-surface",
     "transition-[transform,translate,scale,box-shadow,color,background-color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
     "hover:shadow-glow hover:text-accent motion-safe:hover:scale-105 motion-safe:active:scale-95",

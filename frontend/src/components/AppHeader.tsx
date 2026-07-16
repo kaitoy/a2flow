@@ -42,7 +42,7 @@ export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
             onClick={onMenuClick}
             aria-label="Open menu"
             aria-haspopup="dialog"
-            className="md:hidden -ml-1 shrink-0 cursor-pointer rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
+            className="md:hidden -ml-1 shrink-0 cursor-pointer rounded-lg p-2 pointer-coarse:p-3 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
           >
             <Menu size={20} strokeWidth={1.8} aria-hidden="true" />
           </button>

@@ -28,7 +28,7 @@ export function UserProfileButton({ className }: UserProfileButtonProps) {
   const close = useCallback(() => setOpen(false), []);
 
   const cls = [
-    "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full relative",
+    "inline-flex h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11 cursor-pointer items-center justify-center rounded-full relative",
     "glass-panel text-on-surface",
     "transition-[transform,translate,scale,box-shadow,color,background-color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
     "hover:shadow-glow hover:text-accent motion-safe:hover:scale-105 motion-safe:active:scale-95",

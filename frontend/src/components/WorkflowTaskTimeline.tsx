@@ -83,7 +83,7 @@ export function WorkflowTaskTimeline({
           onClick={onToggle}
           aria-label="Show task timeline"
           aria-expanded={false}
-          className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
+          className="rounded-lg p-2 pointer-coarse:p-3 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
         >
           <ListTree size={18} strokeWidth={1.8} aria-hidden="true" />
         </button>
@@ -100,7 +100,7 @@ export function WorkflowTaskTimeline({
           onClick={onToggle}
           aria-label="Hide task timeline"
           aria-expanded={true}
-          className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
+          className="rounded-lg p-1.5 pointer-coarse:p-2.5 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
         >
           <ChevronLeft size={16} strokeWidth={1.8} aria-hidden="true" />
         </button>
