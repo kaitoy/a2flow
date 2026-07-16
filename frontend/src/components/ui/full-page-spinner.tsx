@@ -6,10 +6,10 @@ import { Spinner } from "@/components/ui/spinner";
  * `AuthProvider`) — reused as a route's `loading.tsx` fallback where no more
  * specific skeleton exists.
  *
- * @param className - Sizing for the outer wrapper. Defaults to `"h-screen"`;
+ * @param className - Sizing for the outer wrapper. Defaults to `"h-dvh"`;
  * pass `"h-full"` when nested inside a layout's own sized container.
  */
-export function FullPageSpinner({ className = "h-screen" }: { className?: string }) {
+export function FullPageSpinner({ className = "h-dvh" }: { className?: string }) {
   return (
     <div className={`flex items-center justify-center ${className}`}>
       <Spinner size="lg" />

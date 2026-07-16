@@ -10,12 +10,12 @@ describe("FullPageSpinner", () => {
 
   it("defaults to filling the viewport height", () => {
     const { container } = render(<FullPageSpinner />);
-    expect(container.firstChild).toHaveClass("h-screen");
+    expect(container.firstChild).toHaveClass("h-dvh");
   });
 
   it("accepts a custom sizing class", () => {
     const { container } = render(<FullPageSpinner className="h-full" />);
     expect(container.firstChild).toHaveClass("h-full");
-    expect(container.firstChild).not.toHaveClass("h-screen");
+    expect(container.firstChild).not.toHaveClass("h-dvh");
   });
 });

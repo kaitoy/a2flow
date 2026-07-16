@@ -17,7 +17,7 @@ import {
  */
 export function WorkflowSessionSkeleton() {
   return (
-    <div role="status" aria-label="Loading" className="flex h-screen overflow-hidden">
+    <div role="status" aria-label="Loading" className="flex h-dvh overflow-hidden">
       <div className={TASK_TIMELINE_ASIDE_CLASS}>
         <div className={TASK_TIMELINE_HEADER_CLASS}>
           <Skeleton className="h-4 w-16" />

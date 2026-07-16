@@ -52,7 +52,7 @@ export default function LoginPage() {
   );
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-4">
+    <main className="relative flex min-h-dvh items-center justify-center px-4">
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>

@@ -129,7 +129,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       <WorkflowTaskTimeline
         tasks={tasks}
         activeTaskId={activeTaskId}
@@ -179,7 +179,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
 /** Full-screen error state shown when the WorkflowSession record fails to load, with a retry action. */
 function WorkflowSessionLoadError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-4">
+    <div className="flex h-dvh flex-col items-center justify-center gap-4">
       <EmptyState
         icon={AlertTriangle}
         animation="wiggle"

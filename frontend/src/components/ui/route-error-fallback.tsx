@@ -34,7 +34,7 @@ export function RouteErrorFallback({
 }: RouteErrorFallbackProps) {
   return (
     <div
-      className={`flex ${fill === "screen" ? "h-screen" : "h-full"} flex-col items-center justify-center gap-4`}
+      className={`flex ${fill === "screen" ? "h-dvh" : "h-full"} flex-col items-center justify-center gap-4`}
     >
       <EmptyState icon={AlertTriangle} animation="wiggle" title={title} description={description} />
       <div className="flex gap-2">

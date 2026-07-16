@@ -29,7 +29,7 @@ const jetbrainsMono = JetBrains_Mono({
  */
 export function GlobalErrorContent({ reset }: { reset: () => void }) {
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-4">
+    <div className="flex h-dvh flex-col items-center justify-center gap-4">
       <EmptyState
         icon={AlertTriangle}
         animation="wiggle"

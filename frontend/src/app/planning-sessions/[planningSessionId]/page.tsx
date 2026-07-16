@@ -73,7 +73,7 @@ function PlanningSessionView({ ps, workflow }: { ps: PlanningSession; workflow: 
   const taskIndexById = useMemo(() => new Map(templates.map((t, i) => [t.id, i + 1])), [templates]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       <WorkflowTaskTimeline
         tasks={templates}
         activeTaskId={null}
@@ -121,7 +121,7 @@ function PlanningSessionView({ ps, workflow }: { ps: PlanningSession; workflow: 
 /** Full-screen error state shown when the PlanningSession record fails to load, with a retry action. */
 function PlanningSessionLoadError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-4">
+    <div className="flex h-dvh flex-col items-center justify-center gap-4">
       <EmptyState
         icon={AlertTriangle}
         animation="wiggle"

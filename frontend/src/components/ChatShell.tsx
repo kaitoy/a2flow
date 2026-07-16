@@ -45,7 +45,7 @@ export function ChatShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       <SessionList
         userId={userId}
         currentSessionId={sessionId}

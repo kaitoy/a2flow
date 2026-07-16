@@ -14,7 +14,7 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <div className="flex h-screen flex-col overflow-hidden">
+      <div className="flex h-dvh flex-col overflow-hidden">
         <AppHeader />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
