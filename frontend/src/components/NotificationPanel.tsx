@@ -34,6 +34,8 @@ const EDGE_PADDING = 8;
 interface Coords {
   top: number;
   left: number;
+  /** Rendered panel width, clamped to the viewport. */
+  width: number;
 }
 
 /** Format an ISO timestamp as a short relative time such as "5m ago" or "2d ago". */
@@ -69,11 +71,13 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
     const anchor = anchorRef.current;
     if (!anchor) return null;
     const rect = anchor.getBoundingClientRect();
+    // Shrink below the preferred width on viewports too narrow to fit it.
+    const width = Math.min(PANEL_WIDTH, window.innerWidth - EDGE_PADDING * 2);
     const left = Math.max(
       EDGE_PADDING,
-      Math.min(rect.right - PANEL_WIDTH, window.innerWidth - PANEL_WIDTH - EDGE_PADDING)
+      Math.min(rect.right - width, window.innerWidth - width - EDGE_PADDING)
     );
-    return { top: rect.bottom + GAP, left };
+    return { top: rect.bottom + GAP, left, width };
   }, [anchorRef]);
 
   // Track the anchor position while open.
@@ -159,7 +163,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
               position: "fixed",
               top: coords.top,
               left: coords.left,
-              width: PANEL_WIDTH,
+              width: coords.width,
               opacity: style.opacity,
               transform: style.y.to((y) => `translateY(${y}px)`),
               zIndex: 9999,

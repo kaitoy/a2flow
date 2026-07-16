@@ -15,5 +15,5 @@ interface AdminPageContainerProps {
  * instead of narrowing the container itself.
  */
 export function AdminPageContainer({ children }: AdminPageContainerProps) {
-  return <div className="mx-auto max-w-6xl p-8">{children}</div>;
+  return <div className="mx-auto max-w-6xl p-4 sm:p-8">{children}</div>;
 }

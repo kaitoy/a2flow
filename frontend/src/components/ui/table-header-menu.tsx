@@ -42,6 +42,8 @@ const DEBOUNCE_MS = 300;
 interface Coords {
   top: number;
   left: number;
+  /** Rendered panel width, clamped to the viewport. */
+  width: number;
 }
 
 /** Menu action row styling, mirroring the app's dropdown menu items (see UserMenu). */
@@ -94,11 +96,13 @@ export function TableHeaderMenu({
     const anchor = buttonRef.current;
     if (!anchor) return null;
     const rect = anchor.getBoundingClientRect();
+    // Shrink below the preferred width on viewports too narrow to fit it.
+    const width = Math.min(PANEL_WIDTH, window.innerWidth - EDGE_PADDING * 2);
     const left = Math.max(
       EDGE_PADDING,
-      Math.min(rect.left, window.innerWidth - PANEL_WIDTH - EDGE_PADDING)
+      Math.min(rect.left, window.innerWidth - width - EDGE_PADDING)
     );
-    return { top: rect.bottom + GAP, left };
+    return { top: rect.bottom + GAP, left, width };
   }, []);
 
   useEffect(() => {
@@ -209,7 +213,7 @@ export function TableHeaderMenu({
                     position: "fixed",
                     top: coords.top,
                     left: coords.left,
-                    width: PANEL_WIDTH,
+                    width: coords.width,
                     opacity: style.opacity,
                     transform: style.y.to((y) => `translateY(${y}px)`),
                     zIndex: 9999,

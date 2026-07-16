@@ -52,7 +52,7 @@ export function AuditMeta({ createdBy, updatedBy, createdAt, updatedAt }: AuditM
   const nameOf = (id: string) => names.get(id) ?? id;
 
   return (
-    <dl className="grid grid-cols-2 gap-4 rounded-xl glass-panel p-4 text-on-surface-variant">
+    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl glass-panel p-4 text-on-surface-variant">
       <MetaItem label="Created by" value={nameOf(createdBy)} />
       <MetaItem label="Updated by" value={nameOf(updatedBy)} />
       {createdAt && <MetaItem label="Created at" value={<DateTime value={createdAt} />} />}
