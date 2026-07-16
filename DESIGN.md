@@ -170,6 +170,13 @@ The app keeps the **Fixed Sidebar + Fluid Content** model. Sidebars are 256px wi
 
 The 8px base spacing unit is preserved. Padding inside glass cards is 24px (`p-6`).
 
+### Responsive & touch
+
+- **Breakpoint** — `md` (768px) is the shell breakpoint: below it every fixed sidebar hides (`max-md:hidden`) and is reachable instead through a hamburger button in the `AppHeader` that opens the same sidebar component inside the shared `SidebarDrawer` (an off-canvas panel over a dimmed scrim, dismissed by scrim tap or Escape, with the modal focus wiring from `useDialogA11y`). Never build a page-specific drawer — pass the sidebar into `SidebarDrawer`.
+- **Viewport height** — full-screen shells use `h-dvh`/`min-h-dvh`, never `h-screen` (100vh), so mobile URL bars don't clip the bottom of the layout. The chat input pads its bottom with `env(safe-area-inset-bottom)`.
+- **Touch (`pointer-coarse:`)** — hover-revealed controls must also be reachable on touch: make them always visible under `pointer-coarse:` (see the session delete button). Icon buttons grow to ~44px hit targets under `pointer-coarse:`. Form fields render at 16px below `sm` so iOS Safari doesn't auto-zoom on focus. In the chat input, Enter inserts a newline on coarse pointers (sending is the Send button's job there).
+- **Popovers** — fixed pixel widths are clamped to the viewport (`Math.min(PANEL_WIDTH, innerWidth - padding)`), see `NotificationPanel` / `UserMenu` / `TableHeaderMenu`.
+
 ## Elevation & Depth
 
 Depth is achieved through **layered translucency** rather than hard borders or heavy shadows.

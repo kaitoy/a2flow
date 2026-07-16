@@ -6,6 +6,8 @@ A chat application that connects a [Google ADK](https://google.github.io/adk-doc
 
 The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference. A **notification center** in the top toolbar surfaces workflow events such as generated drafts and approval requests (see [Notifications](#notifications)).
 
+The UI is **responsive**: below the `md` breakpoint every sidebar (chat session list, admin navigation, workflow task timeline) collapses into an off-canvas drawer opened from a hamburger button in the header, layouts use dynamic-viewport heights so mobile URL bars don't clip the chat input, and touch devices get always-visible controls, ~44px tap targets, 16px form fields (no iOS focus zoom), and Enter-as-newline in the chat input.
+
 ```
 ┌──────────────────────────────────┐    AG-UI RunAgentInput (JSON)    ┌──────────────────────┐
 │   Next.js frontend               │  (render_a2ui tool injected by   │  FastAPI backend     │
