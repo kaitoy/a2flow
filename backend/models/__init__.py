@@ -11,6 +11,7 @@ from .notification import (
 )
 from .planning_session import PlanningSession, PlanningSessionCreate
 from .session import Session
+from .tenant import Tenant, TenantCreate, TenantUpdate
 from .user_avatar import UserAvatar
 from .workflow import (
     GenerateWorkflowRequest,
@@ -61,6 +62,9 @@ __all__ = [
     "PlanningSession",
     "PlanningSessionCreate",
     "Session",
+    "Tenant",
+    "TenantCreate",
+    "TenantUpdate",
     "ToolBinding",
     "UserAvatar",
     "Workflow",

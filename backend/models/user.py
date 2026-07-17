@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import EmailStr, field_serializer, field_validator, model_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import Column, Index, UniqueConstraint
+from sqlalchemy import Column, ForeignKeyConstraint, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
@@ -39,6 +39,10 @@ class Role(StrEnum):
     requester = "requester"
     #: Eligibility as a designated approver of workflow approvals.
     approver = "approver"
+    #: Administration of the caller's own tenant (member/role management
+    #: scoped to `User.tenant_id`). Distinct from `super_admin`, which
+    #: bypasses tenancy entirely.
+    tenant_admin = "tenant_admin"
 
 
 def has_role(user: "User | UserRead", *allowed: Role) -> bool:
@@ -158,6 +162,10 @@ class UserUpdate(SQLModel):
     #: Customization for the generated avatar; ``None`` leaves it unchanged on
     #: update, and an explicit ``null`` from the client clears it.
     avatar_config: AvatarConfig | None = None
+    #: Tenant this user belongs to; ``None`` means a platform-scoped user (the
+    #: seeded system user, or an admin operating outside any tenant), not a
+    #: user pending assignment.
+    tenant_id: str | None = None
 
     @field_validator("roles")
     @classmethod
@@ -195,6 +203,13 @@ class User(UserCreate, BaseEntity, table=True):
     __table_args__ = (
         UniqueConstraint("username", name="uq_users_username"),
         Index("ix_users_username", "username"),
+        Index("ix_users_tenant_id", "tenant_id"),
+        ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            ondelete="RESTRICT",
+            name="fk_users_tenant_id",
+        ),
     )
 
     deleted_at: datetime | None = Field(default=None, sa_type=TZDateTime)
@@ -240,6 +255,8 @@ class UserRead(BaseEntity):
     #: Generated-avatar customization, or ``None`` when the user has not
     #: customized it (the client then renders a username-seeded default).
     avatar_config: AvatarConfig | None = None
+    #: Tenant this user belongs to; ``None`` for a platform-scoped user.
+    tenant_id: str | None = None
 
     @field_serializer("deleted_at", "avatar_updated_at", when_used="json")
     def _serialize_deleted_at(self, dt: datetime | None) -> str | None:
