@@ -8,6 +8,15 @@ import { useSurfaceResolved } from "./surfaceResolvedContext";
  * Disabled when the surface is already resolved (see {@link useSurfaceResolved}), so an
  * already-answered surface can never be resubmitted, in addition to the schema's own
  * `isValid` validity check.
+ *
+ * Text is forced to white regardless of variant, overriding the design-system Button's
+ * per-variant text color (`on-primary` on `primary` turns dark in the dark theme, and
+ * `secondary`/`ghost` default to darker `on-surface(-variant)` text). The visible label
+ * comes from `buildChild(props.child)`, typically a nested `customText`, which sets its
+ * own explicit `color` class — a descendant's own specified color always wins over an
+ * ancestor's inherited one regardless of `!important` on the ancestor, so a plain
+ * `text-white` on the `Button` itself wouldn't reach it. `[&_*]:!text-white` targets every
+ * descendant directly (the rendered `Text`, an `Icon`, etc.) to force white there instead.
  */
 export const customButton = createComponentImplementation(ButtonApi, ({ props, buildChild }) => {
   const resolved = useSurfaceResolved();
@@ -23,6 +32,7 @@ export const customButton = createComponentImplementation(ButtonApi, ({ props, b
       variant={variant}
       onClick={props.action as React.MouseEventHandler<HTMLButtonElement>}
       disabled={props.isValid === false || resolved}
+      className="[&_*]:!text-white"
     >
       {props.child ? buildChild(props.child) : null}
     </Button>
