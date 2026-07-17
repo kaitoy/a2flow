@@ -115,7 +115,7 @@ export function SessionList({
             size={16}
             strokeWidth={1.8}
             aria-hidden="true"
-            className="transition-transform duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:rotate-[-8deg]"
+            className="transition-transform duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:rotate-[-8deg] group-disabled:!translate-y-0 group-disabled:!rotate-0"
           />
           New session
         </Button>
@@ -197,7 +197,7 @@ export function SessionList({
                   "text-on-surface-variant opacity-0 pointer-coarse:opacity-100 pointer-coarse:w-10",
                   "transition-[opacity,background-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
                   "group-hover:opacity-100 hover:bg-error/10 hover:text-error motion-safe:hover:scale-110",
-                  "focus-visible:opacity-100 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",
+                  "focus-visible:opacity-100 disabled:cursor-default disabled:hover:scale-100 disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",
                 ].join(" ")}
               >
                 <span aria-hidden="true" className="text-[14px] leading-none">

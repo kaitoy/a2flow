@@ -33,7 +33,7 @@ const BASE =
   "duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] " +
   "motion-safe:active:scale-[0.97] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 " +
-  "disabled:cursor-not-allowed disabled:active:scale-100";
+  "disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:translate-y-0";
 
 /**
  * Vivid success treatment for the `done` stage. Overrides the active variant's
