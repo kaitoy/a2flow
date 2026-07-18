@@ -15,7 +15,7 @@ from ag_ui_adk import ADKAgent, adk_events_to_messages
 from google.adk.events import Event
 from google.adk.sessions import BaseSessionService
 
-from infrastructure.agent import AgentKind, AgentRegistry
+from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
 from models.planning_session import PlanningSession
 from models.user import Role, User, has_role
@@ -204,7 +204,11 @@ class PlanningSessionService:
                 raise SkillNotReadyError(skill.id)
 
         agent = self._registry.get(
-            ps.agent_skill_id, commit_sha, skill_dir, kind=AgentKind.planning
+            ps.agent_skill_id,
+            commit_sha,
+            skill_dir,
+            tenant_id=ps.tenant_id,
+            kind=AgentKind.planning,
         )
         return agent, ps
 
@@ -233,7 +237,7 @@ class PlanningSessionService:
         """
         ps = await self.get(ps_id, caller=caller)
         session = await self._session_service.get_session(
-            app_name=self._app_name,
+            app_name=tenant_app_name(self._app_name, ps.tenant_id),
             user_id=ps.user_id,
             session_id=ps.session_id,
         )

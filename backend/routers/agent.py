@@ -8,11 +8,18 @@ from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from dependencies import APP_NAME, AgentRegistryDep, CurrentUserIdDep, SessionServiceDep
+from dependencies import (
+    APP_NAME,
+    AgentRegistryDep,
+    CurrentTenantIdDep,
+    CurrentUserIdDep,
+    SessionServiceDep,
+)
 from infrastructure.agent import (
     SESSION_TITLE_KEY,
     derive_session_title,
     first_user_message_text,
+    tenant_app_name,
     with_user_id,
 )
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
@@ -28,6 +35,7 @@ async def agent_endpoint(
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
     user_id: CurrentUserIdDep,
+    tenant_id: CurrentTenantIdDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the ADK agent for the given thread.
 
@@ -50,17 +58,20 @@ async def agent_endpoint(
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
+    scoped_app_name = tenant_app_name(APP_NAME, tenant_id)
 
     async with AsyncExitStack() as stack:
         try:
             await stack.enter_async_context(
-                advisory_lock(agent_run_key(APP_NAME, user_id, input_data.thread_id))
+                advisory_lock(
+                    agent_run_key(scoped_app_name, user_id, input_data.thread_id)
+                )
             )
         except LockNotAcquiredError as exc:
             raise SessionRunInProgressError(input_data.thread_id) from exc
 
         session = await session_service.get_session(
-            app_name=APP_NAME,
+            app_name=scoped_app_name,
             user_id=user_id,
             session_id=input_data.thread_id,
         )
@@ -69,12 +80,12 @@ async def agent_endpoint(
             title = derive_session_title(first_text) if first_text is not None else None
             if title is not None:
                 await session_service.create_session(
-                    app_name=APP_NAME,
+                    app_name=scoped_app_name,
                     user_id=user_id,
                     session_id=input_data.thread_id,
                     state={SESSION_TITLE_KEY: title},
                 )
-        adk_agent = registry.get(None, None, None)
+        adk_agent = registry.get(None, None, None, tenant_id=tenant_id)
 
         # Override forwarded_props.userId with the trusted X-User-Id header so the
         # agent run is keyed by the same user the skill lookup above resolved.

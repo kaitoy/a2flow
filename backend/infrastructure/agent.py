@@ -92,9 +92,10 @@ A2UI_GUIDE_CONTEXT_DESCRIPTION = (
 
 _SESSION_TITLE_MAX_LENGTH = 60
 
-#: Upper bound on cached ADKAgents in :class:`AgentRegistry`. One entry per
-#: skill revision actually run; pulling past a revision leaves its entry behind,
-#: so the cache is capped rather than left to grow with the pull count.
+#: Upper bound on cached ADKAgents per tenant in :class:`AgentRegistry`. One
+#: entry per skill revision actually run; pulling past a revision leaves its
+#: entry behind, so each tenant's cache is capped rather than left to grow with
+#: the pull count.
 _AGENT_CACHE_MAX_ENTRIES = 64
 
 
@@ -455,7 +456,9 @@ def create_app(
 
     Args:
         app_name: Name of the ADK app; ``ADKAgent.from_app`` adopts it as the
-            agent's ``app_name``, so it must match the one the routers use.
+            agent's ``app_name``, so it must match the one the routers use. For
+            a tenant-scoped run this is :func:`tenant_app_name`'s result, as
+            computed by :meth:`AgentRegistry.get`.
         skill_dir: Directory ADK loads the skill from, or ``None`` for the
             default skill-less agent.
         kind: Role of the skill-backed agent (see :class:`AgentKind`); ignored
@@ -471,13 +474,43 @@ def create_app(
     )
 
 
+def tenant_app_name(app_name: str, tenant_id: str) -> str:
+    """Scope a base ADK application name to one tenant.
+
+    ADK's session store and :class:`AgentRegistry`'s agent cache are both keyed
+    by app_name, so two tenants sharing one process must use distinct strings
+    here or one tenant could read another's ADK sessions or reuse another
+    tenant's cached agent. Every caller that talks to ``session_service``,
+    builds a run lock key (``infrastructure.locks.agent_run_key``), or calls
+    :meth:`AgentRegistry.get` must derive its app_name through this helper once
+    a ``tenant_id`` is in scope — never the bare ``dependencies.context.APP_NAME``
+    constant directly — so all three call sites keep agreeing on the same
+    identity.
+
+    The colon that would be the obvious separator is not an option: this string
+    is also used as ADK's ``App.name``, which
+    ``google.adk.apps.app.validate_app_name`` restricts to
+    ``^[a-zA-Z][a-zA-Z0-9_-]*$`` (letters, digits, underscores, and hyphens
+    only), so a hyphen is used instead. ``tenant_id`` is a UUID7 string, which
+    already satisfies that character set on its own.
+
+    Args:
+        app_name: The process-wide base app name (``dependencies.context.APP_NAME``).
+        tenant_id: The tenant to scope the name to.
+
+    Returns:
+        The tenant-scoped app name.
+    """
+    return f"{app_name}-{tenant_id}"
+
+
 class AgentRegistry:
-    """Caches one ADKAgent per ``(agent_skill_id, commit_sha, kind)`` combination.
+    """Caches one ADKAgent per tenant, per ``(agent_skill_id, commit_sha, kind)``.
 
     Agents are stateless across sessions — per-session context lives in the ADK
     session state — so a single ADKAgent serves every session running the same
-    revision of the same skill in the same role. ``(None, None, execution)``
-    keys the default agent that has no skill loaded.
+    revision of the same skill in the same role, for the same tenant.
+    ``(None, None, execution)`` keys the default agent that has no skill loaded.
 
     The revision has to be part of the key because ``create_agent`` reads the
     skill directory eagerly (``load_skill_from_dir`` slurps every file into
@@ -487,9 +520,15 @@ class AgentRegistry:
     session while sessions already pinned to the old revision keep the agent
     they started with.
 
-    Bounded by :data:`_AGENT_CACHE_MAX_ENTRIES` on a least-recently-used basis:
-    pruning keeps the number of live revisions small, but nothing else would
-    ever evict the entry for a revision that has been pulled past.
+    Each tenant gets its own cache, bounded by :data:`_AGENT_CACHE_MAX_ENTRIES`
+    on a least-recently-used basis: pruning keeps the number of live revisions
+    small per tenant, but nothing else would ever evict the entry for a
+    revision that has been pulled past. Partitioning by tenant means one
+    tenant filling its cache cannot evict another tenant's agents. The outer
+    mapping — the set of tenants with at least one cached agent — is itself
+    unbounded; nothing currently prunes the entry for a tenant that stops being
+    active. This is a known, accepted tradeoff, not something this cache
+    solves.
 
     Every agent is built through ``ADKAgent.from_app(create_app(...))`` rather
     than the plain ``ADKAgent(...)`` constructor, so long-running tool calls pause
@@ -499,18 +538,22 @@ class AgentRegistry:
     def __init__(self, session_service: BaseSessionService, app_name: str) -> None:
         self._session_service = session_service
         self._app_name = app_name
-        self._cache: OrderedDict[tuple[str | None, str | None, AgentKind], ADKAgent] = (
-            OrderedDict()
-        )
+        self._cache: dict[
+            str, OrderedDict[tuple[str | None, str | None, AgentKind], ADKAgent]
+        ] = {}
 
     def get(
         self,
         agent_skill_id: str | None,
         commit_sha: str | None,
         skill_dir: Path | None,
+        *,
+        tenant_id: str,
         kind: AgentKind = AgentKind.execution,
     ) -> ADKAgent:
-        """Return the ADKAgent for one revision of a skill, building it on first use.
+        """Return the ADKAgent for one tenant's revision of a skill.
+
+        Builds and caches it on first use.
 
         Args:
             agent_skill_id: Id of the skill, or ``None`` for the default
@@ -519,27 +562,38 @@ class AgentRegistry:
                 the default agent.
             skill_dir: Directory ADK loads the skill from; only read when the
                 agent is not already cached.
+            tenant_id: Id of the tenant the agent is being resolved for. Part
+                of the cache partition — each tenant gets its own capped
+                cache — and folded into the ADK app_name via
+                :func:`tenant_app_name` so two tenants never share an ADK
+                session store namespace even when the underlying database is
+                shared.
             kind: Role of the skill-backed agent (see :class:`AgentKind`);
                 part of the cache key because each kind bakes a different
                 instruction and toolset into its agent.
 
         Returns:
-            The cached (or freshly built) agent for that revision and kind.
+            The cached (or freshly built) agent for that tenant, revision, and kind.
         """
         key = (agent_skill_id, commit_sha, kind)
-        cached = self._cache.get(key)
+        tenant_cache = self._cache.setdefault(tenant_id, OrderedDict())
+        cached = tenant_cache.get(key)
         if cached is not None:
-            self._cache.move_to_end(key)
+            tenant_cache.move_to_end(key)
             return cached
         agent = ADKAgent.from_app(
-            create_app(self._app_name, skill_dir=skill_dir, kind=kind),
+            create_app(
+                tenant_app_name(self._app_name, tenant_id),
+                skill_dir=skill_dir,
+                kind=kind,
+            ),
             user_id_extractor=extract_user_id,
             session_service=self._session_service,
             use_thread_id_as_session_id=True,
             emit_messages_snapshot=True,
             session_timeout_seconds=None,
         )
-        self._cache[key] = agent
-        if len(self._cache) > _AGENT_CACHE_MAX_ENTRIES:
-            self._cache.popitem(last=False)
+        tenant_cache[key] = agent
+        if len(tenant_cache) > _AGENT_CACHE_MAX_ENTRIES:
+            tenant_cache.popitem(last=False)
         return agent

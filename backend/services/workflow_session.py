@@ -14,7 +14,7 @@ from typing import Any
 from ag_ui_adk import ADKAgent, adk_events_to_messages
 from google.adk.sessions import BaseSessionService
 
-from infrastructure.agent import AgentKind, AgentRegistry
+from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
 from models.user import User
 from models.workflow_session import WorkflowSession
@@ -251,7 +251,11 @@ class WorkflowSessionService:
                 raise SkillNotReadyError(skill.id)
 
         agent = self._registry.get(
-            ws.agent_skill_id, commit_sha, skill_dir, kind=AgentKind.execution
+            ws.agent_skill_id,
+            commit_sha,
+            skill_dir,
+            tenant_id=ws.tenant_id,
+            kind=AgentKind.execution,
         )
         return agent, ws
 
@@ -282,7 +286,7 @@ class WorkflowSessionService:
         """
         ws = await self.get(ws_id, caller=caller)
         session = await self._session_service.get_session(
-            app_name=self._app_name,
+            app_name=tenant_app_name(self._app_name, ws.tenant_id),
             user_id=ws.user_id,
             session_id=ws.session_id,
         )
@@ -328,7 +332,7 @@ class WorkflowSessionService:
         """
         ws = await self._get(ws_id)
         session = await self._session_service.get_session(
-            app_name=self._app_name,
+            app_name=tenant_app_name(self._app_name, ws.tenant_id),
             user_id=ws.user_id,
             session_id=ws.session_id,
         )
@@ -371,7 +375,7 @@ class WorkflowSessionService:
         """
         ws = await self._get(ws_id)
         session = await self._session_service.get_session(
-            app_name=self._app_name,
+            app_name=tenant_app_name(self._app_name, ws.tenant_id),
             user_id=ws.user_id,
             session_id=ws.session_id,
         )
@@ -416,7 +420,7 @@ class WorkflowSessionService:
         """
         ws = await self._get(ws_id)
         session = await self._session_service.get_session(
-            app_name=self._app_name,
+            app_name=tenant_app_name(self._app_name, ws.tenant_id),
             user_id=ws.user_id,
             session_id=ws.session_id,
         )
@@ -468,14 +472,15 @@ class WorkflowSessionService:
         """
         ws = await self._get(ws_id)
         self._access.assert_owner(ws.user_id, caller)
+        scoped_app_name = tenant_app_name(self._app_name, ws.tenant_id)
         existing = await self._session_service.get_session(
-            app_name=self._app_name,
+            app_name=scoped_app_name,
             user_id=ws.user_id,
             session_id=ws.session_id,
         )
         if existing is not None:
             await self._session_service.delete_session(
-                app_name=self._app_name,
+                app_name=scoped_app_name,
                 user_id=ws.user_id,
                 session_id=ws.session_id,
             )

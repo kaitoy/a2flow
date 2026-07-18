@@ -13,9 +13,11 @@ from infrastructure.agent import (
     A2UI_GUIDE_CONTEXT_DESCRIPTION,
     A2UI_SCHEMA_CONTEXT_DESCRIPTION,
     AgentKind,
+    tenant_app_name,
 )
 from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
+from tests._seed import DEFAULT_TEST_TENANT_ID
 from tests._workflow import GENERATE_BODY, create_published_workflow, create_skill
 from tests.conftest import FAKE_COMMIT_SHA
 
@@ -274,6 +276,7 @@ async def test_workflow_session_agent_delegates_to_agent_registry(
         skill["id"],
         FAKE_COMMIT_SHA,
         mock_agent_registry.get.call_args.args[2],
+        tenant_id=DEFAULT_TEST_TENANT_ID,
         kind=AgentKind.execution,
     )
 
@@ -408,7 +411,9 @@ async def test_workflow_session_agent_records_sender_on_client_disconnect(
 
     async def _appending_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
         session = await real_session_service.create_session(
-            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+            app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+            user_id=ws["userId"],
+            session_id=ws["sessionId"],
         )
         await real_session_service.append_event(
             session,
@@ -475,7 +480,9 @@ async def test_workflow_session_messages_shared_across_users(
 
     # Seed the owner's ADK session with one user message.
     session = await real_session_service.create_session(
-        app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+        app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+        user_id=ws["userId"],
+        session_id=ws["sessionId"],
     )
     await real_session_service.append_event(
         session,
@@ -517,7 +524,9 @@ async def test_workflow_session_messages_record_sender_after_run(
         # Simulate ag_ui_adk appending the sender's user message to the shared,
         # owner-keyed ADK session during the run.
         session = await real_session_service.create_session(
-            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+            app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+            user_id=ws["userId"],
+            session_id=ws["sessionId"],
         )
         await real_session_service.append_event(
             session,
@@ -567,7 +576,9 @@ async def test_workflow_session_messages_record_tool_sender_after_run(
         # (a function response, author "tool") to the shared, owner-keyed ADK
         # session during the run.
         session = await real_session_service.create_session(
-            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+            app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+            user_id=ws["userId"],
+            session_id=ws["sessionId"],
         )
         await real_session_service.append_event(
             session,
@@ -629,7 +640,9 @@ async def test_workflow_session_messages_skip_render_ack_sender(
         # acknowledgement -- the automatic tool result flushed for a pending
         # render_a2ui call the user never acted on.
         session = await real_session_service.create_session(
-            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+            app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+            user_id=ws["userId"],
+            session_id=ws["sessionId"],
         )
         await real_session_service.append_event(
             session,
@@ -694,7 +707,9 @@ async def test_workflow_session_messages_record_task_after_run(
         input_data: Any, *args: Any, **kwargs: Any
     ) -> AsyncGenerator[Any, None]:
         session = await real_session_service.create_session(
-            app_name=APP_NAME, user_id=ws["userId"], session_id=ws["sessionId"]
+            app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+            user_id=ws["userId"],
+            session_id=ws["sessionId"],
         )
         # A user message before any task is started.
         await real_session_service.append_event(
@@ -809,11 +824,15 @@ async def test_delete_workflow_session_deletes_adk_session(
     skill = await _create_skill(workflow_client)
     ws = await _execute_workflow(workflow_client, skill["id"])
     await real_session_service.create_session(
-        app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=ws["sessionId"]
+        app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+        user_id=SYSTEM_USER_ID,
+        session_id=ws["sessionId"],
     )
     await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
     remaining = await real_session_service.get_session(
-        app_name=APP_NAME, user_id=SYSTEM_USER_ID, session_id=ws["sessionId"]
+        app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+        user_id=SYSTEM_USER_ID,
+        session_id=ws["sessionId"],
     )
     assert remaining is None
 

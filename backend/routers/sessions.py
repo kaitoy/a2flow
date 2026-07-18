@@ -7,10 +7,11 @@ from fastapi import APIRouter
 from dependencies import (
     APP_NAME,
     ApiMetaDep,
+    CurrentTenantIdDep,
     CurrentUserIdDep,
     SessionServiceDep,
 )
-from infrastructure.agent import SESSION_TITLE_KEY
+from infrastructure.agent import SESSION_TITLE_KEY, tenant_app_name
 from models.response import ApiResponse
 from models.session import Session
 from repositories.exceptions import NotFoundError
@@ -21,12 +22,13 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 @router.get("", response_model=ApiResponse[list[Session]])
 async def list_sessions(
     user_id: CurrentUserIdDep,
+    tenant_id: CurrentTenantIdDep,
     session_service: SessionServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[Session]]:
     """List all sessions for a user."""
     response = await session_service.list_sessions(
-        app_name=APP_NAME,
+        app_name=tenant_app_name(APP_NAME, tenant_id),
         user_id=user_id,
     )
     items = [
@@ -45,12 +47,13 @@ async def list_sessions(
 async def get_session(
     session_id: str,
     user_id: CurrentUserIdDep,
+    tenant_id: CurrentTenantIdDep,
     session_service: SessionServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Session]:
     """Get a single session by ID."""
     session = await session_service.get_session(
-        app_name=APP_NAME,
+        app_name=tenant_app_name(APP_NAME, tenant_id),
         user_id=user_id,
         session_id=session_id,
     )
@@ -69,6 +72,7 @@ async def get_session(
 async def get_session_messages(
     session_id: str,
     user_id: CurrentUserIdDep,
+    tenant_id: CurrentTenantIdDep,
     session_service: SessionServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[dict[str, Any]]]:
@@ -80,7 +84,7 @@ async def get_session_messages(
     Clients narrow the dicts back to typed ``Message`` values themselves.
     """
     session = await session_service.get_session(
-        app_name=APP_NAME,
+        app_name=tenant_app_name(APP_NAME, tenant_id),
         user_id=user_id,
         session_id=session_id,
     )
@@ -97,19 +101,21 @@ async def get_session_messages(
 async def delete_session(
     session_id: str,
     user_id: CurrentUserIdDep,
+    tenant_id: CurrentTenantIdDep,
     session_service: SessionServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
     """Delete a session."""
+    scoped_app_name = tenant_app_name(APP_NAME, tenant_id)
     session = await session_service.get_session(
-        app_name=APP_NAME,
+        app_name=scoped_app_name,
         user_id=user_id,
         session_id=session_id,
     )
     if session is None:
         raise NotFoundError("Session", session_id)
     await session_service.delete_session(
-        app_name=APP_NAME,
+        app_name=scoped_app_name,
         user_id=user_id,
         session_id=session_id,
     )

@@ -1,3 +1,5 @@
+import importlib
+import pkgutil
 from collections.abc import AsyncGenerator, AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,12 +13,26 @@ from google.adk.sessions import InMemorySessionService
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.orm import configure_mappers
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+import models
 from config import Settings, get_settings
 from models.user import SYSTEM_USER_ID, User
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+
+# Import every model submodule (mirroring alembic/env.py) and configure
+# SQLAlchemy's mappers before any test runs. Without this, whichever test
+# happens to be first to build a User via ``User.model_construct(...)`` (the
+# header-driven auth override below) and read a mapped attribute off it --
+# ``id``, ``tenant_id``, anything -- crashes with a cryptic
+# ``AttributeError: 'NoneType' object has no attribute 'supports_population'``:
+# ``model_construct`` bypasses the real ``__init__``, so it never triggers
+# SQLAlchemy's normal lazy mapper configuration itself.
+for _finder, _module_name, _is_pkg in pkgutil.iter_modules(models.__path__):
+    importlib.import_module(f"models.{_module_name}")
+configure_mappers()
 
 
 @pytest.fixture(autouse=True)

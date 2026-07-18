@@ -20,7 +20,12 @@ from collections.abc import Awaitable, Callable
 from ag_ui.core import RunAgentInput, UserMessage
 from google.adk.sessions import BaseSessionService
 
-from infrastructure.agent import USER_ID_PROP_KEY, AgentKind, AgentRegistry
+from infrastructure.agent import (
+    USER_ID_PROP_KEY,
+    AgentKind,
+    AgentRegistry,
+    tenant_app_name,
+)
 from infrastructure.locks import advisory_lock, agent_run_key
 from infrastructure.skill_manager import SkillManager
 from infrastructure.summarizer import summarize_planning_transcript
@@ -208,7 +213,7 @@ class WorkflowPlanningService:
         if ps is None:
             return ""
         session = await self._session_service.get_session(
-            app_name=self._app_name,
+            app_name=tenant_app_name(self._app_name, ps.tenant_id),
             user_id=ps.user_id,
             session_id=ps.session_id,
         )
@@ -304,10 +309,12 @@ async def generate_workflow_plan(
         skill_dir = skills_store.skill_dir(skill, ps.agent_skill_commit_sha)
         if not skill_dir.exists():
             raise SkillNotReadyError(skill.id)
+        scoped_app_name = tenant_app_name(app_name, tenant_id)
         agent = registry.get(
             skill.id,
             ps.agent_skill_commit_sha,
             skill_dir,
+            tenant_id=tenant_id,
             kind=AgentKind.initial_planning,
         )
 
@@ -320,7 +327,9 @@ async def generate_workflow_plan(
             context=[],
             forwarded_props={USER_ID_PROP_KEY: ps.user_id},
         )
-        async with advisory_lock(agent_run_key(app_name, ps.user_id, ps.session_id)):
+        async with advisory_lock(
+            agent_run_key(scoped_app_name, ps.user_id, ps.session_id)
+        ):
             async for _event in agent.run(input_data):
                 pass
 
@@ -343,7 +352,7 @@ async def generate_workflow_plan(
             return
 
         session = await session_service.get_session(
-            app_name=app_name, user_id=ps.user_id, session_id=ps.session_id
+            app_name=scoped_app_name, user_id=ps.user_id, session_id=ps.session_id
         )
         transcript = build_planning_transcript(session.events) if session else ""
         description: str | None
