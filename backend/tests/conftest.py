@@ -176,6 +176,20 @@ def _fake_dns_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+@pytest.fixture(autouse=True)
+def _fast_bcrypt_rounds(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Use bcrypt's minimum cost factor for password hashing in tests.
+
+    Nearly every test pays a real bcrypt hash via fixture setup alone (e.g.
+    ``tests/_seed.py``'s ``seed_users``, which every per-file DB client
+    fixture calls, hashes a random token for the system user). Lowering the
+    cost to 4 -- bcrypt's minimum -- cuts that cost sharply; ``verify_password``
+    still round-trips correctly regardless of the rounds used to create the
+    hash.
+    """
+    monkeypatch.setenv("BCRYPT_ROUNDS", "4")
+
+
 @pytest.fixture()
 def real_session_service() -> InMemorySessionService:
     return InMemorySessionService()  # type: ignore[no-untyped-call]

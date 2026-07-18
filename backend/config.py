@@ -12,6 +12,15 @@ configuration value.
 ``scripts/export_openapi.py``'s ``OPENAPI_OUTPUT`` is intentionally excluded:
 that script is a standalone dev-time CLI tool outside the running
 application, and keeps reading its own environment variable directly.
+
+``infrastructure/password.py``'s ``BCRYPT_ROUNDS`` is also intentionally
+excluded and reads ``os.environ`` directly, uncached. ``hash_password`` is
+invoked from test-fixture setup code (``tests/_seed.py``'s ``seed_users``,
+via ``infrastructure.bootstrap.seed_system_user``) before many tests set
+their own env vars in the test body; going through this module's
+``lru_cache``d :func:`get_settings` there would build and freeze the whole
+``Settings`` singleton at that early point, before those later
+``monkeypatch.setenv`` calls (e.g. for ``ADMIN_PASSWORD``) take effect.
 """
 
 from functools import lru_cache
