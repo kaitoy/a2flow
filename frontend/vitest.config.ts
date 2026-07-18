@@ -9,6 +9,12 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // Capped to 50% of CPU cores so a `pre-commit` run that also spins up
+    // backend-pytest's `-n auto` (capped the same way via a
+    // pytest_xdist_auto_num_workers hook in backend/tests/conftest.py)
+    // doesn't oversubscribe the CPU and cause both suites to flake on
+    // timeouts.
+    maxWorkers: "50%",
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

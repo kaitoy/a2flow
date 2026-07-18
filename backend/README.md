@@ -258,10 +258,16 @@ cd backend && uv run uvicorn main:app --reload
 cd backend && uv run pytest
 ```
 
-No LLM API keys are required to run the tests. Pass `-v` for verbose output:
+Tests run in parallel across CPU cores by default via `pytest-xdist` (`-n auto`, set in `pyproject.toml`'s `addopts`). Worker count is capped at 50% of the host's CPU cores by a `pytest_xdist_auto_num_workers` hook in `tests/conftest.py` (mirroring `frontend/vitest.config.ts`'s `maxWorkers: "50%"`) — this leaves cores free for `frontend` tooling (e.g. `vitest`) running alongside it, since backend and frontend changes are often made together. No LLM API keys are required to run the tests. Pass `-v` for verbose output:
 
 ```bash
 cd backend && uv run pytest -v
+```
+
+`-n auto` is incompatible with `--pdb`/`-s`/`--trace` (pytest-xdist errors out since those need a single process). Disable parallelism for a debugging session with `-n0` (note: `-p no:xdist` alone does *not* work here, since `addopts` still passes `-n auto` and the plugin that understands `-n` would be disabled):
+
+```bash
+cd backend && uv run pytest -n0 -k some_test --pdb
 ```
 
 ## API

@@ -1,4 +1,6 @@
 import importlib
+import math
+import os
 import pkgutil
 from collections.abc import AsyncGenerator, AsyncIterator, Iterator
 from contextlib import asynccontextmanager
@@ -33,6 +35,35 @@ from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 for _finder, _module_name, _is_pkg in pkgutil.iter_modules(models.__path__):
     importlib.import_module(f"models.{_module_name}")
 configure_mappers()
+
+_WORKER_CPU_RATIO = 0.5  # matches frontend/vitest.config.ts's `maxWorkers: "50%"`
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_xdist_auto_num_workers(config: pytest.Config) -> int:
+    """Cap pytest-xdist's ``-n auto`` worker count at 50% of host CPU cores.
+
+    Mirrors ``frontend/vitest.config.ts``'s ``maxWorkers: "50%"`` so a
+    ``lefthook`` pre-commit run that spins up both suites concurrently
+    doesn't oversubscribe the CPU. As a conftest.py plugin this hookimpl
+    registers after xdist's own, and since the hookspec is
+    ``firstresult=True``, its return value short-circuits xdist's own
+    ``psutil``/``os.sched_getaffinity`` fallback chain before it runs.
+    ``psutil`` isn't a project dependency and ``os.sched_getaffinity``
+    doesn't exist on Windows, so on this Windows-first dev stack xdist's own
+    chain already bottoms out at ``os.cpu_count()`` today anyway -- using it
+    directly here isn't a loss of fidelity.
+
+    Args:
+        config: The pytest config object. Unused, but required by the
+            ``pytest_xdist_auto_num_workers`` hookspec signature.
+
+    Returns:
+        Half the host's logical CPU count, floored, with a floor of 1 so a
+        single-core host still gets one worker.
+    """
+    cpu_count = os.cpu_count() or 1
+    return max(1, math.floor(cpu_count * _WORKER_CPU_RATIO))
 
 
 @pytest.fixture(autouse=True)
