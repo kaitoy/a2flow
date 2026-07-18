@@ -18,6 +18,7 @@ const BASE = "http://localhost:8000";
 function row(id: string, read: boolean) {
   return {
     id,
+    tenantId: "tenant-1",
     userId: "user-1",
     type: "approval_request",
     title: `Notification ${id}`,

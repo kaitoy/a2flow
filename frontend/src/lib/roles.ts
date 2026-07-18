@@ -18,6 +18,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   [Role.DEVELOPER]: "Developer",
   [Role.REQUESTER]: "Requester",
   [Role.APPROVER]: "Approver",
+  [Role.TENANT_ADMIN]: "Tenant Admin",
 };
 
 /** Every role, in descending order of privilege — the order shown in the UI. */
@@ -27,6 +28,7 @@ export const ALL_ROLES: Role[] = [
   Role.DEVELOPER,
   Role.REQUESTER,
   Role.APPROVER,
+  Role.TENANT_ADMIN,
 ];
 
 /**

@@ -1,5 +1,6 @@
 /** @module admin-nav — Shared admin navigation item list used by the admin sidebar and the welcome page. */
 import {
+  Building2,
   CheckCircle2,
   KeyRound,
   ListChecks,
@@ -41,6 +42,13 @@ export interface AdminNavItem {
  * designated approvers).
  */
 export const adminNavItems: AdminNavItem[] = [
+  {
+    href: "/admin/tenants",
+    label: "Tenants",
+    icon: Building2,
+    description: "Manage tenant organizations",
+    roles: [Role.SUPER_ADMIN],
+  },
   {
     href: "/admin/users",
     label: "Users",

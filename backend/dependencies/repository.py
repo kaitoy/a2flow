@@ -28,12 +28,14 @@ from repositories import (
     SqlNotificationRepository,
     SqlPlanningSessionRepository,
     SqlSecretRepository,
+    SqlTenantRepository,
     SqlUserAvatarRepository,
     SqlUserRepository,
     SqlWorkflowRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
     SqlWorkflowTaskTemplateRepository,
+    TenantRepository,
     UserAvatarRepository,
     UserRepository,
     WorkflowRepository,
@@ -101,6 +103,18 @@ def get_secret_repository(
 
 
 SecretRepositoryDep = Annotated[SecretRepository, Depends(get_secret_repository)]
+
+
+def get_tenant_repository(db: DBSessionDep) -> TenantRepository:
+    """Create a TenantRepository backed by the current database session.
+
+    Not tenant-scoped: ``Tenant`` is the tenant root itself (see
+    "Tenant Isolation" in ``.claude/rules/backend-patterns.md``).
+    """
+    return SqlTenantRepository(db)
+
+
+TenantRepositoryDep = Annotated[TenantRepository, Depends(get_tenant_repository)]
 
 
 def get_user_repository(db: DBSessionDep) -> UserRepository:

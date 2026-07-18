@@ -43,6 +43,7 @@ describe("GenerateWorkflowPage", () => {
           return envelope(
             {
               id: "new-wf-id",
+              tenantId: "tenant-1",
               name: "my-flow",
               description: null,
               agentSkillId: "skill-1",

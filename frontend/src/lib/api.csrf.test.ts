@@ -8,6 +8,7 @@ const BASE = "http://localhost:8000";
 
 const SKILL = {
   id: "skill-1",
+  tenantId: "tenant-1",
   name: "S",
   repoUrl: "https://x/y",
   repoPath: "",

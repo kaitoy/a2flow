@@ -31,6 +31,9 @@ import type {
   SecretUpdate,
   Session as SessionModel,
   SkillSyncStatus,
+  TenantCreate,
+  Tenant as TenantModel,
+  TenantUpdate,
   ToolBinding,
   UserCreate,
   UserRead as UserReadModel,
@@ -51,6 +54,7 @@ import {
   zCreateAgentSkillApiV1AgentSkillsPostResponse,
   zCreateMcpServerApiV1McpServersPostResponse,
   zCreateSecretApiV1SecretsPostResponse,
+  zCreateTenantApiV1TenantsPostResponse,
   zCreateUserApiV1UsersPostResponse,
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zCreateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPostResponse,
@@ -59,6 +63,7 @@ import {
   zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse,
   zDeleteSecretApiV1SecretsSecretIdDeleteResponse,
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
+  zDeleteTenantApiV1TenantsTenantIdDeleteResponse,
   zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse,
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
@@ -75,6 +80,7 @@ import {
   zGetSecretApiV1SecretsSecretIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
+  zGetTenantApiV1TenantsTenantIdGetResponse,
   zGetUserApiV1UsersUserIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
   zGetWorkflowPlanningSessionApiV1WorkflowsWorkflowIdPlanningSessionGetResponse,
@@ -89,6 +95,7 @@ import {
   zListNotificationsApiV1NotificationsGetResponse,
   zListSecretsApiV1SecretsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
+  zListTenantsApiV1TenantsGetResponse,
   zListUsersApiV1UsersGetResponse,
   zListWorkflowSessionsApiV1WorkflowSessionsGetResponse,
   zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse,
@@ -106,6 +113,7 @@ import {
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
   zUpdateSecretApiV1SecretsSecretIdPatchResponse,
+  zUpdateTenantApiV1TenantsTenantIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
   zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
@@ -240,6 +248,7 @@ export type Approval = WithAudit<ApprovalModel>;
 export type McpServer = WithAudit<McpServerModel>;
 export type Notification = WithAudit<NotificationModel>;
 export type Secret = WithAudit<SecretModel>;
+export type Tenant = WithAudit<TenantModel>;
 export type User = WithAudit<UserReadModel>;
 export type PlanningSession = WithAudit<PlanningSessionModel>;
 export type Workflow = WithAudit<WorkflowModel>;
@@ -266,6 +275,8 @@ export type {
   SecretType,
   SecretUpdate,
   SkillSyncStatus,
+  TenantCreate,
+  TenantUpdate,
   ToolBinding,
   UserCreate,
   UserUpdate,
@@ -539,6 +550,46 @@ export async function deleteSecret(id: string): Promise<void> {
   await fetchEnvelope(
     apiClient.delete(`/api/v1/secrets/${encodeURIComponent(id)}`),
     zDeleteSecretApiV1SecretsSecretIdDeleteResponse
+  );
+}
+
+/** List tenants with optional pagination, sort, and filters. */
+export async function listTenants(query: ListQuery = {}): Promise<Tenant[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/tenants", listConfig(query)),
+    zListTenantsApiV1TenantsGetResponse
+  ) as Promise<Tenant[]>;
+}
+
+/** Fetch a single tenant by ID. */
+export async function getTenant(id: string): Promise<Tenant> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/tenants/${encodeURIComponent(id)}`),
+    zGetTenantApiV1TenantsTenantIdGetResponse
+  ) as Promise<Tenant>;
+}
+
+/** Create a new tenant. */
+export async function createTenant(body: TenantCreate): Promise<Tenant> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/tenants", body),
+    zCreateTenantApiV1TenantsPostResponse
+  ) as Promise<Tenant>;
+}
+
+/** Apply a partial update to a tenant. */
+export async function updateTenant(id: string, body: TenantUpdate): Promise<Tenant> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/tenants/${encodeURIComponent(id)}`, body),
+    zUpdateTenantApiV1TenantsTenantIdPatchResponse
+  ) as Promise<Tenant>;
+}
+
+/** Delete a tenant by ID. Fails while any user remains assigned to it. */
+export async function deleteTenant(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/tenants/${encodeURIComponent(id)}`),
+    zDeleteTenantApiV1TenantsTenantIdDeleteResponse
   );
 }
 

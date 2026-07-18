@@ -12,6 +12,7 @@ import EditAgentSkillPage from "./page";
 
 const FULL_SKILL = {
   id: "skill-1",
+  tenantId: "tenant-1",
   name: "my-skill",
   repoUrl: "https://github.com/example/repo",
   repoPath: "",

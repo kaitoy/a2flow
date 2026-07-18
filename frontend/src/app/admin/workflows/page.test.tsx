@@ -89,6 +89,7 @@ describe("WorkflowsPage", () => {
         envelope([
           {
             id: "wf-1",
+            tenantId: "tenant-1",
             name: "my-workflow",
             description: null,
             agentSkillId: "skill-1",

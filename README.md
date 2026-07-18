@@ -158,6 +158,18 @@ Each user record stores a username (unique), first name, last name, email, an `e
 
 **Deleting a user.** If no other record references the user, it is hard-deleted from the database. If it is still referenced (via any `createdBy` / `updatedBy`), it is instead **soft-deleted**: `deletedAt` is set and the account is disabled, so existing references stay valid and the name still resolves. Soft-deleted users (and the system user) are hidden from the user list but remain fetchable by id.
 
+### Tenants
+
+Navigate to [http://localhost:3000/admin/tenants](http://localhost:3000/admin/tenants) to manage tenants — the top-level organizational boundary for multi-tenancy. Unlike every other admin section, this one is restricted to **Super Admin**: it is hidden from the sidebar and welcome page for every other role, and the backend rejects writes from anyone else with HTTP 403 (`FORBIDDEN`).
+
+| Operation | Path |
+|-----------|------|
+| List all tenants | `GET /admin/tenants` |
+| Create a new tenant | `GET /admin/tenants/new` |
+| Edit / delete a tenant | `GET /admin/tenants/{id}` |
+
+Each tenant record stores a unique `name`, a unique URL-safe `slug` (lowercase kebab-case, intended for use in paths or subdomains by later tasks), and an `enabled` flag for deactivating a tenant without deleting it. A [user](#users) belongs to at most one tenant (`User.tenantId`); a tenant cannot be deleted while any user is still assigned to it — the API rejects the delete with HTTP 409 (`CONFLICT_REFERENCED`) instead.
+
 ### Agent Skills
 
 Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/admin/agent-skills) to manage the Agent Skills registry — a catalog of AI agent skills stored in Git repositories.

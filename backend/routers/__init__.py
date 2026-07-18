@@ -13,6 +13,7 @@ from routers import (
     planning_sessions,
     secrets,
     sessions,
+    tenant,
     user,
     workflow_sessions,
     workflow_task_templates,
@@ -42,6 +43,7 @@ api_router.include_router(notifications.router, dependencies=_protected)
 api_router.include_router(planning_sessions.router, dependencies=_protected)
 api_router.include_router(secrets.router, dependencies=_protected)
 api_router.include_router(sessions.router, dependencies=_protected)
+api_router.include_router(tenant.router, dependencies=_protected)
 api_router.include_router(user.router, dependencies=_protected)
 api_router.include_router(workflow_sessions.router, dependencies=_protected)
 api_router.include_router(workflow_task_templates.router, dependencies=_protected)
