@@ -2,10 +2,17 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
+import type { User } from "@/lib/api";
+import type { RootState } from "@/store";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import EditUserPage from "./page";
+
+/** Build a preloaded auth slice for a signed-in super admin. */
+const SUPER_ADMIN_STATE: Partial<RootState> = {
+  auth: { user: { id: "u1", roles: ["super_admin"] } as User, status: "authenticated" },
+};
 
 // Replace the real Avatar with a stub that surfaces the avatarConfig it receives,
 // so the test can assert the page threads the loaded customization through to the
@@ -191,6 +198,50 @@ describe("EditUserPage", () => {
       "data-config",
       JSON.stringify(avatarConfig)
     );
+  });
+
+  it("does not render a tenant field for a non-super-admin viewer", async () => {
+    setup();
+    render(<EditUserPage />);
+    await waitFor(() => screen.getByDisplayValue("alice"));
+    expect(screen.queryByLabelText("Tenant")).not.toBeInTheDocument();
+  });
+
+  it("renders a tenant field pre-filled with the user's tenant for a super-admin viewer", async () => {
+    setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, tenantId: "tenant-1" })
+      )
+    );
+
+    render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => screen.getByDisplayValue("alice"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+    });
+  });
+
+  it("includes the changed tenant in the update request", async () => {
+    setup();
+    let capturedBody: Record<string, unknown> | null = null;
+    server.use(
+      http.patch("http://localhost:8000/api/v1/users/:userId", async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(FULL_USER);
+      })
+    );
+
+    render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => screen.getByDisplayValue("alice"));
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+    });
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(capturedBody?.tenantId).toBe("tenant-1"));
   });
 
   it("shows error on load failure", async () => {

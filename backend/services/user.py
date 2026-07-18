@@ -5,7 +5,8 @@ hashing passwords before persistence (so the repository only ever stores a
 bcrypt hash), raising :class:`NotFoundError` when a user is missing, and
 authorizing writes — admins may edit anyone, a non-admin may only edit their
 own ``avatar_config`` (the self-service account page), and only a super admin
-may grant or revoke the ``super_admin`` role.
+may grant or revoke the ``super_admin`` role or assign/change a user's
+``tenant_id``.
 """
 
 from collections.abc import Sequence
@@ -89,12 +90,15 @@ class UserService:
 
         Raises:
             ForbiddenError: If the new user would hold ``super_admin`` and the
-                acting user is not a super admin.
+                acting user is not a super admin, or if a ``tenant_id`` is
+                supplied and the acting user is not a super admin.
         """
         if Role.super_admin in data.roles and not has_role(
             acting_user, Role.super_admin
         ):
             raise ForbiddenError("Only a super admin can grant the super_admin role")
+        if data.tenant_id is not None and not has_role(acting_user, Role.super_admin):
+            raise ForbiddenError("Only a super admin can assign a tenant")
         hashed = data.model_copy(update={"password": hash_password(data.password)})
         return await self._repo.create(hashed, user_id=acting_user.id)
 
@@ -125,7 +129,8 @@ class UserService:
             NotFoundError: If no user exists with the given ID.
             ForbiddenError: If the acting user is not allowed to apply this
                 update (non-admin editing another user or a non-self-service
-                field, or a non-super-admin changing ``super_admin``).
+                field, a non-super-admin changing ``super_admin``, or a
+                non-super-admin changing ``tenant_id`` to a different value).
         """
         target = await self.get(target_id)
         update = data.model_dump(exclude_unset=True)
@@ -137,6 +142,12 @@ class UserService:
                     raise ForbiddenError(
                         "Only a super admin can grant or revoke the super_admin role"
                     )
+            if (
+                "tenant_id" in update
+                and update["tenant_id"] != target.tenant_id
+                and not has_role(acting_user, Role.super_admin)
+            ):
+                raise ForbiddenError("Only a super admin can change a user's tenant")
         elif target_id != acting_user.id or not set(update) <= _SELF_SERVICE_FIELDS:
             raise ForbiddenError(
                 "Only admins can update other users or non-self-service fields"

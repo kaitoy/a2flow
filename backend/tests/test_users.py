@@ -18,6 +18,7 @@ from tests.conftest import _install_auth_overrides
 async def user_client() -> AsyncGenerator[AsyncClient, None]:
     from infrastructure.database import get_session
     from main import app
+    from models.tenant import Tenant as _Tenant  # noqa: F401 — registers model
     from models.user import User as _User  # noqa: F401 — registers model
 
     mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
@@ -630,3 +631,81 @@ async def test_roleless_user_cannot_update_other_user(
         headers={"X-User-Id": other["id"], "X-User-Roles": "developer,approver"},
     )
     assert_err(response, "FORBIDDEN", 403)
+
+
+# ---------- tenant assignment authorization ----------
+
+
+async def _create_tenant(user_client: AsyncClient, **overrides: Any) -> Any:
+    """Create a tenant (default: as super admin) and return the response body."""
+    body = {"name": "Acme Corp", "slug": "acme-corp", **overrides}
+    return assert_ok(await user_client.post("/api/v1/tenants", json=body), status=201)
+
+
+async def test_admin_cannot_assign_tenant_on_create(user_client: AsyncClient) -> None:
+    """An admin (non-super) creating a user with a tenantId is rejected."""
+    tenant = await _create_tenant(user_client)
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "tenantId": tenant["id"]},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_super_admin_can_assign_tenant_on_create(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin may assign a tenant when creating a user."""
+    tenant = await _create_tenant(user_client)
+    body = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, tenantId=tenant["id"]
+    )
+    assert body["tenantId"] == tenant["id"]
+
+
+async def test_admin_cannot_change_tenant_on_update(user_client: AsyncClient) -> None:
+    """An admin (non-super) changing a user's tenantId via PATCH is rejected."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client)
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"tenantId": tenant["id"]},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_super_admin_can_change_tenant_on_update(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin may change a user's tenant via PATCH."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client)
+    body = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"tenantId": tenant["id"]},
+            headers={"X-User-Roles": "super_admin"},
+        )
+    )
+    assert body["tenantId"] == tenant["id"]
+
+
+async def test_admin_can_resubmit_unchanged_tenant_on_update(
+    user_client: AsyncClient,
+) -> None:
+    """An admin may PATCH other fields while resending the user's current tenantId."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, tenantId=tenant["id"]
+    )
+    body = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"firstName": "Renamed", "tenantId": tenant["id"]},
+            headers={"X-User-Roles": "admin"},
+        )
+    )
+    assert body["firstName"] == "Renamed"
+    assert body["tenantId"] == tenant["id"]

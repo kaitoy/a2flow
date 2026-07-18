@@ -13,6 +13,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { RolesField } from "@/components/admin/roles-field";
+import { TenantField } from "@/components/admin/tenant-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ErrorBanner } from "@/components/ui/error-banner";
@@ -35,6 +36,9 @@ export default function NewUserPage() {
   // Roles live outside the form state: the picker is a controlled multi-select
   // rather than a registered input.
   const [roles, setRoles] = useState<Role[]>([]);
+  // Tenant lives outside the form state, like roles, since it's a controlled
+  // select rather than a registered input.
+  const [tenantId, setTenantId] = useState<string | null>(null);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -68,6 +72,7 @@ export default function NewUserPage() {
           enabled: values.enabled,
           emailVerified: values.emailVerified,
           roles,
+          tenantId,
         });
         dispatch(showToast({ message: "User created" }));
         router.push("/admin/users");
@@ -124,6 +129,8 @@ export default function NewUserPage() {
           </FormField>
 
           <RolesField value={roles} onChange={setRoles} />
+
+          <TenantField value={tenantId} onChange={setTenantId} />
 
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />

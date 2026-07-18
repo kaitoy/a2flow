@@ -43,8 +43,8 @@ async def create_user(
 ) -> ApiResponse[UserRead]:
     """Create a new user and return it without the password hash.
 
-    Requires the ``admin`` role; creating a ``super_admin`` additionally
-    requires the acting user to be a super admin.
+    Requires the ``admin`` role; creating a ``super_admin`` or assigning a
+    ``tenantId`` additionally requires the acting user to be a super admin.
     """
     user = await service.create(body, acting_user=acting_user)
     return ApiResponse(meta=meta, data=UserRead.model_validate(user))

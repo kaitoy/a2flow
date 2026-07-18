@@ -2,10 +2,17 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
+import type { User } from "@/lib/api";
+import type { RootState } from "@/store";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewUserPage from "./page";
+
+/** Build a preloaded auth slice for a signed-in super admin. */
+const SUPER_ADMIN_STATE: Partial<RootState> = {
+  auth: { user: { id: "u1", roles: ["super_admin"] } as User, status: "authenticated" },
+};
 
 const CREATED_USER = {
   id: "new-user-id",
@@ -103,6 +110,39 @@ describe("NewUserPage", () => {
     await user.type(screen.getByLabelText(/password/i), "short");
     await user.tab();
     await waitFor(() => expect(screen.getByText(/at least 12 character/i)).toBeInTheDocument());
+  });
+
+  it("does not render a tenant field for a non-super-admin viewer", () => {
+    render(<NewUserPage />);
+    expect(screen.queryByLabelText("Tenant")).not.toBeInTheDocument();
+  });
+
+  it("renders a tenant field for a super-admin viewer", async () => {
+    render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+    });
+  });
+
+  it("includes the selected tenant in the create request", async () => {
+    const user = userEvent.setup();
+    let receivedBody: Record<string, unknown> | undefined;
+    server.use(
+      http.post("http://localhost:8000/api/v1/users", async ({ request }) => {
+        receivedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(CREATED_USER, 201);
+      })
+    );
+
+    render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await fillRequiredFields(user);
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+    });
+    await user.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(receivedBody?.tenantId).toBe("tenant-1"));
   });
 
   it("shows error on api failure", async () => {
