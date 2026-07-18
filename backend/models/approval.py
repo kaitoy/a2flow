@@ -23,6 +23,7 @@ from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
 from models.constraints import BodyText, ShortText
+from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -65,7 +66,7 @@ class ApprovalCreate(ApprovalUpdate):
     status: ApprovalStatus = ApprovalStatus.pending
 
 
-class Approval(ApprovalCreate, BaseEntity, table=True):
+class Approval(ApprovalCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted approval request.
 
     ``workflow_session_id`` references the owning workflow session

@@ -42,12 +42,16 @@ from repositories import (
     WorkflowTaskTemplateRepository,
 )
 
+from .auth import CurrentTenantIdDep
+
 DBSessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-def get_agent_skill_repository(db: DBSessionDep) -> AgentSkillRepository:
+def get_agent_skill_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> AgentSkillRepository:
     """Create an AgentSkillRepository backed by the current database session."""
-    return SqlAgentSkillRepository(db)
+    return SqlAgentSkillRepository(db, tenant_id=tenant_id)
 
 
 AgentSkillRepositoryDep = Annotated[
@@ -65,9 +69,11 @@ AuthSessionRepositoryDep = Annotated[
 ]
 
 
-def get_mcp_server_repository(db: DBSessionDep) -> MCPServerRepository:
+def get_mcp_server_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> MCPServerRepository:
     """Create an MCPServerRepository backed by the current database session."""
-    return SqlMCPServerRepository(db)
+    return SqlMCPServerRepository(db, tenant_id=tenant_id)
 
 
 MCPServerRepositoryDep = Annotated[
@@ -75,9 +81,11 @@ MCPServerRepositoryDep = Annotated[
 ]
 
 
-def get_notification_repository(db: DBSessionDep) -> NotificationRepository:
+def get_notification_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> NotificationRepository:
     """Create a NotificationRepository backed by the current database session."""
-    return SqlNotificationRepository(db)
+    return SqlNotificationRepository(db, tenant_id=tenant_id)
 
 
 NotificationRepositoryDep = Annotated[
@@ -85,9 +93,11 @@ NotificationRepositoryDep = Annotated[
 ]
 
 
-def get_secret_repository(db: DBSessionDep) -> SecretRepository:
+def get_secret_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> SecretRepository:
     """Create a SecretRepository backed by the current database session."""
-    return SqlSecretRepository(db)
+    return SqlSecretRepository(db, tenant_id=tenant_id)
 
 
 SecretRepositoryDep = Annotated[SecretRepository, Depends(get_secret_repository)]
@@ -114,17 +124,20 @@ UserAvatarRepositoryDep = Annotated[
 def get_workflow_repository(
     db: DBSessionDep,
     skills: AgentSkillRepositoryDep,
+    tenant_id: CurrentTenantIdDep,
 ) -> WorkflowRepository:
     """Create a WorkflowRepository backed by the current database session."""
-    return SqlWorkflowRepository(db, skills)
+    return SqlWorkflowRepository(db, skills, tenant_id=tenant_id)
 
 
 WorkflowRepositoryDep = Annotated[WorkflowRepository, Depends(get_workflow_repository)]
 
 
-def get_workflow_session_repository(db: DBSessionDep) -> WorkflowSessionRepository:
+def get_workflow_session_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> WorkflowSessionRepository:
     """Create a WorkflowSessionRepository backed by the current database session."""
-    return SqlWorkflowSessionRepository(db)
+    return SqlWorkflowSessionRepository(db, tenant_id=tenant_id)
 
 
 WorkflowSessionRepositoryDep = Annotated[
@@ -132,9 +145,11 @@ WorkflowSessionRepositoryDep = Annotated[
 ]
 
 
-def get_message_meta_repository(db: DBSessionDep) -> MessageMetaRepository:
+def get_message_meta_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> MessageMetaRepository:
     """Create a MessageMetaRepository backed by the current database session."""
-    return SqlMessageMetaRepository(db)
+    return SqlMessageMetaRepository(db, tenant_id=tenant_id)
 
 
 MessageMetaRepositoryDep = Annotated[
@@ -146,6 +161,7 @@ def get_workflow_task_repository(
     db: DBSessionDep,
     ws_repo: WorkflowSessionRepositoryDep,
     mcp_repo: MCPServerRepositoryDep,
+    tenant_id: CurrentTenantIdDep,
 ) -> WorkflowTaskRepository:
     """Create a WorkflowTaskRepository backed by the current database session.
 
@@ -153,7 +169,7 @@ def get_workflow_task_repository(
     session exists when creating tasks; the MCPServerRepository validates the
     servers referenced by tool bindings.
     """
-    return SqlWorkflowTaskRepository(db, ws_repo, mcp_repo)
+    return SqlWorkflowTaskRepository(db, ws_repo, mcp_repo, tenant_id=tenant_id)
 
 
 WorkflowTaskRepositoryDep = Annotated[
@@ -165,6 +181,7 @@ def get_workflow_task_template_repository(
     db: DBSessionDep,
     workflows: WorkflowRepositoryDep,
     mcp_repo: MCPServerRepositoryDep,
+    tenant_id: CurrentTenantIdDep,
 ) -> WorkflowTaskTemplateRepository:
     """Create a WorkflowTaskTemplateRepository backed by the current database session.
 
@@ -172,7 +189,9 @@ def get_workflow_task_template_repository(
     workflow exists when creating templates; the MCPServerRepository validates
     the servers referenced by tool bindings.
     """
-    return SqlWorkflowTaskTemplateRepository(db, workflows, mcp_repo)
+    return SqlWorkflowTaskTemplateRepository(
+        db, workflows, mcp_repo, tenant_id=tenant_id
+    )
 
 
 WorkflowTaskTemplateRepositoryDep = Annotated[
@@ -180,9 +199,11 @@ WorkflowTaskTemplateRepositoryDep = Annotated[
 ]
 
 
-def get_planning_session_repository(db: DBSessionDep) -> PlanningSessionRepository:
+def get_planning_session_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> PlanningSessionRepository:
     """Create a PlanningSessionRepository backed by the current database session."""
-    return SqlPlanningSessionRepository(db)
+    return SqlPlanningSessionRepository(db, tenant_id=tenant_id)
 
 
 PlanningSessionRepositoryDep = Annotated[
@@ -193,13 +214,14 @@ PlanningSessionRepositoryDep = Annotated[
 def get_approval_repository(
     db: DBSessionDep,
     ws_repo: WorkflowSessionRepositoryDep,
+    tenant_id: CurrentTenantIdDep,
 ) -> ApprovalRepository:
     """Create an ApprovalRepository backed by the current database session.
 
     The injected WorkflowSessionRepository is used to validate that the parent
     session exists when creating an approval.
     """
-    return SqlApprovalRepository(db, ws_repo)
+    return SqlApprovalRepository(db, ws_repo, tenant_id=tenant_id)
 
 
 ApprovalRepositoryDep = Annotated[ApprovalRepository, Depends(get_approval_repository)]

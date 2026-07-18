@@ -4,6 +4,7 @@ from sqlalchemy import ForeignKeyConstraint, Index
 from sqlmodel import SQLModel
 
 from models.base import BaseEntity
+from models.tenant_scoped import TenantScoped
 
 
 class WorkflowSessionCreate(SQLModel):
@@ -32,7 +33,7 @@ class WorkflowSessionCreate(SQLModel):
     user_id: str
 
 
-class WorkflowSession(WorkflowSessionCreate, BaseEntity, table=True):
+class WorkflowSession(WorkflowSessionCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted record linking an ADK session to the workflow that created it."""
 
     __tablename__ = "workflow_sessions"

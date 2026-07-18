@@ -90,15 +90,27 @@ class SqlWorkflowTaskTemplateRepository:
         session: AsyncSession,
         workflows: WorkflowRepository,
         mcp_repo: MCPServerRepository,
+        *,
+        tenant_id: str,
     ) -> None:
         """Store the session and the Workflow/MCPServer repos for FK checks."""
         self._db = session
         self._workflows = workflows
         self._mcp = mcp_repo
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, template_id: str) -> WorkflowTaskTemplate | None:
+        """Return the template row with the given ID within the current tenant."""
+        stmt = select(WorkflowTaskTemplate).where(
+            WorkflowTaskTemplate.id == template_id,
+            WorkflowTaskTemplate.tenant_id == self._tenant_id,
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, template_id: str) -> WorkflowTaskTemplateRead | None:
         """Return the template with the given ID resolved into a read model, or ``None``."""
-        template = await self._db.get(WorkflowTaskTemplate, template_id)
+        template = await self._get_scoped(template_id)
         if template is None:
             return None
         return self._to_read(
@@ -122,7 +134,9 @@ class SqlWorkflowTaskTemplateRepository:
         workflow are returned. Each template's outgoing dependency edges are
         resolved into ``depends_on_ids`` with a single batched query.
         """
-        stmt = select(WorkflowTaskTemplate)
+        stmt = select(WorkflowTaskTemplate).where(
+            WorkflowTaskTemplate.tenant_id == self._tenant_id
+        )
         if workflow_id is not None:
             stmt = stmt.where(WorkflowTaskTemplate.workflow_id == workflow_id)
         stmt = apply_filters(stmt, WorkflowTaskTemplate, filters)
@@ -153,6 +167,7 @@ class SqlWorkflowTaskTemplateRepository:
         template = WorkflowTaskTemplate.model_validate(
             {
                 **data.model_dump(exclude={"depends_on_ids", "tool_bindings"}),
+                "tenant_id": self._tenant_id,
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -191,7 +206,7 @@ class SqlWorkflowTaskTemplateRepository:
         the template's bound MCP tools. ``workflow_id`` is not part of
         ``WorkflowTaskTemplateUpdate`` so no parent re-validation is needed here.
         """
-        template = await self._db.get(WorkflowTaskTemplate, template_id)
+        template = await self._get_scoped(template_id)
         if template is None:
             raise NotFoundError("WorkflowTaskTemplate", template_id)
         template.sqlmodel_update(
@@ -226,7 +241,7 @@ class SqlWorkflowTaskTemplateRepository:
         removed by the ``ON DELETE CASCADE`` foreign keys on
         ``workflow_task_template_dependencies``.
         """
-        template = await self._db.get(WorkflowTaskTemplate, template_id)
+        template = await self._get_scoped(template_id)
         if template is None:
             raise NotFoundError("WorkflowTaskTemplate", template_id)
         await self._db.delete(template)
@@ -360,7 +375,7 @@ class SqlWorkflowTaskTemplateRepository:
         for dep_id in dep_ids:
             if dep_id == template_id:
                 raise DependencyCycleError(template_id, dep_id)
-            dep = await self._db.get(WorkflowTaskTemplate, dep_id)
+            dep = await self._get_scoped(dep_id)
             if dep is None or dep.workflow_id != workflow_id:
                 raise ForeignKeyViolationError("WorkflowTaskTemplate", dep_id)
         adjacency = await self._workflow_adjacency(workflow_id)

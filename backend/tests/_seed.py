@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_user
+from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 
 #: Named test actors seeded with ``id == username`` so ``X-User-Id: alice`` works.
@@ -22,12 +23,41 @@ DEFAULT_TEST_USER_IDS: tuple[str, ...] = ("alice", "bob", "carol", "owner", "tes
 #: (the ``request_approval`` tool validates approver eligibility).
 DEFAULT_TEST_USER_ROLES: tuple[Role, ...] = (Role.approver,)
 
+#: Tenant id every test client is scoped to by default (see conftest.py's
+#: ``X-User-Tenant-Id`` header handling).
+DEFAULT_TEST_TENANT_ID = "tenant-default"
+
+
+async def seed_tenant(
+    engine: AsyncEngine, tenant_id: str = DEFAULT_TEST_TENANT_ID
+) -> None:
+    """Seed a single Tenant row if it does not already exist.
+
+    Args:
+        engine: The async engine bound to the test database.
+        tenant_id: Id of the tenant to seed.
+    """
+    async with AsyncSession(engine) as session:
+        if await session.get(Tenant, tenant_id) is None:
+            session.add(
+                Tenant(
+                    id=tenant_id,
+                    name=f"Test Tenant ({tenant_id})",
+                    slug=tenant_id,
+                    enabled=True,
+                    created_by=SYSTEM_USER_ID,
+                    updated_by=SYSTEM_USER_ID,
+                )
+            )
+            await session.commit()
+
 
 async def seed_users(
     engine: AsyncEngine,
     ids: Sequence[str] = DEFAULT_TEST_USER_IDS,
     *,
     roles: Sequence[Role] = DEFAULT_TEST_USER_ROLES,
+    tenant_id: str | None = None,
 ) -> None:
     """Seed the system user and the given named test actors into the database.
 
@@ -37,6 +67,9 @@ async def seed_users(
             ``username`` so it can be referenced by ``X-User-Id`` headers.
         roles: Roles granted to each seeded actor; defaults to ``approver`` so
             actors stay eligible as approval approvers.
+        tenant_id: Tenant each seeded actor belongs to. Defaults to ``None``
+            (platform-scoped), matching prior behavior for callers that don't
+            care about tenant scoping.
     """
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
@@ -51,6 +84,7 @@ async def seed_users(
                         password="testpassword",
                         email=f"{uid}@test.local",
                         roles=[role.value for role in roles],
+                        tenant_id=tenant_id,
                         created_by=SYSTEM_USER_ID,
                         updated_by=SYSTEM_USER_ID,
                     )

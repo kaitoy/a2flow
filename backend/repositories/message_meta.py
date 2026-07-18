@@ -41,9 +41,10 @@ class SqlMessageMetaRepository:
     task association cannot roll back a sender attribution (or vice versa).
     """
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Store the SQLModel async session used for all queries."""
+    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+        """Store the SQLModel async session and the tenant these queries are scoped to."""
         self._db = session
+        self._tenant_id = tenant_id
 
     async def _get(
         self, workflow_session_id: str, adk_event_id: str
@@ -54,6 +55,7 @@ class SqlMessageMetaRepository:
             .where(
                 col(MessageMeta.workflow_session_id) == workflow_session_id,
                 col(MessageMeta.adk_event_id) == adk_event_id,
+                MessageMeta.tenant_id == self._tenant_id,
             )
             .limit(1)
         )
@@ -87,6 +89,7 @@ class SqlMessageMetaRepository:
                 workflow_session_id=workflow_session_id,
                 adk_event_id=adk_event_id,
                 sender_user_id=sender_user_id,
+                tenant_id=self._tenant_id,
                 created_by=sender_user_id,
                 updated_by=sender_user_id,
             )
@@ -131,6 +134,7 @@ class SqlMessageMetaRepository:
                 workflow_session_id=workflow_session_id,
                 adk_event_id=adk_event_id,
                 workflow_task_id=workflow_task_id,
+                tenant_id=self._tenant_id,
                 created_by=user_id,
                 updated_by=user_id,
             )
@@ -160,7 +164,8 @@ class SqlMessageMetaRepository:
         """
         result = await self._db.exec(
             select(MessageMeta).where(
-                col(MessageMeta.workflow_session_id) == workflow_session_id
+                col(MessageMeta.workflow_session_id) == workflow_session_id,
+                MessageMeta.tenant_id == self._tenant_id,
             )
         )
         return {row.adk_event_id: row for row in result.all()}

@@ -31,13 +31,22 @@ class PlanningSessionRepository(Protocol):
 class SqlPlanningSessionRepository:
     """SQLModel-backed implementation of PlanningSessionRepository."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Store the SQLModel async session used for all queries."""
+    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+        """Store the SQLModel async session and the tenant these queries are scoped to."""
         self._db = session
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, ps_id: str) -> PlanningSession | None:
+        """Return the PlanningSession with the given ID within the current tenant, or ``None``."""
+        stmt = select(PlanningSession).where(
+            PlanningSession.id == ps_id, PlanningSession.tenant_id == self._tenant_id
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, ps_id: str) -> PlanningSession | None:
         """Return the PlanningSession with the given ID, or ``None`` if missing."""
-        return await self._db.get(PlanningSession, ps_id)
+        return await self._get_scoped(ps_id)
 
     async def get_by_session_id(self, session_id: str) -> PlanningSession | None:
         """Return the PlanningSession for the given ADK session id, or ``None``.
@@ -55,7 +64,10 @@ class SqlPlanningSessionRepository:
         """
         stmt = (
             select(PlanningSession)
-            .where(col(PlanningSession.session_id) == session_id)
+            .where(
+                col(PlanningSession.session_id) == session_id,
+                PlanningSession.tenant_id == self._tenant_id,
+            )
             .limit(1)
         )
         result = await self._db.exec(stmt)
@@ -76,7 +88,10 @@ class SqlPlanningSessionRepository:
         """
         stmt = (
             select(PlanningSession)
-            .where(col(PlanningSession.workflow_id) == workflow_id)
+            .where(
+                col(PlanningSession.workflow_id) == workflow_id,
+                PlanningSession.tenant_id == self._tenant_id,
+            )
             .limit(1)
         )
         result = await self._db.exec(stmt)
@@ -87,7 +102,12 @@ class SqlPlanningSessionRepository:
     ) -> PlanningSession:
         """Persist a new PlanningSession with audit fields populated."""
         ps = PlanningSession.model_validate(
-            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+            {
+                **data.model_dump(),
+                "tenant_id": self._tenant_id,
+                "created_by": user_id,
+                "updated_by": user_id,
+            }
         )
         self._db.add(ps)
         await commit_or_translate_user_fk(self._db, user_id=user_id)
@@ -108,14 +128,15 @@ class SqlPlanningSessionRepository:
             The set of pinned commit shas.
         """
         stmt = select(PlanningSession.agent_skill_commit_sha).where(
-            col(PlanningSession.agent_skill_id) == agent_skill_id
+            col(PlanningSession.agent_skill_id) == agent_skill_id,
+            PlanningSession.tenant_id == self._tenant_id,
         )
         result = await self._db.exec(stmt)
         return set(result.all())
 
     async def delete(self, ps_id: str) -> None:
         """Delete the PlanningSession with the given ID, raising NotFoundError if missing."""
-        ps = await self._db.get(PlanningSession, ps_id)
+        ps = await self._get_scoped(ps_id)
         if ps is None:
             raise NotFoundError("PlanningSession", ps_id)
         await self._db.delete(ps)

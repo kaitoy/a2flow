@@ -14,7 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.agent_skill import AgentSkill
 from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
-from tests._seed import seed_users
+from tests._seed import seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
 
 
@@ -39,6 +39,7 @@ async def skill_client(
     async with mem_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(mem_engine)
+    await seed_tenant(mem_engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine) as session:

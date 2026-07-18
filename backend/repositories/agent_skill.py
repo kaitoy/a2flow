@@ -61,14 +61,22 @@ class SqlAgentSkillRepository:
     a skill is still referenced by one or more workflows.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
         self._db = session
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, skill_id: str) -> AgentSkill | None:
+        stmt = select(AgentSkill).where(
+            AgentSkill.id == skill_id, AgentSkill.tenant_id == self._tenant_id
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, skill_id: str) -> AgentSkill | None:
-        return await self._db.get(AgentSkill, skill_id)
+        return await self._get_scoped(skill_id)
 
     async def exists(self, skill_id: str) -> bool:
-        return (await self._db.get(AgentSkill, skill_id)) is not None
+        return await self._get_scoped(skill_id) is not None
 
     async def list(
         self,
@@ -78,7 +86,8 @@ class SqlAgentSkillRepository:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> list[AgentSkill]:
-        stmt = apply_filters(select(AgentSkill), AgentSkill, filters)
+        stmt = select(AgentSkill).where(AgentSkill.tenant_id == self._tenant_id)
+        stmt = apply_filters(stmt, AgentSkill, filters)
         stmt = apply_sort(
             stmt, AgentSkill, sort, default=[col(AgentSkill.created_at).desc()]
         )
@@ -87,7 +96,12 @@ class SqlAgentSkillRepository:
 
     async def create(self, data: AgentSkillCreate, *, user_id: str) -> AgentSkill:
         skill = AgentSkill.model_validate(
-            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+            {
+                **data.model_dump(),
+                "tenant_id": self._tenant_id,
+                "created_by": user_id,
+                "updated_by": user_id,
+            }
         )
         self._db.add(skill)
         await commit_or_translate_user_fk(self._db, user_id=user_id)
@@ -97,7 +111,7 @@ class SqlAgentSkillRepository:
     async def update(
         self, skill_id: str, data: AgentSkillUpdate, *, user_id: str
     ) -> AgentSkill:
-        skill = await self._db.get(AgentSkill, skill_id)
+        skill = await self._get_scoped(skill_id)
         if skill is None:
             raise NotFoundError("AgentSkill", skill_id)
         skill.sqlmodel_update(data.model_dump(exclude_unset=True))
@@ -138,7 +152,7 @@ class SqlAgentSkillRepository:
         Raises:
             NotFoundError: If no skill exists with the given ID.
         """
-        skill = await self._db.get(AgentSkill, skill_id)
+        skill = await self._get_scoped(skill_id)
         if skill is None:
             raise NotFoundError("AgentSkill", skill_id)
         skill.sync_status = status
@@ -153,7 +167,7 @@ class SqlAgentSkillRepository:
         return skill
 
     async def delete(self, skill_id: str) -> None:
-        skill = await self._db.get(AgentSkill, skill_id)
+        skill = await self._get_scoped(skill_id)
         if skill is None:
             raise NotFoundError("AgentSkill", skill_id)
         await self._db.delete(skill)

@@ -17,6 +17,7 @@ from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
 from models.constraints import DescText, EntityName, PromptText
+from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -65,7 +66,7 @@ class WorkflowCreate(WorkflowUpdate):
     agent_skill_id: str
 
 
-class Workflow(WorkflowCreate, BaseEntity, table=True):
+class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted workflow binding task templates to an agent skill.
 
     ``status`` and ``generation_error`` are server-managed: they are declared
@@ -77,12 +78,13 @@ class Workflow(WorkflowCreate, BaseEntity, table=True):
 
     __tablename__ = "workflows"
 
+    tenant_id: str = Field(foreign_key="tenants.id", ondelete="RESTRICT")
     status: WorkflowStatus = Field(default=WorkflowStatus.draft)
     generation_error: str | None = None
 
     __table_args__ = (
-        UniqueConstraint("name", name="uq_workflows_name"),
-        Index("ix_workflows_name", "name"),
+        UniqueConstraint("tenant_id", "name", name="uq_workflows_tenant_id_name"),
+        Index("ix_workflows_tenant_id_name", "tenant_id", "name"),
         ForeignKeyConstraint(
             ["agent_skill_id"], ["agent_skills.id"], ondelete="RESTRICT"
         ),

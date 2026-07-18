@@ -14,7 +14,6 @@ from infrastructure.secret_resolver import SecretResolver
 from services import (
     AgentSkillService,
     ApprovalService,
-    AuthService,
     MCPRegistryService,
     MCPServerService,
     NotificationService,
@@ -36,7 +35,6 @@ from .context import APP_NAME
 from .repository import (
     AgentSkillRepositoryDep,
     ApprovalRepositoryDep,
-    AuthSessionRepositoryDep,
     MCPServerRepositoryDep,
     MessageMetaRepositoryDep,
     NotificationRepositoryDep,
@@ -83,17 +81,6 @@ def get_skill_sync_job() -> SkillSyncJob:
 
 
 SkillSyncJobDep = Annotated[SkillSyncJob, Depends(get_skill_sync_job)]
-
-
-def get_auth_service(
-    users: UserRepositoryDep,
-    sessions: AuthSessionRepositoryDep,
-) -> AuthService:
-    """Create an AuthService wiring the user and auth-session repositories."""
-    return AuthService(users, sessions)
-
-
-AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 
 
 def get_secret_service(

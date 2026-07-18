@@ -40,13 +40,22 @@ class WorkflowSessionRepository(Protocol):
 class SqlWorkflowSessionRepository:
     """SQLModel-backed implementation of WorkflowSessionRepository."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Store the SQLModel async session used for all queries."""
+    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+        """Store the SQLModel async session and the tenant these queries are scoped to."""
         self._db = session
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, ws_id: str) -> WorkflowSession | None:
+        """Return the WorkflowSession with the given ID within the current tenant, or ``None``."""
+        stmt = select(WorkflowSession).where(
+            WorkflowSession.id == ws_id, WorkflowSession.tenant_id == self._tenant_id
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, ws_id: str) -> WorkflowSession | None:
         """Return the WorkflowSession with the given ID, or ``None`` if missing."""
-        return await self._db.get(WorkflowSession, ws_id)
+        return await self._get_scoped(ws_id)
 
     async def get_by_session_id(self, session_id: str) -> WorkflowSession | None:
         """Return the WorkflowSession for the given ADK session id, or ``None``.
@@ -65,7 +74,10 @@ class SqlWorkflowSessionRepository:
         """
         stmt = (
             select(WorkflowSession)
-            .where(col(WorkflowSession.session_id) == session_id)
+            .where(
+                col(WorkflowSession.session_id) == session_id,
+                WorkflowSession.tenant_id == self._tenant_id,
+            )
             .limit(1)
         )
         result = await self._db.exec(stmt)
@@ -80,7 +92,10 @@ class SqlWorkflowSessionRepository:
         filters: Sequence[FilterSpec] = (),
     ) -> list[WorkflowSession]:
         """Return WorkflowSessions, defaulting to ``created_at`` descending (newest first)."""
-        stmt = apply_filters(select(WorkflowSession), WorkflowSession, filters)
+        stmt = select(WorkflowSession).where(
+            WorkflowSession.tenant_id == self._tenant_id
+        )
+        stmt = apply_filters(stmt, WorkflowSession, filters)
         stmt = apply_sort(
             stmt,
             WorkflowSession,
@@ -98,6 +113,7 @@ class SqlWorkflowSessionRepository:
             {
                 **data.model_dump(),
                 "workflow_id": workflow_id,
+                "tenant_id": self._tenant_id,
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -124,13 +140,14 @@ class SqlWorkflowSessionRepository:
         stmt = select(WorkflowSession.agent_skill_commit_sha).where(
             col(WorkflowSession.agent_skill_id) == agent_skill_id,
             col(WorkflowSession.agent_skill_commit_sha).is_not(None),
+            WorkflowSession.tenant_id == self._tenant_id,
         )
         result = await self._db.exec(stmt)
         return {sha for sha in result.all() if sha is not None}
 
     async def delete(self, ws_id: str) -> None:
         """Delete the WorkflowSession with the given ID, raising NotFoundError if missing."""
-        ws = await self._db.get(WorkflowSession, ws_id)
+        ws = await self._get_scoped(ws_id)
         if ws is None:
             raise NotFoundError("WorkflowSession", ws_id)
         await self._db.delete(ws)

@@ -108,6 +108,20 @@ Foreign key columns store the string representation of the referenced entity's U
 
 JSON columns must use the `JSONColumn` type from `models/base.py` (`sa_column=Column(JSONColumn, nullable=...)`), never the bare SQLAlchemy `JSON`. `JSONColumn` is `JSON().with_variant(JSONB(), "postgresql")`, so it stores `jsonb` on PostgreSQL (decomposed binary form — faster to query, GIN-indexable) and falls back to plain `JSON` on SQLite (which has no `jsonb` type). This mirrors how `TZDateTime` adapts datetime columns per dialect; the database is still selected purely via `DB_URL` with no code change.
 
+### Tenant Isolation
+
+Entities that belong to a tenant (i.e. most resources — everything except `User`, `AuthSession`, `UserAvatar`, and `Tenant` itself) inherit `TenantScoped` (`models/tenant_scoped.py`), placed between the `...Create` base and `BaseEntity`:
+
+```python
+class AgentSkill(AgentSkillCreate, TenantScoped, BaseEntity, table=True):
+    __tablename__ = "agent_skills"
+    ...
+```
+
+`TenantScoped` contributes a required, non-nullable `tenant_id: str` (FK to `tenants.id`, `ondelete="RESTRICT"`, indexed). If the entity's uniqueness is naturally per-tenant (e.g. `name` unique within a tenant, not globally), redeclare `tenant_id` **without** `index=True` and fold it into a composite `UniqueConstraint`/`Index` on `(tenant_id, <field>)` instead — see `models/secret.py`, `models/agent_skill.py`, `models/mcp_server.py`, `models/workflow.py` for the pattern.
+
+`User.tenant_id` is a plain nullable field, not `TenantScoped` — `None` means platform-scoped (the seeded system user, or an admin operating outside any tenant). `User` is the subject of tenant assignment, not a tenant-scoped resource itself.
+
 ---
 
 ## Repository Layer
@@ -131,16 +145,41 @@ class SqlAgentSkillRepository:
 
 Using a Protocol makes the repository easy to mock in tests without depending on the database.
 
+For a `TenantScoped` entity, the constructor also takes a required keyword-only `tenant_id: str`, resolved by the caller (see "Tenant Scoping in the Repository Layer" below) — not a `Protocol` method parameter, since it applies to every operation uniformly:
+
+```python
+class SqlAgentSkillRepository:
+    def __init__(self, db: AsyncSession, *, tenant_id: str) -> None:
+        self._db = db
+        self._tenant_id = tenant_id
+```
+
 ### Standard Repository Operations
 
 | Method | Behavior |
 |---|---|
-| `get(id)` | Returns the entity or `None` if not found |
-| `list(limit, offset)` | Returns all entities ordered by `created_at DESC` |
-| `create(data, user_id)` | Merges `data` fields with `created_by=user_id`, `updated_by=user_id` |
+| `get(id)` | Returns the entity or `None` if not found (or not in the current tenant) |
+| `list(limit, offset)` | Returns all entities ordered by `created_at DESC` (scoped to the current tenant) |
+| `create(data, user_id)` | Merges `data` fields with `created_by=user_id`, `updated_by=user_id` (and `tenant_id=self._tenant_id`) |
 | `update(id, data, user_id)` | Applies only the set fields; sets `updated_by=user_id`; raises `NotFoundError` |
 | `delete(id)` | Raises `NotFoundError` if missing; raises `ReferencedError` on integrity constraint |
 | `exists(id)` | Returns bool; used for cross-entity FK validation |
+
+### Tenant Scoping in the Repository Layer
+
+For a `TenantScoped` entity, every query filters on `self._tenant_id`. `AsyncSession.get(Model, id)` cannot express that extra predicate, so `get`/`update`/`delete`/`exists`/`set_*` on such an entity go through a private `_get_scoped(self, id) -> Model | None` helper built on `select(Model).where(Model.id == id, Model.tenant_id == self._tenant_id)`, not `session.get(...)`:
+
+```python
+async def _get_scoped(self, skill_id: str) -> AgentSkill | None:
+    stmt = select(AgentSkill).where(
+        AgentSkill.id == skill_id, AgentSkill.tenant_id == self._tenant_id
+    )
+    return (await self._db.exec(stmt)).first()
+```
+
+A cross-tenant fetch this way returns `None`, which the existing `NotFoundError` path on `update`/`delete` already handles — a caller in tenant A gets 404, not 403, when it references an id that exists only in tenant B, matching the "fetch entity first so a missing record still surfaces as 404, not 403" rule below. `list()` adds `.where(Model.tenant_id == self._tenant_id)` to its `select()`; `create()` adds `"tenant_id": self._tenant_id` to the `model_validate({...})` merge dict.
+
+Enforcement is deliberately explicit at this layer rather than via `with_loader_criteria`/ORM event listeners: ADK agent tools and background jobs (`infrastructure/*_tools.py`, `services/workflow_planning.py`, `services/agent_skill_sync.py`) open their own `AsyncSession` on the module-level engine outside FastAPI's request scope, so a request-scoped listener would silently not apply to them — the most dangerous path. Those callers resolve `tenant_id` themselves via `repositories/tenant_bootstrap.py` (the single audited module of intentionally tenant-*unscoped* queries — an opaque ADK session id or bare entity id is all they start with) before constructing any repository.
 
 ### Audit Field Population
 
@@ -169,7 +208,7 @@ class SqlWorkflowRepository:
         ...
 ```
 
-This produces a friendlier error message than relying solely on the database constraint.
+This produces a friendlier error message than relying solely on the database constraint. When both repositories are `TenantScoped`, the collaborator must be constructed with the **same** `tenant_id` as the repository holding it — for request-scoped code this is automatic (both come from `CurrentTenantIdDep`, cached per request by FastAPI's `Depends()`), but callers outside request scope (agent tools, background jobs) must thread the same resolved `tenant_id` through every repository they construct for one call.
 
 ### Error Hierarchy (`repositories/exceptions.py`)
 
@@ -353,10 +392,12 @@ All FastAPI dependencies are defined as `Annotated` type aliases in the `depende
 ```python
 CurrentUserDep      # User, from the authenticated session cookie
 CurrentUserIdDep    # str, the authenticated user's id (derived from CurrentUserDep)
+CurrentTenantIdDep  # str, the authenticated user's tenant id (derived from CurrentUserDep);
+                    # raises ForbiddenError if the caller is platform-scoped (tenant_id is None)
 AuthServiceDep      # AuthService, per-request (login/authenticate/logout)
 DBSessionDep        # AsyncSession, per-request
-AgentSkillRepositoryDep   # SqlAgentSkillRepository, per-request
-WorkflowRepositoryDep     # SqlWorkflowRepository, per-request (injects AgentSkillRepository)
+AgentSkillRepositoryDep   # SqlAgentSkillRepository, per-request (tenant-scoped)
+WorkflowRepositoryDep     # SqlWorkflowRepository, per-request (tenant-scoped; injects AgentSkillRepository)
 AgentSkillServiceDep      # AgentSkillService, per-request (injects AgentSkillRepository)
 WorkflowServiceDep        # WorkflowService, per-request (injects repos)
 SessionServiceDep   # ADK BaseSessionService (SQLite- or DB-backed), singleton
@@ -366,9 +407,14 @@ SkillSyncJobDep     # sync_agent_skill, the background clone/pull job
 ```
 
 Routers inject the `*ServiceDep` aliases; the repository aliases exist so the
-service factories can compose them.
+service factories can compose them. A route never needs to declare
+`tenant_id: CurrentTenantIdDep` itself — it reaches every tenant-scoped route
+transitively once the repository factory pulls it in, since FastAPI caches
+`Depends()` results per request.
 
 Singletons are created once using `@lru_cache` on the factory function. Per-request dependencies use `Depends()` with `async def` generators that yield and then commit/rollback.
+
+`get_auth_service`/`AuthServiceDep` are defined in `auth.py`, not `service.py`, and built directly from `repositories.SqlUserRepository`/`SqlAuthSessionRepository` rather than from `repository.py`'s `UserRepositoryDep`/`AuthSessionRepositoryDep` aliases. This is required, not stylistic: `repository.py` imports `CurrentTenantIdDep` from `auth.py` to scope its tenant-aware factories, and `service.py` imports from `repository.py` — if `auth.py` also imported `AuthServiceDep` from `service.py`, the three modules would form a circular import. Keep this asymmetry when touching any of the three files.
 
 ---
 
@@ -393,16 +439,17 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 
 1. **Model file** (`models/<entity>.py`):
    - Define `EntityUpdate` (all optional), `EntityCreate` (required fields), `Entity` (table=True, inherits `BaseEntity`).
+   - If the entity is tenant-isolated (the default — see "Tenant Isolation" above), also inherit `TenantScoped` between `EntityCreate` and `BaseEntity`.
    - Follow constraint naming conventions.
    - Use `sa_type=TZDateTime` for datetime columns and `Column(JSONColumn, ...)` for JSON columns (both from `models/base.py`).
 2. **Migration**: generate and review an Alembic migration for the new table (`cd backend && uv run alembic revision --autogenerate -m "add <entity> table"`) — see Database Configuration above.
 3. **Repository file** (`repositories/<entity>.py`):
    - Define a `Protocol` with the standard five methods plus `exists()`.
-   - Implement `SqlEntityRepository`.
+   - Implement `SqlEntityRepository`. If tenant-isolated, add the `tenant_id` constructor parameter and the `_get_scoped` helper per "Tenant Scoping in the Repository Layer" above.
    - Raise `NotFoundError` / `ReferencedError` / `ForeignKeyViolationError` as appropriate.
 4. **Exceptions**: reuse existing exception types; add new ones to `repositories/exceptions.py` only if needed.
 5. **Service file** (`services/<entity>.py`): define `EntityService` as a concrete class wrapping the repository. Raise `NotFoundError` on missing single-entity fetches and host any multi-collaborator orchestration here.
-6. **Dependencies** (`dependencies/`): add the `EntityRepositoryDep` alias to `repository.py` **and** the `EntityServiceDep` alias to `service.py` (the service factory composes the repository deps), then re-export both from `__init__.py`.
+6. **Dependencies** (`dependencies/`): add the `EntityRepositoryDep` alias to `repository.py` **and** the `EntityServiceDep` alias to `service.py` (the service factory composes the repository deps), then re-export both from `__init__.py`. If tenant-isolated, the `get_entity_repository` factory also takes `tenant_id: CurrentTenantIdDep` and passes it to the `SqlEntityRepository` constructor.
 7. **Router file** (`routers/<entity>.py`):
    - Inject the `EntityServiceDep` (not the repository) and follow RESTful conventions and the error mapping table above.
    - Register in `main.py` with the correct prefix and tag.

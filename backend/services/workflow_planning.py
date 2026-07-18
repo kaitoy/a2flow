@@ -264,10 +264,24 @@ async def generate_workflow_plan(
         SqlWorkflowRepository,
         SqlWorkflowTaskTemplateRepository,
     )
+    from repositories.tenant_bootstrap import resolve_workflow_tenant
+
+    async with AsyncSession(database.engine, expire_on_commit=False) as db:
+        tenant_id = await resolve_workflow_tenant(db, workflow_id)
+    if tenant_id is None:
+        logger.warning(
+            "Plan generation for workflow %s failed: workflow not found.",
+            workflow_id,
+        )
+        return
 
     async def _set_failed(reason: str) -> None:
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
-            workflows = SqlWorkflowRepository(db, SqlAgentSkillRepository(db))
+            workflows = SqlWorkflowRepository(
+                db,
+                SqlAgentSkillRepository(db, tenant_id=tenant_id),
+                tenant_id=tenant_id,
+            )
             await workflows.set_status(
                 workflow_id,
                 WorkflowStatus.failed,
@@ -277,8 +291,10 @@ async def generate_workflow_plan(
 
     try:
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
-            skills = SqlAgentSkillRepository(db)
-            ps = await SqlPlanningSessionRepository(db).get_by_workflow_id(workflow_id)
+            skills = SqlAgentSkillRepository(db, tenant_id=tenant_id)
+            ps = await SqlPlanningSessionRepository(
+                db, tenant_id=tenant_id
+            ).get_by_workflow_id(workflow_id)
             if ps is None:
                 raise NotFoundError("PlanningSession", workflow_id)
             skill = await skills.get(ps.agent_skill_id)
@@ -311,8 +327,13 @@ async def generate_workflow_plan(
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
             templates_repo = SqlWorkflowTaskTemplateRepository(
                 db,
-                SqlWorkflowRepository(db, SqlAgentSkillRepository(db)),
-                SqlMCPServerRepository(db),
+                SqlWorkflowRepository(
+                    db,
+                    SqlAgentSkillRepository(db, tenant_id=tenant_id),
+                    tenant_id=tenant_id,
+                ),
+                SqlMCPServerRepository(db, tenant_id=tenant_id),
+                tenant_id=tenant_id,
             )
             templates = await templates_repo.list(
                 limit=1, offset=0, workflow_id=workflow_id
@@ -338,7 +359,11 @@ async def generate_workflow_plan(
             description = transcript[:2000].rstrip() or None
 
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
-            workflows = SqlWorkflowRepository(db, SqlAgentSkillRepository(db))
+            workflows = SqlWorkflowRepository(
+                db,
+                SqlAgentSkillRepository(db, tenant_id=tenant_id),
+                tenant_id=tenant_id,
+            )
             await workflows.set_status(
                 workflow_id,
                 WorkflowStatus.draft,
@@ -346,7 +371,7 @@ async def generate_workflow_plan(
                 user_id=user_id,
             )
             try:
-                await SqlNotificationRepository(db).create(
+                await SqlNotificationRepository(db, tenant_id=tenant_id).create(
                     NotificationCreate(
                         user_id=ps.user_id,
                         type=NotificationType.workflow_draft_ready,

@@ -21,6 +21,7 @@ from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
 from models.constraints import BodyText, ShortText
+from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -64,7 +65,7 @@ class NotificationCreate(NotificationUpdate):
     read: bool = False
 
 
-class Notification(NotificationCreate, BaseEntity, table=True):
+class Notification(NotificationCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted Notification addressed to a single recipient user.
 
     ``user_id`` references the recipient (``ON DELETE CASCADE``); the optional

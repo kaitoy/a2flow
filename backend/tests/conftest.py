@@ -16,7 +16,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import Settings, get_settings
 from models.user import SYSTEM_USER_ID, User
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
 @pytest.fixture(autouse=True)
@@ -61,13 +61,25 @@ async def _override_get_current_user(request: Request) -> User:
     and ownership check. Role-specific tests opt in by setting the header
     explicitly (e.g. ``X-User-Roles: requester`` or an empty value for a
     role-less user).
+
+    ``tenant_id`` is taken from the ``X-User-Tenant-Id`` header, defaulting to
+    :data:`tests._seed.DEFAULT_TEST_TENANT_ID` when the header is absent so
+    tenant-scoped routes work out of the box; passing an explicit empty value
+    opts a test into a platform-scoped (``tenant_id=None``) caller, mirroring
+    the ``X-User-Roles`` absent-vs-empty convention above.
     """
     roles_header = request.headers.get("X-User-Roles")
     if roles_header is None:
         roles = ["super_admin"]
     else:
         roles = [r.strip() for r in roles_header.split(",") if r.strip()]
-    return User.model_construct(id=request.headers.get("X-User-Id", ""), roles=roles)
+    tenant_header = request.headers.get("X-User-Tenant-Id")
+    tenant_id = (
+        DEFAULT_TEST_TENANT_ID if tenant_header is None else (tenant_header or None)
+    )
+    return User.model_construct(
+        id=request.headers.get("X-User-Id", ""), roles=roles, tenant_id=tenant_id
+    )
 
 
 def _override_verify_csrf() -> None:
@@ -267,6 +279,7 @@ async def _workflow_client_env(
     async with mem_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(mem_engine)
+    await seed_tenant(mem_engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine) as session:
@@ -278,7 +291,9 @@ async def _workflow_client_env(
         from repositories.agent_skill import SqlAgentSkillRepository
 
         async with AsyncSession(mem_engine) as session:
-            await SqlAgentSkillRepository(session).set_sync_state(
+            await SqlAgentSkillRepository(
+                session, tenant_id=DEFAULT_TEST_TENANT_ID
+            ).set_sync_state(
                 skill_id,
                 status=SkillSyncStatus.ready,
                 commit_sha=FAKE_COMMIT_SHA,
@@ -294,7 +309,11 @@ async def _workflow_client_env(
         from repositories.workflow import SqlWorkflowRepository
 
         async with AsyncSession(mem_engine) as session:
-            workflows = SqlWorkflowRepository(session, SqlAgentSkillRepository(session))
+            workflows = SqlWorkflowRepository(
+                session,
+                SqlAgentSkillRepository(session, tenant_id=DEFAULT_TEST_TENANT_ID),
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+            )
             await workflows.set_status(
                 workflow_id, WorkflowStatus.draft, user_id=user_id
             )

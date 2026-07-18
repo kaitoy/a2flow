@@ -13,6 +13,7 @@ from sqlalchemy import ForeignKeyConstraint, Index, UniqueConstraint
 from sqlmodel import SQLModel
 
 from models.base import BaseEntity
+from models.tenant_scoped import TenantScoped
 
 
 class PlanningSessionCreate(SQLModel):
@@ -31,7 +32,7 @@ class PlanningSessionCreate(SQLModel):
     user_id: str
 
 
-class PlanningSession(PlanningSessionCreate, BaseEntity, table=True):
+class PlanningSession(PlanningSessionCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted record linking an ADK chat session to its workflow.
 
     ``workflow_id`` is unique — a workflow has exactly one planning session —

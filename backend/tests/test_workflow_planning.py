@@ -27,7 +27,7 @@ from models.planning_session import PlanningSession
 from models.workflow import Workflow, WorkflowStatus
 from models.workflow_task_template import WorkflowTaskTemplate
 from services.workflow_planning import generate_workflow_plan
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 _SHA = "a" * 40
 
@@ -46,6 +46,7 @@ async def engine(
     async with eng.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(eng, ids=("owner",))
+    await seed_tenant(eng)
 
     monkeypatch.setattr("infrastructure.database.engine", eng)
     yield eng
@@ -60,6 +61,7 @@ async def _seed(eng: AsyncEngine) -> tuple[str, str]:
             repo_url="https://example.com/repo",
             repo_path="",
             commit_sha=_SHA,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by="owner",
             updated_by="owner",
         )
@@ -69,6 +71,7 @@ async def _seed(eng: AsyncEngine) -> tuple[str, str]:
             name="wf-a",
             agent_skill_id=skill.id,
             status=WorkflowStatus.generating,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by="owner",
             updated_by="owner",
         )
@@ -80,6 +83,7 @@ async def _seed(eng: AsyncEngine) -> tuple[str, str]:
             agent_skill_id=skill.id,
             agent_skill_commit_sha=_SHA,
             user_id="owner",
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by="owner",
             updated_by="owner",
         )
@@ -94,6 +98,7 @@ async def _add_template(eng: AsyncEngine, workflow_id: str) -> None:
             WorkflowTaskTemplate(
                 workflow_id=workflow_id,
                 title="Generated step",
+                tenant_id=DEFAULT_TEST_TENANT_ID,
                 created_by="owner",
                 updated_by="owner",
             )
@@ -132,6 +137,7 @@ def _fakes(
                     WorkflowTaskTemplate(
                         workflow_id=ps.workflow_id,
                         title="Generated step",
+                        tenant_id=DEFAULT_TEST_TENANT_ID,
                         created_by="owner",
                         updated_by="owner",
                     )

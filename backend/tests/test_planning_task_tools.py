@@ -20,7 +20,6 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.planning_task_tools import (
-    _resolve_workflow_id,
     create_planning_task,
     delete_planning_task,
     get_planning_task,
@@ -31,8 +30,8 @@ from infrastructure.planning_task_tools import (
 from models.agent_skill import AgentSkill
 from models.planning_session import PlanningSession
 from models.workflow import Workflow
-from repositories import SqlPlanningSessionRepository
-from tests._seed import seed_users
+from repositories.tenant_bootstrap import resolve_planning_session_tenant
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
 @pytest_asyncio.fixture()
@@ -49,6 +48,7 @@ async def engine(
     async with eng.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(eng)
+    await seed_tenant(eng)
 
     monkeypatch.setattr("infrastructure.database.engine", eng)
     yield eng
@@ -64,6 +64,7 @@ async def _seed_planning_session(
             name=f"skill-{session_id}",
             repo_url="https://example.com/repo",
             repo_path="",
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -75,6 +76,7 @@ async def _seed_planning_session(
         workflow = Workflow(
             name=f"wf-{session_id}",
             agent_skill_id=skill_id,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -89,6 +91,7 @@ async def _seed_planning_session(
             agent_skill_id=skill_id,
             agent_skill_commit_sha="a" * 40,
             user_id=user_id,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -250,12 +253,14 @@ async def test_delete_cross_workflow_guard(engine: AsyncEngine) -> None:
 # ---------- session resolution ----------
 
 
-async def test_resolve_workflow_id(engine: AsyncEngine) -> None:
+async def test_resolve_planning_session_tenant(engine: AsyncEngine) -> None:
     workflow_id = await _seed_planning_session(engine, session_id="plan-x")
     async with AsyncSession(engine) as db:
-        repo = SqlPlanningSessionRepository(db)
-        assert await _resolve_workflow_id(_ctx("plan-x"), repo) == workflow_id
-        assert await _resolve_workflow_id(_ctx("absent"), repo) is None
+        assert await resolve_planning_session_tenant(db, "plan-x") == (
+            workflow_id,
+            DEFAULT_TEST_TENANT_ID,
+        )
+        assert await resolve_planning_session_tenant(db, "absent") is None
 
 
 # ---------- tool bindings ----------
@@ -270,6 +275,7 @@ async def _seed_mcp_server(eng: AsyncEngine, *, name: str = "srv") -> str:
         server = MCPServer(
             name=name,
             url="https://mcp.example.com/mcp",
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )

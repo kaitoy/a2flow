@@ -19,6 +19,7 @@ can react to instead of raising.
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Any
 
 from google.adk.tools.tool_context import ToolContext
@@ -51,6 +52,10 @@ from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
 )
+from repositories.tenant_bootstrap import (
+    NoTenantSessionError,
+    resolve_planning_session_tenant,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,55 +64,62 @@ _NO_SESSION = (
 )
 
 
+@dataclass
+class _Scope:
+    """Per-tool-call resolved workflow id, tenant id, and scoped repositories."""
+
+    workflow_id: str
+    tenant_id: str
+    ps_repo: PlanningSessionRepository
+    template_repo: WorkflowTaskTemplateRepository
+
+
 @asynccontextmanager
-async def _repos() -> AsyncIterator[
-    tuple[PlanningSessionRepository, WorkflowTaskTemplateRepository]
-]:
-    """Open a database session and yield the planning-session and template repos.
+async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
+    """Open a database session and yield the resolved scope and its repositories.
 
     Opens a fresh ``AsyncSession`` on the module-level engine (the tools run
-    outside FastAPI's request scope) and wires a PlanningSession repository and
-    a WorkflowTaskTemplate repository to it. The engine is referenced through
-    the ``database`` module so tests can monkeypatch ``database.engine``.
-
-    Yields:
-        A ``(planning_session_repository, workflow_task_template_repository)``
-        tuple bound to the same session.
-    """
-    async with AsyncSession(database.engine) as db:
-        yield (
-            SqlPlanningSessionRepository(db),
-            SqlWorkflowTaskTemplateRepository(
-                db,
-                SqlWorkflowRepository(db, SqlAgentSkillRepository(db)),
-                SqlMCPServerRepository(db),
-            ),
-        )
-
-
-async def _resolve_workflow_id(
-    tool_context: ToolContext, ps_repo: PlanningSessionRepository
-) -> str | None:
-    """Resolve the workflow whose templates the current run edits, or ``None``.
-
-    Reads the ADK session id from ``tool_context.session.id`` and maps it to the
-    owning PlanningSession, whose ``workflow_id`` is the foreign key target for
-    WorkflowTaskTemplate records.
+    outside FastAPI's request scope), resolves the current run's workflow id
+    and tenant id, and wires a PlanningSession repository and a
+    WorkflowTaskTemplate repository to it, both scoped to the resolved tenant.
+    The engine is referenced through the ``database`` module so tests can
+    monkeypatch ``database.engine``.
 
     Args:
         tool_context: The ADK tool context for the current invocation.
-        ps_repo: Repository used to look the session up by its ADK session id.
 
-    Returns:
-        The workflow's primary key, or ``None`` if the session id is missing or
-        no PlanningSession matches it.
+    Yields:
+        The resolved :class:`_Scope`.
+
+    Raises:
+        NoTenantSessionError: If no PlanningSession is bound to the current run.
     """
-    session = getattr(tool_context, "session", None)
-    session_id = getattr(session, "id", None)
-    if not session_id:
-        return None
-    ps = await ps_repo.get_by_session_id(session_id)
-    return ps.workflow_id if ps is not None else None
+    async with AsyncSession(database.engine) as db:
+        session = getattr(tool_context, "session", None)
+        session_id = getattr(session, "id", None)
+        resolved = (
+            await resolve_planning_session_tenant(db, session_id)
+            if session_id
+            else None
+        )
+        if resolved is None:
+            raise NoTenantSessionError()
+        workflow_id, tenant_id = resolved
+        yield _Scope(
+            workflow_id=workflow_id,
+            tenant_id=tenant_id,
+            ps_repo=SqlPlanningSessionRepository(db, tenant_id=tenant_id),
+            template_repo=SqlWorkflowTaskTemplateRepository(
+                db,
+                SqlWorkflowRepository(
+                    db,
+                    SqlAgentSkillRepository(db, tenant_id=tenant_id),
+                    tenant_id=tenant_id,
+                ),
+                SqlMCPServerRepository(db, tenant_id=tenant_id),
+                tenant_id=tenant_id,
+            ),
+        )
 
 
 def _template_to_dict(template: WorkflowTaskTemplateRead) -> dict[str, Any]:
@@ -211,37 +223,37 @@ async def register_planning_tasks(
     if order is None:
         return {"error": "tasks contain a dependency cycle"}
 
-    async with _repos() as (ps_repo, template_repo):
-        workflow_id = await _resolve_workflow_id(tool_context, ps_repo)
-        if workflow_id is None:
-            return {"error": _NO_SESSION}
-        user_id = _user_id(tool_context)
-        key_to_id: dict[str, str] = {}
-        created: list[dict[str, Any]] = []
-        for position, key in enumerate(order):
-            entry = by_key[key]
-            dep_ids = [key_to_id[d] for d in (entry.get("depends_on") or [])]
-            declared_position = entry.get("position")
-            data = WorkflowTaskTemplateCreate(
-                workflow_id=workflow_id,
-                title=entry["title"],
-                description=entry.get("description"),
-                position=declared_position
-                if declared_position is not None
-                else position,
-                depends_on_ids=dep_ids,
-                tool_bindings=bindings_by_key[key],
-            )
-            try:
-                template = await template_repo.create(data, user_id=user_id)
-            except (ForeignKeyViolationError, DependencyCycleError) as exc:
-                return {
-                    "error": f"failed to create task {key!r}: {exc}",
-                    "created": created,
-                }
-            key_to_id[key] = template.id
-            created.append({"key": key, "id": template.id, "title": template.title})
-        return {"created": created}
+    try:
+        async with _repos(tool_context) as s:
+            user_id = _user_id(tool_context)
+            key_to_id: dict[str, str] = {}
+            created: list[dict[str, Any]] = []
+            for position, key in enumerate(order):
+                entry = by_key[key]
+                dep_ids = [key_to_id[d] for d in (entry.get("depends_on") or [])]
+                declared_position = entry.get("position")
+                data = WorkflowTaskTemplateCreate(
+                    workflow_id=s.workflow_id,
+                    title=entry["title"],
+                    description=entry.get("description"),
+                    position=declared_position
+                    if declared_position is not None
+                    else position,
+                    depends_on_ids=dep_ids,
+                    tool_bindings=bindings_by_key[key],
+                )
+                try:
+                    template = await s.template_repo.create(data, user_id=user_id)
+                except (ForeignKeyViolationError, DependencyCycleError) as exc:
+                    return {
+                        "error": f"failed to create task {key!r}: {exc}",
+                        "created": created,
+                    }
+                key_to_id[key] = template.id
+                created.append({"key": key, "id": template.id, "title": template.title})
+            return {"created": created}
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}
 
 
 async def create_planning_task(
@@ -275,22 +287,23 @@ async def create_planning_task(
     bindings = _parse_tool_bindings(tool_bindings or [])
     if bindings is None:
         return _invalid_tools_error("tool_bindings")
-    async with _repos() as (ps_repo, template_repo):
-        workflow_id = await _resolve_workflow_id(tool_context, ps_repo)
-        if workflow_id is None:
-            return {"error": _NO_SESSION}
-        data = WorkflowTaskTemplateCreate(
-            workflow_id=workflow_id,
-            title=title,
-            description=description,
-            depends_on_ids=depends_on_ids or [],
-            tool_bindings=bindings,
-        )
-        try:
-            template = await template_repo.create(data, user_id=_user_id(tool_context))
-        except (ForeignKeyViolationError, DependencyCycleError) as exc:
-            return {"error": str(exc)}
-        return _template_to_dict(template)
+    try:
+        async with _repos(tool_context) as s:
+            data = WorkflowTaskTemplateCreate(
+                workflow_id=s.workflow_id,
+                title=title,
+                description=description,
+                depends_on_ids=depends_on_ids or [],
+                tool_bindings=bindings,
+            )
+            template = await s.template_repo.create(
+                data, user_id=_user_id(tool_context)
+            )
+            return _template_to_dict(template)
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}
+    except (ForeignKeyViolationError, DependencyCycleError) as exc:
+        return {"error": str(exc)}
 
 
 async def list_planning_tasks(tool_context: ToolContext) -> dict[str, Any]:
@@ -305,14 +318,14 @@ async def list_planning_tasks(tool_context: ToolContext) -> dict[str, Any]:
         "position", "tool_bindings"}, ...]}`` ordered by position then creation
         time, or ``{"error": <message>}`` if the session cannot be resolved.
     """
-    async with _repos() as (ps_repo, template_repo):
-        workflow_id = await _resolve_workflow_id(tool_context, ps_repo)
-        if workflow_id is None:
-            return {"error": _NO_SESSION}
-        templates = await template_repo.list(
-            limit=1000, offset=0, workflow_id=workflow_id
-        )
-        return {"tasks": [_template_to_dict(t) for t in templates]}
+    try:
+        async with _repos(tool_context) as s:
+            templates = await s.template_repo.list(
+                limit=1000, offset=0, workflow_id=s.workflow_id
+            )
+            return {"tasks": [_template_to_dict(t) for t in templates]}
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}
 
 
 async def get_planning_task(
@@ -329,14 +342,14 @@ async def get_planning_task(
         The task dict, or ``{"error": <message>}`` if the session cannot be
         resolved or the template does not belong to the plan.
     """
-    async with _repos() as (ps_repo, template_repo):
-        workflow_id = await _resolve_workflow_id(tool_context, ps_repo)
-        if workflow_id is None:
-            return {"error": _NO_SESSION}
-        template = await template_repo.get(template_id)
-        if template is None or template.workflow_id != workflow_id:
-            return _not_in_plan_error(template_id)
-        return _template_to_dict(template)
+    try:
+        async with _repos(tool_context) as s:
+            template = await s.template_repo.get(template_id)
+            if template is None or template.workflow_id != s.workflow_id:
+                return _not_in_plan_error(template_id)
+            return _template_to_dict(template)
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}
 
 
 async def update_planning_task(
@@ -379,35 +392,35 @@ async def update_planning_task(
     )
     if tool_bindings is not None and bindings is None:
         return _invalid_tools_error("tool_bindings")
-    async with _repos() as (ps_repo, template_repo):
-        workflow_id = await _resolve_workflow_id(tool_context, ps_repo)
-        if workflow_id is None:
-            return {"error": _NO_SESSION}
-        existing = await template_repo.get(template_id)
-        if existing is None or existing.workflow_id != workflow_id:
-            return _not_in_plan_error(template_id)
-        fields: dict[str, Any] = {}
-        if title is not None:
-            fields["title"] = title
-        if description is not None:
-            fields["description"] = description
-        if position is not None:
-            fields["position"] = position
-        if depends_on_ids is not None:
-            fields["depends_on_ids"] = depends_on_ids
-        if bindings is not None:
-            fields["tool_bindings"] = bindings
-        try:
-            template = await template_repo.update(
-                template_id,
-                WorkflowTaskTemplateUpdate(**fields),
-                user_id=_user_id(tool_context),
-            )
-        except NotFoundError:
-            return _not_in_plan_error(template_id)
-        except (ForeignKeyViolationError, DependencyCycleError) as exc:
-            return {"error": str(exc)}
-        return _template_to_dict(template)
+    try:
+        async with _repos(tool_context) as s:
+            existing = await s.template_repo.get(template_id)
+            if existing is None or existing.workflow_id != s.workflow_id:
+                return _not_in_plan_error(template_id)
+            fields: dict[str, Any] = {}
+            if title is not None:
+                fields["title"] = title
+            if description is not None:
+                fields["description"] = description
+            if position is not None:
+                fields["position"] = position
+            if depends_on_ids is not None:
+                fields["depends_on_ids"] = depends_on_ids
+            if bindings is not None:
+                fields["tool_bindings"] = bindings
+            try:
+                template = await s.template_repo.update(
+                    template_id,
+                    WorkflowTaskTemplateUpdate(**fields),
+                    user_id=_user_id(tool_context),
+                )
+            except NotFoundError:
+                return _not_in_plan_error(template_id)
+            return _template_to_dict(template)
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}
+    except (ForeignKeyViolationError, DependencyCycleError) as exc:
+        return {"error": str(exc)}
 
 
 async def delete_planning_task(
@@ -425,12 +438,12 @@ async def delete_planning_task(
         if the session cannot be resolved or the template does not belong to
         the plan.
     """
-    async with _repos() as (ps_repo, template_repo):
-        workflow_id = await _resolve_workflow_id(tool_context, ps_repo)
-        if workflow_id is None:
-            return {"error": _NO_SESSION}
-        existing = await template_repo.get(template_id)
-        if existing is None or existing.workflow_id != workflow_id:
-            return _not_in_plan_error(template_id)
-        await template_repo.delete(template_id)
-        return {"deleted": template_id}
+    try:
+        async with _repos(tool_context) as s:
+            existing = await s.template_repo.get(template_id)
+            if existing is None or existing.workflow_id != s.workflow_id:
+                return _not_in_plan_error(template_id)
+            await s.template_repo.delete(template_id)
+            return {"deleted": template_id}
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}

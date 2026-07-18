@@ -18,7 +18,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.approval import Approval, ApprovalStatus
 from models.workflow_session import WorkflowSession
 from tests._envelope import assert_err, assert_ok
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
 
 
@@ -37,6 +37,7 @@ async def approval_env() -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None
     async with mem_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(mem_engine)
+    await seed_tenant(mem_engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine, expire_on_commit=False) as session:
@@ -67,6 +68,7 @@ async def _seed_session(eng: AsyncEngine, *, user_id: str = "owner") -> str:
             agent_skill_repo_path=".",
             skill_dir="/tmp/skill",
             user_id=user_id,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -92,6 +94,7 @@ async def _insert_approval(
             title=title,
             status=status,
             approver=approver,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
         )

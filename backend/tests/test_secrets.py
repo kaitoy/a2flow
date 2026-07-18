@@ -18,7 +18,7 @@ from infrastructure.secret_cipher import get_secret_cipher
 from models.secret import Secret
 from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
-from tests._seed import seed_users
+from tests._seed import seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
 
 
@@ -34,6 +34,7 @@ async def mem_engine() -> AsyncGenerator[AsyncEngine, None]:
     async with eng.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(eng)
+    await seed_tenant(eng)
     yield eng
     await eng.dispose()
 
