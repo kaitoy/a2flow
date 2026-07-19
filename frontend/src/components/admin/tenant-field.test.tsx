@@ -49,4 +49,47 @@ describe("TenantField", () => {
     await user.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
     expect(onChange).toHaveBeenCalledWith("tenant-1");
   });
+
+  it("disables the select when disabled is true", () => {
+    render(<TenantField value={null} onChange={vi.fn()} disabled />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
+  });
+
+  it("does not call onChange when already unassigned and disabled", async () => {
+    const onChange = vi.fn();
+    render(<TenantField value={null} onChange={onChange} disabled />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("clears a previously selected tenant when rendered already disabled", async () => {
+    const onChange = vi.fn();
+    render(<TenantField value="tenant-1" onChange={onChange} disabled />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(null);
+    });
+  });
+
+  it("clears the tenant when transitioning to disabled", async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<TenantField value="tenant-1" onChange={onChange} />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+    });
+    expect(onChange).not.toHaveBeenCalled();
+    rerender(<TenantField value="tenant-1" onChange={onChange} disabled />);
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(null);
+    });
+  });
 });

@@ -310,6 +310,7 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `SessionRunInProgressError` | 409 | `SESSION_RUN_IN_PROGRESS` | An agent run for this ADK session is already in flight (possibly on another replica); `details` carries `threadId`. Raised by `POST /agent` when the run lock (`infrastructure/locks.py`) is contended |
 | `AvatarValidationError` | 422 | `INVALID_AVATAR` | Uploaded avatar has an unsupported type or exceeds the size limit; `details` carries `reason` |
 | `SecretValidationError` | 422 | `INVALID_SECRET` | A Secret PATCH would leave an invalid per-type shape (merged-result check in `SecretService`); `details` carries `reason` |
+| `UserValidationError` | 422 | `INVALID_USER` | A User create/update would combine the `super_admin` role with a non-null `tenant_id` (merged-result check in `UserService`); `details` carries `reason` |
 | `SecretResolutionError` | 502 | `SECRET_RESOLUTION_FAILED` | A `${secret:NAME}` reference or skill `repo_auth_secret` could not be resolved; `details` carries `secret` only — the raw failure reason is logged server-side, never returned to the client |
 | `RequestValidationError` | 422 | `VALIDATION_ERROR` | FastAPI body/query validation; `details.errors` from Pydantic |
 | `McpConnectionError` | 502 | `MCP_UNREACHABLE` | Remote MCP server unreachable; `details` carries `server` only — the raw failure reason is logged server-side, never returned to the client |

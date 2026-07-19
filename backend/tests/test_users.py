@@ -709,3 +709,112 @@ async def test_admin_can_resubmit_unchanged_tenant_on_update(
     )
     assert body["firstName"] == "Renamed"
     assert body["tenantId"] == tenant["id"]
+
+
+# ---------- super_admin cannot carry a tenant ----------
+
+
+async def test_create_user_rejects_super_admin_with_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin creating a super_admin user with a tenantId is rejected."""
+    tenant = await _create_tenant(user_client)
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "roles": ["super_admin"], "tenantId": tenant["id"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_admin_cannot_create_super_admin_with_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """An admin (non-super) attempting the same combo still gets the existing role-grant 403."""
+    tenant = await _create_tenant(user_client)
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "roles": ["super_admin"], "tenantId": tenant["id"]},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_update_user_rejects_granting_super_admin_to_tenant_scoped_user(
+    user_client: AsyncClient,
+) -> None:
+    """Granting super_admin to a user who already has a tenantId is rejected."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, tenantId=tenant["id"]
+    )
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": ["super_admin"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_update_user_rejects_assigning_tenant_to_super_admin(
+    user_client: AsyncClient,
+) -> None:
+    """Assigning a tenantId to an existing super_admin user is rejected."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client, roles=["super_admin"])
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"tenantId": tenant["id"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_update_user_rejects_simultaneous_super_admin_grant_and_tenant_assign(
+    user_client: AsyncClient,
+) -> None:
+    """A single PATCH granting super_admin and assigning a tenantId together is rejected."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client)
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": ["super_admin"], "tenantId": tenant["id"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_update_user_allows_revoking_super_admin_while_assigning_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """Revoking super_admin and assigning a tenantId in the same PATCH succeeds."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client, roles=["super_admin"])
+    body = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"roles": [], "tenantId": tenant["id"]},
+            headers={"X-User-Roles": "super_admin"},
+        )
+    )
+    assert body["roles"] == []
+    assert body["tenantId"] == tenant["id"]
+
+
+async def test_update_user_allows_clearing_tenant_while_granting_super_admin(
+    user_client: AsyncClient,
+) -> None:
+    """Granting super_admin and clearing the tenantId in the same PATCH succeeds."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, tenantId=tenant["id"]
+    )
+    body = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"roles": ["super_admin"], "tenantId": None},
+            headers={"X-User-Roles": "super_admin"},
+        )
+    )
+    assert body["roles"] == ["super_admin"]
+    assert body["tenantId"] is None

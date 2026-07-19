@@ -38,6 +38,7 @@ from repositories.exceptions import (
     SkillNotReadyError,
     UnauthorizedError,
     UniqueViolationError,
+    UserValidationError,
     WorkflowNotRunnableError,
 )
 from routers import api_router
@@ -61,6 +62,7 @@ from routers.exception_handlers import (
     unauthorized_exception_handler,
     unhandled_exception_handler,
     unique_violation_exception_handler,
+    user_validation_exception_handler,
     validation_exception_handler,
     workflow_not_runnable_exception_handler,
 )
@@ -145,6 +147,7 @@ app.add_exception_handler(
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
 app.add_exception_handler(AvatarValidationError, avatar_validation_exception_handler)
 app.add_exception_handler(SecretValidationError, secret_validation_exception_handler)
+app.add_exception_handler(UserValidationError, user_validation_exception_handler)
 app.add_exception_handler(SecretResolutionError, secret_resolution_exception_handler)
 app.add_exception_handler(UnauthorizedError, unauthorized_exception_handler)
 app.add_exception_handler(CsrfError, csrf_exception_handler)

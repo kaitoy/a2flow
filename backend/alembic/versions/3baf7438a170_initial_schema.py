@@ -84,6 +84,10 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("username", name="uq_users_username"),
+        sa.CheckConstraint(
+            "tenant_id IS NULL OR CAST(roles AS TEXT) NOT LIKE '%\"super_admin\"%'",
+            name="ck_users_super_admin_no_tenant",
+        ),
     )
     op.create_index("ix_users_username", "users", ["username"], unique=False)
     op.create_index("ix_users_tenant_id", "users", ["tenant_id"], unique=False)

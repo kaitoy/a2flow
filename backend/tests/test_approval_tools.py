@@ -258,19 +258,25 @@ async def test_request_approval_rejects_approver_without_role(
     assert "approver role" in result["error"]
 
 
-async def test_request_approval_accepts_super_admin_approver(
+async def test_request_approval_rejects_super_admin_approver_without_tenant(
     engine: AsyncEngine,
 ) -> None:
-    """A super admin is approver-eligible even without the approver role."""
+    """A super admin cannot be designated approver for a tenant-scoped session.
+
+    A super admin can never carry a ``tenant_id`` (see the
+    ``ck_users_super_admin_no_tenant`` constraint on ``User``), so it can
+    never satisfy the tenant-membership half of approver eligibility -- there
+    is no platform-scoped bypass, matching ``_is_eligible_approver``'s
+    "no cross-tenant bypass" rule.
+    """
     await seed_users(
         engine,
         ids=("boss",),
         roles=(Role.super_admin,),
-        tenant_id=DEFAULT_TEST_TENANT_ID,
     )
     await _seed_session(engine)
     result = await request_approval("Approve me", _ctx(), approver="boss")
-    assert "error" not in result
+    assert "error" in result
 
 
 async def test_request_approval_rejects_other_tenant_approver(

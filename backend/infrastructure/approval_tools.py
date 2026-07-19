@@ -115,7 +115,11 @@ def _is_eligible_approver(user: User | None, *, tenant_id: str) -> bool:
     Eligible approvers belong to the given tenant, are enabled, not
     soft-deleted, and hold the ``approver`` role (``super_admin`` also
     qualifies for the role check, since it bypasses every role check, but
-    still must belong to the tenant -- there is no cross-tenant bypass).
+    still must belong to the tenant -- there is no cross-tenant bypass). Since
+    a ``super_admin`` can never carry a ``tenant_id`` (see the
+    ``ck_users_super_admin_no_tenant`` constraint on :class:`~models.user.User`),
+    this means a super admin is never eligible as approver for a
+    tenant-scoped session -- there is no platform-scoped exception here.
 
     Args:
         user: The candidate user, or ``None`` when the lookup found nobody.

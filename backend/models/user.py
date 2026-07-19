@@ -11,7 +11,13 @@ from typing import Any
 
 from pydantic import EmailStr, field_serializer, field_validator, model_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import Column, ForeignKeyConstraint, Index, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    ForeignKeyConstraint,
+    Index,
+    UniqueConstraint,
+)
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
@@ -196,7 +202,11 @@ class User(UserCreate, BaseEntity, table=True):
     ``deleted_at`` marks a soft-deleted user: one that is still referenced by other
     records (via ``created_by`` / ``updated_by``) and therefore cannot be removed
     from the database. Soft-deleted users are hidden from the list endpoint but
-    remain fetchable so their names can still be resolved.
+    remain fetchable so their names can still be resolved. A check constraint
+    forbids a ``super_admin`` from carrying a non-null ``tenant_id`` — a super
+    admin is platform-scoped by definition; see
+    :func:`services.user._reject_super_admin_tenant_conflict` for the matching
+    application-layer guard.
     """
 
     __tablename__ = "users"
@@ -209,6 +219,10 @@ class User(UserCreate, BaseEntity, table=True):
             ["tenants.id"],
             ondelete="RESTRICT",
             name="fk_users_tenant_id",
+        ),
+        CheckConstraint(
+            "tenant_id IS NULL OR CAST(roles AS TEXT) NOT LIKE '%\"super_admin\"%'",
+            name="ck_users_super_admin_no_tenant",
         ),
     )
 

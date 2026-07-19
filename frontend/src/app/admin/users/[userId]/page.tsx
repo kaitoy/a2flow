@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AvatarConfig, deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
-import type { Role } from "@/lib/roles";
+import { Role } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -221,7 +221,11 @@ export default function EditUserPage() {
 
           <RolesField value={roles} onChange={setRoles} />
 
-          <TenantField value={tenantId} onChange={setTenantId} />
+          <TenantField
+            value={tenantId}
+            onChange={setTenantId}
+            disabled={roles.includes(Role.SUPER_ADMIN)}
+          />
 
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />

@@ -145,6 +145,44 @@ describe("NewUserPage", () => {
     await waitFor(() => expect(receivedBody?.tenantId).toBe("tenant-1"));
   });
 
+  it("disables the tenant select once super_admin is checked", async () => {
+    const user = userEvent.setup();
+    render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+    });
+    await user.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
+
+    await user.click(screen.getByRole("checkbox", { name: "Super Admin" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
+    });
+  });
+
+  it("submits a null tenantId when super_admin is granted after selecting a tenant", async () => {
+    const user = userEvent.setup();
+    let receivedBody: Record<string, unknown> | undefined;
+    server.use(
+      http.post("http://localhost:8000/api/v1/users", async ({ request }) => {
+        receivedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(CREATED_USER, 201);
+      })
+    );
+
+    render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await fillRequiredFields(user);
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+    });
+    await user.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
+    await user.click(screen.getByRole("checkbox", { name: "Super Admin" }));
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(receivedBody?.tenantId).toBeNull());
+    expect(receivedBody?.roles).toEqual(["super_admin"]);
+  });
+
   it("shows error on api failure", async () => {
     const user = userEvent.setup();
     server.use(
