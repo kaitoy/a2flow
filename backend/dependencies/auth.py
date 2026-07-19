@@ -36,6 +36,11 @@ CSRF_COOKIE_NAME = "a2flow_csrf"
 CSRF_HEADER_NAME = "X-CSRF-Token"
 #: HTTP methods that do not require CSRF validation.
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
+#: Header a platform-scoped (super_admin) caller must send to select which
+#: tenant to act within ("act as tenant X"). Distinct from the test-only
+#: ``X-User-Tenant-Id`` header in ``tests/conftest.py``, which controls the
+#: synthetic test user's own ``tenant_id``, not a super_admin's selected tenant.
+TENANT_HEADER_NAME = "X-Tenant-Id"
 
 #: Local duplicate of ``dependencies.repository.DBSessionDep``. FastAPI caches
 #: dependency results by the underlying callable (``get_session``), so this
@@ -93,24 +98,39 @@ def get_current_user_id(user: CurrentUserDep) -> str:
 CurrentUserIdDep = Annotated[str, Depends(get_current_user_id)]
 
 
-def get_current_tenant_id(user: CurrentUserDep) -> str:
-    """Return the authenticated user's tenant id, resolved from the session cookie.
+def get_current_tenant_id(user: CurrentUserDep, request: Request) -> str:
+    """Return the tenant id the current request is scoped to.
+
+    A tenant-scoped user (``tenant_id is not None``) is always scoped to
+    their own tenant -- the :data:`TENANT_HEADER_NAME` header is ignored for
+    them, so a tenant-scoped caller can never escalate into another tenant by
+    sending it. A platform-scoped caller (``tenant_id is None`` -- a
+    super_admin, or the seeded system user) has no tenant of their own, so
+    the tenant to act within is instead read from that header: the frontend's
+    tenant switcher sets it from the super_admin's active tenant selection,
+    letting them act as any one tenant at a time.
 
     Args:
         user: The user resolved by :func:`get_current_user`.
+        request: The incoming request, used to read :data:`TENANT_HEADER_NAME`
+            for a platform-scoped caller.
 
     Returns:
-        The authenticated user's tenant id.
+        The tenant id this request is scoped to.
 
     Raises:
-        ForbiddenError: If the user is platform-scoped (``tenant_id is None`` —
-            the seeded system user, or an admin operating outside any tenant).
-            Tenant-scoped routes are simply inaccessible to platform-scoped
-            callers; there is no implicit "see everything" fallback.
+        ForbiddenError: If the caller is platform-scoped and the header is
+            missing or empty. There is no implicit "see everything" fallback
+            and no server-side default tenant.
     """
-    if user.tenant_id is None:
-        raise ForbiddenError("This operation requires a tenant-scoped account")
-    return user.tenant_id
+    if user.tenant_id is not None:
+        return user.tenant_id
+    tenant_id = request.headers.get(TENANT_HEADER_NAME, "").strip()
+    if not tenant_id:
+        raise ForbiddenError(
+            f"Select a tenant to act as via the {TENANT_HEADER_NAME} header"
+        )
+    return tenant_id
 
 
 CurrentTenantIdDep = Annotated[str, Depends(get_current_tenant_id)]

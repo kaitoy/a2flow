@@ -574,6 +574,22 @@ async def test_agent_endpoint_forbidden_for_platform_scoped_caller(
     assert response.json()["error"]["code"] == "FORBIDDEN"
 
 
+async def test_agent_endpoint_succeeds_for_platform_scoped_caller_with_tenant_header(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    """A super_admin who has selected a tenant via ``X-Tenant-Id`` can chat as it."""
+    from dependencies.auth import TENANT_HEADER_NAME
+    from tests._seed import DEFAULT_TEST_TENANT_ID
+
+    client, _ = agent_client
+    response = await client.post(
+        "/api/v1/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Tenant-Id": "", TENANT_HEADER_NAME: DEFAULT_TEST_TENANT_ID},
+    )
+    assert response.status_code == 200
+
+
 def _write_skill_md(tmp_path: Any, name: str = "test-skill") -> Any:
     """Create a minimal skill directory with a SKILL.md and return its path."""
     skill_dir = tmp_path / name

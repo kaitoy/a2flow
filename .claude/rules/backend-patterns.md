@@ -120,7 +120,7 @@ class AgentSkill(AgentSkillCreate, TenantScoped, BaseEntity, table=True):
 
 `TenantScoped` contributes a required, non-nullable `tenant_id: str` (FK to `tenants.id`, `ondelete="RESTRICT"`, indexed). If the entity's uniqueness is naturally per-tenant (e.g. `name` unique within a tenant, not globally), redeclare `tenant_id` **without** `index=True` and fold it into a composite `UniqueConstraint`/`Index` on `(tenant_id, <field>)` instead — see `models/secret.py`, `models/agent_skill.py`, `models/mcp_server.py`, `models/workflow.py` for the pattern.
 
-`User.tenant_id` is a plain nullable field, not `TenantScoped` — `None` means platform-scoped (the seeded system user, or an admin operating outside any tenant). `User` is the subject of tenant assignment, not a tenant-scoped resource itself.
+`User.tenant_id` is a plain nullable field, not `TenantScoped` — `None` means platform-scoped (the seeded system user, or a super_admin). `User` is the subject of tenant assignment, not a tenant-scoped resource itself. A platform-scoped caller is not locked out of tenant-scoped routes: `get_current_tenant_id` (`dependencies/auth.py`) resolves the acting tenant from the `X-Tenant-Id` request header in that case — see the `CurrentTenantIdDep` entry under "Dependency Injection" below.
 
 ---
 
@@ -393,8 +393,10 @@ All FastAPI dependencies are defined as `Annotated` type aliases in the `depende
 ```python
 CurrentUserDep      # User, from the authenticated session cookie
 CurrentUserIdDep    # str, the authenticated user's id (derived from CurrentUserDep)
-CurrentTenantIdDep  # str, the authenticated user's tenant id (derived from CurrentUserDep);
-                    # raises ForbiddenError if the caller is platform-scoped (tenant_id is None)
+CurrentTenantIdDep  # str, the tenant this request is scoped to: the caller's own tenant_id,
+                    # or -- for a platform-scoped (super_admin) caller -- the tenant selected
+                    # via the X-Tenant-Id request header ("act as tenant X"); raises
+                    # ForbiddenError if platform-scoped with no header set (auth.py)
 AuthServiceDep      # AuthService, per-request (login/authenticate/logout)
 DBSessionDep        # AsyncSession, per-request
 AgentSkillRepositoryDep   # SqlAgentSkillRepository, per-request (tenant-scoped)

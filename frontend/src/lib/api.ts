@@ -120,6 +120,7 @@ import {
   zUpdateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdPatchResponse,
   zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse,
 } from "@/generated/api/zod.gen";
+import { store } from "@/store";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import { A2UI_CATALOG_ID } from "./a2uiCatalogId";
 import logger from "./logger";
@@ -136,6 +137,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 const CSRF_COOKIE_NAME = "a2flow_csrf";
 /** Header the backend expects the CSRF cookie value echoed in on unsafe requests. */
 const CSRF_HEADER_NAME = "X-CSRF-Token";
+/**
+ * Header carrying the tenant a super_admin has selected to act as (see the
+ * tenant switcher in `AppHeader`). Ignored server-side for a tenant-scoped
+ * user, so it's safe to always attach when a selection exists.
+ */
+const TENANT_HEADER_NAME = "X-Tenant-Id";
 /** HTTP methods that mutate state and therefore require a CSRF token. */
 const UNSAFE_METHODS = new Set(["post", "put", "patch", "delete"]);
 
@@ -159,6 +166,8 @@ apiClient.interceptors.request.use((config) => {
     const token = readCookie(CSRF_COOKIE_NAME);
     if (token) config.headers.set(CSRF_HEADER_NAME, token);
   }
+  const tenantId = store.getState().auth.selectedTenantId;
+  if (tenantId) config.headers.set(TENANT_HEADER_NAME, tenantId);
   return config;
 });
 
@@ -1092,21 +1101,27 @@ export async function resolveApproval(
 }
 
 /**
- * HttpAgent variant that sends the auth session cookie and the CSRF token with
- * each streaming request. The agent endpoints are POSTs, so they need both the
- * cookie (`credentials: "include"`) and the double-submit `X-CSRF-Token` header.
+ * HttpAgent variant that sends the auth session cookie, the CSRF token, and
+ * the selected tenant header with each streaming request. The agent endpoints
+ * are POSTs, so they need both the cookie (`credentials: "include"`) and the
+ * double-submit `X-CSRF-Token` header; a super_admin also needs `X-Tenant-Id`
+ * to reach these tenant-scoped endpoints at all -- unlike the axios-based
+ * calls above, these bypass `apiClient`'s interceptor entirely, so the header
+ * must be attached here too.
  */
 class CredentialedHttpAgent extends HttpAgent {
-  /** Augment the base fetch config with credentials and the CSRF header. */
+  /** Augment the base fetch config with credentials, CSRF, and tenant headers. */
   protected requestInit(input: Parameters<HttpAgent["requestInit"]>[0]): RequestInit {
     const init = super.requestInit(input);
     const csrf = readCookie(CSRF_COOKIE_NAME);
+    const tenantId = store.getState().auth.selectedTenantId;
     return {
       ...init,
       credentials: "include",
       headers: {
         ...(init.headers as Record<string, string> | undefined),
         ...(csrf ? { [CSRF_HEADER_NAME]: csrf } : {}),
+        ...(tenantId ? { [TENANT_HEADER_NAME]: tenantId } : {}),
       },
     };
   }
