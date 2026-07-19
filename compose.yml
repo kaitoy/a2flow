@@ -38,9 +38,13 @@ services:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      # Password for the seeded 'admin' user. Optional: if left unset, a
-      # random password is generated and printed once to `docker compose
-      # logs backend` on first startup.
+      # Password for the seeded 'root' user (holds super_admin). Optional: if
+      # left unset, a random password is generated and printed once to
+      # `docker compose logs backend` on first startup.
+      ROOT_PASSWORD: ${ROOT_PASSWORD:-}
+      # Password for the seeded 'admin' user inside the seeded "Default"
+      # tenant. Optional: same generate-and-log-once fallback as
+      # ROOT_PASSWORD when unset.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       CORS_ORIGINS: http://localhost:3000
       # Store of cloned skill repositories, one directory per published

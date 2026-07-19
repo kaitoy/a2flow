@@ -15,7 +15,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
 from dependencies import APP_NAME
-from infrastructure.bootstrap import seed_admin_user, seed_system_user
+from infrastructure.bootstrap import (
+    seed_default_tenant_and_admin_user,
+    seed_root_user,
+    seed_system_user,
+)
 from infrastructure.database import engine
 from infrastructure.logging_context import setup_logging
 from infrastructure.migrations import run_migrations
@@ -80,11 +84,15 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Apply pending migrations and seed the system and admin users on startup."""
+    """Apply pending migrations and seed the system, root, and Default-tenant admin users on startup."""
     await run_migrations()
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
-        await seed_admin_user(session)
+        # seed_root_user's skip check ("any real user exists") must run
+        # before seed_default_tenant_and_admin_user creates its own real
+        # user, or root would never be seeded on a fresh database.
+        await seed_root_user(session)
+        await seed_default_tenant_and_admin_user(session)
     yield
 
 

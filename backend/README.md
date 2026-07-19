@@ -116,7 +116,7 @@ Database URL for REST API data and ADK session storage — both live in the same
 
 | Table | Description |
 |---|---|
-| `users` | Application users (soft-deleted via `deleted_at`; `roles` holds their granted roles); see [Admin user](#admin-user) and [Authorization](#authorization-roles) |
+| `users` | Application users (soft-deleted via `deleted_at`; `roles` holds their granted roles); see [Seeded users](#seeded-users) and [Authorization](#authorization-roles) |
 | `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](#authentication) |
 | `agent_skills` | Agent skill definitions (incl. optional `repo_auth_secret` / `repo_auth_username` for private-repo clones) |
 | `mcp_servers` | Registered remote MCP servers (name, streamable HTTP URL, request headers — values may embed `${secret:NAME}` placeholders) |
@@ -175,20 +175,23 @@ need the following at the reverse proxy / load balancer layer:
   a fresh request, the same way an abandoned/disconnected stream already
   behaves.
 
-### Admin user
+### Seeded users
 
-On startup the backend seeds two users:
+On startup the backend seeds a hidden **system user**, plus two real accounts, each created only on the very first startup that finds its target record missing:
 
-- A hidden **system user** that owns the bootstrap records (it cannot log in and is excluded from the user list).
-- An initial **`admin`** user holding the **`super_admin`** role (see [Authorization](#authorization-roles)), created only on the very first startup — that is, while the database has no real (non-system) user yet. Once any real user exists it is never re-created.
+- An initial **`root`** user holding the **`super_admin`** role (see [Authorization](#authorization-roles)), platform-scoped (`tenantId: null`). Skipped once *any* real (non-system) user already exists, so it runs only on the very first startup.
+- A **Default** tenant (`slug: default`) and, inside it, an initial **`admin`** user holding the **`admin`** role. The tenant and the user are checked independently (by `slug` and `username`), so either can be recreated without duplicating the other.
 
-The `admin` user's password is read from the `ADMIN_PASSWORD` environment variable:
+The hidden **system user** owns the bootstrap records (it cannot log in and is excluded from the user list).
+
+Passwords are read from environment variables, with the same generate-and-log-once fallback for each:
 
 ```env
+ROOT_PASSWORD=change-me-now-123
 ADMIN_PASSWORD=change-me-now-123
 ```
 
-If unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when the admin user is created — it is tied to the same first-startup-only bootstrap, so it is never regenerated on a later restart, and it cannot be recovered once the log line has scrolled past. Set `ADMIN_PASSWORD` explicitly before the first run for anything beyond local experimentation, or capture the generated password from the startup logs immediately and change it through the user API afterwards. The username is fixed to `admin`.
+If either is unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when that user is created — it cannot be recovered once the log line has scrolled past. Set both explicitly before the first run for anything beyond local experimentation, or capture the generated passwords from the startup logs immediately and change them through the user API afterwards. The usernames are fixed to `root` and `admin`.
 
 ### Authentication
 
@@ -215,11 +218,11 @@ SESSION_IDLE_TIMEOUT_SECONDS=28800
 SESSION_COOKIE_SECURE=false
 ```
 
-The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `admin` user (see [Admin user](#admin-user)) on first run.
+The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `root` or Default-tenant `admin` user (see [Seeded users](#seeded-users)) on first run.
 
 ### Authorization (roles)
 
-Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every route-level role gate; the seeded `admin` user holds it. Two ownership-layer checks are a deliberate exception — see the bullet below. See the [Roles and authorization](../README.md#roles-and-authorization) section of the root README for the full matrix.
+Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every route-level role gate; the seeded `root` user holds it. Two ownership-layer checks are a deliberate exception — see the bullet below. See the [Roles and authorization](../README.md#roles-and-authorization) section of the root README for the full matrix.
 
 Two enforcement points:
 

@@ -72,15 +72,34 @@ with no console error to explain it. The only clue is a
 Auth is a session cookie plus a CSRF header echoing the `a2flow_csrf` cookie:
 
 ```bash
-curl -s -c /tmp/cj.txt -X POST http://127.0.0.1:8099/api/v1/auth/login \
+LOGIN=$(curl -s -c /tmp/cj.txt -X POST http://127.0.0.1:8099/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"verify-pass-123"}'
+  -d '{"username":"admin","password":"verify-pass-123"}')
 CSRF=$(grep a2flow_csrf /tmp/cj.txt | awk '{print $7}')
+ADMIN_ID=$(echo "$LOGIN" | python -c "import json,sys; print(json.load(sys.stdin)['data']['id'])")
+
+# AgentSkill is tenant-scoped and gated behind `developer`; the seeded admin
+# only holds `admin` by default. Grant itself `developer` too (self-granting
+# a non-super_admin role is allowed — UserService.update only gates
+# super_admin grant/revoke).
+curl -s -b /tmp/cj.txt -H "X-CSRF-Token: $CSRF" -X PATCH \
+  http://127.0.0.1:8099/api/v1/users/$ADMIN_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"roles":["admin","developer"]}'
+
 curl -s -b /tmp/cj.txt -H "X-CSRF-Token: $CSRF" -X POST \
   http://127.0.0.1:8099/api/v1/agent-skills \
   -H 'Content-Type: application/json' \
   -d '{"name":"s","repoUrl":"https://github.com/octocat/Hello-World","repoPath":""}'
 ```
+
+`admin` (`ADMIN_PASSWORD`) is the seeded Default-tenant account — it's the
+right login for any tenant-scoped route like the one above. Don't switch this
+to `root`/`ROOT_PASSWORD`: `root` holds `super_admin` and is therefore
+platform-scoped (`tenant_id` is always `null` for a super_admin, by DB
+constraint), so it can never pass a tenant-scoped route's authorization check
+at all. Only reach for `root` to verify something genuinely platform-wide,
+e.g. the Tenants admin page.
 
 `https://github.com/octocat/Hello-World` is a good clone target: tiny, public,
 stable HEAD (`7fd1a60b01f91b314f59955a4e4d4e80d8edf11d`).
