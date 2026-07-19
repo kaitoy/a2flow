@@ -68,6 +68,10 @@ export default function EditUserPage() {
   // Tenant lives outside the form state, like roles, since it's a controlled
   // select rather than a registered input.
   const [tenantId, setTenantId] = useState<string | null>(null);
+  // The tenantId as loaded from the server, kept separate from the live
+  // `tenantId` state above so the field can be locked once a tenant was
+  // already assigned (a tenant is immutable once set — see TenantField).
+  const [originalTenantId, setOriginalTenantId] = useState<string | null>(null);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -96,6 +100,7 @@ export default function EditUserPage() {
         setAvatarConfig(user.avatarConfig ?? null);
         setRoles(user.roles ?? []);
         setTenantId(user.tenantId ?? null);
+        setOriginalTenantId(user.tenantId ?? null);
         reset({
           firstName: user.firstName,
           lastName: user.lastName,
@@ -225,6 +230,7 @@ export default function EditUserPage() {
             value={tenantId}
             onChange={setTenantId}
             disabled={roles.includes(Role.SUPER_ADMIN)}
+            locked={originalTenantId !== null}
           />
 
           <Checkbox label="Enabled" {...register("enabled")} />

@@ -25,7 +25,7 @@ from repositories.exceptions import UnauthorizedError
 from repositories.user import SqlUserRepository
 from services.auth import AuthService
 from tests._envelope import assert_err, assert_ok
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_users
 from tests.conftest import AUTH_PASSWORD, AUTH_USERNAME
 
 
@@ -172,6 +172,7 @@ async def test_authenticate_expires_idle_session(
                 password=hash_password(AUTH_PASSWORD),
                 email="idle@test.local",
                 enabled=True,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )

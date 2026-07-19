@@ -482,6 +482,7 @@ async def auth_client() -> AsyncGenerator[AsyncClient, None]:
                 password=hash_password(AUTH_PASSWORD),
                 email="login@test.local",
                 enabled=True,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )

@@ -181,6 +181,7 @@ async def test_seed_admin_user_skips_when_real_user_exists(
                 last_name="Smith",
                 password="hash",
                 email="alice@example.com",
+                roles=[Role.super_admin.value],
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )

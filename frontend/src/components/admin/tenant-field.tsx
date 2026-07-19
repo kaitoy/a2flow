@@ -20,20 +20,34 @@ export interface TenantFieldProps {
    * is disabled and any previously chosen value is cleared via `onChange`.
    */
   disabled?: boolean;
+  /**
+   * Whether the target's tenant was already persisted (non-null) when this
+   * form loaded. A tenant is immutable once assigned — the backend rejects
+   * any change (HTTP 422) — so the select is disabled without touching
+   * `value`, unlike `disabled`.
+   */
+  locked?: boolean;
 }
 
 /**
  * Tenant picker for the admin user forms, rendered as a labeled select.
  *
- * Only a super admin may assign or change a user's tenant — the backend
- * rejects the field otherwise (HTTP 403) — so the field renders nothing for
- * any other *viewer*, mirroring how {@link RolesField} disables its
- * `super_admin` checkbox for non-super-admins. Separately, when the *target*
- * user's roles make them a super admin (`disabled`), the select is disabled
- * and its value is forced back to `null`, since a super admin can never
- * carry a `tenant_id`.
+ * Only a super admin may assign a user's tenant — the backend rejects the
+ * field otherwise (HTTP 403) — so the field renders nothing for any other
+ * *viewer*, mirroring how {@link RolesField} disables its `super_admin`
+ * checkbox for non-super-admins. Separately, the select becomes
+ * non-interactive for two independent reasons: when the *target* user's
+ * roles make them a super admin (`disabled`), where its value is also forced
+ * back to `null` since a super admin can never carry a `tenant_id`; and when
+ * the target already had a tenant assigned when the form loaded (`locked`),
+ * where the value is left untouched since a tenant is immutable once set.
  */
-export function TenantField({ value, onChange, disabled = false }: TenantFieldProps) {
+export function TenantField({
+  value,
+  onChange,
+  disabled = false,
+  locked = false,
+}: TenantFieldProps) {
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   const [tenants, setTenants] = useState<Tenant[]>([]);
 
@@ -55,7 +69,7 @@ export function TenantField({ value, onChange, disabled = false }: TenantFieldPr
       <Select
         id="tenantId"
         value={value ?? ""}
-        disabled={disabled}
+        disabled={disabled || locked}
         onChange={(e) => onChange(e.target.value || null)}
       >
         <option value="">Unassigned</option>

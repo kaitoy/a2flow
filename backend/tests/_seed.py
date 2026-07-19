@@ -67,12 +67,21 @@ async def seed_users(
             ``username`` so it can be referenced by ``X-User-Id`` headers.
         roles: Roles granted to each seeded actor; defaults to ``approver`` so
             actors stay eligible as approval approvers.
-        tenant_id: Tenant each seeded actor belongs to. Defaults to ``None``
-            (platform-scoped), matching prior behavior for callers that don't
-            care about tenant scoping.
+        tenant_id: Tenant each seeded actor belongs to. Defaults to ``None``,
+            which resolves to :data:`DEFAULT_TEST_TENANT_ID` unless ``roles``
+            includes ``super_admin`` (which must stay tenant-less) — every
+            other user must carry a ``tenant_id``
+            (``ck_users_non_super_admin_requires_tenant``). Pass an explicit
+            value to opt out. The resolved tenant is seeded automatically if
+            missing, so callers don't need to seed it themselves first.
     """
+    if tenant_id is None:
+        tenant_id = None if Role.super_admin in roles else DEFAULT_TEST_TENANT_ID
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
+    if tenant_id is not None:
+        await seed_tenant(engine, tenant_id)
+    async with AsyncSession(engine) as session:
         for uid in ids:
             if await session.get(User, uid) is None:
                 session.add(

@@ -164,9 +164,11 @@ class UserUpdate(SQLModel):
     #: Customization for the generated avatar; ``None`` leaves it unchanged on
     #: update, and an explicit ``null`` from the client clears it.
     avatar_config: AvatarConfig | None = None
-    #: Tenant this user belongs to; ``None`` means a platform-scoped user (the
-    #: seeded system user, or an admin operating outside any tenant), not a
-    #: user pending assignment.
+    #: Tenant this user belongs to. ``None`` is only valid for a ``super_admin``
+    #: (platform-scoped by definition) or the seeded system user — every other
+    #: user must carry a ``tenant_id``. Once non-null, it can never be changed;
+    #: see :func:`services.user._require_tenant_for_non_super_admin` and the
+    #: matching guard against reassignment in :meth:`services.user.UserService.update`.
     tenant_id: str | None = None
 
     @field_validator("roles")
@@ -198,11 +200,14 @@ class User(UserCreate, BaseEntity, table=True):
     ``deleted_at`` marks a soft-deleted user: one that is still referenced by other
     records (via ``created_by`` / ``updated_by``) and therefore cannot be removed
     from the database. Soft-deleted users are hidden from the list endpoint but
-    remain fetchable so their names can still be resolved. A check constraint
-    forbids a ``super_admin`` from carrying a non-null ``tenant_id`` — a super
-    admin is platform-scoped by definition; see
-    :func:`services.user._reject_super_admin_tenant_conflict` for the matching
-    application-layer guard.
+    remain fetchable so their names can still be resolved. Two check constraints
+    enforce the tenant/role invariant from both directions: a ``super_admin``
+    may never carry a non-null ``tenant_id`` (platform-scoped by definition),
+    and every other user (except the seeded system user) must carry one; see
+    :func:`services.user._reject_super_admin_tenant_conflict` and
+    :func:`services.user._require_tenant_for_non_super_admin` for the matching
+    application-layer guards. Once assigned, a ``tenant_id`` can never change —
+    see :meth:`services.user.UserService.update`.
     """
 
     __tablename__ = "users"
@@ -219,6 +224,11 @@ class User(UserCreate, BaseEntity, table=True):
         CheckConstraint(
             "tenant_id IS NULL OR CAST(roles AS TEXT) NOT LIKE '%\"super_admin\"%'",
             name="ck_users_super_admin_no_tenant",
+        ),
+        CheckConstraint(
+            "tenant_id IS NOT NULL OR CAST(roles AS TEXT) LIKE '%\"super_admin\"%' "
+            f"OR id = '{SYSTEM_USER_ID}'",
+            name="ck_users_non_super_admin_requires_tenant",
         ),
     )
 

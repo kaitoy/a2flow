@@ -92,4 +92,27 @@ describe("TenantField", () => {
       expect(onChange).toHaveBeenCalledWith(null);
     });
   });
+
+  it("disables the select when locked, without clearing the value", async () => {
+    const onChange = vi.fn();
+    render(<TenantField value="tenant-1" onChange={onChange} locked />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
+    });
+    expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("does not clear the tenant when rendered already locked", async () => {
+    const onChange = vi.fn();
+    render(<TenantField value="tenant-1" onChange={onChange} locked />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

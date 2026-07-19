@@ -5,9 +5,11 @@ hashing passwords before persistence (so the repository only ever stores a
 bcrypt hash), raising :class:`NotFoundError` when a user is missing, and
 authorizing writes — admins may edit anyone, a non-admin may only edit their
 own ``avatar_config`` (the self-service account page), and only a super admin
-may grant or revoke the ``super_admin`` role or assign/change a user's
-``tenant_id``. A ``super_admin`` is platform-scoped by definition and may
-never carry a ``tenant_id``, regardless of who performs the write.
+may grant or revoke the ``super_admin`` role or assign a user's ``tenant_id``.
+A ``super_admin`` is platform-scoped by definition and may never carry a
+``tenant_id``; every other user must carry one (a non-super-admin actor who
+omits it on create is silently scoped to their own tenant instead). Once a
+``tenant_id`` is non-null it can never change, for any actor.
 """
 
 from collections.abc import Sequence
@@ -48,6 +50,28 @@ def _reject_super_admin_tenant_conflict(
     """
     if tenant_id is not None and Role.super_admin in (roles or []):
         raise UserValidationError("A super admin cannot be assigned a tenant")
+
+
+def _require_tenant_for_non_super_admin(
+    roles: Sequence[str] | None, tenant_id: str | None
+) -> None:
+    """Reject an effective role/tenant combination that leaves a non-super-admin without a tenant.
+
+    Every user other than a ``super_admin`` (and the seeded system user, which
+    never goes through this service) must belong to a tenant — see
+    ``ck_users_non_super_admin_requires_tenant`` (:class:`~models.user.User`)
+    for the matching database-level guarantee.
+
+    Args:
+        roles: The user's effective roles after the write.
+        tenant_id: The user's effective tenant_id after the write.
+
+    Raises:
+        UserValidationError: If ``roles`` does not include ``super_admin`` and
+            ``tenant_id`` is ``None``.
+    """
+    if tenant_id is None and Role.super_admin not in (roles or []):
+        raise UserValidationError("A non-super-admin user must be assigned a tenant")
 
 
 class UserService:
@@ -120,7 +144,8 @@ class UserService:
                 acting user is not a super admin, or if a ``tenant_id`` is
                 supplied and the acting user is not a super admin.
             UserValidationError: If the new user would hold ``super_admin``
-                and also carry a ``tenant_id``.
+                and also carry a ``tenant_id``, or would hold neither
+                ``super_admin`` nor a ``tenant_id``.
         """
         if Role.super_admin in data.roles and not has_role(
             acting_user, Role.super_admin
@@ -128,7 +153,14 @@ class UserService:
             raise ForbiddenError("Only a super admin can grant the super_admin role")
         if data.tenant_id is not None and not has_role(acting_user, Role.super_admin):
             raise ForbiddenError("Only a super admin can assign a tenant")
+        if data.tenant_id is None and not has_role(acting_user, Role.super_admin):
+            # A non-super-admin actor can't supply a tenant_id explicitly (see
+            # above), yet every non-super-admin user must carry one — silently
+            # scope the new user to the acting admin's own tenant instead of
+            # requiring an "assign tenant" privilege they don't have.
+            data = data.model_copy(update={"tenant_id": acting_user.tenant_id})
         _reject_super_admin_tenant_conflict(data.roles, data.tenant_id)
+        _require_tenant_for_non_super_admin(data.roles, data.tenant_id)
         hashed = data.model_copy(update={"password": hash_password(data.password)})
         return await self._repo.create(hashed, user_id=acting_user.id)
 
@@ -160,9 +192,13 @@ class UserService:
             ForbiddenError: If the acting user is not allowed to apply this
                 update (non-admin editing another user or a non-self-service
                 field, a non-super-admin changing ``super_admin``, or a
-                non-super-admin changing ``tenant_id`` to a different value).
+                non-super-admin assigning a tenant to a currently tenant-less
+                target).
             UserValidationError: If the update would leave the target holding
-                ``super_admin`` while also carrying a ``tenant_id``.
+                ``super_admin`` while also carrying a ``tenant_id``, would
+                leave the target holding neither ``super_admin`` nor a
+                ``tenant_id``, or would change a ``tenant_id`` the target
+                already has.
         """
         target = await self.get(target_id)
         update = data.model_dump(exclude_unset=True)
@@ -174,15 +210,21 @@ class UserService:
                     raise ForbiddenError(
                         "Only a super admin can grant or revoke the super_admin role"
                     )
-            if (
-                "tenant_id" in update
-                and update["tenant_id"] != target.tenant_id
-                and not has_role(acting_user, Role.super_admin)
-            ):
-                raise ForbiddenError("Only a super admin can change a user's tenant")
+            if "tenant_id" in update and update["tenant_id"] != target.tenant_id:
+                if target.tenant_id is not None:
+                    # Immutable once assigned, for every actor including a
+                    # super admin — no reassignment, and no clearing back to
+                    # null (e.g. as part of promoting the target to
+                    # super_admin).
+                    raise UserValidationError(
+                        "A user's tenant cannot be changed once assigned"
+                    )
+                if not has_role(acting_user, Role.super_admin):
+                    raise ForbiddenError("Only a super admin can assign a tenant")
             effective_roles = data.roles if data.roles is not None else target.roles
             effective_tenant_id = update.get("tenant_id", target.tenant_id)
             _reject_super_admin_tenant_conflict(effective_roles, effective_tenant_id)
+            _require_tenant_for_non_super_admin(effective_roles, effective_tenant_id)
         elif target_id != acting_user.id or not set(update) <= _SELF_SERVICE_FIELDS:
             raise ForbiddenError(
                 "Only admins can update other users or non-self-service fields"

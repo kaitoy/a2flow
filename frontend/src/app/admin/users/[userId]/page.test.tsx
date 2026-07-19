@@ -244,6 +244,31 @@ describe("EditUserPage", () => {
     await waitFor(() => expect(capturedBody?.tenantId).toBe("tenant-1"));
   });
 
+  it("disables the tenant select for a user who already has a tenant assigned, and keeps it unchanged on save", async () => {
+    setup();
+    let capturedBody: Record<string, unknown> | null = null;
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, tenantId: "tenant-1" })
+      ),
+      http.patch("http://localhost:8000/api/v1/users/:userId", async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(FULL_USER);
+      })
+    );
+
+    render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => screen.getByDisplayValue("alice"));
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
+    });
+    expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(capturedBody?.tenantId).toBe("tenant-1"));
+  });
+
   it("disables the tenant select for a user who already holds super_admin", async () => {
     setup();
     server.use(
