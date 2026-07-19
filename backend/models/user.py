@@ -17,6 +17,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     UniqueConstraint,
+    text,
 )
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
@@ -208,13 +209,27 @@ class User(UserCreate, BaseEntity, table=True):
     :func:`services.user._require_tenant_for_non_super_admin` for the matching
     application-layer guards. Once assigned, a ``tenant_id`` can never change —
     see :meth:`services.user.UserService.update`.
+
+    ``username`` uniqueness is two-tiered, since ``tenant_id`` can be null:
+    ``uq_users_tenant_id_username`` enforces uniqueness within a tenant for
+    tenant-scoped users, and ``ix_users_username_platform_scoped`` is a
+    partial unique index (``tenant_id IS NULL``) enforcing uniqueness among
+    platform-scoped users (``super_admin`` and the seeded system user) — a
+    plain composite constraint alone would not catch that case, since SQL
+    treats every ``NULL`` as distinct from every other ``NULL``.
     """
 
     __tablename__ = "users"
     __table_args__ = (
-        UniqueConstraint("username", name="uq_users_username"),
-        Index("ix_users_username", "username"),
-        Index("ix_users_tenant_id", "tenant_id"),
+        UniqueConstraint("tenant_id", "username", name="uq_users_tenant_id_username"),
+        Index("ix_users_tenant_id_username", "tenant_id", "username"),
+        Index(
+            "ix_users_username_platform_scoped",
+            "username",
+            unique=True,
+            postgresql_where=text("tenant_id IS NULL"),
+            sqlite_where=text("tenant_id IS NULL"),
+        ),
         ForeignKeyConstraint(
             ["tenant_id"],
             ["tenants.id"],

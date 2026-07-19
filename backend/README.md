@@ -180,7 +180,7 @@ need the following at the reverse proxy / load balancer layer:
 On startup the backend seeds a hidden **system user**, plus two real accounts, each created only on the very first startup that finds its target record missing:
 
 - An initial **`root`** user holding the **`super_admin`** role (see [Authorization](#authorization-roles)), platform-scoped (`tenantId: null`). Skipped once *any* real (non-system) user already exists, so it runs only on the very first startup.
-- A **Default** tenant (`slug: default`) and, inside it, an initial **`admin`** user holding the **`admin`** role. The tenant and the user are checked independently (by `slug` and `username`), so either can be recreated without duplicating the other.
+- A **Default** tenant (`slug: default`) and, inside it, an initial **`admin`** user holding the **`admin`** role. The tenant (by `slug`) and the user (by `username` scoped to that tenant) are checked independently, so either can be recreated without duplicating the other.
 
 The hidden **system user** owns the bootstrap records (it cannot log in and is excluded from the user list).
 
@@ -199,7 +199,7 @@ All API routes except `POST /api/v1/auth/login` and `GET /api/v1/health` require
 
 **Flow**
 
-1. `POST /api/v1/auth/login` with `{ "username", "password" }`. On success the response sets two cookies and returns the current user (without the password hash):
+1. `POST /api/v1/auth/login` with `{ "username", "password", "tenantSlug"? }`. `tenantSlug` disambiguates a tenant-scoped user's username (unique only within its tenant) and must be omitted for a platform-scoped user (e.g. `root`). On success the response sets two cookies and returns the current user (without the password hash):
    - `a2flow_session` — HttpOnly, `SameSite=Lax` opaque session token. Only its SHA-256 hash is stored server-side.
    - `a2flow_csrf` — readable (non-HttpOnly), `SameSite=Lax` CSRF token.
 2. The browser sends both cookies automatically on subsequent requests. For state-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) the client must echo the CSRF cookie value in the `X-CSRF-Token` header (double-submit cookie defense). A mismatch or missing header returns `403 CSRF_FAILED`.

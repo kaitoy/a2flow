@@ -348,12 +348,22 @@ function listConfig({
 }
 
 /**
- * Authenticate with username and password. On success the backend sets the
- * session and CSRF cookies and returns the logged-in user.
+ * Authenticate with username, password, and optional tenant slug. On success
+ * the backend sets the session and CSRF cookies and returns the logged-in
+ * user. `tenantSlug` disambiguates a tenant-scoped user's username and must
+ * be omitted for a platform-scoped user (e.g. `root`).
  */
-export async function login(username: string, password: string): Promise<User> {
+export async function login(
+  username: string,
+  password: string,
+  tenantSlug?: string
+): Promise<User> {
   return fetchEnvelope(
-    apiClient.post("/api/v1/auth/login", { username, password }),
+    apiClient.post("/api/v1/auth/login", {
+      username,
+      password,
+      tenantSlug: tenantSlug || undefined,
+    }),
     zLoginApiV1AuthLoginPostResponse
   ) as Promise<User>;
 }

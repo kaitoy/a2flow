@@ -15,7 +15,7 @@ from config import get_settings
 from infrastructure.auth_tokens import generate_token, hash_token
 from infrastructure.password import verify_password
 from models.user import User
-from repositories import AuthSessionRepository, UserRepository
+from repositories import AuthSessionRepository, TenantRepository, UserRepository
 from repositories.exceptions import UnauthorizedError
 
 
@@ -37,31 +37,45 @@ class LoginResult:
 class AuthService:
     """Application service orchestrating authentication and session lifecycle."""
 
-    def __init__(self, users: UserRepository, sessions: AuthSessionRepository) -> None:
+    def __init__(
+        self,
+        users: UserRepository,
+        sessions: AuthSessionRepository,
+        tenants: TenantRepository,
+    ) -> None:
         """Initialize the service.
 
         Args:
             users: Repository for user lookups and credential checks.
             sessions: Repository for login-session persistence.
+            tenants: Repository used to resolve a submitted tenant slug at login.
         """
         self._users = users
         self._sessions = sessions
+        self._tenants = tenants
 
     def _idle_timeout(self) -> timedelta:
         """Return the configured sliding idle timeout as a ``timedelta``."""
         seconds = get_settings().session_idle_timeout_seconds
         return timedelta(seconds=max(seconds, 1))
 
-    async def login(self, username: str, password: str) -> LoginResult:
+    async def login(
+        self, username: str, password: str, *, tenant_slug: str | None = None
+    ) -> LoginResult:
         """Verify credentials and create a new login session.
 
         The same generic :class:`UnauthorizedError` is raised for an unknown
-        username, a wrong password, and a disabled or soft-deleted account, so
-        the response never reveals which users exist.
+        username, an unknown tenant slug, a wrong password, and a disabled or
+        soft-deleted account, so the response never reveals which users or
+        tenants exist.
 
         Args:
             username: The submitted username.
             password: The submitted plaintext password.
+            tenant_slug: Slug of the tenant the user belongs to. Required to
+                disambiguate a tenant-scoped user's username (unique only
+                within its tenant); must be omitted for a platform-scoped
+                user (``root``, or any other super_admin).
 
         Returns:
             A :class:`LoginResult` carrying the user and the freshly minted
@@ -71,7 +85,13 @@ class AuthService:
             UnauthorizedError: If the credentials are invalid or the account
                 cannot log in.
         """
-        user = await self._users.get_by_username(username)
+        tenant_id: str | None = None
+        if tenant_slug:
+            tenant = await self._tenants.get_by_slug(tenant_slug)
+            if tenant is None:
+                raise UnauthorizedError("Invalid username or password")
+            tenant_id = tenant.id
+        user = await self._users.get_by_username(username, tenant_id=tenant_id)
         if (
             user is None
             or not user.enabled

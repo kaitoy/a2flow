@@ -23,6 +23,8 @@ class TenantRepository(Protocol):
 
     async def get(self, tenant_id: str) -> Tenant | None: ...
 
+    async def get_by_slug(self, slug: str) -> Tenant | None: ...
+
     async def list(
         self,
         *,
@@ -60,6 +62,22 @@ class SqlTenantRepository:
 
     async def exists(self, tenant_id: str) -> bool:
         return (await self._db.get(Tenant, tenant_id)) is not None
+
+    async def get_by_slug(self, slug: str) -> Tenant | None:
+        """Return the tenant with the given slug, or ``None`` if no match exists.
+
+        Used by :meth:`services.auth.AuthService.login` to resolve a submitted
+        tenant slug into a ``tenant_id`` before looking up the user, without
+        exposing a public tenant-lookup endpoint.
+
+        Args:
+            slug: The tenant's unique URL-safe slug.
+
+        Returns:
+            The matching ``Tenant`` or ``None``.
+        """
+        stmt = select(Tenant).where(col(Tenant.slug) == slug)
+        return (await self._db.exec(stmt)).first()
 
     async def list(
         self,

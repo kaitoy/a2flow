@@ -138,9 +138,40 @@ async def test_create_user_missing_password_returns_422(
 async def test_create_user_duplicate_username_returns_409(
     user_client: AsyncClient,
 ) -> None:
+    """A duplicate username within the same tenant is rejected."""
     await user_client.post("/api/v1/users", json=_CREATE_BODY)
     response = await user_client.post(
         "/api/v1/users", json={**_CREATE_BODY, "email": "other@example.com"}
+    )
+    assert_err(response, code="CONFLICT_UNIQUE", status=409)
+
+
+async def test_create_user_duplicate_username_different_tenant_allowed(
+    user_client: AsyncClient,
+) -> None:
+    """The same username may be reused by a user in a different tenant."""
+    await user_client.post("/api/v1/users", json=_CREATE_BODY)
+    tenant = await _create_tenant(user_client)
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "email": "other@example.com", "tenantId": tenant["id"]},
+    )
+    assert response.status_code == 201
+
+
+async def test_create_user_duplicate_username_platform_scoped_returns_409(
+    user_client: AsyncClient,
+) -> None:
+    """Two platform-scoped (super_admin) users cannot share a username."""
+    await _create_user(user_client, roles=["super_admin"])
+    response = await user_client.post(
+        "/api/v1/users",
+        json={
+            **_CREATE_BODY,
+            "email": "other@example.com",
+            "roles": ["super_admin"],
+            "tenantId": None,
+        },
     )
     assert_err(response, code="CONFLICT_UNIQUE", status=409)
 

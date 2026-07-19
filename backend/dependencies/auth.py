@@ -24,7 +24,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.database import get_session
 from models.user import User
-from repositories import SqlAuthSessionRepository, SqlUserRepository
+from repositories import (
+    SqlAuthSessionRepository,
+    SqlTenantRepository,
+    SqlUserRepository,
+)
 from repositories.exceptions import CsrfError, ForbiddenError
 from services import AuthService
 
@@ -50,8 +54,10 @@ _DbSessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 def get_auth_service(db: _DbSessionDep) -> AuthService:
-    """Create an AuthService wiring the user and auth-session repositories."""
-    return AuthService(SqlUserRepository(db), SqlAuthSessionRepository(db))
+    """Create an AuthService wiring the user, auth-session, and tenant repositories."""
+    return AuthService(
+        SqlUserRepository(db), SqlAuthSessionRepository(db), SqlTenantRepository(db)
+    )
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]

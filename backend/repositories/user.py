@@ -23,7 +23,9 @@ class UserRepository(Protocol):
 
     async def get(self, user_id: str) -> User | None: ...
 
-    async def get_by_username(self, username: str) -> User | None: ...
+    async def get_by_username(
+        self, username: str, *, tenant_id: str | None
+    ) -> User | None: ...
 
     async def list(
         self,
@@ -59,19 +61,35 @@ class SqlUserRepository:
     async def get(self, user_id: str) -> User | None:
         return await self._db.get(User, user_id)
 
-    async def get_by_username(self, username: str) -> User | None:
-        """Return the user with the given username, or ``None`` if no match exists.
+    async def get_by_username(
+        self, username: str, *, tenant_id: str | None
+    ) -> User | None:
+        """Return the user with the given username scoped to ``tenant_id``.
+
+        ``tenant_id=None`` matches only platform-scoped users (``tenant_id IS
+        NULL`` -- the seeded system user, ``root``, or any other
+        super_admin); a non-``None`` value matches only users belonging to
+        that tenant. This mirrors the two-tier uniqueness enforced by
+        ``uq_users_tenant_id_username`` and the partial unique index on
+        ``username`` where ``tenant_id IS NULL`` (see :class:`~models.user.User`).
 
         Soft-deleted users are included so the auth layer can reject a login
         with an explicit "disabled" decision rather than silently missing them.
 
         Args:
-            username: The unique username to look up.
+            username: The username to look up.
+            tenant_id: The tenant to scope the lookup to, or ``None`` for a
+                platform-scoped user.
 
         Returns:
             The matching ``User`` or ``None``.
         """
-        stmt = select(User).where(col(User.username) == username)
+        tenant_filter = (
+            col(User.tenant_id).is_(None)
+            if tenant_id is None
+            else col(User.tenant_id) == tenant_id
+        )
+        stmt = select(User).where(col(User.username) == username, tenant_filter)
         return (await self._db.exec(stmt)).first()
 
     async def exists(self, user_id: str) -> bool:

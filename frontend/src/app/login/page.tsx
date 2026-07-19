@@ -24,6 +24,7 @@ export default function LoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [username, setUsername] = useState("");
+  const [tenantSlug, setTenantSlug] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   // No `done` stage: a successful sign-in navigates away immediately, so the
@@ -36,7 +37,7 @@ export default function LoginPage() {
       setError(null);
       try {
         await signIn.run(async () => {
-          const user = await login(username, password);
+          const user = await login(username, password, tenantSlug.trim() || undefined);
           dispatch(setUser(user));
           router.replace("/admin");
         });
@@ -48,7 +49,7 @@ export default function LoginPage() {
         );
       }
     },
-    [username, password, dispatch, router, signIn.run]
+    [username, tenantSlug, password, dispatch, router, signIn.run]
   );
 
   return (
@@ -84,6 +85,20 @@ export default function LoginPage() {
             required
             autoFocus
           />
+        </FormField>
+
+        <FormField htmlFor="tenantSlug" label="Tenant">
+          <Input
+            id="tenantSlug"
+            name="tenantSlug"
+            autoComplete="organization"
+            value={tenantSlug}
+            onChange={(e) => setTenantSlug(e.target.value)}
+            placeholder="e.g. acme-corp"
+          />
+          <p className="mt-1 text-xs text-on-surface-variant">
+            Leave blank if you sign in as a platform administrator.
+          </p>
         </FormField>
 
         <FormField htmlFor="password" label="Password" required>

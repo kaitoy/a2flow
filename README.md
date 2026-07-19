@@ -100,7 +100,7 @@ The database is also what coordinates a multi-replica backend: an agent run hold
 
 ## Authentication
 
-The app requires sign-in. Visiting any page while logged out redirects to `/login`. On first run, log in with the seeded **`root`** user (platform-wide `super_admin`) or the **`admin`** user seeded inside the **Default** tenant: set `ROOT_PASSWORD` / `ADMIN_PASSWORD` before the first startup, or, if left unset, read the randomly generated passwords from `docker compose logs backend` (each printed once and not recoverable afterwards). Manage additional users from the [admin UI](#users). After signing in the user lands on the [welcome page](#welcome-page).
+The app requires sign-in. Visiting any page while logged out redirects to `/login`. On first run, log in with the seeded **`root`** user (platform-wide `super_admin` — leave the tenant field blank) or the **`admin`** user seeded inside the **Default** tenant (enter `default` as the tenant): set `ROOT_PASSWORD` / `ADMIN_PASSWORD` before the first startup, or, if left unset, read the randomly generated passwords from `docker compose logs backend` (each printed once and not recoverable afterwards). Manage additional users from the [admin UI](#users). After signing in the user lands on the [welcome page](#welcome-page).
 
 - **Session** — login creates a server-side session (`auth_sessions` table) and sets an HttpOnly `a2flow_session` cookie holding an opaque token (only its hash is stored). Sessions use a sliding **idle timeout** (`SESSION_IDLE_TIMEOUT_SECONDS`, default 8 hours).
 - **CSRF** — login also sets a readable `a2flow_csrf` cookie; the frontend echoes it in the `X-CSRF-Token` header on every state-changing request (double-submit cookie). The backend rejects mismatches with `403`.
@@ -150,7 +150,7 @@ Navigate to [http://localhost:3000/admin/users](http://localhost:3000/admin/user
 | Create a new user | `GET /admin/users/new` |
 | Edit / delete a user | `GET /admin/users/{id}` |
 
-Each user record stores a username (unique), first name, last name, email, an `enabled` flag, an `emailVerified` flag, and the user's [roles](#roles-and-authorization). Passwords are hashed with [bcrypt](https://pypi.org/project/bcrypt/) before persistence and are never returned by the API. On edit, leaving the password field blank keeps the existing password. Users are persisted in `a2flow.db`.
+Each user record stores a username (unique within its tenant, and separately unique among platform-scoped users with no tenant), first name, last name, email, an `enabled` flag, an `emailVerified` flag, and the user's [roles](#roles-and-authorization). Passwords are hashed with [bcrypt](https://pypi.org/project/bcrypt/) before persistence and are never returned by the API. On edit, leaving the password field blank keeps the existing password. Users are persisted in `a2flow.db`.
 
 **Roles.** The create and edit forms include a roles picker (one checkbox per role); the list shows each user's roles in a **Roles** column. Roles are stored as a JSON list, so they cannot be sorted or filtered server-side via the list API's `s` / `q` parameters. The **Super Admin** checkbox is disabled unless the signed-in user is a Super Admin — the backend rejects granting or revoking it otherwise.
 

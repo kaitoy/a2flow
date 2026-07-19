@@ -331,14 +331,16 @@ async def test_seed_default_tenant_and_admin_user_reuses_preexisting_tenant(
     assert users[0].tenant_id == "preexisting-default"
 
 
-async def test_seed_default_tenant_and_admin_user_skips_admin_when_username_exists(
+async def test_seed_default_tenant_and_admin_user_creates_new_admin_alongside_legacy_platform_admin(
     engine: AsyncEngine,
 ) -> None:
-    """A pre-existing 'admin' user (e.g. from before this split) blocks re-creation.
+    """A pre-existing platform-scoped 'admin' does not block the tenant-scoped one.
 
-    Simulates upgrading a deployment that ran the old single-seed bootstrap:
-    the legacy super_admin 'admin' user is left completely untouched, while
-    the Default tenant is still created.
+    Simulates upgrading a deployment that ran the old single-seed bootstrap
+    (a platform-scoped, ``tenant_id IS NULL`` legacy super_admin 'admin'):
+    the admin-seed check is scoped to the Default tenant's id, so the legacy
+    user is left completely untouched and a *new*, Default-tenant-scoped
+    'admin' is created alongside it.
     """
     async with AsyncSession(engine) as session:
         session.add(
@@ -360,10 +362,51 @@ async def test_seed_default_tenant_and_admin_user_skips_admin_when_username_exis
         tenant = await _default_tenant(session)
         users = await _real_users(session)
     assert tenant is not None
+    assert len(users) == 2
+    legacy = next(u for u in users if u.id == "legacy-admin")
+    assert legacy.roles == [Role.super_admin.value]
+    assert legacy.tenant_id is None
+    new_admin = next(u for u in users if u.id != "legacy-admin")
+    assert new_admin.username == "admin"
+    assert new_admin.roles == [Role.admin.value]
+    assert new_admin.tenant_id == tenant.id
+
+
+async def test_seed_default_tenant_and_admin_user_skips_when_admin_already_in_default_tenant(
+    engine: AsyncEngine,
+) -> None:
+    """The admin-seed skip check is scoped to the Default tenant, not global."""
+    async with AsyncSession(engine) as session:
+        tenant = Tenant(
+            name="Default",
+            slug="default",
+            enabled=True,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        tenant_id = tenant.id
+        session.add(tenant)
+        await session.commit()
+        session.add(
+            User(
+                id="existing-tenant-admin",
+                username="admin",
+                first_name="Admin",
+                last_name="User",
+                password="hash",
+                email="admin@localhost",
+                roles=[Role.admin.value],
+                tenant_id=tenant_id,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+        await seed_default_tenant_and_admin_user(session)
+    async with AsyncSession(engine) as session:
+        users = await _real_users(session)
     assert len(users) == 1
-    assert users[0].id == "legacy-admin"
-    assert users[0].roles == [Role.super_admin.value]
-    assert users[0].tenant_id is None
+    assert users[0].id == "existing-tenant-admin"
 
 
 # ---------- ordering contract between seed_root_user and seed_default_tenant_and_admin_user ----------

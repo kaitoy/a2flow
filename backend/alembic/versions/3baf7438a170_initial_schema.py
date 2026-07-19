@@ -83,7 +83,9 @@ def upgrade() -> None:
             name="fk_users_tenant_id",
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("username", name="uq_users_username"),
+        sa.UniqueConstraint(
+            "tenant_id", "username", name="uq_users_tenant_id_username"
+        ),
         sa.CheckConstraint(
             "tenant_id IS NULL OR CAST(roles AS TEXT) NOT LIKE '%\"super_admin\"%'",
             name="ck_users_super_admin_no_tenant",
@@ -94,8 +96,17 @@ def upgrade() -> None:
             name="ck_users_non_super_admin_requires_tenant",
         ),
     )
-    op.create_index("ix_users_username", "users", ["username"], unique=False)
-    op.create_index("ix_users_tenant_id", "users", ["tenant_id"], unique=False)
+    op.create_index(
+        "ix_users_tenant_id_username", "users", ["tenant_id", "username"], unique=False
+    )
+    op.create_index(
+        "ix_users_username_platform_scoped",
+        "users",
+        ["username"],
+        unique=True,
+        postgresql_where=sa.text("tenant_id IS NULL"),
+        sqlite_where=sa.text("tenant_id IS NULL"),
+    )
     with op.batch_alter_table("tenants", schema=None) as batch_op:
         # SQLite's batch mode rebuilds the table and requires every
         # constraint to have an explicit name (unlike a plain CREATE TABLE,
@@ -776,11 +787,19 @@ def downgrade() -> None:
     op.drop_table("agent_skills")
     with op.batch_alter_table("users", schema=None) as batch_op:
         batch_op.drop_constraint("fk_users_tenant_id", type_="foreignkey")
-        batch_op.drop_index("ix_users_tenant_id")
+        batch_op.drop_constraint("uq_users_tenant_id_username", type_="unique")
+        batch_op.drop_index("ix_users_tenant_id_username")
+        batch_op.drop_index("ix_users_username_platform_scoped")
+        # Both CHECK constraints reference tenant_id, so they must be dropped
+        # before the column itself or SQLite's batch-mode table rebuild fails
+        # with "no such column: tenant_id" while recreating the table.
+        batch_op.drop_constraint("ck_users_super_admin_no_tenant", type_="check")
+        batch_op.drop_constraint(
+            "ck_users_non_super_admin_requires_tenant", type_="check"
+        )
         batch_op.drop_column("tenant_id")
     op.drop_index("ix_tenants_slug", table_name="tenants")
     op.drop_index("ix_tenants_name", table_name="tenants")
     op.drop_table("tenants")
-    op.drop_index("ix_users_username", table_name="users")
     op.drop_table("users")
     # ### end Alembic commands ###

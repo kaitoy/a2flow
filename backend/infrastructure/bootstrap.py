@@ -131,10 +131,11 @@ async def seed_root_user(session: AsyncSession) -> None:
 async def seed_default_tenant_and_admin_user(session: AsyncSession) -> None:
     """Create the seeded ``Default`` tenant and its ``admin`` user on first bootstrap.
 
-    The tenant (looked up by ``slug``) and the user (looked up by
-    ``username``) are checked independently, so either can be (re)created on
-    a later startup without duplicating the other. This must run **after**
-    :func:`seed_root_user` — see that function's docstring for why.
+    The tenant (looked up by ``slug``) and the user (looked up by ``username``
+    scoped to this tenant's id) are checked independently, so either can be
+    (re)created on a later startup without duplicating the other. This must
+    run **after** :func:`seed_root_user` — see that function's docstring for
+    why.
 
     The ``admin`` user holds :attr:`Role.admin` (not ``super_admin``), scoped
     to the seeded tenant. Its password is read from
@@ -143,11 +144,12 @@ async def seed_default_tenant_and_admin_user(session: AsyncSession) -> None:
     :func:`seed_root_user`. Both records are created with ``created_by`` /
     ``updated_by`` pointing at the seeded system user (:data:`SYSTEM_USER_ID`).
 
-    On a deployment that already has a pre-existing ``admin`` user from
-    before this function existed (e.g. the old single seeded super_admin),
-    the ``Default`` tenant is still created, but a second ``admin`` user is
-    not — the username-uniqueness check skips it, leaving the legacy user's
-    roles and ``tenant_id`` untouched.
+    The username-uniqueness check is scoped to this tenant's id, so a
+    pre-existing ``admin`` user from before this function existed (e.g. the
+    old single seeded, platform-scoped super_admin) does **not** block this
+    tenant from getting its own ``admin`` — the legacy user's roles and
+    ``tenant_id`` are left untouched, and a second, Default-tenant-scoped
+    ``admin`` is created alongside it.
 
     Args:
         session: Database session used to read and insert the tenant and user.
@@ -174,7 +176,11 @@ async def seed_default_tenant_and_admin_user(session: AsyncSession) -> None:
     else:
         tenant_id = tenant.id
 
-    user_stmt = select(User).where(col(User.username) == "admin").limit(1)
+    user_stmt = (
+        select(User)
+        .where(col(User.username) == "admin", col(User.tenant_id) == tenant_id)
+        .limit(1)
+    )
     if (await session.exec(user_stmt)).first() is not None:
         return
     password = _resolve_seed_password(
