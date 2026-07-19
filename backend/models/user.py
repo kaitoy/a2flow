@@ -45,10 +45,6 @@ class Role(StrEnum):
     requester = "requester"
     #: Eligibility as a designated approver of workflow approvals.
     approver = "approver"
-    #: Administration of the caller's own tenant (member/role management
-    #: scoped to `User.tenant_id`). Distinct from `super_admin`, which
-    #: bypasses tenancy entirely.
-    tenant_admin = "tenant_admin"
 
 
 def has_role(user: "User | UserRead", *allowed: Role) -> bool:
