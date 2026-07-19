@@ -34,8 +34,8 @@ export interface TenantFieldProps {
  *
  * Only a super admin may assign a user's tenant — the backend rejects the
  * field otherwise (HTTP 403) — so the field renders nothing for any other
- * *viewer*, mirroring how {@link RolesField} disables its `super_admin`
- * checkbox for non-super-admins. Separately, the select becomes
+ * *viewer*, mirroring how {@link RolesField} hides its `super_admin` option
+ * for non-super-admins. Separately, the select becomes
  * non-interactive for two independent reasons: when the *target* user's
  * roles make them a super admin (`disabled`), where its value is also forced
  * back to `null` since a super admin can never carry a `tenant_id`; and when
