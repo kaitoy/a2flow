@@ -1,8 +1,9 @@
-/** Redux store configuration combining the chat, auth, notifications, and toast slices. */
+/** Redux store configuration combining the chat, auth, notifications, tenants, and toast slices. */
 import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./authSlice";
 import chatReducer from "./chatSlice";
 import notificationsReducer from "./notificationsSlice";
+import tenantsReducer from "./tenantsSlice";
 import toastReducer from "./toastSlice";
 
 export const store = configureStore({
@@ -10,6 +11,7 @@ export const store = configureStore({
     chat: chatReducer,
     auth: authReducer,
     notifications: notificationsReducer,
+    tenants: tenantsReducer,
     toast: toastReducer,
   },
 });

@@ -40,19 +40,27 @@ function persistSelection(tenantId: string | null): void {
  * open page's data match the newly selected tenant. The initial auto-select
  * doesn't reload: nothing has been displayed yet, so there's no stale data to
  * invalidate.
+ *
+ * The tenant *list* itself is re-fetched whenever `tenants.version` in Redux
+ * changes, not just on mount -- tenant CRUD pages dispatch `tenantsChanged()`
+ * on success so this picker (which lives in the persistent admin layout and
+ * therefore doesn't remount on client-side navigation) reflects new/renamed/
+ * deleted tenants without requiring a reload.
  */
 export function TenantSwitcher() {
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   const dispatch = useAppDispatch();
   const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
+  const tenantsVersion = useAppSelector((s) => s.tenants.version);
   const [tenants, setTenants] = useState<Tenant[]>([]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tenantsVersion is a bump counter that re-triggers the fetch, not a data dependency
   useEffect(() => {
     if (!isSuperAdmin) return;
     listTenants()
       .then(setTenants)
       .catch(() => {});
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, tenantsVersion]);
 
   useEffect(() => {
     if (!isSuperAdmin || tenants.length === 0) return;

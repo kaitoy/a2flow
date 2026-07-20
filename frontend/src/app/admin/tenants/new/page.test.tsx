@@ -66,6 +66,15 @@ describe("NewTenantPage", () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/tenants"));
   });
 
+  it("signals tenantsChanged on success so pickers elsewhere refetch", async () => {
+    const user = userEvent.setup();
+    const { store } = render(<NewTenantPage />);
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(store.getState().tenants.version).toBe(1));
+  });
+
   it("shows validation error on blur when name is empty", async () => {
     const user = userEvent.setup();
     render(<NewTenantPage />);

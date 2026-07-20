@@ -5,6 +5,7 @@ import type { Tenant, User } from "@/lib/api";
 import type { Role } from "@/lib/roles";
 import type { RootState } from "@/store";
 import { SELECTED_TENANT_STORAGE_KEY } from "@/store/authSlice";
+import { tenantsChanged } from "@/store/tenantsSlice";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
@@ -109,6 +110,22 @@ describe("TenantSwitcher", () => {
       expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveValue("tenant-1");
     });
     expect(reloadMock).not.toHaveBeenCalled();
+  });
+
+  it("refetches the tenant list when tenants.version changes, without remounting", async () => {
+    server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1])));
+    const { store } = render(<TenantSwitcher />, { preloadedState: authState(["super_admin"]) });
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("option", { name: "Globex" })).not.toBeInTheDocument();
+
+    server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
+    store.dispatch(tenantsChanged());
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Globex" })).toBeInTheDocument();
+    });
   });
 
   it("shows a disabled placeholder when there are no tenants", async () => {

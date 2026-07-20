@@ -1,9 +1,9 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import TenantsPage from "./page";
 
 vi.mock("next/link", () => ({
@@ -70,5 +70,18 @@ describe("TenantsPage", () => {
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));
     expect(deleteSpy).toHaveBeenCalled();
+  });
+
+  it("signals tenantsChanged on delete so pickers elsewhere refetch", async () => {
+    const user = userEvent.setup();
+    server.use(http.delete("http://localhost:8000/api/v1/tenants/:id", () => envelope(null)));
+
+    const { store } = render(<TenantsPage />);
+    await waitFor(() => screen.getByText("Acme Corp"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /delete/i }));
+
+    await waitFor(() => expect(store.getState().tenants.version).toBe(1));
   });
 });

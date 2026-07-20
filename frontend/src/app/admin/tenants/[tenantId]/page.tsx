@@ -23,6 +23,7 @@ import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { deleteTenant, getTenant, type TenantUpdate, updateTenant } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
+import { tenantsChanged } from "@/store/tenantsSlice";
 import { showToast } from "@/store/toastSlice";
 
 const schema = zTenantCreate;
@@ -88,6 +89,7 @@ export default function EditTenantPage() {
       await save.run(async () => {
         await updateTenant(tenantId, body);
         dispatch(showToast({ message: "Tenant updated" }));
+        dispatch(tenantsChanged());
         router.push("/admin/tenants");
       });
     } catch (err) {
@@ -103,6 +105,7 @@ export default function EditTenantPage() {
     setConfirmOpen(false);
     try {
       await deleteTenant(tenantId);
+      dispatch(tenantsChanged());
       router.push("/admin/tenants");
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Failed to delete tenant");

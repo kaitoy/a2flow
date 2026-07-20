@@ -61,6 +61,32 @@ describe("EditTenantPage", () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/tenants"));
   });
 
+  it("signals tenantsChanged on update so pickers elsewhere refetch", async () => {
+    setup();
+    server.use(
+      http.patch("http://localhost:8000/api/v1/tenants/:tenantId", () => envelope(FULL_TENANT))
+    );
+
+    const { store } = render(<EditTenantPage />);
+    await waitFor(() => screen.getByDisplayValue("Acme Corp"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(store.getState().tenants.version).toBe(1));
+  });
+
+  it("signals tenantsChanged on delete so pickers elsewhere refetch", async () => {
+    setup();
+    server.use(http.delete("http://localhost:8000/api/v1/tenants/:tenantId", () => envelope(null)));
+
+    const { store } = render(<EditTenantPage />);
+    await waitFor(() => screen.getByDisplayValue("Acme Corp"));
+    await userEvent.click(screen.getByRole("button", { name: /delete/i }));
+    const dialog = screen.getByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /delete/i }));
+
+    await waitFor(() => expect(store.getState().tenants.version).toBe(1));
+  });
+
   it("calls delete api and navigates after confirm", async () => {
     setup();
     const pushMock = vi.fn();

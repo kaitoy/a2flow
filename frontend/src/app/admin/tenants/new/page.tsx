@@ -20,6 +20,7 @@ import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createTenant } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
+import { tenantsChanged } from "@/store/tenantsSlice";
 import { showToast } from "@/store/toastSlice";
 
 const schema = zTenantCreate;
@@ -56,6 +57,7 @@ export default function NewTenantPage() {
           enabled: values.enabled,
         });
         dispatch(showToast({ message: "Tenant created" }));
+        dispatch(tenantsChanged());
         router.push("/admin/tenants");
       });
     } catch (err) {

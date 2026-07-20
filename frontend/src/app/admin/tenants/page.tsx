@@ -14,6 +14,8 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteTenant, listTenants, type Tenant } from "@/lib/api";
+import { useAppDispatch } from "@/store/hooks";
+import { tenantsChanged } from "@/store/tenantsSlice";
 
 const LIMIT = 20;
 
@@ -54,6 +56,7 @@ const STATIC_COLUMNS: ColumnDef<Tenant>[] = [
 ];
 
 export default function TenantsPage() {
+  const dispatch = useAppDispatch();
   const {
     rows,
     loading,
@@ -83,6 +86,7 @@ export default function TenantsPage() {
       await deleteTenant(confirmTarget.id);
       setConfirmTarget(null);
       setActionError(null);
+      dispatch(tenantsChanged());
       await reload();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Failed to delete tenant");

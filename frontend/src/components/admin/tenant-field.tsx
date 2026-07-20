@@ -6,6 +6,7 @@ import { FormField } from "@/components/admin/form-field";
 import { Select } from "@/components/ui/select";
 import { listTenants, type Tenant } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
+import { useAppSelector } from "@/store/hooks";
 
 /** Props for {@link TenantField}. */
 export interface TenantFieldProps {
@@ -41,6 +42,10 @@ export interface TenantFieldProps {
  * back to `null` since a super admin can never carry a `tenant_id`; and when
  * the target already had a tenant assigned when the form loaded (`locked`),
  * where the value is left untouched since a tenant is immutable once set.
+ *
+ * The option list is re-fetched whenever `tenants.version` in Redux changes,
+ * so a tenant created/renamed/deleted elsewhere shows up here without
+ * requiring this form to remount.
  */
 export function TenantField({
   value,
@@ -49,14 +54,16 @@ export function TenantField({
   locked = false,
 }: TenantFieldProps) {
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
+  const tenantsVersion = useAppSelector((s) => s.tenants.version);
   const [tenants, setTenants] = useState<Tenant[]>([]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tenantsVersion is a bump counter that re-triggers the fetch, not a data dependency
   useEffect(() => {
     if (!isSuperAdmin) return;
     listTenants()
       .then(setTenants)
       .catch(() => {});
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, tenantsVersion]);
 
   useEffect(() => {
     if (disabled && value !== null) onChange(null);

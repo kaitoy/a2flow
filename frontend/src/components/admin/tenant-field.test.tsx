@@ -1,10 +1,29 @@
 import userEvent from "@testing-library/user-event";
+import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import type { User } from "@/lib/api";
+import type { Tenant, User } from "@/lib/api";
 import type { Role } from "@/lib/roles";
 import type { RootState } from "@/store";
+import { tenantsChanged } from "@/store/tenantsSlice";
+import { envelope } from "@/test/msw/envelope";
+import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import { TenantField } from "./tenant-field";
+
+const BASE = "http://localhost:8000";
+
+const TENANT_1: Tenant = {
+  id: "tenant-1",
+  name: "Acme Corp",
+  slug: "acme-corp",
+  enabled: true,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+const TENANT_2: Tenant = { ...TENANT_1, id: "tenant-2", name: "Globex", slug: "globex" };
 
 /** Build a preloaded auth slice for a signed-in user holding the given roles. */
 function authState(roles: Role[]): Partial<RootState> {
@@ -48,6 +67,24 @@ describe("TenantField", () => {
     });
     await user.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
     expect(onChange).toHaveBeenCalledWith("tenant-1");
+  });
+
+  it("refetches the tenant list when tenants.version changes, without remounting", async () => {
+    server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1])));
+    const { store } = render(<TenantField value={null} onChange={vi.fn()} />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("option", { name: "Globex" })).not.toBeInTheDocument();
+
+    server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
+    store.dispatch(tenantsChanged());
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Globex" })).toBeInTheDocument();
+    });
   });
 
   it("disables the select when disabled is true", () => {
