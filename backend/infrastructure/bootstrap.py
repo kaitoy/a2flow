@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 #: 12-character minimum and short enough to copy out of a log line.
 _GENERATED_PASSWORD_BYTES = 16
 
-#: Slug of the tenant seeded on first startup to hold the initial ``admin`` user.
-_DEFAULT_TENANT_SLUG = "default"
+#: Name of the tenant seeded on first startup to hold the initial ``admin`` user.
+_DEFAULT_TENANT_NAME = "default"
 
 
 async def seed_system_user(session: AsyncSession) -> None:
@@ -131,7 +131,7 @@ async def seed_root_user(session: AsyncSession) -> None:
 async def seed_default_tenant_and_admin_user(session: AsyncSession) -> None:
     """Create the seeded ``Default`` tenant and its ``admin`` user on first bootstrap.
 
-    The tenant (looked up by ``slug``) and the user (looked up by ``username``
+    The tenant (looked up by ``name``) and the user (looked up by ``username``
     scoped to this tenant's id) are checked independently, so either can be
     (re)created on a later startup without duplicating the other. This must
     run **after** :func:`seed_root_user` — see that function's docstring for
@@ -155,13 +155,13 @@ async def seed_default_tenant_and_admin_user(session: AsyncSession) -> None:
         session: Database session used to read and insert the tenant and user.
     """
     tenant_stmt = (
-        select(Tenant).where(col(Tenant.slug) == _DEFAULT_TENANT_SLUG).limit(1)
+        select(Tenant).where(col(Tenant.name) == _DEFAULT_TENANT_NAME).limit(1)
     )
     tenant = (await session.exec(tenant_stmt)).first()
     if tenant is None:
         tenant = Tenant(
-            name="Default",
-            slug=_DEFAULT_TENANT_SLUG,
+            display_name="Default",
+            name=_DEFAULT_TENANT_NAME,
             enabled=True,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,

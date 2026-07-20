@@ -53,7 +53,7 @@ describe("LoginPage", () => {
     expect(replaceMock).toHaveBeenCalledWith("/admin");
   });
 
-  it("submits the typed tenant slug in the request body", async () => {
+  it("submits the typed tenant name in the request body", async () => {
     const user = userEvent.setup();
     vi.mocked(useRouter).mockReturnValue({
       push: vi.fn(),
@@ -77,10 +77,10 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText(/password/i), "secret123abc");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
-    await waitFor(() => expect(requestBody?.tenantSlug).toBe("acme-corp"));
+    await waitFor(() => expect(requestBody?.tenantName).toBe("acme-corp"));
   });
 
-  it("omits tenantSlug from the request body when left blank", async () => {
+  it("omits tenantName from the request body when left blank", async () => {
     const user = userEvent.setup();
     vi.mocked(useRouter).mockReturnValue({
       push: vi.fn(),
@@ -104,7 +104,7 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => expect(requestBody).toBeDefined());
-    expect(requestBody?.tenantSlug).toBeUndefined();
+    expect(requestBody?.tenantName).toBeUndefined();
   });
 
   it("shows an error message on invalid credentials", async () => {

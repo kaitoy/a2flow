@@ -147,7 +147,7 @@ async def test_super_admin_switching_tenant_header_switches_visible_data(
     tenant_b = assert_ok(
         await client.post(
             "/api/v1/tenants",
-            json={"name": "Tenant Switch B", "slug": "tenant-switch-b"},
+            json={"displayName": "Tenant Switch B", "name": "tenant-switch-b"},
         ),
         status=201,
     )["id"]
@@ -198,7 +198,7 @@ async def test_tenant_scoped_caller_cannot_escalate_via_tenant_header(
     other_tenant = assert_ok(
         await client.post(
             "/api/v1/tenants",
-            json={"name": "Tenant Escalation", "slug": "tenant-escalation"},
+            json={"displayName": "Tenant Escalation", "name": "tenant-escalation"},
         ),
         status=201,
     )["id"]

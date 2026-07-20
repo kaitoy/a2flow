@@ -680,7 +680,7 @@ async def test_roleless_user_cannot_update_other_user(
 
 async def _create_tenant(user_client: AsyncClient, **overrides: Any) -> Any:
     """Create a tenant (default: as super admin) and return the response body."""
-    body = {"name": "Acme Corp", "slug": "acme-corp", **overrides}
+    body = {"displayName": "Acme Corp", "name": "acme-corp", **overrides}
     return assert_ok(await user_client.post("/api/v1/tenants", json=body), status=201)
 
 

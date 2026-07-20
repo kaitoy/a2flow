@@ -15,7 +15,7 @@ export default function Loading() {
         addHref="/admin/tenants/new"
         addLabel="+ Add tenant"
       />
-      <AdminListSkeleton columns={["Name", "Slug", "Enabled", "Actions"]} />
+      <AdminListSkeleton columns={["Display Name", "Name", "Enabled", "Actions"]} />
     </AdminPageContainer>
   );
 }

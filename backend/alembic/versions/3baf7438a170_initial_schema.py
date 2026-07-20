@@ -32,12 +32,12 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("display_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("slug", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("enabled", sa.Boolean(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("display_name", name="uq_tenants_display_name"),
         sa.UniqueConstraint("name", name="uq_tenants_name"),
-        sa.UniqueConstraint("slug", name="uq_tenants_slug"),
         # created_by/updated_by -> users.id FKs are added below via
         # batch_alter_table, once "users" exists: tenants and users have a
         # circular FK dependency (every table's created_by/updated_by points
@@ -45,8 +45,10 @@ def upgrade() -> None:
         # SQLite cannot resolve a forward-referenced FK inside CREATE TABLE
         # except for self-references.
     )
+    op.create_index(
+        "ix_tenants_display_name", "tenants", ["display_name"], unique=False
+    )
     op.create_index("ix_tenants_name", "tenants", ["name"], unique=False)
-    op.create_index("ix_tenants_slug", "tenants", ["slug"], unique=False)
     op.create_table(
         "users",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
@@ -798,8 +800,8 @@ def downgrade() -> None:
             "ck_users_non_super_admin_requires_tenant", type_="check"
         )
         batch_op.drop_column("tenant_id")
-    op.drop_index("ix_tenants_slug", table_name="tenants")
     op.drop_index("ix_tenants_name", table_name="tenants")
+    op.drop_index("ix_tenants_display_name", table_name="tenants")
     op.drop_table("tenants")
     op.drop_table("users")
     # ### end Alembic commands ###

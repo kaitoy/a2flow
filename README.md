@@ -170,7 +170,7 @@ Navigate to [http://localhost:3000/admin/tenants](http://localhost:3000/admin/te
 | Create a new tenant | `GET /admin/tenants/new` |
 | Edit / delete a tenant | `GET /admin/tenants/{id}` |
 
-Each tenant record stores a unique `name`, a unique URL-safe `slug` (lowercase kebab-case, intended for use in paths or subdomains by later tasks), and an `enabled` flag for deactivating a tenant without deleting it. A [user](#users) belongs to at most one tenant (`User.tenantId`); a tenant cannot be deleted while any user is still assigned to it — the API rejects the delete with HTTP 409 (`CONFLICT_REFERENCED`) instead. A **Default** tenant (`slug: default`) is seeded automatically on first startup, holding the initial seeded `admin` user.
+Each tenant record stores a unique `displayName` (human-readable label), a unique URL-safe `name` (lowercase kebab-case, intended for use in paths or subdomains by later tasks), and an `enabled` flag for deactivating a tenant without deleting it. A [user](#users) belongs to at most one tenant (`User.tenantId`); a tenant cannot be deleted while any user is still assigned to it — the API rejects the delete with HTTP 409 (`CONFLICT_REFERENCED`) instead. A **Default** tenant (`name: default`) is seeded automatically on first startup, holding the initial seeded `admin` user.
 
 ### Agent Skills
 

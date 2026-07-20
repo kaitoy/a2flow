@@ -38,7 +38,7 @@ export default function EditTenantPage() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
-  const [name, setName] = useState("");
+  const [displayName, setDisplayName] = useState("");
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -50,8 +50,8 @@ export default function EditTenantPage() {
     resolver: zodResolver(schema),
     mode: "onBlur",
     defaultValues: {
+      displayName: "",
       name: "",
-      slug: "",
       enabled: true,
     },
   });
@@ -59,10 +59,10 @@ export default function EditTenantPage() {
   useEffect(() => {
     getTenant(tenantId)
       .then((tenant) => {
-        setName(tenant.name);
+        setDisplayName(tenant.displayName);
         reset({
+          displayName: tenant.displayName,
           name: tenant.name,
-          slug: tenant.slug,
           enabled: tenant.enabled,
         });
         setAudit({
@@ -81,8 +81,8 @@ export default function EditTenantPage() {
   async function onSubmit(values: FormValues) {
     setApiError(null);
     const body: TenantUpdate = {
+      displayName: values.displayName,
       name: values.name,
-      slug: values.slug,
       enabled: values.enabled,
     };
     try {
@@ -140,12 +140,17 @@ export default function EditTenantPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            <Input id="name" {...register("name")} />
+          <FormField
+            htmlFor="displayName"
+            label="Display Name"
+            required
+            error={errors.displayName?.message}
+          >
+            <Input id="displayName" {...register("displayName")} />
           </FormField>
 
-          <FormField htmlFor="slug" label="Slug" required error={errors.slug?.message}>
-            <Input id="slug" {...register("slug")} />
+          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+            <Input id="name" {...register("name")} />
           </FormField>
 
           <Checkbox label="Enabled" {...register("enabled")} />
@@ -179,7 +184,7 @@ export default function EditTenantPage() {
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Tenant"
-        description={`Delete "${name}"?`}
+        description={`Delete "${displayName}"?`}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

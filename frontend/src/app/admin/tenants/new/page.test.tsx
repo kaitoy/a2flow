@@ -9,8 +9,8 @@ import NewTenantPage from "./page";
 
 const CREATED_TENANT = {
   id: "new-tenant-id",
-  name: "Acme Corp",
-  slug: "acme-corp",
+  displayName: "Acme Corp",
+  name: "acme-corp",
   enabled: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -20,14 +20,14 @@ const CREATED_TENANT = {
 
 /** Fill every required field of the create form with valid values. */
 async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByRole("textbox", { name: /name/i }), "Acme Corp");
-  await user.type(screen.getByRole("textbox", { name: /slug/i }), "acme-corp");
+  await user.type(screen.getByRole("textbox", { name: /^display name/i }), "Acme Corp");
+  await user.type(screen.getByRole("textbox", { name: /^name/i }), "acme-corp");
 }
 
 describe("NewTenantPage", () => {
-  it("renders name input", () => {
+  it("renders display name input", () => {
     render(<NewTenantPage />);
-    expect(screen.getByRole("textbox", { name: /name/i })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /^display name/i })).toBeInTheDocument();
   });
 
   it("renders enabled checkbox checked by default", () => {
@@ -75,18 +75,18 @@ describe("NewTenantPage", () => {
     await waitFor(() => expect(store.getState().tenants.version).toBe(1));
   });
 
-  it("shows validation error on blur when name is empty", async () => {
+  it("shows validation error on blur when display name is empty", async () => {
     const user = userEvent.setup();
     render(<NewTenantPage />);
-    await user.click(screen.getByRole("textbox", { name: /name/i }));
+    await user.click(screen.getByRole("textbox", { name: /^display name/i }));
     await user.tab();
     await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
   });
 
-  it("shows validation error on blur when slug has uppercase characters", async () => {
+  it("shows validation error on blur when name has uppercase characters", async () => {
     const user = userEvent.setup();
     render(<NewTenantPage />);
-    await user.type(screen.getByRole("textbox", { name: /slug/i }), "Acme-Corp");
+    await user.type(screen.getByRole("textbox", { name: /^name/i }), "Acme-Corp");
     await user.tab();
     await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
   });

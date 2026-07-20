@@ -23,7 +23,7 @@ class TenantRepository(Protocol):
 
     async def get(self, tenant_id: str) -> Tenant | None: ...
 
-    async def get_by_slug(self, slug: str) -> Tenant | None: ...
+    async def get_by_name(self, name: str) -> Tenant | None: ...
 
     async def list(
         self,
@@ -48,10 +48,11 @@ class TenantRepository(Protocol):
 class SqlTenantRepository:
     """SQLModel-backed implementation of TenantRepository.
 
-    ``create`` and ``update`` catch IntegrityError on the ``name``/``slug``
-    unique constraints and re-raise as :class:`UniqueViolationError`. ``delete``
-    catches IntegrityError raised by ``users.tenant_id``'s ``ondelete=RESTRICT``
-    foreign key and re-raises as :class:`ReferencedError`.
+    ``create`` and ``update`` catch IntegrityError on the
+    ``display_name``/``name`` unique constraints and re-raise as
+    :class:`UniqueViolationError`. ``delete`` catches IntegrityError raised
+    by ``users.tenant_id``'s ``ondelete=RESTRICT`` foreign key and re-raises
+    as :class:`ReferencedError`.
     """
 
     def __init__(self, session: AsyncSession) -> None:
@@ -63,20 +64,20 @@ class SqlTenantRepository:
     async def exists(self, tenant_id: str) -> bool:
         return (await self._db.get(Tenant, tenant_id)) is not None
 
-    async def get_by_slug(self, slug: str) -> Tenant | None:
-        """Return the tenant with the given slug, or ``None`` if no match exists.
+    async def get_by_name(self, name: str) -> Tenant | None:
+        """Return the tenant with the given name, or ``None`` if no match exists.
 
         Used by :meth:`services.auth.AuthService.login` to resolve a submitted
-        tenant slug into a ``tenant_id`` before looking up the user, without
+        tenant name into a ``tenant_id`` before looking up the user, without
         exposing a public tenant-lookup endpoint.
 
         Args:
-            slug: The tenant's unique URL-safe slug.
+            name: The tenant's unique URL-safe name.
 
         Returns:
             The matching ``Tenant`` or ``None``.
         """
-        stmt = select(Tenant).where(col(Tenant.slug) == slug)
+        stmt = select(Tenant).where(col(Tenant.name) == name)
         return (await self._db.exec(stmt)).first()
 
     async def list(
@@ -104,7 +105,11 @@ class SqlTenantRepository:
             await self._db.rollback()
             if is_foreign_key_error(e):
                 raise ForeignKeyViolationError("User", user_id) from e
-            field = "slug" if is_unique_error(e) and "slug" in str(e.orig) else "name"
+            field = (
+                "name"
+                if is_unique_error(e) and "uq_tenants_name" in str(e.orig)
+                else "display_name"
+            )
             raise UniqueViolationError("Tenant", field, getattr(data, field)) from e
         await self._db.refresh(tenant)
         return tenant
@@ -125,7 +130,11 @@ class SqlTenantRepository:
             await self._db.rollback()
             if is_foreign_key_error(e):
                 raise ForeignKeyViolationError("User", user_id) from e
-            field = "slug" if is_unique_error(e) and "slug" in str(e.orig) else "name"
+            field = (
+                "name"
+                if is_unique_error(e) and "uq_tenants_name" in str(e.orig)
+                else "display_name"
+            )
             raise UniqueViolationError(
                 "Tenant", field, str(update.get(field, ""))
             ) from e

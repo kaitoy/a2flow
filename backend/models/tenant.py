@@ -21,16 +21,16 @@ class TenantUpdate(SQLModel):
     """Partial update payload for a Tenant — all fields are optional."""
 
     model_config = _alias_config
-    name: EntityName | None = None
-    slug: TenantSlug | None = None
+    display_name: EntityName | None = None
+    name: TenantSlug | None = None
     enabled: bool | None = None
 
 
 class TenantCreate(TenantUpdate):
     """Creation payload for a Tenant with required fields."""
 
-    name: EntityName
-    slug: TenantSlug
+    display_name: EntityName
+    name: TenantSlug
     #: New tenants are active by default.
     enabled: bool = True
 
@@ -38,18 +38,18 @@ class TenantCreate(TenantUpdate):
 class Tenant(TenantCreate, BaseEntity, table=True):
     """Database-persisted tenant: the top-level organizational boundary.
 
-    ``name`` is a unique, human-readable label; ``slug`` is a unique,
-    URL-safe kebab-case identifier intended for use in paths or subdomains by
-    later tasks. ``enabled`` supports deactivating a tenant without deleting
-    it — and, transitively, without deleting or orphaning its users (see
-    ``User.tenant_id``'s ``ON DELETE RESTRICT`` foreign key in
-    :mod:`models.user`).
+    ``display_name`` is a unique, human-readable label; ``name`` is a
+    unique, URL-safe kebab-case identifier intended for use in paths or
+    subdomains by later tasks. ``enabled`` supports deactivating a tenant
+    without deleting it — and, transitively, without deleting or orphaning
+    its users (see ``User.tenant_id``'s ``ON DELETE RESTRICT`` foreign key
+    in :mod:`models.user`).
     """
 
     __tablename__ = "tenants"
     __table_args__ = (
+        UniqueConstraint("display_name", name="uq_tenants_display_name"),
+        Index("ix_tenants_display_name", "display_name"),
         UniqueConstraint("name", name="uq_tenants_name"),
         Index("ix_tenants_name", "name"),
-        UniqueConstraint("slug", name="uq_tenants_slug"),
-        Index("ix_tenants_slug", "slug"),
     )

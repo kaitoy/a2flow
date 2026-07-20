@@ -9,8 +9,8 @@ import EditTenantPage from "./page";
 
 const FULL_TENANT = {
   id: "tenant-1",
-  name: "Acme Corp",
-  slug: "acme-corp",
+  displayName: "Acme Corp",
+  name: "acme-corp",
   enabled: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -111,14 +111,14 @@ describe("EditTenantPage", () => {
     expect(pushMock).toHaveBeenCalledWith("/admin/tenants");
   });
 
-  it("shows validation error on blur when slug has uppercase characters", async () => {
+  it("shows validation error on blur when name has uppercase characters", async () => {
     setup();
     const user = userEvent.setup();
     render(<EditTenantPage />);
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
-    const slugInput = screen.getByRole("textbox", { name: /slug/i });
-    await user.clear(slugInput);
-    await user.type(slugInput, "Acme-Corp");
+    const nameInput = screen.getByRole("textbox", { name: /^name/i });
+    await user.clear(nameInput);
+    await user.type(nameInput, "Acme-Corp");
     await user.tab();
     await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
   });

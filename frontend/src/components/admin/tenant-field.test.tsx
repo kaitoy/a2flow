@@ -14,8 +14,8 @@ const BASE = "http://localhost:8000";
 
 const TENANT_1: Tenant = {
   id: "tenant-1",
-  name: "Acme Corp",
-  slug: "acme-corp",
+  displayName: "Acme Corp",
+  name: "acme-corp",
   enabled: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -23,7 +23,12 @@ const TENANT_1: Tenant = {
   updatedBy: "",
 };
 
-const TENANT_2: Tenant = { ...TENANT_1, id: "tenant-2", name: "Globex", slug: "globex" };
+const TENANT_2: Tenant = {
+  ...TENANT_1,
+  id: "tenant-2",
+  displayName: "Globex",
+  name: "globex",
+};
 
 /** Build a preloaded auth slice for a signed-in user holding the given roles. */
 function authState(roles: Role[]): Partial<RootState> {

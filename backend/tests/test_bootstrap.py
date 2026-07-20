@@ -217,7 +217,7 @@ async def test_seed_root_user_skips_when_real_user_exists(
 
 
 async def _default_tenant(session: AsyncSession) -> Tenant | None:
-    stmt = select(Tenant).where(col(Tenant.slug) == "default")
+    stmt = select(Tenant).where(col(Tenant.name) == "default")
     return (await session.exec(stmt)).first()
 
 
@@ -229,7 +229,7 @@ async def test_seed_default_tenant_and_admin_user_creates_tenant(
     async with AsyncSession(engine) as session:
         tenant = await _default_tenant(session)
     assert tenant is not None
-    assert tenant.name == "Default"
+    assert tenant.display_name == "Default"
     assert tenant.enabled is True
     assert tenant.created_by == SYSTEM_USER_ID
 
@@ -300,7 +300,7 @@ async def test_seed_default_tenant_and_admin_user_is_idempotent(
         await seed_default_tenant_and_admin_user(session)
     async with AsyncSession(engine) as session:
         users = await _real_users(session)
-        stmt = select(Tenant).where(col(Tenant.slug) == "default")
+        stmt = select(Tenant).where(col(Tenant.name) == "default")
         tenants = list((await session.exec(stmt)).all())
     assert len(users) == 1
     assert len(tenants) == 1
@@ -313,8 +313,8 @@ async def test_seed_default_tenant_and_admin_user_reuses_preexisting_tenant(
         session.add(
             Tenant(
                 id="preexisting-default",
-                name="Default",
-                slug="default",
+                display_name="Default",
+                name="default",
                 enabled=True,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
@@ -323,7 +323,7 @@ async def test_seed_default_tenant_and_admin_user_reuses_preexisting_tenant(
         await session.commit()
         await seed_default_tenant_and_admin_user(session)
     async with AsyncSession(engine) as session:
-        stmt = select(Tenant).where(col(Tenant.slug) == "default")
+        stmt = select(Tenant).where(col(Tenant.name) == "default")
         tenants = list((await session.exec(stmt)).all())
         users = await _real_users(session)
     assert len(tenants) == 1
@@ -378,8 +378,8 @@ async def test_seed_default_tenant_and_admin_user_skips_when_admin_already_in_de
     """The admin-seed skip check is scoped to the Default tenant, not global."""
     async with AsyncSession(engine) as session:
         tenant = Tenant(
-            name="Default",
-            slug="default",
+            display_name="Default",
+            name="default",
             enabled=True,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,

@@ -90,7 +90,7 @@ export function TenantSwitcher() {
       ) : (
         tenants.map((tenant) => (
           <option key={tenant.id} value={tenant.id}>
-            {tenant.name}
+            {tenant.displayName}
           </option>
         ))
       )}

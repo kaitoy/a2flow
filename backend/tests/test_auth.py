@@ -38,7 +38,7 @@ async def _login(client: AsyncClient) -> Any:
             json={
                 "username": AUTH_USERNAME,
                 "password": AUTH_PASSWORD,
-                "tenantSlug": DEFAULT_TEST_TENANT_ID,
+                "tenantName": DEFAULT_TEST_TENANT_ID,
             },
         )
     )
@@ -51,7 +51,7 @@ async def test_login_success_sets_cookies(auth_client: AsyncClient) -> None:
         json={
             "username": AUTH_USERNAME,
             "password": AUTH_PASSWORD,
-            "tenantSlug": DEFAULT_TEST_TENANT_ID,
+            "tenantName": DEFAULT_TEST_TENANT_ID,
         },
     )
     data = assert_ok(response)
@@ -71,7 +71,7 @@ async def test_login_wrong_password_is_unauthenticated(
             json={
                 "username": AUTH_USERNAME,
                 "password": "wrong-password-000",
-                "tenantSlug": DEFAULT_TEST_TENANT_ID,
+                "tenantName": DEFAULT_TEST_TENANT_ID,
             },
         ),
         code="UNAUTHENTICATED",
@@ -87,7 +87,7 @@ async def test_login_unknown_user_is_unauthenticated(auth_client: AsyncClient) -
             json={
                 "username": "nobody",
                 "password": AUTH_PASSWORD,
-                "tenantSlug": DEFAULT_TEST_TENANT_ID,
+                "tenantName": DEFAULT_TEST_TENANT_ID,
             },
         ),
         code="UNAUTHENTICATED",
@@ -203,7 +203,7 @@ async def test_authenticate_expires_idle_session(
             SqlTenantRepository(session),
         )
         result = await service.login(
-            "idle", AUTH_PASSWORD, tenant_slug=DEFAULT_TEST_TENANT_ID
+            "idle", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
         )
         # A fresh token authenticates fine.
         assert (await service.authenticate(result.session_token)).username == "idle"

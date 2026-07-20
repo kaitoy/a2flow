@@ -48,7 +48,7 @@ class AuthService:
         Args:
             users: Repository for user lookups and credential checks.
             sessions: Repository for login-session persistence.
-            tenants: Repository used to resolve a submitted tenant slug at login.
+            tenants: Repository used to resolve a submitted tenant name at login.
         """
         self._users = users
         self._sessions = sessions
@@ -60,22 +60,23 @@ class AuthService:
         return timedelta(seconds=max(seconds, 1))
 
     async def login(
-        self, username: str, password: str, *, tenant_slug: str | None = None
+        self, username: str, password: str, *, tenant_name: str | None = None
     ) -> LoginResult:
         """Verify credentials and create a new login session.
 
         The same generic :class:`UnauthorizedError` is raised for an unknown
-        username, an unknown tenant slug, a wrong password, and a disabled or
+        username, an unknown tenant name, a wrong password, and a disabled or
         soft-deleted account, so the response never reveals which users or
         tenants exist.
 
         Args:
             username: The submitted username.
             password: The submitted plaintext password.
-            tenant_slug: Slug of the tenant the user belongs to. Required to
-                disambiguate a tenant-scoped user's username (unique only
-                within its tenant); must be omitted for a platform-scoped
-                user (``root``, or any other super_admin).
+            tenant_name: Name (the URL-safe kebab-case identifier) of the
+                tenant the user belongs to. Required to disambiguate a
+                tenant-scoped user's username (unique only within its
+                tenant); must be omitted for a platform-scoped user
+                (``root``, or any other super_admin).
 
         Returns:
             A :class:`LoginResult` carrying the user and the freshly minted
@@ -86,8 +87,8 @@ class AuthService:
                 cannot log in.
         """
         tenant_id: str | None = None
-        if tenant_slug:
-            tenant = await self._tenants.get_by_slug(tenant_slug)
+        if tenant_name:
+            tenant = await self._tenants.get_by_name(tenant_name)
             if tenant is None:
                 raise UnauthorizedError("Invalid username or password")
             tenant_id = tenant.id

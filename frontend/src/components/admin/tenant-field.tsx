@@ -82,7 +82,7 @@ export function TenantField({
         <option value="">Unassigned</option>
         {tenants.map((tenant) => (
           <option key={tenant.id} value={tenant.id}>
-            {tenant.name}
+            {tenant.displayName}
           </option>
         ))}
       </Select>

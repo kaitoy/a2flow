@@ -41,8 +41,8 @@ export default function NewTenantPage() {
     resolver: zodResolver(schema),
     mode: "onBlur",
     defaultValues: {
+      displayName: "",
       name: "",
-      slug: "",
       enabled: true,
     },
   });
@@ -52,8 +52,8 @@ export default function NewTenantPage() {
     try {
       await save.run(async () => {
         await createTenant({
+          displayName: values.displayName,
           name: values.name,
-          slug: values.slug,
           enabled: values.enabled,
         });
         dispatch(showToast({ message: "Tenant created" }));
@@ -81,15 +81,20 @@ export default function NewTenantPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            <Input id="name" placeholder="e.g. Acme Corp" {...register("name")} />
+          <FormField
+            htmlFor="displayName"
+            label="Display Name"
+            required
+            error={errors.displayName?.message}
+          >
+            <Input id="displayName" placeholder="e.g. Acme Corp" {...register("displayName")} />
           </FormField>
 
-          <FormField htmlFor="slug" label="Slug" required error={errors.slug?.message}>
+          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
             <Input
-              id="slug"
+              id="name"
               placeholder="Lowercase kebab-case, e.g. acme-corp"
-              {...register("slug")}
+              {...register("name")}
             />
           </FormField>
 

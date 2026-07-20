@@ -27,23 +27,23 @@ const BOOL_FILTER_OPTIONS = [
 
 const STATIC_COLUMNS: ColumnDef<Tenant>[] = [
   {
-    header: "Name",
-    sortField: "name",
-    filterField: "name",
+    header: "Display Name",
+    sortField: "displayName",
+    filterField: "displayName",
     cell: (t) => (
       <Link
         href={`/admin/tenants/${t.id}`}
         className="font-medium text-accent transition-colors hover:underline"
       >
-        {t.name}
+        {t.displayName}
       </Link>
     ),
   },
   {
-    header: "Slug",
-    sortField: "slug",
-    filterField: "slug",
-    cell: (t) => t.slug,
+    header: "Name",
+    sortField: "name",
+    filterField: "name",
+    cell: (t) => t.name,
   },
   {
     header: "Enabled",
@@ -76,8 +76,8 @@ export default function TenantsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
-  function handleDelete(id: string, name: string) {
-    setConfirmTarget({ id, name });
+  function handleDelete(id: string, displayName: string) {
+    setConfirmTarget({ id, name: displayName });
   }
 
   async function executeDelete() {
@@ -101,7 +101,7 @@ export default function TenantsPage() {
       noTruncate: true,
       cell: (tenant) => (
         <div className="flex gap-2">
-          <DeleteIconButton onClick={() => handleDelete(tenant.id, tenant.name)} />
+          <DeleteIconButton onClick={() => handleDelete(tenant.id, tenant.displayName)} />
         </div>
       ),
     },

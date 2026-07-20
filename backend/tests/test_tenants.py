@@ -50,7 +50,7 @@ async def tenant_client() -> AsyncGenerator[AsyncClient, None]:
         await mem_engine.dispose()
 
 
-_CREATE_BODY = {"name": "Acme Corp", "slug": "acme-corp"}
+_CREATE_BODY = {"displayName": "Acme Corp", "name": "acme-corp"}
 
 
 # ---------- create ----------
@@ -67,8 +67,8 @@ async def test_create_tenant_response_has_correct_fields(
     body = assert_ok(
         await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
     )
-    assert body["name"] == "Acme Corp"
-    assert body["slug"] == "acme-corp"
+    assert body["displayName"] == "Acme Corp"
+    assert body["name"] == "acme-corp"
     assert body["enabled"] is True
 
 
@@ -84,21 +84,31 @@ async def test_create_tenant_explicit_enabled_false_is_reflected(
     assert body["enabled"] is False
 
 
-async def test_create_tenant_missing_name_returns_422(
+async def test_create_tenant_missing_display_name_returns_422(
     tenant_client: AsyncClient,
 ) -> None:
-    body = {k: v for k, v in _CREATE_BODY.items() if k != "name"}
+    body = {k: v for k, v in _CREATE_BODY.items() if k != "displayName"}
     response = await tenant_client.post("/api/v1/tenants", json=body)
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
-async def test_create_tenant_rejects_uppercase_slug(
+async def test_create_tenant_rejects_uppercase_name(
     tenant_client: AsyncClient,
 ) -> None:
     response = await tenant_client.post(
-        "/api/v1/tenants", json={**_CREATE_BODY, "slug": "Acme-Corp"}
+        "/api/v1/tenants", json={**_CREATE_BODY, "name": "Acme-Corp"}
     )
     assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_tenant_duplicate_display_name_returns_409(
+    tenant_client: AsyncClient,
+) -> None:
+    await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY)
+    response = await tenant_client.post(
+        "/api/v1/tenants", json={**_CREATE_BODY, "name": "acme-corp-2"}
+    )
+    assert_err(response, code="CONFLICT_UNIQUE", status=409)
 
 
 async def test_create_tenant_duplicate_name_returns_409(
@@ -106,17 +116,7 @@ async def test_create_tenant_duplicate_name_returns_409(
 ) -> None:
     await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY)
     response = await tenant_client.post(
-        "/api/v1/tenants", json={**_CREATE_BODY, "slug": "acme-corp-2"}
-    )
-    assert_err(response, code="CONFLICT_UNIQUE", status=409)
-
-
-async def test_create_tenant_duplicate_slug_returns_409(
-    tenant_client: AsyncClient,
-) -> None:
-    await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY)
-    response = await tenant_client.post(
-        "/api/v1/tenants", json={**_CREATE_BODY, "name": "Acme Corp 2"}
+        "/api/v1/tenants", json={**_CREATE_BODY, "displayName": "Acme Corp 2"}
     )
     assert_err(response, code="CONFLICT_UNIQUE", status=409)
 
@@ -153,7 +153,7 @@ async def test_get_tenant_returns_correct_data(tenant_client: AsyncClient) -> No
     )
     response = await tenant_client.get(f"/api/v1/tenants/{created['id']}")
     body = assert_ok(response)
-    assert body["name"] == "Acme Corp"
+    assert body["displayName"] == "Acme Corp"
 
 
 async def test_get_tenant_unknown_id_returns_404(tenant_client: AsyncClient) -> None:
@@ -175,8 +175,8 @@ async def test_update_tenant_partial_update_leaves_other_fields_unchanged(
     )
     body = assert_ok(response)
     assert body["enabled"] is False
-    assert body["name"] == "Acme Corp"
-    assert body["slug"] == "acme-corp"
+    assert body["displayName"] == "Acme Corp"
+    assert body["name"] == "acme-corp"
 
 
 async def test_update_tenant_unknown_id_returns_404(tenant_client: AsyncClient) -> None:
@@ -186,18 +186,18 @@ async def test_update_tenant_unknown_id_returns_404(tenant_client: AsyncClient) 
     assert_err(response, code="NOT_FOUND", status=404)
 
 
-async def test_update_tenant_duplicate_slug_returns_409(
+async def test_update_tenant_duplicate_name_returns_409(
     tenant_client: AsyncClient,
 ) -> None:
     await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY)
     other = assert_ok(
         await tenant_client.post(
-            "/api/v1/tenants", json={"name": "Other", "slug": "other"}
+            "/api/v1/tenants", json={"displayName": "Other", "name": "other"}
         ),
         status=201,
     )
     response = await tenant_client.patch(
-        f"/api/v1/tenants/{other['id']}", json={"slug": "acme-corp"}
+        f"/api/v1/tenants/{other['id']}", json={"name": "acme-corp"}
     )
     assert_err(response, code="CONFLICT_UNIQUE", status=409)
 

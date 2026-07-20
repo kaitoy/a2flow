@@ -35,10 +35,11 @@ class LoginRequest(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     username: str
     password: str
-    #: Slug of the tenant the user belongs to. Required to disambiguate a
-    #: tenant-scoped user's username (unique only within its tenant); must be
-    #: omitted for a platform-scoped user (``root``, or any other super_admin).
-    tenant_slug: TenantSlug | None = None
+    #: Name (the URL-safe kebab-case identifier) of the tenant the user
+    #: belongs to. Required to disambiguate a tenant-scoped user's username
+    #: (unique only within its tenant); must be omitted for a platform-scoped
+    #: user (``root``, or any other super_admin).
+    tenant_name: TenantSlug | None = None
 
 
 def _cookie_secure() -> bool:
@@ -93,7 +94,7 @@ async def login(
     ``UnauthorizedError`` (HTTP 401) with a generic message.
     """
     result = await service.login(
-        body.username, body.password, tenant_slug=body.tenant_slug
+        body.username, body.password, tenant_name=body.tenant_name
     )
     _set_auth_cookies(
         response,

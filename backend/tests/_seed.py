@@ -42,8 +42,8 @@ async def seed_tenant(
             session.add(
                 Tenant(
                     id=tenant_id,
-                    name=f"Test Tenant ({tenant_id})",
-                    slug=tenant_id,
+                    display_name=f"Test Tenant ({tenant_id})",
+                    name=tenant_id,
                     enabled=True,
                     created_by=SYSTEM_USER_ID,
                     updated_by=SYSTEM_USER_ID,

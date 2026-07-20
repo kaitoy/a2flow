@@ -24,7 +24,7 @@ export default function LoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [username, setUsername] = useState("");
-  const [tenantSlug, setTenantSlug] = useState("");
+  const [tenantName, setTenantName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   // No `done` stage: a successful sign-in navigates away immediately, so the
@@ -37,7 +37,7 @@ export default function LoginPage() {
       setError(null);
       try {
         await signIn.run(async () => {
-          const user = await login(username, password, tenantSlug.trim() || undefined);
+          const user = await login(username, password, tenantName.trim() || undefined);
           dispatch(setUser(user));
           router.replace("/admin");
         });
@@ -49,7 +49,7 @@ export default function LoginPage() {
         );
       }
     },
-    [username, tenantSlug, password, dispatch, router, signIn.run]
+    [username, tenantName, password, dispatch, router, signIn.run]
   );
 
   return (
@@ -87,13 +87,13 @@ export default function LoginPage() {
           />
         </FormField>
 
-        <FormField htmlFor="tenantSlug" label="Tenant">
+        <FormField htmlFor="tenantName" label="Tenant">
           <Input
-            id="tenantSlug"
-            name="tenantSlug"
+            id="tenantName"
+            name="tenantName"
             autoComplete="organization"
-            value={tenantSlug}
-            onChange={(e) => setTenantSlug(e.target.value)}
+            value={tenantName}
+            onChange={(e) => setTenantName(e.target.value)}
             placeholder="e.g. acme-corp"
           />
           <p className="mt-1 text-xs text-on-surface-variant">
