@@ -111,16 +111,29 @@ describe("EditTenantPage", () => {
     expect(pushMock).toHaveBeenCalledWith("/admin/tenants");
   });
 
-  it("shows validation error on blur when name has uppercase characters", async () => {
+  it("renders name as a read-only field", async () => {
     setup();
-    const user = userEvent.setup();
+    render(<EditTenantPage />);
+    await waitFor(() => screen.getByDisplayValue("acme-corp"));
+    expect(screen.getByRole("textbox", { name: /^name/i })).toBeDisabled();
+  });
+
+  it("omits name from the request body", async () => {
+    setup();
+    let capturedBody: Record<string, unknown> | null = null;
+    server.use(
+      http.patch("http://localhost:8000/api/v1/tenants/:tenantId", async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(FULL_TENANT);
+      })
+    );
+
     render(<EditTenantPage />);
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
-    const nameInput = screen.getByRole("textbox", { name: /^name/i });
-    await user.clear(nameInput);
-    await user.type(nameInput, "Acme-Corp");
-    await user.tab();
-    await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(capturedBody).not.toBeNull());
+    expect(capturedBody).not.toHaveProperty("name");
   });
 
   it("shows error on load failure", async () => {

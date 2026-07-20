@@ -186,20 +186,20 @@ async def test_update_tenant_unknown_id_returns_404(tenant_client: AsyncClient) 
     assert_err(response, code="NOT_FOUND", status=404)
 
 
-async def test_update_tenant_duplicate_name_returns_409(
+async def test_update_tenant_ignores_name_change(
     tenant_client: AsyncClient,
 ) -> None:
-    await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY)
-    other = assert_ok(
-        await tenant_client.post(
-            "/api/v1/tenants", json={"displayName": "Other", "name": "other"}
-        ),
-        status=201,
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
     )
     response = await tenant_client.patch(
-        f"/api/v1/tenants/{other['id']}", json={"name": "acme-corp"}
+        f"/api/v1/tenants/{created['id']}",
+        json={"name": "renamed-slug", "displayName": "New Name"},
     )
-    assert_err(response, code="CONFLICT_UNIQUE", status=409)
+    body = assert_ok(response)
+    # name is immutable: the change is dropped, other fields still apply.
+    assert body["name"] == "acme-corp"
+    assert body["displayName"] == "New Name"
 
 
 async def test_non_super_admin_cannot_update_tenant(

@@ -26,7 +26,9 @@ import { useAppDispatch } from "@/store/hooks";
 import { tenantsChanged } from "@/store/tenantsSlice";
 import { showToast } from "@/store/toastSlice";
 
-const schema = zTenantCreate;
+// name is immutable after creation, so it is kept out of the form schema and
+// rendered as a read-only field fed from fetched tenant data instead.
+const schema = zTenantCreate.omit({ name: true });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -39,6 +41,9 @@ export default function EditTenantPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [displayName, setDisplayName] = useState("");
+  // name is immutable after creation, so it lives outside the form state and
+  // is rendered read-only.
+  const [name, setName] = useState("");
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -51,7 +56,6 @@ export default function EditTenantPage() {
     mode: "onBlur",
     defaultValues: {
       displayName: "",
-      name: "",
       enabled: true,
     },
   });
@@ -60,9 +64,9 @@ export default function EditTenantPage() {
     getTenant(tenantId)
       .then((tenant) => {
         setDisplayName(tenant.displayName);
+        setName(tenant.name);
         reset({
           displayName: tenant.displayName,
-          name: tenant.name,
           enabled: tenant.enabled,
         });
         setAudit({
@@ -82,7 +86,6 @@ export default function EditTenantPage() {
     setApiError(null);
     const body: TenantUpdate = {
       displayName: values.displayName,
-      name: values.name,
       enabled: values.enabled,
     };
     try {
@@ -149,8 +152,8 @@ export default function EditTenantPage() {
             <Input id="displayName" {...register("displayName")} />
           </FormField>
 
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            <Input id="name" {...register("name")} />
+          <FormField htmlFor="name" label="Name">
+            <Input id="name" value={name} readOnly disabled />
           </FormField>
 
           <Checkbox label="Enabled" {...register("enabled")} />

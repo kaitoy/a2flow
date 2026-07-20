@@ -18,11 +18,14 @@ _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
 
 class TenantUpdate(SQLModel):
-    """Partial update payload for a Tenant — all fields are optional."""
+    """Partial update payload for a Tenant — all fields are optional.
+
+    ``name`` is intentionally absent: a tenant's name (slug) is immutable
+    after creation, so it cannot be changed through the update endpoint.
+    """
 
     model_config = _alias_config
     display_name: EntityName | None = None
-    name: TenantSlug | None = None
     enabled: bool | None = None
 
 
