@@ -7,6 +7,7 @@ import type { RootState } from "@/store";
 import authReducer from "@/store/authSlice";
 import chatReducer from "@/store/chatSlice";
 import notificationsReducer from "@/store/notificationsSlice";
+import tenantsReducer from "@/store/tenantsSlice";
 import toastReducer from "@/store/toastSlice";
 
 export function makeStore(preloadedState?: Partial<RootState>) {
@@ -18,6 +19,11 @@ export function makeStore(preloadedState?: Partial<RootState>) {
         RootState["notifications"],
         UnknownAction,
         RootState["notifications"] | undefined
+      >,
+      tenants: tenantsReducer as Reducer<
+        RootState["tenants"],
+        UnknownAction,
+        RootState["tenants"] | undefined
       >,
       toast: toastReducer as Reducer<
         RootState["toast"],

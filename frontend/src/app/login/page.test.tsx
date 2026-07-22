@@ -23,9 +23,10 @@ const USER = {
 };
 
 describe("LoginPage", () => {
-  it("renders username and password fields", () => {
+  it("renders username, tenant, and password fields", () => {
     render(<LoginPage />);
     expect(screen.getByRole("textbox", { name: /username/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/tenant/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 
@@ -50,6 +51,60 @@ describe("LoginPage", () => {
 
     await waitFor(() => expect(loginSpy).toHaveBeenCalled());
     expect(replaceMock).toHaveBeenCalledWith("/admin");
+  });
+
+  it("submits the typed tenant name in the request body", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useRouter).mockReturnValue({
+      push: vi.fn(),
+      replace: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+    });
+    let requestBody: Record<string, unknown> | undefined;
+    server.use(
+      http.post("http://localhost:8000/api/v1/auth/login", async ({ request }) => {
+        requestBody = (await request.json()) as Record<string, unknown>;
+        return envelope(USER);
+      })
+    );
+
+    render(<LoginPage />);
+    await user.type(screen.getByRole("textbox", { name: /username/i }), "alice");
+    await user.type(screen.getByLabelText(/tenant/i), "acme-corp");
+    await user.type(screen.getByLabelText(/password/i), "secret123abc");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => expect(requestBody?.tenantName).toBe("acme-corp"));
+  });
+
+  it("omits tenantName from the request body when left blank", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useRouter).mockReturnValue({
+      push: vi.fn(),
+      replace: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+    });
+    let requestBody: Record<string, unknown> | undefined;
+    server.use(
+      http.post("http://localhost:8000/api/v1/auth/login", async ({ request }) => {
+        requestBody = (await request.json()) as Record<string, unknown>;
+        return envelope(USER);
+      })
+    );
+
+    render(<LoginPage />);
+    await user.type(screen.getByRole("textbox", { name: /username/i }), "alice");
+    await user.type(screen.getByLabelText(/password/i), "secret123abc");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => expect(requestBody).toBeDefined());
+    expect(requestBody?.tenantName).toBeUndefined();
   });
 
   it("shows an error message on invalid credentials", async () => {

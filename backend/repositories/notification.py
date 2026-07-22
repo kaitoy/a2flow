@@ -54,13 +54,23 @@ class NotificationRepository(Protocol):
 class SqlNotificationRepository:
     """SQLModel-backed implementation of NotificationRepository."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Store the SQLModel async session used for all queries."""
+    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+        """Store the SQLModel async session and the tenant these queries are scoped to."""
         self._db = session
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, notification_id: str) -> Notification | None:
+        """Return the Notification with the given ID within the current tenant, or ``None``."""
+        stmt = select(Notification).where(
+            Notification.id == notification_id,
+            Notification.tenant_id == self._tenant_id,
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, notification_id: str) -> Notification | None:
         """Return the Notification with the given ID, or ``None`` if missing."""
-        return await self._db.get(Notification, notification_id)
+        return await self._get_scoped(notification_id)
 
     async def list(
         self,
@@ -81,7 +91,10 @@ class SqlNotificationRepository:
         Returns:
             The matching notifications ordered by ``created_at`` descending.
         """
-        stmt = select(Notification).where(Notification.user_id == user_id)
+        stmt = select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.tenant_id == self._tenant_id,
+        )
         if unread_only:
             stmt = stmt.where(col(Notification.read).is_(False))
         stmt = stmt.order_by(col(Notification.created_at).desc())
@@ -91,7 +104,12 @@ class SqlNotificationRepository:
     async def create(self, data: NotificationCreate, *, user_id: str) -> Notification:
         """Persist a new Notification with audit fields populated."""
         notification = Notification.model_validate(
-            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+            {
+                **data.model_dump(),
+                "tenant_id": self._tenant_id,
+                "created_by": user_id,
+                "updated_by": user_id,
+            }
         )
         self._db.add(notification)
         await commit_or_translate_user_fk(self._db, user_id=user_id)
@@ -102,7 +120,7 @@ class SqlNotificationRepository:
         self, notification_id: str, data: NotificationUpdate, *, user_id: str
     ) -> Notification:
         """Apply a partial update to a Notification, raising NotFoundError if missing."""
-        notification = await self._db.get(Notification, notification_id)
+        notification = await self._get_scoped(notification_id)
         if notification is None:
             raise NotFoundError("Notification", notification_id)
         notification.sqlmodel_update(data.model_dump(exclude_unset=True))
@@ -118,7 +136,7 @@ class SqlNotificationRepository:
         Notifications are leaf rows that nothing references, so a plain commit
         cannot raise a referential-integrity error.
         """
-        notification = await self._db.get(Notification, notification_id)
+        notification = await self._get_scoped(notification_id)
         if notification is None:
             raise NotFoundError("Notification", notification_id)
         await self._db.delete(notification)
@@ -135,7 +153,9 @@ class SqlNotificationRepository:
             The number of notifications that were marked read.
         """
         stmt = select(Notification).where(
-            Notification.user_id == user_id, col(Notification.read).is_(False)
+            Notification.user_id == user_id,
+            Notification.tenant_id == self._tenant_id,
+            col(Notification.read).is_(False),
         )
         result = await self._db.exec(stmt)
         notifications = list(result.all())
@@ -158,6 +178,7 @@ class SqlNotificationRepository:
             select(Notification.id)
             .where(Notification.workflow_session_id == workflow_session_id)
             .where(Notification.type == notification_type)
+            .where(Notification.tenant_id == self._tenant_id)
             .limit(1)
         )
         result = await self._db.exec(stmt)

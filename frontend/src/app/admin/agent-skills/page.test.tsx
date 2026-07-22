@@ -33,6 +33,7 @@ const POLL_INTERVAL_MS = 2000;
 /** A skill whose clone is still running, so the page starts polling for it. */
 const CLONING_SKILL = {
   id: "skill-1",
+  tenantId: "tenant-1",
   name: "my-skill",
   repoUrl: "https://github.com/example/repo",
   repoPath: "",

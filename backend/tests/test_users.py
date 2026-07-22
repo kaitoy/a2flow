@@ -11,6 +11,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.bootstrap import seed_system_user
 from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant
 from tests.conftest import _install_auth_overrides
 
 
@@ -18,6 +19,7 @@ from tests.conftest import _install_auth_overrides
 async def user_client() -> AsyncGenerator[AsyncClient, None]:
     from infrastructure.database import get_session
     from main import app
+    from models.tenant import Tenant as _Tenant  # noqa: F401 — registers model
     from models.user import User as _User  # noqa: F401 — registers model
 
     mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
@@ -30,6 +32,7 @@ async def user_client() -> AsyncGenerator[AsyncClient, None]:
         await conn.run_sync(SQLModel.metadata.create_all)
     async with AsyncSession(mem_engine) as session:
         await seed_system_user(session)
+    await seed_tenant(mem_engine, DEFAULT_TEST_TENANT_ID)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine) as session:
@@ -49,12 +52,16 @@ async def user_client() -> AsyncGenerator[AsyncClient, None]:
         await mem_engine.dispose()
 
 
+#: Every non-super-admin user must carry a tenantId
+#: (``ck_users_non_super_admin_requires_tenant``); tests that care about
+#: tenant behavior override this explicitly.
 _CREATE_BODY = {
     "username": "alice",
     "firstName": "Alice",
     "lastName": "Smith",
     "password": "secret123abc",
     "email": "alice@example.com",
+    "tenantId": DEFAULT_TEST_TENANT_ID,
 }
 
 
@@ -131,9 +138,40 @@ async def test_create_user_missing_password_returns_422(
 async def test_create_user_duplicate_username_returns_409(
     user_client: AsyncClient,
 ) -> None:
+    """A duplicate username within the same tenant is rejected."""
     await user_client.post("/api/v1/users", json=_CREATE_BODY)
     response = await user_client.post(
         "/api/v1/users", json={**_CREATE_BODY, "email": "other@example.com"}
+    )
+    assert_err(response, code="CONFLICT_UNIQUE", status=409)
+
+
+async def test_create_user_duplicate_username_different_tenant_allowed(
+    user_client: AsyncClient,
+) -> None:
+    """The same username may be reused by a user in a different tenant."""
+    await user_client.post("/api/v1/users", json=_CREATE_BODY)
+    tenant = await _create_tenant(user_client)
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "email": "other@example.com", "tenantId": tenant["id"]},
+    )
+    assert response.status_code == 201
+
+
+async def test_create_user_duplicate_username_platform_scoped_returns_409(
+    user_client: AsyncClient,
+) -> None:
+    """Two platform-scoped (super_admin) users cannot share a username."""
+    await _create_user(user_client, roles=["super_admin"])
+    response = await user_client.post(
+        "/api/v1/users",
+        json={
+            **_CREATE_BODY,
+            "email": "other@example.com",
+            "roles": ["super_admin"],
+            "tenantId": None,
+        },
     )
     assert_err(response, code="CONFLICT_UNIQUE", status=409)
 
@@ -472,8 +510,15 @@ async def test_create_user_rejects_username_with_bad_charset(
 async def _create_user(
     user_client: AsyncClient, headers: dict[str, str] | None = None, **overrides: Any
 ) -> Any:
-    """Create a user (default: as super admin) and return the response body."""
+    """Create a user (default: as super admin) and return the response body.
+
+    A ``super_admin`` can never carry a tenant, so requesting that role (and
+    not overriding ``tenantId`` explicitly) drops ``_CREATE_BODY``'s default
+    tenant instead of leaving a combination the backend would reject.
+    """
     body = {**_CREATE_BODY, **overrides}
+    if "super_admin" in body.get("roles", []) and "tenantId" not in overrides:
+        body["tenantId"] = None
     return assert_ok(
         await user_client.post("/api/v1/users", json=body, headers=headers or {}),
         status=201,
@@ -565,27 +610,25 @@ async def test_admin_can_edit_super_admin_user_without_touching_roles(
     assert body["roles"] == ["super_admin"]
 
 
-async def test_super_admin_can_grant_and_revoke_super_admin(
+async def test_super_admin_revoking_super_admin_requires_tenant(
     user_client: AsyncClient,
 ) -> None:
-    """A super admin may grant and then revoke the super_admin role."""
-    created = await _create_user(user_client)
-    granted = assert_ok(
-        await user_client.patch(
-            f"/api/v1/users/{created['id']}",
-            json={"roles": ["super_admin"]},
-            headers={"X-User-Roles": "super_admin"},
-        )
+    """Revoking super_admin without supplying a tenantId in the same PATCH is rejected.
+
+    Every non-super-admin user must carry a tenant; a target losing
+    super_admin without gaining one violates that invariant. (Granting
+    super_admin via PATCH is covered separately by
+    ``test_update_user_rejects_granting_super_admin_to_tenant_scoped_user`` —
+    since every ordinary user now already has a tenant, that grant is always
+    rejected, so there is no longer a "grant succeeds" case to cover here.)
+    """
+    created = await _create_user(user_client, roles=["super_admin"])
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": []},
+        headers={"X-User-Roles": "super_admin"},
     )
-    assert granted["roles"] == ["super_admin"]
-    revoked = assert_ok(
-        await user_client.patch(
-            f"/api/v1/users/{created['id']}",
-            json={"roles": []},
-            headers={"X-User-Roles": "super_admin"},
-        )
-    )
-    assert revoked["roles"] == []
+    assert_err(response, "INVALID_USER", 422)
 
 
 async def test_roleless_user_can_update_own_avatar_config(
@@ -630,3 +673,386 @@ async def test_roleless_user_cannot_update_other_user(
         headers={"X-User-Id": other["id"], "X-User-Roles": "developer,approver"},
     )
     assert_err(response, "FORBIDDEN", 403)
+
+
+# ---------- tenant assignment authorization ----------
+
+
+async def _create_tenant(user_client: AsyncClient, **overrides: Any) -> Any:
+    """Create a tenant (default: as super admin) and return the response body."""
+    body = {"displayName": "Acme Corp", "name": "acme-corp", **overrides}
+    return assert_ok(await user_client.post("/api/v1/tenants", json=body), status=201)
+
+
+async def test_admin_cannot_assign_tenant_on_create(user_client: AsyncClient) -> None:
+    """An admin (non-super) creating a user with a tenantId is rejected."""
+    tenant = await _create_tenant(user_client)
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "tenantId": tenant["id"]},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_super_admin_can_assign_tenant_on_create(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin may assign a tenant when creating a user."""
+    tenant = await _create_tenant(user_client)
+    body = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, tenantId=tenant["id"]
+    )
+    assert body["tenantId"] == tenant["id"]
+
+
+async def test_admin_cannot_assign_tenant_to_tenantless_target_on_update(
+    user_client: AsyncClient,
+) -> None:
+    """An admin (non-super) assigning a first tenant via PATCH is rejected.
+
+    The target has no tenant yet (only possible while it holds super_admin),
+    so this exercises the authorization gate rather than the immutability
+    rule below.
+    """
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client, roles=["super_admin"])
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"tenantId": tenant["id"]},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_admin_cannot_change_already_assigned_tenant_on_update(
+    user_client: AsyncClient,
+) -> None:
+    """An admin (non-super) changing an already-assigned tenantId via PATCH is rejected."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client)
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"tenantId": tenant["id"]},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_super_admin_cannot_change_already_assigned_tenant_on_update(
+    user_client: AsyncClient,
+) -> None:
+    """A tenant is immutable once assigned, even for a super admin."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client)
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"tenantId": tenant["id"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_admin_can_resubmit_unchanged_tenant_on_update(
+    user_client: AsyncClient,
+) -> None:
+    """An admin may PATCH other fields while resending the user's current tenantId.
+
+    The acting admin is scoped into the target's own tenant via
+    ``X-User-Tenant-Id`` -- an admin from a *different* tenant would not even
+    reach this business rule (see the "tenant isolation" section below).
+    """
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, tenantId=tenant["id"]
+    )
+    body = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"firstName": "Renamed", "tenantId": tenant["id"]},
+            headers={"X-User-Roles": "admin", "X-User-Tenant-Id": tenant["id"]},
+        )
+    )
+    assert body["firstName"] == "Renamed"
+    assert body["tenantId"] == tenant["id"]
+
+
+# ---------- mandatory tenant for non-super-admin ----------
+
+
+async def test_create_user_rejects_missing_tenant_for_non_super_admin(
+    user_client: AsyncClient,
+) -> None:
+    """Creating a non-super-admin user with no tenantId is rejected."""
+    response = await user_client.post(
+        "/api/v1/users", json={**_CREATE_BODY, "tenantId": None}
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_admin_create_user_auto_assigns_own_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """A plain admin creating a user without tenantId scopes it to their own tenant.
+
+    A non-super-admin actor can't supply a tenantId explicitly (see
+    ``test_admin_cannot_assign_tenant_on_create``), yet the new user must
+    have one — the backend fills in the acting admin's own tenant instead of
+    requiring an "assign tenant" privilege they don't have.
+    """
+    body = await _create_user(
+        user_client, headers={"X-User-Roles": "admin"}, tenantId=None
+    )
+    assert body["tenantId"] == DEFAULT_TEST_TENANT_ID
+
+
+# ---------- super_admin cannot carry a tenant ----------
+
+
+async def test_create_user_rejects_super_admin_with_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin creating a super_admin user with a tenantId is rejected."""
+    tenant = await _create_tenant(user_client)
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "roles": ["super_admin"], "tenantId": tenant["id"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_admin_cannot_create_super_admin_with_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """An admin (non-super) attempting the same combo still gets the existing role-grant 403."""
+    tenant = await _create_tenant(user_client)
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "roles": ["super_admin"], "tenantId": tenant["id"]},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_update_user_rejects_granting_super_admin_to_tenant_scoped_user(
+    user_client: AsyncClient,
+) -> None:
+    """Granting super_admin to a user who already has a tenantId is rejected."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, tenantId=tenant["id"]
+    )
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": ["super_admin"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_update_user_rejects_assigning_tenant_to_super_admin(
+    user_client: AsyncClient,
+) -> None:
+    """Assigning a tenantId to an existing super_admin user is rejected."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client, roles=["super_admin"])
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"tenantId": tenant["id"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_update_user_rejects_simultaneous_super_admin_grant_and_tenant_assign(
+    user_client: AsyncClient,
+) -> None:
+    """A single PATCH granting super_admin and assigning a tenantId together is rejected."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client)
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": ["super_admin"], "tenantId": tenant["id"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_update_user_allows_revoking_super_admin_while_assigning_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """Revoking super_admin and assigning a tenantId in the same PATCH succeeds."""
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(user_client, roles=["super_admin"])
+    body = assert_ok(
+        await user_client.patch(
+            f"/api/v1/users/{created['id']}",
+            json={"roles": [], "tenantId": tenant["id"]},
+            headers={"X-User-Roles": "super_admin"},
+        )
+    )
+    assert body["roles"] == []
+    assert body["tenantId"] == tenant["id"]
+
+
+async def test_update_user_rejects_clearing_already_assigned_tenant_to_grant_super_admin(
+    user_client: AsyncClient,
+) -> None:
+    """A user with an already-assigned tenant can never become super_admin.
+
+    Granting super_admin requires clearing tenant_id (a super admin can never
+    carry one), but a tenant is immutable once assigned — so once a user has
+    a tenant, that promotion path is permanently closed.
+    """
+    tenant = await _create_tenant(user_client)
+    created = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, tenantId=tenant["id"]
+    )
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": ["super_admin"], "tenantId": None},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+# ---------- tenant isolation ----------
+
+
+async def test_list_users_excludes_other_tenant_for_tenant_scoped_caller(
+    user_client: AsyncClient,
+) -> None:
+    """A tenant-scoped caller's list never includes another tenant's users."""
+    other_tenant = await _create_tenant(user_client, name="tenant-isolation-list")
+    await _create_user(
+        user_client,
+        tenantId=other_tenant["id"],
+        username="other-tenant-user",
+        email="other@x.com",
+    )
+    await user_client.post("/api/v1/users", json=_CREATE_BODY)
+
+    listed = assert_ok(
+        await user_client.get("/api/v1/users", headers={"X-User-Roles": "admin"})
+    )
+    assert listed
+    assert all(u["tenantId"] == DEFAULT_TEST_TENANT_ID for u in listed)
+
+
+async def test_list_users_ignores_client_tenant_filter_for_tenant_scoped_caller(
+    user_client: AsyncClient,
+) -> None:
+    """A caller-supplied ``tenantId`` filter can't widen a tenant-scoped caller's list."""
+    other_tenant = await _create_tenant(user_client, name="tenant-isolation-list-q")
+    await _create_user(
+        user_client,
+        tenantId=other_tenant["id"],
+        username="other-tenant-user-q",
+        email="other-q@x.com",
+    )
+    response = await user_client.get(
+        "/api/v1/users",
+        params={"q": f"tenantId:eq:{other_tenant['id']}"},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert assert_ok(response) == []
+
+
+async def test_list_users_super_admin_sees_every_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin's list is unrestricted across tenants (regression guard)."""
+    other_tenant = await _create_tenant(user_client, name="tenant-isolation-list-sa")
+    created = await _create_user(
+        user_client,
+        tenantId=other_tenant["id"],
+        username="other-tenant-user-sa",
+        email="other-sa@x.com",
+    )
+    listed = assert_ok(await user_client.get("/api/v1/users"))
+    assert any(u["id"] == created["id"] for u in listed)
+
+
+async def test_get_user_other_tenant_returns_404_for_tenant_scoped_caller(
+    user_client: AsyncClient,
+) -> None:
+    other_tenant = await _create_tenant(user_client, name="tenant-isolation-get")
+    created = await _create_user(
+        user_client,
+        tenantId=other_tenant["id"],
+        username="other-tenant-user-get",
+        email="other-get@x.com",
+    )
+    response = await user_client.get(
+        f"/api/v1/users/{created['id']}", headers={"X-User-Roles": "admin"}
+    )
+    assert_err(response, "NOT_FOUND", 404)
+
+
+async def test_get_user_platform_scoped_target_succeeds_for_tenant_scoped_caller(
+    user_client: AsyncClient,
+) -> None:
+    """A tenant-scoped caller can still view a platform-scoped user (e.g. a super_admin).
+
+    The tenant boundary applies only between two concrete tenants -- matches
+    the existing precedent that a plain admin may edit a super_admin's
+    profile (see ``test_admin_can_edit_super_admin_user_without_touching_roles``).
+    """
+    super_admin = await _create_user(user_client, roles=["super_admin"])
+    response = await user_client.get(
+        f"/api/v1/users/{super_admin['id']}", headers={"X-User-Roles": "admin"}
+    )
+    assert assert_ok(response)["id"] == super_admin["id"]
+
+
+async def test_get_user_other_tenant_succeeds_for_super_admin(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin can still fetch a user in any tenant (regression guard)."""
+    other_tenant = await _create_tenant(user_client, name="tenant-isolation-get-sa")
+    created = await _create_user(
+        user_client,
+        tenantId=other_tenant["id"],
+        username="other-tenant-user-get-sa",
+        email="other-get-sa@x.com",
+    )
+    response = await user_client.get(f"/api/v1/users/{created['id']}")
+    assert assert_ok(response)["id"] == created["id"]
+
+
+async def test_update_user_other_tenant_returns_404_for_tenant_scoped_admin(
+    user_client: AsyncClient,
+) -> None:
+    other_tenant = await _create_tenant(user_client, name="tenant-isolation-update")
+    created = await _create_user(
+        user_client,
+        tenantId=other_tenant["id"],
+        username="other-tenant-user-update",
+        email="other-update@x.com",
+    )
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"firstName": "Hacked"},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "NOT_FOUND", 404)
+
+
+async def test_delete_user_other_tenant_returns_404_for_tenant_scoped_admin(
+    user_client: AsyncClient,
+) -> None:
+    other_tenant = await _create_tenant(user_client, name="tenant-isolation-delete")
+    created = await _create_user(
+        user_client,
+        tenantId=other_tenant["id"],
+        username="other-tenant-user-delete",
+        email="other-delete@x.com",
+    )
+    response = await user_client.delete(
+        f"/api/v1/users/{created['id']}", headers={"X-User-Roles": "admin"}
+    )
+    assert_err(response, "NOT_FOUND", 404)
+    # The target survives -- a super admin can still fetch it afterwards.
+    fetched = assert_ok(await user_client.get(f"/api/v1/users/{created['id']}"))
+    assert fetched["id"] == created["id"]

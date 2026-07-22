@@ -116,7 +116,7 @@ Database URL for REST API data and ADK session storage — both live in the same
 
 | Table | Description |
 |---|---|
-| `users` | Application users (soft-deleted via `deleted_at`; `roles` holds their granted roles); see [Admin user](#admin-user) and [Authorization](#authorization-roles) |
+| `users` | Application users (soft-deleted via `deleted_at`; `roles` holds their granted roles); see [Seeded users](#seeded-users) and [Authorization](#authorization-roles) |
 | `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](#authentication) |
 | `agent_skills` | Agent skill definitions (incl. optional `repo_auth_secret` / `repo_auth_username` for private-repo clones) |
 | `mcp_servers` | Registered remote MCP servers (name, streamable HTTP URL, request headers — values may embed `${secret:NAME}` placeholders) |
@@ -175,20 +175,23 @@ need the following at the reverse proxy / load balancer layer:
   a fresh request, the same way an abandoned/disconnected stream already
   behaves.
 
-### Admin user
+### Seeded users
 
-On startup the backend seeds two users:
+On startup the backend seeds a hidden **system user**, plus two real accounts, each created only on the very first startup that finds its target record missing:
 
-- A hidden **system user** that owns the bootstrap records (it cannot log in and is excluded from the user list).
-- An initial **`admin`** user holding the **`super_admin`** role (see [Authorization](#authorization-roles)), created only on the very first startup — that is, while the database has no real (non-system) user yet. Once any real user exists it is never re-created.
+- An initial **`root`** user holding the **`super_admin`** role (see [Authorization](#authorization-roles)), platform-scoped (`tenantId: null`). Skipped once *any* real (non-system) user already exists, so it runs only on the very first startup.
+- A **Default** tenant (`slug: default`) and, inside it, an initial **`admin`** user holding the **`admin`** role. The tenant (by `slug`) and the user (by `username` scoped to that tenant) are checked independently, so either can be recreated without duplicating the other.
 
-The `admin` user's password is read from the `ADMIN_PASSWORD` environment variable:
+The hidden **system user** owns the bootstrap records (it cannot log in and is excluded from the user list).
+
+Passwords are read from environment variables, with the same generate-and-log-once fallback for each:
 
 ```env
+ROOT_PASSWORD=change-me-now-123
 ADMIN_PASSWORD=change-me-now-123
 ```
 
-If unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when the admin user is created — it is tied to the same first-startup-only bootstrap, so it is never regenerated on a later restart, and it cannot be recovered once the log line has scrolled past. Set `ADMIN_PASSWORD` explicitly before the first run for anything beyond local experimentation, or capture the generated password from the startup logs immediately and change it through the user API afterwards. The username is fixed to `admin`.
+If either is unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when that user is created — it cannot be recovered once the log line has scrolled past. Set both explicitly before the first run for anything beyond local experimentation, or capture the generated passwords from the startup logs immediately and change them through the user API afterwards. The usernames are fixed to `root` and `admin`.
 
 ### Authentication
 
@@ -196,7 +199,7 @@ All API routes except `POST /api/v1/auth/login` and `GET /api/v1/health` require
 
 **Flow**
 
-1. `POST /api/v1/auth/login` with `{ "username", "password" }`. On success the response sets two cookies and returns the current user (without the password hash):
+1. `POST /api/v1/auth/login` with `{ "username", "password", "tenantSlug"? }`. `tenantSlug` disambiguates a tenant-scoped user's username (unique only within its tenant) and must be omitted for a platform-scoped user (e.g. `root`). On success the response sets two cookies and returns the current user (without the password hash):
    - `a2flow_session` — HttpOnly, `SameSite=Lax` opaque session token. Only its SHA-256 hash is stored server-side.
    - `a2flow_csrf` — readable (non-HttpOnly), `SameSite=Lax` CSRF token.
 2. The browser sends both cookies automatically on subsequent requests. For state-changing requests (`POST`/`PUT`/`PATCH`/`DELETE`) the client must echo the CSRF cookie value in the `X-CSRF-Token` header (double-submit cookie defense). A mismatch or missing header returns `403 CSRF_FAILED`.
@@ -215,11 +218,11 @@ SESSION_IDLE_TIMEOUT_SECONDS=28800
 SESSION_COOKIE_SECURE=false
 ```
 
-The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `admin` user (see [Admin user](#admin-user)) on first run.
+The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `root` or Default-tenant `admin` user (see [Seeded users](#seeded-users)) on first run.
 
 ### Authorization (roles)
 
-Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every route-level role gate; the seeded `admin` user holds it. Two ownership-layer checks are a deliberate exception — see the bullet below. See the [Roles and authorization](../README.md#roles-and-authorization) section of the root README for the full matrix.
+Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every route-level role gate; the seeded `root` user holds it. Two ownership-layer checks are a deliberate exception — see the bullet below. See the [Roles and authorization](../README.md#roles-and-authorization) section of the root README for the full matrix.
 
 Two enforcement points:
 
@@ -258,10 +261,16 @@ cd backend && uv run uvicorn main:app --reload
 cd backend && uv run pytest
 ```
 
-No LLM API keys are required to run the tests. Pass `-v` for verbose output:
+Tests run in parallel across CPU cores by default via `pytest-xdist` (`-n auto`, set in `pyproject.toml`'s `addopts`). Worker count is capped at 50% of the host's CPU cores by a `pytest_xdist_auto_num_workers` hook in `tests/conftest.py` (mirroring `frontend/vitest.config.ts`'s `maxWorkers: "50%"`) — this leaves cores free for `frontend` tooling (e.g. `vitest`) running alongside it, since backend and frontend changes are often made together. No LLM API keys are required to run the tests. Pass `-v` for verbose output:
 
 ```bash
 cd backend && uv run pytest -v
+```
+
+`-n auto` is incompatible with `--pdb`/`-s`/`--trace` (pytest-xdist errors out since those need a single process). Disable parallelism for a debugging session with `-n0` (note: `-p no:xdist` alone does *not* work here, since `addopts` still passes `-n auto` and the plugin that understands `-n` would be disabled):
+
+```bash
+cd backend && uv run pytest -n0 -k some_test --pdb
 ```
 
 ## API

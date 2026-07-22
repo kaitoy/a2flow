@@ -13,6 +13,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.bootstrap import seed_system_user
 from models.user import SYSTEM_USER_ID
 from tests._envelope import assert_err, assert_ok
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant
 from tests.conftest import _install_auth_overrides
 
 
@@ -35,6 +36,7 @@ async def avatar_client() -> AsyncGenerator[AsyncClient, None]:
         await conn.run_sync(SQLModel.metadata.create_all)
     async with AsyncSession(mem_engine) as session:
         await seed_system_user(session)
+    await seed_tenant(mem_engine, DEFAULT_TEST_TENANT_ID)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine) as session:
@@ -60,6 +62,7 @@ _CREATE_BODY = {
     "lastName": "Smith",
     "password": "secret123abc",
     "email": "alice@example.com",
+    "tenantId": DEFAULT_TEST_TENANT_ID,
 }
 
 _PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"fake-image-payload"
@@ -209,6 +212,38 @@ async def test_delete_avatar_clears_marker(avatar_client: AsyncClient) -> None:
         code="NOT_FOUND",
         status=404,
     )
+
+
+# ---------- tenant isolation ----------
+
+
+async def test_get_avatar_other_tenant_returns_404_for_tenant_scoped_caller(
+    avatar_client: AsyncClient,
+) -> None:
+    """A tenant-scoped caller can't fetch another tenant's user's avatar, even if it exists."""
+    other_tenant = assert_ok(
+        await avatar_client.post(
+            "/api/v1/tenants",
+            json={"displayName": "Avatar Isolation", "name": "avatar-isolation"},
+        ),
+        status=201,
+    )
+    other_user = assert_ok(
+        await avatar_client.post(
+            "/api/v1/users",
+            json={**_CREATE_BODY, "tenantId": other_tenant["id"]},
+        ),
+        status=201,
+    )
+    await avatar_client.put(
+        f"/api/v1/users/{other_user['id']}/avatar",
+        files={"file": ("avatar.png", _PNG_BYTES, "image/png")},
+    )
+
+    response = await avatar_client.get(
+        f"/api/v1/users/{other_user['id']}/avatar", headers={"X-User-Roles": "admin"}
+    )
+    assert_err(response, code="NOT_FOUND", status=404)
 
 
 async def test_delete_avatar_without_upload_returns_404(

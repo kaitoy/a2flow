@@ -22,6 +22,7 @@ from dependencies import (
     CurrentUserDep,
     verify_csrf,
 )
+from models.constraints import TenantSlug
 from models.response import ApiResponse
 from models.user import UserRead
 
@@ -34,6 +35,11 @@ class LoginRequest(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     username: str
     password: str
+    #: Name (the URL-safe kebab-case identifier) of the tenant the user
+    #: belongs to. Required to disambiguate a tenant-scoped user's username
+    #: (unique only within its tenant); must be omitted for a platform-scoped
+    #: user (``root``, or any other super_admin).
+    tenant_name: TenantSlug | None = None
 
 
 def _cookie_secure() -> bool:
@@ -87,7 +93,9 @@ async def login(
     On success, sets the session and CSRF cookies. On failure, raises
     ``UnauthorizedError`` (HTTP 401) with a generic message.
     """
-    result = await service.login(body.username, body.password)
+    result = await service.login(
+        body.username, body.password, tenant_name=body.tenant_name
+    )
     _set_auth_cookies(
         response,
         session_token=result.session_token,

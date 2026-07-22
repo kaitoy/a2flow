@@ -23,7 +23,7 @@ from dependencies import (
     CurrentUserDep,
     PlanningSessionServiceDep,
 )
-from infrastructure.agent import with_user_id
+from infrastructure.agent import tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
 from models.planning_session import PlanningSession
 from models.response import ApiResponse
@@ -98,7 +98,13 @@ async def planning_session_agent(
     async with AsyncExitStack() as stack:
         try:
             await stack.enter_async_context(
-                advisory_lock(agent_run_key(APP_NAME, ps.user_id, input_data.thread_id))
+                advisory_lock(
+                    agent_run_key(
+                        tenant_app_name(APP_NAME, ps.tenant_id),
+                        ps.user_id,
+                        input_data.thread_id,
+                    )
+                )
             )
         except LockNotAcquiredError as exc:
             raise SessionRunInProgressError(input_data.thread_id) from exc

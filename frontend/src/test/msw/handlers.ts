@@ -5,6 +5,7 @@ const BASE = "http://localhost:8000";
 
 const SKILL_1 = {
   id: "skill-1",
+  tenantId: "tenant-1",
   name: "my-skill",
   repoUrl: "https://github.com/example/repo",
   repoPath: "",
@@ -33,8 +34,20 @@ const USER_1 = {
   updatedBy: "",
 };
 
+const TENANT_1 = {
+  id: "tenant-1",
+  displayName: "Acme Corp",
+  name: "acme-corp",
+  enabled: true,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 const WORKFLOW_1 = {
   id: "wf-1",
+  tenantId: "tenant-1",
   name: "my-workflow",
   description: null,
   agentSkillId: "skill-1",
@@ -48,6 +61,7 @@ const WORKFLOW_1 = {
 
 const WORKFLOW_SESSION_1 = {
   id: "ws-1",
+  tenantId: "tenant-1",
   sessionId: "executed-session-id",
   workflowId: "wf-1",
   workflowName: "My Workflow",
@@ -66,6 +80,7 @@ const WORKFLOW_SESSION_1 = {
 
 const PLANNING_SESSION_1 = {
   id: "ps-1",
+  tenantId: "tenant-1",
   sessionId: "planning-session-id",
   workflowId: "wf-1",
   agentSkillId: "skill-1",
@@ -108,6 +123,7 @@ const WORKFLOW_TASK_1 = {
 
 const APPROVAL_1 = {
   id: "appr-1",
+  tenantId: "tenant-1",
   workflowSessionId: "ws-1",
   workflowTaskId: null,
   title: "Deploy to production",
@@ -123,6 +139,7 @@ const APPROVAL_1 = {
 
 export const MCP_SERVER_1 = {
   id: "mcp-1",
+  tenantId: "tenant-1",
   name: "my-mcp-server",
   url: "https://mcp.example.com/mcp",
   headers: { Authorization: "Bearer secret" },
@@ -210,6 +227,16 @@ export const handlers = [
 
   http.delete(`${BASE}/api/v1/agent-skills/:skillId`, () => envelope(null)),
 
+  http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1])),
+
+  http.get(`${BASE}/api/v1/tenants/:tenantId`, () => envelope(TENANT_1)),
+
+  http.post(`${BASE}/api/v1/tenants`, () => envelope({ ...TENANT_1, id: "new-tenant-id" }, 201)),
+
+  http.patch(`${BASE}/api/v1/tenants/:tenantId`, () => envelope(TENANT_1)),
+
+  http.delete(`${BASE}/api/v1/tenants/:tenantId`, () => envelope(null)),
+
   http.get(`${BASE}/api/v1/users`, () => envelope([USER_1])),
 
   http.get(`${BASE}/api/v1/users/:userId`, () => envelope(USER_1)),
@@ -260,28 +287,7 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/planning-sessions/:psId/messages`, () => envelope([])),
 
-  http.post(`${BASE}/api/v1/workflows/:id/execute`, () =>
-    envelope(
-      {
-        id: "ws-1",
-        sessionId: "executed-session-id",
-        workflowId: "wf-1",
-        workflowName: "My Workflow",
-        workflowDescription: null,
-        agentSkillId: "skill-1",
-        agentSkillName: "My Skill",
-        agentSkillRepoUrl: "https://github.com/example/repo",
-        agentSkillRepoPath: "",
-        skillDir: "/tmp/skill",
-        userId: "user",
-        createdAt: "2026-01-01T00:00:00Z",
-        updatedAt: "2026-01-01T00:00:00Z",
-        createdBy: "",
-        updatedBy: "",
-      },
-      201
-    )
-  ),
+  http.post(`${BASE}/api/v1/workflows/:id/execute`, () => envelope(WORKFLOW_SESSION_1, 201)),
 
   http.get(`${BASE}/api/v1/workflow-sessions`, () => envelope([WORKFLOW_SESSION_1])),
 
@@ -349,6 +355,7 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/notifications/:notificationId`, ({ params }) =>
     envelope({
       id: params.notificationId as string,
+      tenantId: "tenant-1",
       userId: "user",
       type: "approval_request",
       title: "Plan ready for approval",

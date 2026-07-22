@@ -43,8 +43,8 @@ async def create_user(
 ) -> ApiResponse[UserRead]:
     """Create a new user and return it without the password hash.
 
-    Requires the ``admin`` role; creating a ``super_admin`` additionally
-    requires the acting user to be a super admin.
+    Requires the ``admin`` role; creating a ``super_admin`` or assigning a
+    ``tenantId`` additionally requires the acting user to be a super admin.
     """
     user = await service.create(body, acting_user=acting_user)
     return ApiResponse(meta=meta, data=UserRead.model_validate(user))
@@ -56,14 +56,20 @@ async def list_users(
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
+    acting_user: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[UserRead]]:
-    """Return a page of users without their password hashes."""
+    """Return a page of users without their password hashes.
+
+    A non-super-admin caller only ever sees users in their own tenant; a
+    super admin sees every user.
+    """
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
         sort=sort.sort,
         filters=filters.filters,
+        acting_user=acting_user,
     )
     return ApiResponse(meta=meta, data=[UserRead.model_validate(u) for u in items])
 
@@ -72,10 +78,15 @@ async def list_users(
 async def get_user(
     user_id: str,
     service: UserServiceDep,
+    acting_user: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[UserRead]:
-    """Return a single user without the password hash."""
-    user = await service.get(user_id)
+    """Return a single user without the password hash.
+
+    Raises a 404 (not a 403) if the user exists but belongs to a different
+    tenant than the caller, unless the caller is a super admin.
+    """
+    user = await service.get(user_id, acting_user=acting_user)
     return ApiResponse(meta=meta, data=UserRead.model_validate(user))
 
 
@@ -105,10 +116,15 @@ async def update_user(
 async def delete_user(
     user_id: str,
     service: UserServiceDep,
+    acting_user: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
-    """Delete a user by ID."""
-    await service.delete(user_id)
+    """Delete a user by ID.
+
+    Raises a 404 (not a 403) if the user exists but belongs to a different
+    tenant than the caller, unless the caller is a super admin.
+    """
+    await service.delete(user_id, acting_user=acting_user)
     return ApiResponse(meta=meta, data=None)
 
 
@@ -135,7 +151,7 @@ async def upload_user_avatar(
         content_type=file.content_type or "",
         acting_user=acting_user,
     )
-    user = await service.get(user_id)
+    user = await service.get(user_id, acting_user=acting_user)
     return ApiResponse(meta=meta, data=UserRead.model_validate(user))
 
 
@@ -143,12 +159,17 @@ async def upload_user_avatar(
 async def get_user_avatar(
     user_id: str,
     avatar_service: UserAvatarServiceDep,
+    service: UserServiceDep,
+    acting_user: CurrentUserDep,
 ) -> Response:
     """Return the user's custom avatar image bytes, or 404 if none is stored.
 
     Returns a raw image response (not the JSON envelope) so it can be used
-    directly as an ``<img>`` source.
+    directly as an ``<img>`` source. Raises a 404 if the owning user exists
+    but belongs to a different tenant than the caller, unless the caller is a
+    super admin.
     """
+    await service.get(user_id, acting_user=acting_user)
     avatar = await avatar_service.get(user_id)
     return Response(
         content=avatar.data,
@@ -176,5 +197,5 @@ async def delete_user_avatar(
     default avatar.
     """
     await avatar_service.remove(user_id, acting_user=acting_user)
-    user = await service.get(user_id)
+    user = await service.get(user_id, acting_user=acting_user)
     return ApiResponse(meta=meta, data=UserRead.model_validate(user))

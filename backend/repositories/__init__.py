@@ -15,6 +15,7 @@ from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
 from .notification import NotificationRepository, SqlNotificationRepository
 from .planning_session import PlanningSessionRepository, SqlPlanningSessionRepository
 from .secret import SecretRepository, SqlSecretRepository
+from .tenant import SqlTenantRepository, TenantRepository
 from .user import SqlUserRepository, UserRepository
 from .user_avatar import SqlUserAvatarRepository, UserAvatarRepository
 from .workflow import SqlWorkflowRepository, WorkflowRepository
@@ -47,12 +48,14 @@ __all__ = [
     "SqlNotificationRepository",
     "SqlPlanningSessionRepository",
     "SqlSecretRepository",
+    "SqlTenantRepository",
     "SqlUserAvatarRepository",
     "SqlUserRepository",
     "SqlWorkflowRepository",
     "SqlWorkflowSessionRepository",
     "SqlWorkflowTaskRepository",
     "SqlWorkflowTaskTemplateRepository",
+    "TenantRepository",
     "UnauthorizedError",
     "UniqueViolationError",
     "UserAvatarRepository",

@@ -22,10 +22,11 @@ from models.auth_session import AuthSession
 from models.user import SYSTEM_USER_ID, User
 from repositories.auth_session import SqlAuthSessionRepository
 from repositories.exceptions import UnauthorizedError
+from repositories.tenant import SqlTenantRepository
 from repositories.user import SqlUserRepository
 from services.auth import AuthService
 from tests._envelope import assert_err, assert_ok
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_users
 from tests.conftest import AUTH_PASSWORD, AUTH_USERNAME
 
 
@@ -34,7 +35,11 @@ async def _login(client: AsyncClient) -> Any:
     return assert_ok(
         await client.post(
             "/api/v1/auth/login",
-            json={"username": AUTH_USERNAME, "password": AUTH_PASSWORD},
+            json={
+                "username": AUTH_USERNAME,
+                "password": AUTH_PASSWORD,
+                "tenantName": DEFAULT_TEST_TENANT_ID,
+            },
         )
     )
 
@@ -43,7 +48,11 @@ async def _login(client: AsyncClient) -> Any:
 async def test_login_success_sets_cookies(auth_client: AsyncClient) -> None:
     response = await auth_client.post(
         "/api/v1/auth/login",
-        json={"username": AUTH_USERNAME, "password": AUTH_PASSWORD},
+        json={
+            "username": AUTH_USERNAME,
+            "password": AUTH_PASSWORD,
+            "tenantName": DEFAULT_TEST_TENANT_ID,
+        },
     )
     data = assert_ok(response)
     assert data["username"] == AUTH_USERNAME
@@ -59,7 +68,11 @@ async def test_login_wrong_password_is_unauthenticated(
     assert_err(
         await auth_client.post(
             "/api/v1/auth/login",
-            json={"username": AUTH_USERNAME, "password": "wrong-password-000"},
+            json={
+                "username": AUTH_USERNAME,
+                "password": "wrong-password-000",
+                "tenantName": DEFAULT_TEST_TENANT_ID,
+            },
         ),
         code="UNAUTHENTICATED",
         status=401,
@@ -71,7 +84,11 @@ async def test_login_unknown_user_is_unauthenticated(auth_client: AsyncClient) -
     assert_err(
         await auth_client.post(
             "/api/v1/auth/login",
-            json={"username": "nobody", "password": AUTH_PASSWORD},
+            json={
+                "username": "nobody",
+                "password": AUTH_PASSWORD,
+                "tenantName": DEFAULT_TEST_TENANT_ID,
+            },
         ),
         code="UNAUTHENTICATED",
         status=401,
@@ -172,6 +189,7 @@ async def test_authenticate_expires_idle_session(
                 password=hash_password(AUTH_PASSWORD),
                 email="idle@test.local",
                 enabled=True,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )
@@ -180,9 +198,13 @@ async def test_authenticate_expires_idle_session(
 
     async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
         service = AuthService(
-            SqlUserRepository(session), SqlAuthSessionRepository(session)
+            SqlUserRepository(session),
+            SqlAuthSessionRepository(session),
+            SqlTenantRepository(session),
         )
-        result = await service.login("idle", AUTH_PASSWORD)
+        result = await service.login(
+            "idle", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+        )
         # A fresh token authenticates fine.
         assert (await service.authenticate(result.session_token)).username == "idle"
 

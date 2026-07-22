@@ -19,7 +19,7 @@ from dependencies import (
     SortDep,
     WorkflowSessionServiceDep,
 )
-from infrastructure.agent import keep_a2ui_context, with_user_id
+from infrastructure.agent import keep_a2ui_context, tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
 from models.response import ApiResponse
 from models.workflow_session import WorkflowSession
@@ -177,7 +177,13 @@ async def workflow_session_agent(
         # client-side "already running" guard can see across users.
         try:
             await stack.enter_async_context(
-                advisory_lock(agent_run_key(APP_NAME, ws.user_id, input_data.thread_id))
+                advisory_lock(
+                    agent_run_key(
+                        tenant_app_name(APP_NAME, ws.tenant_id),
+                        ws.user_id,
+                        input_data.thread_id,
+                    )
+                )
             )
         except LockNotAcquiredError as exc:
             raise SessionRunInProgressError(input_data.thread_id) from exc

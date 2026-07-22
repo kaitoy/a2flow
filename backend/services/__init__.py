@@ -7,6 +7,7 @@ from .mcp_server import MCPServerService
 from .notification import NotificationService
 from .planning_session import PlanningSessionService
 from .secret import SecretService
+from .tenant import TenantService
 from .user import UserService
 from .user_avatar import UserAvatarService
 from .workflow import WorkflowService
@@ -26,6 +27,7 @@ __all__ = [
     "NotificationService",
     "PlanningSessionService",
     "SecretService",
+    "TenantService",
     "UserAvatarService",
     "UserService",
     "WorkflowPlanningService",

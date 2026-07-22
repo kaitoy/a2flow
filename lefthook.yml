@@ -19,6 +19,13 @@ pre-commit:
       glob: "backend/*.py"
       run: uv run mypy .
 
+    # Runs in parallel across CPU cores via pytest-xdist (`-n auto` in
+    # backend/pyproject.toml's [tool.pytest.ini_options] addopts, worker
+    # count capped at 50% of CPU cores by a pytest_xdist_auto_num_workers
+    # hook in backend/tests/conftest.py), not just alongside the other
+    # lefthook jobs below. The 50% cap leaves cores free for frontend-vitest
+    # (capped the same way, see frontend/vitest.config.ts) when a commit
+    # touches both backend and frontend files in the same pre-commit run.
     - name: backend-pytest
       root: backend/
       glob: "backend/*.py"

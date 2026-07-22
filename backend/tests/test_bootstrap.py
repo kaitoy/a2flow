@@ -1,13 +1,17 @@
 """Tests for the startup bootstrap helpers in ``infrastructure.bootstrap``.
 
-Covers :func:`seed_admin_user`: it creates the initial ``admin`` user on an
-empty database, honours the ``ADMIN_PASSWORD`` environment variable (or
-generates and logs a random one exactly once when unset), and is a no-op once
-any real (non-system) user already exists.
+Covers :func:`seed_root_user` (the platform-wide super_admin, ``username="root"``)
+and :func:`seed_default_tenant_and_admin_user` (the seeded ``Default`` tenant
+plus its tenant-scoped ``admin`` user): each honours its own environment
+variable (``ROOT_PASSWORD`` / ``ADMIN_PASSWORD``) or generates and logs a
+random password exactly once when unset, and each is independently
+idempotent. Also covers the ordering contract between the two — ``root`` must
+be seeded first, or its "any real user exists" skip check would wrongly fire
+once the Default-tenant admin exists.
 """
 
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, get_args
 
 import pytest
@@ -17,9 +21,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.bootstrap import seed_admin_user, seed_system_user
+from infrastructure.bootstrap import (
+    seed_default_tenant_and_admin_user,
+    seed_root_user,
+    seed_system_user,
+)
 from infrastructure.password import verify_password
 from models.constraints import Password
+from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 
 _PASSWORD_CONSTRAINTS = get_args(Password)[1]
@@ -59,12 +68,14 @@ async def _real_users(session: AsyncSession) -> list[User]:
 
 
 async def _seed_with_generated_password(
-    engine: AsyncEngine, caplog: pytest.LogCaptureFixture
+    engine: AsyncEngine,
+    caplog: pytest.LogCaptureFixture,
+    seed: Callable[[AsyncSession], Awaitable[None]],
 ) -> str:
-    """Run ``seed_admin_user`` and return the password generated for the log."""
+    """Run ``seed`` and return the password generated for the log."""
     with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
         async with AsyncSession(engine) as session:
-            await seed_admin_user(session)
+            await seed(session)
     record = caplog.records[-1]
     assert isinstance(record.args, tuple)
     password = record.args[0]
@@ -72,104 +83,112 @@ async def _seed_with_generated_password(
     return password
 
 
-async def test_seed_admin_user_creates_admin(engine: AsyncEngine) -> None:
+# ---------- seed_root_user ----------
+
+
+async def test_seed_root_user_creates_root(engine: AsyncEngine) -> None:
     async with AsyncSession(engine) as session:
-        await seed_admin_user(session)
+        await seed_root_user(session)
     async with AsyncSession(engine) as session:
         users = await _real_users(session)
     assert len(users) == 1
-    assert users[0].username == "admin"
+    assert users[0].username == "root"
     assert users[0].enabled is True
     assert users[0].created_by == SYSTEM_USER_ID
 
 
-async def test_seed_admin_user_grants_super_admin_role(engine: AsyncEngine) -> None:
-    """The seeded admin holds super_admin so it can manage users and roles."""
+async def test_seed_root_user_grants_super_admin_role(engine: AsyncEngine) -> None:
+    """The seeded root user holds super_admin so it can manage users and roles."""
     async with AsyncSession(engine) as session:
-        await seed_admin_user(session)
+        await seed_root_user(session)
     async with AsyncSession(engine) as session:
-        admin = (await _real_users(session))[0]
-    assert admin.roles == [Role.super_admin.value]
+        root = (await _real_users(session))[0]
+    assert root.roles == [Role.super_admin.value]
+    assert root.tenant_id is None
 
 
-async def test_seed_admin_user_honours_env_password(
+async def test_seed_root_user_honours_env_password(
     engine: AsyncEngine,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    monkeypatch.setenv("ADMIN_PASSWORD", "super-secret-pw")
+    monkeypatch.setenv("ROOT_PASSWORD", "super-secret-pw")
     with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
         async with AsyncSession(engine) as session:
-            await seed_admin_user(session)
+            await seed_root_user(session)
     async with AsyncSession(engine) as session:
-        admin = (await _real_users(session))[0]
-    assert verify_password("super-secret-pw", admin.password)
+        root = (await _real_users(session))[0]
+    assert verify_password("super-secret-pw", root.password)
     assert caplog.records == []
 
 
-async def test_seed_admin_user_generates_random_password_when_unset(
+async def test_seed_root_user_generates_random_password_when_unset(
     engine: AsyncEngine,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
-    password = await _seed_with_generated_password(engine, caplog)
+    monkeypatch.delenv("ROOT_PASSWORD", raising=False)
+    password = await _seed_with_generated_password(engine, caplog, seed_root_user)
     async with AsyncSession(engine) as session:
-        admin = (await _real_users(session))[0]
-    assert verify_password(password, admin.password)
-    assert "ADMIN_PASSWORD not set" in caplog.records[-1].getMessage()
+        root = (await _real_users(session))[0]
+    assert verify_password(password, root.password)
+    assert "ROOT_PASSWORD not set" in caplog.records[-1].getMessage()
 
 
-async def test_seed_admin_user_generated_password_meets_length_bounds(
+async def test_seed_root_user_generated_password_meets_length_bounds(
     engine: AsyncEngine,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
-    password = await _seed_with_generated_password(engine, caplog)
+    monkeypatch.delenv("ROOT_PASSWORD", raising=False)
+    password = await _seed_with_generated_password(engine, caplog, seed_root_user)
     assert _PASSWORD_CONSTRAINTS.min_length <= len(password)
     assert len(password) <= _PASSWORD_CONSTRAINTS.max_length
 
 
-async def test_seed_admin_user_two_fresh_databases_get_different_passwords(
+async def test_seed_root_user_two_fresh_databases_get_different_passwords(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+    monkeypatch.delenv("ROOT_PASSWORD", raising=False)
     engine_a = await _fresh_seeded_engine()
     engine_b = await _fresh_seeded_engine()
     try:
-        password_a = await _seed_with_generated_password(engine_a, caplog)
+        password_a = await _seed_with_generated_password(
+            engine_a, caplog, seed_root_user
+        )
         caplog.clear()
-        password_b = await _seed_with_generated_password(engine_b, caplog)
+        password_b = await _seed_with_generated_password(
+            engine_b, caplog, seed_root_user
+        )
     finally:
         await engine_a.dispose()
         await engine_b.dispose()
     assert password_a != password_b
 
 
-async def test_seed_admin_user_logs_generated_password_only_once(
+async def test_seed_root_user_logs_generated_password_only_once(
     engine: AsyncEngine,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+    monkeypatch.delenv("ROOT_PASSWORD", raising=False)
     with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
         async with AsyncSession(engine) as session:
-            await seed_admin_user(session)
-            await seed_admin_user(session)
+            await seed_root_user(session)
+            await seed_root_user(session)
     assert len(caplog.records) == 1
 
 
-async def test_seed_admin_user_is_idempotent(engine: AsyncEngine) -> None:
+async def test_seed_root_user_is_idempotent(engine: AsyncEngine) -> None:
     async with AsyncSession(engine) as session:
-        await seed_admin_user(session)
-        await seed_admin_user(session)
+        await seed_root_user(session)
+        await seed_root_user(session)
     async with AsyncSession(engine) as session:
         users = await _real_users(session)
     assert len(users) == 1
 
 
-async def test_seed_admin_user_skips_when_real_user_exists(
+async def test_seed_root_user_skips_when_real_user_exists(
     engine: AsyncEngine,
 ) -> None:
     async with AsyncSession(engine) as session:
@@ -181,13 +200,252 @@ async def test_seed_admin_user_skips_when_real_user_exists(
                 last_name="Smith",
                 password="hash",
                 email="alice@example.com",
+                roles=[Role.super_admin.value],
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )
         )
         await session.commit()
-        await seed_admin_user(session)
+        await seed_root_user(session)
     async with AsyncSession(engine) as session:
         users = await _real_users(session)
     assert len(users) == 1
     assert users[0].username == "alice"
+
+
+# ---------- seed_default_tenant_and_admin_user ----------
+
+
+async def _default_tenant(session: AsyncSession) -> Tenant | None:
+    stmt = select(Tenant).where(col(Tenant.name) == "default")
+    return (await session.exec(stmt)).first()
+
+
+async def test_seed_default_tenant_and_admin_user_creates_tenant(
+    engine: AsyncEngine,
+) -> None:
+    async with AsyncSession(engine) as session:
+        await seed_default_tenant_and_admin_user(session)
+    async with AsyncSession(engine) as session:
+        tenant = await _default_tenant(session)
+    assert tenant is not None
+    assert tenant.display_name == "Default"
+    assert tenant.enabled is True
+    assert tenant.created_by == SYSTEM_USER_ID
+
+
+async def test_seed_default_tenant_and_admin_user_creates_admin(
+    engine: AsyncEngine,
+) -> None:
+    async with AsyncSession(engine) as session:
+        await seed_default_tenant_and_admin_user(session)
+    async with AsyncSession(engine) as session:
+        users = await _real_users(session)
+        tenant = await _default_tenant(session)
+    assert tenant is not None
+    assert len(users) == 1
+    assert users[0].username == "admin"
+    assert users[0].roles == [Role.admin.value]
+    assert users[0].tenant_id == tenant.id
+
+
+async def test_seed_default_tenant_and_admin_user_honours_env_password(
+    engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "super-secret-pw")
+    with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
+        async with AsyncSession(engine) as session:
+            await seed_default_tenant_and_admin_user(session)
+    async with AsyncSession(engine) as session:
+        admin = (await _real_users(session))[0]
+    assert verify_password("super-secret-pw", admin.password)
+    assert caplog.records == []
+
+
+async def test_seed_default_tenant_and_admin_user_generates_random_password_when_unset(
+    engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+    password = await _seed_with_generated_password(
+        engine, caplog, seed_default_tenant_and_admin_user
+    )
+    async with AsyncSession(engine) as session:
+        admin = (await _real_users(session))[0]
+    assert verify_password(password, admin.password)
+    assert "ADMIN_PASSWORD not set" in caplog.records[-1].getMessage()
+
+
+async def test_seed_default_tenant_and_admin_user_logs_generated_password_only_once(
+    engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+    with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
+        async with AsyncSession(engine) as session:
+            await seed_default_tenant_and_admin_user(session)
+            await seed_default_tenant_and_admin_user(session)
+    assert len(caplog.records) == 1
+
+
+async def test_seed_default_tenant_and_admin_user_is_idempotent(
+    engine: AsyncEngine,
+) -> None:
+    async with AsyncSession(engine) as session:
+        await seed_default_tenant_and_admin_user(session)
+        await seed_default_tenant_and_admin_user(session)
+    async with AsyncSession(engine) as session:
+        users = await _real_users(session)
+        stmt = select(Tenant).where(col(Tenant.name) == "default")
+        tenants = list((await session.exec(stmt)).all())
+    assert len(users) == 1
+    assert len(tenants) == 1
+
+
+async def test_seed_default_tenant_and_admin_user_reuses_preexisting_tenant(
+    engine: AsyncEngine,
+) -> None:
+    async with AsyncSession(engine) as session:
+        session.add(
+            Tenant(
+                id="preexisting-default",
+                display_name="Default",
+                name="default",
+                enabled=True,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+        await seed_default_tenant_and_admin_user(session)
+    async with AsyncSession(engine) as session:
+        stmt = select(Tenant).where(col(Tenant.name) == "default")
+        tenants = list((await session.exec(stmt)).all())
+        users = await _real_users(session)
+    assert len(tenants) == 1
+    assert tenants[0].id == "preexisting-default"
+    assert users[0].tenant_id == "preexisting-default"
+
+
+async def test_seed_default_tenant_and_admin_user_creates_new_admin_alongside_legacy_platform_admin(
+    engine: AsyncEngine,
+) -> None:
+    """A pre-existing platform-scoped 'admin' does not block the tenant-scoped one.
+
+    Simulates upgrading a deployment that ran the old single-seed bootstrap
+    (a platform-scoped, ``tenant_id IS NULL`` legacy super_admin 'admin'):
+    the admin-seed check is scoped to the Default tenant's id, so the legacy
+    user is left completely untouched and a *new*, Default-tenant-scoped
+    'admin' is created alongside it.
+    """
+    async with AsyncSession(engine) as session:
+        session.add(
+            User(
+                id="legacy-admin",
+                username="admin",
+                first_name="Admin",
+                last_name="User",
+                password="hash",
+                email="admin@localhost",
+                roles=[Role.super_admin.value],
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+        await seed_default_tenant_and_admin_user(session)
+    async with AsyncSession(engine) as session:
+        tenant = await _default_tenant(session)
+        users = await _real_users(session)
+    assert tenant is not None
+    assert len(users) == 2
+    legacy = next(u for u in users if u.id == "legacy-admin")
+    assert legacy.roles == [Role.super_admin.value]
+    assert legacy.tenant_id is None
+    new_admin = next(u for u in users if u.id != "legacy-admin")
+    assert new_admin.username == "admin"
+    assert new_admin.roles == [Role.admin.value]
+    assert new_admin.tenant_id == tenant.id
+
+
+async def test_seed_default_tenant_and_admin_user_skips_when_admin_already_in_default_tenant(
+    engine: AsyncEngine,
+) -> None:
+    """The admin-seed skip check is scoped to the Default tenant, not global."""
+    async with AsyncSession(engine) as session:
+        tenant = Tenant(
+            display_name="Default",
+            name="default",
+            enabled=True,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        tenant_id = tenant.id
+        session.add(tenant)
+        await session.commit()
+        session.add(
+            User(
+                id="existing-tenant-admin",
+                username="admin",
+                first_name="Admin",
+                last_name="User",
+                password="hash",
+                email="admin@localhost",
+                roles=[Role.admin.value],
+                tenant_id=tenant_id,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+        await seed_default_tenant_and_admin_user(session)
+    async with AsyncSession(engine) as session:
+        users = await _real_users(session)
+    assert len(users) == 1
+    assert users[0].id == "existing-tenant-admin"
+
+
+# ---------- ordering contract between seed_root_user and seed_default_tenant_and_admin_user ----------
+
+
+async def test_seed_root_user_then_default_tenant_admin_user_together(
+    engine: AsyncEngine,
+) -> None:
+    async with AsyncSession(engine) as session:
+        await seed_root_user(session)
+        await seed_default_tenant_and_admin_user(session)
+    async with AsyncSession(engine) as session:
+        users = await _real_users(session)
+        tenant = await _default_tenant(session)
+    assert tenant is not None
+    usernames = {user.username for user in users}
+    assert usernames == {"root", "admin"}
+    root = next(user for user in users if user.username == "root")
+    admin = next(user for user in users if user.username == "admin")
+    assert root.roles == [Role.super_admin.value]
+    assert root.tenant_id is None
+    assert admin.roles == [Role.admin.value]
+    assert admin.tenant_id == tenant.id
+
+
+async def test_seed_default_tenant_admin_user_before_root_user_prevents_root(
+    engine: AsyncEngine,
+) -> None:
+    """Regression guard for the ordering contract: root must be seeded first.
+
+    If the Default-tenant admin were seeded before root, it would count as
+    the "real user" that makes ``seed_root_user``'s skip check fire, and
+    root would never be created.
+    """
+    async with AsyncSession(engine) as session:
+        await seed_default_tenant_and_admin_user(session)
+        await seed_root_user(session)
+    async with AsyncSession(engine) as session:
+        users = await _real_users(session)
+    usernames = {user.username for user in users}
+    assert usernames == {"admin"}
+    assert "root" not in usernames

@@ -25,11 +25,12 @@ from enum import StrEnum
 from pydantic import model_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import Index, UniqueConstraint
-from sqlmodel import SQLModel
+from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
 from models.constraints import SecretName, SecretValue, VaultKey, VaultMount, VaultPath
+from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -94,7 +95,7 @@ class SecretCreate(SecretUpdate):
         return self
 
 
-class Secret(SecretCreate, BaseEntity, table=True):
+class Secret(SecretCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted secret.
 
     The ``value`` column holds Fernet ciphertext for ``local`` secrets and is
@@ -103,9 +104,10 @@ class Secret(SecretCreate, BaseEntity, table=True):
     """
 
     __tablename__ = "secrets"
+    tenant_id: str = Field(foreign_key="tenants.id", ondelete="RESTRICT")
     __table_args__ = (
-        UniqueConstraint("name", name="uq_secrets_name"),
-        Index("ix_secrets_name", "name"),
+        UniqueConstraint("tenant_id", "name", name="uq_secrets_tenant_id_name"),
+        Index("ix_secrets_tenant_id_name", "tenant_id", "name"),
     )
 
 

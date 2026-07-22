@@ -31,7 +31,7 @@ from models.workflow_task import (
     WorkflowTaskToolBinding,
 )
 from repositories.exceptions import McpConnectionError
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
 @pytest_asyncio.fixture()
@@ -48,6 +48,7 @@ async def engine(
     async with eng.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(eng)
+    await seed_tenant(eng)
 
     monkeypatch.setattr("infrastructure.database.engine", eng)
     yield eng
@@ -72,6 +73,7 @@ async def _seed_server(
             name=name,
             url=url,
             headers=headers or {},
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )
@@ -94,6 +96,7 @@ async def _seed_session(eng: AsyncEngine, *, session_id: str = "sess-abc") -> st
             agent_skill_repo_path=".",
             skill_dir="/tmp/skill",
             user_id=SYSTEM_USER_ID,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )
@@ -116,6 +119,7 @@ async def _seed_task(
             workflow_session_id=ws_id,
             title="Step",
             status=status,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )
@@ -309,7 +313,13 @@ async def test_call_validates_against_union_of_in_progress_tasks(
 # ---------- list_mcp_tools ----------
 
 
+async def test_list_mcp_tools_without_session_errors(engine: AsyncEngine) -> None:
+    result = await list_mcp_tools(_ctx("unknown-session"))
+    assert "error" in result
+
+
 async def test_list_mcp_tools_empty_registry(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
     result = await list_mcp_tools(_ctx())
     assert result == {"servers": []}
 
@@ -317,6 +327,7 @@ async def test_list_mcp_tools_empty_registry(engine: AsyncEngine) -> None:
 async def test_list_mcp_tools_aggregates_and_isolates_failures(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    await _seed_session(engine)
     good_id = await _seed_server(engine, name="good", url="https://good/mcp")
     bad_id = await _seed_server(engine, name="bad", url="https://bad/mcp")
 
@@ -359,6 +370,7 @@ async def _seed_local_secret(eng: AsyncEngine, name: str, value: str) -> None:
                 name=name,
                 type=SecretType.local,
                 value=get_secret_cipher().encrypt(value),
+                tenant_id=DEFAULT_TEST_TENANT_ID,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )
@@ -424,6 +436,7 @@ async def test_call_with_missing_secret_returns_error(
 async def test_list_mcp_tools_isolates_secret_resolution_failure(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    await _seed_session(engine)
     await _seed_local_secret(engine, "good-token", "tok-1")
     good_id = await _seed_server(
         engine,

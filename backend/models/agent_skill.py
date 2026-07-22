@@ -18,6 +18,7 @@ from models.constraints import (
     RepoPath,
     SecretName,
 )
+from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -70,7 +71,7 @@ class AgentSkillCreate(AgentSkillUpdate):
     repo_path: RepoPath = ""
 
 
-class AgentSkill(AgentSkillCreate, BaseEntity, table=True):
+class AgentSkill(AgentSkillCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted agent skill referencing a Git repository of ADK tools.
 
     The sync fields below are server-managed: they are declared on the table
@@ -88,14 +89,15 @@ class AgentSkill(AgentSkillCreate, BaseEntity, table=True):
 
     __tablename__ = "agent_skills"
 
+    tenant_id: str = Field(foreign_key="tenants.id", ondelete="RESTRICT")
     sync_status: SkillSyncStatus = Field(default=SkillSyncStatus.pending)
     sync_error: str | None = None
     commit_sha: str | None = None
     synced_at: datetime | None = Field(default=None, sa_type=TZDateTime)
 
     __table_args__ = (
-        UniqueConstraint("name", name="uq_agent_skills_name"),
-        Index("ix_agent_skills_name", "name"),
+        UniqueConstraint("tenant_id", "name", name="uq_agent_skills_tenant_id_name"),
+        Index("ix_agent_skills_tenant_id_name", "tenant_id", "name"),
     )
 
     @field_serializer("synced_at", when_used="json")

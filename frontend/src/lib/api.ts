@@ -31,6 +31,9 @@ import type {
   SecretUpdate,
   Session as SessionModel,
   SkillSyncStatus,
+  TenantCreate,
+  Tenant as TenantModel,
+  TenantUpdate,
   ToolBinding,
   UserCreate,
   UserRead as UserReadModel,
@@ -51,6 +54,7 @@ import {
   zCreateAgentSkillApiV1AgentSkillsPostResponse,
   zCreateMcpServerApiV1McpServersPostResponse,
   zCreateSecretApiV1SecretsPostResponse,
+  zCreateTenantApiV1TenantsPostResponse,
   zCreateUserApiV1UsersPostResponse,
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zCreateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPostResponse,
@@ -59,6 +63,7 @@ import {
   zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse,
   zDeleteSecretApiV1SecretsSecretIdDeleteResponse,
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
+  zDeleteTenantApiV1TenantsTenantIdDeleteResponse,
   zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse,
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
@@ -75,6 +80,7 @@ import {
   zGetSecretApiV1SecretsSecretIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
+  zGetTenantApiV1TenantsTenantIdGetResponse,
   zGetUserApiV1UsersUserIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
   zGetWorkflowPlanningSessionApiV1WorkflowsWorkflowIdPlanningSessionGetResponse,
@@ -89,6 +95,7 @@ import {
   zListNotificationsApiV1NotificationsGetResponse,
   zListSecretsApiV1SecretsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
+  zListTenantsApiV1TenantsGetResponse,
   zListUsersApiV1UsersGetResponse,
   zListWorkflowSessionsApiV1WorkflowSessionsGetResponse,
   zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse,
@@ -106,12 +113,14 @@ import {
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
   zUpdateSecretApiV1SecretsSecretIdPatchResponse,
+  zUpdateTenantApiV1TenantsTenantIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
   zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
   zUpdateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdPatchResponse,
   zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse,
 } from "@/generated/api/zod.gen";
+import { store } from "@/store";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import { A2UI_CATALOG_ID } from "./a2uiCatalogId";
 import logger from "./logger";
@@ -128,6 +137,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 const CSRF_COOKIE_NAME = "a2flow_csrf";
 /** Header the backend expects the CSRF cookie value echoed in on unsafe requests. */
 const CSRF_HEADER_NAME = "X-CSRF-Token";
+/**
+ * Header carrying the tenant a super_admin has selected to act as (see the
+ * tenant switcher in `AppHeader`). Ignored server-side for a tenant-scoped
+ * user, so it's safe to always attach when a selection exists.
+ */
+const TENANT_HEADER_NAME = "X-Tenant-Id";
 /** HTTP methods that mutate state and therefore require a CSRF token. */
 const UNSAFE_METHODS = new Set(["post", "put", "patch", "delete"]);
 
@@ -151,6 +166,8 @@ apiClient.interceptors.request.use((config) => {
     const token = readCookie(CSRF_COOKIE_NAME);
     if (token) config.headers.set(CSRF_HEADER_NAME, token);
   }
+  const tenantId = store.getState().auth.selectedTenantId;
+  if (tenantId) config.headers.set(TENANT_HEADER_NAME, tenantId);
   return config;
 });
 
@@ -240,6 +257,7 @@ export type Approval = WithAudit<ApprovalModel>;
 export type McpServer = WithAudit<McpServerModel>;
 export type Notification = WithAudit<NotificationModel>;
 export type Secret = WithAudit<SecretModel>;
+export type Tenant = WithAudit<TenantModel>;
 export type User = WithAudit<UserReadModel>;
 export type PlanningSession = WithAudit<PlanningSessionModel>;
 export type Workflow = WithAudit<WorkflowModel>;
@@ -266,6 +284,8 @@ export type {
   SecretType,
   SecretUpdate,
   SkillSyncStatus,
+  TenantCreate,
+  TenantUpdate,
   ToolBinding,
   UserCreate,
   UserUpdate,
@@ -328,12 +348,22 @@ function listConfig({
 }
 
 /**
- * Authenticate with username and password. On success the backend sets the
- * session and CSRF cookies and returns the logged-in user.
+ * Authenticate with username, password, and optional tenant name. On success
+ * the backend sets the session and CSRF cookies and returns the logged-in
+ * user. `tenantName` disambiguates a tenant-scoped user's username and must
+ * be omitted for a platform-scoped user (e.g. `root`).
  */
-export async function login(username: string, password: string): Promise<User> {
+export async function login(
+  username: string,
+  password: string,
+  tenantName?: string
+): Promise<User> {
   return fetchEnvelope(
-    apiClient.post("/api/v1/auth/login", { username, password }),
+    apiClient.post("/api/v1/auth/login", {
+      username,
+      password,
+      tenantName: tenantName || undefined,
+    }),
     zLoginApiV1AuthLoginPostResponse
   ) as Promise<User>;
 }
@@ -539,6 +569,46 @@ export async function deleteSecret(id: string): Promise<void> {
   await fetchEnvelope(
     apiClient.delete(`/api/v1/secrets/${encodeURIComponent(id)}`),
     zDeleteSecretApiV1SecretsSecretIdDeleteResponse
+  );
+}
+
+/** List tenants with optional pagination, sort, and filters. */
+export async function listTenants(query: ListQuery = {}): Promise<Tenant[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/tenants", listConfig(query)),
+    zListTenantsApiV1TenantsGetResponse
+  ) as Promise<Tenant[]>;
+}
+
+/** Fetch a single tenant by ID. */
+export async function getTenant(id: string): Promise<Tenant> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/tenants/${encodeURIComponent(id)}`),
+    zGetTenantApiV1TenantsTenantIdGetResponse
+  ) as Promise<Tenant>;
+}
+
+/** Create a new tenant. */
+export async function createTenant(body: TenantCreate): Promise<Tenant> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/tenants", body),
+    zCreateTenantApiV1TenantsPostResponse
+  ) as Promise<Tenant>;
+}
+
+/** Apply a partial update to a tenant. */
+export async function updateTenant(id: string, body: TenantUpdate): Promise<Tenant> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/tenants/${encodeURIComponent(id)}`, body),
+    zUpdateTenantApiV1TenantsTenantIdPatchResponse
+  ) as Promise<Tenant>;
+}
+
+/** Delete a tenant by ID. Fails while any user remains assigned to it. */
+export async function deleteTenant(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/tenants/${encodeURIComponent(id)}`),
+    zDeleteTenantApiV1TenantsTenantIdDeleteResponse
   );
 }
 
@@ -1041,21 +1111,27 @@ export async function resolveApproval(
 }
 
 /**
- * HttpAgent variant that sends the auth session cookie and the CSRF token with
- * each streaming request. The agent endpoints are POSTs, so they need both the
- * cookie (`credentials: "include"`) and the double-submit `X-CSRF-Token` header.
+ * HttpAgent variant that sends the auth session cookie, the CSRF token, and
+ * the selected tenant header with each streaming request. The agent endpoints
+ * are POSTs, so they need both the cookie (`credentials: "include"`) and the
+ * double-submit `X-CSRF-Token` header; a super_admin also needs `X-Tenant-Id`
+ * to reach these tenant-scoped endpoints at all -- unlike the axios-based
+ * calls above, these bypass `apiClient`'s interceptor entirely, so the header
+ * must be attached here too.
  */
 class CredentialedHttpAgent extends HttpAgent {
-  /** Augment the base fetch config with credentials and the CSRF header. */
+  /** Augment the base fetch config with credentials, CSRF, and tenant headers. */
   protected requestInit(input: Parameters<HttpAgent["requestInit"]>[0]): RequestInit {
     const init = super.requestInit(input);
     const csrf = readCookie(CSRF_COOKIE_NAME);
+    const tenantId = store.getState().auth.selectedTenantId;
     return {
       ...init,
       credentials: "include",
       headers: {
         ...(init.headers as Record<string, string> | undefined),
         ...(csrf ? { [CSRF_HEADER_NAME]: csrf } : {}),
+        ...(tenantId ? { [TENANT_HEADER_NAME]: tenantId } : {}),
       },
     };
   }

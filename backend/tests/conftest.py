@@ -1,3 +1,7 @@
+import importlib
+import math
+import os
+import pkgutil
 from collections.abc import AsyncGenerator, AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,12 +15,55 @@ from google.adk.sessions import InMemorySessionService
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.orm import configure_mappers
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+import models
 from config import Settings, get_settings
 from models.user import SYSTEM_USER_ID, User
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+
+# Import every model submodule (mirroring alembic/env.py) and configure
+# SQLAlchemy's mappers before any test runs. Without this, whichever test
+# happens to be first to build a User via ``User.model_construct(...)`` (the
+# header-driven auth override below) and read a mapped attribute off it --
+# ``id``, ``tenant_id``, anything -- crashes with a cryptic
+# ``AttributeError: 'NoneType' object has no attribute 'supports_population'``:
+# ``model_construct`` bypasses the real ``__init__``, so it never triggers
+# SQLAlchemy's normal lazy mapper configuration itself.
+for _finder, _module_name, _is_pkg in pkgutil.iter_modules(models.__path__):
+    importlib.import_module(f"models.{_module_name}")
+configure_mappers()
+
+_WORKER_CPU_RATIO = 0.5  # matches frontend/vitest.config.ts's `maxWorkers: "50%"`
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_xdist_auto_num_workers(config: pytest.Config) -> int:
+    """Cap pytest-xdist's ``-n auto`` worker count at 50% of host CPU cores.
+
+    Mirrors ``frontend/vitest.config.ts``'s ``maxWorkers: "50%"`` so a
+    ``lefthook`` pre-commit run that spins up both suites concurrently
+    doesn't oversubscribe the CPU. As a conftest.py plugin this hookimpl
+    registers after xdist's own, and since the hookspec is
+    ``firstresult=True``, its return value short-circuits xdist's own
+    ``psutil``/``os.sched_getaffinity`` fallback chain before it runs.
+    ``psutil`` isn't a project dependency and ``os.sched_getaffinity``
+    doesn't exist on Windows, so on this Windows-first dev stack xdist's own
+    chain already bottoms out at ``os.cpu_count()`` today anyway -- using it
+    directly here isn't a loss of fidelity.
+
+    Args:
+        config: The pytest config object. Unused, but required by the
+            ``pytest_xdist_auto_num_workers`` hookspec signature.
+
+    Returns:
+        Half the host's logical CPU count, floored, with a floor of 1 so a
+        single-core host still gets one worker.
+    """
+    cpu_count = os.cpu_count() or 1
+    return max(1, math.floor(cpu_count * _WORKER_CPU_RATIO))
 
 
 @pytest.fixture(autouse=True)
@@ -26,15 +73,16 @@ def _reset_settings_cache(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     ``config.get_settings`` is process-wide ``@lru_cache``d; without clearing
     it before and after every test, the first test that constructs it would
     freeze every later test's view of env-driven config (``ADMIN_PASSWORD``,
-    ``SESSION_IDLE_TIMEOUT_SECONDS``, ``SECRET_ENCRYPTION_KEY``/
-    ``SECRET_KEY_FILE``, ...) regardless of ``monkeypatch.setenv``/``delenv``
-    calls made during the test.
+    ``ROOT_PASSWORD``, ``SESSION_IDLE_TIMEOUT_SECONDS``,
+    ``SECRET_ENCRYPTION_KEY``/``SECRET_KEY_FILE``, ...) regardless of
+    ``monkeypatch.setenv``/``delenv`` calls made during the test.
 
     ``Settings`` also reads ``backend/.env`` directly (independent of
     ``os.environ``), so real values a developer has set there (e.g. a local
-    ``ADMIN_PASSWORD``) would otherwise leak into tests that expect the
-    variable to be unset and rely on ``monkeypatch.delenv`` to simulate that.
-    Disabling the dotenv source here keeps tests seeing only ``os.environ``.
+    ``ADMIN_PASSWORD`` or ``ROOT_PASSWORD``) would otherwise leak into tests
+    that expect the variable to be unset and rely on ``monkeypatch.delenv``
+    to simulate that. Disabling the dotenv source here keeps tests seeing
+    only ``os.environ``.
     """
     monkeypatch.setitem(Settings.model_config, "env_file", None)
     get_settings.cache_clear()
@@ -61,13 +109,25 @@ async def _override_get_current_user(request: Request) -> User:
     and ownership check. Role-specific tests opt in by setting the header
     explicitly (e.g. ``X-User-Roles: requester`` or an empty value for a
     role-less user).
+
+    ``tenant_id`` is taken from the ``X-User-Tenant-Id`` header, defaulting to
+    :data:`tests._seed.DEFAULT_TEST_TENANT_ID` when the header is absent so
+    tenant-scoped routes work out of the box; passing an explicit empty value
+    opts a test into a platform-scoped (``tenant_id=None``) caller, mirroring
+    the ``X-User-Roles`` absent-vs-empty convention above.
     """
     roles_header = request.headers.get("X-User-Roles")
     if roles_header is None:
         roles = ["super_admin"]
     else:
         roles = [r.strip() for r in roles_header.split(",") if r.strip()]
-    return User.model_construct(id=request.headers.get("X-User-Id", ""), roles=roles)
+    tenant_header = request.headers.get("X-User-Tenant-Id")
+    tenant_id = (
+        DEFAULT_TEST_TENANT_ID if tenant_header is None else (tenant_header or None)
+    )
+    return User.model_construct(
+        id=request.headers.get("X-User-Id", ""), roles=roles, tenant_id=tenant_id
+    )
 
 
 def _override_verify_csrf() -> None:
@@ -115,6 +175,20 @@ def _fake_dns_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "infrastructure.url_safety.resolve_host", lambda host: ["93.184.216.34"]
     )
+
+
+@pytest.fixture(autouse=True)
+def _fast_bcrypt_rounds(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Use bcrypt's minimum cost factor for password hashing in tests.
+
+    Nearly every test pays a real bcrypt hash via fixture setup alone (e.g.
+    ``tests/_seed.py``'s ``seed_users``, which every per-file DB client
+    fixture calls, hashes a random token for the system user). Lowering the
+    cost to 4 -- bcrypt's minimum -- cuts that cost sharply; ``verify_password``
+    still round-trips correctly regardless of the rounds used to create the
+    hash.
+    """
+    monkeypatch.setenv("BCRYPT_ROUNDS", "4")
 
 
 @pytest.fixture()
@@ -267,6 +341,7 @@ async def _workflow_client_env(
     async with mem_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(mem_engine)
+    await seed_tenant(mem_engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine) as session:
@@ -278,7 +353,9 @@ async def _workflow_client_env(
         from repositories.agent_skill import SqlAgentSkillRepository
 
         async with AsyncSession(mem_engine) as session:
-            await SqlAgentSkillRepository(session).set_sync_state(
+            await SqlAgentSkillRepository(
+                session, tenant_id=DEFAULT_TEST_TENANT_ID
+            ).set_sync_state(
                 skill_id,
                 status=SkillSyncStatus.ready,
                 commit_sha=FAKE_COMMIT_SHA,
@@ -294,7 +371,11 @@ async def _workflow_client_env(
         from repositories.workflow import SqlWorkflowRepository
 
         async with AsyncSession(mem_engine) as session:
-            workflows = SqlWorkflowRepository(session, SqlAgentSkillRepository(session))
+            workflows = SqlWorkflowRepository(
+                session,
+                SqlAgentSkillRepository(session, tenant_id=DEFAULT_TEST_TENANT_ID),
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+            )
             await workflows.set_status(
                 workflow_id, WorkflowStatus.draft, user_id=user_id
             )
@@ -402,6 +483,7 @@ async def auth_client() -> AsyncGenerator[AsyncClient, None]:
                 password=hash_password(AUTH_PASSWORD),
                 email="login@test.local",
                 enabled=True,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )

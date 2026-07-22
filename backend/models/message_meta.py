@@ -19,9 +19,10 @@ sender's avatar/name and group messages under their task. Messages without a row
 from sqlalchemy import ForeignKeyConstraint, Index, UniqueConstraint
 
 from models.base import BaseEntity
+from models.tenant_scoped import TenantScoped
 
 
-class MessageMeta(BaseEntity, table=True):
+class MessageMeta(TenantScoped, BaseEntity, table=True):
     """Database-persisted side-channel metadata for one ADK chat event.
 
     ``workflow_session_id`` references the owning workflow session

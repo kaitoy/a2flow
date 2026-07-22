@@ -14,7 +14,7 @@ Then wire the hooks into `.git/hooks/` from the repository root:
 lefthook install
 ```
 
-**pre-commit** (parallel, ~25s on a clean repo): `ruff check` / `ruff format --check` / `mypy` / `pytest` on the backend, `biome ci` / `vitest run` on the frontend. Each job is gated by a `glob` so backend-only or frontend-only commits skip the other side's jobs.
+**pre-commit** (parallel; `pytest` itself also runs in parallel via `pytest-xdist`): `ruff check` / `ruff format --check` / `mypy` / `pytest` on the backend, `biome ci` / `vitest run` on the frontend. Each job is gated by a `glob` so backend-only or frontend-only commits skip the other side's jobs.
 
 **pre-push** (sequential): `next build` to catch type errors and missing `zod.gen` exports before the change reaches the remote.
 

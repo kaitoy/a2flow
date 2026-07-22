@@ -11,7 +11,14 @@ from typing import Any
 
 from pydantic import EmailStr, field_serializer, field_validator, model_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import Column, Index, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    ForeignKeyConstraint,
+    Index,
+    UniqueConstraint,
+    text,
+)
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
@@ -158,6 +165,12 @@ class UserUpdate(SQLModel):
     #: Customization for the generated avatar; ``None`` leaves it unchanged on
     #: update, and an explicit ``null`` from the client clears it.
     avatar_config: AvatarConfig | None = None
+    #: Tenant this user belongs to. ``None`` is only valid for a ``super_admin``
+    #: (platform-scoped by definition) or the seeded system user — every other
+    #: user must carry a ``tenant_id``. Once non-null, it can never be changed;
+    #: see :func:`services.user._require_tenant_for_non_super_admin` and the
+    #: matching guard against reassignment in :meth:`services.user.UserService.update`.
+    tenant_id: str | None = None
 
     @field_validator("roles")
     @classmethod
@@ -188,13 +201,50 @@ class User(UserCreate, BaseEntity, table=True):
     ``deleted_at`` marks a soft-deleted user: one that is still referenced by other
     records (via ``created_by`` / ``updated_by``) and therefore cannot be removed
     from the database. Soft-deleted users are hidden from the list endpoint but
-    remain fetchable so their names can still be resolved.
+    remain fetchable so their names can still be resolved. Two check constraints
+    enforce the tenant/role invariant from both directions: a ``super_admin``
+    may never carry a non-null ``tenant_id`` (platform-scoped by definition),
+    and every other user (except the seeded system user) must carry one; see
+    :func:`services.user._reject_super_admin_tenant_conflict` and
+    :func:`services.user._require_tenant_for_non_super_admin` for the matching
+    application-layer guards. Once assigned, a ``tenant_id`` can never change —
+    see :meth:`services.user.UserService.update`.
+
+    ``username`` uniqueness is two-tiered, since ``tenant_id`` can be null:
+    ``uq_users_tenant_id_username`` enforces uniqueness within a tenant for
+    tenant-scoped users, and ``ix_users_username_platform_scoped`` is a
+    partial unique index (``tenant_id IS NULL``) enforcing uniqueness among
+    platform-scoped users (``super_admin`` and the seeded system user) — a
+    plain composite constraint alone would not catch that case, since SQL
+    treats every ``NULL`` as distinct from every other ``NULL``.
     """
 
     __tablename__ = "users"
     __table_args__ = (
-        UniqueConstraint("username", name="uq_users_username"),
-        Index("ix_users_username", "username"),
+        UniqueConstraint("tenant_id", "username", name="uq_users_tenant_id_username"),
+        Index("ix_users_tenant_id_username", "tenant_id", "username"),
+        Index(
+            "ix_users_username_platform_scoped",
+            "username",
+            unique=True,
+            postgresql_where=text("tenant_id IS NULL"),
+            sqlite_where=text("tenant_id IS NULL"),
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            ondelete="RESTRICT",
+            name="fk_users_tenant_id",
+        ),
+        CheckConstraint(
+            "tenant_id IS NULL OR CAST(roles AS TEXT) NOT LIKE '%\"super_admin\"%'",
+            name="ck_users_super_admin_no_tenant",
+        ),
+        CheckConstraint(
+            "tenant_id IS NOT NULL OR CAST(roles AS TEXT) LIKE '%\"super_admin\"%' "
+            f"OR id = '{SYSTEM_USER_ID}'",
+            name="ck_users_non_super_admin_requires_tenant",
+        ),
     )
 
     deleted_at: datetime | None = Field(default=None, sa_type=TZDateTime)
@@ -240,6 +290,8 @@ class UserRead(BaseEntity):
     #: Generated-avatar customization, or ``None`` when the user has not
     #: customized it (the client then renders a username-seeded default).
     avatar_config: AvatarConfig | None = None
+    #: Tenant this user belongs to; ``None`` for a platform-scoped user.
+    tenant_id: str | None = None
 
     @field_serializer("deleted_at", "avatar_updated_at", when_used="json")
     def _serialize_deleted_at(self, dt: datetime | None) -> str | None:

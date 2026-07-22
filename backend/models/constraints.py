@@ -89,6 +89,23 @@ SecretName = Annotated[
 #: only in encrypted form (see :class:`models.secret.Secret`).
 SecretValue = Annotated[str, StringConstraints(min_length=1, max_length=8192)]
 
+#: Character rule for a tenant's URL-safe identifier: lowercase ASCII letters
+#: and digits in dash-separated segments (kebab-case), e.g. ``acme-corp``. No
+#: uppercase, leading/trailing/doubled dashes, or other punctuation. This is
+#: deliberately stricter than :data:`SLUG_PATTERN` (used by :data:`Username` /
+#: :data:`SecretName`), which permits uppercase, ``.``, and ``_`` — those are
+#: login-style identifiers, not the canonical lowercase kebab-case form a
+#: tenant slug needs if it is ever used in a URL path or subdomain.
+TENANT_SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+
+#: Tenant URL-safe identifier: kebab-case, 1–63 characters. The 63-character
+#: ceiling keeps it usable as a single DNS label if tenants are ever addressed
+#: via subdomain.
+TenantSlug = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=63, pattern=TENANT_SLUG_PATTERN),
+]
+
 #: Character rule shared by the Vault reference fields: no C0 controls or
 #: DEL/C1 controls (they cannot appear in a URL path segment or JSON key).
 _VAULT_FIELD_PATTERN = r"^[^\x00-\x1f\x7f-\x9f]+$"

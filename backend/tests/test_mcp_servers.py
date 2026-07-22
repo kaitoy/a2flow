@@ -16,7 +16,7 @@ from models.secret import Secret as _Secret  # noqa: F401 — registers model
 from models.user import SYSTEM_USER_ID
 from repositories.exceptions import McpConnectionError
 from tests._envelope import assert_err, assert_ok
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
 
 
@@ -32,6 +32,7 @@ async def mem_engine() -> AsyncGenerator[AsyncEngine, None]:
     async with eng.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(eng)
+    await seed_tenant(eng)
     yield eng
     await eng.dispose()
 
@@ -253,6 +254,7 @@ async def test_delete_server_referenced_by_binding_returns_409(
             agent_skill_repo_path=".",
             skill_dir="/tmp/skill",
             user_id=SYSTEM_USER_ID,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )
@@ -262,6 +264,7 @@ async def test_delete_server_referenced_by_binding_returns_409(
         task = WorkflowTask(
             workflow_session_id=ws.id,
             title="Step",
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )

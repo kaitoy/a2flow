@@ -89,15 +89,26 @@ class SqlWorkflowTaskRepository:
         session: AsyncSession,
         ws_repo: WorkflowSessionRepository,
         mcp_repo: MCPServerRepository,
+        *,
+        tenant_id: str,
     ) -> None:
         """Store the session and the WorkflowSession/MCPServer repos for FK checks."""
         self._db = session
         self._ws = ws_repo
         self._mcp = mcp_repo
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, task_id: str) -> WorkflowTask | None:
+        """Return the WorkflowTask row with the given ID within the current tenant."""
+        stmt = select(WorkflowTask).where(
+            WorkflowTask.id == task_id, WorkflowTask.tenant_id == self._tenant_id
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, task_id: str) -> WorkflowTaskRead | None:
         """Return the WorkflowTask with the given ID resolved into a read model, or ``None``."""
-        task = await self._db.get(WorkflowTask, task_id)
+        task = await self._get_scoped(task_id)
         if task is None:
             return None
         return self._to_read(
@@ -119,7 +130,7 @@ class SqlWorkflowTaskRepository:
         session are returned. Each task's outgoing dependency edges are resolved
         into ``depends_on_ids`` with a single batched query.
         """
-        stmt = select(WorkflowTask)
+        stmt = select(WorkflowTask).where(WorkflowTask.tenant_id == self._tenant_id)
         if workflow_session_id is not None:
             stmt = stmt.where(WorkflowTask.workflow_session_id == workflow_session_id)
         stmt = apply_filters(stmt, WorkflowTask, filters)
@@ -149,6 +160,7 @@ class SqlWorkflowTaskRepository:
         task = WorkflowTask.model_validate(
             {
                 **data.model_dump(exclude={"depends_on_ids", "tool_bindings"}),
+                "tenant_id": self._tenant_id,
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -183,7 +195,7 @@ class SqlWorkflowTaskRepository:
         the task's bound MCP tools. ``workflow_session_id`` is not part of
         ``WorkflowTaskUpdate`` so no parent re-validation is needed here.
         """
-        task = await self._db.get(WorkflowTask, task_id)
+        task = await self._get_scoped(task_id)
         if task is None:
             raise NotFoundError("WorkflowTask", task_id)
         task.sqlmodel_update(
@@ -215,7 +227,7 @@ class SqlWorkflowTaskRepository:
         Dependency edges referencing the task (in either direction) are removed
         by the ``ON DELETE CASCADE`` foreign keys on ``workflow_task_dependencies``.
         """
-        task = await self._db.get(WorkflowTask, task_id)
+        task = await self._get_scoped(task_id)
         if task is None:
             raise NotFoundError("WorkflowTask", task_id)
         await self._db.delete(task)
@@ -344,7 +356,7 @@ class SqlWorkflowTaskRepository:
         for dep_id in dep_ids:
             if dep_id == task_id:
                 raise DependencyCycleError(task_id, dep_id)
-            dep = await self._db.get(WorkflowTask, dep_id)
+            dep = await self._get_scoped(dep_id)
             if dep is None or dep.workflow_session_id != session_id:
                 raise ForeignKeyViolationError("WorkflowTask", dep_id)
         adjacency = await self._session_adjacency(session_id)

@@ -7,6 +7,7 @@ from httpx import AsyncClient
 
 from infrastructure.agent import AgentKind
 from tests._envelope import assert_err, assert_ok
+from tests._seed import DEFAULT_TEST_TENANT_ID
 from tests._workflow import create_skill, generate_workflow
 from tests.conftest import FAKE_COMMIT_SHA
 
@@ -140,6 +141,7 @@ async def test_planning_session_agent_uses_planning_kind(
         skill["id"],
         FAKE_COMMIT_SHA,
         mock_agent_registry.get.call_args.args[2],
+        tenant_id=DEFAULT_TEST_TENANT_ID,
         kind=AgentKind.planning,
     )
 

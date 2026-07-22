@@ -2,8 +2,9 @@ from google.adk.sessions import InMemorySessionService
 from httpx import AsyncClient
 
 from dependencies import APP_NAME
-from infrastructure.agent import SESSION_TITLE_KEY
+from infrastructure.agent import SESSION_TITLE_KEY, tenant_app_name
 from tests._envelope import assert_err, assert_ok
+from tests._seed import DEFAULT_TEST_TENANT_ID
 
 
 async def _create_session(
@@ -11,9 +12,13 @@ async def _create_session(
     user_id: str,
     session_id: str | None = None,
     state: dict[str, object] | None = None,
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
 ) -> str:
     session = await service.create_session(
-        app_name=APP_NAME, user_id=user_id, session_id=session_id, state=state
+        app_name=tenant_app_name(APP_NAME, tenant_id),
+        user_id=user_id,
+        session_id=session_id,
+        state=state,
     )
     return session.id
 
@@ -153,3 +158,37 @@ async def test_get_session_includes_title_from_state(
         f"/api/v1/sessions/{session_id}", headers={"X-User-Id": "judy"}
     )
     assert assert_ok(response)["title"] == "Debug the pipeline"
+
+
+async def test_list_sessions_forbidden_for_platform_scoped_caller(
+    client_with_real_sessions: AsyncClient,
+) -> None:
+    response = await client_with_real_sessions.get(
+        "/api/v1/sessions",
+        headers={"X-User-Id": "kevin", "X-User-Tenant-Id": ""},
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
+
+
+async def test_list_sessions_does_not_mix_tenants(
+    client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    """The same ADK user_id in two tenants must not see each other's sessions."""
+    await _create_session(real_session_service, "shared-user", tenant_id="tenant-a")
+    await _create_session(real_session_service, "shared-user", tenant_id="tenant-b")
+
+    tenant_a_sessions = assert_ok(
+        await client_with_real_sessions.get(
+            "/api/v1/sessions",
+            headers={"X-User-Id": "shared-user", "X-User-Tenant-Id": "tenant-a"},
+        )
+    )
+    tenant_b_sessions = assert_ok(
+        await client_with_real_sessions.get(
+            "/api/v1/sessions",
+            headers={"X-User-Id": "shared-user", "X-User-Tenant-Id": "tenant-b"},
+        )
+    )
+    assert len(tenant_a_sessions) == 1
+    assert len(tenant_b_sessions) == 1

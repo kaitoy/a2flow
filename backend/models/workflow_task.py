@@ -27,6 +27,7 @@ from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
 from models.constraints import DescText, Position, ShortText, ToolName
+from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -85,7 +86,7 @@ class WorkflowTaskCreate(WorkflowTaskUpdate):
     tool_bindings: list[ToolBinding] = []
 
 
-class WorkflowTask(BaseEntity, table=True):
+class WorkflowTask(TenantScoped, BaseEntity, table=True):
     """Database-persisted WorkflowTask record belonging to a WorkflowSession.
 
     This table holds only the scalar fields of a task. Dependency edges between

@@ -202,6 +202,21 @@ class SecretValidationError(RepositoryError):
         super().__init__(reason)
 
 
+class UserValidationError(RepositoryError):
+    """Raised when a User create/update would combine super_admin with a tenant.
+
+    A super admin is platform-scoped by definition and must never carry a
+    tenant_id. On a PATCH the rule applies to the merged result of the stored
+    record and the partial update (mirrors :class:`SecretValidationError`),
+    which only the service can compute. Carries a human-readable ``reason``
+    surfaced in the error envelope's ``details`` block when returning HTTP 422.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SecretResolutionError(Exception):
     """Raised when a ``${secret:NAME}`` reference cannot be resolved to a value.
 

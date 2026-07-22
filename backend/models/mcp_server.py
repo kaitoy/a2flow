@@ -22,6 +22,7 @@ from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity, JSONColumn
 from models.constraints import EntityName, HttpUrl
+from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -78,13 +79,14 @@ class MCPServerCreate(MCPServerUpdate):
     headers: dict[str, str] = Field(default_factory=dict)
 
 
-class MCPServer(MCPServerCreate, BaseEntity, table=True):
+class MCPServer(MCPServerCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted remote MCP server reachable over streamable HTTP."""
 
     __tablename__ = "mcp_servers"
+    tenant_id: str = Field(foreign_key="tenants.id", ondelete="RESTRICT")
     __table_args__ = (
-        UniqueConstraint("name", name="uq_mcp_servers_name"),
-        Index("ix_mcp_servers_name", "name"),
+        UniqueConstraint("tenant_id", "name", name="uq_mcp_servers_tenant_id_name"),
+        Index("ix_mcp_servers_tenant_id_name", "tenant_id", "name"),
     )
 
     headers: dict[str, str] = Field(

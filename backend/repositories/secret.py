@@ -54,22 +54,34 @@ class SqlSecretRepository:
     plaintext.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Store the SQLModel session used for all operations."""
+    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+        """Store the SQLModel session and the tenant these operations are scoped to."""
         self._db = session
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, secret_id: str) -> Secret | None:
+        """Return the Secret with the given ID within the current tenant, or ``None``."""
+        stmt = select(Secret).where(
+            Secret.id == secret_id, Secret.tenant_id == self._tenant_id
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, secret_id: str) -> Secret | None:
         """Return the Secret with the given ID, or ``None`` if missing."""
-        return await self._db.get(Secret, secret_id)
+        return await self._get_scoped(secret_id)
 
     async def get_by_name(self, name: str) -> Secret | None:
         """Return the Secret with the given unique name, or ``None`` if missing."""
-        result = await self._db.exec(select(Secret).where(Secret.name == name))
+        stmt = select(Secret).where(
+            Secret.name == name, Secret.tenant_id == self._tenant_id
+        )
+        result = await self._db.exec(stmt)
         return result.first()
 
     async def exists(self, secret_id: str) -> bool:
         """Return ``True`` if a Secret with the given ID exists."""
-        return (await self._db.get(Secret, secret_id)) is not None
+        return await self._get_scoped(secret_id) is not None
 
     async def list(
         self,
@@ -80,7 +92,8 @@ class SqlSecretRepository:
         filters: Sequence[FilterSpec] = (),
     ) -> list[Secret]:
         """Return a page of Secrets, defaulting to ``created_at`` descending."""
-        stmt = apply_filters(select(Secret), Secret, filters)
+        stmt = select(Secret).where(Secret.tenant_id == self._tenant_id)
+        stmt = apply_filters(stmt, Secret, filters)
         stmt = apply_sort(stmt, Secret, sort, default=[col(Secret.created_at).desc()])
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
@@ -88,7 +101,12 @@ class SqlSecretRepository:
     async def create(self, data: SecretCreate, *, user_id: str) -> Secret:
         """Create a new Secret, raising UniqueViolationError on duplicate name."""
         secret = Secret.model_validate(
-            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+            {
+                **data.model_dump(),
+                "tenant_id": self._tenant_id,
+                "created_by": user_id,
+                "updated_by": user_id,
+            }
         )
         self._db.add(secret)
         try:
@@ -105,7 +123,7 @@ class SqlSecretRepository:
         self, secret_id: str, data: SecretUpdate, *, user_id: str
     ) -> Secret:
         """Apply a partial update, raising NotFoundError or UniqueViolationError."""
-        secret = await self._db.get(Secret, secret_id)
+        secret = await self._get_scoped(secret_id)
         if secret is None:
             raise NotFoundError("Secret", secret_id)
         update = data.model_dump(exclude_unset=True)
@@ -131,7 +149,7 @@ class SqlSecretRepository:
         by foreign key, so deletion never raises ReferencedError; a dangling
         reference instead fails lazily at resolution time.
         """
-        secret = await self._db.get(Secret, secret_id)
+        secret = await self._get_scoped(secret_id)
         if secret is None:
             raise NotFoundError("Secret", secret_id)
         await self._db.delete(secret)

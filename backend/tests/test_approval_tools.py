@@ -25,7 +25,7 @@ from models.notification import Notification, NotificationType
 from models.user import Role
 from models.workflow_session import WorkflowSession
 from repositories import SqlApprovalRepository, SqlNotificationRepository
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
 @pytest_asyncio.fixture()
@@ -41,7 +41,9 @@ async def engine(
 
     async with eng.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
-    await seed_users(eng)
+    await seed_users(eng, ids=())  # system user only; Tenant FKs to it
+    await seed_tenant(eng)
+    await seed_users(eng, tenant_id=DEFAULT_TEST_TENANT_ID)
 
     monkeypatch.setattr("infrastructure.database.engine", eng)
     yield eng
@@ -63,6 +65,7 @@ async def _seed_session(
             agent_skill_repo_path=".",
             skill_dir="/tmp/skill",
             user_id=user_id,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -80,7 +83,7 @@ def _ctx(session_id: str = "sess-abc", user_id: str = "owner") -> Any:
 async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notification]:
     """Return all notifications addressed to ``user_id`` via the repository."""
     async with AsyncSession(eng) as db:
-        repo = SqlNotificationRepository(db)
+        repo = SqlNotificationRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
         return await repo.list(user_id=user_id, limit=100, offset=0)
 
 
@@ -174,7 +177,7 @@ async def test_get_approval_reflects_resolution(engine: AsyncEngine) -> None:
     created = await request_approval("Decide", _ctx(), approver="alice")
     # Resolve directly through the repository (the frontend's PATCH path).
     async with AsyncSession(engine) as db:
-        repo = SqlApprovalRepository(db, _ws_repo(db))
+        repo = SqlApprovalRepository(db, _ws_repo(db), tenant_id=DEFAULT_TEST_TENANT_ID)
         from models.approval import ApprovalUpdate
 
         await repo.update(
@@ -188,7 +191,8 @@ async def test_get_approval_reflects_resolution(engine: AsyncEngine) -> None:
 
 
 async def test_list_users_returns_seeded_users(engine: AsyncEngine) -> None:
-    result = await list_users()
+    await _seed_session(engine)
+    result = await list_users(_ctx())
     assert "error" not in result
     usernames = {u["username"] for u in result["users"]}
     assert {"alice", "bob", "carol", "owner", "tester"} <= usernames
@@ -199,15 +203,31 @@ async def test_list_users_returns_seeded_users(engine: AsyncEngine) -> None:
 
 
 async def test_list_users_excludes_system_user(engine: AsyncEngine) -> None:
-    result = await list_users()
+    await _seed_session(engine)
+    result = await list_users(_ctx())
     from models.user import SYSTEM_USER_ID
 
     assert all(u["id"] != SYSTEM_USER_ID for u in result["users"])
 
 
+async def test_list_users_excludes_other_tenant_users(engine: AsyncEngine) -> None:
+    await seed_tenant(engine, tenant_id="tenant-other")
+    await seed_users(engine, ids=("dave",), tenant_id="tenant-other")
+    await _seed_session(engine)
+    result = await list_users(_ctx())
+    usernames = {u["username"] for u in result["users"]}
+    assert "dave" not in usernames
+    assert {"alice", "bob", "carol", "owner", "tester"} <= usernames
+
+
+async def test_list_users_without_session_errors(engine: AsyncEngine) -> None:
+    result = await list_users(_ctx("unknown-session"))
+    assert "error" in result
+
+
 async def test_list_users_id_usable_as_approver(engine: AsyncEngine) -> None:
     await _seed_session(engine)
-    users = await list_users()
+    users = await list_users(_ctx())
     approver_id = users["users"][0]["id"]
     result = await request_approval("Approve me", _ctx(), approver=approver_id)
     assert "error" not in result
@@ -219,7 +239,7 @@ def _ws_repo(db: AsyncSession) -> Any:
     """Build a WorkflowSession repository for the approval repository's FK check."""
     from repositories import SqlWorkflowSessionRepository
 
-    return SqlWorkflowSessionRepository(db)
+    return SqlWorkflowSessionRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
 
 
 # ---------- approver eligibility (roles) ----------
@@ -229,29 +249,56 @@ async def test_request_approval_rejects_approver_without_role(
     engine: AsyncEngine,
 ) -> None:
     """A user without the approver role cannot be designated as an approver."""
-    await seed_users(engine, ids=("norole",), roles=())
+    await seed_users(
+        engine, ids=("norole",), roles=(), tenant_id=DEFAULT_TEST_TENANT_ID
+    )
     await _seed_session(engine)
     result = await request_approval("Approve me", _ctx(), approver="norole")
     assert "error" in result
     assert "approver role" in result["error"]
 
 
-async def test_request_approval_accepts_super_admin_approver(
+async def test_request_approval_rejects_super_admin_approver_without_tenant(
     engine: AsyncEngine,
 ) -> None:
-    """A super admin is approver-eligible even without the approver role."""
-    await seed_users(engine, ids=("boss",), roles=(Role.super_admin,))
+    """A super admin cannot be designated approver for a tenant-scoped session.
+
+    A super admin can never carry a ``tenant_id`` (see the
+    ``ck_users_super_admin_no_tenant`` constraint on ``User``), so it can
+    never satisfy the tenant-membership half of approver eligibility -- there
+    is no platform-scoped bypass, matching ``_is_eligible_approver``'s
+    "no cross-tenant bypass" rule.
+    """
+    await seed_users(
+        engine,
+        ids=("boss",),
+        roles=(Role.super_admin,),
+    )
     await _seed_session(engine)
     result = await request_approval("Approve me", _ctx(), approver="boss")
-    assert "error" not in result
+    assert "error" in result
+
+
+async def test_request_approval_rejects_other_tenant_approver(
+    engine: AsyncEngine,
+) -> None:
+    """An approver belonging to a different tenant cannot be designated."""
+    await seed_tenant(engine, tenant_id="tenant-other")
+    await seed_users(engine, ids=("dave",), tenant_id="tenant-other")
+    await _seed_session(engine)
+    result = await request_approval("Approve me", _ctx(), approver="dave")
+    assert "error" in result
 
 
 async def test_list_users_excludes_users_without_approver_role(
     engine: AsyncEngine,
 ) -> None:
     """The approver-selection tool omits users lacking the approver role."""
-    await seed_users(engine, ids=("norole",), roles=())
-    result = await list_users()
+    await seed_users(
+        engine, ids=("norole",), roles=(), tenant_id=DEFAULT_TEST_TENANT_ID
+    )
+    await _seed_session(engine)
+    result = await list_users(_ctx())
     usernames = {u["username"] for u in result["users"]}
     assert "norole" not in usernames
     # The default seeded actors hold the approver role and stay listed.

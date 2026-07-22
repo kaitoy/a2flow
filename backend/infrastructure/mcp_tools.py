@@ -34,6 +34,7 @@ from infrastructure import database, mcp_client
 from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.secret_resolver import SecretResolver
 from infrastructure.vault_client import get_vault_client
+from infrastructure.workflow_task_tools import _resolve_scope
 from models.workflow_task import WorkflowTaskRead, WorkflowTaskStatus
 from repositories import (
     SqlMCPServerRepository,
@@ -42,11 +43,12 @@ from repositories import (
     SqlWorkflowTaskRepository,
 )
 from repositories.exceptions import McpConnectionError, SecretResolutionError
+from repositories.tenant_bootstrap import NoTenantSessionError
 
 logger = logging.getLogger(__name__)
 
 
-def _build_resolver(db: AsyncSession) -> SecretResolver:
+def _build_resolver(db: AsyncSession, tenant_id: str) -> SecretResolver:
     """Build a SecretResolver on the given session and the process singletons.
 
     The agent tools run outside FastAPI's request scope, so they cannot use the
@@ -55,12 +57,15 @@ def _build_resolver(db: AsyncSession) -> SecretResolver:
 
     Args:
         db: The open database session.
+        tenant_id: Tenant the resolved secrets must belong to.
 
     Returns:
         A resolver backed by the session's secret repository.
     """
     return SecretResolver(
-        SqlSecretRepository(db), get_secret_cipher(), get_vault_client()
+        SqlSecretRepository(db, tenant_id=tenant_id),
+        get_secret_cipher(),
+        get_vault_client(),
     )
 
 
@@ -69,28 +74,6 @@ _NO_TASK_IN_PROGRESS = (
     "no task is in_progress; mark a task in_progress with "
     "`update_workflow_task` before calling MCP tools"
 )
-
-
-async def _resolve_ws_id(tool_context: ToolContext, db: AsyncSession) -> str | None:
-    """Resolve the current run's WorkflowSession primary key, or ``None``.
-
-    Mirrors :func:`infrastructure.workflow_task_tools._resolve_ws_id`: maps the
-    ADK session id (the AG-UI thread id) to the owning WorkflowSession.
-
-    Args:
-        tool_context: The ADK tool context for the current invocation.
-        db: The open database session.
-
-    Returns:
-        The WorkflowSession primary key, or ``None`` if the session id is
-        missing or no WorkflowSession matches it.
-    """
-    session = getattr(tool_context, "session", None)
-    session_id = getattr(session, "id", None)
-    if not session_id:
-        return None
-    ws = await SqlWorkflowSessionRepository(db).get_by_session_id(session_id)
-    return ws.id if ws is not None else None
 
 
 @asynccontextmanager
@@ -107,10 +90,17 @@ async def _db_session() -> AsyncIterator[AsyncSession]:
         yield db
 
 
-async def _in_progress_tasks(db: AsyncSession, ws_id: str) -> list[WorkflowTaskRead]:
+async def _in_progress_tasks(
+    db: AsyncSession, ws_id: str, tenant_id: str
+) -> list[WorkflowTaskRead]:
     """Return the session's tasks currently in the ``in_progress`` status."""
-    ws_repo = SqlWorkflowSessionRepository(db)
-    task_repo = SqlWorkflowTaskRepository(db, ws_repo, SqlMCPServerRepository(db))
+    ws_repo = SqlWorkflowSessionRepository(db, tenant_id=tenant_id)
+    task_repo = SqlWorkflowTaskRepository(
+        db,
+        ws_repo,
+        SqlMCPServerRepository(db, tenant_id=tenant_id),
+        tenant_id=tenant_id,
+    )
     tasks = await task_repo.list(limit=1000, offset=0, workflow_session_id=ws_id)
     return [t for t in tasks if t.status == WorkflowTaskStatus.in_progress]
 
@@ -186,8 +176,14 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
     # resolver needs the secrets table); the network fan-out happens after.
     prepared: list[tuple[dict[str, Any], str, dict[str, str] | None, str | None]] = []
     async with _db_session() as db:
-        servers = await SqlMCPServerRepository(db).list(limit=1000, offset=0)
-        resolver = _build_resolver(db)
+        try:
+            _ws_id, tenant_id = await _resolve_scope(tool_context, db)
+        except NoTenantSessionError:
+            return {"error": _NO_SESSION}
+        servers = await SqlMCPServerRepository(db, tenant_id=tenant_id).list(
+            limit=1000, offset=0
+        )
+        resolver = _build_resolver(db, tenant_id)
         for server in servers:
             base = {"server_id": server.id, "server_name": server.name}
             try:
@@ -270,10 +266,11 @@ async def call_mcp_tool(
     if args is None:
         return {"error": "arguments must be an object matching the tool's input schema"}
     async with _db_session() as db:
-        ws_id = await _resolve_ws_id(tool_context, db)
-        if ws_id is None:
+        try:
+            ws_id, tenant_id = await _resolve_scope(tool_context, db)
+        except NoTenantSessionError:
             return {"error": _NO_SESSION}
-        tasks = await _in_progress_tasks(db, ws_id)
+        tasks = await _in_progress_tasks(db, ws_id, tenant_id)
         if not tasks:
             return {"error": _NO_TASK_IN_PROGRESS}
         allowed = {
@@ -287,11 +284,13 @@ async def call_mcp_tool(
                     f"the current in-progress task. Bound tools: {bound}"
                 )
             }
-        server = await SqlMCPServerRepository(db).get(server_id)
+        server = await SqlMCPServerRepository(db, tenant_id=tenant_id).get(server_id)
         if server is None:
             return {"error": f"MCP server {server_id!r} is not registered"}
         try:
-            resolved_headers = await _build_resolver(db).resolve_headers(server.headers)
+            resolved_headers = await _build_resolver(db, tenant_id).resolve_headers(
+                server.headers
+            )
         except SecretResolutionError as exc:
             logger.warning(
                 "Secret %s resolution failed for MCP server %s: %s",

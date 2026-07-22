@@ -35,6 +35,7 @@ from repositories import (
 from repositories.exceptions import (
     NotFoundError,
 )
+from repositories.tenant_bootstrap import resolve_agent_skill_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -157,11 +158,17 @@ async def sync_agent_skill(skill_id: str, *, user_id: str) -> None:
     """
     try:
         async with AsyncSession(engine, expire_on_commit=False) as db:
-            secrets = SqlSecretRepository(db)
+            tenant_id = await resolve_agent_skill_tenant(db, skill_id)
+            if tenant_id is None:
+                logger.warning(
+                    "Background sync of skill %s failed: skill not found.", skill_id
+                )
+                return
+            secrets = SqlSecretRepository(db, tenant_id=tenant_id)
             service = AgentSkillSyncService(
-                skills=SqlAgentSkillRepository(db),
-                sessions=SqlWorkflowSessionRepository(db),
-                planning_sessions=SqlPlanningSessionRepository(db),
+                skills=SqlAgentSkillRepository(db, tenant_id=tenant_id),
+                sessions=SqlWorkflowSessionRepository(db, tenant_id=tenant_id),
+                planning_sessions=SqlPlanningSessionRepository(db, tenant_id=tenant_id),
                 resolver=SecretResolver(
                     secrets, get_secret_cipher(), get_vault_client()
                 ),

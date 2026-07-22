@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalStatus
 from tests._envelope import assert_err, assert_ok
+from tests._seed import DEFAULT_TEST_TENANT_ID
 from tests._workflow import create_published_workflow, create_skill
 
 
@@ -28,6 +29,7 @@ async def _insert_approval(
             title="Approve me",
             status=ApprovalStatus.pending,
             approver=approver,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
         )

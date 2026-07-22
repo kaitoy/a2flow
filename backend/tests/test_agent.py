@@ -390,7 +390,7 @@ def test_agent_registry_builds_resumable_agents() -> None:
     service = InMemorySessionService()  # type: ignore[no-untyped-call]
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
 
-    agent = registry.get(None, None, None)
+    agent = registry.get(None, None, None, tenant_id="tenant-1")
 
     # Private to ag-ui-adk, but it is the exact predicate that decides whether an
     # LRO tool call pauses through ADK or abandons the runner's generator.
@@ -405,7 +405,9 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
     service = InMemorySessionService()  # type: ignore[no-untyped-call]
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
 
-    assert registry.get(None, None, None) is registry.get(None, None, None)
+    assert registry.get(None, None, None, tenant_id="tenant-1") is registry.get(
+        None, None, None, tenant_id="tenant-1"
+    )
 
     def _skill_dir(name: str) -> Any:
         path = tmp_path / name
@@ -416,26 +418,176 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
         )
         return path
 
-    old = registry.get("skill-1", "a" * 40, _skill_dir("old"))
-    assert registry.get("skill-1", "a" * 40, _skill_dir("ignored")) is old
+    old = registry.get("skill-1", "a" * 40, _skill_dir("old"), tenant_id="tenant-1")
+    assert (
+        registry.get("skill-1", "a" * 40, _skill_dir("ignored"), tenant_id="tenant-1")
+        is old
+    )
 
     # A pull publishes a new revision; the same skill at a different revision is
     # a different agent, because create_agent reads the skill directory once and
     # keeps its contents in memory forever after.
-    assert registry.get("skill-1", "b" * 40, _skill_dir("new")) is not old
+    assert (
+        registry.get("skill-1", "b" * 40, _skill_dir("new"), tenant_id="tenant-1")
+        is not old
+    )
 
     # The same revision in a different role is a different agent too: each kind
     # bakes its own instruction and toolset into the built agent.
     from infrastructure.agent import AgentKind
 
     planning = registry.get(
-        "skill-1", "a" * 40, _skill_dir("planning"), kind=AgentKind.planning
+        "skill-1",
+        "a" * 40,
+        _skill_dir("planning"),
+        tenant_id="tenant-1",
+        kind=AgentKind.planning,
     )
     assert planning is not old
     assert (
-        registry.get("skill-1", "a" * 40, _skill_dir("x"), kind=AgentKind.planning)
+        registry.get(
+            "skill-1",
+            "a" * 40,
+            _skill_dir("x"),
+            tenant_id="tenant-1",
+            kind=AgentKind.planning,
+        )
         is planning
     )
+
+
+def test_agent_registry_caches_are_isolated_per_tenant(tmp_path: Any) -> None:
+    """The same skill revision resolved for two tenants yields distinct agents."""
+    from infrastructure.agent import AgentRegistry
+
+    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    registry = AgentRegistry(session_service=service, app_name="A2Flow")
+
+    skill_dir = tmp_path / "skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: skill\ndescription: A test skill\n---\n\nInstructions.\n",
+        encoding="utf-8",
+    )
+
+    tenant_a = registry.get("skill-1", "a" * 40, skill_dir, tenant_id="tenant-a")
+    tenant_b = registry.get("skill-1", "a" * 40, skill_dir, tenant_id="tenant-b")
+    assert tenant_a is not tenant_b
+    assert (
+        registry.get("skill-1", "a" * 40, skill_dir, tenant_id="tenant-a") is tenant_a
+    )
+
+
+def test_agent_registry_evicts_lru_entry_per_tenant_when_over_capacity(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Once a tenant's cache exceeds the cap, its true LRU entry is rebuilt."""
+    import infrastructure.agent as agent_module
+    from infrastructure.agent import AgentRegistry
+
+    monkeypatch.setattr(agent_module, "_AGENT_CACHE_MAX_ENTRIES", 2)
+    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    registry = AgentRegistry(session_service=service, app_name="A2Flow")
+
+    def _skill_dir(name: str) -> Any:
+        path = tmp_path / name
+        path.mkdir()
+        (path / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: A test skill\n---\n\nInstructions.\n",
+            encoding="utf-8",
+        )
+        return path
+
+    first = registry.get("skill-1", "a" * 40, _skill_dir("s1"), tenant_id="tenant-1")
+    second = registry.get("skill-2", "a" * 40, _skill_dir("s2"), tenant_id="tenant-1")
+    # Touch `first` again so `second` becomes the true LRU entry.
+    registry.get("skill-1", "a" * 40, _skill_dir("s1-again"), tenant_id="tenant-1")
+    third = registry.get("skill-3", "a" * 40, _skill_dir("s3"), tenant_id="tenant-1")
+
+    assert (
+        registry.get("skill-1", "a" * 40, _skill_dir("s1-x"), tenant_id="tenant-1")
+        is first
+    )
+    assert (
+        registry.get("skill-3", "a" * 40, _skill_dir("s3-x"), tenant_id="tenant-1")
+        is third
+    )
+    assert (
+        registry.get("skill-2", "a" * 40, _skill_dir("s2-x"), tenant_id="tenant-1")
+        is not second
+    )
+
+
+def test_agent_registry_lru_cap_is_independent_per_tenant(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Filling one tenant's cache to its cap must not evict another tenant's entries."""
+    import infrastructure.agent as agent_module
+    from infrastructure.agent import AgentRegistry
+
+    monkeypatch.setattr(agent_module, "_AGENT_CACHE_MAX_ENTRIES", 1)
+    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    registry = AgentRegistry(session_service=service, app_name="A2Flow")
+
+    def _skill_dir(name: str) -> Any:
+        path = tmp_path / name
+        path.mkdir()
+        (path / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: A test skill\n---\n\nInstructions.\n",
+            encoding="utf-8",
+        )
+        return path
+
+    tenant_a_agent = registry.get(
+        "skill-1", "a" * 40, _skill_dir("a1"), tenant_id="tenant-a"
+    )
+    tenant_b_agent = registry.get(
+        "skill-1", "a" * 40, _skill_dir("b1"), tenant_id="tenant-b"
+    )
+
+    assert (
+        registry.get("skill-1", "a" * 40, _skill_dir("a2"), tenant_id="tenant-a")
+        is tenant_a_agent
+    )
+    assert (
+        registry.get("skill-1", "a" * 40, _skill_dir("b2"), tenant_id="tenant-b")
+        is tenant_b_agent
+    )
+
+
+def test_tenant_app_name_scopes_the_base_name_to_the_tenant() -> None:
+    from infrastructure.agent import tenant_app_name
+
+    assert tenant_app_name("A2Flow", "tenant-1") == "A2Flow-tenant-1"
+
+
+async def test_agent_endpoint_forbidden_for_platform_scoped_caller(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    client, _ = agent_client
+    response = await client.post(
+        "/api/v1/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Tenant-Id": ""},
+    )
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
+async def test_agent_endpoint_succeeds_for_platform_scoped_caller_with_tenant_header(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    """A super_admin who has selected a tenant via ``X-Tenant-Id`` can chat as it."""
+    from dependencies.auth import TENANT_HEADER_NAME
+    from tests._seed import DEFAULT_TEST_TENANT_ID
+
+    client, _ = agent_client
+    response = await client.post(
+        "/api/v1/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Tenant-Id": "", TENANT_HEADER_NAME: DEFAULT_TEST_TENANT_ID},
+    )
+    assert response.status_code == 200
 
 
 def _write_skill_md(tmp_path: Any, name: str = "test-skill") -> Any:

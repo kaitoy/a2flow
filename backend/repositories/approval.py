@@ -47,7 +47,11 @@ class SqlApprovalRepository:
     """SQLModel-backed implementation of ApprovalRepository."""
 
     def __init__(
-        self, session: AsyncSession, ws_repo: WorkflowSessionRepository
+        self,
+        session: AsyncSession,
+        ws_repo: WorkflowSessionRepository,
+        *,
+        tenant_id: str,
     ) -> None:
         """Store the async session and the WorkflowSession repository.
 
@@ -57,10 +61,19 @@ class SqlApprovalRepository:
         """
         self._db = session
         self._ws_repo = ws_repo
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, approval_id: str) -> Approval | None:
+        """Return the Approval with the given ID within the current tenant, or ``None``."""
+        stmt = select(Approval).where(
+            Approval.id == approval_id, Approval.tenant_id == self._tenant_id
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, approval_id: str) -> Approval | None:
         """Return the Approval with the given ID, or ``None`` if missing."""
-        return await self._db.get(Approval, approval_id)
+        return await self._get_scoped(approval_id)
 
     async def list(
         self,
@@ -81,7 +94,8 @@ class SqlApprovalRepository:
         Returns:
             The matching approvals.
         """
-        stmt = apply_filters(select(Approval), Approval, filters)
+        stmt = select(Approval).where(Approval.tenant_id == self._tenant_id)
+        stmt = apply_filters(stmt, Approval, filters)
         stmt = apply_sort(
             stmt,
             Approval,
@@ -114,7 +128,12 @@ class SqlApprovalRepository:
         ):
             raise ForeignKeyViolationError("User", data.approver)
         approval = Approval.model_validate(
-            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+            {
+                **data.model_dump(),
+                "tenant_id": self._tenant_id,
+                "created_by": user_id,
+                "updated_by": user_id,
+            }
         )
         self._db.add(approval)
         await commit_or_translate_user_fk(self._db, user_id=user_id)
@@ -125,7 +144,7 @@ class SqlApprovalRepository:
         self, approval_id: str, data: ApprovalUpdate, *, user_id: str
     ) -> Approval:
         """Apply a partial update to an Approval, raising NotFoundError if missing."""
-        approval = await self._db.get(Approval, approval_id)
+        approval = await self._get_scoped(approval_id)
         if approval is None:
             raise NotFoundError("Approval", approval_id)
         approval.sqlmodel_update(data.model_dump(exclude_unset=True))
@@ -137,7 +156,11 @@ class SqlApprovalRepository:
 
     async def exists(self, approval_id: str) -> bool:
         """Return whether an Approval with the given ID exists."""
-        stmt = select(Approval.id).where(Approval.id == approval_id).limit(1)
+        stmt = (
+            select(Approval.id)
+            .where(Approval.id == approval_id, Approval.tenant_id == self._tenant_id)
+            .limit(1)
+        )
         result = await self._db.exec(stmt)
         return result.first() is not None
 
@@ -161,6 +184,7 @@ class SqlApprovalRepository:
             .where(
                 Approval.workflow_session_id == workflow_session_id,
                 Approval.approver == user_id,
+                Approval.tenant_id == self._tenant_id,
             )
             .limit(1)
         )
@@ -184,7 +208,10 @@ class SqlApprovalRepository:
         """
         stmt = (
             select(Approval)
-            .where(Approval.workflow_task_id == workflow_task_id)
+            .where(
+                Approval.workflow_task_id == workflow_task_id,
+                Approval.tenant_id == self._tenant_id,
+            )
             .order_by(col(Approval.created_at).desc())
         )
         result = await self._db.exec(stmt)

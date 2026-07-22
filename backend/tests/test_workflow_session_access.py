@@ -24,7 +24,7 @@ from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.approval import Approval, ApprovalStatus
 from models.workflow_session import WorkflowSession
 from tests._envelope import assert_err, assert_ok
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import FAKE_COMMIT_SHA, _install_auth_overrides
 
 #: Headers modeling the session owner without any role.
@@ -56,6 +56,7 @@ async def _seed_skill(eng: AsyncEngine) -> None:
                 repo_path="",
                 sync_status=SkillSyncStatus.ready,
                 commit_sha=FAKE_COMMIT_SHA,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
                 created_by="owner",
                 updated_by="owner",
             )
@@ -83,6 +84,7 @@ async def access_env(
     async with mem_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(mem_engine)
+    await seed_tenant(mem_engine)
     await _seed_skill(mem_engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -117,6 +119,7 @@ async def _seed_session(eng: AsyncEngine, *, user_id: str = "owner") -> str:
             agent_skill_repo_path="",
             agent_skill_commit_sha=FAKE_COMMIT_SHA,
             user_id=user_id,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -136,6 +139,7 @@ async def _insert_approval(
             title="Approve me",
             status=ApprovalStatus.pending,
             approver=approver,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by="owner",
             updated_by="owner",
         )

@@ -21,6 +21,7 @@ mapping errors to an ``{"error": ...}`` payload instead of raising.
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Any
 
 from google.adk.tools.tool_context import ToolContext
@@ -30,7 +31,7 @@ from infrastructure import database
 from infrastructure.workflow_task_tools import (
     _NO_SESSION,
     _notify,
-    _resolve_ws_id,
+    _resolve_scope,
     _user_id,
 )
 from models.approval import ApprovalCreate
@@ -50,52 +51,80 @@ from repositories import (
     WorkflowTaskRepository,
 )
 from repositories.exceptions import ForeignKeyViolationError
+from repositories.query import FilterSpec
+from repositories.tenant_bootstrap import NoTenantSessionError
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class _Scope:
+    """Per-tool-call resolved WorkflowSession id, tenant id, and scoped repos."""
+
+    ws_id: str
+    tenant_id: str
+    ws_repo: WorkflowSessionRepository
+    approval_repo: ApprovalRepository
+    task_repo: WorkflowTaskRepository
+    notif_repo: NotificationRepository
+    user_repo: UserRepository
+
+
 @asynccontextmanager
-async def _repos() -> AsyncIterator[
-    tuple[
-        WorkflowSessionRepository,
-        ApprovalRepository,
-        WorkflowTaskRepository,
-        NotificationRepository,
-        UserRepository,
-    ]
-]:
-    """Open a database session and yield the repositories the approval tools need.
+async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
+    """Open a database session and yield the resolved scope and its repositories.
 
     Opens a fresh ``AsyncSession`` on the module-level engine (referenced through
-    the ``database`` module so tests can monkeypatch ``database.engine``) and
-    wires the WorkflowSession, Approval, WorkflowTask, Notification, and User
-    repositories to it.
+    the ``database`` module so tests can monkeypatch ``database.engine``),
+    resolves the current run's WorkflowSession id and tenant id, and wires the
+    WorkflowSession, Approval, WorkflowTask, and Notification repositories to
+    it, all scoped to the resolved tenant. The User repository is not tenant
+    scoped -- ``User`` is not a ``TenantScoped`` entity.
+
+    Args:
+        tool_context: The ADK tool context for the current invocation.
 
     Yields:
-        A ``(workflow_session_repository, approval_repository,
-        workflow_task_repository, notification_repository, user_repository)``
-        tuple bound to the same session.
+        The resolved :class:`_Scope`.
+
+    Raises:
+        NoTenantSessionError: If no WorkflowSession is bound to the current run.
     """
     async with AsyncSession(database.engine) as db:
-        ws_repo = SqlWorkflowSessionRepository(db)
-        yield (
-            ws_repo,
-            SqlApprovalRepository(db, ws_repo),
-            SqlWorkflowTaskRepository(db, ws_repo, SqlMCPServerRepository(db)),
-            SqlNotificationRepository(db),
-            SqlUserRepository(db),
+        ws_id, tenant_id = await _resolve_scope(tool_context, db)
+        ws_repo = SqlWorkflowSessionRepository(db, tenant_id=tenant_id)
+        yield _Scope(
+            ws_id=ws_id,
+            tenant_id=tenant_id,
+            ws_repo=ws_repo,
+            approval_repo=SqlApprovalRepository(db, ws_repo, tenant_id=tenant_id),
+            task_repo=SqlWorkflowTaskRepository(
+                db,
+                ws_repo,
+                SqlMCPServerRepository(db, tenant_id=tenant_id),
+                tenant_id=tenant_id,
+            ),
+            notif_repo=SqlNotificationRepository(db, tenant_id=tenant_id),
+            user_repo=SqlUserRepository(db),
         )
 
 
-def _is_eligible_approver(user: User | None) -> bool:
+def _is_eligible_approver(user: User | None, *, tenant_id: str) -> bool:
     """Return whether a user may be designated as an approval's approver.
 
-    Eligible approvers are enabled, not soft-deleted, and hold the
-    ``approver`` role (``super_admin`` also qualifies, since it bypasses every
-    role check).
+    Eligible approvers belong to the given tenant, are enabled, not
+    soft-deleted, and hold the ``approver`` role (``super_admin`` also
+    qualifies for the role check, since it bypasses every role check, but
+    still must belong to the tenant -- there is no cross-tenant bypass). Since
+    a ``super_admin`` can never carry a ``tenant_id`` (see the
+    ``ck_users_super_admin_no_tenant`` constraint on :class:`~models.user.User`),
+    this means a super admin is never eligible as approver for a
+    tenant-scoped session -- there is no platform-scoped exception here.
 
     Args:
         user: The candidate user, or ``None`` when the lookup found nobody.
+        tenant_id: Tenant the approver must belong to (the current run's
+            resolved tenant).
 
     Returns:
         ``True`` if the user exists and may receive approval requests.
@@ -104,6 +133,7 @@ def _is_eligible_approver(user: User | None) -> bool:
         user is not None
         and user.enabled
         and user.deleted_at is None
+        and user.tenant_id == tenant_id
         and has_role(user, Role.approver)
     )
 
@@ -145,47 +175,51 @@ async def request_approval(
     """
     if not approver:
         return {"error": "approver is required"}
-    async with _repos() as (ws_repo, approval_repo, task_repo, notif_repo, user_repo):
-        ws_id = await _resolve_ws_id(tool_context, ws_repo)
-        if ws_id is None:
-            return {"error": _NO_SESSION}
-        if workflow_task_id is not None:
-            task = await task_repo.get(workflow_task_id)
-            if task is None or task.workflow_session_id != ws_id:
+    try:
+        async with _repos(tool_context) as s:
+            if workflow_task_id is not None:
+                task = await s.task_repo.get(workflow_task_id)
+                if task is None or task.workflow_session_id != s.ws_id:
+                    return {
+                        "error": f"WorkflowTask {workflow_task_id!r} "
+                        "not found in the current session"
+                    }
+            if not _is_eligible_approver(
+                await s.user_repo.get(approver), tenant_id=s.tenant_id
+            ):
                 return {
-                    "error": f"WorkflowTask {workflow_task_id!r} "
-                    "not found in the current session"
+                    "error": f"User {approver!r} cannot be designated as an approver: "
+                    "the user must exist, be enabled, and hold the approver role. "
+                    "Use list_users to discover eligible approvers."
                 }
-        if not _is_eligible_approver(await user_repo.get(approver)):
-            return {
-                "error": f"User {approver!r} cannot be designated as an approver: "
-                "the user must exist, be enabled, and hold the approver role. "
-                "Use list_users to discover eligible approvers."
-            }
-        data = ApprovalCreate(
-            workflow_session_id=ws_id,
-            title=title,
-            description=description,
-            workflow_task_id=workflow_task_id,
-            approver=approver,
-        )
-        try:
-            approval = await approval_repo.create(data, user_id=_user_id(tool_context))
-        except ForeignKeyViolationError as exc:
-            return {"error": str(exc)}
-        # Capture the result before _notify commits again, which would expire
-        # these attributes and trigger a lazy reload outside the greenlet context.
-        result = {"approval_id": approval.id, "status": approval.status.value}
-        await _notify(
-            ws_repo,
-            notif_repo,
-            ws_id,
-            NotificationType.approval_request,
-            title,
-            body=description,
-            recipient=approver,
-        )
-        return result
+            data = ApprovalCreate(
+                workflow_session_id=s.ws_id,
+                title=title,
+                description=description,
+                workflow_task_id=workflow_task_id,
+                approver=approver,
+            )
+            try:
+                approval = await s.approval_repo.create(
+                    data, user_id=_user_id(tool_context)
+                )
+            except ForeignKeyViolationError as exc:
+                return {"error": str(exc)}
+            # Capture the result before _notify commits again, which would expire
+            # these attributes and trigger a lazy reload outside the greenlet context.
+            result = {"approval_id": approval.id, "status": approval.status.value}
+            await _notify(
+                s.ws_repo,
+                s.notif_repo,
+                s.ws_id,
+                NotificationType.approval_request,
+                title,
+                body=description,
+                recipient=approver,
+            )
+            return result
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}
 
 
 def _user_to_dict(user: User) -> dict[str, Any]:
@@ -199,23 +233,41 @@ def _user_to_dict(user: User) -> dict[str, Any]:
     }
 
 
-async def list_users() -> dict[str, Any]:
+async def list_users(tool_context: ToolContext) -> dict[str, Any]:
     """List the users eligible to be addressed as an approval's ``approver``.
 
     Call this before :func:`request_approval` to discover valid ``approver`` ids:
     pick the intended person from the returned list and pass their ``id`` as the
     ``approver`` argument. Only enabled users holding the ``approver`` role (or
-    ``super_admin``) are returned; soft-deleted accounts and the internal system
-    user are excluded.
+    ``super_admin``) *and* belonging to the current run's tenant are returned;
+    soft-deleted accounts, other tenants' users, platform-scoped users, and the
+    internal system user are excluded.
+
+    Args:
+        tool_context: Injected by ADK; identifies the current session. Not shown
+            to the model.
 
     Returns:
-        ``{"users": [{"id", "username", "first_name", "last_name", "email"}, ...]}``
-        ordered by creation time (newest first).
+        On success ``{"users": [{"id", "username", "first_name", "last_name",
+        "email"}, ...]}`` ordered by creation time (newest first). On failure
+        ``{"error": <message>}`` if the session cannot be resolved to a tenant.
     """
-    async with AsyncSession(database.engine) as db:
-        user_repo = SqlUserRepository(db)
-        users = await user_repo.list(limit=1000, offset=0)
-        return {"users": [_user_to_dict(u) for u in users if _is_eligible_approver(u)]}
+    try:
+        async with _repos(tool_context) as s:
+            users = await s.user_repo.list(
+                limit=1000,
+                offset=0,
+                filters=[FilterSpec(field="tenantId", op="eq", value=s.tenant_id)],
+            )
+            return {
+                "users": [
+                    _user_to_dict(u)
+                    for u in users
+                    if _is_eligible_approver(u, tenant_id=s.tenant_id)
+                ]
+            }
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}
 
 
 async def get_approval(approval_id: str, tool_context: ToolContext) -> dict[str, Any]:
@@ -234,20 +286,20 @@ async def get_approval(approval_id: str, tool_context: ToolContext) -> dict[str,
         "workflow_task_id"}``. On failure ``{"error": <message>}`` if the session
         cannot be resolved or the approval does not belong to it.
     """
-    async with _repos() as (ws_repo, approval_repo, _task_repo, _notif_repo, _users):
-        ws_id = await _resolve_ws_id(tool_context, ws_repo)
-        if ws_id is None:
-            return {"error": _NO_SESSION}
-        approval = await approval_repo.get(approval_id)
-        if approval is None or approval.workflow_session_id != ws_id:
+    try:
+        async with _repos(tool_context) as s:
+            approval = await s.approval_repo.get(approval_id)
+            if approval is None or approval.workflow_session_id != s.ws_id:
+                return {
+                    "error": f"Approval {approval_id!r} not found in the current session"
+                }
             return {
-                "error": f"Approval {approval_id!r} not found in the current session"
+                "approval_id": approval.id,
+                "title": approval.title,
+                "status": approval.status.value,
+                "response": approval.response,
+                "approver": approval.approver,
+                "workflow_task_id": approval.workflow_task_id,
             }
-        return {
-            "approval_id": approval.id,
-            "title": approval.title,
-            "status": approval.status.value,
-            "response": approval.response,
-            "approver": approval.approver,
-            "workflow_task_id": approval.workflow_task_id,
-        }
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}

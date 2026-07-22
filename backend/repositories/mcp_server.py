@@ -52,17 +52,26 @@ class SqlMCPServerRepository:
     bindings (``ondelete=RESTRICT``).
     """
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Store the SQLModel session used for all operations."""
+    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+        """Store the SQLModel session and the tenant these operations are scoped to."""
         self._db = session
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, server_id: str) -> MCPServer | None:
+        """Return the MCPServer with the given ID within the current tenant, or ``None``."""
+        stmt = select(MCPServer).where(
+            MCPServer.id == server_id, MCPServer.tenant_id == self._tenant_id
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, server_id: str) -> MCPServer | None:
         """Return the MCPServer with the given ID, or ``None`` if missing."""
-        return await self._db.get(MCPServer, server_id)
+        return await self._get_scoped(server_id)
 
     async def exists(self, server_id: str) -> bool:
         """Return ``True`` if an MCPServer with the given ID exists."""
-        return (await self._db.get(MCPServer, server_id)) is not None
+        return await self._get_scoped(server_id) is not None
 
     async def list(
         self,
@@ -73,7 +82,8 @@ class SqlMCPServerRepository:
         filters: Sequence[FilterSpec] = (),
     ) -> list[MCPServer]:
         """Return a page of MCPServers, defaulting to ``created_at`` descending."""
-        stmt = apply_filters(select(MCPServer), MCPServer, filters)
+        stmt = select(MCPServer).where(MCPServer.tenant_id == self._tenant_id)
+        stmt = apply_filters(stmt, MCPServer, filters)
         stmt = apply_sort(
             stmt, MCPServer, sort, default=[col(MCPServer.created_at).desc()]
         )
@@ -83,7 +93,12 @@ class SqlMCPServerRepository:
     async def create(self, data: MCPServerCreate, *, user_id: str) -> MCPServer:
         """Create a new MCPServer, raising UniqueViolationError on duplicate name."""
         server = MCPServer.model_validate(
-            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+            {
+                **data.model_dump(),
+                "tenant_id": self._tenant_id,
+                "created_by": user_id,
+                "updated_by": user_id,
+            }
         )
         self._db.add(server)
         try:
@@ -100,7 +115,7 @@ class SqlMCPServerRepository:
         self, server_id: str, data: MCPServerUpdate, *, user_id: str
     ) -> MCPServer:
         """Apply a partial update, raising NotFoundError or UniqueViolationError."""
-        server = await self._db.get(MCPServer, server_id)
+        server = await self._get_scoped(server_id)
         if server is None:
             raise NotFoundError("MCPServer", server_id)
         update = data.model_dump(exclude_unset=True)
@@ -121,7 +136,7 @@ class SqlMCPServerRepository:
 
     async def delete(self, server_id: str) -> None:
         """Delete the MCPServer, raising ReferencedError while tool bindings remain."""
-        server = await self._db.get(MCPServer, server_id)
+        server = await self._get_scoped(server_id)
         if server is None:
             raise NotFoundError("MCPServer", server_id)
         await self._db.delete(server)

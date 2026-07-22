@@ -19,7 +19,7 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.workflow_task_tools import (
-    _resolve_ws_id,
+    _resolve_scope,
     create_workflow_task,
     delete_workflow_task,
     get_workflow_task,
@@ -29,7 +29,8 @@ from infrastructure.workflow_task_tools import (
 from models.notification import Notification, NotificationType
 from models.workflow_session import WorkflowSession
 from repositories import SqlNotificationRepository, SqlWorkflowSessionRepository
-from tests._seed import seed_users
+from repositories.tenant_bootstrap import NoTenantSessionError
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
 @pytest_asyncio.fixture()
@@ -46,6 +47,7 @@ async def engine(
     async with eng.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(eng)
+    await seed_tenant(eng)
 
     monkeypatch.setattr("infrastructure.database.engine", eng)
     yield eng
@@ -53,7 +55,11 @@ async def engine(
 
 
 async def _seed_session(
-    eng: AsyncEngine, *, session_id: str = "sess-abc", user_id: str = "owner"
+    eng: AsyncEngine,
+    *,
+    session_id: str = "sess-abc",
+    user_id: str = "owner",
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
 ) -> str:
     """Insert a WorkflowSession with the given ADK session id and return its PK."""
     async with AsyncSession(eng) as db:
@@ -65,6 +71,7 @@ async def _seed_session(
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
             user_id=user_id,
+            tenant_id=tenant_id,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -171,18 +178,21 @@ async def test_delete_cross_session_guard(engine: AsyncEngine) -> None:
     assert "error" in result
 
 
-async def test_resolve_ws_id(engine: AsyncEngine) -> None:
+async def test_resolve_scope(engine: AsyncEngine) -> None:
     ws_id = await _seed_session(engine, session_id="sess-x")
     async with AsyncSession(engine) as db:
-        repo = SqlWorkflowSessionRepository(db)
-        assert await _resolve_ws_id(_ctx("sess-x"), repo) == ws_id
-        assert await _resolve_ws_id(_ctx("absent"), repo) is None
+        assert await _resolve_scope(_ctx("sess-x"), db) == (
+            ws_id,
+            DEFAULT_TEST_TENANT_ID,
+        )
+        with pytest.raises(NoTenantSessionError):
+            await _resolve_scope(_ctx("absent"), db)
 
 
 async def test_get_by_session_id(engine: AsyncEngine) -> None:
     ws_id = await _seed_session(engine, session_id="sess-find")
     async with AsyncSession(engine) as db:
-        repo = SqlWorkflowSessionRepository(db)
+        repo = SqlWorkflowSessionRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
         found = await repo.get_by_session_id("sess-find")
         assert found is not None
         assert found.id == ws_id
@@ -192,7 +202,7 @@ async def test_get_by_session_id(engine: AsyncEngine) -> None:
 async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notification]:
     """Return all notifications addressed to ``user_id`` via the repository."""
     async with AsyncSession(eng) as db:
-        repo = SqlNotificationRepository(db)
+        repo = SqlNotificationRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
         return await repo.list(user_id=user_id, limit=100, offset=0)
 
 
@@ -243,6 +253,7 @@ async def _seed_mcp_server(eng: AsyncEngine, *, name: str = "srv") -> str:
         server = MCPServer(
             name=name,
             url="https://mcp.example.com/mcp",
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )
@@ -303,3 +314,28 @@ async def test_update_workflow_task_keeps_bindings_when_omitted(
     )
     result = await update_workflow_task(created["id"], _ctx(), title="Renamed")
     assert result["tool_bindings"] == [{"server_id": server_id, "tool_name": "search"}]
+
+
+# ---------- tenant isolation ----------
+
+
+async def test_get_workflow_task_cross_tenant_guard(engine: AsyncEngine) -> None:
+    """A task created under one tenant's session is invisible from another's.
+
+    Both sessions use distinct ADK session ids (the normal case): the tenant
+    boundary is enforced by the resolved tenant id, not by session-id
+    collision, so this confirms the bootstrap-resolution path picks the
+    correct tenant for each call and that the underlying repositories filter
+    on it.
+    """
+    await seed_tenant(engine, "tenant-other")
+    await _seed_session(
+        engine, session_id="sess-tenant-a", tenant_id=DEFAULT_TEST_TENANT_ID
+    )
+    await _seed_session(engine, session_id="sess-tenant-b", tenant_id="tenant-other")
+    created = await create_workflow_task("Tenant A's task", _ctx("sess-tenant-a"))
+
+    blocked = await get_workflow_task(created["id"], _ctx("sess-tenant-b"))
+    assert "error" in blocked
+    allowed = await get_workflow_task(created["id"], _ctx("sess-tenant-a"))
+    assert allowed["id"] == created["id"]

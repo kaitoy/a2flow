@@ -17,7 +17,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.notification import Notification, NotificationType
 from tests._envelope import assert_err, assert_ok
-from tests._seed import seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 # Import the conftest auth-override installer indirectly by reusing its behaviour
 # through the public app dependency overrides set up below.
@@ -43,6 +43,7 @@ async def notif_env() -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None]:
     async with mem_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await seed_users(mem_engine)
+    await seed_tenant(mem_engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine, expire_on_commit=False) as session:
@@ -75,6 +76,7 @@ async def _insert_notification(
             type=notification_type,
             title=title,
             read=read,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
         )

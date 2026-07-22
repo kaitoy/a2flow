@@ -12,11 +12,11 @@ function authState(roles: Role[]): Partial<RootState> {
 }
 
 describe("RolesField", () => {
-  it("renders a checkbox per role", () => {
+  it("renders a checkbox per non-super-admin role", () => {
     render(<RolesField value={[]} onChange={vi.fn()} />, {
       preloadedState: authState(["admin"]),
     });
-    for (const label of ["Super Admin", "Admin", "Developer", "Requester", "Approver"]) {
+    for (const label of ["Admin", "Developer", "Requester", "Approver"]) {
       expect(screen.getByRole("checkbox", { name: label })).toBeInTheDocument();
     }
   });
@@ -38,17 +38,28 @@ describe("RolesField", () => {
     expect(onChange).toHaveBeenCalledWith(["requester"]);
   });
 
-  it("disables the super_admin checkbox for a non-super-admin viewer", () => {
+  it("hides the super_admin option for a non-super-admin viewer", () => {
     render(<RolesField value={[]} onChange={vi.fn()} />, {
       preloadedState: authState(["admin"]),
     });
-    expect(screen.getByRole("checkbox", { name: "Super Admin" })).toBeDisabled();
+    expect(screen.queryByRole("checkbox", { name: "Super Admin" })).not.toBeInTheDocument();
   });
 
-  it("enables the super_admin checkbox for a super-admin viewer", () => {
+  it("shows the super_admin option for a super-admin viewer", () => {
     render(<RolesField value={[]} onChange={vi.fn()} />, {
       preloadedState: authState(["super_admin"]),
     });
-    expect(screen.getByRole("checkbox", { name: "Super Admin" })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: "Super Admin" })).toBeInTheDocument();
+  });
+
+  it("preserves an existing super_admin grant when a non-super-admin toggles another role", async () => {
+    const onChange = vi.fn();
+    render(<RolesField value={["super_admin", "developer"]} onChange={onChange} />, {
+      preloadedState: authState(["admin"]),
+    });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Approver" }));
+    const reported = onChange.mock.calls[0][0];
+    expect(reported).toHaveLength(3);
+    expect(reported).toEqual(expect.arrayContaining(["super_admin", "developer", "approver"]));
   });
 });

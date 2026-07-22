@@ -15,6 +15,7 @@ import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { RolesField } from "@/components/admin/roles-field";
+import { TenantField } from "@/components/admin/tenant-field";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AvatarConfig, deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
-import type { Role } from "@/lib/roles";
+import { Role } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -64,6 +65,13 @@ export default function EditUserPage() {
   // Roles live outside the form state: the picker is a controlled multi-select
   // rather than a registered input.
   const [roles, setRoles] = useState<Role[]>([]);
+  // Tenant lives outside the form state, like roles, since it's a controlled
+  // select rather than a registered input.
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  // The tenantId as loaded from the server, kept separate from the live
+  // `tenantId` state above so the field can be locked once a tenant was
+  // already assigned (a tenant is immutable once set — see TenantField).
+  const [originalTenantId, setOriginalTenantId] = useState<string | null>(null);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -91,6 +99,8 @@ export default function EditUserPage() {
         setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
         setAvatarConfig(user.avatarConfig ?? null);
         setRoles(user.roles ?? []);
+        setTenantId(user.tenantId ?? null);
+        setOriginalTenantId(user.tenantId ?? null);
         reset({
           firstName: user.firstName,
           lastName: user.lastName,
@@ -121,6 +131,7 @@ export default function EditUserPage() {
       enabled: values.enabled,
       emailVerified: values.emailVerified,
       roles,
+      tenantId,
     };
     if (values.password) {
       body.password = values.password;
@@ -214,6 +225,13 @@ export default function EditUserPage() {
           </FormField>
 
           <RolesField value={roles} onChange={setRoles} />
+
+          <TenantField
+            value={tenantId}
+            onChange={setTenantId}
+            disabled={roles.includes(Role.SUPER_ADMIN)}
+            locked={originalTenantId !== null}
+          />
 
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />

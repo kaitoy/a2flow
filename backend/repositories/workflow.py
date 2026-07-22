@@ -58,12 +58,22 @@ class SqlWorkflowRepository:
     updating a workflow, raising ForeignKeyViolationError if it does not.
     """
 
-    def __init__(self, session: AsyncSession, skills: AgentSkillRepository) -> None:
+    def __init__(
+        self, session: AsyncSession, skills: AgentSkillRepository, *, tenant_id: str
+    ) -> None:
         self._db = session
         self._skills = skills
+        self._tenant_id = tenant_id
+
+    async def _get_scoped(self, workflow_id: str) -> Workflow | None:
+        stmt = select(Workflow).where(
+            Workflow.id == workflow_id, Workflow.tenant_id == self._tenant_id
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
 
     async def get(self, workflow_id: str) -> Workflow | None:
-        return await self._db.get(Workflow, workflow_id)
+        return await self._get_scoped(workflow_id)
 
     async def list(
         self,
@@ -73,7 +83,8 @@ class SqlWorkflowRepository:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> list[Workflow]:
-        stmt = apply_filters(select(Workflow), Workflow, filters)
+        stmt = select(Workflow).where(Workflow.tenant_id == self._tenant_id)
+        stmt = apply_filters(stmt, Workflow, filters)
         stmt = apply_sort(
             stmt, Workflow, sort, default=[col(Workflow.created_at).desc()]
         )
@@ -85,7 +96,12 @@ class SqlWorkflowRepository:
         if not await self._skills.exists(data.agent_skill_id):
             raise ForeignKeyViolationError("AgentSkill", data.agent_skill_id)
         workflow = Workflow.model_validate(
-            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+            {
+                **data.model_dump(),
+                "tenant_id": self._tenant_id,
+                "created_by": user_id,
+                "updated_by": user_id,
+            }
         )
         self._db.add(workflow)
         try:
@@ -102,7 +118,7 @@ class SqlWorkflowRepository:
         self, workflow_id: str, data: WorkflowUpdate, *, user_id: str
     ) -> Workflow:
         """Apply a partial update, raising NotFoundError or UniqueViolationError."""
-        workflow = await self._db.get(Workflow, workflow_id)
+        workflow = await self._get_scoped(workflow_id)
         if workflow is None:
             raise NotFoundError("Workflow", workflow_id)
         update = data.model_dump(exclude_unset=True)
@@ -153,7 +169,7 @@ class SqlWorkflowRepository:
         Raises:
             NotFoundError: If no workflow exists with the given ID.
         """
-        workflow = await self._db.get(Workflow, workflow_id)
+        workflow = await self._get_scoped(workflow_id)
         if workflow is None:
             raise NotFoundError("Workflow", workflow_id)
         workflow.status = status
@@ -167,7 +183,7 @@ class SqlWorkflowRepository:
         return workflow
 
     async def delete(self, workflow_id: str) -> None:
-        workflow = await self._db.get(Workflow, workflow_id)
+        workflow = await self._get_scoped(workflow_id)
         if workflow is None:
             raise NotFoundError("Workflow", workflow_id)
         await self._db.delete(workflow)

@@ -33,6 +33,7 @@ from repositories.exceptions import (
     SkillNotReadyError,
     UnauthorizedError,
     UniqueViolationError,
+    UserValidationError,
     WorkflowNotRunnableError,
 )
 
@@ -157,6 +158,20 @@ async def secret_validation_exception_handler(
     return _envelope_error(
         request,
         code="INVALID_SECRET",
+        message=str(exc),
+        status_code=422,
+        details={"reason": exc.reason},
+    )
+
+
+async def user_validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 422 with INVALID_USER code when a merged user role/tenant combination is invalid."""
+    assert isinstance(exc, UserValidationError)
+    return _envelope_error(
+        request,
+        code="INVALID_USER",
         message=str(exc),
         status_code=422,
         details={"reason": exc.reason},
