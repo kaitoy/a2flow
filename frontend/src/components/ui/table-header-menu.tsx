@@ -251,16 +251,11 @@ export function TableHeaderMenu({
                       </div>
                       {filterOptions ? (
                         <Select
+                          aria-label={`Filter ${label}`}
                           value={filterValue ?? ""}
-                          onChange={(e) => onFilterChange?.(e.target.value)}
-                        >
-                          <option value="">All</option>
-                          {filterOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </Select>
+                          onChange={(next) => onFilterChange?.(next)}
+                          options={[{ value: "", label: "All" }, ...filterOptions]}
+                        />
                       ) : (
                         <Input
                           type="text"

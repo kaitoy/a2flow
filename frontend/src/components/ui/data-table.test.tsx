@@ -244,7 +244,8 @@ describe("DataTable", () => {
     );
     await user.click(screen.getByRole("button", { name: "Name" }));
     const select = await screen.findByRole("combobox");
-    await user.selectOptions(select, "alpha");
+    await user.click(select);
+    await user.click(await screen.findByRole("option", { name: "Alpha" }));
     expect(onFilterChange).toHaveBeenCalledWith([{ field: "name", op: "eq", value: "alpha" }]);
   });
 

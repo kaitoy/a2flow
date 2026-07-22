@@ -77,15 +77,12 @@ export function TenantField({
         id="tenantId"
         value={value ?? ""}
         disabled={disabled || locked}
-        onChange={(e) => onChange(e.target.value || null)}
-      >
-        <option value="">Unassigned</option>
-        {tenants.map((tenant) => (
-          <option key={tenant.id} value={tenant.id}>
-            {tenant.displayName}
-          </option>
-        ))}
-      </Select>
+        onChange={(next) => onChange(next || null)}
+        options={[
+          { value: "", label: "Unassigned" },
+          ...tenants.map((tenant) => ({ value: tenant.id, label: tenant.displayName })),
+        ]}
+      />
     </FormField>
   );
 }

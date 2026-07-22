@@ -44,12 +44,12 @@ describe("TenantField", () => {
   });
 
   it("renders a tenant select populated with options for a super-admin viewer", async () => {
+    const user = userEvent.setup();
     render(<TenantField value={null} onChange={vi.fn()} />, {
       preloadedState: authState(["super_admin"]),
     });
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-    });
+    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
+    expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
   });
 
   it("selects the currently assigned tenant", async () => {
@@ -57,7 +57,7 @@ describe("TenantField", () => {
       preloadedState: authState(["super_admin"]),
     });
     await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Acme Corp");
     });
   });
 
@@ -67,21 +67,20 @@ describe("TenantField", () => {
     render(<TenantField value={null} onChange={onChange} />, {
       preloadedState: authState(["super_admin"]),
     });
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-    });
-    await user.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
+    const trigger = await screen.findByRole("combobox", { name: "Tenant" });
+    await user.click(trigger);
+    await user.click(await screen.findByRole("option", { name: "Acme Corp" }));
     expect(onChange).toHaveBeenCalledWith("tenant-1");
   });
 
   it("refetches the tenant list when tenants.version changes, without remounting", async () => {
+    const user = userEvent.setup();
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1])));
     const { store } = render(<TenantField value={null} onChange={vi.fn()} />, {
       preloadedState: authState(["super_admin"]),
     });
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-    });
+    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
+    expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Globex" })).not.toBeInTheDocument();
 
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
@@ -126,7 +125,7 @@ describe("TenantField", () => {
       preloadedState: authState(["super_admin"]),
     });
     await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Acme Corp");
     });
     expect(onChange).not.toHaveBeenCalled();
     rerender(<TenantField value="tenant-1" onChange={onChange} disabled />);
@@ -143,7 +142,7 @@ describe("TenantField", () => {
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
     });
-    expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+    expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Acme Corp");
     expect(onChange).not.toHaveBeenCalled();
   });
 

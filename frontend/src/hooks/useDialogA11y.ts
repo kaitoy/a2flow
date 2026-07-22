@@ -6,6 +6,16 @@ import { type RefObject, useEffect, useRef } from "react";
 const FOCUSABLE_SELECTOR =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
+/**
+ * Attribute every panel managed by this hook self-tags while open, so a
+ * pointerdown inside one popover is never misread as "outside" by another
+ * popover it happens to be nested in (e.g. a `Select` listbox opened inside
+ * `TableHeaderMenu`'s dialog) — the two panels are DOM siblings once
+ * portaled, not ancestor/descendant, so a plain containment check can't tell
+ * they're related.
+ */
+const NESTED_POPOVER_ATTR = "data-glass-popover";
+
 /** Options for {@link useDialogA11y}. */
 export interface UseDialogA11yOptions {
   /** Whether the panel is currently open. */
@@ -39,7 +49,10 @@ export interface UseDialogA11yOptions {
  * Shared accessibility wiring for anchored popovers and modal dialogs: moves
  * focus into the panel on open, traps Tab navigation within it while open,
  * closes on Escape (and optionally on an outside pointerdown), and restores
- * focus to the trigger on close.
+ * focus to the trigger on close. Also treats a pointerdown landing inside any
+ * other currently-open popover managed by this hook as inside (not outside),
+ * so a popover nested inside another one doesn't cause the outer popover to
+ * close before the inner one's own click handler runs.
  */
 export function useDialogA11y({
   open,
@@ -76,6 +89,17 @@ export function useDialogA11y({
     };
   }, [open, ready, panelId]);
 
+  // Self-tag the panel while it's open so a sibling popover's outside-click
+  // check (see handlePointerDown below) can recognize it as "inside".
+  useEffect(() => {
+    if (!open || !ready) return;
+    const panel = document.getElementById(panelId);
+    panel?.setAttribute(NESTED_POPOVER_ATTR, "true");
+    return () => {
+      document.getElementById(panelId)?.removeAttribute(NESTED_POPOVER_ATTR);
+    };
+  }, [open, ready, panelId]);
+
   // Close on Escape or (optionally) a click outside both the panel and its
   // anchor; trap Tab focus within the panel while open.
   useEffect(() => {
@@ -107,6 +131,11 @@ export function useDialogA11y({
       const target = e.target as Node;
       if (anchorRef?.current?.contains(target)) return;
       if (document.getElementById(panelId)?.contains(target)) return;
+      // A portaled panel is a DOM sibling of this one, not a descendant, so
+      // a nested popover (e.g. a Select listbox opened inside this dialog)
+      // needs its own explicit "inside" check via the shared marker.
+      const targetEl = target instanceof Element ? target : target.parentElement;
+      if (targetEl?.closest(`[${NESTED_POPOVER_ATTR}]`)) return;
       onClose();
     }
 

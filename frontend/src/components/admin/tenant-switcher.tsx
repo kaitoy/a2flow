@@ -77,23 +77,17 @@ export function TenantSwitcher() {
       aria-label="Acting tenant"
       value={selectedTenantId ?? ""}
       disabled={tenants.length === 0}
-      onChange={(e) => {
-        const next = e.target.value || null;
-        persistSelection(next);
-        dispatch(setSelectedTenantId(next));
+      onChange={(next) => {
+        persistSelection(next || null);
+        dispatch(setSelectedTenantId(next || null));
         window.location.reload();
       }}
+      options={
+        tenants.length === 0
+          ? [{ value: "", label: "No tenants" }]
+          : tenants.map((tenant) => ({ value: tenant.id, label: tenant.displayName }))
+      }
       className="w-auto min-w-32"
-    >
-      {tenants.length === 0 ? (
-        <option value="">No tenants</option>
-      ) : (
-        tenants.map((tenant) => (
-          <option key={tenant.id} value={tenant.id}>
-            {tenant.displayName}
-          </option>
-        ))
-      )}
-    </Select>
+    />
   );
 }

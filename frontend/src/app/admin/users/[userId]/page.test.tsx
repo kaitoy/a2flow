@@ -219,7 +219,7 @@ describe("EditUserPage", () => {
     await waitFor(() => screen.getByDisplayValue("alice"));
 
     await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Acme Corp");
     });
   });
 
@@ -235,10 +235,8 @@ describe("EditUserPage", () => {
 
     render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
     await waitFor(() => screen.getByDisplayValue("alice"));
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-    });
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
+    await userEvent.click(await screen.findByRole("combobox", { name: "Tenant" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Acme Corp" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(capturedBody?.tenantId).toBe("tenant-1"));
@@ -262,7 +260,7 @@ describe("EditUserPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
     });
-    expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+    expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Acme Corp");
 
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -301,7 +299,7 @@ describe("EditUserPage", () => {
     render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
     await waitFor(() => screen.getByDisplayValue("alice"));
     await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveValue("tenant-1");
+      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Acme Corp");
     });
     await userEvent.click(screen.getByRole("checkbox", { name: "Super Admin" }));
     await waitFor(() => {

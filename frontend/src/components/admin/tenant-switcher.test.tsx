@@ -60,19 +60,21 @@ describe("TenantSwitcher", () => {
   });
 
   it("renders a select populated with every tenant for a super-admin viewer", async () => {
+    const user = userEvent.setup();
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
     render(<TenantSwitcher />, { preloadedState: authState(["super_admin"]) });
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "Globex" })).toBeInTheDocument();
-    });
+    await user.click(await screen.findByRole("combobox", { name: "Acting tenant" }));
+    expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Globex" })).toBeInTheDocument();
   });
 
   it("auto-selects the first tenant when nothing is selected yet", async () => {
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
     render(<TenantSwitcher />, { preloadedState: authState(["super_admin"]) });
     await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveValue("tenant-1");
+      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveTextContent(
+        "Acme Corp"
+      );
     });
   });
 
@@ -80,7 +82,7 @@ describe("TenantSwitcher", () => {
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
     render(<TenantSwitcher />, { preloadedState: authState(["super_admin"], "tenant-2") });
     await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveValue("tenant-2");
+      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveTextContent("Globex");
     });
   });
 
@@ -90,7 +92,9 @@ describe("TenantSwitcher", () => {
       preloadedState: authState(["super_admin"], "stale-tenant"),
     });
     await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveValue("tenant-1");
+      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveTextContent(
+        "Acme Corp"
+      );
     });
   });
 
@@ -98,11 +102,11 @@ describe("TenantSwitcher", () => {
     const user = userEvent.setup();
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
     render(<TenantSwitcher />, { preloadedState: authState(["super_admin"]) });
-    await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveValue("tenant-1");
-    });
+    const trigger = screen.getByRole("combobox", { name: "Acting tenant" });
+    await waitFor(() => expect(trigger).toHaveTextContent("Acme Corp"));
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Acting tenant" }), "tenant-2");
+    await user.click(trigger);
+    await user.click(screen.getByRole("option", { name: "Globex" }));
 
     expect(window.localStorage.getItem(SELECTED_TENANT_STORAGE_KEY)).toBe("tenant-2");
     expect(reloadMock).toHaveBeenCalledOnce();
@@ -112,17 +116,19 @@ describe("TenantSwitcher", () => {
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
     render(<TenantSwitcher />, { preloadedState: authState(["super_admin"]) });
     await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveValue("tenant-1");
+      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveTextContent(
+        "Acme Corp"
+      );
     });
     expect(reloadMock).not.toHaveBeenCalled();
   });
 
   it("refetches the tenant list when tenants.version changes, without remounting", async () => {
+    const user = userEvent.setup();
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1])));
     const { store } = render(<TenantSwitcher />, { preloadedState: authState(["super_admin"]) });
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-    });
+    await user.click(await screen.findByRole("combobox", { name: "Acting tenant" }));
+    expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Globex" })).not.toBeInTheDocument();
 
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));

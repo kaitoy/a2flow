@@ -118,10 +118,10 @@ describe("NewUserPage", () => {
   });
 
   it("renders a tenant field for a super-admin viewer", async () => {
+    const user = userEvent.setup();
     render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-    });
+    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
+    expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
   });
 
   it("includes the selected tenant in the create request", async () => {
@@ -136,10 +136,8 @@ describe("NewUserPage", () => {
 
     render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
     await fillRequiredFields(user);
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-    });
-    await user.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
+    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
+    await user.click(await screen.findByRole("option", { name: "Acme Corp" }));
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(receivedBody?.tenantId).toBe("tenant-1"));
@@ -148,10 +146,8 @@ describe("NewUserPage", () => {
   it("disables the tenant select once super_admin is checked", async () => {
     const user = userEvent.setup();
     render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-    });
-    await user.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
+    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
+    await user.click(await screen.findByRole("option", { name: "Acme Corp" }));
 
     await user.click(screen.getByRole("checkbox", { name: "Super Admin" }));
 
@@ -172,10 +168,8 @@ describe("NewUserPage", () => {
 
     render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
     await fillRequiredFields(user);
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
-    });
-    await user.selectOptions(screen.getByRole("combobox", { name: "Tenant" }), "tenant-1");
+    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
+    await user.click(await screen.findByRole("option", { name: "Acme Corp" }));
     await user.click(screen.getByRole("checkbox", { name: "Super Admin" }));
     await user.click(screen.getByRole("button", { name: /save/i }));
 

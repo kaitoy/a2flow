@@ -69,7 +69,9 @@ describe("TableHeaderMenu", () => {
 
     await user.click(screen.getByRole("button", { name: "Status" }));
 
-    await waitFor(() => expect(screen.getByRole("combobox")).toHaveFocus());
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Filter Status" })).toHaveFocus()
+    );
   });
 
   it("emits the clicked sort direction and closes the menu", async () => {
@@ -156,7 +158,7 @@ describe("TableHeaderMenu", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("emits immediately from the select variant", async () => {
+  it("selects a filter option without closing the outer column menu", async () => {
     const user = userEvent.setup();
     const onFilterChange = vi.fn();
     render(
@@ -167,11 +169,16 @@ describe("TableHeaderMenu", () => {
         filterOptions={[{ label: "Active", value: "active" }]}
       />
     );
+    const trigger = screen.getByRole("button", { name: "Status" });
 
-    await user.click(screen.getByRole("button", { name: "Status" }));
-    await user.selectOptions(await screen.findByRole("combobox"), "active");
+    await user.click(trigger);
+    await user.click(await screen.findByRole("combobox", { name: "Filter Status" }));
+    await user.click(await screen.findByRole("option", { name: "Active" }));
 
     expect(onFilterChange).toHaveBeenCalledWith("active");
+    // The nested Select listbox closing must not take the outer column menu
+    // down with it (see useDialogA11y's nested-popover handling).
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
   });
 
   it("closes and returns focus to the trigger on Escape", async () => {

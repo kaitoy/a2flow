@@ -146,4 +146,57 @@ describe("useDialogA11y", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
+
+  it("does not close when a pointerdown lands inside a nested popover panel", async () => {
+    // Two independent useDialogA11y instances whose panels are DOM siblings,
+    // mirroring two separate createPortal calls where one panel (e.g. a
+    // Select listbox) is visually nested inside the other (e.g.
+    // TableHeaderMenu's dialog) but not a DOM descendant of it.
+    function NestedHarness() {
+      const [outerOpen, setOuterOpen] = useState(true);
+      const [innerOpen, setInnerOpen] = useState(true);
+      const outerAnchorRef = useRef<HTMLButtonElement | null>(null);
+      const innerAnchorRef = useRef<HTMLButtonElement | null>(null);
+      useDialogA11y({
+        open: outerOpen,
+        onClose: () => setOuterOpen(false),
+        anchorRef: outerAnchorRef,
+        panelId: "outer-panel",
+      });
+      useDialogA11y({
+        open: innerOpen,
+        onClose: () => setInnerOpen(false),
+        anchorRef: innerAnchorRef,
+        panelId: "inner-panel",
+      });
+
+      return (
+        <>
+          <button type="button" ref={outerAnchorRef}>
+            outer anchor
+          </button>
+          <button type="button" ref={innerAnchorRef}>
+            inner anchor
+          </button>
+          {outerOpen && (
+            <div id="outer-panel" role="dialog" aria-label="Outer panel" tabIndex={-1}>
+              outer panel
+            </div>
+          )}
+          {innerOpen && (
+            <div id="inner-panel" role="listbox" aria-label="Inner panel" tabIndex={-1}>
+              <button type="button">inner option</button>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    render(<NestedHarness />);
+
+    fireEvent.pointerDown(screen.getByText("inner option"));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+  });
 });
