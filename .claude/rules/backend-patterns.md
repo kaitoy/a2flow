@@ -122,6 +122,8 @@ class AgentSkill(AgentSkillCreate, TenantScoped, BaseEntity, table=True):
 
 `User.tenant_id` is a plain nullable field, not `TenantScoped` — `None` means platform-scoped (the seeded system user, or a super_admin). `User` is the subject of tenant assignment, not a tenant-scoped resource itself. A platform-scoped caller is not locked out of tenant-scoped routes: `get_current_tenant_id` (`dependencies/auth.py`) resolves the acting tenant from the `X-Tenant-Id` request header in that case — see the `CurrentTenantIdDep` entry under "Dependency Injection" below.
 
+That doesn't mean `User` has no tenant boundary, though — it's enforced one layer up instead of via a repository-level filter. `UserService` (`services/user.py`) restricts a non-super-admin actor's `get`/`list`/`update`/`delete` to users sharing their own `tenant_id` (a cross-tenant reference raises `NotFoundError`, matching the 404-not-403 convention below); a super admin is exempt. This is an ownership-style check in the service layer, not the repository-level `_get_scoped`/`tenant_id`-filter pattern the rest of this section describes — see "Ownership rules — service layer" under Authorization.
+
 ---
 
 ## Repository Layer
@@ -327,10 +329,10 @@ The caller's identity comes from the authenticated session cookie. `dependencies
 
 ### Authorization
 
-Authentication (a valid session) is applied router-wide; **authorization** has two layers, both raising `ForbiddenError` (403 `FORBIDDEN`):
+Authentication (a valid session) is applied router-wide; **authorization** has two layers, most often raising `ForbiddenError` (403 `FORBIDDEN`):
 
 1. **Role gates — router layer.** `dependencies/authz.py::require_roles(*roles)` builds a route dependency; attach it per route (`@router.post(..., dependencies=[Depends(require_roles(Role.developer))])`), never router-wide, because every router mixes open `GET`s with gated writes. Reads are deliberately open to all authenticated users. `Role` and the shared `has_role(user, *roles)` helper (with its `super_admin` bypass) live in `models/user.py` — always go through `has_role`, never compare `user.roles` directly.
-2. **Ownership rules — service layer.** Anything a role cannot express belongs in the service, alongside the business rules: `UserService.update` (self-service fields + the `super_admin` grant/revoke guard), `UserAvatarService` (self-only writes), `ApprovalService.resolve` (designated approver — no `super_admin` bypass), `WorkflowTaskService.update`'s status-change guard (`services/workflow_task.py`: changing a task's `status` is restricted to the session owner or, when the task has a linked `Approval`, that Approval's designated approver — also no `super_admin` bypass, for consistency with `ApprovalService.resolve`), and `WorkflowSessionAccessPolicy` (`services/workflow_session_access.py`), which `WorkflowSessionService` and `WorkflowTaskService` call with the `caller: User` their routers pass in. Fetch the entity first so a missing record still surfaces as 404, not 403.
+2. **Ownership rules — service layer.** Anything a role cannot express belongs in the service, alongside the business rules: `UserService.update` (self-service fields + the `super_admin` grant/revoke guard), `UserAvatarService` (self-only writes), `ApprovalService.resolve` (designated approver — no `super_admin` bypass), `WorkflowTaskService.update`'s status-change guard (`services/workflow_task.py`: changing a task's `status` is restricted to the session owner or, when the task has a linked `Approval`, that Approval's designated approver — also no `super_admin` bypass, for consistency with `ApprovalService.resolve`), and `WorkflowSessionAccessPolicy` (`services/workflow_session_access.py`), which `WorkflowSessionService` and `WorkflowTaskService` call with the `caller: User` their routers pass in. Fetch the entity first so a missing record still surfaces as 404, not 403. `UserService`'s tenant-visibility check (`_assert_tenant_visible`, restricting `get`/`list`/`update`/`delete` to the caller's own tenant unless they're a super admin — see "Tenant Isolation" above) follows the same fetch-first rule but raises `NotFoundError`, not `ForbiddenError`, for a cross-tenant reference, so existence in another tenant is never confirmed to the caller.
 
 ### Path and Tag Naming
 

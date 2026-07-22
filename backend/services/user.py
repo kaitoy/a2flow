@@ -10,6 +10,19 @@ A ``super_admin`` is platform-scoped by definition and may never carry a
 ``tenant_id``; every other user must carry one (a non-super-admin actor who
 omits it on create is silently scoped to their own tenant instead). Once a
 ``tenant_id`` is non-null it can never change, for any actor.
+
+``User`` is not a ``TenantScoped`` model (see ``models/tenant_scoped.py``), so
+unlike every other resource it has no repository-level tenant filter. Instead
+this service enforces the boundary itself: :func:`_assert_tenant_visible`
+restricts a non-super-admin actor to users sharing their own concrete tenant
+for every read/write that targets an existing user (``get``, and transitively
+``update``/``delete``, plus ``list``'s query filter) — a cross-tenant
+reference surfaces as :class:`NotFoundError`, not :class:`ForbiddenError`, so
+existence in another tenant is never leaked. A ``super_admin`` actor is
+exempt, same as every other role check in this module, and so is a
+platform-scoped *target* (``tenant_id is None`` — a ``super_admin`` or the
+system user), matching the existing precedent that any admin may view or
+edit a super_admin's profile fields.
 """
 
 from collections.abc import Sequence
@@ -74,6 +87,34 @@ def _require_tenant_for_non_super_admin(
         raise UserValidationError("A non-super-admin user must be assigned a tenant")
 
 
+def _assert_tenant_visible(acting_user: User, target: User) -> None:
+    """Reject access to a user belonging to a different, concrete tenant.
+
+    The boundary is between two actual tenants only: a platform-scoped
+    target (``target.tenant_id is None`` -- a ``super_admin`` or the seeded
+    system user) is exempt, matching the existing precedent that any admin
+    may view or edit a super_admin's profile fields (role changes are
+    separately gated in :meth:`UserService.update`). A ``super_admin`` actor
+    is likewise exempt, matching every other role check in this module. Any
+    other actor (including one with the ``admin`` role) may only see users
+    sharing their own tenant.
+
+    Args:
+        acting_user: The authenticated user making the request.
+        target: The user record being accessed.
+
+    Raises:
+        NotFoundError: If neither exemption applies and ``target.tenant_id``
+            differs from ``acting_user.tenant_id`` -- reported as "not
+            found" rather than "forbidden" so a cross-tenant reference never
+            confirms the target's existence.
+    """
+    if has_role(acting_user, Role.super_admin) or target.tenant_id is None:
+        return
+    if target.tenant_id != acting_user.tenant_id:
+        raise NotFoundError("User", target.id)
+
+
 class UserService:
     """Application service orchestrating User operations."""
 
@@ -85,21 +126,26 @@ class UserService:
         """
         self._repo = repo
 
-    async def get(self, user_id: str) -> User:
+    async def get(self, user_id: str, *, acting_user: User) -> User:
         """Return the User with the given ID.
 
         Args:
             user_id: Identifier of the user to fetch.
+            acting_user: The authenticated user making the request; must be a
+                super admin or share the target's tenant.
 
         Returns:
             The matching User.
 
         Raises:
-            NotFoundError: If no user exists with the given ID.
+            NotFoundError: If no user exists with the given ID, or if it
+                exists but is outside ``acting_user``'s tenant (see
+                :func:`_assert_tenant_visible`).
         """
         user = await self._repo.get(user_id)
         if user is None:
             raise NotFoundError("User", user_id)
+        _assert_tenant_visible(acting_user, user)
         return user
 
     async def list(
@@ -109,18 +155,32 @@ class UserService:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        acting_user: User,
     ) -> list[User]:
-        """Return a page of User records.
+        """Return a page of User records visible to the acting user.
+
+        A non-super-admin actor is restricted to users in their own tenant: a
+        matching ``tenantId:eq:`` filter is appended to ``filters``, so it
+        combines with (never widens) whatever the caller supplied. A super
+        admin sees every user, unrestricted.
 
         Args:
             limit: Maximum number of records to return.
             offset: Number of records to skip.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
+            acting_user: The authenticated user making the request.
 
         Returns:
             The requested page of users.
         """
+        if not has_role(acting_user, Role.super_admin):
+            filters = (
+                *filters,
+                FilterSpec(
+                    field="tenantId", op="eq", value=acting_user.tenant_id or ""
+                ),
+            )
         return await self._repo.list(
             limit=limit, offset=offset, sort=sort, filters=filters
         )
@@ -188,7 +248,9 @@ class UserService:
             The updated User.
 
         Raises:
-            NotFoundError: If no user exists with the given ID.
+            NotFoundError: If no user exists with the given ID, or if it
+                exists but is outside ``acting_user``'s tenant (see
+                :func:`_assert_tenant_visible`).
             ForbiddenError: If the acting user is not allowed to apply this
                 update (non-admin editing another user or a non-self-service
                 field, a non-super-admin changing ``super_admin``, or a
@@ -200,7 +262,7 @@ class UserService:
                 ``tenant_id``, or would change a ``tenant_id`` the target
                 already has.
         """
-        target = await self.get(target_id)
+        target = await self.get(target_id, acting_user=acting_user)
         update = data.model_dump(exclude_unset=True)
         if has_role(acting_user, Role.admin):
             if data.roles is not None and not has_role(acting_user, Role.super_admin):
@@ -238,13 +300,18 @@ class UserService:
             target_id, UserUpdate(**update), user_id=acting_user.id
         )
 
-    async def delete(self, user_id: str) -> None:
+    async def delete(self, user_id: str, *, acting_user: User) -> None:
         """Delete a User.
 
         Args:
             user_id: Identifier of the user to delete.
+            acting_user: The authenticated user performing the deletion; must
+                be a super admin or share the target's tenant.
 
         Raises:
-            NotFoundError: If no user exists with the given ID.
+            NotFoundError: If no user exists with the given ID, or if it
+                exists but is outside ``acting_user``'s tenant (see
+                :func:`_assert_tenant_visible`).
         """
+        await self.get(user_id, acting_user=acting_user)
         await self._repo.delete(user_id)

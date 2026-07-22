@@ -214,6 +214,38 @@ async def test_delete_avatar_clears_marker(avatar_client: AsyncClient) -> None:
     )
 
 
+# ---------- tenant isolation ----------
+
+
+async def test_get_avatar_other_tenant_returns_404_for_tenant_scoped_caller(
+    avatar_client: AsyncClient,
+) -> None:
+    """A tenant-scoped caller can't fetch another tenant's user's avatar, even if it exists."""
+    other_tenant = assert_ok(
+        await avatar_client.post(
+            "/api/v1/tenants",
+            json={"displayName": "Avatar Isolation", "name": "avatar-isolation"},
+        ),
+        status=201,
+    )
+    other_user = assert_ok(
+        await avatar_client.post(
+            "/api/v1/users",
+            json={**_CREATE_BODY, "tenantId": other_tenant["id"]},
+        ),
+        status=201,
+    )
+    await avatar_client.put(
+        f"/api/v1/users/{other_user['id']}/avatar",
+        files={"file": ("avatar.png", _PNG_BYTES, "image/png")},
+    )
+
+    response = await avatar_client.get(
+        f"/api/v1/users/{other_user['id']}/avatar", headers={"X-User-Roles": "admin"}
+    )
+    assert_err(response, code="NOT_FOUND", status=404)
+
+
 async def test_delete_avatar_without_upload_returns_404(
     avatar_client: AsyncClient,
 ) -> None:
