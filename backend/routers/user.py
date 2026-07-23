@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, Response, UploadFile
 
 from dependencies import (
     ApiMetaDep,
+    CurrentTenantIdDep,
     CurrentUserDep,
     FilterDep,
     PaginationDep,
@@ -57,12 +58,15 @@ async def list_users(
     sort: SortDep,
     filters: FilterDep,
     acting_user: CurrentUserDep,
+    acting_tenant_id: CurrentTenantIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[UserRead]]:
     """Return a page of users without their password hashes.
 
-    A non-super-admin caller only ever sees users in their own tenant; a
-    super admin sees every user.
+    A non-super-admin caller only ever sees users in their own tenant. A
+    super admin sees users in the tenant they're currently acting as (see
+    :data:`CurrentTenantIdDep`, resolved from the app bar's tenant switcher),
+    plus every super_admin user platform-wide regardless of tenant.
     """
     items = await service.list(
         limit=pagination.limit,
@@ -70,6 +74,7 @@ async def list_users(
         sort=sort.sort,
         filters=filters.filters,
         acting_user=acting_user,
+        acting_tenant_id=acting_tenant_id,
     )
     return ApiResponse(meta=meta, data=[UserRead.model_validate(u) for u in items])
 

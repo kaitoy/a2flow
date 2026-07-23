@@ -10,11 +10,12 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteUser, listUsers, type User } from "@/lib/api";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS, Role } from "@/lib/roles";
 
 const LIMIT = 20;
 
@@ -62,9 +63,21 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
   },
   {
     // Roles are stored as a JSON list, which the list API's sort/filter params
-    // cannot address, so this column is display-only.
+    // cannot address, so this column is display-only. The Super Admin badge is
+    // a chip, not plain text, so it opts out of single-line truncation.
     header: "Roles",
-    cell: (u) => (u.roles?.length ? u.roles.map((r) => ROLE_LABELS[r]).join(", ") : "—"),
+    noTruncate: true,
+    cell: (u) => {
+      const isSuperAdmin = u.roles?.includes(Role.SUPER_ADMIN);
+      const otherRoles = (u.roles ?? []).filter((r) => r !== Role.SUPER_ADMIN);
+      return (
+        <div className="flex items-center gap-1.5">
+          {isSuperAdmin && <Badge>Super Admin</Badge>}
+          {otherRoles.length > 0 && <span>{otherRoles.map((r) => ROLE_LABELS[r]).join(", ")}</span>}
+          {!isSuperAdmin && otherRoles.length === 0 && "—"}
+        </div>
+      );
+    },
   },
   {
     header: "Enabled",

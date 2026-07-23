@@ -1,6 +1,7 @@
 "use client";
 
 import type { ToolCallActivityContent } from "@/lib/agentActivity";
+import { Badge } from "./ui/badge";
 import { Spinner } from "./ui/spinner";
 
 /**
@@ -31,11 +32,7 @@ export function ToolActivityBubble({ content }: { content: ToolCallActivityConte
           </span>
         )}
         <span className="font-mono font-medium text-on-surface">{content.name}</span>
-        {content.isMcp && (
-          <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-badge tracking-wide uppercase text-accent">
-            MCP
-          </span>
-        )}
+        {content.isMcp && <Badge>MCP</Badge>}
         <span>{running ? "running…" : "done"}</span>
       </div>
     </div>

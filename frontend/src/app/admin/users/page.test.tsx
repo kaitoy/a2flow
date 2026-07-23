@@ -40,6 +40,37 @@ describe("UsersPage", () => {
     await waitFor(() => expect(screen.getByText("No users registered yet.")).toBeInTheDocument());
   });
 
+  it("shows a Super Admin badge for a super_admin user", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/users", () =>
+        envelope([
+          {
+            id: "user-1",
+            username: "alice",
+            firstName: "Alice",
+            lastName: "Smith",
+            email: "alice@example.com",
+            enabled: true,
+            emailVerified: false,
+            roles: ["super_admin"],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+    render(<UsersPage />);
+    await waitFor(() => expect(screen.getByText("Super Admin")).toBeInTheDocument());
+  });
+
+  it("does not show a Super Admin badge for a regular user", async () => {
+    render(<UsersPage />);
+    await waitFor(() => screen.getByText("alice"));
+    expect(screen.queryByText("Super Admin")).not.toBeInTheDocument();
+  });
+
   it("shows an error toast on api failure", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/users", () =>

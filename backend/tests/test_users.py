@@ -959,10 +959,10 @@ async def test_list_users_ignores_client_tenant_filter_for_tenant_scoped_caller(
     assert assert_ok(response) == []
 
 
-async def test_list_users_super_admin_sees_every_tenant(
+async def test_list_users_super_admin_excludes_other_tenant_regular_user(
     user_client: AsyncClient,
 ) -> None:
-    """A super admin's list is unrestricted across tenants (regression guard)."""
+    """A super admin's list is scoped to their acting tenant for regular users."""
     other_tenant = await _create_tenant(user_client, name="tenant-isolation-list-sa")
     created = await _create_user(
         user_client,
@@ -971,7 +971,76 @@ async def test_list_users_super_admin_sees_every_tenant(
         email="other-sa@x.com",
     )
     listed = assert_ok(await user_client.get("/api/v1/users"))
-    assert any(u["id"] == created["id"] for u in listed)
+    assert all(u["id"] != created["id"] for u in listed)
+
+
+async def test_list_users_super_admin_sees_every_super_admin_regardless_of_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin's list always includes every other super_admin user."""
+    other_super_admin = await _create_user(
+        user_client,
+        headers={"X-User-Roles": "super_admin"},
+        username="other-super-admin",
+        email="other-super-admin@x.com",
+        roles=["super_admin"],
+    )
+    listed = assert_ok(await user_client.get("/api/v1/users"))
+    assert any(u["id"] == other_super_admin["id"] for u in listed)
+
+
+async def test_list_users_super_admin_switches_acting_tenant_via_header(
+    user_client: AsyncClient,
+) -> None:
+    """Switching the acting tenant changes which regular users are visible,
+    while a super admin stays visible regardless of the selection."""
+    from dependencies.auth import TENANT_HEADER_NAME
+
+    tenant_b = await _create_tenant(user_client, name="tenant-switch-users-b")
+    user_a = await _create_user(
+        user_client, username="user-in-a", email="user-in-a@x.com"
+    )
+    user_b = await _create_user(
+        user_client,
+        tenantId=tenant_b["id"],
+        username="user-in-b",
+        email="user-in-b@x.com",
+    )
+    other_super_admin = await _create_user(
+        user_client,
+        headers={"X-User-Roles": "super_admin"},
+        username="switch-super-admin",
+        email="switch-super-admin@x.com",
+        roles=["super_admin"],
+    )
+
+    def _headers(tenant_id: str) -> dict[str, str]:
+        return {"X-User-Tenant-Id": "", TENANT_HEADER_NAME: tenant_id}
+
+    listed_a = assert_ok(
+        await user_client.get("/api/v1/users", headers=_headers(DEFAULT_TEST_TENANT_ID))
+    )
+    ids_a = {u["id"] for u in listed_a}
+    assert user_a["id"] in ids_a
+    assert user_b["id"] not in ids_a
+    assert other_super_admin["id"] in ids_a
+
+    listed_b = assert_ok(
+        await user_client.get("/api/v1/users", headers=_headers(tenant_b["id"]))
+    )
+    ids_b = {u["id"] for u in listed_b}
+    assert user_b["id"] in ids_b
+    assert user_a["id"] not in ids_b
+    assert other_super_admin["id"] in ids_b
+
+
+async def test_list_users_platform_scoped_super_admin_requires_tenant_header(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin with no acting tenant selected is forbidden, same as any
+    other tenant-scoped route (see ``CurrentTenantIdDep``)."""
+    response = await user_client.get("/api/v1/users", headers={"X-User-Tenant-Id": ""})
+    assert_err(response, "FORBIDDEN", 403)
 
 
 async def test_get_user_other_tenant_returns_404_for_tenant_scoped_caller(

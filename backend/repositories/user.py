@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Protocol
 
+from sqlalchemy import Text, cast, or_
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -16,6 +17,15 @@ from repositories.exceptions import (
     UniqueViolationError,
 )
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
+
+#: Portable "roles contains super_admin" predicate for the JSON ``roles``
+#: column, shared with :func:`list`'s ``visible_tenant_id`` scope. Mirrors the
+#: ``CAST(roles AS TEXT) LIKE '%"super_admin"%'`` idiom already used by the
+#: ``ck_users_super_admin_no_tenant`` / ``ck_users_non_super_admin_requires_tenant``
+#: CHECK constraints (:class:`~models.user.User`) -- chosen there, and reused
+#: here, because it works identically on SQLite's plain ``JSON`` and
+#: PostgreSQL's ``jsonb``, unlike a native JSON "contains" operator.
+_IS_SUPER_ADMIN = cast(col(User.roles), Text).like('%"super_admin"%')
 
 
 class UserRepository(Protocol):
@@ -34,6 +44,7 @@ class UserRepository(Protocol):
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        visible_tenant_id: str | None = None,
     ) -> list[User]: ...
 
     async def create(self, data: UserCreate, *, user_id: str) -> User: ...
@@ -102,12 +113,39 @@ class SqlUserRepository:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        visible_tenant_id: str | None = None,
     ) -> list[User]:
+        """List users, optionally OR-scoped to a tenant plus every super_admin.
+
+        ``visible_tenant_id``, when set, restricts the result to rows where
+        either ``tenant_id`` matches it or the row holds the ``super_admin``
+        role -- the visibility a super_admin actor gets for the tenant they
+        are currently acting as (see :meth:`services.user.UserService.list`).
+        A non-super-admin actor's own-tenant restriction is expressed instead
+        as a ``FilterSpec`` in ``filters`` and this parameter is left unset,
+        since it combines with (never widens past) the caller-supplied
+        filters the same way.
+
+        Args:
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query (AND-combined).
+            visible_tenant_id: When set, OR-scopes the result to this tenant
+                plus every super_admin, regardless of ``filters``.
+
+        Returns:
+            The requested page of users.
+        """
         stmt = (
             select(User)
             .where(col(User.deleted_at).is_(None))
             .where(col(User.id) != SYSTEM_USER_ID)
         )
+        if visible_tenant_id is not None:
+            stmt = stmt.where(
+                or_(col(User.tenant_id) == visible_tenant_id, _IS_SUPER_ADMIN)
+            )
         stmt = apply_filters(stmt, User, filters)
         stmt = apply_sort(stmt, User, sort, default=[col(User.created_at).desc()])
         result = await self._db.exec(stmt.limit(limit).offset(offset))

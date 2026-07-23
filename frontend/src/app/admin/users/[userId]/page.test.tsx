@@ -328,6 +328,28 @@ describe("EditUserPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a Super Admin badge for a super_admin target", async () => {
+    setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, roles: ["super_admin"] })
+      )
+    );
+
+    render(<EditUserPage />);
+    await waitFor(() => screen.getByDisplayValue("alice"));
+
+    expect(screen.getByText("Super Admin")).toBeInTheDocument();
+  });
+
+  it("does not show a Super Admin badge for a non-super-admin target", async () => {
+    setup();
+    render(<EditUserPage />);
+    await waitFor(() => screen.getByDisplayValue("alice"));
+
+    expect(screen.queryByText("Super Admin")).not.toBeInTheDocument();
+  });
+
   it("shows error on load failure", async () => {
     setup();
     server.use(

@@ -156,13 +156,19 @@ class UserService:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
         acting_user: User,
+        acting_tenant_id: str,
     ) -> list[User]:
         """Return a page of User records visible to the acting user.
 
         A non-super-admin actor is restricted to users in their own tenant: a
         matching ``tenantId:eq:`` filter is appended to ``filters``, so it
         combines with (never widens) whatever the caller supplied. A super
-        admin sees every user, unrestricted.
+        admin is instead scoped to the tenant they are currently acting as
+        (``acting_tenant_id``, resolved from the ``X-Tenant-Id`` header via
+        the app bar's tenant switcher -- see ``CurrentTenantIdDep``), plus
+        every ``super_admin`` user platform-wide regardless of tenant; this
+        OR-scope can't be expressed as a ``FilterSpec`` (AND-only), so it's
+        applied by the repository via ``visible_tenant_id`` instead.
 
         Args:
             limit: Maximum number of records to return.
@@ -170,17 +176,25 @@ class UserService:
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
             acting_user: The authenticated user making the request.
+            acting_tenant_id: The tenant the request is scoped to -- the
+                caller's own tenant, or, for a super admin, the tenant
+                currently selected via the app bar's tenant switcher.
 
         Returns:
             The requested page of users.
         """
-        if not has_role(acting_user, Role.super_admin):
-            filters = (
-                *filters,
-                FilterSpec(
-                    field="tenantId", op="eq", value=acting_user.tenant_id or ""
-                ),
+        if has_role(acting_user, Role.super_admin):
+            return await self._repo.list(
+                limit=limit,
+                offset=offset,
+                sort=sort,
+                filters=filters,
+                visible_tenant_id=acting_tenant_id,
             )
+        filters = (
+            *filters,
+            FilterSpec(field="tenantId", op="eq", value=acting_user.tenant_id or ""),
+        )
         return await self._repo.list(
             limit=limit, offset=offset, sort=sort, filters=filters
         )

@@ -24,6 +24,7 @@ import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { RolesField } from "@/components/admin/roles-field";
 import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -206,7 +207,10 @@ export default function EditUserPage() {
         >
           <div className="flex flex-col gap-1.5">
             <span className="text-label-caps">Avatar</span>
-            <Avatar user={{ id: userId, username, avatarUpdatedAt, avatarConfig }} size={96} />
+            <div className="flex items-center gap-3">
+              <Avatar user={{ id: userId, username, avatarUpdatedAt, avatarConfig }} size={96} />
+              {targetIsSuperAdmin && <Badge>Super Admin</Badge>}
+            </div>
           </div>
 
           <FormField htmlFor="username" label="Username">
