@@ -1,8 +1,9 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import EditWorkflowPage from "./page";
@@ -67,19 +68,23 @@ describe("EditWorkflowPage", () => {
     await waitFor(() => expect(publishSpy).toHaveBeenCalled());
   });
 
-  it("shows an error when publish is rejected (no templates yet)", async () => {
+  it("shows an error toast when publish is rejected (no templates yet)", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post(
-        "http://localhost:8000/api/v1/workflows/:id/publish",
-        () => new HttpResponse(null, { status: 409 })
+      http.post("http://localhost:8000/api/v1/workflows/:id/publish", () =>
+        envelopeErr("WORKFLOW_NOT_RUNNABLE", "Workflow has no task templates", 409)
       )
     );
 
     render(<EditWorkflowPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
-    await waitFor(() => expect(screen.getByText(/409/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Workflow has no task templates",
+        variant: "error",
+      })
+    );
   });
 
   it("opens the workflow's planning session", async () => {

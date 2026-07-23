@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Server } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
@@ -18,7 +18,6 @@ import {
   pairsToRecord,
 } from "@/components/admin/key-value-editor";
 import { Button } from "@/components/ui/button";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { zMcpServerCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -41,7 +40,6 @@ function NewMcpServerForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
-  const [apiError, setApiError] = useState<string | null>(null);
 
   // Seed the form from registry prefill query params (set by the registry search
   // dialog); falls back to empty values for a manual entry.
@@ -67,7 +65,6 @@ function NewMcpServerForm() {
   });
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         await createMcpServer({
@@ -78,8 +75,8 @@ function NewMcpServerForm() {
         dispatch(showToast({ message: "MCP server created" }));
         router.push("/admin/mcp-servers");
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to create MCP server");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -127,8 +124,6 @@ function NewMcpServerForm() {
               {"${secret:name}"}, resolved when connecting.
             </p>
           </FormField>
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

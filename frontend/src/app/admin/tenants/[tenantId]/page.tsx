@@ -17,7 +17,6 @@ import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -37,7 +36,6 @@ export default function EditTenantPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [displayName, setDisplayName] = useState("");
@@ -76,14 +74,13 @@ export default function EditTenantPage() {
           updatedAt: tenant.updatedAt,
         });
       })
-      .catch((e: unknown) => {
-        setApiError(e instanceof Error ? e.message : "Failed to load tenant");
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
   }, [tenantId, reset]);
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     const body: TenantUpdate = {
       displayName: values.displayName,
       enabled: values.enabled,
@@ -95,8 +92,8 @@ export default function EditTenantPage() {
         dispatch(tenantsChanged());
         router.push("/admin/tenants");
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to update tenant");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -110,8 +107,8 @@ export default function EditTenantPage() {
       await deleteTenant(tenantId);
       dispatch(tenantsChanged());
       router.push("/admin/tenants");
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to delete tenant");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -157,8 +154,6 @@ export default function EditTenantPage() {
           </FormField>
 
           <Checkbox label="Enabled" {...register("enabled")} />
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

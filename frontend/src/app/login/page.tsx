@@ -1,7 +1,6 @@
 /** @module LoginPage — Username/password sign-in that establishes the session cookie. */
 "use client";
 
-import axios from "axios";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -26,7 +25,6 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [tenantName, setTenantName] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   // No `done` stage: a successful sign-in navigates away immediately, so the
   // success color/checkmark/wiggle would only flash before the page unmounts.
   const signIn = useAsyncAction({ showDone: false });
@@ -34,19 +32,14 @@ export default function LoginPage() {
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      setError(null);
       try {
         await signIn.run(async () => {
           const user = await login(username, password, tenantName.trim() || undefined);
           dispatch(setUser(user));
           router.replace("/admin");
         });
-      } catch (err) {
-        setError(
-          axios.isAxiosError(err) && err.response?.status === 401
-            ? "Invalid username or password."
-            : "Something went wrong. Please try again."
-        );
+      } catch {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
       }
     },
     [username, tenantName, password, dispatch, router, signIn.run]
@@ -112,8 +105,6 @@ export default function LoginPage() {
             required
           />
         </FormField>
-
-        {error && <p className="text-sm text-error">{error}</p>}
 
         <Button
           type="submit"

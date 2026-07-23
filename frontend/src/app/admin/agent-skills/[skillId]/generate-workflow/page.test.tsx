@@ -1,8 +1,9 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import GenerateWorkflowPage from "./page";
@@ -72,12 +73,11 @@ describe("GenerateWorkflowPage", () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows/new-wf-id"));
   });
 
-  it("shows an error when the skill has no published revision", async () => {
+  it("shows an error toast when the skill has no published revision", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post(
-        "http://localhost:8000/api/v1/agent-skills/:skillId/workflows",
-        () => new HttpResponse(null, { status: 409 })
+      http.post("http://localhost:8000/api/v1/agent-skills/:skillId/workflows", () =>
+        envelopeErr("SKILL_NOT_READY", "Skill has no published revision", 409)
       )
     );
 
@@ -87,6 +87,11 @@ describe("GenerateWorkflowPage", () => {
     await user.type(screen.getByLabelText(/prompt/i), "Do the thing");
     await user.click(screen.getByRole("button", { name: /generate/i }));
 
-    await waitFor(() => expect(screen.getByText(/409/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Skill has no published revision",
+        variant: "error",
+      })
+    );
   });
 });

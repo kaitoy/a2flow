@@ -5,8 +5,7 @@ import { MessagesSquare, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { deleteSession, getSession, listSessions, type Session } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { showToast } from "@/store/toastSlice";
+import { useAppSelector } from "@/store/hooks";
 import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { formatFullTimestamp } from "./ui/date-time";
@@ -39,7 +38,6 @@ export function SessionList({
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string } | null>(null);
-  const dispatch = useAppDispatch();
   const reduxSessionId = useAppSelector((s) => s.chat.sessionId);
   const isStreaming = useAppSelector((s) => s.chat.isStreaming);
 
@@ -92,9 +90,7 @@ export function SessionList({
         onDeleted?.(targetId);
       }
     } catch {
-      dispatch(
-        showToast({ message: "Failed to delete session. Please try again.", variant: "error" })
-      );
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     } finally {
       setConfirmTarget(null);
     }

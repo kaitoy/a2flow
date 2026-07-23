@@ -16,7 +16,6 @@ import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { zSecretCreate } from "@/generated/api/zod.gen";
@@ -55,7 +54,6 @@ export default function EditSecretPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
@@ -100,14 +98,13 @@ export default function EditSecretPage() {
           updatedAt: secret.updatedAt,
         });
       })
-      .catch((e: unknown) => {
-        setApiError(e instanceof Error ? e.message : "Failed to load secret");
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
   }, [secretId, reset]);
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     const body: SecretUpdate =
       values.type === "local"
         ? {
@@ -129,8 +126,8 @@ export default function EditSecretPage() {
         dispatch(showToast({ message: "Secret updated" }));
         router.push("/admin/secrets");
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to update secret");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -143,8 +140,8 @@ export default function EditSecretPage() {
     try {
       await deleteSecret(secretId);
       router.push("/admin/secrets");
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to delete secret");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -236,8 +233,6 @@ export default function EditSecretPage() {
               </FormField>
             </>
           )}
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

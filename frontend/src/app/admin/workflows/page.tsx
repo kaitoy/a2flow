@@ -14,7 +14,6 @@ import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
@@ -154,7 +153,6 @@ export default function WorkflowsPage() {
     rows,
     loading,
     refreshing,
-    error,
     offset,
     sort,
     filters,
@@ -162,12 +160,8 @@ export default function WorkflowsPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<Workflow>(listWorkflows, {
-    limit: LIMIT,
-    errorMessage: "Failed to load workflows",
-  });
+  } = useTableQuery<Workflow>(listWorkflows, { limit: LIMIT });
   const [skillMap, setSkillMap] = useState<Map<string, string>>(new Map());
-  const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
 
@@ -202,22 +196,20 @@ export default function WorkflowsPage() {
     try {
       await deleteWorkflow(confirmTarget.id);
       setConfirmTarget(null);
-      setActionError(null);
       await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to delete workflow");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
       setConfirmTarget(null);
     }
   }
 
   async function handleRun(id: string) {
-    setActionError(null);
     setRunningId(id);
     try {
       const workflowSession = await executeWorkflow(id);
       router.push(`/workflow-sessions/${workflowSession.id}`);
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to run workflow");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
       setRunningId(null);
     }
   }
@@ -231,9 +223,6 @@ export default function WorkflowsPage() {
         onRefresh={reload}
         refreshing={loading || refreshing}
       />
-      <div className="mb-4">
-        <ErrorBanner error={actionError ?? error} />
-      </div>
       <DataTable
         columns={buildColumns(skillMap, handleRun, runningId, handleDelete, {
           canRun,

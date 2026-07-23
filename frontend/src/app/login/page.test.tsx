@@ -1,9 +1,10 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render } from "@/test/test-utils";
 import LoginPage from "./page";
@@ -107,18 +108,11 @@ describe("LoginPage", () => {
     expect(requestBody?.tenantName).toBeUndefined();
   });
 
-  it("shows an error message on invalid credentials", async () => {
+  it("shows an error toast on invalid credentials", async () => {
     const user = userEvent.setup();
     server.use(
       http.post("http://localhost:8000/api/v1/auth/login", () =>
-        HttpResponse.json(
-          {
-            meta: { requestId: "r", receivedAt: "", respondedAt: "" },
-            data: null,
-            error: { code: "UNAUTHENTICATED", message: "Invalid", details: null },
-          },
-          { status: 401 }
-        )
+        envelopeErr("UNAUTHENTICATED", "Invalid username or password", 401)
       )
     );
 
@@ -127,6 +121,11 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText(/password/i), "wrong-pass-123");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
-    expect(await screen.findByText(/invalid username or password/i)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Invalid username or password",
+        variant: "error",
+      })
+    );
   });
 });

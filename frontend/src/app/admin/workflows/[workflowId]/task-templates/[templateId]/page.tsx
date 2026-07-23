@@ -17,7 +17,6 @@ import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zWorkflowTaskTemplateCreate } from "@/generated/api/zod.gen";
@@ -65,7 +64,6 @@ export default function EditWorkflowTaskTemplatePage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [candidates, setCandidates] = useState<WorkflowTaskTemplate[]>([]);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
@@ -118,8 +116,8 @@ export default function EditWorkflowTaskTemplatePage() {
           updatedAt: template.updatedAt,
         });
       })
-      .catch((e: unknown) => {
-        setApiError(e instanceof Error ? e.message : "Failed to load template");
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
   }, [templateId, reset]);
@@ -141,7 +139,6 @@ export default function EditWorkflowTaskTemplatePage() {
   }, []);
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         await updateWorkflowTaskTemplate(templateId, {
@@ -154,8 +151,8 @@ export default function EditWorkflowTaskTemplatePage() {
         dispatch(showToast({ message: "Template updated" }));
         router.push(`/admin/workflows/${workflowId}/task-templates`);
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to update template");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -164,8 +161,8 @@ export default function EditWorkflowTaskTemplatePage() {
     try {
       await deleteWorkflowTaskTemplate(templateId);
       router.push(`/admin/workflows/${workflowId}/task-templates`);
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to delete template");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -247,8 +244,6 @@ export default function EditWorkflowTaskTemplatePage() {
               )}
             />
           </FormField>
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

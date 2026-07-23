@@ -121,6 +121,7 @@ import {
   zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse,
 } from "@/generated/api/zod.gen";
 import { store } from "@/store";
+import { showToast } from "@/store/toastSlice";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import { A2UI_CATALOG_ID } from "./a2uiCatalogId";
 import logger from "./logger";
@@ -177,13 +178,16 @@ apiClient.interceptors.response.use(
     // Redirect to the login page when a request is rejected for lack of a valid
     // session — except the login request itself, which surfaces 401 inline.
     const url: string = error?.config?.url ?? "";
-    if (
+    const isSessionExpiry =
       typeof window !== "undefined" &&
       error?.response?.status === 401 &&
       !url.endsWith("/auth/login") &&
-      window.location.pathname !== "/login"
-    ) {
+      window.location.pathname !== "/login";
+    if (isSessionExpiry) {
+      // A toast would just flash and vanish mid-navigation, so skip it here.
       window.location.assign("/login");
+    } else {
+      reportApiError(error);
     }
     return Promise.reject(error);
   }
@@ -213,6 +217,30 @@ export class ApiClientError extends Error {
 }
 
 /**
+ * Extract a user-facing message from a failed API call and show it as a red
+ * toast. Called from the response interceptor (HTTP-level failures) and from
+ * {@link fetchEnvelope} (2xx responses whose envelope still carries an error).
+ */
+function reportApiError(error: unknown): void {
+  let message = "Something went wrong. Please try again.";
+  if (error instanceof ApiClientError) {
+    message = error.message;
+  } else if (axios.isAxiosError(error)) {
+    const envelopeError = (error.response?.data as { error?: ApiError } | null | undefined)?.error;
+    if (envelopeError?.message) {
+      message = envelopeError.message;
+    } else if (!error.response) {
+      message = "Unable to reach the server. Please check your connection and try again.";
+    } else if (error.message) {
+      message = error.message;
+    }
+  } else if (error instanceof Error) {
+    message = error.message;
+  }
+  store.dispatch(showToast({ message, variant: "error" }));
+}
+
+/**
  * Zod schema shape produced for every wrapped response by ``@hey-api/openapi-ts``.
  * Constrains the helper below so only generated envelope schemas can be passed in.
  */
@@ -238,12 +266,14 @@ async function fetchEnvelope<S extends EnvelopeSchema>(
     error: ApiError | null;
   };
   if (env.error) {
-    throw new ApiClientError(
+    const err = new ApiClientError(
       env.error.code,
       env.error.message,
       env.error.details,
       env.meta.requestId
     );
+    reportApiError(err);
+    throw err;
   }
   return env.data;
 }

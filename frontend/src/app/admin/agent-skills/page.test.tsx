@@ -1,10 +1,11 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { Role } from "@/lib/roles";
 import type { RootState } from "@/store";
-import { envelope } from "@/test/msw/envelope";
+import { store as appStore } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { act, render, screen, waitFor, within } from "@/test/test-utils";
 import AgentSkillsPage from "./page";
@@ -98,10 +99,17 @@ describe("AgentSkillsPage", () => {
     );
   });
 
-  it("shows error banner on api failure", async () => {
-    server.use(http.get(SKILL_URL, () => new HttpResponse(null, { status: 500 })));
+  it("shows an error toast on api failure", async () => {
+    server.use(
+      http.get(SKILL_URL, () => envelopeErr("INTERNAL_ERROR", "Internal server error", 500))
+    );
     render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
-    await waitFor(() => expect(screen.getByText(/500/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(appStore.getState().toast.items.at(-1)).toMatchObject({
+        message: "Internal server error",
+        variant: "error",
+      })
+    );
   });
 
   it("add skill link is present", async () => {

@@ -1,10 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { RegistrySearchDialog } from "@/components/admin/registry-search-dialog";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 
 const BASE = "http://localhost:8000";
@@ -64,12 +65,19 @@ describe("RegistrySearchDialog", () => {
     await waitFor(() => expect(screen.getByText("No servers found")).toBeInTheDocument());
   });
 
-  it("shows an error banner when the search fails", async () => {
+  it("shows an error toast when the search fails", async () => {
     server.use(
-      http.get(`${BASE}/api/v1/mcp-registry`, () => new HttpResponse(null, { status: 500 }))
+      http.get(`${BASE}/api/v1/mcp-registry`, () =>
+        envelopeErr("REGISTRY_UNREACHABLE", "MCP registry unavailable", 502)
+      )
     );
     render(<RegistrySearchDialog open onClose={vi.fn()} onSelect={vi.fn()} />);
-    await waitFor(() => expect(screen.getByText(/500/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "MCP registry unavailable",
+        variant: "error",
+      })
+    );
   });
 
   it("loads the next page when Load more is clicked", async () => {

@@ -1,10 +1,11 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { Role } from "@/lib/roles";
 import type { RootState } from "@/store";
-import { envelope } from "@/test/msw/envelope";
+import { store as appStore } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import WorkflowsPage from "./page";
@@ -50,18 +51,22 @@ describe("WorkflowsPage", () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/ws-1"));
   });
 
-  it("shows an error banner when Run fails", async () => {
+  it("shows an error toast when Run fails", async () => {
     server.use(
-      http.post(
-        "http://localhost:8000/api/v1/workflows/:id/execute",
-        () => new HttpResponse(null, { status: 500 })
+      http.post("http://localhost:8000/api/v1/workflows/:id/execute", () =>
+        envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
       )
     );
     const user = userEvent.setup();
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: "Run" }));
-    await waitFor(() => expect(screen.getByText(/500/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(appStore.getState().toast.items.at(-1)).toMatchObject({
+        message: "Internal server error",
+        variant: "error",
+      })
+    );
   });
 
   it("calls delete api after confirm", async () => {

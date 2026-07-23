@@ -4,7 +4,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
@@ -13,7 +12,6 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zAgentSkillCreate } from "@/generated/api/zod.gen";
@@ -35,7 +33,6 @@ type FormValues = z.infer<typeof schema>;
 export default function NewAgentSkillPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const [apiError, setApiError] = useState<string | null>(null);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -56,7 +53,6 @@ export default function NewAgentSkillPage() {
   });
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         await createAgentSkill({
@@ -70,8 +66,8 @@ export default function NewAgentSkillPage() {
         dispatch(showToast({ message: "Agent skill created" }));
         router.push("/admin/agent-skills");
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to create agent skill");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -146,8 +142,6 @@ export default function NewAgentSkillPage() {
               {...register("repoAuthUsername")}
             />
           </FormField>
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

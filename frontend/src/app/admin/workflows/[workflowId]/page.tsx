@@ -17,7 +17,6 @@ import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zGenerateWorkflowRequest } from "@/generated/api/zod.gen";
@@ -72,7 +71,6 @@ export default function EditWorkflowPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [skillName, setSkillName] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -112,8 +110,8 @@ export default function EditWorkflowPage() {
         applyWorkflow(wf);
         setSkillName((await getAgentSkill(wf.agentSkillId)).name);
       })
-      .catch((e: unknown) => {
-        setApiError(e instanceof Error ? e.message : "Failed to load workflow");
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
   }, [workflowId, applyWorkflow]);
@@ -134,7 +132,6 @@ export default function EditWorkflowPage() {
   }, [generating, workflowId, applyWorkflow]);
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         const updated = await updateWorkflow(workflowId, {
@@ -144,31 +141,29 @@ export default function EditWorkflowPage() {
         applyWorkflow(updated);
         dispatch(showToast({ message: "Workflow updated" }));
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to update workflow");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
   async function handlePublish() {
-    setApiError(null);
     try {
       await publish.run(async () => {
         const published = await publishWorkflow(workflowId);
         applyWorkflow(published);
         dispatch(showToast({ message: "Workflow published" }));
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to publish workflow");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
   async function handleOpenPlanning() {
-    setApiError(null);
     try {
       const ps = await getWorkflowPlanningSession(workflowId);
       router.push(`/planning-sessions/${ps.id}`);
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to open planning session");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -177,8 +172,8 @@ export default function EditWorkflowPage() {
     try {
       await deleteWorkflow(workflowId);
       router.push("/admin/workflows");
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to delete workflow");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -195,7 +190,6 @@ export default function EditWorkflowPage() {
         <AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />
         <FormColumn>
           <FormSkeleton fields={4} />
-          <ErrorBanner error={apiError} />
         </FormColumn>
       </AdminPageContainer>
     );
@@ -238,8 +232,6 @@ export default function EditWorkflowPage() {
               {...register("description")}
             />
           </FormField>
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex flex-wrap gap-2">
             <Button

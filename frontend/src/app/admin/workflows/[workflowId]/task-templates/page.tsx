@@ -12,7 +12,6 @@ import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import {
@@ -138,7 +137,6 @@ export default function WorkflowTaskTemplatesPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const [templates, setTemplates] = useState<WorkflowTaskTemplate[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [sort, setSort] = useState<SortSpec | null>(null);
   const [filters, setFilters] = useState<FilterSpec[]>([]);
@@ -148,7 +146,6 @@ export default function WorkflowTaskTemplatesPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       // The graph needs every template (in position order) so dependency edges
       // are not cut across pages or hidden by sort/filter.
@@ -157,8 +154,8 @@ export default function WorkflowTaskTemplatesPage() {
           ? await listWorkflowTaskTemplates(workflowId, { limit: GRAPH_LIMIT })
           : await listWorkflowTaskTemplates(workflowId, { limit: LIMIT, offset, sort, filters });
       setTemplates(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load task templates");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     } finally {
       setLoading(false);
     }
@@ -198,8 +195,8 @@ export default function WorkflowTaskTemplatesPage() {
       await deleteWorkflowTaskTemplate(confirmTarget.id);
       setConfirmTarget(null);
       await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete template");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
       setConfirmTarget(null);
     }
   }
@@ -229,9 +226,6 @@ export default function WorkflowTaskTemplatesPage() {
           onChange={setView}
           aria-label="Template view"
         />
-      </div>
-      <div className="mb-4">
-        <ErrorBanner error={error} />
       </div>
       {view === "graph" ? (
         <WorkflowTaskGraph tasks={templates} />

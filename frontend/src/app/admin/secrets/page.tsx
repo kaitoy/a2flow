@@ -12,7 +12,6 @@ import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteSecret, listSecrets, type Secret } from "@/lib/api";
 
@@ -59,7 +58,6 @@ export default function SecretsPage() {
     rows,
     loading,
     refreshing,
-    error,
     offset,
     sort,
     filters,
@@ -67,11 +65,7 @@ export default function SecretsPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<Secret>(listSecrets, {
-    limit: LIMIT,
-    errorMessage: "Failed to load secrets",
-  });
-  const [actionError, setActionError] = useState<string | null>(null);
+  } = useTableQuery<Secret>(listSecrets, { limit: LIMIT });
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   function handleDelete(id: string, name: string) {
@@ -83,10 +77,9 @@ export default function SecretsPage() {
     try {
       await deleteSecret(confirmTarget.id);
       setConfirmTarget(null);
-      setActionError(null);
       await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to delete secret");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
       setConfirmTarget(null);
     }
   }
@@ -115,9 +108,6 @@ export default function SecretsPage() {
         onRefresh={reload}
         refreshing={loading || refreshing}
       />
-      <div className="mb-4">
-        <ErrorBanner error={actionError ?? error} />
-      </div>
       <DataTable
         columns={columns}
         rows={rows}

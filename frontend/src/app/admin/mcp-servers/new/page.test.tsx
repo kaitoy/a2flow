@@ -1,8 +1,9 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { MCP_SERVER_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
@@ -73,9 +74,8 @@ describe("NewMcpServerPage", () => {
   it("shows error on api failure", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post(
-        "http://localhost:8000/api/v1/mcp-servers",
-        () => new HttpResponse(null, { status: 422 })
+      http.post("http://localhost:8000/api/v1/mcp-servers", () =>
+        envelopeErr("VALIDATION_ERROR", "Invalid request", 422)
       )
     );
 
@@ -84,6 +84,11 @@ describe("NewMcpServerPage", () => {
     await user.type(screen.getByLabelText(/url/i), "https://mcp.test/mcp");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
-    await waitFor(() => expect(screen.getByText(/422/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Invalid request",
+        variant: "error",
+      })
+    );
   });
 });

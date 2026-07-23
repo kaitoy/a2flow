@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
@@ -47,7 +46,6 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const loadMoreAction = useAsyncAction({ showDone: false });
-  const [error, setError] = useState<string | null>(null);
 
   // Reset all state when the dialog closes so it reopens clean.
   useEffect(() => {
@@ -56,7 +54,6 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
     setQuery("");
     setServers([]);
     setCursor(null);
-    setError(null);
   }, [open]);
 
   // Debounce the typed term into the committed query.
@@ -70,16 +67,15 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
     if (!open) return;
     let cancelled = false;
     setLoading(true);
-    setError(null);
     searchMcpRegistry({ search: query || undefined })
       .then((result) => {
         if (cancelled) return;
         setServers(result.servers);
         setCursor(result.nextCursor ?? null);
       })
-      .catch((e) => {
+      .catch(() => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to search the MCP registry");
+        // Failure toast is shown globally by api.ts; still clear stale results.
         setServers([]);
         setCursor(null);
       })
@@ -101,8 +97,8 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
         setServers((prev) => [...prev, ...result.servers]);
         setCursor(result.nextCursor ?? null);
       });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load more results");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -156,10 +152,6 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                   placeholder="e.g. github, weather, search…"
                   aria-label="Search the MCP registry"
                 />
-
-                <div className="mb-4">
-                  <ErrorBanner error={error} />
-                </div>
 
                 <div className="mt-4 flex-1 overflow-y-auto">
                   {servers.length === 0 ? (

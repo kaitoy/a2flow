@@ -36,8 +36,6 @@ export interface UseTableQueryResult<T> {
    * header's refresh spinner.
    */
   refreshing: boolean;
-  /** Human-readable error message from the last failed fetch, or null. */
-  error: string | null;
   /** Current pagination offset. */
   offset: number;
   /** Active single-column sort directive, or null for the server default order. */
@@ -61,8 +59,6 @@ export interface UseTableQueryResult<T> {
 export interface UseTableQueryOptions {
   /** Page size passed to the fetcher. Defaults to 20. */
   limit?: number;
-  /** Fallback error message when the thrown error is not an `Error`. */
-  errorMessage?: string;
 }
 
 /**
@@ -76,20 +72,21 @@ export interface UseTableQueryOptions {
  *
  * Only a query change raises `loading`; a `reload` swaps the rows in place under
  * the `refreshing` flag. That keeps a refresh — and especially a poll loop —
- * from flashing the table back to its skeleton on every fetch.
+ * from flashing the table back to its skeleton on every fetch. A failed fetch
+ * shows a red toast globally (see `api.ts`'s `reportApiError`) rather than
+ * setting any state here.
  *
  * @param fetcher - Resolves a page of rows for the given {@link ListQuery}.
- * @param options - Optional page size and fallback error message.
+ * @param options - Optional page size.
  * @returns Reactive list state plus setters wired for a `DataTable`.
  */
 export function useTableQuery<T>(
   fetcher: (query: ListQuery) => Promise<T[]>,
-  { limit = 20, errorMessage = "Failed to load data" }: UseTableQueryOptions = {}
+  { limit = 20 }: UseTableQueryOptions = {}
 ): UseTableQueryResult<T> {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [sort, setSortState] = useState<SortSpec | null>(null);
   const [filters, setFiltersState] = useState<FilterSpec[]>([]);
@@ -102,19 +99,17 @@ export function useTableQuery<T>(
   const load = useCallback(
     async ({ silent = false }: ReloadOptions = {}) => {
       if (!silent) setRefreshing(true);
-      setError(null);
       try {
         setRows(await fetcherRef.current({ limit, offset, sort, filters }));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : errorMessage);
+      } catch {
+        // Failure toast is shown globally by api.ts; the rows on screen stay
+        // as they were before this fetch.
       } finally {
-        // The rows on screen now answer the current query, whichever way the
-        // fetch went: on failure the error banner explains the stale ones.
         setLoading(false);
         if (!silent) setRefreshing(false);
       }
     },
-    [limit, offset, sort, filters, errorMessage]
+    [limit, offset, sort, filters]
   );
 
   // `load` is recreated only when the query changes, so this effect fires on
@@ -139,7 +134,6 @@ export function useTableQuery<T>(
     rows,
     loading,
     refreshing,
-    error,
     offset,
     sort,
     filters,

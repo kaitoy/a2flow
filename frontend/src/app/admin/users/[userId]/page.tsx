@@ -20,7 +20,6 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -48,7 +47,6 @@ export default function EditUserPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   // Username is immutable after creation, so it lives outside the form state and
@@ -116,14 +114,13 @@ export default function EditUserPage() {
           updatedAt: user.updatedAt,
         });
       })
-      .catch((e: unknown) => {
-        setApiError(e instanceof Error ? e.message : "Failed to load user");
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
   }, [userId, reset]);
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     const body: UserUpdate = {
       firstName: values.firstName,
       lastName: values.lastName,
@@ -142,8 +139,8 @@ export default function EditUserPage() {
         dispatch(showToast({ message: "User updated" }));
         router.push("/admin/users");
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to update user");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -156,8 +153,8 @@ export default function EditUserPage() {
     try {
       await deleteUser(userId);
       router.push("/admin/users");
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to delete user");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -235,8 +232,6 @@ export default function EditUserPage() {
 
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

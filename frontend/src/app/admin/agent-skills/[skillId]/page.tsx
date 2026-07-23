@@ -16,7 +16,6 @@ import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zAgentSkillCreate } from "@/generated/api/zod.gen";
@@ -64,7 +63,6 @@ export default function EditAgentSkillPage() {
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [sync, setSync] = useState<SyncState | null>(null);
@@ -117,8 +115,8 @@ export default function EditAgentSkillPage() {
           updatedAt: skill.updatedAt,
         });
       })
-      .catch((e: unknown) => {
-        setApiError(e instanceof Error ? e.message : "Failed to load agent skill");
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
   }, [skillId, reset, applySync]);
@@ -138,18 +136,16 @@ export default function EditAgentSkillPage() {
   }, [sync?.status, skillId, applySync]);
 
   async function handlePull() {
-    setApiError(null);
     try {
       await pull.run(async () => {
         applySync(await pullAgentSkill(skillId));
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to pull agent skill");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         await updateAgentSkill(skillId, {
@@ -163,8 +159,8 @@ export default function EditAgentSkillPage() {
         dispatch(showToast({ message: "Agent skill updated" }));
         router.push("/admin/agent-skills");
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to update agent skill");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -177,8 +173,8 @@ export default function EditAgentSkillPage() {
     try {
       await deleteAgentSkill(skillId);
       router.push("/admin/agent-skills");
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to delete agent skill");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -288,8 +284,6 @@ export default function EditAgentSkillPage() {
               {...register("repoAuthUsername")}
             />
           </FormField>
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             {canEdit && (

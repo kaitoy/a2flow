@@ -4,7 +4,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
@@ -14,7 +13,6 @@ import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -30,7 +28,6 @@ type FormValues = z.infer<typeof schema>;
 export default function NewTenantPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const [apiError, setApiError] = useState<string | null>(null);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -48,7 +45,6 @@ export default function NewTenantPage() {
   });
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         await createTenant({
@@ -60,8 +56,8 @@ export default function NewTenantPage() {
         dispatch(tenantsChanged());
         router.push("/admin/tenants");
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to create tenant");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -99,8 +95,6 @@ export default function NewTenantPage() {
           </FormField>
 
           <Checkbox label="Enabled" {...register("enabled")} />
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

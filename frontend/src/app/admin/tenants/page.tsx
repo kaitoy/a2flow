@@ -11,7 +11,6 @@ import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteTenant, listTenants, type Tenant } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
@@ -61,7 +60,6 @@ export default function TenantsPage() {
     rows,
     loading,
     refreshing,
-    error,
     offset,
     sort,
     filters,
@@ -69,11 +67,7 @@ export default function TenantsPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<Tenant>(listTenants, {
-    limit: LIMIT,
-    errorMessage: "Failed to load tenants",
-  });
-  const [actionError, setActionError] = useState<string | null>(null);
+  } = useTableQuery<Tenant>(listTenants, { limit: LIMIT });
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   function handleDelete(id: string, displayName: string) {
@@ -85,11 +79,10 @@ export default function TenantsPage() {
     try {
       await deleteTenant(confirmTarget.id);
       setConfirmTarget(null);
-      setActionError(null);
       dispatch(tenantsChanged());
       await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to delete tenant");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
       setConfirmTarget(null);
     }
   }
@@ -118,9 +111,6 @@ export default function TenantsPage() {
         onRefresh={reload}
         refreshing={loading || refreshing}
       />
-      <div className="mb-4">
-        <ErrorBanner error={actionError ?? error} />
-      </div>
       <DataTable
         columns={columns}
         rows={rows}

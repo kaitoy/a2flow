@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteMcpServer,
@@ -71,7 +70,6 @@ export default function McpServersPage() {
     rows,
     loading,
     refreshing,
-    error,
     offset,
     sort,
     filters,
@@ -79,12 +77,8 @@ export default function McpServersPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<McpServer>(listMcpServers, {
-    limit: LIMIT,
-    errorMessage: "Failed to load MCP servers",
-  });
+  } = useTableQuery<McpServer>(listMcpServers, { limit: LIMIT });
   const router = useRouter();
-  const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [registryOpen, setRegistryOpen] = useState(false);
 
@@ -103,10 +97,9 @@ export default function McpServersPage() {
     try {
       await deleteMcpServer(confirmTarget.id);
       setConfirmTarget(null);
-      setActionError(null);
       await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to delete MCP server");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
       setConfirmTarget(null);
     }
   }
@@ -145,9 +138,6 @@ export default function McpServersPage() {
         onRefresh={reload}
         refreshing={loading || refreshing}
       />
-      <div className="mb-4">
-        <ErrorBanner error={actionError ?? error} />
-      </div>
       <DataTable
         columns={columns}
         rows={rows}

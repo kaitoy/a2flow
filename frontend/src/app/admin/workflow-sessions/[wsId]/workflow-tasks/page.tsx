@@ -9,7 +9,6 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import {
@@ -150,7 +149,6 @@ export default function WorkflowTasksPage() {
   const { wsId } = useParams<{ wsId: string }>();
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [sort, setSort] = useState<SortSpec | null>(null);
   const [filters, setFilters] = useState<FilterSpec[]>([]);
@@ -159,7 +157,6 @@ export default function WorkflowTasksPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       // The graph needs every task (in position order) so dependency edges are
       // not cut across pages or hidden by sort/filter.
@@ -168,8 +165,8 @@ export default function WorkflowTasksPage() {
           ? await listWorkflowTasks(wsId, { limit: GRAPH_LIMIT })
           : await listWorkflowTasks(wsId, { limit: LIMIT, offset, sort, filters });
       setTasks(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load workflow tasks");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     } finally {
       setLoading(false);
     }
@@ -221,9 +218,6 @@ export default function WorkflowTasksPage() {
           onChange={setView}
           aria-label="Task view"
         />
-      </div>
-      <div className="mb-4">
-        <ErrorBanner error={error} />
       </div>
       {view === "graph" ? (
         <WorkflowTaskGraph tasks={tasks} />

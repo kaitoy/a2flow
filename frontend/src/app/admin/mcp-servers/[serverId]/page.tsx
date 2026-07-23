@@ -22,7 +22,6 @@ import {
 } from "@/components/admin/key-value-editor";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { zMcpServerCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -44,7 +43,6 @@ export default function EditMcpServerPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
@@ -77,14 +75,13 @@ export default function EditMcpServerPage() {
           updatedAt: server.updatedAt,
         });
       })
-      .catch((e: unknown) => {
-        setApiError(e instanceof Error ? e.message : "Failed to load MCP server");
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
   }, [serverId, reset]);
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         await updateMcpServer(serverId, {
@@ -95,8 +92,8 @@ export default function EditMcpServerPage() {
         dispatch(showToast({ message: "MCP server updated" }));
         router.push("/admin/mcp-servers");
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to update MCP server");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -109,8 +106,8 @@ export default function EditMcpServerPage() {
     try {
       await deleteMcpServer(serverId);
       router.push("/admin/mcp-servers");
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to delete MCP server");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -170,8 +167,6 @@ export default function EditMcpServerPage() {
               {"${secret:name}"}, resolved when connecting.
             </p>
           </FormField>
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

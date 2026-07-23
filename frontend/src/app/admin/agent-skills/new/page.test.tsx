@@ -1,8 +1,9 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewAgentSkillPage from "./page";
@@ -172,12 +173,11 @@ describe("NewAgentSkillPage", () => {
     await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
   });
 
-  it("shows error on api failure", async () => {
+  it("shows error toast on api failure", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post(
-        "http://localhost:8000/api/v1/agent-skills",
-        () => new HttpResponse(null, { status: 422 })
+      http.post("http://localhost:8000/api/v1/agent-skills", () =>
+        envelopeErr("INVALID_SECRET", "Auth secret is invalid for this repo", 422)
       )
     );
 
@@ -186,6 +186,11 @@ describe("NewAgentSkillPage", () => {
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
-    await waitFor(() => expect(screen.getByText(/422/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Auth secret is invalid for this repo",
+        variant: "error",
+      })
+    );
   });
 });

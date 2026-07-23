@@ -13,7 +13,6 @@ import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteWorkflowSession,
@@ -93,7 +92,6 @@ export default function WorkflowSessionsPage() {
     rows,
     loading,
     refreshing,
-    error,
     offset,
     sort,
     filters,
@@ -101,12 +99,8 @@ export default function WorkflowSessionsPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<WorkflowSession>(listWorkflowSessions, {
-    limit: LIMIT,
-    errorMessage: "Failed to load workflow sessions",
-  });
+  } = useTableQuery<WorkflowSession>(listWorkflowSessions, { limit: LIMIT });
   const [userMap, setUserMap] = useState<Map<string, string>>(new Map());
-  const [actionError, setActionError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   function handleDelete(id: string, name: string) {
@@ -118,10 +112,9 @@ export default function WorkflowSessionsPage() {
     try {
       await deleteWorkflowSession(confirmTarget.id);
       setConfirmTarget(null);
-      setActionError(null);
       await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to delete workflow session");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
       setConfirmTarget(null);
     }
   }
@@ -146,9 +139,6 @@ export default function WorkflowSessionsPage() {
         onRefresh={reload}
         refreshing={loading || refreshing}
       />
-      <div className="mb-4">
-        <ErrorBanner error={actionError ?? error} />
-      </div>
       <DataTable
         columns={buildColumns(userMap, handleDelete)}
         rows={rows}

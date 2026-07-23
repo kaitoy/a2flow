@@ -10,7 +10,6 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { type Approval, type ApprovalStatus, getUserNames, listApprovals } from "@/lib/api";
 
@@ -28,7 +27,6 @@ export default function ApprovalsPage() {
     rows,
     loading,
     refreshing,
-    error,
     offset,
     sort,
     filters,
@@ -36,10 +34,7 @@ export default function ApprovalsPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<Approval>(listApprovals, {
-    limit: LIMIT,
-    errorMessage: "Failed to load approvals",
-  });
+  } = useTableQuery<Approval>(listApprovals, { limit: LIMIT });
 
   // Resolve the intended approvers' user IDs to display names (best-effort,
   // falling back to the raw ID), mirroring AuditMeta. The comma-joined key lets
@@ -123,9 +118,6 @@ export default function ApprovalsPage() {
         onRefresh={reload}
         refreshing={loading || refreshing}
       />
-      <div className="mb-4">
-        <ErrorBanner error={error} />
-      </div>
       <DataTable
         columns={columns}
         rows={rows}

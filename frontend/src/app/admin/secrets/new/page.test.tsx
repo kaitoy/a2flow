@@ -1,8 +1,9 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { SECRET_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
@@ -117,9 +118,8 @@ describe("NewSecretPage", () => {
   it("shows error on api failure", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post(
-        "http://localhost:8000/api/v1/secrets",
-        () => new HttpResponse(null, { status: 422 })
+      http.post("http://localhost:8000/api/v1/secrets", () =>
+        envelopeErr("VALIDATION_ERROR", "Invalid request", 422)
       )
     );
 
@@ -128,6 +128,11 @@ describe("NewSecretPage", () => {
     await user.type(screen.getByLabelText(/value/i), "tok-123");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
-    await waitFor(() => expect(screen.getByText(/422/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Invalid request",
+        variant: "error",
+      })
+    );
   });
 });

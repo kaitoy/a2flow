@@ -1,8 +1,9 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { MCP_SERVER_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -92,13 +93,17 @@ describe("EditMcpServerPage", () => {
   it("shows error on load failure", async () => {
     setup();
     server.use(
-      http.get(
-        "http://localhost:8000/api/v1/mcp-servers/:serverId",
-        () => new HttpResponse(null, { status: 404 })
+      http.get("http://localhost:8000/api/v1/mcp-servers/:serverId", () =>
+        envelopeErr("NOT_FOUND", "McpServer not found", 404)
       )
     );
 
     render(<EditMcpServerPage />);
-    await waitFor(() => expect(screen.getByText(/404/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "McpServer not found",
+        variant: "error",
+      })
+    );
   });
 });

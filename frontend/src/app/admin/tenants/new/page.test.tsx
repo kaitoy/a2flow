@@ -1,8 +1,9 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewTenantPage from "./page";
@@ -94,9 +95,8 @@ describe("NewTenantPage", () => {
   it("shows error on api failure", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post(
-        "http://localhost:8000/api/v1/tenants",
-        () => new HttpResponse(null, { status: 409 })
+      http.post("http://localhost:8000/api/v1/tenants", () =>
+        envelopeErr("CONFLICT_UNIQUE", "Tenant name already in use", 409)
       )
     );
 
@@ -104,6 +104,11 @@ describe("NewTenantPage", () => {
     await fillRequiredFields(user);
     await user.click(screen.getByRole("button", { name: /save/i }));
 
-    await waitFor(() => expect(screen.getByText(/409/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Tenant name already in use",
+        variant: "error",
+      })
+    );
   });
 });

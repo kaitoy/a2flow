@@ -12,7 +12,6 @@ import { PaginationControls } from "@/components/admin/pagination-controls";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteUser, listUsers, type User } from "@/lib/api";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -90,7 +89,6 @@ export default function UsersPage() {
     rows,
     loading,
     refreshing,
-    error,
     offset,
     sort,
     filters,
@@ -98,8 +96,7 @@ export default function UsersPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<User>(listUsers, { limit: LIMIT, errorMessage: "Failed to load users" });
-  const [actionError, setActionError] = useState<string | null>(null);
+  } = useTableQuery<User>(listUsers, { limit: LIMIT });
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   function handleDelete(id: string, name: string) {
@@ -111,10 +108,9 @@ export default function UsersPage() {
     try {
       await deleteUser(confirmTarget.id);
       setConfirmTarget(null);
-      setActionError(null);
       await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to delete user");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
       setConfirmTarget(null);
     }
   }
@@ -143,9 +139,6 @@ export default function UsersPage() {
         onRefresh={reload}
         refreshing={loading || refreshing}
       />
-      <div className="mb-4">
-        <ErrorBanner error={actionError ?? error} />
-      </div>
       <DataTable
         columns={columns}
         rows={rows}

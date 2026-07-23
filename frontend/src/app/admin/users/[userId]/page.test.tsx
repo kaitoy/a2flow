@@ -1,10 +1,11 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { RootState } from "@/store";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import EditUserPage from "./page";
@@ -313,13 +314,17 @@ describe("EditUserPage", () => {
   it("shows error on load failure", async () => {
     setup();
     server.use(
-      http.get(
-        "http://localhost:8000/api/v1/users/:userId",
-        () => new HttpResponse(null, { status: 404 })
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelopeErr("NOT_FOUND", "User not found", 404)
       )
     );
 
     render(<EditUserPage />);
-    await waitFor(() => expect(screen.getByText(/404/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "User not found",
+        variant: "error",
+      })
+    );
   });
 });

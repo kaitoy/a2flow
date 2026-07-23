@@ -14,7 +14,6 @@ import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zWorkflowTaskTemplateCreate } from "@/generated/api/zod.gen";
@@ -52,7 +51,6 @@ export default function NewWorkflowTaskTemplatePage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const [apiError, setApiError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<WorkflowTaskTemplate[]>([]);
   const [toolOptions, setToolOptions] = useState<McpToolOption[]>([]);
 
@@ -91,7 +89,6 @@ export default function NewWorkflowTaskTemplatePage() {
   }, []);
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         await createWorkflowTaskTemplate({
@@ -105,8 +102,8 @@ export default function NewWorkflowTaskTemplatePage() {
         dispatch(showToast({ message: "Template created" }));
         router.push(`/admin/workflows/${workflowId}/task-templates`);
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to create template");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -175,8 +172,6 @@ export default function NewWorkflowTaskTemplatePage() {
               )}
             />
           </FormField>
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

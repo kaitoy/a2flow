@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store as appStore } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import ApprovalsPage from "./page";
 
@@ -41,14 +42,18 @@ describe("ApprovalsPage", () => {
     await waitFor(() => expect(screen.getByText("No approval requests yet.")).toBeInTheDocument());
   });
 
-  it("shows an error banner when load fails", async () => {
+  it("shows an error toast when load fails", async () => {
     server.use(
-      http.get(
-        "http://localhost:8000/api/v1/approvals",
-        () => new HttpResponse(null, { status: 500 })
+      http.get("http://localhost:8000/api/v1/approvals", () =>
+        envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
       )
     );
     render(<ApprovalsPage />);
-    await waitFor(() => expect(screen.getByText(/500/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(appStore.getState().toast.items.at(-1)).toMatchObject({
+        message: "Internal server error",
+        variant: "error",
+      })
+    );
   });
 });

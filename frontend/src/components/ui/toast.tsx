@@ -9,39 +9,53 @@ import { useMotionConfig } from "@/lib/motion";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { dismissToast, type Toast } from "@/store/toastSlice";
 
-/** How long a toast stays on screen before auto-dismissing, in milliseconds. */
+/** How long a success toast stays on screen before auto-dismissing, in milliseconds. */
 const AUTO_DISMISS_MS = 3500;
 
 /**
- * A single toast card. Owns its own auto-dismiss timer so each toast disappears
- * independently {@link AUTO_DISMISS_MS} after it mounts.
+ * A single toast card. A success toast owns its own auto-dismiss timer so it
+ * disappears independently {@link AUTO_DISMISS_MS} after it mounts; an error
+ * toast has no timer and stays until the user clicks its dismiss button.
  */
 function ToastCard({ toast }: { toast: Toast }) {
   const dispatch = useAppDispatch();
   const isError = toast.variant === "error";
 
   useEffect(() => {
+    if (isError) return;
     const timer = setTimeout(() => dispatch(dismissToast(toast.id)), AUTO_DISMISS_MS);
     return () => clearTimeout(timer);
-  }, [dispatch, toast.id]);
+  }, [dispatch, toast.id, isError]);
 
   return (
     <div
       className={[
         "flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm",
         isError
-          ? "border border-error/40 bg-error-container text-on-error-container shadow-glass-lg backdrop-blur-md"
+          ? "justify-between border border-error/40 bg-error-container text-on-error-container shadow-glass-lg backdrop-blur-md"
           : "glass-panel-overlay border border-success/40 text-on-surface",
       ].join(" ")}
       role="status"
       aria-live="polite"
     >
-      {isError ? (
-        <span aria-hidden="true">⚠</span>
-      ) : (
-        <Check className="size-4 shrink-0 text-success" aria-hidden="true" />
+      <span className="flex items-center gap-2.5">
+        {isError ? (
+          <span aria-hidden="true">⚠</span>
+        ) : (
+          <Check className="size-4 shrink-0 text-success" aria-hidden="true" />
+        )}
+        <span>{toast.message}</span>
+      </span>
+      {isError && (
+        <button
+          type="button"
+          onClick={() => dispatch(dismissToast(toast.id))}
+          className="cursor-pointer rounded-full px-2 leading-none text-on-error-container/70 transition-[transform,translate,scale,background-color,color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] hover:bg-error/15 hover:text-on-error-container motion-safe:hover:scale-110"
+          aria-label="Dismiss"
+        >
+          ✕
+        </button>
       )}
-      <span>{toast.message}</span>
     </div>
   );
 }

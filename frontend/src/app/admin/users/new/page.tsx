@@ -16,7 +16,6 @@ import { RolesField } from "@/components/admin/roles-field";
 import { TenantField } from "@/components/admin/tenant-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -32,7 +31,6 @@ type FormValues = z.infer<typeof schema>;
 export default function NewUserPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const [apiError, setApiError] = useState<string | null>(null);
   // Roles live outside the form state: the picker is a controlled multi-select
   // rather than a registered input.
   const [roles, setRoles] = useState<Role[]>([]);
@@ -60,7 +58,6 @@ export default function NewUserPage() {
   });
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         await createUser({
@@ -77,8 +74,8 @@ export default function NewUserPage() {
         dispatch(showToast({ message: "User created" }));
         router.push("/admin/users");
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to create user");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -138,8 +135,6 @@ export default function NewUserPage() {
 
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

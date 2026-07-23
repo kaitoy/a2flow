@@ -14,7 +14,6 @@ import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
@@ -111,7 +110,6 @@ export default function AgentSkillsPage() {
     rows,
     loading,
     refreshing,
-    error,
     offset,
     sort,
     filters,
@@ -119,11 +117,7 @@ export default function AgentSkillsPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<AgentSkill>(listAgentSkills, {
-    limit: LIMIT,
-    errorMessage: "Failed to load agent skills",
-  });
-  const [actionError, setActionError] = useState<string | null>(null);
+  } = useTableQuery<AgentSkill>(listAgentSkills, { limit: LIMIT });
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [pullingId, setPullingId] = useState<string | null>(null);
 
@@ -150,10 +144,9 @@ export default function AgentSkillsPage() {
     try {
       await deleteAgentSkill(confirmTarget.id);
       setConfirmTarget(null);
-      setActionError(null);
       await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to delete agent skill");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
       setConfirmTarget(null);
     }
   }
@@ -162,10 +155,9 @@ export default function AgentSkillsPage() {
     setPullingId(id);
     try {
       await pullAgentSkill(id);
-      setActionError(null);
       await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to pull agent skill");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     } finally {
       setPullingId(null);
     }
@@ -214,9 +206,6 @@ export default function AgentSkillsPage() {
         onRefresh={reload}
         refreshing={loading || refreshing}
       />
-      <div className="mb-4">
-        <ErrorBanner error={actionError ?? error} />
-      </div>
       <DataTable
         columns={columns}
         rows={rows}

@@ -7,13 +7,15 @@ interface Row {
   id: string;
 }
 
-/** A promise plus the handle to settle it, for holding a fetch open mid-test. */
+/** A promise plus the handles to settle it, for holding a fetch open mid-test. */
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => {
-    resolve = r;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 /**
@@ -107,11 +109,26 @@ describe("useTableQuery", () => {
     expect(result.current.sort).toEqual({ field: "name", descending: false });
   });
 
-  it("captures an error message when the fetch fails", async () => {
-    const fetcher = vi.fn(async (_q: ListQuery): Promise<{ id: string }[]> => {
-      throw new Error("boom");
+  it("keeps the previous rows on screen when a fetch fails", async () => {
+    const held = deferred<{ id: string }[]>();
+    let calls = 0;
+    const fetcher = vi.fn((_q: ListQuery): Promise<{ id: string }[]> => {
+      calls += 1;
+      return calls === 1 ? Promise.resolve([{ id: "1" }]) : held.promise;
     });
-    const { result } = renderHook(() => useTableQuery(fetcher, { errorMessage: "fallback" }));
-    await waitFor(() => expect(result.current.error).toBe("boom"));
+    const { result } = renderHook(() => useTableQuery(fetcher, { limit: 10 }));
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: "1" }]));
+
+    act(() => {
+      void result.current.reload();
+    });
+    await waitFor(() => expect(result.current.refreshing).toBe(true));
+
+    act(() => {
+      held.reject(new Error("boom"));
+    });
+    await waitFor(() => expect(result.current.refreshing).toBe(false));
+    expect(result.current.rows).toEqual([{ id: "1" }]);
+    expect(result.current.loading).toBe(false);
   });
 });

@@ -1,8 +1,9 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store as appStore } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import McpServersPage from "./page";
 
@@ -42,15 +43,19 @@ describe("McpServersPage", () => {
     );
   });
 
-  it("shows error banner on api failure", async () => {
+  it("shows an error toast on api failure", async () => {
     server.use(
-      http.get(
-        "http://localhost:8000/api/v1/mcp-servers",
-        () => new HttpResponse(null, { status: 500 })
+      http.get("http://localhost:8000/api/v1/mcp-servers", () =>
+        envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
       )
     );
     render(<McpServersPage />);
-    await waitFor(() => expect(screen.getByText(/500/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(appStore.getState().toast.items.at(-1)).toMatchObject({
+        message: "Internal server error",
+        variant: "error",
+      })
+    );
   });
 
   it("add server link is present", async () => {

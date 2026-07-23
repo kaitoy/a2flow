@@ -1,8 +1,9 @@
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { SECRET_1, SECRET_VAULT_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -117,13 +118,17 @@ describe("EditSecretPage", () => {
   it("shows error on load failure", async () => {
     setup();
     server.use(
-      http.get(
-        "http://localhost:8000/api/v1/secrets/:secretId",
-        () => new HttpResponse(null, { status: 404 })
+      http.get("http://localhost:8000/api/v1/secrets/:secretId", () =>
+        envelopeErr("NOT_FOUND", "Secret not found", 404)
       )
     );
 
     render(<EditSecretPage />);
-    await waitFor(() => expect(screen.getByText(/404/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Secret not found",
+        variant: "error",
+      })
+    );
   });
 });

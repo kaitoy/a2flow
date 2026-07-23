@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sparkles } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
@@ -13,7 +13,6 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
-import { ErrorBanner } from "@/components/ui/error-banner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zGenerateWorkflowRequest } from "@/generated/api/zod.gen";
@@ -38,7 +37,6 @@ export default function GenerateWorkflowPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const [apiError, setApiError] = useState<string | null>(null);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -56,13 +54,12 @@ export default function GenerateWorkflowPage() {
   useEffect(() => {
     getAgentSkill(skillId)
       .then((skill) => reset({ name: skill.name, prompt: "" }))
-      .catch((e: unknown) => {
-        setApiError(e instanceof Error ? e.message : "Failed to load agent skill");
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
       });
   }, [skillId, reset]);
 
   async function onSubmit(values: FormValues) {
-    setApiError(null);
     try {
       await save.run(async () => {
         const workflow = await generateWorkflow(skillId, {
@@ -72,8 +69,8 @@ export default function GenerateWorkflowPage() {
         dispatch(showToast({ message: "Workflow generation started" }));
         router.push(`/admin/workflows/${workflow.id}`);
       });
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Failed to generate workflow");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
@@ -105,8 +102,6 @@ export default function GenerateWorkflowPage() {
               {...register("prompt")}
             />
           </FormField>
-
-          <ErrorBanner error={apiError} />
 
           <div className="flex gap-2">
             <Button

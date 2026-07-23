@@ -1,9 +1,10 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { useParams } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import WorkflowTaskTemplatesPage from "./page";
 
@@ -91,14 +92,18 @@ describe("WorkflowTaskTemplatesPage", () => {
     expect(deleteSpy).toHaveBeenCalled();
   });
 
-  it("shows an error banner when load fails", async () => {
+  it("shows an error toast when load fails", async () => {
     server.use(
-      http.get(
-        "http://localhost:8000/api/v1/workflows/:id/task-templates",
-        () => new HttpResponse(null, { status: 500 })
+      http.get("http://localhost:8000/api/v1/workflows/:id/task-templates", () =>
+        envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
       )
     );
     render(<WorkflowTaskTemplatesPage />);
-    await waitFor(() => expect(screen.getByText(/500/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Internal server error",
+        variant: "error",
+      })
+    );
   });
 });
