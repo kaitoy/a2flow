@@ -1,4 +1,10 @@
-/** @module NewUserPage — Admin form for creating a new application user. */
+/**
+ * @module NewUserPage — Admin form for creating a new application user.
+ *
+ * The tenant a new user belongs to is not picked in this form — it's derived
+ * from the app bar's tenant picker (`auth.selectedTenantId`), the same tenant
+ * every other request already acts as. See `tenantId` below.
+ */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,15 +19,14 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { RolesField } from "@/components/admin/roles-field";
-import { TenantField } from "@/components/admin/tenant-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createUser } from "@/lib/api";
-import { Role } from "@/lib/roles";
-import { useAppDispatch } from "@/store/hooks";
+import { Role, useHasRole } from "@/lib/roles";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
 const schema = zUserCreate;
@@ -34,9 +39,17 @@ export default function NewUserPage() {
   // Roles live outside the form state: the picker is a controlled multi-select
   // rather than a registered input.
   const [roles, setRoles] = useState<Role[]>([]);
-  // Tenant lives outside the form state, like roles, since it's a controlled
-  // select rather than a registered input.
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const isSuperAdminViewer = useHasRole(Role.SUPER_ADMIN);
+  const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
+  const targetIsSuperAdmin = roles.includes(Role.SUPER_ADMIN);
+  // A plain admin's own tenant is applied server-side regardless of what's
+  // sent, so only a super admin's app-bar selection is ever meaningful here.
+  // A super admin is always platform-scoped, so granting that role forces
+  // null no matter what tenant is currently selected in the app bar.
+  const tenantId = isSuperAdminViewer && !targetIsSuperAdmin ? selectedTenantId : null;
+  // Only a super admin creating a non-super-admin user needs a tenant; block
+  // submission instead of round-tripping to the backend's 422 for this case.
+  const tenantMissing = isSuperAdminViewer && !targetIsSuperAdmin && selectedTenantId === null;
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -127,20 +140,20 @@ export default function NewUserPage() {
 
           <RolesField value={roles} onChange={setRoles} />
 
-          <TenantField
-            value={tenantId}
-            onChange={setTenantId}
-            disabled={roles.includes(Role.SUPER_ADMIN)}
-          />
-
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />
+
+          {tenantMissing && (
+            <p className="text-xs text-error">
+              Select a tenant in the header before creating this user.
+            </p>
+          )}
 
           <div className="flex gap-2">
             <Button
               type="submit"
               variant="primary"
-              disabled={save.inFlight}
+              disabled={save.inFlight || tenantMissing}
               status={save.status}
               pendingLabel="Saving…"
             >

@@ -10,10 +10,16 @@ import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import EditUserPage from "./page";
 
-/** Build a preloaded auth slice for a signed-in super admin. */
-const SUPER_ADMIN_STATE: Partial<RootState> = {
-  auth: { user: { id: "u1", roles: ["super_admin"] } as User, status: "authenticated" },
-};
+/** Build a preloaded auth slice for a signed-in super admin acting as a given tenant. */
+function superAdminState(selectedTenantId: string | null): Partial<RootState> {
+  return {
+    auth: {
+      user: { id: "u1", roles: ["super_admin"] } as User,
+      status: "authenticated",
+      selectedTenantId,
+    },
+  };
+}
 
 // Replace the real Avatar with a stub that surfaces the avatarConfig it receives,
 // so the test can assert the page threads the loaded customization through to the
@@ -208,42 +214,56 @@ describe("EditUserPage", () => {
     expect(screen.queryByLabelText("Tenant")).not.toBeInTheDocument();
   });
 
-  it("renders a tenant field pre-filled with the user's tenant for a super-admin viewer", async () => {
+  it("does not render a tenant field for a super-admin viewer either", async () => {
     setup();
-    server.use(
-      http.get("http://localhost:8000/api/v1/users/:userId", () =>
-        envelope({ ...FULL_USER, tenantId: "tenant-1" })
-      )
-    );
-
-    render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    render(<EditUserPage />, { preloadedState: superAdminState("tenant-1") });
     await waitFor(() => screen.getByDisplayValue("alice"));
-
-    await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Acme Corp");
-    });
+    expect(screen.queryByLabelText("Tenant")).not.toBeInTheDocument();
   });
 
-  it("includes the changed tenant in the update request", async () => {
+  it("submits the app-bar selected tenant when demoting a still-tenant-less super admin", async () => {
     setup();
     let capturedBody: Record<string, unknown> | null = null;
     server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, roles: ["super_admin"] })
+      ),
       http.patch("http://localhost:8000/api/v1/users/:userId", async ({ request }) => {
         capturedBody = (await request.json()) as Record<string, unknown>;
         return envelope(FULL_USER);
       })
     );
 
-    render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    render(<EditUserPage />, { preloadedState: superAdminState("tenant-1") });
     await waitFor(() => screen.getByDisplayValue("alice"));
-    await userEvent.click(await screen.findByRole("combobox", { name: "Tenant" }));
-    await userEvent.click(await screen.findByRole("option", { name: "Acme Corp" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Super Admin" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(capturedBody?.tenantId).toBe("tenant-1"));
+    expect(capturedBody?.roles).toEqual([]);
   });
 
-  it("disables the tenant select for a user who already has a tenant assigned, and keeps it unchanged on save", async () => {
+  it("keeps a super admin's tenantId null on save regardless of the app-bar selection", async () => {
+    setup();
+    let capturedBody: Record<string, unknown> | null = null;
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, roles: ["super_admin"] })
+      ),
+      http.patch("http://localhost:8000/api/v1/users/:userId", async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(FULL_USER);
+      })
+    );
+
+    render(<EditUserPage />, { preloadedState: superAdminState("tenant-1") });
+    await waitFor(() => screen.getByDisplayValue("alice"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(capturedBody?.tenantId).toBeNull());
+  });
+
+  it("keeps an already-assigned tenant unchanged on save, regardless of the app-bar selection", async () => {
     setup();
     let capturedBody: Record<string, unknown> | null = null;
     server.use(
@@ -256,19 +276,38 @@ describe("EditUserPage", () => {
       })
     );
 
-    render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    render(<EditUserPage />, { preloadedState: superAdminState("tenant-2") });
     await waitFor(() => screen.getByDisplayValue("alice"));
-    await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
-    });
-    expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Acme Corp");
-
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(capturedBody?.tenantId).toBe("tenant-1"));
   });
 
-  it("disables the tenant select for a user who already holds super_admin", async () => {
+  it("shows a validation error when granting super_admin to a user who already has a tenant assigned", async () => {
+    setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, tenantId: "tenant-1" })
+      ),
+      http.patch("http://localhost:8000/api/v1/users/:userId", () =>
+        envelopeErr("INVALID_USER", "A super admin cannot be assigned a tenant", 422)
+      )
+    );
+
+    render(<EditUserPage />, { preloadedState: superAdminState("tenant-1") });
+    await waitFor(() => screen.getByDisplayValue("alice"));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Super Admin" }));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "A super admin cannot be assigned a tenant",
+        variant: "error",
+      })
+    );
+  });
+
+  it("disables save and shows a hint when demoting a super admin with no tenant selected in the app bar", async () => {
     setup();
     server.use(
       http.get("http://localhost:8000/api/v1/users/:userId", () =>
@@ -276,39 +315,17 @@ describe("EditUserPage", () => {
       )
     );
 
-    render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    render(<EditUserPage />, { preloadedState: superAdminState(null) });
     await waitFor(() => screen.getByDisplayValue("alice"));
 
-    await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
-    });
-  });
-
-  it("clears an existing tenant when super_admin is granted via PATCH", async () => {
-    setup();
-    let capturedBody: Record<string, unknown> | null = null;
-    server.use(
-      http.get("http://localhost:8000/api/v1/users/:userId", () =>
-        envelope({ ...FULL_USER, tenantId: "tenant-1" })
-      ),
-      http.patch("http://localhost:8000/api/v1/users/:userId", async ({ request }) => {
-        capturedBody = (await request.json()) as Record<string, unknown>;
-        return envelope(FULL_USER);
-      })
-    );
-
-    render(<EditUserPage />, { preloadedState: SUPER_ADMIN_STATE });
-    await waitFor(() => screen.getByDisplayValue("alice"));
-    await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Acme Corp");
-    });
     await userEvent.click(screen.getByRole("checkbox", { name: "Super Admin" }));
-    await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
-    });
-    await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
-    await waitFor(() => expect(capturedBody?.tenantId).toBeNull());
+    expect(screen.getByRole("button", { name: /save/i })).toBeDisabled();
+    expect(
+      screen.getByText(
+        /select a tenant in the header before removing this user's super admin role/i
+      )
+    ).toBeInTheDocument();
   });
 
   it("shows error on load failure", async () => {

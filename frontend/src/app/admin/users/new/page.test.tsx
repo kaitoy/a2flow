@@ -10,10 +10,16 @@ import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewUserPage from "./page";
 
-/** Build a preloaded auth slice for a signed-in super admin. */
-const SUPER_ADMIN_STATE: Partial<RootState> = {
-  auth: { user: { id: "u1", roles: ["super_admin"] } as User, status: "authenticated" },
-};
+/** Build a preloaded auth slice for a signed-in super admin acting as a given tenant. */
+function superAdminState(selectedTenantId: string | null): Partial<RootState> {
+  return {
+    auth: {
+      user: { id: "u1", roles: ["super_admin"] } as User,
+      status: "authenticated",
+      selectedTenantId,
+    },
+  };
+}
 
 const CREATED_USER = {
   id: "new-user-id",
@@ -118,14 +124,12 @@ describe("NewUserPage", () => {
     expect(screen.queryByLabelText("Tenant")).not.toBeInTheDocument();
   });
 
-  it("renders a tenant field for a super-admin viewer", async () => {
-    const user = userEvent.setup();
-    render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
-    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
-    expect(screen.getByRole("option", { name: "Acme Corp" })).toBeInTheDocument();
+  it("does not render a tenant field for a super-admin viewer either", () => {
+    render(<NewUserPage />, { preloadedState: superAdminState("tenant-1") });
+    expect(screen.queryByLabelText("Tenant")).not.toBeInTheDocument();
   });
 
-  it("includes the selected tenant in the create request", async () => {
+  it("submits the app-bar selected tenant for a super-admin viewer", async () => {
     const user = userEvent.setup();
     let receivedBody: Record<string, unknown> | undefined;
     server.use(
@@ -135,29 +139,14 @@ describe("NewUserPage", () => {
       })
     );
 
-    render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    render(<NewUserPage />, { preloadedState: superAdminState("tenant-1") });
     await fillRequiredFields(user);
-    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
-    await user.click(await screen.findByRole("option", { name: "Acme Corp" }));
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(receivedBody?.tenantId).toBe("tenant-1"));
   });
 
-  it("disables the tenant select once super_admin is checked", async () => {
-    const user = userEvent.setup();
-    render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
-    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
-    await user.click(await screen.findByRole("option", { name: "Acme Corp" }));
-
-    await user.click(screen.getByRole("checkbox", { name: "Super Admin" }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("combobox", { name: "Tenant" })).toBeDisabled();
-    });
-  });
-
-  it("submits a null tenantId when super_admin is granted after selecting a tenant", async () => {
+  it("submits a null tenantId when granting super_admin, regardless of the app-bar selection", async () => {
     const user = userEvent.setup();
     let receivedBody: Record<string, unknown> | undefined;
     server.use(
@@ -167,15 +156,49 @@ describe("NewUserPage", () => {
       })
     );
 
-    render(<NewUserPage />, { preloadedState: SUPER_ADMIN_STATE });
+    render(<NewUserPage />, { preloadedState: superAdminState("tenant-1") });
     await fillRequiredFields(user);
-    await user.click(await screen.findByRole("combobox", { name: "Tenant" }));
-    await user.click(await screen.findByRole("option", { name: "Acme Corp" }));
     await user.click(screen.getByRole("checkbox", { name: "Super Admin" }));
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(receivedBody?.tenantId).toBeNull());
     expect(receivedBody?.roles).toEqual(["super_admin"]);
+  });
+
+  it("disables save and shows a hint when no tenant is selected in the app bar", async () => {
+    const user = userEvent.setup();
+    render(<NewUserPage />, { preloadedState: superAdminState(null) });
+    await fillRequiredFields(user);
+
+    expect(screen.getByRole("button", { name: /save/i })).toBeDisabled();
+    expect(
+      screen.getByText(/select a tenant in the header before creating this user/i)
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: "Super Admin" }));
+
+    expect(screen.getByRole("button", { name: /save/i })).not.toBeDisabled();
+    expect(
+      screen.queryByText(/select a tenant in the header before creating this user/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not block save for a non-super-admin viewer, and submits a null tenantId", async () => {
+    const user = userEvent.setup();
+    let receivedBody: Record<string, unknown> | undefined;
+    server.use(
+      http.post("http://localhost:8000/api/v1/users", async ({ request }) => {
+        receivedBody = (await request.json()) as Record<string, unknown>;
+        return envelope(CREATED_USER, 201);
+      })
+    );
+
+    render(<NewUserPage />);
+    await fillRequiredFields(user);
+    expect(screen.getByRole("button", { name: /save/i })).not.toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(receivedBody?.tenantId).toBeNull());
   });
 
   it("shows error on api failure", async () => {

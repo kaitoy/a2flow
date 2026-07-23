@@ -1,4 +1,12 @@
-/** @module UserDetailPage — Admin edit/view form for an existing user. */
+/**
+ * @module UserDetailPage — Admin edit/view form for an existing user.
+ *
+ * A tenant already assigned to the target is immutable (see `tenantId`
+ * below), so this form never lets it be picked. For a still-tenant-less
+ * target (a super admin being demoted, most commonly), the tenant to assign
+ * is derived from the app bar's tenant picker (`auth.selectedTenantId`)
+ * instead, the same as the create form.
+ */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +23,6 @@ import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { RolesField } from "@/components/admin/roles-field";
-import { TenantField } from "@/components/admin/tenant-field";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,8 +31,8 @@ import { Input } from "@/components/ui/input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AvatarConfig, deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
-import { Role } from "@/lib/roles";
-import { useAppDispatch } from "@/store/hooks";
+import { Role, useHasRole } from "@/lib/roles";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
 // Reuse the generated create-schema field constraints, but drop the immutable
@@ -63,13 +70,25 @@ export default function EditUserPage() {
   // Roles live outside the form state: the picker is a controlled multi-select
   // rather than a registered input.
   const [roles, setRoles] = useState<Role[]>([]);
-  // Tenant lives outside the form state, like roles, since it's a controlled
-  // select rather than a registered input.
-  const [tenantId, setTenantId] = useState<string | null>(null);
-  // The tenantId as loaded from the server, kept separate from the live
-  // `tenantId` state above so the field can be locked once a tenant was
-  // already assigned (a tenant is immutable once set — see TenantField).
+  // The tenantId as loaded from the server. A tenant is immutable once
+  // assigned (the backend rejects any change), so it's the source of truth
+  // whenever it's non-null; `tenantId` below only derives a value from the
+  // app bar's selection for a still-tenant-less target.
   const [originalTenantId, setOriginalTenantId] = useState<string | null>(null);
+  const isSuperAdminViewer = useHasRole(Role.SUPER_ADMIN);
+  const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
+  const tenantLocked = originalTenantId !== null;
+  const targetIsSuperAdmin = roles.includes(Role.SUPER_ADMIN);
+  const tenantId = tenantLocked
+    ? originalTenantId
+    : isSuperAdminViewer && !targetIsSuperAdmin
+      ? selectedTenantId
+      : null;
+  // Only relevant for a still-tenant-less target being given a non-super-admin
+  // role: the backend requires a tenant in that case, so block submission
+  // instead of round-tripping to its 422.
+  const tenantMissing =
+    !tenantLocked && isSuperAdminViewer && !targetIsSuperAdmin && selectedTenantId === null;
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -97,7 +116,6 @@ export default function EditUserPage() {
         setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
         setAvatarConfig(user.avatarConfig ?? null);
         setRoles(user.roles ?? []);
-        setTenantId(user.tenantId ?? null);
         setOriginalTenantId(user.tenantId ?? null);
         reset({
           firstName: user.firstName,
@@ -223,21 +241,20 @@ export default function EditUserPage() {
 
           <RolesField value={roles} onChange={setRoles} />
 
-          <TenantField
-            value={tenantId}
-            onChange={setTenantId}
-            disabled={roles.includes(Role.SUPER_ADMIN)}
-            locked={originalTenantId !== null}
-          />
-
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />
+
+          {tenantMissing && (
+            <p className="text-xs text-error">
+              Select a tenant in the header before removing this user's Super Admin role.
+            </p>
+          )}
 
           <div className="flex gap-2">
             <Button
               type="submit"
               variant="primary"
-              disabled={save.inFlight}
+              disabled={save.inFlight || tenantMissing}
               status={save.status}
               pendingLabel="Saving…"
             >
