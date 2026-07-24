@@ -108,7 +108,8 @@ async def test_me_requires_session(auth_client: AsyncClient) -> None:
 async def test_me_returns_current_user_after_login(auth_client: AsyncClient) -> None:
     await _login(auth_client)
     data = assert_ok(await auth_client.get("/api/v1/auth/me"))
-    assert data["username"] == AUTH_USERNAME
+    assert data["user"]["username"] == AUTH_USERNAME
+    assert data["impersonatedBy"] is None
 
 
 @pytest.mark.asyncio

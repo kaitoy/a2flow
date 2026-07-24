@@ -6,7 +6,15 @@ import { ConfirmDialog } from "./confirm-dialog";
 
 /** Wraps {@link ConfirmDialog} with a real trigger button, matching how it's
  * opened in practice, so focus restoration on close is testable. */
-function TriggerHarness({ onConfirm }: { onConfirm: () => void }) {
+function TriggerHarness({
+  onConfirm,
+  confirmLabel,
+  confirmVariant,
+}: {
+  onConfirm: () => void;
+  confirmLabel?: string;
+  confirmVariant?: "danger" | "primary" | "secondary";
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -17,6 +25,8 @@ function TriggerHarness({ onConfirm }: { onConfirm: () => void }) {
         open={open}
         title="Delete item?"
         description="This cannot be undone."
+        confirmLabel={confirmLabel}
+        confirmVariant={confirmVariant}
         onConfirm={() => {
           setOpen(false);
           onConfirm();
@@ -93,5 +103,17 @@ describe("ConfirmDialog", () => {
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
     expect(onConfirm).toHaveBeenCalled();
+  });
+
+  it("renders a custom confirmLabel instead of the default Delete", async () => {
+    const user = userEvent.setup();
+    render(
+      <TriggerHarness onConfirm={vi.fn()} confirmLabel="Impersonate" confirmVariant="primary" />
+    );
+
+    await user.click(screen.getByText("open dialog"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Impersonate" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 });

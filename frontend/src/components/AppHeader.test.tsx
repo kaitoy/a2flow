@@ -52,4 +52,23 @@ describe("AppHeader", () => {
       expect(screen.getByLabelText("Acting tenant")).toBeInTheDocument();
     });
   });
+
+  it("does not render the impersonation indicator when not impersonating", () => {
+    render(<AppHeader />);
+    expect(screen.queryByText(/Acting as/)).not.toBeInTheDocument();
+  });
+
+  it("renders the impersonation indicator when impersonating", () => {
+    const preloadedState: Partial<RootState> = {
+      auth: {
+        user: { id: "target-1", username: "target", roles: [] } as User,
+        status: "authenticated",
+        selectedTenantId: null,
+        impersonatedUserId: "target-1",
+        impersonatedBy: { id: "actor-1", username: "actor" } as User,
+      },
+    };
+    render(<AppHeader />, { preloadedState });
+    expect(screen.getByText("Acting as target")).toBeInTheDocument();
+  });
 });

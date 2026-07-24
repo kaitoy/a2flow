@@ -10,6 +10,10 @@ from .exceptions import (
     UnauthorizedError,
     UniqueViolationError,
 )
+from .impersonation_event import (
+    ImpersonationEventRepository,
+    SqlImpersonationEventRepository,
+)
 from .mcp_server import MCPServerRepository, SqlMCPServerRepository
 from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
 from .notification import NotificationRepository, SqlNotificationRepository
@@ -32,6 +36,7 @@ __all__ = [
     "AuthSessionRepository",
     "CsrfError",
     "ForeignKeyViolationError",
+    "ImpersonationEventRepository",
     "MCPServerRepository",
     "MessageMetaRepository",
     "NotFoundError",
@@ -43,6 +48,7 @@ __all__ = [
     "SqlAgentSkillRepository",
     "SqlApprovalRepository",
     "SqlAuthSessionRepository",
+    "SqlImpersonationEventRepository",
     "SqlMCPServerRepository",
     "SqlMessageMetaRepository",
     "SqlNotificationRepository",

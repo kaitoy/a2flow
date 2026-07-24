@@ -1,9 +1,11 @@
 /** @module UsersPage — Admin list page for managing application users. */
 "use client";
 
-import { Users as UsersIcon } from "lucide-react";
+import { UserCog, Users as UsersIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
@@ -14,8 +16,11 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { deleteUser, listUsers, type User } from "@/lib/api";
-import { ROLE_LABELS, Role } from "@/lib/roles";
+import { deleteUser, listUsers, startImpersonation, type User } from "@/lib/api";
+import { persistImpersonatedUserId } from "@/lib/impersonation";
+import { ROLE_LABELS, Role, useHasRole } from "@/lib/roles";
+import { setMe } from "@/store/authSlice";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 const LIMIT = 20;
 
@@ -111,6 +116,31 @@ export default function UsersPage() {
     reload,
   } = useTableQuery<User>(listUsers, { limit: LIMIT });
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
+  const [impersonateTarget, setImpersonateTarget] = useState<{ id: string; name: string } | null>(
+    null
+  );
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const viewer = useAppSelector((s) => s.auth.user);
+  const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
+  // `useHasRole` passes for super_admin too (its bypass), but by the time this
+  // matters below `isSuperAdmin` has already been checked first, so here it
+  // can only mean "genuinely holds admin, not super_admin".
+  const isAdmin = useHasRole(Role.ADMIN);
+
+  /**
+   * Whether the viewer may impersonate `row`, mirroring the backend's
+   * eligibility rules: a `super_admin` row can never be impersonated, an
+   * `admin` row only by a `super_admin` viewer (a regular admin still can't
+   * impersonate a fellow admin).
+   */
+  function canImpersonate(row: User): boolean {
+    if (!viewer || row.id === viewer.id) return false;
+    if (row.roles?.includes(Role.SUPER_ADMIN)) return false;
+    if (row.roles?.includes(Role.ADMIN) && !isSuperAdmin) return false;
+    if (isSuperAdmin) return true;
+    return isAdmin && row.tenantId === viewer.tenantId;
+  }
 
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
@@ -128,6 +158,24 @@ export default function UsersPage() {
     }
   }
 
+  function handleImpersonate(id: string, name: string) {
+    setImpersonateTarget({ id, name });
+  }
+
+  async function executeImpersonate() {
+    if (!impersonateTarget) return;
+    try {
+      const me = await startImpersonation(impersonateTarget.id);
+      dispatch(setMe(me));
+      persistImpersonatedUserId(me.user.id);
+      setImpersonateTarget(null);
+      router.push("/admin");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
+      setImpersonateTarget(null);
+    }
+  }
+
   const columns: ColumnDef<User>[] = [
     ...STATIC_COLUMNS,
     {
@@ -135,6 +183,13 @@ export default function UsersPage() {
       noTruncate: true,
       cell: (user) => (
         <div className="flex gap-2">
+          {canImpersonate(user) && (
+            <ActionIconButton
+              icon={UserCog}
+              label="Impersonate"
+              onClick={() => handleImpersonate(user.id, user.username)}
+            />
+          )}
           <DeleteIconButton onClick={() => handleDelete(user.id, user.username)} />
         </div>
       ),
@@ -177,6 +232,17 @@ export default function UsersPage() {
         description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
+      />
+      <ConfirmDialog
+        open={impersonateTarget !== null}
+        title="Impersonate User"
+        description={
+          impersonateTarget ? `Act as "${impersonateTarget.name}"? You can stop at any time.` : ""
+        }
+        confirmLabel="Impersonate"
+        confirmVariant="primary"
+        onConfirm={executeImpersonate}
+        onCancel={() => setImpersonateTarget(null)}
       />
     </AdminPageContainer>
   );

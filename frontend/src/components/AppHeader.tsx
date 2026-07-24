@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import logo from "@/../assets/logo.png";
 import { TenantSwitcher } from "@/components/admin/tenant-switcher";
+import { ImpersonationIndicator } from "@/components/ImpersonationIndicator";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserProfileButton } from "@/components/UserProfileButton";
@@ -71,6 +72,7 @@ export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
         {children}
       </div>
       <div className="flex items-center gap-2">
+        <ImpersonationIndicator />
         <TenantSwitcher />
         <NotificationBell />
         <ThemeToggle />

@@ -2,6 +2,7 @@ from .agent_skill import AgentSkillService
 from .agent_skill_sync import AgentSkillSyncService, sync_agent_skill
 from .approval import ApprovalService
 from .auth import AuthService
+from .impersonation import ImpersonationService
 from .mcp_registry import MCPRegistryService
 from .mcp_server import MCPServerService
 from .notification import NotificationService
@@ -22,6 +23,7 @@ __all__ = [
     "AgentSkillSyncService",
     "ApprovalService",
     "AuthService",
+    "ImpersonationService",
     "MCPRegistryService",
     "MCPServerService",
     "NotificationService",

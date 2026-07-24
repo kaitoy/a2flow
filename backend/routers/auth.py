@@ -20,11 +20,14 @@ from dependencies import (
     ApiMetaDep,
     AuthServiceDep,
     CurrentUserDep,
+    ImpersonationServiceDep,
+    RealUserDep,
+    require_actor_roles,
     verify_csrf,
 )
 from models.constraints import TenantSlug
 from models.response import ApiResponse
-from models.user import UserRead
+from models.user import Role, UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -40,6 +43,28 @@ class LoginRequest(BaseModel):
     #: (unique only within its tenant); must be omitted for a platform-scoped
     #: user (``root``, or any other super_admin).
     tenant_name: TenantSlug | None = None
+
+
+class MeResponse(BaseModel):
+    """Response shape for ``GET /auth/me`` and the impersonate start/stop endpoints.
+
+    ``user`` is the effective identity (the impersonation target, while one
+    is active). ``impersonated_by`` is the real, session-authenticated actor
+    when it differs from ``user`` -- the signal the frontend uses to render
+    an "acting as" indicator and to self-heal a stale local impersonation
+    selection when it comes back ``None``.
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    user: UserRead
+    impersonated_by: UserRead | None = None
+
+
+class ImpersonateRequest(BaseModel):
+    """Body submitted to start impersonating another user."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    target_user_id: str
 
 
 def _cookie_secure() -> bool:
@@ -109,20 +134,83 @@ async def logout(
     request: Request,
     response: Response,
     service: AuthServiceDep,
-    _user: CurrentUserDep,
+    _user: RealUserDep,
     _csrf: Annotated[None, Depends(verify_csrf)],
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
-    """Revoke the current session and clear the auth cookies."""
+    """Revoke the current session and clear the auth cookies.
+
+    Depends on :data:`~dependencies.RealUserDep`, not the possibly-
+    impersonated ``CurrentUserDep`` -- logout must always end the real
+    session regardless of any impersonation header on this request.
+    """
     await service.logout(request.cookies.get(SESSION_COOKIE_NAME, ""))
     _clear_auth_cookies(response)
     return ApiResponse(meta=meta, data=None)
 
 
-@router.get("/me", response_model=ApiResponse[UserRead])
+@router.get("/me", response_model=ApiResponse[MeResponse])
 async def me(
     user: CurrentUserDep,
+    real_user: RealUserDep,
     meta: ApiMetaDep,
-) -> ApiResponse[UserRead]:
-    """Return the currently authenticated user."""
-    return ApiResponse(meta=meta, data=UserRead.model_validate(user))
+) -> ApiResponse[MeResponse]:
+    """Return the currently authenticated (effective) user.
+
+    ``impersonated_by`` is set whenever the real actor differs from the
+    effective user, i.e. an impersonation is active.
+    """
+    impersonated_by = (
+        UserRead.model_validate(real_user) if real_user.id != user.id else None
+    )
+    return ApiResponse(
+        meta=meta,
+        data=MeResponse(
+            user=UserRead.model_validate(user), impersonated_by=impersonated_by
+        ),
+    )
+
+
+@router.post("/impersonate", response_model=ApiResponse[MeResponse])
+async def start_impersonation(
+    body: ImpersonateRequest,
+    actor: RealUserDep,
+    service: ImpersonationServiceDep,
+    _role: Annotated[None, Depends(require_actor_roles(Role.admin))],
+    _csrf: Annotated[None, Depends(verify_csrf)],
+    meta: ApiMetaDep,
+) -> ApiResponse[MeResponse]:
+    """Start impersonating another user, recording the audit event.
+
+    Gated by :func:`~dependencies.require_actor_roles` (checked against the
+    real actor, not any already-active impersonation) rather than the
+    ordinary ``require_roles`` -- see that dependency's docstring.
+    """
+    target = await service.start(actor=actor, target_user_id=body.target_user_id)
+    return ApiResponse(
+        meta=meta,
+        data=MeResponse(
+            user=UserRead.model_validate(target),
+            impersonated_by=UserRead.model_validate(actor),
+        ),
+    )
+
+
+@router.delete("/impersonate", response_model=ApiResponse[MeResponse])
+async def stop_impersonation(
+    actor: RealUserDep,
+    service: ImpersonationServiceDep,
+    _csrf: Annotated[None, Depends(verify_csrf)],
+    meta: ApiMetaDep,
+) -> ApiResponse[MeResponse]:
+    """Stop impersonating, closing the open audit event.
+
+    A no-op, never an error, if no impersonation is currently open for the
+    real actor -- so a client can always safely call this regardless of its
+    own local state.
+    """
+    await service.stop(actor=actor)
+    return ApiResponse(
+        meta=meta,
+        data=MeResponse(user=UserRead.model_validate(actor), impersonated_by=None),
+    )

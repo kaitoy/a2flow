@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { login } from "@/lib/api";
-import { setUser } from "@/store/authSlice";
+import { persistImpersonatedUserId } from "@/lib/impersonation";
+import { clearImpersonation, setUser } from "@/store/authSlice";
 import { useAppDispatch } from "@/store/hooks";
 
 /**
@@ -36,6 +37,10 @@ export default function LoginPage() {
         await signIn.run(async () => {
           const user = await login(username, password, tenantName.trim() || undefined);
           dispatch(setUser(user));
+          // A fresh login must never inherit a previous session's impersonation
+          // selection lingering in localStorage.
+          dispatch(clearImpersonation());
+          persistImpersonatedUserId(null);
           router.replace("/admin");
         });
       } catch {

@@ -10,6 +10,10 @@ interface ConfirmDialogProps {
   description: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Label for the confirm button. Defaults to `"Delete"`. */
+  confirmLabel?: string;
+  /** Style variant for the confirm button. Defaults to `"danger"`. */
+  confirmVariant?: "danger" | "primary" | "secondary";
 }
 
 /** Modal confirmation dialog with focus trap, keyboard navigation, and backdrop. */
@@ -19,6 +23,8 @@ export function ConfirmDialog({
   description,
   onConfirm,
   onCancel,
+  confirmLabel = "Delete",
+  confirmVariant = "danger",
 }: ConfirmDialogProps) {
   const config = useMotionConfig("gentle");
   const transitions = useTransition(open, {
@@ -75,8 +81,8 @@ export function ConfirmDialog({
                   <Button variant="ghost" onClick={onCancel}>
                     Cancel
                   </Button>
-                  <Button variant="danger" onClick={onConfirm}>
-                    Delete
+                  <Button variant={confirmVariant} onClick={onConfirm}>
+                    {confirmLabel}
                   </Button>
                 </div>
               </animated.div>

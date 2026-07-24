@@ -110,6 +110,8 @@ import {
   zPullAgentSkillApiV1AgentSkillsSkillIdPullPostResponse,
   zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
   zSearchMcpRegistryApiV1McpRegistryGetResponse,
+  zStartImpersonationApiV1AuthImpersonatePostResponse,
+  zStopImpersonationApiV1AuthImpersonateDeleteResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
   zUpdateSecretApiV1SecretsSecretIdPatchResponse,
@@ -144,6 +146,13 @@ const CSRF_HEADER_NAME = "X-CSRF-Token";
  * user, so it's safe to always attach when a selection exists.
  */
 const TENANT_HEADER_NAME = "X-Tenant-Id";
+/**
+ * Header carrying the user id an admin/super_admin is impersonating (see
+ * the impersonation indicator in `AppHeader`). Re-validated by the backend
+ * on every request, so a stale value is harmless -- it silently falls back
+ * to the real user rather than failing the request.
+ */
+const IMPERSONATE_HEADER_NAME = "X-Impersonate-User-Id";
 /** HTTP methods that mutate state and therefore require a CSRF token. */
 const UNSAFE_METHODS = new Set(["post", "put", "patch", "delete"]);
 
@@ -169,6 +178,8 @@ apiClient.interceptors.request.use((config) => {
   }
   const tenantId = store.getState().auth.selectedTenantId;
   if (tenantId) config.headers.set(TENANT_HEADER_NAME, tenantId);
+  const impersonatedUserId = store.getState().auth.impersonatedUserId;
+  if (impersonatedUserId) config.headers.set(IMPERSONATE_HEADER_NAME, impersonatedUserId);
   return config;
 });
 
@@ -403,12 +414,38 @@ export async function logout(): Promise<void> {
   await fetchEnvelope(apiClient.post("/api/v1/auth/logout"), zLogoutApiV1AuthLogoutPostResponse);
 }
 
-/** Fetch the currently authenticated user, or throw if the session is invalid. */
-export async function getMe(): Promise<User> {
+/**
+ * Result of `getMe`/`login`/the impersonate start-stop endpoints: the
+ * effective user, plus the real actor when an impersonation is active.
+ */
+export interface Me {
+  user: User;
+  impersonatedBy: User | null;
+}
+
+/** Fetch the currently authenticated (effective) user, or throw if the session is invalid. */
+export async function getMe(): Promise<Me> {
+  return fetchEnvelope(apiClient.get("/api/v1/auth/me"), zMeApiV1AuthMeGetResponse) as Promise<Me>;
+}
+
+/**
+ * Start impersonating another user. The backend enforces eligibility (role,
+ * tenant, and target-role restrictions); a rejection surfaces as a thrown
+ * `ApiClientError` with the usual `FORBIDDEN`/`NOT_FOUND` codes.
+ */
+export async function startImpersonation(targetUserId: string): Promise<Me> {
   return fetchEnvelope(
-    apiClient.get("/api/v1/auth/me"),
-    zMeApiV1AuthMeGetResponse
-  ) as Promise<User>;
+    apiClient.post("/api/v1/auth/impersonate", { targetUserId }),
+    zStartImpersonationApiV1AuthImpersonatePostResponse
+  ) as Promise<Me>;
+}
+
+/** Stop impersonating, if currently active; a no-op (never throws for this reason) otherwise. */
+export async function stopImpersonation(): Promise<Me> {
+  return fetchEnvelope(
+    apiClient.delete("/api/v1/auth/impersonate"),
+    zStopImpersonationApiV1AuthImpersonateDeleteResponse
+  ) as Promise<Me>;
 }
 
 /** Fetch all sessions for the current user (resolved from the session cookie). */
@@ -1141,20 +1178,23 @@ export async function resolveApproval(
 }
 
 /**
- * HttpAgent variant that sends the auth session cookie, the CSRF token, and
- * the selected tenant header with each streaming request. The agent endpoints
- * are POSTs, so they need both the cookie (`credentials: "include"`) and the
- * double-submit `X-CSRF-Token` header; a super_admin also needs `X-Tenant-Id`
- * to reach these tenant-scoped endpoints at all -- unlike the axios-based
- * calls above, these bypass `apiClient`'s interceptor entirely, so the header
+ * HttpAgent variant that sends the auth session cookie, the CSRF token, the
+ * selected tenant header, and the impersonation header with each streaming
+ * request. The agent endpoints are POSTs, so they need both the cookie
+ * (`credentials: "include"`) and the double-submit `X-CSRF-Token` header; a
+ * super_admin also needs `X-Tenant-Id` to reach these tenant-scoped endpoints
+ * at all, and an impersonating admin needs `X-Impersonate-User-Id` for the
+ * agent to act as the impersonated user -- unlike the axios-based calls
+ * above, these bypass `apiClient`'s interceptor entirely, so the headers
  * must be attached here too.
  */
 class CredentialedHttpAgent extends HttpAgent {
-  /** Augment the base fetch config with credentials, CSRF, and tenant headers. */
+  /** Augment the base fetch config with credentials, CSRF, tenant, and impersonation headers. */
   protected requestInit(input: Parameters<HttpAgent["requestInit"]>[0]): RequestInit {
     const init = super.requestInit(input);
     const csrf = readCookie(CSRF_COOKIE_NAME);
     const tenantId = store.getState().auth.selectedTenantId;
+    const impersonatedUserId = store.getState().auth.impersonatedUserId;
     return {
       ...init,
       credentials: "include",
@@ -1162,6 +1202,7 @@ class CredentialedHttpAgent extends HttpAgent {
         ...(init.headers as Record<string, string> | undefined),
         ...(csrf ? { [CSRF_HEADER_NAME]: csrf } : {}),
         ...(tenantId ? { [TENANT_HEADER_NAME]: tenantId } : {}),
+        ...(impersonatedUserId ? { [IMPERSONATE_HEADER_NAME]: impersonatedUserId } : {}),
       },
     };
   }

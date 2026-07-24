@@ -377,5 +377,5 @@ export const handlers = [
 
   http.post(`${BASE}/api/v1/auth/logout`, () => envelope(null)),
 
-  http.get(`${BASE}/api/v1/auth/me`, () => envelope(USER_1)),
+  http.get(`${BASE}/api/v1/auth/me`, () => envelope({ user: USER_1, impersonatedBy: null })),
 ];

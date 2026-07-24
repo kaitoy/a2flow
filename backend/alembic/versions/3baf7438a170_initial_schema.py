@@ -181,6 +181,41 @@ def upgrade() -> None:
         "ix_auth_sessions_token_hash", "auth_sessions", ["token_hash"], unique=False
     )
     op.create_table(
+        "impersonation_events",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "impersonator_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+        ),
+        sa.Column("target_user_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["impersonator_id"],
+            ["users.id"],
+            ondelete="RESTRICT",
+            name="fk_impersonation_events_impersonator_id",
+        ),
+        sa.ForeignKeyConstraint(
+            ["target_user_id"],
+            ["users.id"],
+            ondelete="RESTRICT",
+            name="fk_impersonation_events_target_user_id",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_impersonation_events_impersonator_id_ended_at",
+        "impersonation_events",
+        ["impersonator_id", "ended_at"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_impersonation_events_target_user_id",
+        "impersonation_events",
+        ["target_user_id"],
+        unique=False,
+    )
+    op.create_table(
         "mcp_servers",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -783,6 +818,14 @@ def downgrade() -> None:
     op.drop_table("secrets")
     op.drop_index("ix_mcp_servers_tenant_id_name", table_name="mcp_servers")
     op.drop_table("mcp_servers")
+    op.drop_index(
+        "ix_impersonation_events_target_user_id", table_name="impersonation_events"
+    )
+    op.drop_index(
+        "ix_impersonation_events_impersonator_id_ended_at",
+        table_name="impersonation_events",
+    )
+    op.drop_table("impersonation_events")
     op.drop_index("ix_auth_sessions_token_hash", table_name="auth_sessions")
     op.drop_table("auth_sessions")
     op.drop_index("ix_agent_skills_tenant_id_name", table_name="agent_skills")

@@ -1,6 +1,7 @@
 from .agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from .approval import Approval, ApprovalCreate, ApprovalStatus, ApprovalUpdate
 from .auth_session import AuthSession
+from .impersonation_event import ImpersonationEvent
 from .mcp_server import MCPServer, MCPServerCreate, MCPServerUpdate, McpToolInfo
 from .message_meta import MessageMeta
 from .notification import (
@@ -49,6 +50,7 @@ __all__ = [
     "ApprovalStatus",
     "ApprovalUpdate",
     "AuthSession",
+    "ImpersonationEvent",
     "MCPServer",
     "MCPServerCreate",
     "MCPServerUpdate",

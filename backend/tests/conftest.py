@@ -136,14 +136,24 @@ def _override_verify_csrf() -> None:
 
 
 def _install_auth_overrides(app: Any) -> None:
-    """Override the auth and CSRF dependencies with the header-based test stand-ins."""
+    """Override the auth and CSRF dependencies with the header-based test stand-ins.
+
+    ``get_session_user`` (``RealUserDep``'s dependency -- the real,
+    non-impersonated identity) is overridden with the same stand-in as
+    ``get_current_user``: these header-driven tests have no real session
+    cookie at all, so without this override anything depending on
+    ``RealUserDep`` (``require_actor_roles``, the impersonate routes, ``GET
+    /auth/me``) would 401 trying to read a cookie that was never set.
+    """
     from dependencies.auth import (
         get_current_user,
         get_current_user_id,
+        get_session_user,
         verify_csrf,
     )
 
     app.dependency_overrides[get_current_user] = _override_get_current_user
+    app.dependency_overrides[get_session_user] = _override_get_current_user
     app.dependency_overrides[get_current_user_id] = _override_get_current_user_id
     app.dependency_overrides[verify_csrf] = _override_verify_csrf
 

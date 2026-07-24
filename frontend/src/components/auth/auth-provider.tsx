@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { getMe } from "@/lib/api";
-import { clearUser, setUser } from "@/store/authSlice";
+import { clearUser, setMe } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 /**
@@ -26,8 +26,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     getMe()
-      .then((user) => {
-        if (!cancelled) dispatch(setUser(user));
+      .then((me) => {
+        if (!cancelled) dispatch(setMe(me));
       })
       .catch(() => {
         if (cancelled) return;
