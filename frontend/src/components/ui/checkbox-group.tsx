@@ -12,6 +12,12 @@ export interface CheckboxOption {
    * super admin may grant or revoke).
    */
   disabled?: boolean;
+  /**
+   * When true, renders a thin divider above this option, visually separating
+   * it from the previous one (e.g. splitting a mutually-exclusive option from
+   * the rest of the group).
+   */
+  dividerBefore?: boolean;
 }
 
 /** Props for {@link CheckboxGroup}. */
@@ -37,6 +43,8 @@ const ROW_DISABLED =
   "flex items-center gap-2.5 rounded-lg px-3 py-2 cursor-not-allowed " +
   "text-sm text-on-surface-variant transition-colors duration-150";
 
+const DIVIDER_BEFORE = "mt-1.5 border-t border-divider/60 pt-2.5";
+
 /**
  * Controlled multi-select rendered as a vertical list of labeled checkboxes.
  *
@@ -44,7 +52,8 @@ const ROW_DISABLED =
  * selection array (values are added in option order and removed in place). Each
  * checkbox's accessible name is its option label, so it can be queried by role
  * and name. Options marked `disabled` render as read-only checkboxes that keep
- * their current state.
+ * their current state. An option marked `dividerBefore` renders a thin divider
+ * above it, splitting the list into visually distinct groups.
  */
 export function CheckboxGroup({
   options,
@@ -76,7 +85,12 @@ export function CheckboxGroup({
   return (
     <div className="flex flex-col gap-0.5 rounded-xl glass-panel p-1.5">
       {options.map((option) => (
-        <label key={option.value} className={option.disabled ? ROW_DISABLED : ROW}>
+        <label
+          key={option.value}
+          className={`${option.disabled ? ROW_DISABLED : ROW}${
+            option.dividerBefore ? ` ${DIVIDER_BEFORE}` : ""
+          }`}
+        >
           <input
             type="checkbox"
             name={name}

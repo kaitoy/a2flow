@@ -17,12 +17,17 @@ export interface RolesFieldProps {
  *
  * The `super_admin` option is omitted entirely for a non-super-admin viewer —
  * the backend rejects granting or revoking it otherwise (HTTP 403), and only a
- * super admin should even know the role exists. A target's existing
- * `super_admin` grant is preserved and submitted unchanged even though its
- * checkbox isn't rendered: {@link CheckboxGroup} otherwise reconstructs its
- * reported selection from the rendered options alone, so toggling any other
- * role would silently drop the grant — `handleChange` re-adds it whenever it
- * was already held but missing from what `CheckboxGroup` reported back.
+ * super admin should even know the role exists.
+ *
+ * `super_admin` is mutually exclusive with every other role (it already
+ * bypasses every role-based check, so combining it with another role is
+ * redundant). Rather than silently dropping a selection, checking either side
+ * disables the other: once `super_admin` is held, every other checkbox is
+ * disabled (and vice versa), with a divider and hint explaining why. A
+ * non-super-admin viewer editing a target that already holds `super_admin`
+ * therefore sees every rendered checkbox disabled — the `super_admin`
+ * checkbox itself stays hidden from them, but nothing else can be toggled
+ * until a super admin lifts the grant.
  */
 export function RolesField({ value, onChange }: RolesFieldProps) {
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
@@ -30,21 +35,31 @@ export function RolesField({ value, onChange }: RolesFieldProps) {
   const visibleRoles = isSuperAdmin
     ? ALL_ROLES
     : ALL_ROLES.filter((role) => role !== Role.SUPER_ADMIN);
-  const options: CheckboxOption[] = visibleRoles.map((role) => ({
+
+  const holdsSuperAdmin = value.includes(Role.SUPER_ADMIN);
+  const holdsOtherRole = value.some((role) => role !== Role.SUPER_ADMIN);
+
+  const options: CheckboxOption[] = visibleRoles.map((role, i) => ({
     value: role,
     label: ROLE_LABELS[role],
+    disabled: role === Role.SUPER_ADMIN ? holdsOtherRole : holdsSuperAdmin,
+    dividerBefore: isSuperAdmin && i === 1,
   }));
-
-  function handleChange(next: string[]) {
-    const keepsSuperAdmin =
-      !isSuperAdmin && value.includes(Role.SUPER_ADMIN) && !next.includes(Role.SUPER_ADMIN);
-    onChange((keepsSuperAdmin ? [...next, Role.SUPER_ADMIN] : next) as Role[]);
-  }
 
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-label-caps">Roles</span>
-      <CheckboxGroup name="roles" options={options} value={value} onChange={handleChange} />
+      <CheckboxGroup
+        name="roles"
+        options={options}
+        value={value}
+        onChange={(next) => onChange(next as Role[])}
+      />
+      {isSuperAdmin && (
+        <p className="text-xs text-on-surface-variant">
+          Super Admin can&apos;t be combined with other roles — uncheck it to change the others.
+        </p>
+      )}
     </div>
   );
 }

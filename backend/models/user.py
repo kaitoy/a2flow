@@ -33,7 +33,9 @@ class Role(StrEnum):
 
     Roles are independent grants (no inheritance): a user holds any subset of
     them, and each role unlocks a specific group of operations. The single
-    exception is :attr:`super_admin`, which bypasses every authorization check.
+    exception is :attr:`super_admin`, which bypasses every authorization
+    check and, for that reason, is mutually exclusive with every other role —
+    see :func:`services.user._reject_super_admin_role_combination`.
     """
 
     #: All operations; bypasses every role and ownership check.
@@ -217,6 +219,11 @@ class User(UserCreate, BaseEntity, table=True):
     platform-scoped users (``super_admin`` and the seeded system user) — a
     plain composite constraint alone would not catch that case, since SQL
     treats every ``NULL`` as distinct from every other ``NULL``.
+
+    A third check constraint, ``ck_users_super_admin_exclusive``, enforces
+    that a ``super_admin`` never holds any other role — see
+    :func:`services.user._reject_super_admin_role_combination` for the
+    matching application-layer guard.
     """
 
     __tablename__ = "users"
@@ -244,6 +251,11 @@ class User(UserCreate, BaseEntity, table=True):
             "tenant_id IS NOT NULL OR CAST(roles AS TEXT) LIKE '%\"super_admin\"%' "
             f"OR id = '{SYSTEM_USER_ID}'",
             name="ck_users_non_super_admin_requires_tenant",
+        ),
+        CheckConstraint(
+            "CAST(roles AS TEXT) NOT LIKE '%\"super_admin\"%' "
+            "OR CAST(roles AS TEXT) = '[\"super_admin\"]'",
+            name="ck_users_super_admin_exclusive",
         ),
     )
 

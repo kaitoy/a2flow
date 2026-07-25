@@ -52,14 +52,42 @@ describe("RolesField", () => {
     expect(screen.getByRole("checkbox", { name: "Super Admin" })).toBeInTheDocument();
   });
 
-  it("preserves an existing super_admin grant when a non-super-admin toggles another role", async () => {
-    const onChange = vi.fn();
-    render(<RolesField value={["super_admin", "developer"]} onChange={onChange} />, {
+  it("disables every other role checkbox once super_admin is held", () => {
+    render(<RolesField value={["super_admin"]} onChange={vi.fn()} />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    for (const label of ["Admin", "Developer", "Requester", "Approver"]) {
+      expect(screen.getByRole("checkbox", { name: label })).toBeDisabled();
+    }
+  });
+
+  it("disables the super_admin checkbox once another role is held", () => {
+    render(<RolesField value={["developer"]} onChange={vi.fn()} />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    expect(screen.getByRole("checkbox", { name: "Super Admin" })).toBeDisabled();
+  });
+
+  it("does not disable any checkbox when no role is held", () => {
+    render(<RolesField value={[]} onChange={vi.fn()} />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    for (const label of ["Super Admin", "Admin", "Developer", "Requester", "Approver"]) {
+      expect(screen.getByRole("checkbox", { name: label })).not.toBeDisabled();
+    }
+  });
+
+  it("shows a hint explaining super_admin is exclusive for a super-admin viewer", () => {
+    render(<RolesField value={[]} onChange={vi.fn()} />, {
+      preloadedState: authState(["super_admin"]),
+    });
+    expect(screen.getByText(/can't be combined with other roles/i)).toBeInTheDocument();
+  });
+
+  it("does not show the exclusivity hint for a non-super-admin viewer", () => {
+    render(<RolesField value={[]} onChange={vi.fn()} />, {
       preloadedState: authState(["admin"]),
     });
-    await userEvent.click(screen.getByRole("checkbox", { name: "Approver" }));
-    const reported = onChange.mock.calls[0][0];
-    expect(reported).toHaveLength(3);
-    expect(reported).toEqual(expect.arrayContaining(["super_admin", "developer", "approver"]));
+    expect(screen.queryByText(/can't be combined with other roles/i)).not.toBeInTheDocument();
   });
 });

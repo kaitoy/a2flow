@@ -97,6 +97,11 @@ def upgrade() -> None:
             "OR id = '00000000-0000-0000-0000-000000000000'",
             name="ck_users_non_super_admin_requires_tenant",
         ),
+        sa.CheckConstraint(
+            "CAST(roles AS TEXT) NOT LIKE '%\"super_admin\"%' "
+            "OR CAST(roles AS TEXT) = '[\"super_admin\"]'",
+            name="ck_users_super_admin_exclusive",
+        ),
     )
     op.create_index(
         "ix_users_tenant_id_username", "users", ["tenant_id", "username"], unique=False

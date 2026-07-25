@@ -110,7 +110,7 @@ See [backend/README.md](backend/README.md#authentication) for the endpoint and c
 
 ## Roles and authorization
 
-Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy, and a user may hold any combination of them — with one exception: **Super Admin bypasses every role-based check**. Two ownership-layer checks are a deliberate exception to that bypass — see [Human approval](#human-approval). A user with **no roles at all** is valid: they can still use the regular chat and manage their own [account](#users) (avatar), but nothing else.
+Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy — with one exception: **Super Admin bypasses every role-based check** and, for that reason, is **mutually exclusive** with every other role — a user is either a Super Admin or holds some combination of the other four roles, never both. Two ownership-layer checks are a deliberate exception to the bypass — see [Human approval](#human-approval). A user with **no roles at all** is valid: they can still use the regular chat and manage their own [account](#users) (avatar), but nothing else.
 
 | Role | Grants |
 |---|---|
@@ -154,7 +154,7 @@ Navigate to [http://localhost:3000/admin/users](http://localhost:3000/admin/user
 
 Each user record stores a username (unique within its tenant, and separately unique among platform-scoped users with no tenant), first name, last name, email, an `enabled` flag, an `emailVerified` flag, and the user's [roles](#roles-and-authorization). Passwords are hashed with [bcrypt](https://pypi.org/project/bcrypt/) before persistence and are never returned by the API. On edit, leaving the password field blank keeps the existing password. Users are persisted in `a2flow.db`.
 
-**Roles.** The create and edit forms include a roles picker (one checkbox per role); the list shows each user's roles in a **Roles** column. Roles are stored as a JSON list, so they cannot be sorted or filtered server-side via the list API's `s` / `q` parameters. The **Super Admin** checkbox is disabled unless the signed-in user is a Super Admin — the backend rejects granting or revoking it otherwise.
+**Roles.** The create and edit forms include a roles picker (one checkbox per role); the list shows each user's roles in a **Roles** column. Roles are stored as a JSON list, so they cannot be sorted or filtered server-side via the list API's `s` / `q` parameters. The **Super Admin** checkbox is disabled unless the signed-in user is a Super Admin — the backend rejects granting or revoking it otherwise. Because Super Admin is mutually exclusive with every other role, checking it disables every other role checkbox (and vice versa), with a divider and hint explaining why — the backend rejects any combination of the two regardless.
 
 **Impersonate.** Each row eligible under the [impersonation rules](#roles-and-authorization) shows an **Impersonate** action — hidden for the signed-in user's own row, for any `super_admin` row, and, unless the viewer is a Super Admin, for any `admin` row; confirming navigates to the welcome page acting as that user. See [Roles and authorization](#roles-and-authorization) for who can impersonate whom and how to stop.
 

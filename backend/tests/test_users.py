@@ -917,6 +917,61 @@ async def test_update_user_rejects_clearing_already_assigned_tenant_to_grant_sup
     assert_err(response, "INVALID_USER", 422)
 
 
+# ---------- super_admin exclusivity ----------
+
+
+async def test_create_user_rejects_super_admin_with_another_role(
+    user_client: AsyncClient,
+) -> None:
+    """Creating a user with super_admin alongside another role is rejected."""
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "roles": ["super_admin", "admin"], "tenantId": None},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_admin_cannot_create_super_admin_with_another_role(
+    user_client: AsyncClient,
+) -> None:
+    """An admin (non-super) attempting the same combo still gets the existing role-grant 403."""
+    response = await user_client.post(
+        "/api/v1/users",
+        json={**_CREATE_BODY, "roles": ["super_admin", "admin"], "tenantId": None},
+        headers={"X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_update_user_rejects_adding_role_to_super_admin(
+    user_client: AsyncClient,
+) -> None:
+    """Adding a role to an existing super_admin user via PATCH is rejected."""
+    created = await _create_user(
+        user_client, headers={"X-User-Roles": "super_admin"}, roles=["super_admin"]
+    )
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": ["super_admin", "developer"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
+async def test_update_user_rejects_granting_super_admin_alongside_existing_role(
+    user_client: AsyncClient,
+) -> None:
+    """Granting super_admin to a user that keeps another role in the same PATCH is rejected."""
+    created = await _create_user(user_client, roles=["developer"])
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"roles": ["super_admin", "developer"]},
+        headers={"X-User-Roles": "super_admin"},
+    )
+    assert_err(response, "INVALID_USER", 422)
+
+
 # ---------- tenant isolation ----------
 
 

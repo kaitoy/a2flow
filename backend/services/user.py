@@ -87,6 +87,29 @@ def _require_tenant_for_non_super_admin(
         raise UserValidationError("A non-super-admin user must be assigned a tenant")
 
 
+def _reject_super_admin_role_combination(roles: Sequence[str] | None) -> None:
+    """Reject an effective roles list that combines super_admin with any other role.
+
+    Runs independent of the acting user's role, mirroring
+    :func:`_reject_super_admin_tenant_conflict` — ``super_admin`` already
+    bypasses every other role via :func:`has_role`, so holding one alongside
+    it is redundant at best and confusing at worst. This is the fast,
+    friendly-error path (HTTP 422); the same invariant is also enforced at
+    the database level by the ``ck_users_super_admin_exclusive`` CHECK
+    constraint (:class:`~models.user.User`), for concurrent-write safety.
+
+    Args:
+        roles: The user's effective roles after the write.
+
+    Raises:
+        UserValidationError: If ``roles`` includes ``super_admin`` together
+            with any other role.
+    """
+    role_set = set(roles or [])
+    if Role.super_admin in role_set and len(role_set) > 1:
+        raise UserValidationError("A super admin cannot hold any other role")
+
+
 def _assert_tenant_visible(acting_user: User, target: User) -> None:
     """Reject access to a user belonging to a different, concrete tenant.
 
@@ -218,8 +241,9 @@ class UserService:
                 acting user is not a super admin, or if a ``tenant_id`` is
                 supplied and the acting user is not a super admin.
             UserValidationError: If the new user would hold ``super_admin``
-                and also carry a ``tenant_id``, or would hold neither
-                ``super_admin`` nor a ``tenant_id``.
+                and also carry a ``tenant_id``, would hold neither
+                ``super_admin`` nor a ``tenant_id``, or would hold
+                ``super_admin`` together with another role.
         """
         if Role.super_admin in data.roles and not has_role(
             acting_user, Role.super_admin
@@ -235,6 +259,7 @@ class UserService:
             data = data.model_copy(update={"tenant_id": acting_user.tenant_id})
         _reject_super_admin_tenant_conflict(data.roles, data.tenant_id)
         _require_tenant_for_non_super_admin(data.roles, data.tenant_id)
+        _reject_super_admin_role_combination(data.roles)
         hashed = data.model_copy(update={"password": hash_password(data.password)})
         return await self._repo.create(hashed, user_id=acting_user.id)
 
@@ -273,8 +298,9 @@ class UserService:
             UserValidationError: If the update would leave the target holding
                 ``super_admin`` while also carrying a ``tenant_id``, would
                 leave the target holding neither ``super_admin`` nor a
-                ``tenant_id``, or would change a ``tenant_id`` the target
-                already has.
+                ``tenant_id``, would change a ``tenant_id`` the target
+                already has, or would leave the target holding
+                ``super_admin`` together with another role.
         """
         target = await self.get(target_id, acting_user=acting_user)
         update = data.model_dump(exclude_unset=True)
@@ -301,6 +327,7 @@ class UserService:
             effective_tenant_id = update.get("tenant_id", target.tenant_id)
             _reject_super_admin_tenant_conflict(effective_roles, effective_tenant_id)
             _require_tenant_for_non_super_admin(effective_roles, effective_tenant_id)
+            _reject_super_admin_role_combination(effective_roles)
         elif target_id != acting_user.id or not set(update) <= _SELF_SERVICE_FIELDS:
             raise ForbiddenError(
                 "Only admins can update other users or non-self-service fields"
