@@ -5,6 +5,7 @@ use :class:`UserRead`, which omits ``password`` entirely so the hash is never
 serialized to clients.
 """
 
+import re
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -72,61 +73,47 @@ def has_role(user: "User | UserRead", *allowed: Role) -> bool:
     return bool(roles & set(allowed))
 
 
-#: Maximum number of part selections or color overrides allowed in an avatar config.
-_MAX_AVATAR_ENTRIES = 50
+#: Maximum number of palette colors allowed in an avatar config.
+_MAX_AVATAR_COLORS = 8
 
-#: Maximum length, in characters, of each avatar config key and value.
-_MAX_AVATAR_VALUE_LENGTH = 128
+#: Pattern every avatar palette entry must match: a six-digit ``#rrggbb`` hex color.
+_AVATAR_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 class AvatarConfig(SQLModel):
-    """Customization for a user's generated (Humation) avatar.
+    """Customization for a user's generated (boring-avatars ``beam``) avatar.
 
-    Holds the part ``selections`` (selection-slot id -> part id), ``colors``
-    (color-slot id -> hex value), and an optional ``background`` the frontend
-    feeds to the Humation avatar renderer. The inner mapping keys are Humation
-    slot identifiers defined by the frontend asset package, so they are not
-    validated against a manifest here; only their sizes are bounded.
+    Holds the ordered ``colors`` palette the frontend feeds to the avatar
+    renderer. The renderer picks entries from the palette by hashing the
+    username seed, so the order is meaningful; an empty list means "use the
+    application default palette".
     """
 
     model_config = _alias_config
-    selections: dict[str, str] = Field(default_factory=dict)
-    colors: dict[str, str] = Field(default_factory=dict)
-    background: str | None = None
+    colors: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _validate_sizes(self) -> "AvatarConfig":
-        """Bound the number of entries and the length of each key and value.
+    def _validate_colors(self) -> "AvatarConfig":
+        """Bound the palette length and require every entry to be a hex color.
+
+        The renderer derives contrasting foreground colors by parsing each
+        palette entry as hex, so a non-hex value renders wrong rather than
+        failing loudly — hence the format check here.
 
         Returns:
             The validated model instance.
 
         Raises:
-            ValueError: If a mapping has more than ``_MAX_AVATAR_ENTRIES`` entries,
-                or any key, value, or the background exceeds
-                ``_MAX_AVATAR_VALUE_LENGTH`` characters.
+            ValueError: If the palette holds more than ``_MAX_AVATAR_COLORS``
+                entries, or any entry is not a ``#rrggbb`` hex color.
         """
-        for mapping in (self.selections, self.colors):
-            if len(mapping) > _MAX_AVATAR_ENTRIES:
+        if len(self.colors) > _MAX_AVATAR_COLORS:
+            raise ValueError(f"At most {_MAX_AVATAR_COLORS} avatar colors are allowed")
+        for color in self.colors:
+            if not _AVATAR_COLOR_RE.match(color):
                 raise ValueError(
-                    f"At most {_MAX_AVATAR_ENTRIES} avatar entries are allowed"
+                    "Avatar colors must be six-digit hex values like '#16BFA9'"
                 )
-            for key, value in mapping.items():
-                if (
-                    len(key) > _MAX_AVATAR_VALUE_LENGTH
-                    or len(value) > _MAX_AVATAR_VALUE_LENGTH
-                ):
-                    raise ValueError(
-                        "Avatar config keys and values must be at most "
-                        f"{_MAX_AVATAR_VALUE_LENGTH} characters"
-                    )
-        if (
-            self.background is not None
-            and len(self.background) > _MAX_AVATAR_VALUE_LENGTH
-        ):
-            raise ValueError(
-                f"Avatar background must be at most {_MAX_AVATAR_VALUE_LENGTH} characters"
-            )
         return self
 
 
@@ -164,7 +151,7 @@ class UserUpdate(SQLModel):
     email_verified: bool | None = None
     #: Roles to assign; ``None`` leaves the target's roles unchanged on update.
     roles: list[Role] | None = None
-    #: Customization for the generated avatar; ``None`` leaves it unchanged on
+    #: Color palette for the generated avatar; ``None`` leaves it unchanged on
     #: update, and an explicit ``null`` from the client clears it.
     avatar_config: AvatarConfig | None = None
     #: Tenant this user belongs to. ``None`` is only valid for a ``super_admin``
@@ -270,7 +257,7 @@ class User(UserCreate, BaseEntity, table=True):
     roles: list[str] = Field(  # type: ignore[assignment]
         default_factory=list, sa_column=Column(JSONColumn, nullable=False)
     )
-    #: Generated-avatar customization, stored as a JSON blob. Overrides the
+    #: Generated-avatar color palette, stored as a JSON blob. Overrides the
     #: typed :class:`AvatarConfig` inherited from :class:`UserUpdate` so it
     #: persists as a plain dict column.
     avatar_config: dict[str, Any] | None = Field(  # type: ignore[assignment]
@@ -299,8 +286,8 @@ class UserRead(BaseEntity):
     #: ISO-8601 timestamp of the last custom-avatar change, or ``None`` when the
     #: user has no uploaded avatar (the client then renders a generated default).
     avatar_updated_at: datetime | None = None
-    #: Generated-avatar customization, or ``None`` when the user has not
-    #: customized it (the client then renders a username-seeded default).
+    #: Generated-avatar color palette, or ``None`` when the user has not
+    #: customized it (the client then renders its default palette).
     avatar_config: AvatarConfig | None = None
     #: Tenant this user belongs to; ``None`` for a platform-scoped user.
     tenant_id: str | None = None

@@ -290,11 +290,7 @@ async def test_update_user_unknown_id_returns_404(user_client: AsyncClient) -> N
 # ---------- avatar config ----------
 
 
-_AVATAR_CONFIG = {
-    "selections": {"head": "braids", "body": "hoodie"},
-    "colors": {"hair": "#4A3728"},
-    "background": "#EFEFEF",
-}
+_AVATAR_CONFIG = {"colors": ["#4A3728", "#EFEFEF", "#16BFA9"]}
 
 
 async def test_create_user_avatar_config_defaults_none(
@@ -343,9 +339,22 @@ async def test_update_user_avatar_config_rejects_oversized(
     created = assert_ok(
         await user_client.post("/api/v1/users", json=_CREATE_BODY), status=201
     )
-    oversized = {"selections": {f"slot{i}": "part" for i in range(51)}}
+    oversized = {"colors": ["#16BFA9"] * 9}
     response = await user_client.patch(
         f"/api/v1/users/{created['id']}", json={"avatarConfig": oversized}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_update_user_avatar_config_rejects_non_hex_color(
+    user_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await user_client.post("/api/v1/users", json=_CREATE_BODY), status=201
+    )
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"avatarConfig": {"colors": ["rebeccapurple"]}},
     )
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
@@ -639,11 +648,11 @@ async def test_roleless_user_can_update_own_avatar_config(
     body = assert_ok(
         await user_client.patch(
             f"/api/v1/users/{created['id']}",
-            json={"avatarConfig": {"selections": {"hair": "h1"}}},
+            json={"avatarConfig": {"colors": ["#16BFA9"]}},
             headers={"X-User-Id": created["id"], "X-User-Roles": ""},
         )
     )
-    assert body["avatarConfig"]["selections"] == {"hair": "h1"}
+    assert body["avatarConfig"]["colors"] == ["#16BFA9"]
 
 
 async def test_roleless_user_cannot_update_own_profile_fields(
@@ -669,7 +678,7 @@ async def test_roleless_user_cannot_update_other_user(
     )
     response = await user_client.patch(
         f"/api/v1/users/{created['id']}",
-        json={"avatarConfig": {"selections": {}}},
+        json={"avatarConfig": {"colors": []}},
         headers={"X-User-Id": other["id"], "X-User-Roles": "developer,approver"},
     )
     assert_err(response, "FORBIDDEN", 403)

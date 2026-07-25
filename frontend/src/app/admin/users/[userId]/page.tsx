@@ -64,8 +64,8 @@ export default function EditUserPage() {
   // read-only preview without touching the editable fields. Avatar editing is
   // self-service only (the account page); the admin form just displays the
   // current avatar. `avatarUpdatedAt` marks a custom uploaded image;
-  // `avatarConfig` holds the user's Humation customization so the preview
-  // matches their generated avatar elsewhere in the app.
+  // `avatarConfig` holds the user's generated-avatar palette so the preview
+  // matches their avatar elsewhere in the app.
   const [avatarUpdatedAt, setAvatarUpdatedAt] = useState<string | null>(null);
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
   // Roles live outside the form state: the picker is a controlled multi-select
@@ -208,7 +208,20 @@ export default function EditUserPage() {
           <div className="flex flex-col gap-1.5">
             <span className="text-label-caps">Avatar</span>
             <div className="flex items-center gap-3">
-              <Avatar user={{ id: userId, username, avatarUpdatedAt, avatarConfig }} size={96} />
+              <Avatar
+                // `originalTenantId`, not the derived `tenantId`: the avatar seed
+                // must match the user's stored tenant, so a still-tenant-less
+                // target keeps the same face here as in the user list rather than
+                // borrowing the app bar's selection.
+                user={{
+                  id: userId,
+                  username,
+                  tenantId: originalTenantId,
+                  avatarUpdatedAt,
+                  avatarConfig,
+                }}
+                size={96}
+              />
               {targetIsSuperAdmin && <Badge>Super Admin</Badge>}
             </div>
           </div>

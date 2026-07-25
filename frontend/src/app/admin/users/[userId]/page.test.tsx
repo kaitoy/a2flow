@@ -21,12 +21,16 @@ function superAdminState(selectedTenantId: string | null): Partial<RootState> {
   };
 }
 
-// Replace the real Avatar with a stub that surfaces the avatarConfig it receives,
-// so the test can assert the page threads the loaded customization through to the
-// preview without depending on the Humation renderer's internals.
+// Replace the real Avatar with a stub that surfaces the avatarConfig and tenantId
+// it receives, so the test can assert the page threads the loaded customization
+// and seed through to the preview without depending on the renderer's internals.
 vi.mock("@/components/ui/avatar", () => ({
-  Avatar: ({ user }: { user: { avatarConfig?: unknown } | null }) => (
-    <div data-testid="avatar" data-config={JSON.stringify(user?.avatarConfig ?? null)} />
+  Avatar: ({ user }: { user: { avatarConfig?: unknown; tenantId?: unknown } | null }) => (
+    <div
+      data-testid="avatar"
+      data-config={JSON.stringify(user?.avatarConfig ?? null)}
+      data-tenant={JSON.stringify(user?.tenantId ?? null)}
+    />
   ),
 }));
 
@@ -187,11 +191,7 @@ describe("EditUserPage", () => {
 
   it("passes the loaded avatar customization to the preview", async () => {
     setup();
-    const avatarConfig = {
-      selections: { head: "braids" },
-      colors: { hair: "#4A3728" },
-      background: "#EFEFEF",
-    };
+    const avatarConfig = { colors: ["#4A3728", "#EFEFEF"] };
     server.use(
       http.get("http://localhost:8000/api/v1/users/:userId", () =>
         envelope({ ...FULL_USER, avatarConfig })
@@ -205,6 +205,20 @@ describe("EditUserPage", () => {
       "data-config",
       JSON.stringify(avatarConfig)
     );
+  });
+
+  it("seeds the preview from the tenant the user is stored with", async () => {
+    setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, tenantId: "tenant-7" })
+      )
+    );
+
+    render(<EditUserPage />);
+    await waitFor(() => screen.getByDisplayValue("alice"));
+
+    expect(screen.getByTestId("avatar")).toHaveAttribute("data-tenant", JSON.stringify("tenant-7"));
   });
 
   it("does not render a tenant field for a non-super-admin viewer", async () => {

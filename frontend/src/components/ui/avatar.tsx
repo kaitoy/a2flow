@@ -1,13 +1,31 @@
 /** @module Avatar — User avatar showing an uploaded image or a generated default. */
 "use client";
 
-import { humation1 } from "@humation/assets-humation-1";
-import { Avatar as HumationAvatar } from "@humation/react";
+import BoringAvatar from "boring-avatars";
 import { useState } from "react";
 import { avatarUrl, type User } from "@/lib/api";
+import { avatarPalette } from "@/lib/avatar-palette";
 
 /** The subset of user fields an {@link Avatar} needs to render. */
-export type AvatarUser = Pick<User, "id" | "username" | "avatarUpdatedAt" | "avatarConfig">;
+export type AvatarUser = Pick<
+  User,
+  "id" | "username" | "tenantId" | "avatarUpdatedAt" | "avatarConfig"
+>;
+
+/**
+ * Build the deterministic seed the generated avatar is seeded from.
+ *
+ * Usernames are only unique within a tenant, so the tenant is folded into the
+ * seed: the same username in two tenants gets two distinct avatars. A
+ * platform-scoped user (`super_admin`, and the seeded system user) has no
+ * tenant and is seeded from the username alone.
+ *
+ * @param user - The user to depict.
+ * @returns The seed string passed to the avatar renderer.
+ */
+function avatarSeed(user: AvatarUser): string {
+  return user.tenantId ? `${user.tenantId}/${user.username}` : user.username;
+}
 
 /** Props for {@link Avatar}. */
 interface AvatarProps {
@@ -24,11 +42,11 @@ interface AvatarProps {
  *
  * Renders the user's uploaded image when one exists (falling back to the
  * generated default if it fails to load), otherwise a
- * {@link https://github.com/humation-labs/humation | Humation} illustration.
- * The illustration is always seeded from the username, and any saved
- * `avatarConfig` (part selections, colors, background) overrides the seeded
- * parts so a customized avatar renders consistently everywhere. While the user
- * is still loading (`null`), a neutral placeholder keeps the layout stable.
+ * {@link https://github.com/boringdesigners/boring-avatars | boring-avatars}
+ * `beam` SVG. The SVG is always seeded from {@link avatarSeed} (tenant plus
+ * username), and a saved `avatarConfig.colors` replaces the default palette so
+ * a customized avatar renders consistently everywhere. While the user is still
+ * loading (`null`), a neutral placeholder keeps the layout stable.
  */
 export function Avatar({ user, size = 36, className }: AvatarProps) {
   const url = user ? avatarUrl(user) : null;
@@ -72,15 +90,12 @@ export function Avatar({ user, size = 36, className }: AvatarProps) {
   // The generated avatar is decorative: a username or accessible control label
   // always accompanies it (table cell, menu text, button aria-label), so it is
   // left without an SVG <title> to avoid duplicating that text.
-  const config = user.avatarConfig;
   return (
     <span className={cls} style={style}>
-      <HumationAvatar
-        assets={humation1}
-        seed={user.username}
-        selections={config?.selections}
-        colors={config?.colors}
-        background={config?.background ?? undefined}
+      <BoringAvatar
+        name={avatarSeed(user)}
+        variant="beam"
+        colors={avatarPalette(user.avatarConfig)}
         size={size}
       />
     </span>
