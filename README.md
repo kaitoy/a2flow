@@ -132,6 +132,21 @@ The initial seeded **`root`** user holds `super_admin` and is platform-scoped (n
 
 ⚠️ Approver eligibility is validated when the approval is created: the agent's `list_users` tool only offers users holding `approver`, and `request_approval` rejects anyone else. Revoking the `approver` role later does **not** invalidate approvals already addressed to that user — they can still resolve them, so an in-flight workflow never gets stuck.
 
+## Demo data
+
+Setting `DEMO_DATA=true` on the backend registers a ready-made example of the approval-gated "launch an EC2 instance" workflow on startup, so there is something to run without registering every piece by hand. Everything lands in the seeded **Default** tenant:
+
+- two [secrets](#secrets) holding an AWS access key id and secret access key,
+- an [MCP server](#mcp-servers) (`Demo AWS API`) that launches the AWS API MCP server over `stdio` with `uvx`, reading those secrets through `${secret:…}` references,
+- an [agent skill](#agent-skills) pointing at `sample_skills/aws-ec2-launch` in this repository,
+- a `demo-approver` and a `demo-requester` [user](#users), holding the roles the sample skill's approval step needs.
+
+The [workflow](#workflows) itself is not seeded — these are the ingredients you generate one from. Turning the flag off and restarting **removes** the same records again, so it is a genuine on/off switch. Records that other data has come to depend on are kept (and logged) rather than deleted, and a demo user who has created records is soft-deleted so their name still resolves.
+
+⚠️ The demo MCP server can run **mutating** AWS CLI commands, not just reads. Whatever credentials you give it can create and delete real resources — use a throwaway account or a tightly scoped IAM policy.
+
+See [Demo data](backend/README.md#demo-data) for the full record list and every related environment variable.
+
 ## Admin UI
 
 The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admin).

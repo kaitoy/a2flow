@@ -46,6 +46,19 @@ services:
       # tenant. Optional: same generate-and-log-once fallback as
       # ROOT_PASSWORD when unset.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Set DEMO_DATA=true to register the sample "launch an EC2 instance"
+      # dataset (secrets, AWS API MCP server, agent skill, approver/requester
+      # users) in the Default tenant on startup; unsetting it removes those
+      # records again on the next startup. DEMO_PASSWORD has the same
+      # generate-and-log-once fallback as the passwords above. The AWS
+      # credentials are optional -- a placeholder is stored when they are
+      # unset -- but note the demo MCP server can run mutating AWS CLI
+      # commands, not only reads.
+      DEMO_DATA: ${DEMO_DATA:-}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      DEMO_AWS_ACCESS_KEY_ID: ${DEMO_AWS_ACCESS_KEY_ID:-}
+      DEMO_AWS_SECRET_ACCESS_KEY: ${DEMO_AWS_SECRET_ACCESS_KEY:-}
+      DEMO_AWS_REGION: ${DEMO_AWS_REGION:-us-east-1}
       CORS_ORIGINS: http://localhost:3000
       # Store of cloned skill repositories, one directory per published
       # revision. Durable state, not a cache: a workflow session pins the

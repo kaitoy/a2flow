@@ -19,8 +19,10 @@ logger = logging.getLogger(__name__)
 #: 12-character minimum and short enough to copy out of a log line.
 _GENERATED_PASSWORD_BYTES = 16
 
-#: Name of the tenant seeded on first startup to hold the initial ``admin`` user.
-_DEFAULT_TENANT_NAME = "default"
+#: Name (slug) of the tenant seeded on first startup to hold the initial
+#: ``admin`` user. Also the tenant the demo dataset is registered in — see
+#: :mod:`infrastructure.demo_data`.
+DEFAULT_TENANT_NAME = "default"
 
 
 async def seed_system_user(session: AsyncSession) -> None:
@@ -53,10 +55,11 @@ async def seed_system_user(session: AsyncSession) -> None:
     await session.commit()
 
 
-def _resolve_seed_password(
-    configured: str | None, *, subject: str, env_var: str
-) -> str:
+def resolve_seed_password(configured: str | None, *, subject: str, env_var: str) -> str:
     """Return a configured seed password, or generate and log one once.
+
+    Shared by the seed functions below and by :mod:`infrastructure.demo_data`,
+    so every bootstrap account follows the same configure-or-generate rule.
 
     Args:
         configured: Password read from settings (e.g.
@@ -109,7 +112,7 @@ async def seed_root_user(session: AsyncSession) -> None:
     stmt = select(User).where(col(User.id) != SYSTEM_USER_ID).limit(1)
     if (await session.exec(stmt)).first() is not None:
         return
-    password = _resolve_seed_password(
+    password = resolve_seed_password(
         get_settings().root_password, subject="'root' user", env_var="ROOT_PASSWORD"
     )
     root = User(
@@ -154,14 +157,12 @@ async def seed_default_tenant_and_admin_user(session: AsyncSession) -> None:
     Args:
         session: Database session used to read and insert the tenant and user.
     """
-    tenant_stmt = (
-        select(Tenant).where(col(Tenant.name) == _DEFAULT_TENANT_NAME).limit(1)
-    )
+    tenant_stmt = select(Tenant).where(col(Tenant.name) == DEFAULT_TENANT_NAME).limit(1)
     tenant = (await session.exec(tenant_stmt)).first()
     if tenant is None:
         tenant = Tenant(
             display_name="Default",
-            name=_DEFAULT_TENANT_NAME,
+            name=DEFAULT_TENANT_NAME,
             enabled=True,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
@@ -183,7 +184,7 @@ async def seed_default_tenant_and_admin_user(session: AsyncSession) -> None:
     )
     if (await session.exec(user_stmt)).first() is not None:
         return
-    password = _resolve_seed_password(
+    password = resolve_seed_password(
         get_settings().admin_password, subject="'admin' user", env_var="ADMIN_PASSWORD"
     )
     admin = User(

@@ -4,6 +4,7 @@ Configures middleware, exception handlers, and the API router,
 then starts the application with Uvicorn when run directly.
 """
 
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -21,9 +22,11 @@ from infrastructure.bootstrap import (
     seed_system_user,
 )
 from infrastructure.database import engine
+from infrastructure.demo_data import sync_demo_data
 from infrastructure.logging_context import setup_logging
 from infrastructure.migrations import run_migrations
 from middleware.envelope import RequestContextMiddleware
+from models.user import SYSTEM_USER_ID
 from repositories.exceptions import (
     AvatarValidationError,
     CsrfError,
@@ -72,6 +75,7 @@ from routers.exception_handlers import (
     validation_exception_handler,
     workflow_not_runnable_exception_handler,
 )
+from services.agent_skill_sync import sync_agent_skill
 
 # Populates os.environ from backend/.env so vendor SDKs (litellm, google-genai)
 # that read GOOGLE_API_KEY/OPENAI_API_KEY/ANTHROPIC_API_KEY/AWS_BEARER_TOKEN_BEDROCK
@@ -86,15 +90,34 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Apply pending migrations and seed the system, root, and Default-tenant admin users on startup."""
+    """Apply pending migrations, seed the baseline users, and sync the demo data.
+
+    Seeds the system, root, and Default-tenant admin users, then registers or
+    removes the optional demo dataset depending on ``DEMO_DATA``. A demo agent
+    skill registered by this run still needs its repository cloned; that runs
+    as a background task rather than inline, so a slow or unreachable remote
+    delays nothing (``sync_agent_skill`` records every failure on the skill
+    row itself).
+    """
     await run_migrations()
+    # Holds a strong reference to the clone task for as long as the
+    # application runs, so it cannot be garbage-collected mid-flight.
+    background: set[asyncio.Task[None]] = set()
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
         # seed_root_user's skip check ("any real user exists") must run
         # before seed_default_tenant_and_admin_user creates its own real
-        # user, or root would never be seeded on a fresh database.
+        # user, or root would never be seeded on a fresh database. The demo
+        # users are real users too, so sync_demo_data comes after both.
         await seed_root_user(session)
         await seed_default_tenant_and_admin_user(session)
+        demo_skill_id = await sync_demo_data(session)
+    if demo_skill_id is not None:
+        clone = asyncio.create_task(
+            sync_agent_skill(demo_skill_id, user_id=SYSTEM_USER_ID)
+        )
+        background.add(clone)
+        clone.add_done_callback(background.discard)
     yield
 
 

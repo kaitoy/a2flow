@@ -194,6 +194,45 @@ ADMIN_PASSWORD=change-me-now-123
 
 If either is unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when that user is created — it cannot be recovered once the log line has scrolled past. Set both explicitly before the first run for anything beyond local experimentation, or capture the generated passwords from the startup logs immediately and change them through the user API afterwards. The usernames are fixed to `root` and `admin`.
 
+### Demo data
+
+`DEMO_DATA=true` registers a ready-made example of the approval-gated "launch an EC2 instance" workflow on startup, so a fresh install has something to run without registering every piece by hand. Everything lands in the seeded **Default** tenant:
+
+| Resource | Name | Details |
+|---|---|---|
+| Secret | `demo-aws-access-key-id` | `local` type, Fernet-encrypted like any other secret |
+| Secret | `demo-aws-secret-access-key` | same |
+| MCP server | `Demo AWS API` | `stdio` transport, `uvx awslabs.aws-api-mcp-server@latest`; its `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars are `${secret:…}` references to the two secrets above, and `AWS_REGION` comes from `DEMO_AWS_REGION` |
+| Agent skill | `Demo AWS EC2 Launch` | `sample_skills/aws-ec2-launch` in this repository (see [Agent skills](#agent-skills)) |
+| User | `demo-approver` | holds `approver` — the manager the sample skill routes its approval request to |
+| User | `demo-requester` | holds `requester` — may execute the workflow |
+
+The Workflow itself is deliberately not seeded: these records are the ingredients you assemble one from.
+
+```env
+DEMO_DATA=true
+DEMO_PASSWORD=change-me-now-123
+DEMO_AWS_ACCESS_KEY_ID=AKIA...
+DEMO_AWS_SECRET_ACCESS_KEY=...
+DEMO_AWS_REGION=us-east-1
+```
+
+- `DEMO_PASSWORD` is shared by both demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
+- The AWS credentials are optional. Left unset, a `REPLACE_ME` placeholder is stored instead, so the demo is complete in shape and you fill the real values in from the Secrets page. Set them here to have the demo reach AWS straight after startup.
+
+  > **The demo MCP server is not restricted to read-only AWS CLI commands.** Whatever credentials you give it can create, modify, and delete real resources — including running instances that cost money. Point it at a throwaway account, or scope the IAM policy down.
+
+- The agent skill's repository is cloned in the background after startup, so a slow or unreachable remote never delays the server coming up. The skill shows as `pending` until the clone lands, exactly as a skill registered through the API does; a failure is recorded on the skill row with its reason.
+
+> **Running the backend natively on Windows?** The demo MCP server's `uvx awslabs.aws-api-mcp-server@latest` is the form upstream documents, and it is what the backend container runs. On Windows, `uv` cannot match that package's dotted console-script name and fails with *"The executable `awslabs.aws-api-mcp-server` was not found"*. Edit the server's arguments on its admin page to `--from`, `awslabs.aws-api-mcp-server@latest`, `awslabs.aws-api-mcp-server.exe` to launch it there.
+
+Turning the flag off (`DEMO_DATA=false`, or removing it) **removes those records again** on the next startup — the flag is declarative in both directions. Each record is tracked by a fixed id, not by name, so renaming one in the admin UI does not strand it.
+
+Two things survive that removal by design:
+
+- A demo record something else has come to depend on — a Workflow built on the demo skill, a task tool binding on the demo MCP server — cannot be deleted. That is logged at `WARNING` and skipped; the remaining demo records are still removed, and the app starts normally.
+- A demo user who has signed in and created records is **soft-deleted** (disabled, `deletedAt` set) rather than removed, so their name still resolves on those records. Re-enabling `DEMO_DATA` revives such an account instead of leaving it disabled.
+
 ### Authentication
 
 All API routes except `POST /api/v1/auth/login` and `GET /api/v1/health` require an authenticated session. Authentication is cookie-based and backed by the `auth_sessions` table.
