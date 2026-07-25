@@ -11,6 +11,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { RegistrySearchDialog } from "@/components/admin/registry-search-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
@@ -41,21 +42,25 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
     ),
   },
   {
-    header: "URL",
+    header: "Transport",
+    sortField: "transport",
+    filterField: "transport",
+    cell: (s) => <Badge>{s.transport === "stdio" ? "stdio" : "HTTP"}</Badge>,
+  },
+  {
+    header: "Endpoint",
     sortField: "url",
     filterField: "url",
     className: "font-mono",
-    cell: (s) => s.url,
+    cell: (s) => (s.transport === "stdio" ? [s.command, ...(s.args ?? [])].join(" ") : s.url),
   },
   {
-    header: "Headers",
+    header: "Headers / Env",
     cell: (s) => {
-      const count = Object.keys(s.headers ?? {}).length;
-      return count === 0 ? (
-        <span className="text-on-surface-variant">—</span>
-      ) : (
-        `${count} header${count === 1 ? "" : "s"}`
-      );
+      const count = Object.keys((s.transport === "stdio" ? s.env : s.headers) ?? {}).length;
+      if (count === 0) return <span className="text-on-surface-variant">—</span>;
+      const noun = s.transport === "stdio" ? "variable" : "header";
+      return `${count} ${noun}${count === 1 ? "" : "s"}`;
     },
   },
   {

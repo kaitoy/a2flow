@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
-import { MCP_SERVER_1 } from "@/test/msw/handlers";
+import { MCP_SERVER_1, MCP_STDIO_SERVER } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewMcpServerPage from "./page";
@@ -37,8 +37,41 @@ describe("NewMcpServerPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "test-server",
+        transport: "streamable_http",
         url: "https://mcp.test/mcp",
         headers: { Authorization: "Bearer abc" },
+      })
+    );
+  });
+
+  it("submits create api with command, args, and env when transport is stdio", async () => {
+    const user = userEvent.setup();
+    let receivedBody: unknown;
+    server.use(
+      http.post("http://localhost:8000/api/v1/mcp-servers", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope({ ...MCP_STDIO_SERVER, id: "new-id" }, 201);
+      })
+    );
+
+    render(<NewMcpServerPage />);
+    await user.type(screen.getByLabelText(/name/i), "local-files");
+    await user.click(screen.getByRole("tab", { name: "stdio" }));
+    await user.click(screen.getByRole("tab", { name: "npx" }));
+    await user.click(screen.getByRole("button", { name: /add argument/i }));
+    await user.type(screen.getByLabelText("args value 1"), "-y");
+    await user.click(screen.getByRole("button", { name: /add row/i }));
+    await user.type(screen.getByLabelText("env key 1"), "API_KEY");
+    await user.type(screen.getByLabelText("env value 1"), "secret");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "local-files",
+        transport: "stdio",
+        command: "npx",
+        args: ["-y"],
+        env: { API_KEY: "secret" },
       })
     );
   });

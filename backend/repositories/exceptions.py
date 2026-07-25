@@ -77,11 +77,12 @@ class UniqueViolationError(RepositoryError):
 
 
 class McpConnectionError(Exception):
-    """Raised when a registered remote MCP server cannot be reached or errors out.
+    """Raised when a registered MCP server cannot be reached, launched, or errors out.
 
-    Carries the ``server`` (name or URL, already known to the caller) and a
-    ``reason`` string. The HTTP layer logs ``reason`` server-side but never
-    returns it to the client, since it echoes the raw caught exception text.
+    Carries the ``server`` (name, URL, or command line — already known to the
+    caller) and a ``reason`` string. The HTTP layer logs ``reason`` server-side
+    but never returns it to the client, since it echoes the raw caught
+    exception text.
     """
 
     def __init__(self, server: str, reason: str) -> None:
@@ -180,6 +181,21 @@ class AvatarValidationError(RepositoryError):
 
     Carries a human-readable ``reason`` so the HTTP layer can surface it in the
     error envelope's ``details`` block when returning HTTP 422.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
+class McpServerValidationError(RepositoryError):
+    """Raised when an MCPServer create/update would leave an invalid transport shape.
+
+    ``MCPServerCreate`` enforces the shape at the request boundary, but a PATCH
+    body alone cannot: the rule applies to the merged result of the stored
+    record and the partial update, which only the service can compute. Carries
+    a human-readable ``reason`` surfaced in the error envelope's ``details``
+    block when returning HTTP 422.
     """
 
     def __init__(self, reason: str) -> None:

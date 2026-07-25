@@ -1,7 +1,7 @@
 """ADK agent proxy tools for invoking MCP tools bound to WorkflowTasks.
 
-The workflow agent never talks to remote MCP servers directly. Instead it gets
-two generic tools:
+The workflow agent never talks to MCP servers directly. Instead it gets two
+generic tools:
 
 * :func:`list_mcp_tools` — discover the tools advertised by every MCP server
   registered in A2Flow, so the agent can bind the ones a task needs during the
@@ -31,6 +31,7 @@ from mcp import types
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database, mcp_client
+from infrastructure.mcp_client import McpConnection
 from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.secret_resolver import SecretResolver
 from infrastructure.vault_client import get_vault_client
@@ -173,8 +174,9 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
         "error"}, ...]}``. An empty registry yields ``{"servers": []}``.
     """
     # Resolve ${secret:NAME} placeholders while the session is open (the
-    # resolver needs the secrets table); the network fan-out happens after.
-    prepared: list[tuple[dict[str, Any], str, dict[str, str] | None, str | None]] = []
+    # resolver needs the secrets table); the network/process fan-out happens
+    # after.
+    prepared: list[tuple[dict[str, Any], McpConnection | None, str | None]] = []
     async with _db_session() as db:
         try:
             _ws_id, tenant_id = await _resolve_scope(tool_context, db)
@@ -187,7 +189,7 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
         for server in servers:
             base = {"server_id": server.id, "server_name": server.name}
             try:
-                headers = await resolver.resolve_headers(server.headers)
+                connection = await mcp_client.resolve_connection(server, resolver)
             except SecretResolutionError as exc:
                 logger.warning(
                     "Secret %s resolution failed for MCP server %s: %s",
@@ -196,15 +198,19 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
                     exc.reason,
                 )
                 error = f"cannot resolve secret {exc.secret_name!r} in headers"
-                prepared.append((base, server.url, None, error))
+                prepared.append((base, None, error))
                 continue
-            prepared.append((base, server.url, headers, None))
+            except McpConnectionError as exc:
+                logger.warning(
+                    "MCP server %s is not usable: %s", server.name, exc.reason
+                )
+                prepared.append((base, None, exc.reason))
+                continue
+            prepared.append((base, connection, None))
 
-    async def _query(
-        base: dict[str, Any], url: str, headers: dict[str, str]
-    ) -> dict[str, Any]:
+    async def _query(base: dict[str, Any], connection: McpConnection) -> dict[str, Any]:
         try:
-            tools = await mcp_client.list_server_tools(url, headers)
+            tools = await mcp_client.list_server_tools(connection)
         except McpConnectionError as exc:
             logger.warning(
                 "MCP server %s unreachable: %s", base["server_name"], exc.reason
@@ -224,13 +230,12 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
 
     async def _entry(
         base: dict[str, Any],
-        url: str,
-        headers: dict[str, str] | None,
+        connection: McpConnection | None,
         error: str | None,
     ) -> dict[str, Any]:
-        if error is not None or headers is None:
+        if connection is None:
             return {**base, "error": error or "secret resolution failed"}
-        return await _query(base, url, headers)
+        return await _query(base, connection)
 
     return {"servers": list(await asyncio.gather(*(_entry(*p) for p in prepared)))}
 
@@ -288,8 +293,8 @@ async def call_mcp_tool(
         if server is None:
             return {"error": f"MCP server {server_id!r} is not registered"}
         try:
-            resolved_headers = await _build_resolver(db, tenant_id).resolve_headers(
-                server.headers
+            connection = await mcp_client.resolve_connection(
+                server, _build_resolver(db, tenant_id)
             )
         except SecretResolutionError as exc:
             logger.warning(
@@ -304,15 +309,12 @@ async def call_mcp_tool(
                     f"of MCP server {server.name!r}"
                 )
             }
-        server_url, server_headers, server_name = (
-            server.url,
-            resolved_headers,
-            server.name,
-        )
+        except McpConnectionError as exc:
+            logger.warning("MCP server %s is not usable: %s", server.name, exc.reason)
+            return {"error": f"MCP server {server.name!r} is not usable: {exc.reason}"}
+        server_name = server.name
     try:
-        result = await mcp_client.call_server_tool(
-            server_url, server_headers, tool_name, args
-        )
+        result = await mcp_client.call_server_tool(connection, tool_name, args)
     except McpConnectionError as exc:
         logger.warning("MCP server %s unreachable: %s", server_name, exc.reason)
         return {"error": f"MCP server {server_name!r} unreachable: {exc.reason}"}

@@ -228,9 +228,29 @@ def upgrade() -> None:
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("url", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "transport",
+            sa.Enum("streamable_http", "stdio", name="mcptransport"),
+            nullable=False,
+        ),
+        sa.Column("url", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
             "headers",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
+        sa.Column(
+            "command",
+            sa.Enum("npx", "uvx", name="mcpcommand"),
+            nullable=True,
+        ),
+        sa.Column(
+            "args",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
+        sa.Column(
+            "env",
             sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
             nullable=False,
         ),

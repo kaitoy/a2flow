@@ -1,8 +1,8 @@
 "use client";
 
-import { animated, useSpring } from "@react-spring/web";
-import { useLayoutEffect, useRef } from "react";
-import { type SpringPreset, useMotionConfig } from "@/lib/motion";
+import { animated } from "@react-spring/web";
+import { useSlidingIndicator } from "@/hooks/useSlidingIndicator";
+import type { SpringPreset } from "@/lib/motion";
 
 /** Props for {@link SlidingIndicator}. */
 export interface SlidingIndicatorProps {
@@ -22,6 +22,9 @@ export interface SlidingIndicatorProps {
  * serve as the bar's positioning context (must be `position: relative`); the
  * bar derives the container from its own DOM parent so it works correctly on
  * first mount, before the parent's React ref has been attached.
+ *
+ * The measurement itself lives in {@link useSlidingIndicator}, shared with the
+ * horizontal selection pill of `SegmentedControl`.
  */
 export function SlidingIndicator({
   itemMap,
@@ -29,60 +32,25 @@ export function SlidingIndicator({
   deps = [],
   preset = "gentle",
 }: SlidingIndicatorProps) {
-  const config = useMotionConfig(preset);
-  const firstMountRef = useRef(true);
-  const barRef = useRef<HTMLSpanElement>(null);
-  const [style, api] = useSpring(() => ({
-    y: 0,
-    height: 0,
-    opacity: 0,
-    config,
-  }));
-
-  useLayoutEffect(() => {
-    const container = barRef.current?.parentElement ?? null;
-    const target = activeKey !== null ? (itemMap.current?.get(activeKey) ?? null) : null;
-
-    if (!container || !target) {
-      api.start({ opacity: 0, immediate: firstMountRef.current, config });
-      firstMountRef.current = false;
-      return;
-    }
-
-    const measure = () => {
-      const c = container.getBoundingClientRect();
-      const t = target.getBoundingClientRect();
-      const barHeight = t.height * (2 / 3);
-      const y = t.top - c.top + (t.height - barHeight) / 2 + container.scrollTop;
-      api.start({
-        y,
-        height: barHeight,
-        opacity: 1,
-        immediate: firstMountRef.current,
-        config,
-      });
-      firstMountRef.current = false;
-    };
-
-    measure();
-
-    const ro = new ResizeObserver(measure);
-    ro.observe(container);
-    for (const item of itemMap.current?.values() ?? []) {
-      if (item) ro.observe(item);
-    }
-
-    return () => ro.disconnect();
-  }, [activeKey, api, config, itemMap, ...deps]);
+  const { ref, offset, size, opacity } = useSlidingIndicator({
+    itemMap,
+    activeKey,
+    deps,
+    preset,
+    axis: "vertical",
+    // Two thirds of the item's height, so the bar reads as a marker beside the
+    // item rather than a full-height fill.
+    extent: 2 / 3,
+  });
 
   return (
     <animated.span
-      ref={barRef}
+      ref={ref}
       aria-hidden="true"
       style={{
-        transform: style.y.to((y) => `translateY(${y}px)`),
-        height: style.height,
-        opacity: style.opacity,
+        transform: offset.to((y) => `translateY(${y}px)`),
+        height: size,
+        opacity,
       }}
       className="pointer-events-none absolute left-0 top-0 w-[3px] rounded-r-full bg-accent shadow-glow"
     />

@@ -3,9 +3,11 @@
 The resolver is the single component that turns a secret *reference* into its
 plaintext value, used by every consumer:
 
-* :class:`services.mcp_server.MCPServerService` and the agent proxy tools in
-  :mod:`infrastructure.mcp_tools` resolve placeholders inside MCP server
-  header values before connecting.
+* :func:`infrastructure.mcp_client.resolve_connection` resolves placeholders
+  inside MCP server header values (streamable HTTP) and environment variable
+  values (stdio) before connecting, on behalf of
+  :class:`services.mcp_server.MCPServerService` and the agent proxy tools in
+  :mod:`infrastructure.mcp_tools`.
 * :class:`services.workflow.WorkflowService` resolves an AgentSkill's
   ``repo_auth_secret`` (a bare secret name) before cloning.
 
@@ -102,6 +104,23 @@ class SecretResolver:
         result.append(text[cursor:])
         return "".join(result)
 
+    async def resolve_mapping(self, values: dict[str, str]) -> dict[str, str]:
+        """Resolve placeholders in every value of a mapping.
+
+        Used for MCP server headers (streamable HTTP) and environment variables
+        (stdio), both of which carry secrets the same way.
+
+        Args:
+            values: Keys to values, the values possibly containing placeholders.
+
+        Returns:
+            A new mapping with all placeholders replaced; keys are untouched.
+
+        Raises:
+            SecretResolutionError: If any referenced secret fails to resolve.
+        """
+        return {key: await self.resolve_text(value) for key, value in values.items()}
+
     async def resolve_headers(self, headers: dict[str, str]) -> dict[str, str]:
         """Resolve placeholders in every value of a header mapping.
 
@@ -114,7 +133,7 @@ class SecretResolver:
         Raises:
             SecretResolutionError: If any referenced secret fails to resolve.
         """
-        return {key: await self.resolve_text(value) for key, value in headers.items()}
+        return await self.resolve_mapping(headers)
 
     def _decrypt(self, secret: Secret) -> str:
         """Decrypt a local secret's stored ciphertext.

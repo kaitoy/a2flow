@@ -10,6 +10,7 @@ from httpx import ASGITransport, AsyncClient
 
 from infrastructure import mcp_registry_client
 from models.mcp_registry import McpRegistrySearchResult, McpRegistryServerEntry
+from models.mcp_server import McpTransport
 from models.user import SYSTEM_USER_ID
 from repositories.exceptions import RegistryUnavailableError
 from tests._envelope import assert_err, assert_ok
@@ -88,16 +89,53 @@ def _payload() -> dict[str, Any]:
                 },
             },
             {
-                # stdio-only package, no remotes -> skipped
+                # npm stdio package -> registrable over stdio
                 "server": {
                     "name": "io.example/local-only",
                     "version": "0.1.0",
-                    "packages": [{"registryType": "npm", "identifier": "local-only"}],
+                    "packages": [
+                        {
+                            "registryType": "npm",
+                            "identifier": "local-only",
+                            "version": "0.1.0",
+                            "runtimeHint": "npx",
+                            "transport": {"type": "stdio"},
+                            "runtimeArguments": [{"type": "positional", "value": "-y"}],
+                            "packageArguments": [
+                                {"type": "named", "name": "--root", "value": "/data"},
+                                {"type": "named", "name": "--verbose"},
+                            ],
+                            "environmentVariables": [
+                                {
+                                    "name": "API_KEY",
+                                    "description": "Token",
+                                    "isRequired": True,
+                                    "isSecret": True,
+                                },
+                                {"name": "ROOT", "default": "/data"},
+                            ],
+                        }
+                    ],
                 },
                 "_meta": {},
             },
             {
-                # sse-only remote -> skipped (streamable HTTP unsupported)
+                # OCI package -> skipped (the backend image cannot launch it)
+                "server": {
+                    "name": "io.example/oci-only",
+                    "version": "2.0.0",
+                    "packages": [
+                        {
+                            "registryType": "oci",
+                            "identifier": "example/mcp",
+                            "transport": {"type": "stdio"},
+                        }
+                    ],
+                },
+                "_meta": {},
+            },
+            {
+                # sse-only remote, no packages -> skipped entirely
                 "server": {
                     "name": "io.example/sse",
                     "version": "1.0.0",
@@ -106,12 +144,12 @@ def _payload() -> dict[str, Any]:
                 "_meta": {},
             },
         ],
-        "metadata": {"count": 3, "nextCursor": "next-page-token"},
+        "metadata": {"count": 4, "nextCursor": "next-page-token"},
     }
 
 
 @pytest.mark.asyncio
-async def test_search_filters_to_streamable_http(
+async def test_search_surfaces_streamable_http_remotes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake = _FakeClient(payload=_payload(), exc=None)
@@ -120,10 +158,11 @@ async def test_search_filters_to_streamable_http(
     result = await mcp_registry_client.search_servers(search="weather")
 
     assert isinstance(result, McpRegistrySearchResult)
-    assert [s.name for s in result.servers] == ["io.example/weather"]
     assert result.next_cursor == "next-page-token"
 
     entry = result.servers[0]
+    assert entry.name == "io.example/weather"
+    assert entry.transport is McpTransport.streamable_http
     assert entry.url == "https://mcp.example.com/weather"
     assert entry.title == "Weather"
     assert entry.status == "active"
@@ -133,6 +172,144 @@ async def test_search_filters_to_streamable_http(
     assert header.name == "Authorization"
     assert header.is_required is True
     assert header.is_secret is True
+
+
+@pytest.mark.asyncio
+async def test_search_surfaces_launchable_stdio_packages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeClient(payload=_payload(), exc=None)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **_: fake)
+
+    result = await mcp_registry_client.search_servers()
+
+    entry = next(s for s in result.servers if s.name == "io.example/local-only")
+    assert entry.transport is McpTransport.stdio
+    assert entry.command == "npx"
+    assert entry.args == ["-y", "local-only@0.1.0", "--root", "/data", "--verbose"]
+    assert entry.url is None
+    assert [(v.name, v.value, v.is_secret) for v in entry.env] == [
+        ("API_KEY", None, True),
+        ("ROOT", "/data", False),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_search_skips_servers_it_cannot_register(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """OCI packages and SSE-only remotes have no launchable form here."""
+    fake = _FakeClient(payload=_payload(), exc=None)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **_: fake)
+
+    result = await mcp_registry_client.search_servers()
+
+    assert [s.name for s in result.servers] == [
+        "io.example/weather",
+        "io.example/local-only",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_search_prefers_the_remote_when_a_server_has_both(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "servers": [
+            {
+                "server": {
+                    "name": "io.example/both",
+                    "version": "1.0.0",
+                    "remotes": [
+                        {"type": "streamable-http", "url": "https://both.example/mcp"}
+                    ],
+                    "packages": [
+                        {
+                            "registryType": "pypi",
+                            "identifier": "both-mcp",
+                            "transport": {"type": "stdio"},
+                        }
+                    ],
+                },
+                "_meta": {},
+            }
+        ],
+        "metadata": {},
+    }
+    fake = _FakeClient(payload=payload, exc=None)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **_: fake)
+
+    result = await mcp_registry_client.search_servers()
+
+    assert len(result.servers) == 1
+    assert result.servers[0].transport is McpTransport.streamable_http
+
+
+@pytest.mark.asyncio
+async def test_search_defaults_the_command_from_the_package_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A PyPI package without a runtimeHint is launched with uvx."""
+    payload = {
+        "servers": [
+            {
+                "server": {
+                    "name": "io.example/pypi",
+                    "version": "0.2.0",
+                    "packages": [
+                        {
+                            "registryType": "pypi",
+                            "identifier": "pypi-mcp",
+                            "version": "0.2.0",
+                            "transport": {"type": "stdio"},
+                        }
+                    ],
+                },
+                "_meta": {},
+            }
+        ],
+        "metadata": {},
+    }
+    fake = _FakeClient(payload=payload, exc=None)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **_: fake)
+
+    entry = (await mcp_registry_client.search_servers()).servers[0]
+    assert entry.command == "uvx"
+    assert entry.args == ["pypi-mcp@0.2.0"]
+
+
+@pytest.mark.asyncio
+async def test_search_skips_a_package_with_an_unsupported_runtime_hint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A runtimeHint other than npx/uvx has no launchable form here."""
+    payload = {
+        "servers": [
+            {
+                "server": {
+                    "name": "io.example/bunx-only",
+                    "version": "0.1.0",
+                    "packages": [
+                        {
+                            "registryType": "npm",
+                            "identifier": "bunx-mcp",
+                            "version": "0.1.0",
+                            "runtimeHint": "bunx",
+                            "transport": {"type": "stdio"},
+                        }
+                    ],
+                },
+                "_meta": {},
+            }
+        ],
+        "metadata": {},
+    }
+    fake = _FakeClient(payload=payload, exc=None)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **_: fake)
+
+    result = await mcp_registry_client.search_servers()
+
+    assert result.servers == []
 
 
 @pytest.mark.asyncio

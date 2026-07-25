@@ -15,8 +15,19 @@ const WEATHER = {
   title: "Weather",
   description: "Weather lookups.",
   version: "1.2.0",
+  transport: "streamable_http",
   url: "https://mcp.example.com/weather",
   headers: [{ name: "Authorization", isRequired: true, isSecret: true }],
+};
+
+const FILES = {
+  name: "io.example/files",
+  title: "Files",
+  version: "0.3.0",
+  transport: "stdio",
+  command: "npx",
+  args: ["-y", "files-mcp@0.3.0"],
+  env: [{ name: "API_KEY", isRequired: true, isSecret: true }],
 };
 
 const SEARCH = {
@@ -57,6 +68,15 @@ describe("RegistrySearchDialog", () => {
 
     await user.click(screen.getByRole("button", { name: /use this/i }));
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ name: "io.example/weather" }));
+  });
+
+  it("shows a stdio result's command line and transport badge", async () => {
+    server.use(pageHandler([FILES]));
+    render(<RegistrySearchDialog open onClose={vi.fn()} onSelect={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Files")).toBeInTheDocument());
+    expect(screen.getByText("npx -y files-mcp@0.3.0")).toBeInTheDocument();
+    expect(screen.getByText("stdio")).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no results", async () => {

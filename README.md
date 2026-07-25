@@ -45,7 +45,7 @@ a2flow/
 
 ### 1. Backend
 
-Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/)
+Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/). Node.js is optional and only needed to launch stdio [MCP servers](#mcp-servers) published as npm packages (`npx`); the `docker compose` image ships it.
 
 ```bash
 cd backend
@@ -213,7 +213,7 @@ Private repositories are supported through the optional **Auth Secret** field: s
 
 ### MCP Servers
 
-Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admin/mcp-servers) to manage the registry of remote [MCP](https://modelcontextprotocol.io/) servers whose tools the workflow agent can bind to WorkflowTasks (see [MCP tools for tasks](#mcp-tools-for-tasks)).
+Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admin/mcp-servers) to manage the registry of [MCP](https://modelcontextprotocol.io/) servers whose tools the workflow agent can bind to WorkflowTasks (see [MCP tools for tasks](#mcp-tools-for-tasks)).
 
 | Operation | Path |
 |-----------|------|
@@ -221,17 +221,28 @@ Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admi
 | Register a new server | `GET /admin/mcp-servers/new` |
 | Edit / delete a server | `GET /admin/mcp-servers/{id}` |
 
-Each record stores a unique name, the server's **streamable HTTP** endpoint URL (SSE-only servers are not supported), and an optional set of HTTP headers sent with every request — typically `Authorization: Bearer …` for servers that require auth. ⚠️ Literal header values are stored **in plaintext** in `a2flow.db` and returned by the API; instead of embedding a credential directly, reference a registered [Secret](#secrets) with the `${secret:name}` placeholder syntax (e.g. `Authorization: Bearer ${secret:github-token}`) — placeholders are expanded only at connect time and the credential never appears in the stored record or any API response.
+Each record stores a unique name plus a **transport**, which decides the rest of the form:
 
-The list page's **Browse registry** button opens a search dialog backed by the official [MCP registry](https://registry.modelcontextprotocol.io/) (`GET /api/v1/mcp-registry`). It searches servers by name and lists only those reachable over streamable HTTP (the only transport A2Flow supports). Picking a result opens the create form pre-filled with the server's name, URL, and required header keys, so you only fill in secret header values before saving. The registry base URL is configurable via the `MCP_REGISTRY_URL` env var; an unreachable registry yields HTTP 502 (`REGISTRY_UNREACHABLE`).
+| Transport | Fields | Notes |
+|---|---|---|
+| **Streamable HTTP** (default) | `url`, `headers` | A remote server. SSE-only servers are not supported. Headers are sent with every request — typically `Authorization: Bearer …`. |
+| **stdio** | `command`, `args`, `env` | A server launched as a child process of the backend, e.g. `npx` + `["-y", "@modelcontextprotocol/server-everything"]`. Both `npx` (Node.js 22) and `uvx` are available in the backend image. |
 
-`GET /api/v1/mcp-servers/{id}/tools` queries the live server and returns the tools it advertises (name, description, input schema); the admin task forms use it to populate the tool picker. An unreachable server yields HTTP 502 (`MCP_UNREACHABLE`). A server cannot be deleted while WorkflowTask tool bindings still reference it (HTTP 409 `CONFLICT_REFERENCED`).
+⚠️ Literal header and environment values are stored **in plaintext** in `a2flow.db` and returned by the API; instead of embedding a credential directly, reference a registered [Secret](#secrets) with the `${secret:name}` placeholder syntax (e.g. `Authorization: Bearer ${secret:github-token}`, or `API_KEY: ${secret:files-key}`) — placeholders are expanded only at connect time and the credential never appears in the stored record or any API response.
+
+⚠️ Registering a stdio server means **running the chosen command inside the backend container**, as the container's unprivileged `app` user. It is gated behind the same `developer` role as any other MCP server write. `args` is passed to the process as a list and never through a shell, and the child inherits only the small safe set of environment variables the MCP SDK allows (`PATH`, `HOME`, …) plus the `env` you configure — the backend's own API keys and `DB_URL` are not visible to it.
+
+Switching an existing server's transport clears the other transport's fields; a request that mixes the two shapes (a URL on a stdio server, a command on a remote one) is rejected with HTTP 422 (`INVALID_MCP_SERVER`).
+
+The list page's **Browse registry** button opens a search dialog backed by the official [MCP registry](https://registry.modelcontextprotocol.io/) (`GET /api/v1/mcp-registry`). It searches servers by name and lists those A2Flow can register: servers with a streamable-HTTP remote, and servers published as an npm or PyPI package it can launch over stdio (OCI/NuGet packages are skipped). Picking a result opens the create form pre-filled with the connection details and the required header/environment keys, so you only fill in secret values before saving. The package-to-command mapping is best-effort — review it before saving. The registry base URL is configurable via the `MCP_REGISTRY_URL` env var; an unreachable registry yields HTTP 502 (`REGISTRY_UNREACHABLE`).
+
+`GET /api/v1/mcp-servers/{id}/tools` queries the live server and returns the tools it advertises (name, description, input schema); the admin task forms use it to populate the tool picker. A server that cannot be reached or launched yields HTTP 502 (`MCP_UNREACHABLE`). A server cannot be deleted while WorkflowTask tool bindings still reference it (HTTP 409 `CONFLICT_REFERENCED`).
 
 ### Secrets
 
 Navigate to [http://localhost:3000/admin/secrets](http://localhost:3000/admin/secrets) to manage named credentials used for authentication elsewhere in the app:
 
-- **MCP server headers** — any header value may embed `${secret:name}` placeholders, expanded when connecting (see [MCP Servers](#mcp-servers)).
+- **MCP server headers and environment** — any header value (streamable HTTP) or environment variable value (stdio) may embed `${secret:name}` placeholders, expanded when connecting (see [MCP Servers](#mcp-servers)).
 - **Agent Skill repository clones** — a skill's **Auth Secret** names the secret whose value is used as the git basic-auth password (see [Agent Skills](#agent-skills)).
 
 | Operation | Path |
@@ -315,10 +326,10 @@ The execution agent works through the pre-copied WorkflowTasks: it lists the tas
 
 ##### MCP tools for tasks
 
-WorkflowTasks can use tools from remote MCP servers registered in the [MCP Servers](#mcp-servers) admin page:
+WorkflowTasks can use tools from the MCP servers registered in the [MCP Servers](#mcp-servers) admin page:
 
 1. **Bind at plan time** — while planning, the agent calls `list_mcp_tools`, which queries every registered server concurrently and returns each server's advertised tools (unreachable servers are reported per-server without failing the listing). Steps that need an external tool get a `tools` entry (`[{"server_id": …, "tool_name": …}]`) in `register_planning_tasks`; bindings are persisted on the templates and copied onto the run's tasks at execute time, surfaced as `toolBindings` on the REST read models.
-2. **Enforce at execution time** — the agent invokes bound tools through the `call_mcp_tool(server_id, tool_name, arguments)` proxy. The backend validates that the pair is bound to a task currently `in_progress` in the session (the union of bindings when several are in progress) before opening a per-call streamable HTTP connection to the server and forwarding the call. Calls to unbound tools are rejected with an error listing the allowed tools, so a shared, skill-cached agent can never use tools a task wasn't granted.
+2. **Enforce at execution time** — the agent invokes bound tools through the `call_mcp_tool(server_id, tool_name, arguments)` proxy. The backend validates that the pair is bound to a task currently `in_progress` in the session (the union of bindings when several are in progress) before opening a per-call connection to the server — a streamable HTTP request, or a freshly spawned child process for a stdio server — and forwarding the call. Calls to unbound tools are rejected with an error listing the allowed tools, so a shared, skill-cached agent can never use tools a task wasn't granted.
 
 Bound tools appear as chips in the **Tools** column of the Task Templates and Workflow Tasks lists, and the template forms include an **MCP Tools** picker populated live from the registered servers (already-bound tools stay visible even if their server is unreachable).
 

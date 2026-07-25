@@ -22,6 +22,7 @@ from repositories.exceptions import (
     ForbiddenError,
     ForeignKeyViolationError,
     McpConnectionError,
+    McpServerValidationError,
     NotFoundError,
     QueryValidationError,
     ReferencedError,
@@ -150,6 +151,20 @@ async def avatar_validation_exception_handler(
     )
 
 
+async def mcp_server_validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 422 with INVALID_MCP_SERVER code when a merged transport shape is invalid."""
+    assert isinstance(exc, McpServerValidationError)
+    return _envelope_error(
+        request,
+        code="INVALID_MCP_SERVER",
+        message=str(exc),
+        status_code=422,
+        details={"reason": exc.reason},
+    )
+
+
 async def secret_validation_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
@@ -271,7 +286,7 @@ async def workflow_not_runnable_exception_handler(
 async def mcp_connection_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
-    """Return HTTP 502 with MCP_UNREACHABLE code when a remote MCP server cannot be reached."""
+    """Return HTTP 502 with MCP_UNREACHABLE code when an MCP server cannot be reached."""
     assert isinstance(exc, McpConnectionError)
     logger.warning("MCP server %s unreachable: %s", exc.server, exc.reason)
     return _envelope_error(

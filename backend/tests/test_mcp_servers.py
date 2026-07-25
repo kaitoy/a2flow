@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
 from models.secret import Secret as _Secret  # noqa: F401 — registers model
 from models.user import SYSTEM_USER_ID
 from repositories.exceptions import McpConnectionError
@@ -218,6 +219,218 @@ async def test_update_server_rejects_url_resolving_to_private_ip(
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
+# ---------- stdio transport ----------
+
+
+_STDIO_BODY = {
+    "name": "local-files",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "files-mcp@0.3.0"],
+    "env": {"API_KEY": "tok"},
+}
+
+
+async def test_create_stdio_server_returns_201_with_its_fields(
+    mcp_client: AsyncClient,
+) -> None:
+    body = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_STDIO_BODY), status=201
+    )
+    assert body["transport"] == "stdio"
+    assert body["command"] == "npx"
+    assert body["args"] == ["-y", "files-mcp@0.3.0"]
+    assert body["env"] == {"API_KEY": "tok"}
+    assert body["url"] is None
+
+
+async def test_create_stdio_server_without_command_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers", json={"name": "X", "transport": "stdio"}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_stdio_server_with_url_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers",
+        json={**_STDIO_BODY, "url": "https://mcp.example.com/mcp"},
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_http_server_with_command_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers", json={**_CREATE_BODY, "command": "npx"}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_stdio_server_with_unsupported_command_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers", json={**_STDIO_BODY, "command": "python3"}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_patch_stdio_server_with_unsupported_command_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_STDIO_BODY), status=201
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}", json={"command": "/usr/bin/python3"}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_stdio_server_skips_the_url_safety_check(
+    mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stdio server opens no socket, so DNS resolution must not gate it."""
+
+    def _fail(host: str) -> list[str]:
+        raise AssertionError("url safety must not be checked for a stdio server")
+
+    monkeypatch.setattr("infrastructure.url_safety.resolve_host", _fail)
+    assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_STDIO_BODY), status=201
+    )
+
+
+async def test_patch_stdio_field_on_http_server_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_CREATE_BODY), status=201
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}", json={"command": "npx"}
+    )
+    err = assert_err(response, code="INVALID_MCP_SERVER", status=422)
+    assert "command" in err["details"]["reason"]
+
+
+async def test_patch_url_on_stdio_server_returns_422(mcp_client: AsyncClient) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_STDIO_BODY), status=201
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}",
+        json={"url": "https://mcp.example.com/mcp"},
+    )
+    assert_err(response, code="INVALID_MCP_SERVER", status=422)
+
+
+async def test_patch_switching_to_stdio_clears_url_and_headers(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_CREATE_BODY), status=201
+    )
+    body = assert_ok(
+        await mcp_client.patch(
+            f"/api/v1/mcp-servers/{created['id']}",
+            json={"transport": "stdio", "command": "uvx", "args": ["pkg"]},
+        )
+    )
+    assert body["transport"] == "stdio"
+    assert body["command"] == "uvx"
+    assert body["url"] is None
+    assert body["headers"] == {}
+
+
+async def test_patch_switching_to_stdio_without_command_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_CREATE_BODY), status=201
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}", json={"transport": "stdio"}
+    )
+    assert_err(response, code="INVALID_MCP_SERVER", status=422)
+
+
+async def test_patch_switching_to_http_clears_command_args_and_env(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_STDIO_BODY), status=201
+    )
+    body = assert_ok(
+        await mcp_client.patch(
+            f"/api/v1/mcp-servers/{created['id']}",
+            json={"transport": "streamable_http", "url": "https://mcp.example.com/mcp"},
+        )
+    )
+    assert body["transport"] == "streamable_http"
+    assert body["url"] == "https://mcp.example.com/mcp"
+    assert body["command"] is None
+    assert body["args"] == []
+    assert body["env"] == {}
+
+
+async def test_list_stdio_server_tools_uses_a_stdio_connection(
+    mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert_ok(
+        await mcp_client.post(
+            "/api/v1/secrets",
+            json={"name": "files-key", "type": "local", "value": "tok-xyz"},
+        ),
+        status=201,
+    )
+    created = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers",
+            json={**_STDIO_BODY, "env": {"API_KEY": "${secret:files-key}"}},
+        ),
+        status=201,
+    )
+    seen: dict[str, Any] = {}
+
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        seen["connection"] = connection
+        return []
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    assert_ok(await mcp_client.get(f"/api/v1/mcp-servers/{created['id']}/tools"))
+    assert seen["connection"] == StdioConnection(
+        command="npx", args=["-y", "files-mcp@0.3.0"], env={"API_KEY": "tok-xyz"}
+    )
+
+
+async def test_stdio_server_unreachable_error_omits_env(
+    mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_STDIO_BODY), status=201
+    )
+
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        raise McpConnectionError(connection.label, "no such file or directory")
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    response = await mcp_client.get(f"/api/v1/mcp-servers/{created['id']}/tools")
+    err = assert_err(response, code="MCP_UNREACHABLE", status=502)
+    assert err["details"] == {"server": "npx -y files-mcp@0.3.0"}
+    assert "tok" not in response.text
+
+
 # ---------- delete ----------
 
 
@@ -293,11 +506,8 @@ async def test_list_server_tools_returns_tools(
     )
     seen: dict[str, Any] = {}
 
-    async def fake_list_server_tools(
-        url: str, headers: dict[str, str] | None = None
-    ) -> list[Any]:
-        seen["url"] = url
-        seen["headers"] = headers
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        seen["connection"] = connection
         return [
             SimpleNamespace(
                 name="search",
@@ -318,8 +528,9 @@ async def test_list_server_tools_returns_tools(
             "inputSchema": {"type": "object"},
         }
     ]
-    assert seen["url"] == _CREATE_BODY["url"]
-    assert seen["headers"] == _CREATE_BODY["headers"]
+    assert seen["connection"] == HttpConnection(
+        url="https://mcp.example.com/mcp", headers={"Authorization": "Bearer secret"}
+    )
 
 
 async def test_list_server_tools_unreachable_returns_502(
@@ -329,10 +540,8 @@ async def test_list_server_tools_unreachable_returns_502(
         await mcp_client.post("/api/v1/mcp-servers", json=_CREATE_BODY), status=201
     )
 
-    async def fake_list_server_tools(
-        url: str, headers: dict[str, str] | None = None
-    ) -> list[Any]:
-        raise McpConnectionError(url, "connection refused")
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        raise McpConnectionError(connection.label, "connection refused")
 
     monkeypatch.setattr(
         "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
@@ -374,17 +583,17 @@ async def test_list_server_tools_resolves_secret_placeholders(
     )
     seen: dict[str, Any] = {}
 
-    async def fake_list_server_tools(
-        url: str, headers: dict[str, str] | None = None
-    ) -> list[Any]:
-        seen["headers"] = headers
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        seen["connection"] = connection
         return []
 
     monkeypatch.setattr(
         "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
     )
     assert_ok(await mcp_client.get(f"/api/v1/mcp-servers/{created['id']}/tools"))
-    assert seen["headers"] == {"Authorization": "Bearer tok-xyz"}
+    assert seen["connection"] == HttpConnection(
+        url="https://mcp.example.com/mcp", headers={"Authorization": "Bearer tok-xyz"}
+    )
 
 
 async def test_list_server_tools_missing_secret_returns_502(
@@ -404,10 +613,8 @@ async def test_list_server_tools_missing_secret_returns_502(
     )
     connected: list[str] = []
 
-    async def fake_list_server_tools(
-        url: str, headers: dict[str, str] | None = None
-    ) -> list[Any]:
-        connected.append(url)
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        connected.append(connection.label)
         return []
 
     monkeypatch.setattr(

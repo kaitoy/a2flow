@@ -31,6 +31,7 @@ from repositories.exceptions import (
     ForbiddenError,
     ForeignKeyViolationError,
     McpConnectionError,
+    McpServerValidationError,
     NotFoundError,
     QueryValidationError,
     ReferencedError,
@@ -54,6 +55,7 @@ from routers.exception_handlers import (
     foreign_key_violation_exception_handler,
     http_exception_handler,
     mcp_connection_exception_handler,
+    mcp_server_validation_exception_handler,
     not_found_exception_handler,
     query_validation_exception_handler,
     referenced_exception_handler,
@@ -155,6 +157,9 @@ app.add_exception_handler(
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
 app.add_exception_handler(AvatarValidationError, avatar_validation_exception_handler)
 app.add_exception_handler(SecretValidationError, secret_validation_exception_handler)
+app.add_exception_handler(
+    McpServerValidationError, mcp_server_validation_exception_handler
+)
 app.add_exception_handler(UserValidationError, user_validation_exception_handler)
 app.add_exception_handler(SecretResolutionError, secret_resolution_exception_handler)
 app.add_exception_handler(UnauthorizedError, unauthorized_exception_handler)

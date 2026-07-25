@@ -24,6 +24,15 @@ describe("McpServersPage", () => {
     await waitFor(() => expect(screen.getByText("my-mcp-server")).toBeInTheDocument());
     expect(screen.getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
     expect(screen.getByText("1 header")).toBeInTheDocument();
+    expect(screen.getByText("HTTP")).toBeInTheDocument();
+  });
+
+  it("renders a stdio server's command line and variable count", async () => {
+    render(<McpServersPage />);
+    await waitFor(() => expect(screen.getByText("local-files")).toBeInTheDocument());
+    expect(screen.getByText("npx -y files-mcp@0.3.0")).toBeInTheDocument();
+    expect(screen.getByText("1 variable")).toBeInTheDocument();
+    expect(screen.getByText("stdio")).toBeInTheDocument();
   });
 
   it("name links to the edit page", async () => {
@@ -74,7 +83,7 @@ describe("McpServersPage", () => {
 
     render(<McpServersPage />);
     await waitFor(() => screen.getByText("my-mcp-server"));
-    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(screen.getAllByRole("button", { name: "Delete" })[0]);
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));
     expect(deleteSpy).toHaveBeenCalled();

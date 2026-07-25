@@ -141,10 +141,29 @@ export const MCP_SERVER_1 = {
   id: "mcp-1",
   tenantId: "tenant-1",
   name: "my-mcp-server",
+  transport: "streamable_http",
   url: "https://mcp.example.com/mcp",
   headers: { Authorization: "Bearer secret" },
+  args: [],
+  env: {},
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+export const MCP_STDIO_SERVER = {
+  id: "mcp-2",
+  tenantId: "tenant-1",
+  name: "local-files",
+  transport: "stdio",
+  headers: {},
+  command: "npx",
+  args: ["-y", "files-mcp@0.3.0"],
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: literal secret-reference syntax stored by the API
+  env: { API_KEY: "${secret:files-key}" },
+  createdAt: "2026-01-02T00:00:00Z",
+  updatedAt: "2026-01-02T00:00:00Z",
   createdBy: "",
   updatedBy: "",
 };
@@ -309,7 +328,7 @@ export const handlers = [
 
   http.delete(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(null)),
 
-  http.get(`${BASE}/api/v1/mcp-servers`, () => envelope([MCP_SERVER_1])),
+  http.get(`${BASE}/api/v1/mcp-servers`, () => envelope([MCP_SERVER_1, MCP_STDIO_SERVER])),
 
   http.get(`${BASE}/api/v1/mcp-servers/:serverId/tools`, () => envelope([MCP_TOOL_1])),
 

@@ -30,8 +30,8 @@ async def search_mcp_registry(
         cursor: Optional pagination cursor from a previous result.
 
     Returns:
-        An envelope wrapping the page of streamable-HTTP servers and the cursor
-        for the next page.
+        An envelope wrapping the page of registrable servers (streamable-HTTP
+        remotes and stdio packages) and the cursor for the next page.
     """
     result = await service.search(search=search, cursor=cursor)
     return ApiResponse(meta=meta, data=result)

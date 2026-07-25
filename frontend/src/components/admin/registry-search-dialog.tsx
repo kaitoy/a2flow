@@ -3,6 +3,7 @@ import { animated, useTransition } from "@react-spring/web";
 import { PackageSearch } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -26,10 +27,11 @@ const DEBOUNCE_MS = 300;
 
 /**
  * Modal dialog that searches the official MCP registry by name and lets the
- * operator pick a streamable-HTTP server to pre-fill the create form.
+ * operator pick a server to pre-fill the create form.
  *
- * Only servers A2Flow can register (those exposing a streamable-HTTP remote)
- * are returned by the backend, so every result is selectable.
+ * Only servers A2Flow can register are returned by the backend — those exposing
+ * a streamable-HTTP remote, or publishing an npm/PyPI stdio package — so every
+ * result is selectable.
  */
 export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearchDialogProps) {
   const config = useMotionConfig("gentle");
@@ -142,8 +144,9 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                   Browse MCP Registry
                 </h2>
                 <p className="mb-4 text-sm text-on-surface-variant">
-                  Search the official MCP registry by name. Only servers reachable over streamable
-                  HTTP are shown.
+                  Search the official MCP registry by name. Only servers A2Flow can register are
+                  shown: those reachable over streamable HTTP, and those published as an npm or PyPI
+                  package it can launch over stdio.
                 </p>
 
                 <Input
@@ -172,11 +175,12 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                           className="flex items-start justify-between gap-3 rounded-xl glass-panel p-3"
                         >
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-on-surface">
+                            <p className="flex items-center gap-2 truncate font-medium text-on-surface">
                               {server.title || server.name}
-                              <span className="ml-2 font-mono text-xs text-on-surface-variant">
+                              <span className="font-mono text-xs text-on-surface-variant">
                                 v{server.version}
                               </span>
+                              <Badge>{server.transport === "stdio" ? "stdio" : "HTTP"}</Badge>
                             </p>
                             {server.description && (
                               <p className="mt-0.5 line-clamp-2 text-sm text-on-surface-variant">
@@ -184,7 +188,9 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                               </p>
                             )}
                             <p className="mt-0.5 truncate font-mono text-xs text-on-surface-variant">
-                              {server.url}
+                              {server.transport === "stdio"
+                                ? [server.command, ...(server.args ?? [])].join(" ")
+                                : server.url}
                             </p>
                           </div>
                           <Button

@@ -16,7 +16,7 @@ class MCPRegistryService:
     async def search(
         self, *, search: str | None = None, cursor: str | None = None
     ) -> McpRegistrySearchResult:
-        """Search the registry for registrable (streamable-HTTP) servers.
+        """Search the registry for servers A2Flow can register.
 
         Args:
             search: Substring matched against server names; ``None`` lists servers.

@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
-import { MCP_SERVER_1 } from "@/test/msw/handlers";
+import { MCP_SERVER_1, MCP_STDIO_SERVER } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import EditMcpServerPage from "./page";
@@ -41,8 +41,53 @@ describe("EditMcpServerPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "my-mcp-server",
+        transport: "streamable_http",
         url: "https://mcp.example.com/mcp",
         headers: {},
+      })
+    );
+  });
+
+  it("prefills command, args, and env for a stdio server", async () => {
+    vi.mocked(useParams).mockReturnValue({ serverId: "mcp-2" });
+    server.use(
+      http.get("http://localhost:8000/api/v1/mcp-servers/:serverId", () =>
+        envelope(MCP_STDIO_SERVER)
+      )
+    );
+
+    render(<EditMcpServerPage />);
+    await waitFor(() => expect(screen.getByDisplayValue("local-files")).toBeInTheDocument());
+    expect(screen.getByRole("tab", { name: "npx" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByDisplayValue("-y")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("files-mcp@0.3.0")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("API_KEY")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^url$/i)).not.toBeInTheDocument();
+  });
+
+  it("drops url and headers when switching a server to stdio", async () => {
+    setup();
+    let receivedBody: unknown;
+    server.use(
+      http.patch("http://localhost:8000/api/v1/mcp-servers/:serverId", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope(MCP_STDIO_SERVER);
+      })
+    );
+
+    render(<EditMcpServerPage />);
+    await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
+    await userEvent.click(screen.getByRole("tab", { name: "stdio" }));
+    await userEvent.click(screen.getByRole("tab", { name: "uvx" }));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "my-mcp-server",
+        transport: "stdio",
+        command: "uvx",
+        args: [],
+        env: {},
       })
     );
   });

@@ -5,38 +5,27 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Server } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
+import { useForm } from "react-hook-form";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
-import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { recordToPairs } from "@/components/admin/key-value-editor";
 import {
-  KeyValueEditor,
-  type KeyValuePair,
-  pairsToRecord,
-  recordToPairs,
-} from "@/components/admin/key-value-editor";
+  emptyMcpServerFormValues,
+  McpServerFields,
+  type McpServerFormValues,
+  mcpServerFormSchema,
+  toMcpServerBody,
+} from "@/components/admin/mcp-server-fields";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { zMcpServerCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { deleteMcpServer, getMcpServer, updateMcpServer } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
-
-// Generated schema carries the name/url constraints; the form edits headers as
-// an ordered key/value pair list (converted to a record on submit), so override
-// that one field's shape while keeping the rest from the generated schema.
-const schema = zMcpServerCreate.omit({ headers: true }).extend({
-  headers: z.array(z.object({ key: z.string(), value: z.string() })),
-});
-
-type FormValues = z.infer<typeof schema>;
 
 export default function EditMcpServerPage() {
   const { serverId } = useParams<{ serverId: string }>();
@@ -53,20 +42,27 @@ export default function EditMcpServerPage() {
     reset,
     control,
     getValues,
+    watch,
     formState: { errors },
-  } = useForm({
-    resolver: zodResolver(schema),
+  } = useForm<McpServerFormValues>({
+    resolver: zodResolver(mcpServerFormSchema),
     mode: "onBlur",
-    defaultValues: { name: "", url: "", headers: [] as KeyValuePair[] },
+    defaultValues: emptyMcpServerFormValues(),
   });
+  const transport = watch("transport");
 
   useEffect(() => {
     getMcpServer(serverId)
       .then((server) => {
         reset({
+          ...emptyMcpServerFormValues(),
           name: server.name,
-          url: server.url,
+          transport: server.transport ?? "streamable_http",
+          url: server.url ?? "",
           headers: recordToPairs(server.headers ?? {}),
+          command: server.command ?? "npx",
+          args: server.args ?? [],
+          env: recordToPairs(server.env ?? {}),
         });
         setAudit({
           createdBy: server.createdBy,
@@ -81,14 +77,10 @@ export default function EditMcpServerPage() {
       .finally(() => setLoading(false));
   }, [serverId, reset]);
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: McpServerFormValues) {
     try {
       await save.run(async () => {
-        await updateMcpServer(serverId, {
-          name: values.name,
-          url: values.url,
-          headers: pairsToRecord(values.headers),
-        });
+        await updateMcpServer(serverId, toMcpServerBody(values));
         dispatch(showToast({ message: "MCP server updated" }));
         router.push("/admin/mcp-servers");
       });
@@ -123,7 +115,7 @@ export default function EditMcpServerPage() {
         <Breadcrumbs items={breadcrumbItems} />
         <AdminPageHeader title="Edit MCP Server" icon={Server} />
         <FormColumn>
-          <FormSkeleton fields={3} />
+          <FormSkeleton fields={4} />
         </FormColumn>
       </AdminPageContainer>
     );
@@ -139,34 +131,12 @@ export default function EditMcpServerPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            <Input id="name" {...register("name")} />
-          </FormField>
-
-          <FormField htmlFor="url" label="URL" required error={errors.url?.message}>
-            <Input id="url" {...register("url")} />
-          </FormField>
-
-          <FormField htmlFor="headers" label="HTTP Headers">
-            <Controller
-              control={control}
-              name="headers"
-              render={({ field }) => (
-                <KeyValueEditor
-                  name="headers"
-                  pairs={field.value}
-                  onChange={field.onChange}
-                  keyPlaceholder="Authorization"
-                  valuePlaceholder="Bearer …"
-                />
-              )}
-            />
-            <p className="mt-1 text-xs text-on-surface-variant">
-              Values may reference registered secrets as{" "}
-              {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
-              {"${secret:name}"}, resolved when connecting.
-            </p>
-          </FormField>
+          <McpServerFields
+            register={register}
+            control={control}
+            errors={errors}
+            transport={transport}
+          />
 
           <div className="flex gap-2">
             <Button

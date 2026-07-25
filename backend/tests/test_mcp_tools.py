@@ -19,9 +19,10 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.secret_cipher import get_secret_cipher
-from models.mcp_server import MCPServer
+from models.mcp_server import MCPServer, McpTransport
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
 from models.workflow_session import WorkflowSession
@@ -67,12 +68,39 @@ async def _seed_server(
     url: str = "https://mcp.example.com/mcp",
     headers: dict[str, str] | None = None,
 ) -> str:
-    """Insert an MCPServer and return its id."""
+    """Insert a streamable-HTTP MCPServer and return its id."""
     async with AsyncSession(eng) as db:
         server = MCPServer(
             name=name,
+            transport=McpTransport.streamable_http,
             url=url,
             headers=headers or {},
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        db.add(server)
+        await db.commit()
+        await db.refresh(server)
+        return server.id
+
+
+async def _seed_stdio_server(
+    eng: AsyncEngine,
+    *,
+    name: str = "stdio-srv",
+    command: str = "npx",
+    args: list[str] | None = None,
+    env: dict[str, str] | None = None,
+) -> str:
+    """Insert a stdio MCPServer and return its id."""
+    async with AsyncSession(eng) as db:
+        server = MCPServer(
+            name=name,
+            transport=McpTransport.stdio,
+            command=command,
+            args=args if args is not None else ["-y", "pkg"],
+            env=env or {},
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
@@ -190,12 +218,11 @@ async def test_call_bound_tool_forwards_to_server(
     seen: dict[str, Any] = {}
 
     async def fake_call_server_tool(
-        url: str,
-        headers: dict[str, str] | None,
+        connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> types.CallToolResult:
-        seen.update(url=url, headers=headers, tool_name=tool_name, arguments=arguments)
+        seen.update(connection=connection, tool_name=tool_name, arguments=arguments)
         return _tool_result("found it", structured={"hits": 1})
 
     monkeypatch.setattr(
@@ -203,8 +230,9 @@ async def test_call_bound_tool_forwards_to_server(
     )
     result = await call_mcp_tool(server_id, "search", {"q": "a2flow"}, _ctx())
     assert result == {"result": {"content": ["found it"], "structured": {"hits": 1}}}
-    assert seen["url"] == "https://mcp.example.com/mcp"
-    assert seen["headers"] == {"Authorization": "Bearer t"}
+    assert seen["connection"] == HttpConnection(
+        url="https://mcp.example.com/mcp", headers={"Authorization": "Bearer t"}
+    )
     assert seen["tool_name"] == "search"
     assert seen["arguments"] == {"q": "a2flow"}
 
@@ -218,8 +246,7 @@ async def test_call_accepts_json_string_arguments(
     seen: dict[str, Any] = {}
 
     async def fake_call_server_tool(
-        url: str,
-        headers: dict[str, str] | None,
+        connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> types.CallToolResult:
@@ -250,12 +277,11 @@ async def test_call_unreachable_server_errors(
     await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
 
     async def fake_call_server_tool(
-        url: str,
-        headers: dict[str, str] | None,
+        connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> types.CallToolResult:
-        raise McpConnectionError(url, "connection refused")
+        raise McpConnectionError(connection.label, "connection refused")
 
     monkeypatch.setattr(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
@@ -272,8 +298,7 @@ async def test_call_tool_error_result_becomes_error_dict(
     await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
 
     async def fake_call_server_tool(
-        url: str,
-        headers: dict[str, str] | None,
+        connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> types.CallToolResult:
@@ -295,8 +320,7 @@ async def test_call_validates_against_union_of_in_progress_tasks(
     await _seed_task(engine, ws_id, bindings=[(server_id, "beta")])
 
     async def fake_call_server_tool(
-        url: str,
-        headers: dict[str, str] | None,
+        connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> types.CallToolResult:
@@ -308,6 +332,40 @@ async def test_call_validates_against_union_of_in_progress_tasks(
     for tool_name in ("alpha", "beta"):
         result = await call_mcp_tool(server_id, tool_name, {}, _ctx())
         assert "error" not in result
+
+
+async def test_call_forwards_a_stdio_server_as_a_stdio_connection(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _seed_local_secret(engine, "files-key", "tok-stdio")
+    server_id = await _seed_stdio_server(
+        engine,
+        command="npx",
+        args=["-y", "files-mcp@0.3.0"],
+        env={"API_KEY": "${secret:files-key}"},
+    )
+    ws_id = await _seed_session(engine)
+    await _seed_task(engine, ws_id, bindings=[(server_id, "read_file")])
+    seen: dict[str, Any] = {}
+
+    async def fake_call_server_tool(
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> types.CallToolResult:
+        seen["connection"] = connection
+        return _tool_result()
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
+    )
+    result = await call_mcp_tool(server_id, "read_file", {}, _ctx())
+    assert "error" not in result
+    assert seen["connection"] == StdioConnection(
+        command="npx",
+        args=["-y", "files-mcp@0.3.0"],
+        env={"API_KEY": "tok-stdio"},
+    )
 
 
 # ---------- list_mcp_tools ----------
@@ -331,11 +389,9 @@ async def test_list_mcp_tools_aggregates_and_isolates_failures(
     good_id = await _seed_server(engine, name="good", url="https://good/mcp")
     bad_id = await _seed_server(engine, name="bad", url="https://bad/mcp")
 
-    async def fake_list_server_tools(
-        url: str, headers: dict[str, str] | None = None
-    ) -> list[Any]:
-        if "bad" in url:
-            raise McpConnectionError(url, "connection refused")
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        if "bad" in connection.label:
+            raise McpConnectionError(connection.label, "connection refused")
         return [
             SimpleNamespace(
                 name="search",
@@ -390,12 +446,11 @@ async def test_call_resolves_secret_placeholder_in_headers(
     seen: dict[str, Any] = {}
 
     async def fake_call_server_tool(
-        url: str,
-        headers: dict[str, str] | None,
+        connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> types.CallToolResult:
-        seen["headers"] = headers
+        seen["connection"] = connection
         return _tool_result()
 
     monkeypatch.setattr(
@@ -403,7 +458,9 @@ async def test_call_resolves_secret_placeholder_in_headers(
     )
     result = await call_mcp_tool(server_id, "search", {}, _ctx())
     assert "error" not in result
-    assert seen["headers"] == {"Authorization": "Bearer tok-xyz"}
+    assert seen["connection"] == HttpConnection(
+        url="https://mcp.example.com/mcp", headers={"Authorization": "Bearer tok-xyz"}
+    )
 
 
 async def test_call_with_missing_secret_returns_error(
@@ -417,12 +474,11 @@ async def test_call_with_missing_secret_returns_error(
     called: list[str] = []
 
     async def fake_call_server_tool(
-        url: str,
-        headers: dict[str, str] | None,
+        connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
     ) -> types.CallToolResult:
-        called.append(url)
+        called.append(connection.label)
         return _tool_result()
 
     monkeypatch.setattr(
@@ -452,10 +508,8 @@ async def test_list_mcp_tools_isolates_secret_resolution_failure(
     )
     seen: dict[str, Any] = {}
 
-    async def fake_list_server_tools(
-        url: str, headers: dict[str, str] | None = None
-    ) -> list[Any]:
-        seen[url] = headers
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        seen[connection.label] = connection
         return []
 
     monkeypatch.setattr(
@@ -465,4 +519,8 @@ async def test_list_mcp_tools_isolates_secret_resolution_failure(
     by_id = {entry["server_id"]: entry for entry in result["servers"]}
     assert by_id[good_id]["tools"] == []
     assert "cannot resolve secret 'missing'" in by_id[bad_id]["error"]
-    assert seen == {"https://good/mcp": {"Authorization": "Bearer tok-1"}}
+    assert seen == {
+        "https://good/mcp": HttpConnection(
+            url="https://good/mcp", headers={"Authorization": "Bearer tok-1"}
+        )
+    }

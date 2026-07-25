@@ -1,17 +1,29 @@
 """MCPServer data models for create, update, and database persistence.
 
-An MCPServer is a remote Model Context Protocol server registered with A2Flow.
+An MCPServer is a Model Context Protocol server registered with A2Flow.
 Registered servers are the catalog the workflow agent draws from when it binds
 MCP tools to WorkflowTasks: at planning time the agent lists each server's
 tools, and at execution time bound tools are invoked through the
 ``call_mcp_tool`` proxy (see :mod:`infrastructure.mcp_tools`).
 
-Connections use streamable HTTP. The optional ``headers`` mapping (e.g.
-``{"Authorization": "Bearer ..."}``) is sent verbatim with every request to the
-server; values are stored in plaintext, which is acceptable for this app's
+Two transports exist, discriminated by ``transport``:
+
+* ``streamable_http`` — a remote server addressed by ``url``. The optional
+  ``headers`` mapping (e.g. ``{"Authorization": "Bearer ..."}``) is sent
+  verbatim with every request.
+* ``stdio`` — a local server launched as a child process of the backend:
+  ``command`` (``npx`` or ``uvx``, the only two runtimes the backend image
+  ships) plus ``args``, with ``env`` merged over the small set of variables
+  :func:`mcp.client.stdio.get_default_environment` deems safe to inherit.
+  ``args`` is passed as a list and never through a shell.
+
+``headers`` and ``env`` values may embed ``${secret:NAME}`` placeholders,
+resolved at connection time (see :mod:`infrastructure.secret_resolver`);
+anything else is stored in plaintext, which is acceptable for this app's
 local, single-operator deployment model.
 """
 
+from enum import StrEnum
 from typing import Any
 
 from pydantic import model_validator
@@ -21,7 +33,7 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity, JSONColumn
-from models.constraints import EntityName, HttpUrl
+from models.constraints import EntityName, HttpUrl, McpArg
 from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -32,55 +44,142 @@ _MAX_HEADERS = 50
 #: Maximum length, in characters, of each header key and value.
 _MAX_HEADER_VALUE_LENGTH = 1024
 
+#: Maximum number of environment variables allowed on a stdio MCP server.
+_MAX_ENV_VARS = 50
+
+#: Maximum length, in characters, of each environment variable key and value.
+_MAX_ENV_VALUE_LENGTH = 4096
+
+#: Maximum number of ``argv`` entries allowed on a stdio MCP server.
+_MAX_ARGS = 100
+
+
+class McpTransport(StrEnum):
+    """How A2Flow reaches an MCP server: over HTTP, or as a child process."""
+
+    streamable_http = "streamable_http"
+    stdio = "stdio"
+
+
+class McpCommand(StrEnum):
+    """Launcher for a stdio MCP server: the only two runtimes the backend image ships."""
+
+    npx = "npx"
+    uvx = "uvx"
+
 
 class MCPServerUpdate(SQLModel):
     """Partial update payload for an MCPServer — all fields are optional.
 
-    When ``headers`` is ``None`` the stored headers are left unchanged; when it
-    is a mapping the full set of headers is replaced with that mapping.
+    When ``headers``, ``args``, or ``env`` is ``None`` the stored value is left
+    unchanged; when it is a mapping (or list) the stored value is replaced
+    wholesale. The per-transport shape rules (which fields must be present or
+    absent) are enforced against the merged result by
+    :class:`services.mcp_server.MCPServerService`, because a PATCH body alone
+    cannot know the effective transport.
     """
 
     model_config = _alias_config
     name: EntityName | None = None
+    transport: McpTransport | None = None
     url: HttpUrl | None = None
     headers: dict[str, str] | None = None
+    command: McpCommand | None = None
+    args: list[McpArg] | None = None
+    env: dict[str, str] | None = None
 
     @model_validator(mode="after")
-    def _validate_headers(self) -> "MCPServerUpdate":
-        """Bound the headers mapping size and the length of each key and value.
+    def _validate_sizes(self) -> "MCPServerUpdate":
+        """Bound the headers/env mappings and the ``args`` list.
 
         Returns:
             The validated model instance.
 
         Raises:
-            ValueError: If there are more than ``_MAX_HEADERS`` entries, or any
-                header key or value exceeds ``_MAX_HEADER_VALUE_LENGTH`` characters.
+            ValueError: If any collection exceeds its entry-count cap, or any
+                header/env key or value exceeds its length cap.
         """
-        if self.headers is not None:
-            if len(self.headers) > _MAX_HEADERS:
-                raise ValueError(f"At most {_MAX_HEADERS} headers are allowed")
-            for key, value in self.headers.items():
-                if (
-                    len(key) > _MAX_HEADER_VALUE_LENGTH
-                    or len(value) > _MAX_HEADER_VALUE_LENGTH
-                ):
-                    raise ValueError(
-                        "Header keys and values must be at most "
-                        f"{_MAX_HEADER_VALUE_LENGTH} characters"
-                    )
+        _assert_mapping_within(
+            self.headers, _MAX_HEADERS, _MAX_HEADER_VALUE_LENGTH, "Header"
+        )
+        _assert_mapping_within(
+            self.env, _MAX_ENV_VARS, _MAX_ENV_VALUE_LENGTH, "Environment variable"
+        )
+        if self.args is not None and len(self.args) > _MAX_ARGS:
+            raise ValueError(f"At most {_MAX_ARGS} arguments are allowed")
         return self
 
 
+def _assert_mapping_within(
+    mapping: dict[str, str] | None, max_entries: int, max_length: int, label: str
+) -> None:
+    """Reject a mapping that exceeds its entry-count or key/value length caps.
+
+    Args:
+        mapping: The mapping to check; ``None`` passes (the field is unset).
+        max_entries: Maximum number of entries allowed.
+        max_length: Maximum length, in characters, of each key and each value.
+        label: Human-readable field name used in the error messages.
+
+    Raises:
+        ValueError: If the mapping has too many entries, or any key or value is
+            too long.
+    """
+    if mapping is None:
+        return
+    if len(mapping) > max_entries:
+        raise ValueError(f"At most {max_entries} {label.lower()} entries are allowed")
+    for key, value in mapping.items():
+        if len(key) > max_length or len(value) > max_length:
+            raise ValueError(
+                f"{label} keys and values must be at most {max_length} characters"
+            )
+
+
 class MCPServerCreate(MCPServerUpdate):
-    """Creation payload for an MCPServer with required fields."""
+    """Creation payload for an MCPServer with required fields.
+
+    ``transport`` defaults to ``streamable_http`` so an existing remote-server
+    payload stays valid unchanged.
+    """
 
     name: EntityName
-    url: HttpUrl
+    transport: McpTransport = McpTransport.streamable_http
+    url: HttpUrl | None = None
     headers: dict[str, str] = Field(default_factory=dict)
+    command: McpCommand | None = None
+    args: list[McpArg] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_shape(self) -> "MCPServerCreate":
+        """Enforce exactly one shape per transport.
+
+        Returns:
+            The validated model instance.
+
+        Raises:
+            ValueError: If a ``streamable_http`` server is missing ``url`` or
+                carries stdio fields, or a ``stdio`` server is missing
+                ``command`` or carries remote fields.
+        """
+        if self.transport is McpTransport.streamable_http:
+            if self.url is None:
+                raise ValueError("A streamable_http server requires a url")
+            if self.command is not None or self.args or self.env:
+                raise ValueError(
+                    "A streamable_http server must not set command, args, or env"
+                )
+        else:
+            if self.command is None:
+                raise ValueError("A stdio server requires a command")
+            if self.url is not None or self.headers:
+                raise ValueError("A stdio server must not set url or headers")
+        return self
 
 
 class MCPServer(MCPServerCreate, TenantScoped, BaseEntity, table=True):
-    """Database-persisted remote MCP server reachable over streamable HTTP."""
+    """Database-persisted MCP server, remote over streamable HTTP or local stdio."""
 
     __tablename__ = "mcp_servers"
     tenant_id: str = Field(foreign_key="tenants.id", ondelete="RESTRICT")
@@ -92,10 +191,16 @@ class MCPServer(MCPServerCreate, TenantScoped, BaseEntity, table=True):
     headers: dict[str, str] = Field(
         default_factory=dict, sa_column=Column(JSONColumn, nullable=False)
     )
+    args: list[str] = Field(
+        default_factory=list, sa_column=Column(JSONColumn, nullable=False)
+    )
+    env: dict[str, str] = Field(
+        default_factory=dict, sa_column=Column(JSONColumn, nullable=False)
+    )
 
 
 class McpToolInfo(SQLModel):
-    """A tool advertised by a remote MCP server.
+    """A tool advertised by a registered MCP server.
 
     Returned by ``GET /mcp-servers/{id}/tools`` so the admin UI (and the agent,
     via ``list_mcp_tools``) can present the server's catalog when binding tools

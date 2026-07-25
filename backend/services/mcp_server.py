@@ -1,18 +1,27 @@
 """Use case service for MCPServer resources.
 
 Wraps the :class:`MCPServerRepository` with the business rules the routers need
-(raising :class:`NotFoundError` when a server is missing) and hosts the one
-orchestration the admin UI's tool picker needs: connecting to a registered
+(raising :class:`NotFoundError` when a server is missing, and validating the
+*merged* per-transport shape — ``MCPServerCreate``'s validator covers POST
+bodies, but only the service can see what a PATCH merges into) and hosts the
+one orchestration the admin UI's tool picker needs: connecting to a registered
 server to list the tools it advertises.
 """
 
 from collections.abc import Sequence
+from typing import Any
 
 from infrastructure import mcp_client
 from infrastructure.secret_resolver import SecretResolver
-from models.mcp_server import MCPServer, MCPServerCreate, MCPServerUpdate, McpToolInfo
+from models.mcp_server import (
+    MCPServer,
+    MCPServerCreate,
+    MCPServerUpdate,
+    McpToolInfo,
+    McpTransport,
+)
 from repositories import MCPServerRepository
-from repositories.exceptions import NotFoundError
+from repositories.exceptions import McpServerValidationError, NotFoundError
 from repositories.query import FilterSpec, SortSpec
 
 # Module-level alias for ``list[McpToolInfo]``. The service defines a method
@@ -91,7 +100,13 @@ class MCPServerService:
     async def update(
         self, server_id: str, data: MCPServerUpdate, *, user_id: str
     ) -> MCPServer:
-        """Apply a partial update to an MCPServer.
+        """Apply a partial update, validating the merged per-transport shape.
+
+        The effective transport is ``data.transport`` when provided, else the
+        stored one. Fields explicitly sent in the PATCH must fit the effective
+        transport's shape; fields belonging to the *other* transport that
+        merely remain on the stored record (a transport switch) are cleared
+        automatically.
 
         Args:
             server_id: Identifier of the server to update.
@@ -103,7 +118,38 @@ class MCPServerService:
 
         Raises:
             NotFoundError: If no server exists with the given ID.
+            McpServerValidationError: If the merged result violates the
+                effective transport's shape.
         """
+        existing = await self.get(server_id)
+        effective = data.transport or existing.transport
+        updates: dict[str, Any] = {}
+
+        if effective is McpTransport.streamable_http:
+            if data.command is not None or data.args or data.env:
+                raise McpServerValidationError(
+                    "A streamable_http server must not set command, args, or env"
+                )
+            if existing.transport is not McpTransport.streamable_http:
+                if data.url is None:
+                    raise McpServerValidationError(
+                        "Switching to a streamable_http server requires a url"
+                    )
+                updates.update({"command": None, "args": [], "env": {}})
+        else:
+            if data.url is not None or data.headers:
+                raise McpServerValidationError(
+                    "A stdio server must not set url or headers"
+                )
+            if existing.transport is not McpTransport.stdio:
+                if data.command is None:
+                    raise McpServerValidationError(
+                        "Switching to a stdio server requires a command"
+                    )
+                updates.update({"url": None, "headers": {}})
+
+        if updates:
+            data = data.model_copy(update=updates)
         return await self._repo.update(server_id, data, user_id=user_id)
 
     async def delete(self, server_id: str) -> None:
@@ -129,13 +175,13 @@ class MCPServerService:
 
         Raises:
             NotFoundError: If no server exists with the given ID.
-            McpConnectionError: If the server cannot be reached.
+            McpConnectionError: If the server cannot be reached or launched.
             SecretResolutionError: If a ``${secret:NAME}`` placeholder in the
-                server's headers cannot be resolved.
+                server's headers or environment cannot be resolved.
         """
         server = await self.get(server_id)
-        headers = await self._resolver.resolve_headers(server.headers)
-        tools = await mcp_client.list_server_tools(server.url, headers)
+        connection = await mcp_client.resolve_connection(server, self._resolver)
+        tools = await mcp_client.list_server_tools(connection)
         return [
             McpToolInfo(
                 name=tool.name,

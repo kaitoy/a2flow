@@ -243,5 +243,10 @@ PromptText = Annotated[str, StringConstraints(min_length=1, max_length=20000)]
 #: MCP tool name: 1–255 characters.
 ToolName = Annotated[str, StringConstraints(min_length=1, max_length=255)]
 
+#: One ``argv`` entry for a stdio MCP server: up to 4096 characters, anything
+#: except NUL (which ``execve`` cannot carry). Deliberately permissive — an
+#: argument legitimately holds JSON, paths, or free text.
+McpArg = Annotated[str, StringConstraints(max_length=4096, pattern=r"^[^\x00]*$")]
+
 #: Layout/ordering position: an integer in ``[0, 100000]``.
 Position = Annotated[int, Field(ge=0, le=100000)]
