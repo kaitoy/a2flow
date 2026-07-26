@@ -115,7 +115,7 @@ export default function McpServersPage() {
       header: "Actions",
       noTruncate: true,
       cell: (server) => (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           <DeleteIconButton onClick={() => handleDelete(server.id, server.name)} />
         </div>
       ),

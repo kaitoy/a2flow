@@ -126,7 +126,7 @@ function buildColumns(
       header: "Actions",
       noTruncate: true,
       cell: (w) => (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           {permissions.canRun && (
             <ActionIconButton
               icon={runningId === w.id ? Loader2 : Play}

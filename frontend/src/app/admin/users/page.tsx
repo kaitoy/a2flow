@@ -90,6 +90,7 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
     filterField: "enabled",
     filterOp: "eq",
     filterOptions: BOOL_FILTER_OPTIONS,
+    className: "text-center",
     cell: (u) => boolCell(u.enabled),
   },
   {
@@ -98,6 +99,7 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
     filterField: "emailVerified",
     filterOp: "eq",
     filterOptions: BOOL_FILTER_OPTIONS,
+    className: "text-center",
     cell: (u) => boolCell(u.emailVerified),
   },
 ];
@@ -182,7 +184,7 @@ export default function UsersPage() {
       header: "Actions",
       noTruncate: true,
       cell: (user) => (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           {canImpersonate(user) && (
             <ActionIconButton
               icon={UserCog}

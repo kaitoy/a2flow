@@ -50,6 +50,7 @@ const STATIC_COLUMNS: ColumnDef<Tenant>[] = [
     filterField: "enabled",
     filterOp: "eq",
     filterOptions: BOOL_FILTER_OPTIONS,
+    className: "text-center",
     cell: (t) => (t.enabled ? "✓" : "—"),
   },
 ];
@@ -93,7 +94,7 @@ export default function TenantsPage() {
       header: "Actions",
       noTruncate: true,
       cell: (tenant) => (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           <DeleteIconButton onClick={() => handleDelete(tenant.id, tenant.displayName)} />
         </div>
       ),

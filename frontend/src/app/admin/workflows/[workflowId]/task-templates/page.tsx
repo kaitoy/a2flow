@@ -120,7 +120,7 @@ function buildColumns(
       header: "Actions",
       noTruncate: true,
       cell: (t) => (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           <DeleteIconButton onClick={() => onDelete(t.id, t.title)} />
         </div>
       ),

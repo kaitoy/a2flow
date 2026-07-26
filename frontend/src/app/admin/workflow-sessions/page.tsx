@@ -68,7 +68,7 @@ function buildColumns(
       header: "Actions",
       noTruncate: true,
       cell: (s) => (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           <ActionIconButton
             icon={ListChecks}
             label="View tasks"

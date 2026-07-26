@@ -178,7 +178,7 @@ export default function AgentSkillsPage() {
             header: "Actions",
             noTruncate: true,
             cell: (skill: AgentSkill) => (
-              <div className="flex gap-2">
+              <div className="flex justify-center gap-2">
                 <ActionIconButton
                   icon={Sparkles}
                   label="Generate workflow"

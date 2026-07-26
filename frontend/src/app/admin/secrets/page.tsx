@@ -92,7 +92,7 @@ export default function SecretsPage() {
       header: "Actions",
       noTruncate: true,
       cell: (secret) => (
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           <DeleteIconButton onClick={() => handleDelete(secret.id, secret.name)} />
         </div>
       ),
