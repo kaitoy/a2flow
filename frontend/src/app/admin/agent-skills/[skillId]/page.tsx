@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
@@ -219,18 +220,15 @@ export default function EditAgentSkillPage() {
               <span className="font-mono">{formatRevision(sync.commitSha)}</span>
             </div>
             {canEdit && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={handlePull}
-                disabled={pull.inFlight || sync.status === "pending"}
-                status={pull.status}
-                pendingLabel="Pulling…"
-                className="ml-auto"
-              >
-                <RefreshCw aria-hidden="true" className="size-4" />
-                Pull
-              </Button>
+              <div className="ml-auto">
+                <ActionIconButton
+                  icon={RefreshCw}
+                  label="Pull"
+                  onClick={handlePull}
+                  disabled={pull.inFlight || sync.status === "pending"}
+                  spinning={pull.inFlight || sync.status === "pending"}
+                />
+              </div>
             )}
             {sync.error && (
               <p className="w-full break-words font-mono text-error text-xs">{sync.error}</p>
