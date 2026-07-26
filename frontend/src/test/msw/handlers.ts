@@ -174,14 +174,15 @@ export const MCP_TOOL_1 = {
   inputSchema: { type: "object" },
 };
 
-// Note: secret responses never carry a `value` field — the API is write-only.
+// Note: secret responses carry only the entry `keys`, never their values — the
+// API is write-only.
 export const SECRET_1 = {
   id: "secret-1",
   name: "github-token",
   type: "local",
+  keys: ["token"],
   vaultMount: null,
   vaultPath: null,
-  vaultKey: null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -192,9 +193,9 @@ export const SECRET_VAULT_1 = {
   id: "secret-2",
   name: "vault-token",
   type: "vault",
+  keys: [],
   vaultMount: "secret",
   vaultPath: "myapp/github",
-  vaultKey: "token",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",

@@ -9,26 +9,38 @@ import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewSecretPage from "./page";
 
+/** Fill the first entry row, which the form starts with. */
+async function typeEntry(user: ReturnType<typeof userEvent.setup>, key: string, value: string) {
+  await user.type(screen.getByLabelText("entries key 1"), key);
+  await user.type(screen.getByLabelText("entries value 1"), value);
+}
+
 describe("NewSecretPage", () => {
-  it("renders name input, type toggle, and value input by default", () => {
+  it("renders name input, type toggle, and one entry row by default", () => {
     render(<NewSecretPage />);
-    expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: /secret type/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/value/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("entries key 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("entries value 1")).toBeInTheDocument();
     expect(screen.queryByLabelText(/vault mount/i)).not.toBeInTheDocument();
   });
 
-  it("switching to vault shows the reference inputs and hides the value", async () => {
+  it("masks entry values so they are not shoulder-readable", () => {
+    render(<NewSecretPage />);
+    expect(screen.getByLabelText("entries value 1")).toHaveAttribute("type", "password");
+  });
+
+  it("switching to vault shows the reference inputs and hides the entries", async () => {
     const user = userEvent.setup();
     render(<NewSecretPage />);
     await user.click(screen.getByRole("tab", { name: /hashicorp vault/i }));
     expect(screen.getByLabelText(/vault mount/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/vault path/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/vault key/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^value/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/vault key/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("entries key 1")).not.toBeInTheDocument();
   });
 
-  it("submits a local secret with its value", async () => {
+  it("submits a local secret with its entries", async () => {
     const user = userEvent.setup();
     let receivedBody: unknown;
     server.use(
@@ -39,12 +51,43 @@ describe("NewSecretPage", () => {
     );
 
     render(<NewSecretPage />);
-    await user.type(screen.getByLabelText(/name/i), "api-token");
-    await user.type(screen.getByLabelText(/value/i), "tok-123");
+    await user.type(screen.getByLabelText(/^name/i), "api-token");
+    await typeEntry(user, "token", "tok-123");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() =>
-      expect(receivedBody).toEqual({ name: "api-token", type: "local", value: "tok-123" })
+      expect(receivedBody).toEqual({
+        name: "api-token",
+        type: "local",
+        entries: { token: "tok-123" },
+      })
+    );
+  });
+
+  it("submits every entry of a multi-entry secret", async () => {
+    const user = userEvent.setup();
+    let receivedBody: unknown;
+    server.use(
+      http.post("http://localhost:8000/api/v1/secrets", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope({ ...SECRET_1, id: "new-id" }, 201);
+      })
+    );
+
+    render(<NewSecretPage />);
+    await user.type(screen.getByLabelText(/^name/i), "aws-credentials");
+    await typeEntry(user, "AWS_ACCESS_KEY_ID", "AKIA1");
+    await user.click(screen.getByRole("button", { name: /add row/i }));
+    await user.type(screen.getByLabelText("entries key 2"), "AWS_SECRET_ACCESS_KEY");
+    await user.type(screen.getByLabelText("entries value 2"), "sk-1");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "aws-credentials",
+        type: "local",
+        entries: { AWS_ACCESS_KEY_ID: "AKIA1", AWS_SECRET_ACCESS_KEY: "sk-1" },
+      })
     );
   });
 
@@ -59,11 +102,10 @@ describe("NewSecretPage", () => {
     );
 
     render(<NewSecretPage />);
-    await user.type(screen.getByLabelText(/name/i), "vault-token");
+    await user.type(screen.getByLabelText(/^name/i), "vault-token");
     await user.click(screen.getByRole("tab", { name: /hashicorp vault/i }));
     await user.type(screen.getByLabelText(/vault mount/i), "secret");
     await user.type(screen.getByLabelText(/vault path/i), "myapp/github");
-    await user.type(screen.getByLabelText(/vault key/i), "token");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() =>
@@ -72,7 +114,6 @@ describe("NewSecretPage", () => {
         type: "vault",
         vaultMount: "secret",
         vaultPath: "myapp/github",
-        vaultKey: "token",
       })
     );
   });
@@ -90,14 +131,14 @@ describe("NewSecretPage", () => {
     });
 
     render(<NewSecretPage />);
-    await user.type(screen.getByLabelText(/name/i), "api-token");
-    await user.type(screen.getByLabelText(/value/i), "tok-123");
+    await user.type(screen.getByLabelText(/^name/i), "api-token");
+    await typeEntry(user, "token", "tok-123");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/secrets"));
   });
 
-  it("rejects submit when a local secret has no value", async () => {
+  it("rejects submit when a local secret has no entry", async () => {
     const user = userEvent.setup();
     const postSpy = vi.fn();
     server.use(
@@ -108,10 +149,33 @@ describe("NewSecretPage", () => {
     );
 
     render(<NewSecretPage />);
-    await user.type(screen.getByLabelText(/name/i), "api-token");
+    await user.type(screen.getByLabelText(/^name/i), "api-token");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
-    await waitFor(() => expect(screen.getByText(/value is required/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/at least one entry is required/i)).toBeInTheDocument()
+    );
+    expect(postSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects submit when an entry has no value", async () => {
+    const user = userEvent.setup();
+    const postSpy = vi.fn();
+    server.use(
+      http.post("http://localhost:8000/api/v1/secrets", () => {
+        postSpy();
+        return envelope({ ...SECRET_1, id: "new-id" }, 201);
+      })
+    );
+
+    render(<NewSecretPage />);
+    await user.type(screen.getByLabelText(/^name/i), "api-token");
+    await user.type(screen.getByLabelText("entries key 1"), "token");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/every entry requires a value/i)).toBeInTheDocument()
+    );
     expect(postSpy).not.toHaveBeenCalled();
   });
 
@@ -124,8 +188,8 @@ describe("NewSecretPage", () => {
     );
 
     render(<NewSecretPage />);
-    await user.type(screen.getByLabelText(/name/i), "api-token");
-    await user.type(screen.getByLabelText(/value/i), "tok-123");
+    await user.type(screen.getByLabelText(/^name/i), "api-token");
+    await typeEntry(user, "token", "tok-123");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() =>

@@ -234,7 +234,7 @@ class UserValidationError(RepositoryError):
 
 
 class SecretResolutionError(Exception):
-    """Raised when a ``${secret:NAME}`` reference cannot be resolved to a value.
+    """Raised when a ``${secret:NAME/KEY}`` reference cannot be resolved to a value.
 
     Covers a missing secret name, a ciphertext that cannot be decrypted, a
     Vault read failure, and a ``vault``-type secret with no Vault connection

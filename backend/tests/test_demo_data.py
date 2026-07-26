@@ -21,16 +21,16 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import get_settings
 from infrastructure.bootstrap import DEFAULT_TENANT_NAME, seed_system_user
 from infrastructure.demo_data import (
-    DEMO_ACCESS_KEY_SECRET_ID,
-    DEMO_ACCESS_KEY_SECRET_NAME,
+    DEMO_ACCESS_KEY_ENTRY_KEY,
     DEMO_AGENT_SKILL_ID,
     DEMO_AGENT_SKILL_NAME,
     DEMO_APPROVER_USER_ID,
+    DEMO_AWS_SECRET_ID,
+    DEMO_AWS_SECRET_NAME,
     DEMO_MCP_SERVER_ID,
     DEMO_MCP_SERVER_NAME,
     DEMO_REQUESTER_USER_ID,
-    DEMO_SECRET_KEY_SECRET_ID,
-    DEMO_SECRET_KEY_SECRET_NAME,
+    DEMO_SECRET_KEY_ENTRY_KEY,
     sync_demo_data,
 )
 from infrastructure.password import verify_password
@@ -183,7 +183,7 @@ async def test_sync_demo_data_seeds_the_full_dataset(
     _enable(monkeypatch)
     await _sync(engine)
     assert len(await _demo_users(engine)) == 2
-    assert len(await _rows(engine, Secret)) == 2
+    assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
     assert len(await _rows(engine, AgentSkill)) == 1
 
@@ -212,7 +212,7 @@ async def test_sync_demo_data_is_idempotent(
     await _sync(engine)
     await _sync(engine)
     assert len(await _demo_users(engine)) == 2
-    assert len(await _rows(engine, Secret)) == 2
+    assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
     assert len(await _rows(engine, AgentSkill)) == 1
 
@@ -290,18 +290,20 @@ async def test_demo_secrets_store_the_configured_values_encrypted(
     monkeypatch.setenv("DEMO_AWS_SECRET_ACCESS_KEY", "s3cr3t-key")
     await _sync(engine)
     async with AsyncSession(engine) as session:
-        access_key = await session.get(Secret, DEMO_ACCESS_KEY_SECRET_ID)
-        secret_key = await session.get(Secret, DEMO_SECRET_KEY_SECRET_ID)
-    assert access_key is not None and secret_key is not None
-    assert access_key.name == DEMO_ACCESS_KEY_SECRET_NAME
-    assert access_key.type is SecretType.local
-    assert access_key.tenant_id == TENANT_ID
-    assert access_key.value is not None
-    assert access_key.value != "AKIAEXAMPLE"  # stored as ciphertext
+        secret = await session.get(Secret, DEMO_AWS_SECRET_ID)
+    assert secret is not None
+    assert secret.name == DEMO_AWS_SECRET_NAME
+    assert secret.type is SecretType.local
+    assert secret.tenant_id == TENANT_ID
+    assert sorted(secret.entries) == [
+        DEMO_ACCESS_KEY_ENTRY_KEY,
+        DEMO_SECRET_KEY_ENTRY_KEY,
+    ]
+    access_key = secret.entries[DEMO_ACCESS_KEY_ENTRY_KEY]
+    assert access_key != "AKIAEXAMPLE"  # stored as ciphertext
     cipher = get_secret_cipher()
-    assert cipher.decrypt(access_key.value) == "AKIAEXAMPLE"
-    assert secret_key.value is not None
-    assert cipher.decrypt(secret_key.value) == "s3cr3t-key"
+    assert cipher.decrypt(access_key) == "AKIAEXAMPLE"
+    assert cipher.decrypt(secret.entries[DEMO_SECRET_KEY_ENTRY_KEY]) == "s3cr3t-key"
 
 
 async def test_demo_secrets_fall_back_to_a_placeholder(
@@ -310,9 +312,10 @@ async def test_demo_secrets_fall_back_to_a_placeholder(
     _enable(monkeypatch)
     await _sync(engine)
     async with AsyncSession(engine) as session:
-        access_key = await session.get(Secret, DEMO_ACCESS_KEY_SECRET_ID)
-    assert access_key is not None and access_key.value is not None
-    assert get_secret_cipher().decrypt(access_key.value) == "REPLACE_ME"
+        secret = await session.get(Secret, DEMO_AWS_SECRET_ID)
+    assert secret is not None
+    decrypted = get_secret_cipher().decrypt(secret.entries[DEMO_ACCESS_KEY_ENTRY_KEY])
+    assert decrypted == "REPLACE_ME"
 
 
 async def test_demo_mcp_server_is_a_stdio_uvx_launcher(
@@ -333,8 +336,12 @@ async def test_demo_mcp_server_is_a_stdio_uvx_launcher(
     assert server.headers == {}
     assert server.env == {
         "AWS_REGION": "ap-northeast-1",
-        "AWS_ACCESS_KEY_ID": f"${{secret:{DEMO_ACCESS_KEY_SECRET_NAME}}}",
-        "AWS_SECRET_ACCESS_KEY": f"${{secret:{DEMO_SECRET_KEY_SECRET_NAME}}}",
+        "AWS_ACCESS_KEY_ID": (
+            f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_ACCESS_KEY_ENTRY_KEY}}}"
+        ),
+        "AWS_SECRET_ACCESS_KEY": (
+            f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_SECRET_KEY_ENTRY_KEY}}}"
+        ),
     }
 
 
@@ -394,9 +401,9 @@ async def test_a_name_collision_is_skipped_without_failing(
             Secret(
                 id="operator-secret",
                 tenant_id=TENANT_ID,
-                name=DEMO_ACCESS_KEY_SECRET_NAME,
+                name=DEMO_AWS_SECRET_NAME,
                 type=SecretType.local,
-                value="ciphertext",
+                entries={"token": "ciphertext"},
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )
@@ -405,8 +412,7 @@ async def test_a_name_collision_is_skipped_without_failing(
     with caplog.at_level(logging.WARNING, logger=_DEMO_LOGGER):
         assert await _sync(engine) == DEMO_AGENT_SKILL_ID
     async with AsyncSession(engine) as session:
-        assert await session.get(Secret, DEMO_ACCESS_KEY_SECRET_ID) is None
-        assert await session.get(Secret, DEMO_SECRET_KEY_SECRET_ID) is not None
+        assert await session.get(Secret, DEMO_AWS_SECRET_ID) is None
         assert await session.get(MCPServer, DEMO_MCP_SERVER_ID) is not None
     assert any("conflicts with an existing" in r.getMessage() for r in caplog.records)
 

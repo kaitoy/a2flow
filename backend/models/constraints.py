@@ -78,11 +78,29 @@ Username = Annotated[
 
 #: Secret identifier: slug charset, 1–128 characters. Deliberately restricted to
 #: :data:`SLUG_PATTERN` (not :data:`ENTITY_NAME_PATTERN`) because secret names
-#: appear inside ``${secret:NAME}`` placeholders in MCP server header values;
+#: appear inside ``${secret:NAME/KEY}`` placeholders in MCP server header values;
 #: the slug charset keeps the placeholder regex unambiguous (``}`` or whitespace
-#: inside a name would break it).
+#: inside a name would break it, and the absence of ``/`` is what makes the
+#: name/key split unambiguous).
 SecretName = Annotated[
     str, StringConstraints(min_length=1, max_length=128, pattern=SLUG_PATTERN)
+]
+
+#: Key of one entry within a secret, e.g. ``AWS_ACCESS_KEY_ID``: slug charset,
+#: 1–256 characters. Restricted to :data:`SLUG_PATTERN` for the same reason as
+#: :data:`SecretName` — an entry key appears after the ``/`` in a
+#: ``${secret:NAME/KEY}`` placeholder, so it must not contain ``}``.
+SecretEntryKey = Annotated[
+    str, StringConstraints(min_length=1, max_length=256, pattern=SLUG_PATTERN)
+]
+
+#: Reference to one entry of a secret, in ``NAME/KEY`` form. The key is
+#: mandatory: a secret holds a map of entries, so a bare name never identifies a
+#: single value. Used by fields that name a secret directly rather than through
+#: a ``${secret:...}`` placeholder (e.g. ``AgentSkill.repo_auth_secret``).
+SECRET_REF_PATTERN = r"^[a-zA-Z0-9._-]+/[^{}]+$"
+SecretRef = Annotated[
+    str, StringConstraints(min_length=3, max_length=385, pattern=SECRET_REF_PATTERN)
 ]
 
 #: Plaintext secret value as submitted to the API: 1–8192 characters. Stored
@@ -121,12 +139,6 @@ VaultMount = Annotated[
 VaultPath = Annotated[
     str,
     StringConstraints(min_length=1, max_length=1024, pattern=_VAULT_FIELD_PATTERN),
-]
-
-#: Key within the Vault secret's data object: 1–256 characters.
-VaultKey = Annotated[
-    str,
-    StringConstraints(min_length=1, max_length=256, pattern=_VAULT_FIELD_PATTERN),
 ]
 
 #: Username sent as the HTTP basic-auth user when cloning a private skill

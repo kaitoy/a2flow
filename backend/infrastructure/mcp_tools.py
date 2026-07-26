@@ -173,7 +173,7 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
         "description", "input_schema"}, ...]} | {"server_id", "server_name",
         "error"}, ...]}``. An empty registry yields ``{"servers": []}``.
     """
-    # Resolve ${secret:NAME} placeholders while the session is open (the
+    # Resolve ${secret:NAME/KEY} placeholders while the session is open (the
     # resolver needs the secrets table); the network/process fan-out happens
     # after.
     prepared: list[tuple[dict[str, Any], McpConnection | None, str | None]] = []

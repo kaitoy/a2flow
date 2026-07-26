@@ -224,7 +224,7 @@ The list and edit pages show each skill's **Status** (`Cloning` / `ready` / `fai
 
 Under `docker compose`, `SKILLS_DIR` is `/var/lib/a2flow/skills`, persisted in the `skills` Docker volume so the store survives container recreation. It is **durable state, not a cache**: a workflow session pins the revision it started with, so wiping the directory leaves existing sessions unable to load their skill until an admin pulls again. Scaling the backend past one replica requires every replica to mount this same volume.
 
-Private repositories are supported through the optional **Auth Secret** field: set it to the name of a registered [Secret](#secrets) and its value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name. The secret is resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill.
+Private repositories are supported through the optional **Auth Secret** field: set it to a `name/key` reference to one entry of a registered [Secret](#secrets) (e.g. `git-credentials/github-pat`) and that entry's value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name. The secret is resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill.
 
 ### MCP Servers
 
@@ -243,7 +243,7 @@ Each record stores a unique name plus a **transport**, which decides the rest of
 | **Streamable HTTP** (default) | `url`, `headers` | A remote server. SSE-only servers are not supported. Headers are sent with every request — typically `Authorization: Bearer …`. |
 | **stdio** | `command`, `args`, `env` | A server launched as a child process of the backend, e.g. `npx` + `["-y", "@modelcontextprotocol/server-everything"]`. Both `npx` (Node.js 22) and `uvx` are available in the backend image. |
 
-⚠️ Literal header and environment values are stored **in plaintext** in `a2flow.db` and returned by the API; instead of embedding a credential directly, reference a registered [Secret](#secrets) with the `${secret:name}` placeholder syntax (e.g. `Authorization: Bearer ${secret:github-token}`, or `API_KEY: ${secret:files-key}`) — placeholders are expanded only at connect time and the credential never appears in the stored record or any API response.
+⚠️ Literal header and environment values are stored **in plaintext** in `a2flow.db` and returned by the API; instead of embedding a credential directly, reference one entry of a registered [Secret](#secrets) with the `${secret:name/key}` placeholder syntax (e.g. `Authorization: Bearer ${secret:github/token}`, or `AWS_ACCESS_KEY_ID: ${secret:aws-credentials/AWS_ACCESS_KEY_ID}`) — placeholders are expanded only at connect time and the credential never appears in the stored record or any API response.
 
 ⚠️ Registering a stdio server means **running the chosen command inside the backend container**, as the container's unprivileged `app` user. It is gated behind the same `developer` role as any other MCP server write. `args` is passed to the process as a list and never through a shell, and the child inherits only the small safe set of environment variables the MCP SDK allows (`PATH`, `HOME`, …) plus the `env` you configure — the backend's own API keys and `DB_URL` are not visible to it.
 
@@ -255,10 +255,16 @@ The list page's **Browse registry** button opens a search dialog backed by the o
 
 ### Secrets
 
-Navigate to [http://localhost:3000/admin/secrets](http://localhost:3000/admin/secrets) to manage named credentials used for authentication elsewhere in the app:
+Navigate to [http://localhost:3000/admin/secrets](http://localhost:3000/admin/secrets) to manage named credentials used for authentication elsewhere in the app.
 
-- **MCP server headers and environment** — any header value (streamable HTTP) or environment variable value (stdio) may embed `${secret:name}` placeholders, expanded when connecting (see [MCP Servers](#mcp-servers)).
-- **Agent Skill repository clones** — a skill's **Auth Secret** names the secret whose value is used as the git basic-auth password (see [Agent Skills](#agent-skills)).
+A secret is a **named bundle of key/value entries**, the same shape [HashiCorp Vault's KV engine](https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2) uses: one path holds a map of keys to values. Credentials that belong together — an AWS access key id and its secret access key, say — live in one secret as two entries rather than in two separate secrets.
+
+A single entry is referenced as `name/key`:
+
+- **MCP server headers and environment** — any header value (streamable HTTP) or environment variable value (stdio) may embed `${secret:name/key}` placeholders, expanded when connecting (see [MCP Servers](#mcp-servers)).
+- **Agent Skill repository clones** — a skill's **Auth Secret** is a `name/key` reference to the entry used as the git basic-auth password (see [Agent Skills](#agent-skills)).
+
+The key is **always required**, even when the secret holds a single entry — a bare name identifies a map, not a value. A key-less `${secret:name}` fails with `SECRET_RESOLUTION_FAILED` rather than being passed through as a literal string.
 
 | Operation | Path |
 |-----------|------|
@@ -268,8 +274,8 @@ Navigate to [http://localhost:3000/admin/secrets](http://localhost:3000/admin/se
 
 A secret has one of two types:
 
-- **Local (encrypted)** — the value is submitted once and stored in `a2flow.db` encrypted with [Fernet](https://cryptography.io/en/latest/fernet/) (AES-128-CBC + HMAC). The API is **write-only**: no response ever contains the value (neither plaintext nor ciphertext); the edit form leaves the value blank, and leaving it blank on save keeps the stored value.
-- **HashiCorp Vault** — only a [KV v2](https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2) reference (mount, path, key) is stored; the value is read live from Vault each time the secret is resolved.
+- **Local (encrypted)** — the entries are submitted once and stored in `a2flow.db` with each value encrypted with [Fernet](https://cryptography.io/en/latest/fernet/) (AES-128-CBC + HMAC). Keys are stored in plaintext so they can be listed without decrypting anything. The API is **write-only**: a response carries the entry keys but never a value (neither plaintext nor ciphertext). The edit form therefore shows every stored key with a blank value — leave one blank to keep the stored value, retype it to replace it, or remove the row to delete that entry.
+- **HashiCorp Vault** — only a KV v2 reference (mount and path) is stored; every key at that path is readable, and each value is fetched live from Vault when it is resolved.
 
 Secrets are referenced **by name** and resolved lazily: renaming or deleting a secret that something still references does not fail at edit time, but the next use fails with HTTP 502 (`SECRET_RESOLUTION_FAILED`) naming the missing secret.
 

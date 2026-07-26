@@ -7,6 +7,7 @@ router layer never touches the repository directly.
 
 from collections.abc import Sequence
 
+from infrastructure.secret_resolver import split_secret_ref
 from models.agent_skill import (
     AgentSkill,
     AgentSkillCreate,
@@ -32,20 +33,26 @@ class AgentSkillService:
         self._repo = repo
         self._secrets = secrets
 
-    async def _check_auth_secret(self, name: str | None) -> None:
-        """Raise if ``name`` is set but no Secret with that name exists.
+    async def _check_auth_secret(self, ref: str | None) -> None:
+        """Raise if ``ref`` is set but names no existing Secret.
 
-        This is a friendliness check at edit time only — the reference is by
-        name, not by foreign key, so a later rename or delete of the secret
-        still fails lazily at clone time.
+        Only the name half of the ``NAME/KEY`` reference is checked. Whether the
+        key exists is deliberately left to clone time: a ``vault`` secret's keys
+        live in Vault and would need a live read, so checking here would make
+        the two secret types behave differently. This is a friendliness check at
+        edit time only — the reference is by name, not by foreign key, so a
+        later rename or delete of the secret still fails lazily at clone time.
 
         Args:
-            name: The ``repo_auth_secret`` value from the payload, or ``None``.
+            ref: The ``repo_auth_secret`` value from the payload, or ``None``.
 
         Raises:
             ForeignKeyViolationError: If the named secret does not exist.
         """
-        if name is not None and await self._secrets.get_by_name(name) is None:
+        if ref is None:
+            return
+        name, _ = split_secret_ref(ref)
+        if await self._secrets.get_by_name(name) is None:
             raise ForeignKeyViolationError("Secret", name)
 
     async def get(self, skill_id: str) -> AgentSkill:

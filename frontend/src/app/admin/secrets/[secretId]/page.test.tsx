@@ -14,13 +14,12 @@ function setup() {
 }
 
 describe("EditSecretPage", () => {
-  it("prefills name and leaves the value blank for a local secret", async () => {
+  it("prefills one blank-valued row per stored entry key", async () => {
     setup();
     render(<EditSecretPage />);
     await waitFor(() => expect(screen.getByDisplayValue("github-token")).toBeInTheDocument());
-    const valueInput = screen.getByLabelText(/value/i);
-    expect(valueInput).toHaveValue("");
-    expect(valueInput).toHaveAttribute("placeholder", "Leave blank to keep the current value");
+    expect(screen.getByLabelText("entries key 1")).toHaveValue("token");
+    expect(screen.getByLabelText("entries value 1")).toHaveValue("");
   });
 
   it("prefills the vault reference for a vault secret", async () => {
@@ -32,10 +31,10 @@ describe("EditSecretPage", () => {
     await waitFor(() => expect(screen.getByDisplayValue("vault-token")).toBeInTheDocument());
     expect(screen.getByDisplayValue("secret")).toBeInTheDocument();
     expect(screen.getByDisplayValue("myapp/github")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("token")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/vault key/i)).not.toBeInTheDocument();
   });
 
-  it("omits the value from the patch when left blank", async () => {
+  it("sends the blank keep-existing sentinel when a value is untouched", async () => {
     setup();
     let receivedBody: unknown;
     server.use(
@@ -47,28 +46,65 @@ describe("EditSecretPage", () => {
 
     render(<EditSecretPage />);
     await waitFor(() => screen.getByDisplayValue("github-token"));
-    await userEvent.click(screen.getByRole("button", { name: /save/i }));
-
-    await waitFor(() => expect(receivedBody).toEqual({ name: "github-token", type: "local" }));
-  });
-
-  it("includes the value in the patch when entered", async () => {
-    setup();
-    let receivedBody: unknown;
-    server.use(
-      http.patch("http://localhost:8000/api/v1/secrets/:secretId", async ({ request }) => {
-        receivedBody = await request.json();
-        return envelope(SECRET_1);
-      })
-    );
-
-    render(<EditSecretPage />);
-    await waitFor(() => screen.getByDisplayValue("github-token"));
-    await userEvent.type(screen.getByLabelText(/value/i), "tok-456");
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() =>
-      expect(receivedBody).toEqual({ name: "github-token", type: "local", value: "tok-456" })
+      expect(receivedBody).toEqual({
+        name: "github-token",
+        type: "local",
+        entries: { token: "" },
+      })
+    );
+  });
+
+  it("includes a retyped value in the patch", async () => {
+    setup();
+    let receivedBody: unknown;
+    server.use(
+      http.patch("http://localhost:8000/api/v1/secrets/:secretId", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope(SECRET_1);
+      })
+    );
+
+    render(<EditSecretPage />);
+    await waitFor(() => screen.getByDisplayValue("github-token"));
+    await userEvent.type(screen.getByLabelText("entries value 1"), "tok-456");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "github-token",
+        type: "local",
+        entries: { token: "tok-456" },
+      })
+    );
+  });
+
+  it("drops an entry from the patch when its row is removed", async () => {
+    setup();
+    let receivedBody: unknown;
+    server.use(
+      http.get("http://localhost:8000/api/v1/secrets/:secretId", () =>
+        envelope({ ...SECRET_1, keys: ["token", "extra"] })
+      ),
+      http.patch("http://localhost:8000/api/v1/secrets/:secretId", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope(SECRET_1);
+      })
+    );
+
+    render(<EditSecretPage />);
+    await waitFor(() => screen.getByDisplayValue("github-token"));
+    await userEvent.click(screen.getByRole("button", { name: /remove entries row 2/i }));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "github-token",
+        type: "local",
+        entries: { token: "" },
+      })
     );
   });
 

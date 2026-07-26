@@ -120,8 +120,8 @@ Database URL for REST API data and ADK session storage — both live in the same
 | `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](#authentication) |
 | `impersonation_events` | Audit trail of impersonation sessions (`impersonator_id`, `target_user_id`, `started_at`, `ended_at`); see [Authentication](#authentication) |
 | `agent_skills` | Agent skill definitions (incl. optional `repo_auth_secret` / `repo_auth_username` for private-repo clones) |
-| `mcp_servers` | Registered MCP servers (name, `transport`, then either streamable HTTP URL + request headers or stdio command + args + env — header and env values may embed `${secret:NAME}` placeholders) |
-| `secrets` | Named credentials: Fernet-encrypted local values or HashiCorp Vault KV v2 references; see [Secrets](#secrets) |
+| `mcp_servers` | Registered MCP servers (name, `transport`, then either streamable HTTP URL + request headers or stdio command + args + env — header and env values may embed `${secret:NAME/KEY}` placeholders) |
+| `secrets` | Named key/value credential bundles: an `entries` map of Fernet-encrypted local values, or a HashiCorp Vault KV v2 path reference; see [Secrets](#secrets) |
 | `workflows` | Workflow definitions (name, skill reference, lifecycle `status`, summarized description) |
 | `workflow_task_templates` | The pre-planned task list of a workflow (`workflow_id` FK with `ON DELETE CASCADE`; dependency edges and MCP tool bindings live in their own `workflow_task_template_*` join tables) |
 | `planning_sessions` | One per workflow: the chat in which its task templates are produced and refined |
@@ -200,9 +200,8 @@ If either is unset (or empty), a random password is generated instead and logged
 
 | Resource | Name | Details |
 |---|---|---|
-| Secret | `demo-aws-access-key-id` | `local` type, Fernet-encrypted like any other secret |
-| Secret | `demo-aws-secret-access-key` | same |
-| MCP server | `Demo AWS API` | `stdio` transport, `uvx awslabs.aws-api-mcp-server@latest`; its `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars are `${secret:…}` references to the two secrets above, and `AWS_REGION` comes from `DEMO_AWS_REGION` |
+| Secret | `demo-aws-credentials` | `local` type with two entries, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, each Fernet-encrypted like any other secret |
+| MCP server | `Demo AWS API` | `stdio` transport, `uvx awslabs.aws-api-mcp-server@latest`; its `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars are `${secret:demo-aws-credentials/…}` references to the two entries above, and `AWS_REGION` comes from `DEMO_AWS_REGION` |
 | Agent skill | `Demo AWS EC2 Launch` | `sample_skills/aws-ec2-launch` in this repository (see [Agent skills](#agent-skills)) |
 | User | `demo-approver` | holds `approver` — the manager the sample skill routes its approval request to |
 | User | `demo-requester` | holds `requester` — may execute the workflow |
@@ -341,7 +340,7 @@ Sessions are created lazily: the backend ADK session is materialized on the firs
 
 Agent skills are reusable skill definitions that can be attached to workflows. Each record stores a unique `name`, a Git `repoUrl`, an optional `repoPath` (default `""`), and an optional `description`. Deleting a skill that is still referenced by one or more workflows returns `409 CONFLICT_REFERENCED`. CRUD endpoints are in the [API reference](http://localhost:3000/api-doc).
 
-Private repositories are supported through the optional `repoAuthSecret` field — the **name** of a registered [secret](#secrets) whose value is used as the HTTP basic-auth password for the clone — plus `repoAuthUsername` (default `x-access-token`, which suits GitHub PATs). Create/update validates that the named secret exists (`422 FOREIGN_KEY_VIOLATION` otherwise), but the reference is by name and resolved lazily at clone time: a later rename or delete of the secret makes the next clone fail with `502 SECRET_RESOLUTION_FAILED`.
+Private repositories are supported through the optional `repoAuthSecret` field — a `NAME/KEY` reference to one entry of a registered [secret](#secrets), whose value is used as the HTTP basic-auth password for the clone — plus `repoAuthUsername` (default `x-access-token`, which suits GitHub PATs). Create/update validates that the **name** half exists (`422 FOREIGN_KEY_VIOLATION` otherwise); the key is not checked there, since a `vault` secret's keys would need a live Vault read and the two types should behave alike. The whole reference is resolved lazily at clone time: a later rename or delete of the secret, or a key that no longer exists, makes the next clone fail with `502 SECRET_RESOLUTION_FAILED`.
 
 The content at `repoUrl`/`repoPath` (e.g. `SKILL.md`) is loaded directly into the workflow agent's LLM prompt, unsandboxed — only register repositories you trust, since their content is effectively an instruction to the agent, not inert data.
 
@@ -356,7 +355,7 @@ A registry of [MCP](https://modelcontextprotocol.io/) servers whose tools the wo
 | `streamable_http` (default) | `url`, `headers` | One streamable HTTP session per operation, 30-second timeout. SSE-transport servers are not supported. |
 | `stdio` | `command`, `args`, `env` | One child process per operation, 120-second timeout — the larger budget covers a cold `npx -y pkg@version` / `uvx pkg` download. `command` is restricted to `npx`/`uvx`, the only two runtimes the backend image ships. |
 
-Literal `headers` / `env` values are stored in plaintext; to keep a credential out of the record, embed a `${secret:NAME}` placeholder referencing a registered [secret](#secrets) — placeholders are expanded only when connecting, and a reference that no longer resolves fails the connection attempt (`502 SECRET_RESOLUTION_FAILED` on the REST path; a per-server `error` entry for the agent's `list_mcp_tools`/`call_mcp_tool` proxies).
+Literal `headers` / `env` values are stored in plaintext; to keep a credential out of the record, embed a `${secret:NAME/KEY}` placeholder referencing a registered [secret](#secrets) — placeholders are expanded only when connecting, and a reference that no longer resolves fails the connection attempt (`502 SECRET_RESOLUTION_FAILED` on the REST path; a per-server `error` entry for the agent's `list_mcp_tools`/`call_mcp_tool` proxies).
 
 A stdio server runs its `command` inside the backend container. `args` is handed to the process as a list and never through a shell, and the child inherits only the variables `mcp.client.stdio.get_default_environment()` deems safe (`PATH`, `HOME`, …) merged with the configured `env` — the backend's own secrets are not visible to it. Writes are gated behind the same `developer` role as any other MCP server write.
 
@@ -368,9 +367,11 @@ The CRUD endpoints are in the [API reference](http://localhost:3000/api-doc). On
 
 ### Secrets
 
-Named credentials consumed by MCP server header placeholders and agent-skill repository clones. Each secret is either `local` — the submitted `value` is Fernet-encrypted with the key described in [Secret management](#secret-management) and stored in the `secrets` table — or `vault` — only a KV v2 reference (`vaultMount`, `vaultPath`, `vaultKey`) is stored and the value is read from HashiCorp Vault at resolution time.
+Named bundles of key/value entries — the shape a Vault KV path has — consumed by MCP server placeholders and agent-skill repository clones. Each secret is either `local` — the submitted `entries` map is stored in the `secrets` table as `{key: Fernet ciphertext}`, encrypted with the key described in [Secret management](#secret-management), with entry keys kept in plaintext so they can be listed without decrypting — or `vault` — only a KV v2 reference (`vaultMount`, `vaultPath`) is stored and every key at that path is read from HashiCorp Vault at resolution time.
 
-The API is **write-only for values**: create/update accept a plaintext `value`, but every response uses a read view with no `value` field at all, so neither the plaintext nor the ciphertext is ever serialized to clients. On update, omitting `value` keeps the stored ciphertext; switching `type` clears the other shape's fields, and a PATCH that would leave an invalid merged shape (e.g. a `vault` secret with a `value`) returns `422 INVALID_SECRET`. Names are unique (`409 CONFLICT_UNIQUE`), use the slug charset (letters, digits, `.`, `_`, `-`), and are what placeholders and `repoAuthSecret` reference — deletion is never blocked by references; dangling ones fail at their next resolution with `502 SECRET_RESOLUTION_FAILED` (the failure reason is logged server-side only). CRUD endpoints are in the [API reference](http://localhost:3000/api-doc).
+References always name one entry, as `NAME/KEY` (`${secret:NAME/KEY}` in a placeholder). The key is required even for a single-entry secret; a key-less reference raises `502 SECRET_RESOLUTION_FAILED` rather than passing through unsubstituted.
+
+The API is **write-only for values**: create/update accept plaintext `entries`, but every response uses a read view exposing only the sorted entry `keys`, so neither a plaintext nor a ciphertext value is ever serialized to clients. On update, omitting `entries` keeps the stored map; supplying it replaces the map wholesale (keys left out are deleted), with an **empty-string value meaning "keep the ciphertext already stored under this key"** — the only way a client can preserve a value it never receives. An empty value for a key that does not exist yet, or a map that would leave the secret with no entries, returns `422 INVALID_SECRET`; so does switching `type` into an invalid merged shape (e.g. a `vault` secret with `entries`), while a valid switch clears the other shape's fields. Names are unique (`409 CONFLICT_UNIQUE`) and entry keys and names both use the slug charset (letters, digits, `.`, `_`, `-`) — the absence of `/` is what keeps `NAME/KEY` unambiguous. Deletion is never blocked by references; dangling ones fail at their next resolution with `502 SECRET_RESOLUTION_FAILED` (the failure reason is logged server-side only). CRUD endpoints are in the [API reference](http://localhost:3000/api-doc).
 
 ---
 

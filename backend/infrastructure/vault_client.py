@@ -200,24 +200,27 @@ class VaultClient:
         self._auth = auth
         self._client = client or httpx.AsyncClient(follow_redirects=False)
 
-    async def read_kv2(self, mount: str, path: str, key: str) -> str:
-        """Read one key of a KV v2 secret.
+    async def read_kv2(self, mount: str, path: str) -> dict[str, str]:
+        """Read every key of a KV v2 secret.
 
         Performs ``GET {addr}/v1/{mount}/data/{path}``. On a 403 the cached
         token is invalidated and the read retried once, covering tokens revoked
         before their lease expired.
 
+        The whole data object is returned rather than a single key because a
+        Secret row references a Vault *path*, and each ``${secret:NAME/KEY}``
+        placeholder picks its key out of the result — see
+        :class:`infrastructure.secret_resolver.SecretResolver`.
+
         Args:
             mount: The KV v2 mount point (e.g. ``secret``).
             path: The secret path below the mount.
-            key: The key within the secret's data object.
 
         Returns:
-            The secret value.
+            The secret's data object, with every value coerced to ``str``.
 
         Raises:
-            VaultError: If the request errors, the response status is not 200,
-                or the key is missing from the secret data.
+            VaultError: If the request errors or the response status is not 200.
         """
         response = await self._get(mount, path)
         if response.status_code == 403:
@@ -228,9 +231,7 @@ class VaultClient:
                 f"Vault read of {mount}/{path} failed with HTTP {response.status_code}"
             )
         data = (response.json().get("data") or {}).get("data") or {}
-        if key not in data:
-            raise VaultError(f"Key {key!r} not found in Vault secret {mount}/{path}")
-        return str(data[key])
+        return {str(key): str(value) for key, value in data.items()}
 
     async def _get(self, mount: str, path: str) -> httpx.Response:
         """Issue the KV v2 read request with a fresh or cached token.

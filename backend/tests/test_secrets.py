@@ -1,7 +1,8 @@
 """Integration tests for the Secret CRUD endpoints.
 
-The central invariant: no response from any route ever contains a ``value``
-key — neither the submitted plaintext nor the stored ciphertext.
+The central invariant: no response from any route ever contains an ``entries``
+key or any value — neither the submitted plaintext nor the stored ciphertext.
+Responses expose only the entry ``keys``.
 """
 
 from collections.abc import AsyncGenerator
@@ -63,13 +64,21 @@ async def secrets_client(
         app.dependency_overrides.clear()
 
 
-_LOCAL_BODY = {"name": "github-token", "type": "local", "value": "tok-123"}
+_LOCAL_BODY = {
+    "name": "github-token",
+    "type": "local",
+    "entries": {"token": "tok-123"},
+}
+_MULTI_BODY = {
+    "name": "aws-credentials",
+    "type": "local",
+    "entries": {"AWS_ACCESS_KEY_ID": "AKIA1", "AWS_SECRET_ACCESS_KEY": "sk-1"},
+}
 _VAULT_BODY = {
     "name": "vault-token",
     "type": "vault",
     "vaultMount": "secret",
     "vaultPath": "myapp/github",
-    "vaultKey": "token",
 }
 
 
@@ -89,7 +98,7 @@ async def test_create_local_secret_returns_201(secrets_client: AsyncClient) -> N
     assert response.status_code == 201
 
 
-async def test_create_local_secret_response_has_no_value(
+async def test_create_local_secret_response_has_keys_but_no_values(
     secrets_client: AsyncClient,
 ) -> None:
     body = assert_ok(
@@ -97,7 +106,19 @@ async def test_create_local_secret_response_has_no_value(
     )
     assert body["name"] == "github-token"
     assert body["type"] == "local"
+    assert body["keys"] == ["token"]
+    assert "entries" not in body
     assert "value" not in body
+
+
+async def test_create_multi_entry_secret_lists_every_key_sorted(
+    secrets_client: AsyncClient,
+) -> None:
+    body = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_MULTI_BODY), status=201
+    )
+    assert body["keys"] == ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+    assert "entries" not in body
 
 
 async def test_create_vault_secret_response_has_reference_but_no_value(
@@ -109,27 +130,38 @@ async def test_create_vault_secret_response_has_reference_but_no_value(
     assert body["type"] == "vault"
     assert body["vaultMount"] == "secret"
     assert body["vaultPath"] == "myapp/github"
-    assert body["vaultKey"] == "token"
-    assert "value" not in body
+    assert body["keys"] == []
+    assert "entries" not in body
 
 
-async def test_create_local_secret_stores_ciphertext(
+async def test_create_multi_entry_secret_stores_each_value_encrypted(
     secrets_client: AsyncClient, mem_engine: AsyncEngine
 ) -> None:
     body = assert_ok(
-        await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY), status=201
+        await secrets_client.post("/api/v1/secrets", json=_MULTI_BODY), status=201
     )
     stored = await _db_secret(mem_engine, body["id"])
-    assert stored.value is not None
-    assert stored.value != "tok-123"
-    assert get_secret_cipher().decrypt(stored.value) == "tok-123"
+    cipher = get_secret_cipher()
+    assert stored.entries["AWS_ACCESS_KEY_ID"] != "AKIA1"
+    assert cipher.decrypt(stored.entries["AWS_ACCESS_KEY_ID"]) == "AKIA1"
+    assert cipher.decrypt(stored.entries["AWS_SECRET_ACCESS_KEY"]) == "sk-1"
 
 
-async def test_create_local_secret_without_value_returns_422(
+async def test_create_local_secret_without_entries_returns_422(
     secrets_client: AsyncClient,
 ) -> None:
     response = await secrets_client.post(
         "/api/v1/secrets", json={"name": "x", "type": "local"}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_local_secret_with_empty_entry_value_returns_422(
+    secrets_client: AsyncClient,
+) -> None:
+    """The keep-existing sentinel is a PATCH-only affordance; POST rejects it."""
+    response = await secrets_client.post(
+        "/api/v1/secrets", json={**_LOCAL_BODY, "entries": {"token": ""}}
     )
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
@@ -143,19 +175,19 @@ async def test_create_local_secret_with_vault_fields_returns_422(
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
-async def test_create_vault_secret_missing_key_returns_422(
+async def test_create_vault_secret_missing_path_returns_422(
     secrets_client: AsyncClient,
 ) -> None:
-    body = {k: v for k, v in _VAULT_BODY.items() if k != "vaultKey"}
+    body = {k: v for k, v in _VAULT_BODY.items() if k != "vaultPath"}
     response = await secrets_client.post("/api/v1/secrets", json=body)
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
 
-async def test_create_vault_secret_with_value_returns_422(
+async def test_create_vault_secret_with_entries_returns_422(
     secrets_client: AsyncClient,
 ) -> None:
     response = await secrets_client.post(
-        "/api/v1/secrets", json={**_VAULT_BODY, "value": "v"}
+        "/api/v1/secrets", json={**_VAULT_BODY, "entries": {"token": "v"}}
     )
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
@@ -165,6 +197,16 @@ async def test_create_secret_rejects_non_slug_name(
 ) -> None:
     response = await secrets_client.post(
         "/api/v1/secrets", json={**_LOCAL_BODY, "name": "has space"}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_secret_rejects_non_slug_entry_key(
+    secrets_client: AsyncClient,
+) -> None:
+    """A key with ``/`` would make ``${secret:NAME/KEY}`` ambiguous."""
+    response = await secrets_client.post(
+        "/api/v1/secrets", json={**_LOCAL_BODY, "entries": {"a/b": "v"}}
     )
     assert_err(response, code="VALIDATION_ERROR", status=422)
 
@@ -192,18 +234,19 @@ async def test_list_secrets_returns_created_without_values(
     await secrets_client.post("/api/v1/secrets", json=_VAULT_BODY)
     items = assert_ok(await secrets_client.get("/api/v1/secrets"))
     assert len(items) == 2
-    assert all("value" not in item for item in items)
+    assert all("entries" not in item for item in items)
 
 
-async def test_get_secret_returns_data_without_value(
+async def test_get_secret_returns_keys_without_values(
     secrets_client: AsyncClient,
 ) -> None:
     created = assert_ok(
-        await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY), status=201
+        await secrets_client.post("/api/v1/secrets", json=_MULTI_BODY), status=201
     )
     body = assert_ok(await secrets_client.get(f"/api/v1/secrets/{created['id']}"))
-    assert body["name"] == "github-token"
-    assert "value" not in body
+    assert body["name"] == "aws-credentials"
+    assert body["keys"] == ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+    assert "entries" not in body
 
 
 async def test_get_secret_unknown_id_returns_404(secrets_client: AsyncClient) -> None:
@@ -224,40 +267,103 @@ async def test_update_secret_rename(secrets_client: AsyncClient) -> None:
         )
     )
     assert body["name"] == "renamed"
-    assert "value" not in body
+    assert "entries" not in body
 
 
-async def test_update_secret_value_replaces_ciphertext(
+async def test_update_entries_replaces_ciphertext(
     secrets_client: AsyncClient, mem_engine: AsyncEngine
 ) -> None:
     created = assert_ok(
         await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY), status=201
     )
-    before = (await _db_secret(mem_engine, created["id"])).value
+    before = (await _db_secret(mem_engine, created["id"])).entries["token"]
     assert_ok(
         await secrets_client.patch(
-            f"/api/v1/secrets/{created['id']}", json={"value": "tok-456"}
+            f"/api/v1/secrets/{created['id']}", json={"entries": {"token": "tok-456"}}
         )
     )
     stored = await _db_secret(mem_engine, created["id"])
-    assert stored.value != before
-    assert stored.value is not None
-    assert get_secret_cipher().decrypt(stored.value) == "tok-456"
+    assert stored.entries["token"] != before
+    assert get_secret_cipher().decrypt(stored.entries["token"]) == "tok-456"
 
 
-async def test_update_secret_omitting_value_keeps_ciphertext(
+async def test_update_omitting_entries_keeps_the_stored_map(
     secrets_client: AsyncClient, mem_engine: AsyncEngine
 ) -> None:
     created = assert_ok(
-        await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY), status=201
+        await secrets_client.post("/api/v1/secrets", json=_MULTI_BODY), status=201
     )
-    before = (await _db_secret(mem_engine, created["id"])).value
+    before = dict((await _db_secret(mem_engine, created["id"])).entries)
     assert_ok(
         await secrets_client.patch(
             f"/api/v1/secrets/{created['id']}", json={"name": "renamed"}
         )
     )
-    assert (await _db_secret(mem_engine, created["id"])).value == before
+    assert (await _db_secret(mem_engine, created["id"])).entries == before
+
+
+async def test_update_entries_replaces_wholesale_dropping_missing_keys(
+    secrets_client: AsyncClient, mem_engine: AsyncEngine
+) -> None:
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_MULTI_BODY), status=201
+    )
+    body = assert_ok(
+        await secrets_client.patch(
+            f"/api/v1/secrets/{created['id']}",
+            json={"entries": {"AWS_ACCESS_KEY_ID": "AKIA2"}},
+        )
+    )
+    assert body["keys"] == ["AWS_ACCESS_KEY_ID"]
+    stored = await _db_secret(mem_engine, created["id"])
+    assert "AWS_SECRET_ACCESS_KEY" not in stored.entries
+
+
+async def test_update_empty_entry_value_keeps_the_stored_ciphertext(
+    secrets_client: AsyncClient, mem_engine: AsyncEngine
+) -> None:
+    """Blank means "keep it" — the only way to preserve a value never sent back."""
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_MULTI_BODY), status=201
+    )
+    before = dict((await _db_secret(mem_engine, created["id"])).entries)
+    assert_ok(
+        await secrets_client.patch(
+            f"/api/v1/secrets/{created['id']}",
+            json={
+                "entries": {"AWS_ACCESS_KEY_ID": "AKIA2", "AWS_SECRET_ACCESS_KEY": ""}
+            },
+        )
+    )
+    stored = await _db_secret(mem_engine, created["id"])
+    cipher = get_secret_cipher()
+    assert cipher.decrypt(stored.entries["AWS_ACCESS_KEY_ID"]) == "AKIA2"
+    assert stored.entries["AWS_SECRET_ACCESS_KEY"] == before["AWS_SECRET_ACCESS_KEY"]
+
+
+async def test_update_empty_value_for_a_new_key_returns_422(
+    secrets_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY), status=201
+    )
+    response = await secrets_client.patch(
+        f"/api/v1/secrets/{created['id']}",
+        json={"entries": {"token": "", "brand-new": ""}},
+    )
+    assert_err(response, code="INVALID_SECRET", status=422)
+
+
+async def test_update_clearing_every_entry_returns_422(
+    secrets_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY), status=201
+    )
+    response = await secrets_client.patch(
+        f"/api/v1/secrets/{created['id']}", json={"entries": {}}
+    )
+    assert_err(response, code="INVALID_SECRET", status=422)
 
 
 async def test_update_local_secret_with_vault_fields_returns_422(
@@ -272,19 +378,19 @@ async def test_update_local_secret_with_vault_fields_returns_422(
     assert_err(response, code="INVALID_SECRET", status=422)
 
 
-async def test_update_vault_secret_with_value_returns_422(
+async def test_update_vault_secret_with_entries_returns_422(
     secrets_client: AsyncClient,
 ) -> None:
     created = assert_ok(
         await secrets_client.post("/api/v1/secrets", json=_VAULT_BODY), status=201
     )
     response = await secrets_client.patch(
-        f"/api/v1/secrets/{created['id']}", json={"value": "v"}
+        f"/api/v1/secrets/{created['id']}", json={"entries": {"token": "v"}}
     )
     assert_err(response, code="INVALID_SECRET", status=422)
 
 
-async def test_update_switch_local_to_vault_clears_value(
+async def test_update_switch_local_to_vault_clears_entries(
     secrets_client: AsyncClient, mem_engine: AsyncEngine
 ) -> None:
     created = assert_ok(
@@ -293,16 +399,12 @@ async def test_update_switch_local_to_vault_clears_value(
     body = assert_ok(
         await secrets_client.patch(
             f"/api/v1/secrets/{created['id']}",
-            json={
-                "type": "vault",
-                "vaultMount": "secret",
-                "vaultPath": "p",
-                "vaultKey": "k",
-            },
+            json={"type": "vault", "vaultMount": "secret", "vaultPath": "p"},
         )
     )
     assert body["type"] == "vault"
-    assert (await _db_secret(mem_engine, created["id"])).value is None
+    assert body["keys"] == []
+    assert (await _db_secret(mem_engine, created["id"])).entries == {}
 
 
 async def test_update_switch_local_to_vault_missing_fields_returns_422(
@@ -312,8 +414,7 @@ async def test_update_switch_local_to_vault_missing_fields_returns_422(
         await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY), status=201
     )
     response = await secrets_client.patch(
-        f"/api/v1/secrets/{created['id']}",
-        json={"type": "vault", "vaultMount": "secret"},
+        f"/api/v1/secrets/{created['id']}", json={"type": "vault"}
     )
     assert_err(response, code="INVALID_SECRET", status=422)
 
@@ -327,19 +428,18 @@ async def test_update_switch_vault_to_local_clears_vault_fields(
     body = assert_ok(
         await secrets_client.patch(
             f"/api/v1/secrets/{created['id']}",
-            json={"type": "local", "value": "tok-789"},
+            json={"type": "local", "entries": {"token": "tok-789"}},
         )
     )
     assert body["type"] == "local"
     assert body["vaultMount"] is None
     assert body["vaultPath"] is None
-    assert body["vaultKey"] is None
+    assert body["keys"] == ["token"]
     stored = await _db_secret(mem_engine, created["id"])
-    assert stored.value is not None
-    assert get_secret_cipher().decrypt(stored.value) == "tok-789"
+    assert get_secret_cipher().decrypt(stored.entries["token"]) == "tok-789"
 
 
-async def test_update_switch_vault_to_local_without_value_returns_422(
+async def test_update_switch_vault_to_local_without_entries_returns_422(
     secrets_client: AsyncClient,
 ) -> None:
     created = assert_ok(

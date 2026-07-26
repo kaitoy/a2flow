@@ -17,7 +17,7 @@ Two transports exist, discriminated by ``transport``:
   :func:`mcp.client.stdio.get_default_environment` deems safe to inherit.
   ``args`` is passed as a list and never through a shell.
 
-``headers`` and ``env`` values may embed ``${secret:NAME}`` placeholders,
+``headers`` and ``env`` values may embed ``${secret:NAME/KEY}`` placeholders,
 resolved at connection time (see :mod:`infrastructure.secret_resolver`);
 anything else is stored in plaintext, which is acceptable for this app's
 local, single-operator deployment model.

@@ -111,7 +111,7 @@ class AgentSkillSyncService:
             ):
                 auth: tuple[str, str] | None = None
                 if skill.repo_auth_secret is not None:
-                    token = await self._resolver.resolve_value(skill.repo_auth_secret)
+                    token = await self._resolver.resolve_ref(skill.repo_auth_secret)
                     auth = (skill.repo_auth_username or _DEFAULT_GIT_USERNAME, token)
 
                 commit_sha = await self._skill_manager.clone(skill, auth=auth)

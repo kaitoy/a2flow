@@ -43,7 +43,7 @@ class McpRegistryEnvVar(BaseModel):
 
     The stdio counterpart of :class:`McpRegistryHeader`, and definitions in the
     same sense: a secret variable carries no value and must be filled in by the
-    operator (or pointed at a ``${secret:NAME}`` reference).
+    operator (or pointed at a ``${secret:NAME/KEY}`` reference).
     """
 
     model_config = _alias_config

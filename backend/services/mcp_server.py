@@ -39,7 +39,7 @@ class MCPServerService:
 
         Args:
             repo: Repository providing MCPServer persistence.
-            resolver: Resolver expanding ``${secret:NAME}`` placeholders in
+            resolver: Resolver expanding ``${secret:NAME/KEY}`` placeholders in
                 header values before connecting to a server.
         """
         self._repo = repo
@@ -176,7 +176,7 @@ class MCPServerService:
         Raises:
             NotFoundError: If no server exists with the given ID.
             McpConnectionError: If the server cannot be reached or launched.
-            SecretResolutionError: If a ``${secret:NAME}`` placeholder in the
+            SecretResolutionError: If a ``${secret:NAME/KEY}`` placeholder in the
                 server's headers or environment cannot be resolved.
         """
         server = await self.get(server_id)

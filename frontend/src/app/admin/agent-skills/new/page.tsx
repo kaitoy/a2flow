@@ -123,11 +123,12 @@ export default function NewAgentSkillPage() {
           >
             <Input
               id="repoAuthSecret"
-              placeholder="Secret name for private repos (optional)"
+              placeholder="name/key for private repos (optional)"
               {...register("repoAuthSecret")}
             />
             <p className="mt-1 text-xs text-on-surface-variant">
-              Name of a registered Secret used as the clone token for a private repository.
+              One entry of a registered Secret, written as name/key, used as the clone token for a
+              private repository.
             </p>
           </FormField>
 

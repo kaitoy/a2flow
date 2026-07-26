@@ -16,7 +16,11 @@ from tests._envelope import assert_err, assert_ok
 from tests._workflow import create_published_workflow
 
 _SKILL_BODY = {"name": "authz-skill", "repo_url": "https://github.com/x/y"}
-_SECRET_BODY = {"name": "authz-secret", "type": "local", "value": "s3cr3t"}
+_SECRET_BODY = {
+    "name": "authz-secret",
+    "type": "local",
+    "entries": {"token": "s3cr3t"},
+}
 _MCP_BODY = {"name": "authz-mcp", "url": "https://mcp.example.com/mcp"}
 _USER_BODY = {
     "username": "authzuser",
@@ -98,7 +102,7 @@ async def test_update_secret_requires_admin_role(workflow_client: AsyncClient) -
     )
     res = await workflow_client.patch(
         f"/api/v1/secrets/{created['id']}",
-        json={"value": "new"},
+        json={"entries": {"token": "new"}},
         headers=_roles("requester"),
     )
     assert_err(res, "FORBIDDEN", 403)

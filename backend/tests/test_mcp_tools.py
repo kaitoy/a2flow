@@ -342,7 +342,7 @@ async def test_call_forwards_a_stdio_server_as_a_stdio_connection(
         engine,
         command="npx",
         args=["-y", "files-mcp@0.3.0"],
-        env={"API_KEY": "${secret:files-key}"},
+        env={"API_KEY": "${secret:files-key/k}"},
     )
     ws_id = await _seed_session(engine)
     await _seed_task(engine, ws_id, bindings=[(server_id, "read_file")])
@@ -419,13 +419,13 @@ async def test_list_mcp_tools_aggregates_and_isolates_failures(
 
 
 async def _seed_local_secret(eng: AsyncEngine, name: str, value: str) -> None:
-    """Insert a local Secret whose value is encrypted with the process cipher."""
+    """Insert a local Secret holding one ``k`` entry encrypted with the process cipher."""
     async with AsyncSession(eng) as db:
         db.add(
             Secret(
                 name=name,
                 type=SecretType.local,
-                value=get_secret_cipher().encrypt(value),
+                entries={"k": get_secret_cipher().encrypt(value)},
                 tenant_id=DEFAULT_TEST_TENANT_ID,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
@@ -439,7 +439,7 @@ async def test_call_resolves_secret_placeholder_in_headers(
 ) -> None:
     await _seed_local_secret(engine, "api-token", "tok-xyz")
     server_id = await _seed_server(
-        engine, headers={"Authorization": "Bearer ${secret:api-token}"}
+        engine, headers={"Authorization": "Bearer ${secret:api-token/k}"}
     )
     ws_id = await _seed_session(engine)
     await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
@@ -467,7 +467,7 @@ async def test_call_with_missing_secret_returns_error(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     server_id = await _seed_server(
-        engine, headers={"Authorization": "Bearer ${secret:nope}"}
+        engine, headers={"Authorization": "Bearer ${secret:nope/k}"}
     )
     ws_id = await _seed_session(engine)
     await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
@@ -498,13 +498,13 @@ async def test_list_mcp_tools_isolates_secret_resolution_failure(
         engine,
         name="good",
         url="https://good/mcp",
-        headers={"Authorization": "Bearer ${secret:good-token}"},
+        headers={"Authorization": "Bearer ${secret:good-token/k}"},
     )
     bad_id = await _seed_server(
         engine,
         name="bad",
         url="https://bad/mcp",
-        headers={"Authorization": "Bearer ${secret:missing}"},
+        headers={"Authorization": "Bearer ${secret:missing/k}"},
     )
     seen: dict[str, Any] = {}
 

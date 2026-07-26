@@ -34,6 +34,11 @@ export interface KeyValueEditorProps {
   keyPlaceholder?: string;
   /** Placeholder for the value inputs. */
   valuePlaceholder?: string;
+  /**
+   * Input type for the value column. Use `"password"` for write-only values
+   * such as secret entries, so they are masked while being typed.
+   */
+  valueType?: "text" | "password";
 }
 
 /**
@@ -48,6 +53,7 @@ export function KeyValueEditor({
   onChange,
   keyPlaceholder = "Key",
   valuePlaceholder = "Value",
+  valueType = "text",
 }: KeyValueEditorProps) {
   function updateRow(index: number, patch: Partial<KeyValuePair>) {
     onChange(pairs.map((pair, i) => (i === index ? { ...pair, ...patch } : pair)));
@@ -73,6 +79,7 @@ export function KeyValueEditor({
           />
           <Input
             aria-label={`${name} value ${index + 1}`}
+            type={valueType}
             placeholder={valuePlaceholder}
             value={pair.value}
             onChange={(e) => updateRow(index, { value: e.target.value })}

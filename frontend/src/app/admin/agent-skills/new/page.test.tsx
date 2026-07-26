@@ -73,7 +73,7 @@ describe("NewAgentSkillPage", () => {
     render(<NewAgentSkillPage />);
     await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
-    await user.type(screen.getByLabelText(/auth secret/i), "git-token");
+    await user.type(screen.getByLabelText(/auth secret/i), "git-token/pat");
     await user.type(screen.getByLabelText(/auth username/i), "oauth2");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -82,7 +82,7 @@ describe("NewAgentSkillPage", () => {
         name: "Test",
         repoUrl: "https://x.com",
         description: null,
-        repoAuthSecret: "git-token",
+        repoAuthSecret: "git-token/pat",
         repoAuthUsername: "oauth2",
       })
     );

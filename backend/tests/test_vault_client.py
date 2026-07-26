@@ -36,7 +36,7 @@ async def test_token_auth_reads_value() -> None:
         return httpx.Response(200, json={"data": {"data": {"token": "s3cr3t"}}})
 
     client = VaultClient(_ADDR, TokenAuth("tok"), client=_mock_client(handler))
-    assert await client.read_kv2("secret", "myapp/github", "token") == "s3cr3t"
+    assert await client.read_kv2("secret", "myapp/github") == {"token": "s3cr3t"}
 
 
 async def test_non_200_raises_vault_error() -> None:
@@ -45,16 +45,17 @@ async def test_non_200_raises_vault_error() -> None:
 
     client = VaultClient(_ADDR, TokenAuth("tok"), client=_mock_client(handler))
     with pytest.raises(VaultError, match="404"):
-        await client.read_kv2("secret", "missing", "token")
+        await client.read_kv2("secret", "missing")
 
 
-async def test_missing_key_raises_vault_error() -> None:
+async def test_read_returns_every_key_at_the_path() -> None:
+    """The whole data object comes back; picking a key is the resolver's job."""
+
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"data": {"data": {"other": "v"}}})
+        return httpx.Response(200, json={"data": {"data": {"a": "1", "b": 2}}})
 
     client = VaultClient(_ADDR, TokenAuth("tok"), client=_mock_client(handler))
-    with pytest.raises(VaultError, match="not found"):
-        await client.read_kv2("secret", "myapp/github", "token")
+    assert await client.read_kv2("secret", "myapp/github") == {"a": "1", "b": "2"}
 
 
 async def test_network_error_raises_vault_error() -> None:
@@ -63,7 +64,7 @@ async def test_network_error_raises_vault_error() -> None:
 
     client = VaultClient(_ADDR, TokenAuth("tok"), client=_mock_client(handler))
     with pytest.raises(VaultError, match="request failed"):
-        await client.read_kv2("secret", "myapp/github", "token")
+        await client.read_kv2("secret", "myapp/github")
 
 
 # ---------- AppRole auth ----------
@@ -100,15 +101,15 @@ class _AppRoleHandler:
 async def test_approle_logs_in_then_reads() -> None:
     handler = _AppRoleHandler()
     client = VaultClient(_ADDR, AppRoleAuth("rid", "sid"), client=_mock_client(handler))
-    assert await client.read_kv2("secret", "p", "token") == "s3cr3t"
+    assert await client.read_kv2("secret", "p") == {"token": "s3cr3t"}
     assert handler.logins == 1
 
 
 async def test_approle_caches_token_across_reads() -> None:
     handler = _AppRoleHandler()
     client = VaultClient(_ADDR, AppRoleAuth("rid", "sid"), client=_mock_client(handler))
-    await client.read_kv2("secret", "p", "token")
-    await client.read_kv2("secret", "p", "token")
+    await client.read_kv2("secret", "p")
+    await client.read_kv2("secret", "p")
     assert handler.logins == 1
 
 
@@ -117,8 +118,8 @@ async def test_approle_relogs_in_after_lease_expiry() -> None:
     # read must trigger a fresh login.
     handler = _AppRoleHandler(lease_duration=1)
     client = VaultClient(_ADDR, AppRoleAuth("rid", "sid"), client=_mock_client(handler))
-    await client.read_kv2("secret", "p", "token")
-    await client.read_kv2("secret", "p", "token")
+    await client.read_kv2("secret", "p")
+    await client.read_kv2("secret", "p")
     assert handler.logins == 2
 
 
@@ -126,7 +127,7 @@ async def test_approle_retries_once_after_403() -> None:
     handler = _AppRoleHandler()
     handler.reject_tokens.add("tok-1")
     client = VaultClient(_ADDR, AppRoleAuth("rid", "sid"), client=_mock_client(handler))
-    assert await client.read_kv2("secret", "p", "token") == "s3cr3t"
+    assert await client.read_kv2("secret", "p") == {"token": "s3cr3t"}
     assert handler.logins == 2
     assert handler.reads == 2
 
@@ -137,7 +138,7 @@ async def test_approle_login_failure_raises_vault_error() -> None:
 
     client = VaultClient(_ADDR, AppRoleAuth("rid", "sid"), client=_mock_client(handler))
     with pytest.raises(VaultError, match="login failed"):
-        await client.read_kv2("secret", "p", "token")
+        await client.read_kv2("secret", "p")
 
 
 async def test_approle_login_without_token_raises_vault_error() -> None:
@@ -146,7 +147,7 @@ async def test_approle_login_without_token_raises_vault_error() -> None:
 
     client = VaultClient(_ADDR, AppRoleAuth("rid", "sid"), client=_mock_client(handler))
     with pytest.raises(VaultError, match="no client token"):
-        await client.read_kv2("secret", "p", "token")
+        await client.read_kv2("secret", "p")
 
 
 async def test_approle_uses_custom_login_mount() -> None:
@@ -165,5 +166,5 @@ async def test_approle_uses_custom_login_mount() -> None:
         AppRoleAuth("rid", "sid", mount="my-approle"),
         client=_mock_client(handler),
     )
-    await client.read_kv2("secret", "p", "token")
+    await client.read_kv2("secret", "p")
     assert seen == ["/v1/auth/my-approle/login"]

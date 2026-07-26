@@ -1,10 +1,10 @@
 """Use case service for Secret resources.
 
 Wraps the :class:`SecretRepository` with the two business rules the routers
-need: plaintext values are encrypted before they reach the repository (so the
-persistence layer never sees them), and partial updates are validated against
-the *merged* per-type shape — ``SecretCreate``'s validator covers POST bodies,
-but only the service can combine a PATCH body with the stored record.
+need: plaintext entry values are encrypted before they reach the repository (so
+the persistence layer never sees them), and partial updates are validated
+against the *merged* per-type shape — ``SecretCreate``'s validator covers POST
+bodies, but only the service can combine a PATCH body with the stored record.
 """
 
 from collections.abc import Sequence
@@ -17,7 +17,7 @@ from repositories.query import FilterSpec, SortSpec
 
 #: The Vault reference fields that must all be present on a ``vault`` secret
 #: and all be absent on a ``local`` one.
-_VAULT_FIELDS = ("vault_mount", "vault_path", "vault_key")
+_VAULT_FIELDS = ("vault_mount", "vault_path")
 
 
 class SecretService:
@@ -74,7 +74,7 @@ class SecretService:
         )
 
     async def create(self, data: SecretCreate, *, user_id: str) -> Secret:
-        """Create a new Secret, encrypting a local value before persistence.
+        """Create a new Secret, encrypting local entry values before persistence.
 
         Args:
             data: Fields for the new secret; shape already validated by
@@ -84,8 +84,11 @@ class SecretService:
         Returns:
             The created Secret.
         """
-        if data.type is SecretType.local and data.value is not None:
-            data = data.model_copy(update={"value": self._cipher.encrypt(data.value)})
+        if data.type is SecretType.local and data.entries:
+            encrypted = {
+                key: self._cipher.encrypt(value) for key, value in data.entries.items()
+            }
+            data = data.model_copy(update={"entries": encrypted})
         return await self._repo.create(data, user_id=user_id)
 
     async def update(
@@ -97,7 +100,11 @@ class SecretService:
         type. Fields explicitly sent in the PATCH must fit the effective
         type's shape; fields belonging to the *other* shape that merely remain
         on the stored record (a type switch) are cleared automatically.
-        Omitting ``value`` on a local secret keeps the stored ciphertext.
+
+        Omitting ``entries`` on a local secret keeps the stored map. Supplying
+        it replaces the map wholesale — keys left out are removed — with an
+        empty-string value meaning "keep the ciphertext already stored under
+        this key", the only way a client can preserve a value it never sees.
 
         Args:
             secret_id: Identifier of the secret to update.
@@ -114,7 +121,7 @@ class SecretService:
         """
         existing = await self.get(secret_id)
         effective_type = data.type or existing.type
-        updates: dict[str, str | None] = {}
+        updates: dict[str, str | dict[str, str] | None] = {}
 
         provided_vault = [
             field for field in _VAULT_FIELDS if getattr(data, field) is not None
@@ -122,17 +129,17 @@ class SecretService:
         if effective_type is SecretType.local:
             if provided_vault:
                 raise SecretValidationError("A local secret must not set Vault fields")
-            if data.value is not None:
-                updates["value"] = self._cipher.encrypt(data.value)
+            if data.entries is not None:
+                updates["entries"] = self._merge_entries(data.entries, existing)
             elif existing.type is not SecretType.local:
                 raise SecretValidationError(
-                    "Switching to a local secret requires a value"
+                    "Switching to a local secret requires at least one entry"
                 )
             if existing.type is not SecretType.local:
                 updates.update(dict.fromkeys(_VAULT_FIELDS))
         else:
-            if data.value is not None:
-                raise SecretValidationError("A vault secret must not set a value")
+            if data.entries:
+                raise SecretValidationError("A vault secret must not set entries")
             for field in _VAULT_FIELDS:
                 effective = getattr(data, field) or (
                     getattr(existing, field)
@@ -141,10 +148,10 @@ class SecretService:
                 )
                 if effective is None:
                     raise SecretValidationError(
-                        "A vault secret requires vaultMount, vaultPath, and vaultKey"
+                        "A vault secret requires vaultMount and vaultPath"
                     )
             if existing.type is not SecretType.vault:
-                updates["value"] = None
+                updates["entries"] = {}
 
         if updates:
             data = data.model_copy(update=updates)
@@ -163,3 +170,33 @@ class SecretService:
             NotFoundError: If no secret exists with the given ID.
         """
         await self._repo.delete(secret_id)
+
+    def _merge_entries(
+        self, submitted: dict[str, str], existing: Secret
+    ) -> dict[str, str]:
+        """Build the replacement entry map, encrypting every new value.
+
+        Args:
+            submitted: The plaintext map from the PATCH body, where an empty
+                value means "keep the stored ciphertext for this key".
+            existing: The stored secret supplying those retained ciphertexts.
+
+        Returns:
+            The full replacement map of key to ciphertext.
+
+        Raises:
+            SecretValidationError: If the result would be empty, or a key with
+                an empty value has no stored ciphertext to keep.
+        """
+        if not submitted:
+            raise SecretValidationError("A local secret requires at least one entry")
+        stored = existing.entries if existing.type is SecretType.local else {}
+        merged: dict[str, str] = {}
+        for key, value in submitted.items():
+            if value == "":
+                if key not in stored:
+                    raise SecretValidationError("A new entry requires a value")
+                merged[key] = stored[key]
+            else:
+                merged[key] = self._cipher.encrypt(value)
+        return merged

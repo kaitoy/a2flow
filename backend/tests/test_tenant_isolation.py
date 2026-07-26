@@ -105,7 +105,9 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
     secrets = SqlSecretRepository(db, tenant_id=tenant_id)
     secret = await secrets.create(
         SecretCreate(
-            name=f"secret-{suffix}", type=SecretType.local, value="ciphertext"
+            name=f"secret-{suffix}",
+            type=SecretType.local,
+            entries={"token": "ciphertext"},
         ),
         user_id="owner",
     )

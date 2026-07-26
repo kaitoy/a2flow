@@ -41,9 +41,11 @@ const STATIC_COLUMNS: ColumnDef<Secret>[] = [
     header: "Reference",
     cell: (s) =>
       s.type === "vault" ? (
-        `${s.vaultMount}/${s.vaultPath} · ${s.vaultKey}`
+        `${s.vaultMount}/${s.vaultPath}`
       ) : (
-        <span className="text-on-surface-variant">Encrypted value</span>
+        <span className="text-on-surface-variant">
+          {(s.keys ?? []).length === 1 ? "1 entry" : `${(s.keys ?? []).length} entries`}
+        </span>
       ),
   },
   {

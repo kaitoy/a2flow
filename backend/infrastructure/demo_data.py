@@ -5,9 +5,10 @@ this module keeps a small, self-contained example of everything the
 approval-gated "launch an EC2 instance" workflow needs, all inside the
 seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
 
-* two Secrets holding the AWS access key id / secret access key,
+* one Secret holding the AWS access key id and secret access key as two
+  entries,
 * one stdio MCPServer launching the AWS API MCP server through ``uvx``,
-  referencing those secrets from its ``env`` via ``${secret:NAME}``,
+  referencing those entries from its ``env`` via ``${secret:NAME/KEY}``,
 * one AgentSkill pointing at ``sample_skills/aws-ec2-launch`` in this
   repository,
 * two Users: a ``demo-approver`` (the manager the skill asks for approval)
@@ -57,11 +58,8 @@ DEMO_APPROVER_USER_ID = "00000000-0000-0000-0000-00000000d001"
 #: Fixed identifier of the demo ``requester`` user (who executes the workflow).
 DEMO_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d002"
 
-#: Fixed identifier of the demo Secret holding the AWS access key id.
-DEMO_ACCESS_KEY_SECRET_ID = "00000000-0000-0000-0000-00000000d101"
-
-#: Fixed identifier of the demo Secret holding the AWS secret access key.
-DEMO_SECRET_KEY_SECRET_ID = "00000000-0000-0000-0000-00000000d102"
+#: Fixed identifier of the demo Secret holding the AWS credentials.
+DEMO_AWS_SECRET_ID = "00000000-0000-0000-0000-00000000d101"
 
 #: Fixed identifier of the demo AWS API MCP server.
 DEMO_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d201"
@@ -69,12 +67,16 @@ DEMO_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d201"
 #: Fixed identifier of the demo ``aws-ec2-launch`` agent skill.
 DEMO_AGENT_SKILL_ID = "00000000-0000-0000-0000-00000000d301"
 
-#: Name of the demo Secret holding the AWS access key id. Also embedded in the
-#: demo MCP server's ``env`` as a ``${secret:NAME}`` placeholder.
-DEMO_ACCESS_KEY_SECRET_NAME = "demo-aws-access-key-id"
+#: Name of the demo Secret holding both AWS credentials. Its two entries are
+#: embedded in the demo MCP server's ``env`` as ``${secret:NAME/KEY}``
+#: placeholders.
+DEMO_AWS_SECRET_NAME = "demo-aws-credentials"
 
-#: Name of the demo Secret holding the AWS secret access key.
-DEMO_SECRET_KEY_SECRET_NAME = "demo-aws-secret-access-key"
+#: Entry key of the AWS access key id within :data:`DEMO_AWS_SECRET_NAME`.
+DEMO_ACCESS_KEY_ENTRY_KEY = "AWS_ACCESS_KEY_ID"
+
+#: Entry key of the AWS secret access key within :data:`DEMO_AWS_SECRET_NAME`.
+DEMO_SECRET_KEY_ENTRY_KEY = "AWS_SECRET_ACCESS_KEY"
 
 #: Name of the demo MCP server as shown in the admin UI.
 DEMO_MCP_SERVER_NAME = "Demo AWS API"
@@ -203,10 +205,7 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     )
     await _delete_demo_row(session, MCPServer, DEMO_MCP_SERVER_ID, label="MCP server")
     await _delete_demo_row(
-        session, Secret, DEMO_ACCESS_KEY_SECRET_ID, label="AWS access key secret"
-    )
-    await _delete_demo_row(
-        session, Secret, DEMO_SECRET_KEY_SECRET_ID, label="AWS secret key secret"
+        session, Secret, DEMO_AWS_SECRET_ID, label="AWS credentials secret"
     )
     for spec in _DEMO_USERS:
         await _delete_demo_user(session, spec.id)
@@ -366,57 +365,51 @@ async def _delete_demo_user(session: AsyncSession, user_id: str) -> None:
 
 
 async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
-    """Create the two demo AWS credential secrets.
+    """Create the demo AWS credentials secret.
 
-    Values come from ``DEMO_AWS_ACCESS_KEY_ID`` / ``DEMO_AWS_SECRET_ACCESS_KEY``
-    when set, so a fully working demo is one restart away, and fall back to a
-    placeholder otherwise. They are stored as Fernet ciphertext, the same as
-    any secret created through the API — the encryption lives in the service
-    layer, which this out-of-request caller cannot use, so the cipher is
-    applied directly here.
+    Both credentials live in a single secret as two entries, the way a Vault KV
+    path holds several keys. Values come from ``DEMO_AWS_ACCESS_KEY_ID`` /
+    ``DEMO_AWS_SECRET_ACCESS_KEY`` when set, so a fully working demo is one
+    restart away, and fall back to a placeholder otherwise. They are stored as
+    Fernet ciphertext, the same as any secret created through the API — the
+    encryption lives in the service layer, which this out-of-request caller
+    cannot use, so the cipher is applied directly here.
 
     Args:
         session: Database session used to read and insert secrets.
-        tenant_id: Id of the ``Default`` tenant the secrets belong to.
+        tenant_id: Id of the ``Default`` tenant the secret belongs to.
     """
+    if await session.get(Secret, DEMO_AWS_SECRET_ID) is not None:
+        return
     settings = get_settings()
-    entries = (
-        (
-            DEMO_ACCESS_KEY_SECRET_ID,
-            DEMO_ACCESS_KEY_SECRET_NAME,
-            settings.demo_aws_access_key_id,
-        ),
-        (
-            DEMO_SECRET_KEY_SECRET_ID,
-            DEMO_SECRET_KEY_SECRET_NAME,
-            settings.demo_aws_secret_access_key,
-        ),
-    )
-    for secret_id, name, configured in entries:
-        if await session.get(Secret, secret_id) is not None:
-            continue
-        await _insert(
-            session,
-            Secret(
-                id=secret_id,
-                tenant_id=tenant_id,
-                name=name,
-                type=SecretType.local,
-                value=get_secret_cipher().encrypt(
-                    configured or _PLACEHOLDER_SECRET_VALUE
+    cipher = get_secret_cipher()
+    await _insert(
+        session,
+        Secret(
+            id=DEMO_AWS_SECRET_ID,
+            tenant_id=tenant_id,
+            name=DEMO_AWS_SECRET_NAME,
+            type=SecretType.local,
+            entries={
+                DEMO_ACCESS_KEY_ENTRY_KEY: cipher.encrypt(
+                    settings.demo_aws_access_key_id or _PLACEHOLDER_SECRET_VALUE
                 ),
-                created_by=SYSTEM_USER_ID,
-                updated_by=SYSTEM_USER_ID,
-            ),
-            label=f"secret '{name}'",
-        )
+                DEMO_SECRET_KEY_ENTRY_KEY: cipher.encrypt(
+                    settings.demo_aws_secret_access_key or _PLACEHOLDER_SECRET_VALUE
+                ),
+            },
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"secret '{DEMO_AWS_SECRET_NAME}'",
+    )
 
 
 async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
     """Create the demo AWS API MCP server.
 
     Registered as a ``stdio`` server launched with ``uvx``, which the backend
-    image already provides. Its AWS credentials are ``${secret:NAME}``
+    image already provides. Its AWS credentials are ``${secret:NAME/KEY}``
     placeholders resolved at connection time by
     :class:`infrastructure.secret_resolver.SecretResolver`, so the plaintext
     never lands in the ``mcp_servers`` row.
@@ -439,8 +432,12 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
             headers={},
             env={
                 "AWS_REGION": get_settings().demo_aws_region,
-                "AWS_ACCESS_KEY_ID": f"${{secret:{DEMO_ACCESS_KEY_SECRET_NAME}}}",
-                "AWS_SECRET_ACCESS_KEY": f"${{secret:{DEMO_SECRET_KEY_SECRET_NAME}}}",
+                "AWS_ACCESS_KEY_ID": (
+                    f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_ACCESS_KEY_ENTRY_KEY}}}"
+                ),
+                "AWS_SECRET_ACCESS_KEY": (
+                    f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_SECRET_KEY_ENTRY_KEY}}}"
+                ),
             },
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,

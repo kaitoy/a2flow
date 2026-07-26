@@ -5,49 +5,32 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { KeyRound } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
+import { useForm } from "react-hook-form";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
-import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import {
+  buildSecretFormSchema,
+  emptySecretFormValues,
+  SecretFields,
+  type SecretFormValues,
+  toSecretBody,
+} from "@/components/admin/secret-fields";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { zSecretCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { deleteSecret, getSecret, type SecretUpdate, updateSecret } from "@/lib/api";
+import { deleteSecret, getSecret, updateSecret } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
-// Like the create form, per-type fields are plain strings validated here. The
-// value is left blank to keep the stored one (the API never returns it), so
-// only the Vault reference fields are client-required; the backend rejects a
-// type switch to local without a value.
-const schema = z
-  .object({
-    name: zSecretCreate.shape.name,
-    type: zSecretCreate.shape.type,
-    value: z.string().max(8192),
-    vaultMount: z.string().max(256),
-    vaultPath: z.string().max(1024),
-    vaultKey: z.string().max(256),
-  })
-  .superRefine((v, ctx) => {
-    if (v.type === "vault") {
-      for (const field of ["vaultMount", "vaultPath", "vaultKey"] as const) {
-        if (v[field] === "") {
-          ctx.addIssue({ code: "custom", path: [field], message: "Required for a Vault secret" });
-        }
-      }
-    }
-  });
-
-type FormValues = z.infer<typeof schema>;
+/**
+ * Editing allows blank entry values: the API never returns a stored value, so a
+ * blank one is the sentinel that keeps it.
+ */
+const schema = buildSecretFormSchema(false);
 
 export default function EditSecretPage() {
   const { secretId } = useParams<{ secretId: string }>();
@@ -69,14 +52,7 @@ export default function EditSecretPage() {
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: {
-      name: "",
-      type: "local" as const,
-      value: "",
-      vaultMount: "",
-      vaultPath: "",
-      vaultKey: "",
-    },
+    defaultValues: emptySecretFormValues(),
   });
   const type = watch("type");
 
@@ -86,10 +62,11 @@ export default function EditSecretPage() {
         reset({
           name: secret.name,
           type: secret.type,
-          value: "",
+          // Values are write-only, so each stored key comes back with a blank
+          // value the user may either leave (keeping it) or overwrite.
+          entries: (secret.keys ?? []).map((key) => ({ key, value: "" })),
           vaultMount: secret.vaultMount ?? "",
           vaultPath: secret.vaultPath ?? "",
-          vaultKey: secret.vaultKey ?? "",
         });
         setAudit({
           createdBy: secret.createdBy,
@@ -104,25 +81,10 @@ export default function EditSecretPage() {
       .finally(() => setLoading(false));
   }, [secretId, reset]);
 
-  async function onSubmit(values: FormValues) {
-    const body: SecretUpdate =
-      values.type === "local"
-        ? {
-            name: values.name,
-            type: "local",
-            // A blank value keeps the stored one.
-            ...(values.value === "" ? {} : { value: values.value }),
-          }
-        : {
-            name: values.name,
-            type: "vault",
-            vaultMount: values.vaultMount,
-            vaultPath: values.vaultPath,
-            vaultKey: values.vaultKey,
-          };
+  async function onSubmit(values: SecretFormValues) {
     try {
       await save.run(async () => {
-        await updateSecret(secretId, body);
+        await updateSecret(secretId, toSecretBody(values));
         dispatch(showToast({ message: "Secret updated" }));
         router.push("/admin/secrets");
       });
@@ -173,66 +135,7 @@ export default function EditSecretPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            <Input id="name" {...register("name")} />
-          </FormField>
-
-          <FormField htmlFor="type" label="Type" required>
-            <Controller
-              control={control}
-              name="type"
-              render={({ field }) => (
-                <SegmentedControl
-                  aria-label="Secret type"
-                  options={[
-                    { value: "local", label: "Local (encrypted)" },
-                    { value: "vault", label: "HashiCorp Vault" },
-                  ]}
-                  value={field.value}
-                  onChange={field.onChange}
-                />
-              )}
-            />
-          </FormField>
-
-          {type === "local" ? (
-            <FormField htmlFor="value" label="Value" error={errors.value?.message}>
-              <Input
-                id="value"
-                type="password"
-                autoComplete="off"
-                placeholder="Leave blank to keep the current value"
-                {...register("value")}
-              />
-            </FormField>
-          ) : (
-            <>
-              <FormField
-                htmlFor="vaultMount"
-                label="Vault Mount"
-                required
-                error={errors.vaultMount?.message}
-              >
-                <Input id="vaultMount" placeholder="secret" {...register("vaultMount")} />
-              </FormField>
-              <FormField
-                htmlFor="vaultPath"
-                label="Vault Path"
-                required
-                error={errors.vaultPath?.message}
-              >
-                <Input id="vaultPath" placeholder="myapp/github" {...register("vaultPath")} />
-              </FormField>
-              <FormField
-                htmlFor="vaultKey"
-                label="Vault Key"
-                required
-                error={errors.vaultKey?.message}
-              >
-                <Input id="vaultKey" placeholder="token" {...register("vaultKey")} />
-              </FormField>
-            </>
-          )}
+          <SecretFields register={register} control={control} errors={errors} type={type} />
 
           <div className="flex gap-2">
             <Button

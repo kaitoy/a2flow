@@ -58,7 +58,7 @@ def _service(
     )
 
     resolver = MagicMock()
-    resolver.resolve_value = resolve or AsyncMock(return_value="tok-123")
+    resolver.resolve_ref = resolve or AsyncMock(return_value="tok-123")
 
     store = MagicMock()
     store.clone = clone or AsyncMock(return_value=_SHA)
@@ -151,7 +151,7 @@ async def test_unresolvable_auth_secret_is_recorded_as_a_failure() -> None:
         side_effect=SecretResolutionError("git-token", "no such secret")
     )
     service, skills, store = _service(
-        _skill(repo_auth_secret="git-token"), resolve=resolve
+        _skill(repo_auth_secret="git-token/token"), resolve=resolve
     )
 
     await service.sync("skill-1", user_id="alice")
@@ -161,7 +161,7 @@ async def test_unresolvable_auth_secret_is_recorded_as_a_failure() -> None:
 
 
 async def test_auth_secret_is_resolved_into_basic_auth_credentials() -> None:
-    service, _skills, store = _service(_skill(repo_auth_secret="git-token"))
+    service, _skills, store = _service(_skill(repo_auth_secret="git-token/token"))
 
     await service.sync("skill-1", user_id="alice")
 
@@ -170,7 +170,7 @@ async def test_auth_secret_is_resolved_into_basic_auth_credentials() -> None:
 
 async def test_explicit_auth_username_overrides_the_default() -> None:
     service, _skills, store = _service(
-        _skill(repo_auth_secret="git-token", repo_auth_username="git")
+        _skill(repo_auth_secret="git-token/token", repo_auth_username="git")
     )
 
     await service.sync("skill-1", user_id="alice")

@@ -386,14 +386,14 @@ async def test_list_stdio_server_tools_uses_a_stdio_connection(
     assert_ok(
         await mcp_client.post(
             "/api/v1/secrets",
-            json={"name": "files-key", "type": "local", "value": "tok-xyz"},
+            json={"name": "files-key", "type": "local", "entries": {"k": "tok-xyz"}},
         ),
         status=201,
     )
     created = assert_ok(
         await mcp_client.post(
             "/api/v1/mcp-servers",
-            json={**_STDIO_BODY, "env": {"API_KEY": "${secret:files-key}"}},
+            json={**_STDIO_BODY, "env": {"API_KEY": "${secret:files-key/k}"}},
         ),
         status=201,
     )
@@ -562,11 +562,11 @@ async def test_list_server_tools_unknown_id_returns_404(
 async def test_list_server_tools_resolves_secret_placeholders(
     mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """${secret:NAME} placeholders in headers are expanded before connecting."""
+    """${secret:NAME/KEY} placeholders in headers are expanded before connecting."""
     assert_ok(
         await mcp_client.post(
             "/api/v1/secrets",
-            json={"name": "api-token", "type": "local", "value": "tok-xyz"},
+            json={"name": "api-token", "type": "local", "entries": {"k": "tok-xyz"}},
         ),
         status=201,
     )
@@ -576,7 +576,7 @@ async def test_list_server_tools_resolves_secret_placeholders(
             json={
                 "name": "with-secret",
                 "url": "https://mcp.example.com/mcp",
-                "headers": {"Authorization": "Bearer ${secret:api-token}"},
+                "headers": {"Authorization": "Bearer ${secret:api-token/k}"},
             },
         ),
         status=201,
@@ -606,7 +606,7 @@ async def test_list_server_tools_missing_secret_returns_502(
             json={
                 "name": "dangling",
                 "url": "https://mcp.example.com/mcp",
-                "headers": {"Authorization": "Bearer ${secret:nope}"},
+                "headers": {"Authorization": "Bearer ${secret:nope/k}"},
             },
         ),
         status=201,

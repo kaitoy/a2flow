@@ -23,10 +23,10 @@ describe("SecretsPage", () => {
     render(<SecretsPage />);
     await waitFor(() => expect(screen.getByText("github-token")).toBeInTheDocument());
     expect(screen.getByText("Local")).toBeInTheDocument();
-    expect(screen.getByText("Encrypted value")).toBeInTheDocument();
+    expect(screen.getByText("1 entry")).toBeInTheDocument();
     expect(screen.getByText("vault-token")).toBeInTheDocument();
     expect(screen.getByText("Vault")).toBeInTheDocument();
-    expect(screen.getByText("secret/myapp/github · token")).toBeInTheDocument();
+    expect(screen.getByText("secret/myapp/github")).toBeInTheDocument();
   });
 
   it("name links to the edit page", async () => {

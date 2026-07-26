@@ -9,7 +9,7 @@ Design notes:
 
 * **Connection specs, not transports.** Callers build an :data:`McpConnection`
   once — normally via :func:`resolve_connection`, which also expands
-  ``${secret:NAME}`` placeholders — and hand it to :func:`list_server_tools` /
+  ``${secret:NAME/KEY}`` placeholders — and hand it to :func:`list_server_tools` /
   :func:`call_server_tool`. Nothing outside this module branches on transport.
 * **One connection per operation.** Both ``streamablehttp_client`` and
   ``stdio_client`` run an anyio task group that must be entered and exited in
@@ -63,7 +63,7 @@ class HttpConnection:
     Attributes:
         url: The server's streamable HTTP endpoint.
         headers: Extra HTTP headers sent with every request, with any
-            ``${secret:NAME}`` placeholders already resolved.
+            ``${secret:NAME/KEY}`` placeholders already resolved.
     """
 
     url: str
@@ -91,7 +91,7 @@ class StdioConnection:
             interpreted by a shell.
         env: Environment variables merged over the small safe-to-inherit set
             :func:`mcp.client.stdio.get_default_environment` provides, with any
-            ``${secret:NAME}`` placeholders already resolved. The backend's own
+            ``${secret:NAME/KEY}`` placeholders already resolved. The backend's own
             environment (API keys, ``DB_URL``, …) is *not* inherited.
     """
 
@@ -124,7 +124,7 @@ async def resolve_connection(
 
     Args:
         server: The registered MCP server row.
-        resolver: Resolver expanding ``${secret:NAME}`` placeholders in the
+        resolver: Resolver expanding ``${secret:NAME/KEY}`` placeholders in the
             server's header (remote) or environment (stdio) values.
 
     Returns:

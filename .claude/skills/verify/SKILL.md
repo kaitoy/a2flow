@@ -51,6 +51,15 @@ Keep `SKILLS_DIR` **short**. A skill clone writes
 a deep root pushes that past Windows' 260-char `MAX_PATH`; dulwich then fails
 with `WinError 3` mid-clone.
 
+The scratchpad path is itself deep, so `"$sp\st\sk"` above only survives a
+shallow clone target like `octocat/Hello-World`. Adding `$env:DEMO_DATA = "true"`
+clones **this** repository, whose own paths run to
+`frontend/src/app/admin/agent-skills/[skillId]/generate-workflow/page.test.tsx`,
+and that overflows — the clone dies with `FileNotFoundError` (not `WinError 3`)
+and the demo skill lands in `syncStatus: failed`. Everything else in the demo
+dataset still seeds, so ignore it unless you need the skill; otherwise point
+`SKILLS_DIR` at a short root such as `C:\a2f\sk`.
+
 Frontend (only needed for UI work):
 
 ```powershell
@@ -74,7 +83,7 @@ Auth is a session cookie plus a CSRF header echoing the `a2flow_csrf` cookie:
 ```bash
 LOGIN=$(curl -s -c /tmp/cj.txt -X POST http://127.0.0.1:8099/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"verify-pass-123"}')
+  -d '{"username":"admin","password":"verify-pass-123","tenantName":"default"}')
 CSRF=$(grep a2flow_csrf /tmp/cj.txt | awk '{print $7}')
 ADMIN_ID=$(echo "$LOGIN" | python -c "import json,sys; print(json.load(sys.stdin)['data']['id'])")
 
@@ -92,6 +101,14 @@ curl -s -b /tmp/cj.txt -H "X-CSRF-Token: $CSRF" -X POST \
   -H 'Content-Type: application/json' \
   -d '{"name":"s","repoUrl":"https://github.com/octocat/Hello-World","repoPath":""}'
 ```
+
+`tenantName` is **required** for `admin`, and omitting it is the one failure
+that looks like a wrong password: a tenant-scoped username is unique only
+within its tenant, so `AuthService.login` cannot resolve it without the tenant
+and answers the same generic `401 UNAUTHENTICATED` / "Invalid username or
+password" it gives for a bad password. `default` is the seeded tenant's name
+(the kebab-case identifier, not the `Default` display name). Omit `tenantName`
+only for a platform-scoped user such as `root`.
 
 `admin` (`ADMIN_PASSWORD`) is the seeded Default-tenant account — it's the
 right login for any tenant-scoped route like the one above. Don't switch this
@@ -116,5 +133,12 @@ takes ~4s.
 - **GitHub answers 401, not 404, for a repository that does not exist** (it
   refuses to leak existence). So the "bad URL" path is an auth failure, not a
   not-found — worth remembering when picking a repo to force a clone failure.
+- **MCP server URLs are DNS-resolved at create time** by the SSRF check in
+  `infrastructure/url_safety.py`, so a made-up host like
+  `https://mcp.invalid.example/mcp` is rejected with `422 VALIDATION_ERROR`
+  before the row exists. To reach the *connect* path (and whatever runs before
+  it, e.g. `${secret:…}` resolution), register a resolvable public host such as
+  `https://example.com/mcp`: it passes validation, then fails the actual
+  connection with `502 MCP_UNREACHABLE`.
 - The Chrome extension may refuse `localhost:<port>`; if browser automation
   returns `Permission denied by user`, the UI cannot be driven from here.

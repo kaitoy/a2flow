@@ -132,9 +132,9 @@ export interface McpServerFieldsProps {
 function SecretReferenceHint() {
   return (
     <p className="mt-1 text-xs text-on-surface-variant">
-      Values may reference registered secrets as{" "}
+      Values may reference one entry of a registered secret as{" "}
       {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
-      {"${secret:name}"}, resolved when connecting.
+      {"${secret:name/key}"}, resolved when connecting.
     </p>
   );
 }
