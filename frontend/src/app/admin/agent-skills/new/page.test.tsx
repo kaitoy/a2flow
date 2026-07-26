@@ -47,7 +47,7 @@ describe("NewAgentSkillPage", () => {
     await waitFor(() => expect(createSpy).toHaveBeenCalled());
   });
 
-  it("submits auth password and username when provided", async () => {
+  it("submits the picked secret reference and the auth username", async () => {
     const user = userEvent.setup();
     let receivedBody: unknown;
     server.use(
@@ -73,7 +73,9 @@ describe("NewAgentSkillPage", () => {
     render(<NewAgentSkillPage />);
     await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
-    await user.type(screen.getByLabelText(/auth password/i), "git-token/pat");
+    // github-token holds a single entry, so choosing it completes the reference.
+    await user.click(screen.getByRole("combobox", { name: "Auth Password" }));
+    await user.click(await screen.findByRole("option", { name: "github-token" }));
     await user.type(screen.getByLabelText(/auth username/i), "oauth2");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -82,7 +84,7 @@ describe("NewAgentSkillPage", () => {
         name: "Test",
         repoUrl: "https://x.com",
         description: null,
-        repoAuthPassword: "git-token/pat",
+        repoAuthPassword: "github-token/token",
         repoAuthUsername: "oauth2",
       })
     );

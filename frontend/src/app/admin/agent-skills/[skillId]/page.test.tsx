@@ -64,25 +64,36 @@ describe("EditAgentSkillPage", () => {
     await waitFor(() => expect(patchSpy).toHaveBeenCalled());
   });
 
-  it("prefills auth fields and sends null when cleared", async () => {
+  it("prefills the secret picker and sends null when the reference is cleared", async () => {
     setup();
     server.use(
-      http.get("http://localhost:8000/api/v1/agent-skills/:skillId", () =>
-        envelope({ ...FULL_SKILL, repoAuthPassword: "git-token/pat", repoAuthUsername: "oauth2" })
+      http.get(SKILL_URL, () =>
+        envelope({
+          ...FULL_SKILL,
+          repoAuthPassword: "github-token/token",
+          repoAuthUsername: "oauth2",
+        })
       )
     );
     let receivedBody: unknown;
     server.use(
-      http.patch("http://localhost:8000/api/v1/agent-skills/:skillId", async ({ request }) => {
+      http.patch(SKILL_URL, async ({ request }) => {
         receivedBody = await request.json();
         return envelope(FULL_SKILL);
       })
     );
 
     render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
-    await waitFor(() => expect(screen.getByDisplayValue("git-token/pat")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Auth Password" })).toHaveTextContent(
+        "github-token"
+      )
+    );
+    expect(screen.getByRole("combobox", { name: "Entry Key" })).toHaveTextContent("token");
     expect(screen.getByDisplayValue("oauth2")).toBeInTheDocument();
-    await userEvent.clear(screen.getByLabelText(/auth password/i));
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Auth Password" }));
+    await userEvent.click(await screen.findByRole("option", { name: "None" }));
     await userEvent.clear(screen.getByLabelText(/auth username/i));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -96,6 +107,26 @@ describe("EditAgentSkillPage", () => {
         repoAuthUsername: null,
       })
     );
+  });
+
+  it("keeps a reference whose secret was deleted, and saves it unchanged", async () => {
+    setup();
+    server.use(
+      http.get(SKILL_URL, () => envelope({ ...FULL_SKILL, repoAuthPassword: "gone/pat" }))
+    );
+    let receivedBody: unknown;
+    server.use(
+      http.patch(SKILL_URL, async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope(FULL_SKILL);
+      })
+    );
+
+    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    expect(await screen.findByText(/no secret named "gone" is registered/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(receivedBody).toMatchObject({ repoAuthPassword: "gone/pat" }));
   });
 
   it("navigates to list after save", async () => {

@@ -8,8 +8,11 @@ plaintext value, used by every consumer:
   values (stdio) before connecting, on behalf of
   :class:`services.mcp_server.MCPServerService` and the agent proxy tools in
   :mod:`infrastructure.mcp_tools`.
-* :class:`services.workflow.WorkflowService` resolves an AgentSkill's
-  ``repo_auth_password`` (a bare ``NAME/KEY`` reference) before cloning.
+* :class:`services.agent_skill_sync.AgentSkillSyncService` resolves an
+  AgentSkill's ``repo_auth_password`` (a bare ``NAME/KEY`` reference) before
+  cloning.
+* :class:`services.secret.SecretService` lists a secret's entry keys — without
+  any value — so the admin UI can offer them as a picker.
 
 The module lives in the infrastructure layer (not ``services``) because
 :mod:`infrastructure.mcp_tools` needs it: an infrastructure module importing
@@ -169,6 +172,28 @@ class SecretResolver:
         """
         return {key: await self.resolve_text(value) for key, value in values.items()}
 
+    async def list_keys(self, secret: Secret) -> list[str]:
+        """Return the sorted entry keys of a secret, exposing no value.
+
+        ``local`` keys are read straight off the stored map (they are kept in
+        plaintext precisely so listing them decrypts nothing); ``vault`` keys
+        need a live read of the KV v2 path, since a Secret row records only the
+        path, never the keys living at it.
+
+        Args:
+            secret: The secret whose entry keys are wanted.
+
+        Returns:
+            The entry keys in sorted order.
+
+        Raises:
+            SecretResolutionError: If a ``vault`` secret's path cannot be read
+                (Vault not configured, reference incomplete, or the read fails).
+        """
+        if secret.type is SecretType.local:
+            return sorted(secret.entries)
+        return sorted(await self._read_vault_data(secret))
+
     async def resolve_headers(self, headers: dict[str, str]) -> dict[str, str]:
         """Resolve placeholders in every value of a header mapping.
 
@@ -218,8 +243,32 @@ class SecretResolver:
             The value fetched from Vault.
 
         Raises:
+            SecretResolutionError: If the path cannot be read, or holds no such
+                key.
+        """
+        data = await self._read_vault_data(secret)
+        if key not in data:
+            raise SecretResolutionError(
+                secret.name, "the Vault secret has no entry with this key"
+            )
+        return data[key]
+
+    async def _read_vault_data(self, secret: Secret) -> dict[str, str]:
+        """Read the whole data object of a vault secret's KV v2 path.
+
+        Shared by :meth:`_read_vault`, which picks one key out of the result,
+        and :meth:`list_keys`, which keeps only the keys — so the "can this
+        path be read at all" guards live in exactly one place.
+
+        Args:
+            secret: A ``vault``-type secret row.
+
+        Returns:
+            Every key/value pair stored at the referenced path.
+
+        Raises:
             SecretResolutionError: If Vault is not configured, the reference is
-                incomplete, the read fails, or the path holds no such key.
+                incomplete, or the read fails.
         """
         if self._vault is None:
             raise SecretResolutionError(
@@ -229,11 +278,6 @@ class SecretResolver:
         if not (secret.vault_mount and secret.vault_path):
             raise SecretResolutionError(secret.name, "incomplete Vault reference")
         try:
-            data = await self._vault.read_kv2(secret.vault_mount, secret.vault_path)
+            return await self._vault.read_kv2(secret.vault_mount, secret.vault_path)
         except VaultError as exc:
             raise SecretResolutionError(secret.name, exc.reason) from exc
-        if key not in data:
-            raise SecretResolutionError(
-                secret.name, "the Vault secret has no entry with this key"
-            )
-        return data[key]

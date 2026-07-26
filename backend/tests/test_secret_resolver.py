@@ -153,6 +153,35 @@ async def test_resolve_ref_without_key_raises() -> None:
         await resolver.resolve_ref("api-key")
 
 
+async def test_list_keys_returns_local_entry_keys_sorted() -> None:
+    # vault is None here: listing a local secret's keys must never need Vault.
+    resolver, _ = _resolver([_local_secret("aws", KEY="b", ID="a")])
+    assert await resolver.list_keys(_local_secret("aws", KEY="b", ID="a")) == [
+        "ID",
+        "KEY",
+    ]
+
+
+async def test_list_keys_reads_vault_path_and_drops_values() -> None:
+    secret = _vault_secret("gh")
+    resolver, _ = _resolver([secret], vault=_FakeVault())
+    assert await resolver.list_keys(secret) == ["token", "username"]
+
+
+async def test_list_keys_vault_unconfigured_raises() -> None:
+    secret = _vault_secret("gh")
+    resolver, _ = _resolver([secret], vault=None)
+    with pytest.raises(SecretResolutionError, match="Vault"):
+        await resolver.list_keys(secret)
+
+
+async def test_list_keys_vault_failure_raises() -> None:
+    secret = _vault_secret("gh")
+    resolver, _ = _resolver([secret], vault=_FakeVault(fail=True))
+    with pytest.raises(SecretResolutionError, match="gh"):
+        await resolver.list_keys(secret)
+
+
 async def test_resolve_text_replaces_multiple_placeholders() -> None:
     resolver, _ = _resolver([_local_secret("aws", ID="AAA", KEY="BBB")])
     result = await resolver.resolve_text("x ${secret:aws/ID} y ${secret:aws/KEY} z")

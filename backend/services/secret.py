@@ -5,11 +5,17 @@ need: plaintext entry values are encrypted before they reach the repository (so
 the persistence layer never sees them), and partial updates are validated
 against the *merged* per-type shape — ``SecretCreate``'s validator covers POST
 bodies, but only the service can combine a PATCH body with the stored record.
+
+Listing a secret's entry keys is delegated to
+:class:`~infrastructure.secret_resolver.SecretResolver`, the one component that
+already knows how to reach both storage backends, so the "can this Vault path
+be read" guards are not restated here.
 """
 
 from collections.abc import Sequence
 
 from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_resolver import SecretResolver
 from models.secret import Secret, SecretCreate, SecretType, SecretUpdate
 from repositories import SecretRepository
 from repositories.exceptions import NotFoundError, SecretValidationError
@@ -23,15 +29,20 @@ _VAULT_FIELDS = ("vault_mount", "vault_path")
 class SecretService:
     """Application service orchestrating Secret operations."""
 
-    def __init__(self, repo: SecretRepository, cipher: SecretCipher) -> None:
+    def __init__(
+        self, repo: SecretRepository, cipher: SecretCipher, resolver: SecretResolver
+    ) -> None:
         """Initialize the service.
 
         Args:
             repo: Repository providing Secret persistence.
             cipher: Cipher used to encrypt local secret values before storage.
+            resolver: Resolver used to enumerate a secret's entry keys, which
+                for a ``vault`` secret means a live read of its KV v2 path.
         """
         self._repo = repo
         self._cipher = cipher
+        self._resolver = resolver
 
     async def get(self, secret_id: str) -> Secret:
         """Return the Secret with the given ID.
@@ -49,6 +60,22 @@ class SecretService:
         if secret is None:
             raise NotFoundError("Secret", secret_id)
         return secret
+
+    async def list_keys(self, secret_id: str) -> list[str]:
+        """Return the entry keys of one Secret, exposing no value.
+
+        Args:
+            secret_id: Identifier of the secret whose keys are wanted.
+
+        Returns:
+            The entry keys in sorted order.
+
+        Raises:
+            NotFoundError: If no secret exists with the given ID.
+            SecretResolutionError: If the secret is ``vault``-typed and its
+                path cannot be read.
+        """
+        return await self._resolver.list_keys(await self.get(secret_id))
 
     async def list(
         self,

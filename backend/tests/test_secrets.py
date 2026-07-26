@@ -476,3 +476,77 @@ async def test_delete_secret_unknown_id_returns_404(
 ) -> None:
     response = await secrets_client.delete("/api/v1/secrets/nonexistent")
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+# ---------- entry keys ----------
+
+
+class _FakeVault:
+    """Stand-in VaultClient whose KV v2 path holds two entries."""
+
+    async def read_kv2(self, mount: str, path: str) -> dict[str, str]:
+        return {"username": "octocat", "token": "tok-live"}
+
+
+def _use_vault(vault: object | None) -> None:
+    """Point the app's Vault dependency at a stand-in for the current test.
+
+    The ``secrets_client`` fixture clears every override afterwards, so this
+    needs no teardown of its own.
+    """
+    from dependencies import get_vault_client
+    from main import app
+
+    app.dependency_overrides[get_vault_client] = lambda: vault
+
+
+async def test_list_keys_of_local_secret_returns_sorted_keys(
+    secrets_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_MULTI_BODY), status=201
+    )
+    body = assert_ok(await secrets_client.get(f"/api/v1/secrets/{created['id']}/keys"))
+    assert body == ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+
+
+async def test_list_keys_of_local_secret_leaks_no_value(
+    secrets_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_MULTI_BODY), status=201
+    )
+    response = await secrets_client.get(f"/api/v1/secrets/{created['id']}/keys")
+    assert_ok(response)
+    assert "AKIA1" not in response.text
+    assert "sk-1" not in response.text
+
+
+async def test_list_keys_of_vault_secret_reads_the_path(
+    secrets_client: AsyncClient,
+) -> None:
+    _use_vault(_FakeVault())
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_VAULT_BODY), status=201
+    )
+    response = await secrets_client.get(f"/api/v1/secrets/{created['id']}/keys")
+    assert assert_ok(response) == ["token", "username"]
+    # The read pulls the whole data object; only the keys may reach the client.
+    assert "octocat" not in response.text
+    assert "tok-live" not in response.text
+
+
+async def test_list_keys_of_vault_secret_without_vault_returns_502(
+    secrets_client: AsyncClient,
+) -> None:
+    _use_vault(None)
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_VAULT_BODY), status=201
+    )
+    response = await secrets_client.get(f"/api/v1/secrets/{created['id']}/keys")
+    assert_err(response, code="SECRET_RESOLUTION_FAILED", status=502)
+
+
+async def test_list_keys_unknown_id_returns_404(secrets_client: AsyncClient) -> None:
+    response = await secrets_client.get("/api/v1/secrets/nonexistent/keys")
+    assert_err(response, code="NOT_FOUND", status=404)

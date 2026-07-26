@@ -6,20 +6,22 @@ import { RefreshCw, Wand2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import {
+  AgentSkillFields,
+  type AgentSkillFormValues,
+  agentSkillFormSchema,
+  emptyAgentSkillFormValues,
+  toAgentSkillUpdateBody,
+} from "@/components/admin/agent-skill-fields";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
-import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { zAgentSkillCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
   formatRevision,
@@ -37,16 +39,6 @@ import {
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
-
-// The generated auth fields are nullish with min-length 1, so a blank input
-// would fail validation; the form allows the empty string ("no auth") and
-// maps it to null on submit, clearing the field server-side.
-const schema = zAgentSkillCreate.omit({ repoAuthPassword: true, repoAuthUsername: true }).extend({
-  repoAuthPassword: z.literal("").or(zAgentSkillCreate.shape.repoAuthPassword.unwrap().unwrap()),
-  repoAuthUsername: z.literal("").or(zAgentSkillCreate.shape.repoAuthUsername.unwrap().unwrap()),
-});
-
-type FormValues = z.infer<typeof schema>;
 
 /** How often the page re-fetches the skill while its clone is still running. */
 const POLL_INTERVAL_MS = 2000;
@@ -72,21 +64,15 @@ export default function EditAgentSkillPage() {
   const pull = useAsyncAction({ showDone: false });
   const {
     register,
+    control,
     handleSubmit,
     reset,
     getValues,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(agentSkillFormSchema),
     mode: "onBlur",
-    defaultValues: {
-      name: "",
-      repoUrl: "",
-      repoPath: "",
-      description: "",
-      repoAuthPassword: "",
-      repoAuthUsername: "",
-    },
+    defaultValues: emptyAgentSkillFormValues(),
   });
 
   const applySync = useCallback((skill: AgentSkill) => {
@@ -146,17 +132,10 @@ export default function EditAgentSkillPage() {
     }
   }
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: AgentSkillFormValues) {
     try {
       await save.run(async () => {
-        await updateAgentSkill(skillId, {
-          name: values.name,
-          repoUrl: values.repoUrl,
-          repoPath: values.repoPath,
-          description: values.description || null,
-          repoAuthPassword: values.repoAuthPassword || null,
-          repoAuthUsername: values.repoAuthUsername || null,
-        });
+        await updateAgentSkill(skillId, toAgentSkillUpdateBody(values));
         dispatch(showToast({ message: "Agent skill updated" }));
         router.push("/admin/agent-skills");
       });
@@ -240,49 +219,7 @@ export default function EditAgentSkillPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            <Input id="name" {...register("name")} />
-          </FormField>
-
-          <FormField htmlFor="repoUrl" label="Repo URL" required error={errors.repoUrl?.message}>
-            <Input id="repoUrl" {...register("repoUrl")} />
-          </FormField>
-
-          <FormField htmlFor="repoPath" label="Repo Path">
-            <Input id="repoPath" {...register("repoPath")} />
-          </FormField>
-
-          <FormField htmlFor="description" label="Description">
-            <Textarea id="description" rows={4} {...register("description")} />
-          </FormField>
-
-          <FormField
-            htmlFor="repoAuthUsername"
-            label="Auth Username"
-            error={errors.repoAuthUsername?.message}
-          >
-            <Input
-              id="repoAuthUsername"
-              placeholder="e.g. octocat (optional)"
-              {...register("repoAuthUsername")}
-            />
-          </FormField>
-
-          <FormField
-            htmlFor="repoAuthPassword"
-            label="Auth Password"
-            error={errors.repoAuthPassword?.message}
-          >
-            <Input
-              id="repoAuthPassword"
-              placeholder="name/key for private repos (optional)"
-              {...register("repoAuthPassword")}
-            />
-            <p className="mt-1 text-xs text-on-surface-variant">
-              One entry of a registered Secret, written as name/key, used as the clone token for a
-              private repository.
-            </p>
-          </FormField>
+          <AgentSkillFields register={register} control={control} errors={errors} />
 
           <div className="flex gap-2">
             {canEdit && (

@@ -96,6 +96,7 @@ import {
   zListMcpServersApiV1McpServersGetResponse,
   zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse,
   zListNotificationsApiV1NotificationsGetResponse,
+  zListSecretKeysApiV1SecretsSecretIdKeysGetResponse,
   zListSecretsApiV1SecretsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
   zListTenantsApiV1TenantsGetResponse,
@@ -621,6 +622,20 @@ export async function getSecret(id: string): Promise<Secret> {
   ) as Promise<Secret>;
 }
 
+/**
+ * List the entry keys of one secret. No value is ever returned.
+ *
+ * Unlike the `keys` field on a secret read — which only ever reports a `local`
+ * secret's entries — this covers both kinds: a `vault` secret's keys are read
+ * live from its KV v2 path.
+ */
+export async function listSecretKeys(id: string): Promise<string[]> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/secrets/${encodeURIComponent(id)}/keys`),
+    zListSecretKeysApiV1SecretsSecretIdKeysGetResponse
+  ) as Promise<string[]>;
+}
+
 /** Register a new secret: a `local` encrypted value or a `vault` KV v2 reference. */
 export async function createSecret(body: SecretCreate): Promise<Secret> {
   return fetchEnvelope(
@@ -629,7 +644,7 @@ export async function createSecret(body: SecretCreate): Promise<Secret> {
   ) as Promise<Secret>;
 }
 
-/** Apply a partial update to a secret. Omitting `value` keeps the stored value unchanged. */
+/** Apply a partial update to a secret. Omitting `entries` keeps the stored map unchanged. */
 export async function updateSecret(id: string, body: SecretUpdate): Promise<Secret> {
   return fetchEnvelope(
     apiClient.patch(`/api/v1/secrets/${encodeURIComponent(id)}`, body),

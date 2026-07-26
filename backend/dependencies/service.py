@@ -85,16 +85,6 @@ def get_skill_sync_job() -> SkillSyncJob:
 SkillSyncJobDep = Annotated[SkillSyncJob, Depends(get_skill_sync_job)]
 
 
-def get_secret_service(
-    repo: SecretRepositoryDep, cipher: SecretCipherDep
-) -> SecretService:
-    """Create a SecretService wiring the repository and the cipher singleton."""
-    return SecretService(repo, cipher)
-
-
-SecretServiceDep = Annotated[SecretService, Depends(get_secret_service)]
-
-
 def get_secret_resolver(
     repo: SecretRepositoryDep,
     cipher: SecretCipherDep,
@@ -105,6 +95,22 @@ def get_secret_resolver(
 
 
 SecretResolverDep = Annotated[SecretResolver, Depends(get_secret_resolver)]
+
+
+def get_secret_service(
+    repo: SecretRepositoryDep, cipher: SecretCipherDep, resolver: SecretResolverDep
+) -> SecretService:
+    """Create a SecretService wiring the repository, cipher, and resolver.
+
+    Declared after :func:`get_secret_resolver` because it annotates against
+    ``SecretResolverDep``. FastAPI caches ``Depends()`` per request, so the
+    resolver's repository is the very same tenant-scoped instance the service
+    holds.
+    """
+    return SecretService(repo, cipher, resolver)
+
+
+SecretServiceDep = Annotated[SecretService, Depends(get_secret_service)]
 
 
 def get_mcp_server_service(

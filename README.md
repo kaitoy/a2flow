@@ -224,7 +224,9 @@ The list and edit pages show each skill's **Status** (`Cloning` / `ready` / `fai
 
 Under `docker compose`, `SKILLS_DIR` is `/var/lib/a2flow/skills`, persisted in the `skills` Docker volume so the store survives container recreation. It is **durable state, not a cache**: a workflow session pins the revision it started with, so wiping the directory leaves existing sessions unable to load their skill until an admin pulls again. Scaling the backend past one replica requires every replica to mount this same volume.
 
-Private repositories are supported through the optional **Auth Password** field: set it to a `name/key` reference to one entry of a registered [Secret](#secrets) (e.g. `git-credentials/github-pat`) and that entry's value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name. The secret is resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill.
+Private repositories are supported through the optional **Auth Password** field. It is not typed in: pick a registered [Secret](#secrets) and one **Entry Key** within it from the two dropdowns, and that entry's value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. Both secret types are offered — a `vault` secret's entry keys are read live from its KV v2 path, since they are not stored locally. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name.
+
+The secret is stored as a `name/key` reference and resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill. The edit form does not quietly drop such a stale reference: it stays selected, marked `(not found)`, with a warning — clearing it is your call.
 
 ### MCP Servers
 
@@ -262,7 +264,7 @@ A secret is a **named bundle of key/value entries**, the same shape [HashiCorp V
 A single entry is referenced as `name/key`:
 
 - **MCP server headers and environment** — any header value (streamable HTTP) or environment variable value (stdio) may embed `${secret:name/key}` placeholders, expanded when connecting (see [MCP Servers](#mcp-servers)).
-- **Agent Skill repository clones** — a skill's **Auth Password** is a `name/key` reference to the entry used as the git basic-auth password (see [Agent Skills](#agent-skills)).
+- **Agent Skill repository clones** — a skill's **Auth Password** is a `name/key` reference to the entry used as the git basic-auth password, chosen from dropdowns rather than typed (see [Agent Skills](#agent-skills)).
 
 The key is **always required**, even when the secret holds a single entry — a bare name identifies a map, not a value. A key-less `${secret:name}` fails with `SECRET_RESOLUTION_FAILED` rather than being passed through as a literal string.
 
@@ -276,6 +278,8 @@ A secret has one of two types:
 
 - **Local (encrypted)** — the entries are submitted once and stored in `a2flow.db` with each value encrypted with [Fernet](https://cryptography.io/en/latest/fernet/) (AES-128-CBC + HMAC). Keys are stored in plaintext so they can be listed without decrypting anything. The API is **write-only**: a response carries the entry keys but never a value (neither plaintext nor ciphertext). The edit form therefore shows every stored key with a blank value — leave one blank to keep the stored value, retype it to replace it, or remove the row to delete that entry.
 - **HashiCorp Vault** — only a KV v2 reference (mount and path) is stored; every key at that path is readable, and each value is fetched live from Vault when it is resolved.
+
+`GET /api/v1/secrets/{id}/keys` lists one secret's entry keys — and only its keys — for both types alike: from the stored map for a `local` secret, from a live KV v2 read for a `vault` one (which yields HTTP 502 `SECRET_RESOLUTION_FAILED` when Vault is unreachable or unconfigured). The Agent Skill auth-password picker uses it; the `keys` field on a secret read cannot serve that purpose, since it is always empty for a `vault` secret.
 
 Secrets are referenced **by name** and resolved lazily: renaming or deleting a secret that something still references does not fail at edit time, but the next use fails with HTTP 502 (`SECRET_RESOLUTION_FAILED`) naming the missing secret.
 

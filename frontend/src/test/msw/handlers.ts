@@ -347,6 +347,12 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/secrets/:secretId`, () => envelope(SECRET_1)),
 
+  // A vault secret's keys are not in its read view (they live in Vault), so the
+  // picker reads them from this route for both kinds alike.
+  http.get(`${BASE}/api/v1/secrets/:secretId/keys`, ({ params }) =>
+    envelope(params.secretId === SECRET_VAULT_1.id ? ["password", "username"] : SECRET_1.keys)
+  ),
+
   http.post(`${BASE}/api/v1/secrets`, () => envelope({ ...SECRET_1, id: "new-secret-id" }, 201)),
 
   http.patch(`${BASE}/api/v1/secrets/:secretId`, () => envelope(SECRET_1)),

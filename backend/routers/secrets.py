@@ -4,6 +4,11 @@ Secret values are write-only: create and update accept plaintext ``entries``
 (encrypted by the service before persistence), but every response uses
 :class:`SecretRead`, which replaces them with a bare ``keys`` list — neither the
 plaintext nor the stored ciphertext is ever serialized to clients.
+
+``GET /{secret_id}/keys`` exists alongside that field because ``SecretRead.keys``
+can only report a ``local`` secret's entries; a ``vault`` secret's keys live at
+its KV v2 path and need a live read, which would be far too expensive to do for
+every row of a list response. Pickers that must offer both kinds use this route.
 """
 
 from fastapi import APIRouter, Depends
@@ -68,6 +73,16 @@ async def get_secret(
 ) -> ApiResponse[SecretRead]:
     secret = await service.get(secret_id)
     return ApiResponse(meta=meta, data=SecretRead.from_secret(secret))
+
+
+@router.get("/{secret_id}/keys", response_model=ApiResponse[list[str]])
+async def list_secret_keys(
+    secret_id: str,
+    service: SecretServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[str]]:
+    keys = await service.list_keys(secret_id)
+    return ApiResponse(meta=meta, data=keys)
 
 
 @router.patch(
