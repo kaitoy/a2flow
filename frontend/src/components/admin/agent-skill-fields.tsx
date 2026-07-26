@@ -175,7 +175,7 @@ export function AgentSkillFields({
             label="Auth Password"
             idPrefix="repoAuthPassword"
             error={errors.repoAuthPassword?.message}
-            hint="One entry of a registered Secret, used as the clone token for a private repository."
+            hint="One entry of a registered Secret, used as the password for a private repository."
           />
         )}
       />
