@@ -53,6 +53,7 @@ export function emptyAgentSkillFormValues(): AgentSkillFormValues {
     name: "",
     repoUrl: "",
     repoPath: "",
+    repoRef: "",
     description: "",
     repoAuthPassword: "",
     repoAuthUsername: "",
@@ -71,6 +72,7 @@ export function toAgentSkillCreateBody(values: AgentSkillFormValues): AgentSkill
     name: values.name,
     repoUrl: values.repoUrl,
     repoPath: values.repoPath || undefined,
+    repoRef: values.repoRef || null,
     description: values.description || null,
     repoAuthPassword: values.repoAuthPassword || undefined,
     repoAuthUsername: values.repoAuthUsername || undefined,
@@ -89,6 +91,7 @@ export function toAgentSkillUpdateBody(values: AgentSkillFormValues): AgentSkill
     name: values.name,
     repoUrl: values.repoUrl,
     repoPath: values.repoPath,
+    repoRef: values.repoRef || null,
     description: values.description || null,
     repoAuthPassword: values.repoAuthPassword || null,
     repoAuthUsername: values.repoAuthUsername || null,
@@ -141,6 +144,14 @@ export function AgentSkillFields({
           id="repoPath"
           placeholder={showPlaceholders ? "path/within/repo (optional)" : undefined}
           {...register("repoPath")}
+        />
+      </FormField>
+
+      <FormField htmlFor="repoRef" label="Ref" error={errors.repoRef?.message}>
+        <Input
+          id="repoRef"
+          placeholder={showPlaceholders ? "branch or tag (optional)" : undefined}
+          {...register("repoRef")}
         />
       </FormField>
 

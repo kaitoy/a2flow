@@ -80,7 +80,10 @@ class AgentSkillSyncService:
         self._skill_manager = skill_manager
 
     async def sync(self, skill_id: str, *, user_id: str) -> None:
-        """Clone the skill's repository at HEAD, publish it, and prune stale revisions.
+        """Clone the skill's repository, publish it, and prune stale revisions.
+
+        Clones at the skill's configured ``repo_ref`` (a branch or tag) when
+        set, or the repository's default branch otherwise.
 
         Never raises for an unreachable or broken repository: the failure is the
         result the admin UI is waiting for, so it is recorded on the row

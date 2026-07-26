@@ -465,6 +465,101 @@ async def test_create_skill_accepts_nested_repo_path(
     assert assert_ok(response, status=201)["repoPath"] == "skills/my-skill"
 
 
+async def test_create_skill_accepts_a_repo_ref(skill_client: AsyncClient) -> None:
+    """A branch or tag name pins the clone to that ref instead of the default branch."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={**_CREATE_BODY, "repo_ref": "feature/x"},
+    )
+    assert assert_ok(response, status=201)["repoRef"] == "feature/x"
+
+
+async def test_create_skill_without_repo_ref_defaults_to_none(
+    skill_client: AsyncClient,
+) -> None:
+    """Omitting repo_ref means "clone the repository's default branch"."""
+    response = await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY)
+    assert assert_ok(response, status=201)["repoRef"] is None
+
+
+async def test_update_skill_can_set_repo_ref(skill_client: AsyncClient) -> None:
+    created = assert_ok(
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
+    )
+    response = await skill_client.patch(
+        f"/api/v1/agent-skills/{created['id']}", json={"repo_ref": "v1.0.0"}
+    )
+    assert assert_ok(response)["repoRef"] == "v1.0.0"
+
+
+async def test_update_skill_can_clear_repo_ref(skill_client: AsyncClient) -> None:
+    created = assert_ok(
+        await skill_client.post(
+            "/api/v1/agent-skills", json={**_CREATE_BODY, "repo_ref": "v1.0.0"}
+        ),
+        status=201,
+    )
+    response = await skill_client.patch(
+        f"/api/v1/agent-skills/{created['id']}", json={"repo_ref": None}
+    )
+    assert assert_ok(response)["repoRef"] is None
+
+
+async def test_create_skill_rejects_overlong_repo_ref(
+    skill_client: AsyncClient,
+) -> None:
+    """A repo_ref longer than the 255-character ceiling returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={**_CREATE_BODY, "repo_ref": "a" * 256},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_repo_ref_with_control_char(
+    skill_client: AsyncClient,
+) -> None:
+    """A repo_ref containing a control character returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={**_CREATE_BODY, "repo_ref": "bad\tref"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_repo_ref_with_parent_segment(
+    skill_client: AsyncClient,
+) -> None:
+    """A repo_ref containing '..' is invalid per git check-ref-format, so it returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={**_CREATE_BODY, "repo_ref": "feature/../x"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_repo_ref_ending_in_dot_lock(
+    skill_client: AsyncClient,
+) -> None:
+    """A repo_ref segment ending in '.lock' is invalid per git check-ref-format, so it returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={**_CREATE_BODY, "repo_ref": "feature/x.lock"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_create_skill_rejects_bare_at_sign_repo_ref(
+    skill_client: AsyncClient,
+) -> None:
+    """A repo_ref of a single '@' is invalid per git check-ref-format, so it returns 422."""
+    response = await skill_client.post(
+        "/api/v1/agent-skills",
+        json={**_CREATE_BODY, "repo_ref": "@"},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
 # ---------- clone / pull ----------
 
 

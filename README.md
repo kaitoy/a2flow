@@ -203,7 +203,7 @@ Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/adm
 
 | Pull a skill's repository | `POST /api/v1/agent-skills/{id}/pull` |
 
-Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, and description.
+Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, an optional **Ref** (a branch or tag name), and description.
 
 #### The skill store
 
@@ -220,7 +220,7 @@ The list and edit pages show each skill's **Status** (`Cloning` / `ready` / `fai
 - **`commitSha`** — the published revision. A skill is runnable **only** once this is set; a workflow started against a skill with no revision is rejected with HTTP 409 (`SKILL_NOT_READY`).
 - **`syncStatus`** — how the *last* clone or pull went. A pull that fails does **not** clear `commitSha`, so a skill that was working keeps working at its previous revision; only the status and the error change.
 
-**Pull** re-clones the repository at its current remote HEAD. It is how a skill picks up upstream changes, and how a failed registration clone is retried after fixing the URL or the credentials. Concurrent clones of one skill are serialized across replicas by the advisory lock in `backend/infrastructure/locks.py`; a replica that finds another already cloning the skill skips the work instead of duplicating it. After a successful pull, revisions that no longer back any workflow session are pruned.
+**Pull** re-clones the repository at its configured **Ref**, or its default branch when none is set. It is how a skill picks up upstream changes, and how a failed registration clone is retried after fixing the URL or the credentials. Setting a **Ref** (a branch or tag name) pins every clone and pull to that ref instead of the repository's default branch — a moved branch tip or a re-pointed tag is picked up the next time the skill is synced. Concurrent clones of one skill are serialized across replicas by the advisory lock in `backend/infrastructure/locks.py`; a replica that finds another already cloning the skill skips the work instead of duplicating it. After a successful pull, revisions that no longer back any workflow session are pruned.
 
 Under `docker compose`, `SKILLS_DIR` is `/var/lib/a2flow/skills`, persisted in the `skills` Docker volume so the store survives container recreation. It is **durable state, not a cache**: a workflow session pins the revision it started with, so wiping the directory leaves existing sessions unable to load their skill until an admin pulls again. Scaling the backend past one replica requires every replica to mount this same volume.
 

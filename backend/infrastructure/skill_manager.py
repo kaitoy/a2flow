@@ -169,7 +169,12 @@ class SkillManager:
     async def clone(
         self, skill: AgentSkill, auth: tuple[str, str] | None = None
     ) -> str:
-        """Clone the skill's repository at HEAD and publish it as a revision directory.
+        """Clone the skill's repository and publish it as a revision directory.
+
+        Clones at ``skill.repo_ref`` (a branch or tag name) when set, or the
+        repository's default branch otherwise. Every call re-resolves the ref,
+        so a moved branch tip or a re-pointed tag is picked up on the next
+        clone/pull.
 
         Idempotent: when the remote HEAD is a revision this store already
         published, the freshly cloned copy is discarded and the existing
@@ -203,6 +208,8 @@ class SkillManager:
                 repo_url, timeout=self._clone_timeout_seconds
             )
             kwargs = {} if auth is None else {"username": auth[0], "password": auth[1]}
+            if skill.repo_ref:
+                kwargs["branch"] = skill.repo_ref
             repo = porcelain.clone(
                 repo_url,
                 str(staging),

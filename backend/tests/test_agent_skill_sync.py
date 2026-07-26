@@ -186,6 +186,15 @@ async def test_skill_without_auth_password_clones_anonymously() -> None:
     assert store.clone.await_args.kwargs["auth"] is None
 
 
+async def test_sync_passes_the_skill_with_its_configured_ref_to_clone() -> None:
+    """Proves pull follows a pinned ref: clone reads repo_ref off the same skill."""
+    service, _skills, store = _service(_skill(repo_ref="release/v2"))
+
+    await service.sync("skill-1", user_id="alice")
+
+    assert store.clone.await_args.args[0].repo_ref == "release/v2"
+
+
 async def test_sync_of_a_skill_already_being_synced_elsewhere_is_a_noop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

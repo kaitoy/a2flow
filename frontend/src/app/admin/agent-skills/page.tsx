@@ -84,6 +84,13 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
     cell: (s) => s.repoPath || "—",
   },
   {
+    header: "Ref",
+    sortField: "repoRef",
+    filterField: "repoRef",
+    className: "font-mono",
+    cell: (s) => s.repoRef || "—",
+  },
+  {
     header: "Status",
     sortField: "syncStatus",
     filterField: "syncStatus",

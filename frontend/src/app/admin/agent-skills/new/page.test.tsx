@@ -83,6 +83,7 @@ describe("NewAgentSkillPage", () => {
       expect(receivedBody).toEqual({
         name: "Test",
         repoUrl: "https://x.com",
+        repoRef: null,
         description: null,
         repoAuthPassword: "github-token/token",
         repoAuthUsername: "oauth2",
@@ -122,6 +123,7 @@ describe("NewAgentSkillPage", () => {
       expect(receivedBody).toEqual({
         name: "Test",
         repoUrl: "https://x.com",
+        repoRef: null,
         description: null,
       })
     );

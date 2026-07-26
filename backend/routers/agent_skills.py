@@ -67,7 +67,7 @@ async def pull_agent_skill(
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[AgentSkill]:
-    """Re-clone a skill's repository at its current remote HEAD.
+    """Re-clone a skill's repository at its configured ref, or the default branch.
 
     The way a skill picks up upstream changes, and the way a failed
     registration clone is retried. Accepted and run in the background like the

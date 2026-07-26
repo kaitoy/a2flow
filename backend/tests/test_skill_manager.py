@@ -22,12 +22,15 @@ _SHA_B = "b" * 40
 
 
 def _make_skill(
-    repo_path: str = "", repo_url: str = "https://github.com/example/repo"
+    repo_path: str = "",
+    repo_url: str = "https://github.com/example/repo",
+    repo_ref: str | None = None,
 ) -> AgentSkill:
     return AgentSkill(
         name="test-skill",
         repo_url=repo_url,
         repo_path=repo_path,
+        repo_ref=repo_ref,
         created_by="system",
         updated_by="system",
     )
@@ -226,6 +229,30 @@ async def test_clone_without_auth_omits_credentials(
     kwargs = fake_clone.call_args.kwargs
     assert "username" not in kwargs
     assert "password" not in kwargs
+
+
+async def test_clone_passes_configured_ref_as_branch_to_dulwich(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A configured repo_ref is forwarded to porcelain.clone as the branch kwarg."""
+    fake_clone = _fake_porcelain_clone(monkeypatch)
+    manager = _manager(tmp_path)
+
+    await manager.clone(_make_skill(repo_ref="release/v2"))
+
+    assert fake_clone.call_args.kwargs["branch"] == "release/v2"
+
+
+async def test_clone_without_ref_omits_branch_kwarg(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without a configured repo_ref, no branch kwarg reaches porcelain.clone."""
+    fake_clone = _fake_porcelain_clone(monkeypatch)
+    manager = _manager(tmp_path)
+
+    await manager.clone(_make_skill())
+
+    assert "branch" not in fake_clone.call_args.kwargs
 
 
 async def test_clone_passes_configured_timeout_to_the_pool_manager(

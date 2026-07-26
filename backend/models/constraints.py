@@ -153,6 +153,61 @@ GitUsername = Annotated[
     ),
 ]
 
+#: Character set forbidden anywhere in a git ref name per `git check-ref-format`:
+#: ASCII control characters, space, and the characters git reserves for shell
+#: globbing / ref syntax (`~^:?*[\`). Empty string is permitted — it means "no
+#: ref pinned", same as `None`.
+GIT_REF_PATTERN = r"^[^\x00-\x20\x7f-\x9f~^:?*\[\\]*$"
+
+
+def _reject_invalid_git_ref(value: str) -> str:
+    """Reject a value `git check-ref-format` would refuse as a branch/tag name.
+
+    Complements :data:`GIT_REF_PATTERN`, which only rules out individual
+    forbidden characters; the structural rules below (per-component checks,
+    "must not contain '..'", etc.) cannot be expressed in a single regex.
+
+    Args:
+        value: The candidate branch or tag name. The empty string is accepted
+            unchanged (means "no ref pinned").
+
+    Returns:
+        The unchanged value when it is a well-formed ref name.
+
+    Raises:
+        ValueError: If the value violates one of the git ref-name rules.
+    """
+    if value == "":
+        return value
+    if value == "@":
+        raise ValueError("must not be the single character '@'")
+    if "@{" in value:
+        raise ValueError("must not contain the sequence '@{'")
+    if ".." in value:
+        raise ValueError("must not contain '..'")
+    if value.endswith("."):
+        raise ValueError("must not end with '.'")
+    for segment in value.split("/"):
+        if segment == "":
+            raise ValueError("must not start or end with '/' or contain '//'")
+        if segment.startswith("."):
+            raise ValueError("no path segment may start with '.'")
+        if segment.endswith(".lock"):
+            raise ValueError("no path segment may end with '.lock'")
+    return value
+
+
+#: Git branch or tag name pinning an AgentSkill's clone to something other than
+#: the repository's default branch: up to 255 characters, validated against
+#: `git check-ref-format`'s rules via :data:`GIT_REF_PATTERN` and
+#: :func:`_reject_invalid_git_ref`. The empty string carries the same meaning
+#: as `None` — no ref pinned, clone the default branch.
+GitRef = Annotated[
+    str,
+    StringConstraints(max_length=255, pattern=GIT_REF_PATTERN),
+    AfterValidator(_reject_invalid_git_ref),
+]
+
 #: Human-readable resource identifier (agent skill / workflow / MCP server name):
 #: 1–256 characters. Permits any printable character (unicode letters, digits,
 #: punctuation, symbols, emoji) plus the half-width (U+0020) and full-width

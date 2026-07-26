@@ -102,6 +102,7 @@ describe("EditAgentSkillPage", () => {
         name: "my-skill",
         repoUrl: "https://github.com/example/repo",
         repoPath: "",
+        repoRef: null,
         description: null,
         repoAuthPassword: null,
         repoAuthUsername: null,

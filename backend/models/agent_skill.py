@@ -13,6 +13,7 @@ from models.base import BaseEntity, TZDateTime, iso_z_or_none
 from models.constraints import (
     DescText,
     EntityName,
+    GitRef,
     GitUsername,
     HttpUrl,
     RepoPath,
@@ -53,13 +54,17 @@ class AgentSkillUpdate(SQLModel):
     matching basic-auth username and defaults to ``x-access-token`` (suitable
     for GitHub PATs) when left unset. The secret is referenced by name and
     resolved at clone time, so renaming or deleting it later makes the next
-    clone fail rather than the edit.
+    clone fail rather than the edit. ``repo_ref`` optionally names a branch or
+    tag to clone instead of the repository's default branch; every clone/pull
+    re-resolves it, so a moved branch tip or a re-pointed tag is picked up on
+    the next sync.
     """
 
     model_config = _alias_config
     name: EntityName | None = None
     repo_url: HttpUrl | None = None
     repo_path: RepoPath | None = None
+    repo_ref: GitRef | None = None
     description: DescText | None = None
     repo_auth_password: SecretRef | None = None
     repo_auth_username: GitUsername | None = None

@@ -90,6 +90,7 @@ export default function EditAgentSkillPage() {
           name: skill.name,
           repoUrl: skill.repoUrl,
           repoPath: skill.repoPath,
+          repoRef: skill.repoRef ?? "",
           description: skill.description ?? "",
           repoAuthPassword: skill.repoAuthPassword ?? "",
           repoAuthUsername: skill.repoAuthUsername ?? "",

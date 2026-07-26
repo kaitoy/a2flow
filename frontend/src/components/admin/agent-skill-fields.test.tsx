@@ -15,6 +15,7 @@ const FILLED: AgentSkillFormValues = {
   name: "code-review",
   repoUrl: "https://github.com/owner/repo",
   repoPath: "skills/review",
+  repoRef: "release/v2",
   description: "Reviews code",
   repoAuthPassword: "github-token/token",
   repoAuthUsername: "octocat",
@@ -46,6 +47,7 @@ describe("emptyAgentSkillFormValues", () => {
       name: "",
       repoUrl: "",
       repoPath: "",
+      repoRef: "",
       description: "",
       repoAuthPassword: "",
       repoAuthUsername: "",
@@ -59,6 +61,7 @@ describe("toAgentSkillCreateBody", () => {
       name: "code-review",
       repoUrl: "https://github.com/owner/repo",
       repoPath: "skills/review",
+      repoRef: "release/v2",
       description: "Reviews code",
       repoAuthPassword: "github-token/token",
       repoAuthUsername: "octocat",
@@ -75,6 +78,7 @@ describe("toAgentSkillCreateBody", () => {
       name: "x",
       repoUrl: "https://x.com",
       repoPath: undefined,
+      repoRef: null,
       description: null,
       repoAuthPassword: undefined,
       repoAuthUsername: undefined,
@@ -93,6 +97,7 @@ describe("toAgentSkillUpdateBody", () => {
       name: "x",
       repoUrl: "https://x.com",
       repoPath: "",
+      repoRef: null,
       description: null,
       repoAuthPassword: null,
       repoAuthUsername: null,
@@ -110,6 +115,7 @@ describe("AgentSkillFields", () => {
     expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/repo url/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/repo path/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^ref$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/auth username/i)).toBeInTheDocument();
   });

@@ -142,6 +142,7 @@ def upgrade() -> None:
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("repo_url", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("repo_path", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("repo_ref", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
             "repo_auth_password", sqlmodel.sql.sqltypes.AutoString(), nullable=True
