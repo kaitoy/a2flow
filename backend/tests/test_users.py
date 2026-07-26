@@ -579,15 +579,22 @@ async def test_admin_cannot_grant_super_admin(user_client: AsyncClient) -> None:
     assert_err(response, "FORBIDDEN", 403)
 
 
-async def test_admin_cannot_revoke_super_admin(user_client: AsyncClient) -> None:
-    """An admin (non-super) revoking super_admin via PATCH is rejected."""
+async def test_admin_cannot_reach_super_admin_to_revoke_role(
+    user_client: AsyncClient,
+) -> None:
+    """An admin (non-super) revoking super_admin via PATCH gets 404, not 403.
+
+    The target is invisible to a plain admin at all (see
+    :func:`_assert_tenant_visible`), so the role-grant/revoke guard is never
+    reached.
+    """
     created = await _create_user(user_client, roles=["super_admin"])
     response = await user_client.patch(
         f"/api/v1/users/{created['id']}",
         json={"roles": []},
         headers={"X-User-Roles": "admin"},
     )
-    assert_err(response, "FORBIDDEN", 403)
+    assert_err(response, "NOT_FOUND", 404)
 
 
 async def test_admin_can_update_other_roles(user_client: AsyncClient) -> None:
@@ -603,20 +610,20 @@ async def test_admin_can_update_other_roles(user_client: AsyncClient) -> None:
     assert body["roles"] == ["developer", "approver"]
 
 
-async def test_admin_can_edit_super_admin_user_without_touching_roles(
-    user_client: AsyncClient,
-) -> None:
-    """An admin editing a super_admin's profile (roles unchanged) is allowed."""
+async def test_admin_cannot_edit_super_admin_user(user_client: AsyncClient) -> None:
+    """An admin (non-super) editing a super_admin's profile fields is rejected.
+
+    A super_admin target is invisible to a plain admin (see
+    :func:`_assert_tenant_visible`), so even an otherwise-uncontroversial
+    profile edit (no role change) gets 404, not a partial success.
+    """
     created = await _create_user(user_client, roles=["super_admin"])
-    body = assert_ok(
-        await user_client.patch(
-            f"/api/v1/users/{created['id']}",
-            json={"firstName": "Renamed"},
-            headers={"X-User-Roles": "admin"},
-        )
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"firstName": "Renamed"},
+        headers={"X-User-Roles": "admin"},
     )
-    assert body["firstName"] == "Renamed"
-    assert body["roles"] == ["super_admin"]
+    assert_err(response, "NOT_FOUND", 404)
 
 
 async def test_super_admin_revoking_super_admin_requires_tenant(
@@ -715,14 +722,14 @@ async def test_super_admin_can_assign_tenant_on_create(
     assert body["tenantId"] == tenant["id"]
 
 
-async def test_admin_cannot_assign_tenant_to_tenantless_target_on_update(
+async def test_admin_cannot_reach_tenantless_target_to_assign_tenant_on_update(
     user_client: AsyncClient,
 ) -> None:
-    """An admin (non-super) assigning a first tenant via PATCH is rejected.
+    """An admin (non-super) assigning a first tenant via PATCH gets 404, not 403.
 
     The target has no tenant yet (only possible while it holds super_admin),
-    so this exercises the authorization gate rather than the immutability
-    rule below.
+    so it's invisible to a plain admin (see :func:`_assert_tenant_visible`)
+    before the tenant-assignment guard would even run.
     """
     tenant = await _create_tenant(user_client)
     created = await _create_user(user_client, roles=["super_admin"])
@@ -731,7 +738,7 @@ async def test_admin_cannot_assign_tenant_to_tenantless_target_on_update(
         json={"tenantId": tenant["id"]},
         headers={"X-User-Roles": "admin"},
     )
-    assert_err(response, "FORBIDDEN", 403)
+    assert_err(response, "NOT_FOUND", 404)
 
 
 async def test_admin_cannot_change_already_assigned_tenant_on_update(
@@ -1123,20 +1130,20 @@ async def test_get_user_other_tenant_returns_404_for_tenant_scoped_caller(
     assert_err(response, "NOT_FOUND", 404)
 
 
-async def test_get_user_platform_scoped_target_succeeds_for_tenant_scoped_caller(
+async def test_get_user_platform_scoped_target_returns_404_for_tenant_scoped_caller(
     user_client: AsyncClient,
 ) -> None:
-    """A tenant-scoped caller can still view a platform-scoped user (e.g. a super_admin).
+    """A tenant-scoped caller cannot view a platform-scoped user (e.g. a super_admin).
 
-    The tenant boundary applies only between two concrete tenants -- matches
-    the existing precedent that a plain admin may edit a super_admin's
-    profile (see ``test_admin_can_edit_super_admin_user_without_touching_roles``).
+    Only a super_admin actor is exempt from the tenant boundary (see
+    :func:`_assert_tenant_visible`); a plain admin gets 404, the same as any
+    other cross-tenant reference, so existence is never leaked.
     """
     super_admin = await _create_user(user_client, roles=["super_admin"])
     response = await user_client.get(
         f"/api/v1/users/{super_admin['id']}", headers={"X-User-Roles": "admin"}
     )
-    assert assert_ok(response)["id"] == super_admin["id"]
+    assert_err(response, "NOT_FOUND", 404)
 
 
 async def test_get_user_other_tenant_succeeds_for_super_admin(
@@ -1182,6 +1189,24 @@ async def test_delete_user_other_tenant_returns_404_for_tenant_scoped_admin(
         username="other-tenant-user-delete",
         email="other-delete@x.com",
     )
+    response = await user_client.delete(
+        f"/api/v1/users/{created['id']}", headers={"X-User-Roles": "admin"}
+    )
+    assert_err(response, "NOT_FOUND", 404)
+    # The target survives -- a super admin can still fetch it afterwards.
+    fetched = assert_ok(await user_client.get(f"/api/v1/users/{created['id']}"))
+    assert fetched["id"] == created["id"]
+
+
+async def test_delete_super_admin_returns_404_for_tenant_scoped_admin(
+    user_client: AsyncClient,
+) -> None:
+    """A plain admin deleting a super_admin user gets 404, not success.
+
+    A super_admin target is invisible to a plain admin (see
+    :func:`_assert_tenant_visible`), same as a cross-tenant target.
+    """
+    created = await _create_user(user_client, roles=["super_admin"])
     response = await user_client.delete(
         f"/api/v1/users/{created['id']}", headers={"X-User-Roles": "admin"}
     )

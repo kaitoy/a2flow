@@ -18,11 +18,12 @@ restricts a non-super-admin actor to users sharing their own concrete tenant
 for every read/write that targets an existing user (``get``, and transitively
 ``update``/``delete``, plus ``list``'s query filter) — a cross-tenant
 reference surfaces as :class:`NotFoundError`, not :class:`ForbiddenError`, so
-existence in another tenant is never leaked. A ``super_admin`` actor is
-exempt, same as every other role check in this module, and so is a
-platform-scoped *target* (``tenant_id is None`` — a ``super_admin`` or the
-system user), matching the existing precedent that any admin may view or
-edit a super_admin's profile fields.
+existence in another tenant is never leaked. Only a ``super_admin`` actor is
+exempt, same as every other role check in this module — a platform-scoped
+*target* (``tenant_id is None`` — a ``super_admin`` or the system user) gets
+no separate exemption, so a plain ``admin`` can never view, edit, or delete a
+``super_admin``'s record; only the ``super_admin`` itself or another
+``super_admin`` actor can.
 """
 
 from collections.abc import Sequence
@@ -111,28 +112,30 @@ def _reject_super_admin_role_combination(roles: Sequence[str] | None) -> None:
 
 
 def _assert_tenant_visible(acting_user: User, target: User) -> None:
-    """Reject access to a user belonging to a different, concrete tenant.
+    """Reject access to a user outside the acting user's own tenant.
 
-    The boundary is between two actual tenants only: a platform-scoped
-    target (``target.tenant_id is None`` -- a ``super_admin`` or the seeded
-    system user) is exempt, matching the existing precedent that any admin
-    may view or edit a super_admin's profile fields (role changes are
-    separately gated in :meth:`UserService.update`). A ``super_admin`` actor
-    is likewise exempt, matching every other role check in this module. Any
-    other actor (including one with the ``admin`` role) may only see users
-    sharing their own tenant.
+    Only a ``super_admin`` actor is exempt from the tenant boundary, matching
+    every other role check in this module. Every non-super-admin user
+    (``admin`` included) is guaranteed by ``ck_users_non_super_admin_requires_tenant``
+    (:class:`~models.user.User`) to carry a concrete, non-null ``tenant_id``,
+    so a platform-scoped target (``target.tenant_id is None`` -- a
+    ``super_admin`` or the seeded system user) always fails the comparison
+    below for such an actor: a ``super_admin`` target can therefore only be
+    viewed, edited, or deleted by itself (via the ``super_admin`` exemption)
+    or by another ``super_admin`` actor, never by a plain ``admin``.
 
     Args:
         acting_user: The authenticated user making the request.
         target: The user record being accessed.
 
     Raises:
-        NotFoundError: If neither exemption applies and ``target.tenant_id``
-            differs from ``acting_user.tenant_id`` -- reported as "not
-            found" rather than "forbidden" so a cross-tenant reference never
-            confirms the target's existence.
+        NotFoundError: If the acting user is not a super admin and
+            ``target.tenant_id`` differs from ``acting_user.tenant_id`` --
+            reported as "not found" rather than "forbidden" so a cross-tenant
+            (or platform-scoped) reference never confirms the target's
+            existence.
     """
-    if has_role(acting_user, Role.super_admin) or target.tenant_id is None:
+    if has_role(acting_user, Role.super_admin):
         return
     if target.tenant_id != acting_user.tenant_id:
         raise NotFoundError("User", target.id)
@@ -268,12 +271,15 @@ class UserService:
     ) -> User:
         """Apply a partial update to a User, authorizing the acting user.
 
-        An ``admin`` (or ``super_admin``) may update any user and any field,
-        except that granting or revoking the ``super_admin`` role requires the
-        acting user to be a super admin. Any other caller may update only
-        their own record, and only its self-service fields
-        (:data:`_SELF_SERVICE_FIELDS` — the avatar customization edited from
-        the ``/profile`` page).
+        An ``admin`` may update any field of any user sharing their own
+        tenant, except that granting or revoking the ``super_admin`` role
+        requires the acting user to be a super admin. A ``super_admin``
+        target is never visible to a plain ``admin`` (see
+        :func:`_assert_tenant_visible`), so it can only be updated by itself
+        or by another ``super_admin`` actor, who may update any user and any
+        field. Any other caller may update only their own record, and only
+        its self-service fields (:data:`_SELF_SERVICE_FIELDS` — the avatar
+        customization edited from the ``/profile`` page).
 
         A blank or omitted password leaves the stored password unchanged; a
         non-empty password is hashed before persistence.
