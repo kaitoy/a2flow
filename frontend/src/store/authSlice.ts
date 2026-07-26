@@ -72,17 +72,18 @@ const authSlice = createSlice({
     },
     /**
      * Record the result of `getMe`/login/impersonate: the effective user and
-     * the real actor (if impersonating). If the server reports no active
-     * impersonation, clears `impersonatedUserId` too -- this is how a stale
-     * local selection (stopped elsewhere, target since ineligible) self-heals.
+     * the real actor (if impersonating). Reconciles `impersonatedUserId` to
+     * match: set to the effective user's id while impersonating, cleared
+     * otherwise -- this is how a stale local selection (stopped elsewhere,
+     * target since ineligible) self-heals, and how the very first `setMe`
+     * after a fresh impersonate/login response takes effect immediately
+     * rather than only after a future reload re-seeds it from `localStorage`.
      */
     setMe(state, action: PayloadAction<Me>) {
       state.user = action.payload.user;
       state.status = "authenticated";
       state.impersonatedBy = action.payload.impersonatedBy;
-      if (action.payload.impersonatedBy === null) {
-        state.impersonatedUserId = null;
-      }
+      state.impersonatedUserId = action.payload.impersonatedBy ? action.payload.user.id : null;
     },
     /** Clear the user and mark the session as unauthenticated. */
     clearUser(state) {

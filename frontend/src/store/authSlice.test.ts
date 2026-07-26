@@ -64,6 +64,7 @@ describe("authSlice", () => {
     expect(state.user).toEqual(TARGET);
     expect(state.status).toBe("authenticated");
     expect(state.impersonatedBy).toEqual(ACTOR);
+    expect(state.impersonatedUserId).toBe(TARGET.id);
   });
 
   it("setMe with a null impersonatedBy self-heals a stale impersonatedUserId", async () => {
