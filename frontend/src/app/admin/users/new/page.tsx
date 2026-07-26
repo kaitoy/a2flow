@@ -22,6 +22,7 @@ import { RolesField } from "@/components/admin/roles-field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createUser } from "@/lib/api";
@@ -130,9 +131,8 @@ export default function NewUserPage() {
           </FormField>
 
           <FormField htmlFor="password" label="Password" required error={errors.password?.message}>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               placeholder="At least 12 characters"
               {...register("password")}
             />

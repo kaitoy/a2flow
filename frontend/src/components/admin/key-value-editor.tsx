@@ -3,6 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 
 /** One editable key/value row. */
 export interface KeyValuePair {
@@ -36,7 +37,7 @@ export interface KeyValueEditorProps {
   valuePlaceholder?: string;
   /**
    * Input type for the value column. Use `"password"` for write-only values
-   * such as secret entries, so they are masked while being typed.
+   * such as secret entries, so they render masked with a show/hide toggle.
    */
   valueType?: "text" | "password";
 }
@@ -77,13 +78,22 @@ export function KeyValueEditor({
             value={pair.key}
             onChange={(e) => updateRow(index, { key: e.target.value })}
           />
-          <Input
-            aria-label={`${name} value ${index + 1}`}
-            type={valueType}
-            placeholder={valuePlaceholder}
-            value={pair.value}
-            onChange={(e) => updateRow(index, { value: e.target.value })}
-          />
+          {valueType === "password" ? (
+            <PasswordInput
+              aria-label={`${name} value ${index + 1}`}
+              placeholder={valuePlaceholder}
+              value={pair.value}
+              onChange={(e) => updateRow(index, { value: e.target.value })}
+            />
+          ) : (
+            <Input
+              aria-label={`${name} value ${index + 1}`}
+              type="text"
+              placeholder={valuePlaceholder}
+              value={pair.value}
+              onChange={(e) => updateRow(index, { value: e.target.value })}
+            />
+          )}
           <Button
             type="button"
             variant="danger"

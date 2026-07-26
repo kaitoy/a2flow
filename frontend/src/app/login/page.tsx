@@ -9,6 +9,7 @@ import { FormField } from "@/components/admin/form-field";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { login } from "@/lib/api";
 import { persistImpersonatedUserId } from "@/lib/impersonation";
@@ -100,10 +101,9 @@ export default function LoginPage() {
         </FormField>
 
         <FormField htmlFor="password" label="Password" required>
-          <Input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

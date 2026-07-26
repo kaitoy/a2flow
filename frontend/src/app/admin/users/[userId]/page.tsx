@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { type AvatarConfig, deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
@@ -248,9 +249,8 @@ export default function EditUserPage() {
           </FormField>
 
           <FormField htmlFor="password" label="Password" error={errors.password?.message}>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               placeholder="Leave blank to keep unchanged"
               {...register("password")}
             />
