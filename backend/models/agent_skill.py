@@ -46,7 +46,7 @@ class SkillSyncStatus(StrEnum):
 class AgentSkillUpdate(SQLModel):
     """Partial update payload for an AgentSkill — all fields are optional.
 
-    ``repo_auth_secret`` references one entry of a registered Secret in
+    ``repo_auth_password`` references one entry of a registered Secret in
     ``NAME/KEY`` form, whose value is used as the HTTP basic-auth password when
     cloning the repository, enabling private repos. The key is mandatory
     because a Secret holds a map of entries. ``repo_auth_username`` is the
@@ -61,7 +61,7 @@ class AgentSkillUpdate(SQLModel):
     repo_url: HttpUrl | None = None
     repo_path: RepoPath | None = None
     description: DescText | None = None
-    repo_auth_secret: SecretRef | None = None
+    repo_auth_password: SecretRef | None = None
     repo_auth_username: GitUsername | None = None
 
 

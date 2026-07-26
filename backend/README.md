@@ -119,7 +119,7 @@ Database URL for REST API data and ADK session storage — both live in the same
 | `users` | Application users (soft-deleted via `deleted_at`; `roles` holds their granted roles); see [Seeded users](#seeded-users) and [Authorization](#authorization-roles) |
 | `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](#authentication) |
 | `impersonation_events` | Audit trail of impersonation sessions (`impersonator_id`, `target_user_id`, `started_at`, `ended_at`); see [Authentication](#authentication) |
-| `agent_skills` | Agent skill definitions (incl. optional `repo_auth_secret` / `repo_auth_username` for private-repo clones) |
+| `agent_skills` | Agent skill definitions (incl. optional `repo_auth_password` / `repo_auth_username` for private-repo clones) |
 | `mcp_servers` | Registered MCP servers (name, `transport`, then either streamable HTTP URL + request headers or stdio command + args + env — header and env values may embed `${secret:NAME/KEY}` placeholders) |
 | `secrets` | Named key/value credential bundles: an `entries` map of Fernet-encrypted local values, or a HashiCorp Vault KV v2 path reference; see [Secrets](#secrets) |
 | `workflows` | Workflow definitions (name, skill reference, lifecycle `status`, summarized description) |
@@ -340,7 +340,7 @@ Sessions are created lazily: the backend ADK session is materialized on the firs
 
 Agent skills are reusable skill definitions that can be attached to workflows. Each record stores a unique `name`, a Git `repoUrl`, an optional `repoPath` (default `""`), and an optional `description`. Deleting a skill that is still referenced by one or more workflows returns `409 CONFLICT_REFERENCED`. CRUD endpoints are in the [API reference](http://localhost:3000/api-doc).
 
-Private repositories are supported through the optional `repoAuthSecret` field — a `NAME/KEY` reference to one entry of a registered [secret](#secrets), whose value is used as the HTTP basic-auth password for the clone — plus `repoAuthUsername` (default `x-access-token`, which suits GitHub PATs). Create/update validates that the **name** half exists (`422 FOREIGN_KEY_VIOLATION` otherwise); the key is not checked there, since a `vault` secret's keys would need a live Vault read and the two types should behave alike. The whole reference is resolved lazily at clone time: a later rename or delete of the secret, or a key that no longer exists, makes the next clone fail with `502 SECRET_RESOLUTION_FAILED`.
+Private repositories are supported through the optional `repoAuthPassword` field — a `NAME/KEY` reference to one entry of a registered [secret](#secrets), whose value is used as the HTTP basic-auth password for the clone — plus `repoAuthUsername` (default `x-access-token`, which suits GitHub PATs). Create/update validates that the **name** half exists (`422 FOREIGN_KEY_VIOLATION` otherwise); the key is not checked there, since a `vault` secret's keys would need a live Vault read and the two types should behave alike. The whole reference is resolved lazily at clone time: a later rename or delete of the secret, or a key that no longer exists, makes the next clone fail with `502 SECRET_RESOLUTION_FAILED`.
 
 The content at `repoUrl`/`repoPath` (e.g. `SKILL.md`) is loaded directly into the workflow agent's LLM prompt, unsandboxed — only register repositories you trust, since their content is effectively an instruction to the agent, not inert data.
 

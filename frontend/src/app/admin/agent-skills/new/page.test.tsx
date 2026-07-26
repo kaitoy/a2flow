@@ -47,7 +47,7 @@ describe("NewAgentSkillPage", () => {
     await waitFor(() => expect(createSpy).toHaveBeenCalled());
   });
 
-  it("submits auth secret and username when provided", async () => {
+  it("submits auth password and username when provided", async () => {
     const user = userEvent.setup();
     let receivedBody: unknown;
     server.use(
@@ -73,7 +73,7 @@ describe("NewAgentSkillPage", () => {
     render(<NewAgentSkillPage />);
     await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
-    await user.type(screen.getByLabelText(/auth secret/i), "git-token/pat");
+    await user.type(screen.getByLabelText(/auth password/i), "git-token/pat");
     await user.type(screen.getByLabelText(/auth username/i), "oauth2");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -82,7 +82,7 @@ describe("NewAgentSkillPage", () => {
         name: "Test",
         repoUrl: "https://x.com",
         description: null,
-        repoAuthSecret: "git-token/pat",
+        repoAuthPassword: "git-token/pat",
         repoAuthUsername: "oauth2",
       })
     );
@@ -177,7 +177,7 @@ describe("NewAgentSkillPage", () => {
     const user = userEvent.setup();
     server.use(
       http.post("http://localhost:8000/api/v1/agent-skills", () =>
-        envelopeErr("INVALID_SECRET", "Auth secret is invalid for this repo", 422)
+        envelopeErr("INVALID_SECRET", "Auth password is invalid for this repo", 422)
       )
     );
 
@@ -188,7 +188,7 @@ describe("NewAgentSkillPage", () => {
 
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
-        message: "Auth secret is invalid for this repo",
+        message: "Auth password is invalid for this repo",
         variant: "error",
       })
     );

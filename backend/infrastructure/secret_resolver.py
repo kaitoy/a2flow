@@ -9,7 +9,7 @@ plaintext value, used by every consumer:
   :class:`services.mcp_server.MCPServerService` and the agent proxy tools in
   :mod:`infrastructure.mcp_tools`.
 * :class:`services.workflow.WorkflowService` resolves an AgentSkill's
-  ``repo_auth_secret`` (a bare ``NAME/KEY`` reference) before cloning.
+  ``repo_auth_password`` (a bare ``NAME/KEY`` reference) before cloning.
 
 The module lives in the infrastructure layer (not ``services``) because
 :mod:`infrastructure.mcp_tools` needs it: an infrastructure module importing
@@ -106,7 +106,7 @@ class SecretResolver:
         """Return the plaintext value named by a bare ``NAME/KEY`` reference.
 
         Used by fields that store a reference directly rather than embedding it
-        in a placeholder, such as an AgentSkill's ``repo_auth_secret``.
+        in a placeholder, such as an AgentSkill's ``repo_auth_password``.
 
         Args:
             ref: The reference to resolve.

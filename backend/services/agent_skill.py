@@ -27,13 +27,13 @@ class AgentSkillService:
 
         Args:
             repo: Repository providing AgentSkill persistence.
-            secrets: Repository used to check that a ``repo_auth_secret``
+            secrets: Repository used to check that a ``repo_auth_password``
                 names an existing Secret at create/update time.
         """
         self._repo = repo
         self._secrets = secrets
 
-    async def _check_auth_secret(self, ref: str | None) -> None:
+    async def _check_auth_password(self, ref: str | None) -> None:
         """Raise if ``ref`` is set but names no existing Secret.
 
         Only the name half of the ``NAME/KEY`` reference is checked. Whether the
@@ -44,7 +44,7 @@ class AgentSkillService:
         later rename or delete of the secret still fails lazily at clone time.
 
         Args:
-            ref: The ``repo_auth_secret`` value from the payload, or ``None``.
+            ref: The ``repo_auth_password`` value from the payload, or ``None``.
 
         Raises:
             ForeignKeyViolationError: If the named secret does not exist.
@@ -106,10 +106,10 @@ class AgentSkillService:
             The created AgentSkill.
 
         Raises:
-            ForeignKeyViolationError: If ``repo_auth_secret`` names a Secret
+            ForeignKeyViolationError: If ``repo_auth_password`` names a Secret
                 that does not exist.
         """
-        await self._check_auth_secret(data.repo_auth_secret)
+        await self._check_auth_password(data.repo_auth_password)
         return await self._repo.create(data, user_id=user_id)
 
     async def update(
@@ -127,10 +127,10 @@ class AgentSkillService:
 
         Raises:
             NotFoundError: If no skill exists with the given ID.
-            ForeignKeyViolationError: If ``repo_auth_secret`` names a Secret
+            ForeignKeyViolationError: If ``repo_auth_password`` names a Secret
                 that does not exist.
         """
-        await self._check_auth_secret(data.repo_auth_secret)
+        await self._check_auth_password(data.repo_auth_password)
         return await self._repo.update(skill_id, data, user_id=user_id)
 
     async def mark_pending(self, skill_id: str, *, user_id: str) -> AgentSkill:

@@ -224,7 +224,7 @@ The list and edit pages show each skill's **Status** (`Cloning` / `ready` / `fai
 
 Under `docker compose`, `SKILLS_DIR` is `/var/lib/a2flow/skills`, persisted in the `skills` Docker volume so the store survives container recreation. It is **durable state, not a cache**: a workflow session pins the revision it started with, so wiping the directory leaves existing sessions unable to load their skill until an admin pulls again. Scaling the backend past one replica requires every replica to mount this same volume.
 
-Private repositories are supported through the optional **Auth Secret** field: set it to a `name/key` reference to one entry of a registered [Secret](#secrets) (e.g. `git-credentials/github-pat`) and that entry's value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name. The secret is resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill.
+Private repositories are supported through the optional **Auth Password** field: set it to a `name/key` reference to one entry of a registered [Secret](#secrets) (e.g. `git-credentials/github-pat`) and that entry's value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name. The secret is resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill.
 
 ### MCP Servers
 
@@ -262,7 +262,7 @@ A secret is a **named bundle of key/value entries**, the same shape [HashiCorp V
 A single entry is referenced as `name/key`:
 
 - **MCP server headers and environment** — any header value (streamable HTTP) or environment variable value (stdio) may embed `${secret:name/key}` placeholders, expanded when connecting (see [MCP Servers](#mcp-servers)).
-- **Agent Skill repository clones** — a skill's **Auth Secret** is a `name/key` reference to the entry used as the git basic-auth password (see [Agent Skills](#agent-skills)).
+- **Agent Skill repository clones** — a skill's **Auth Password** is a `name/key` reference to the entry used as the git basic-auth password (see [Agent Skills](#agent-skills)).
 
 The key is **always required**, even when the secret holds a single entry — a bare name identifies a map, not a value. A key-less `${secret:name}` fails with `SECRET_RESOLUTION_FAILED` rather than being passed through as a literal string.
 

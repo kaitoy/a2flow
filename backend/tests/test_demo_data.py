@@ -368,7 +368,7 @@ async def test_demo_agent_skill_points_at_the_sample_skill(
     assert skill.tenant_id == TENANT_ID
     assert skill.repo_url == "https://github.com/kaitoy/a2flow"
     assert skill.repo_path == "sample_skills/aws-ec2-launch"
-    assert skill.repo_auth_secret is None
+    assert skill.repo_auth_password is None
     # Cloning is the caller's job, so the row starts out unpublished.
     assert skill.sync_status is SkillSyncStatus.pending
     assert skill.commit_sha is None

@@ -68,7 +68,7 @@ describe("EditAgentSkillPage", () => {
     setup();
     server.use(
       http.get("http://localhost:8000/api/v1/agent-skills/:skillId", () =>
-        envelope({ ...FULL_SKILL, repoAuthSecret: "git-token/pat", repoAuthUsername: "oauth2" })
+        envelope({ ...FULL_SKILL, repoAuthPassword: "git-token/pat", repoAuthUsername: "oauth2" })
       )
     );
     let receivedBody: unknown;
@@ -82,7 +82,7 @@ describe("EditAgentSkillPage", () => {
     render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => expect(screen.getByDisplayValue("git-token/pat")).toBeInTheDocument());
     expect(screen.getByDisplayValue("oauth2")).toBeInTheDocument();
-    await userEvent.clear(screen.getByLabelText(/auth secret/i));
+    await userEvent.clear(screen.getByLabelText(/auth password/i));
     await userEvent.clear(screen.getByLabelText(/auth username/i));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -92,7 +92,7 @@ describe("EditAgentSkillPage", () => {
         repoUrl: "https://github.com/example/repo",
         repoPath: "",
         description: null,
-        repoAuthSecret: null,
+        repoAuthPassword: null,
         repoAuthUsername: null,
       })
     );

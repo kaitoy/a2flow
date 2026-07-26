@@ -4,7 +4,7 @@ A Secret is a named bundle of key/value entries — the same shape HashiCorp
 Vault's KV engine uses, where one path holds a map of keys to values. MCP server
 headers and environment variables reference a single entry through
 ``${secret:NAME/KEY}`` placeholders, and AgentSkills reference one through
-``repo_auth_secret``. The key is always required: a bare name identifies a map,
+``repo_auth_password``. The key is always required: a bare name identifies a map,
 not a value.
 
 Two shapes exist, discriminated by ``type``:

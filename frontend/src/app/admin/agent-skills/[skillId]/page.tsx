@@ -41,8 +41,8 @@ import { showToast } from "@/store/toastSlice";
 // The generated auth fields are nullish with min-length 1, so a blank input
 // would fail validation; the form allows the empty string ("no auth") and
 // maps it to null on submit, clearing the field server-side.
-const schema = zAgentSkillCreate.omit({ repoAuthSecret: true, repoAuthUsername: true }).extend({
-  repoAuthSecret: z.literal("").or(zAgentSkillCreate.shape.repoAuthSecret.unwrap().unwrap()),
+const schema = zAgentSkillCreate.omit({ repoAuthPassword: true, repoAuthUsername: true }).extend({
+  repoAuthPassword: z.literal("").or(zAgentSkillCreate.shape.repoAuthPassword.unwrap().unwrap()),
   repoAuthUsername: z.literal("").or(zAgentSkillCreate.shape.repoAuthUsername.unwrap().unwrap()),
 });
 
@@ -84,7 +84,7 @@ export default function EditAgentSkillPage() {
       repoUrl: "",
       repoPath: "",
       description: "",
-      repoAuthSecret: "",
+      repoAuthPassword: "",
       repoAuthUsername: "",
     },
   });
@@ -105,7 +105,7 @@ export default function EditAgentSkillPage() {
           repoUrl: skill.repoUrl,
           repoPath: skill.repoPath,
           description: skill.description ?? "",
-          repoAuthSecret: skill.repoAuthSecret ?? "",
+          repoAuthPassword: skill.repoAuthPassword ?? "",
           repoAuthUsername: skill.repoAuthUsername ?? "",
         });
         applySync(skill);
@@ -154,7 +154,7 @@ export default function EditAgentSkillPage() {
           repoUrl: values.repoUrl,
           repoPath: values.repoPath,
           description: values.description || null,
-          repoAuthSecret: values.repoAuthSecret || null,
+          repoAuthPassword: values.repoAuthPassword || null,
           repoAuthUsername: values.repoAuthUsername || null,
         });
         dispatch(showToast({ message: "Agent skill updated" }));
@@ -257,31 +257,31 @@ export default function EditAgentSkillPage() {
           </FormField>
 
           <FormField
-            htmlFor="repoAuthSecret"
-            label="Auth Secret"
-            error={errors.repoAuthSecret?.message}
-          >
-            <Input
-              id="repoAuthSecret"
-              placeholder="name/key for private repos (optional)"
-              {...register("repoAuthSecret")}
-            />
-            <p className="mt-1 text-xs text-on-surface-variant">
-              One entry of a registered Secret, written as name/key, used as the clone token for a
-              private repository.
-            </p>
-          </FormField>
-
-          <FormField
             htmlFor="repoAuthUsername"
             label="Auth Username"
             error={errors.repoAuthUsername?.message}
           >
             <Input
               id="repoAuthUsername"
-              placeholder="x-access-token (default)"
+              placeholder="e.g. octocat (optional)"
               {...register("repoAuthUsername")}
             />
+          </FormField>
+
+          <FormField
+            htmlFor="repoAuthPassword"
+            label="Auth Password"
+            error={errors.repoAuthPassword?.message}
+          >
+            <Input
+              id="repoAuthPassword"
+              placeholder="name/key for private repos (optional)"
+              {...register("repoAuthPassword")}
+            />
+            <p className="mt-1 text-xs text-on-surface-variant">
+              One entry of a registered Secret, written as name/key, used as the clone token for a
+              private repository.
+            </p>
           </FormField>
 
           <div className="flex gap-2">

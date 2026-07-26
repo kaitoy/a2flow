@@ -449,7 +449,7 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
 async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str | None:
     """Create the demo agent skill pointing at this repository's sample skill.
 
-    The repository is public, so no ``repo_auth_secret`` is needed. The row is
+    The repository is public, so no ``repo_auth_password`` is needed. The row is
     left ``pending``: cloning is the caller's job, since it is a network
     operation that must not block application startup.
 

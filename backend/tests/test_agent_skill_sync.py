@@ -145,13 +145,13 @@ async def test_an_unforeseen_clone_error_still_settles_the_skill() -> None:
     assert "401 Unauthorized" in kwargs["error"]
 
 
-async def test_unresolvable_auth_secret_is_recorded_as_a_failure() -> None:
-    """A dangling repo_auth_secret fails the clone rather than escaping the job."""
+async def test_unresolvable_auth_password_is_recorded_as_a_failure() -> None:
+    """A dangling repo_auth_password fails the clone rather than escaping the job."""
     resolve = AsyncMock(
         side_effect=SecretResolutionError("git-token", "no such secret")
     )
     service, skills, store = _service(
-        _skill(repo_auth_secret="git-token/token"), resolve=resolve
+        _skill(repo_auth_password="git-token/token"), resolve=resolve
     )
 
     await service.sync("skill-1", user_id="alice")
@@ -160,8 +160,8 @@ async def test_unresolvable_auth_secret_is_recorded_as_a_failure() -> None:
     assert skills.set_sync_state.await_args.kwargs["status"] == SkillSyncStatus.failed
 
 
-async def test_auth_secret_is_resolved_into_basic_auth_credentials() -> None:
-    service, _skills, store = _service(_skill(repo_auth_secret="git-token/token"))
+async def test_auth_password_is_resolved_into_basic_auth_credentials() -> None:
+    service, _skills, store = _service(_skill(repo_auth_password="git-token/token"))
 
     await service.sync("skill-1", user_id="alice")
 
@@ -170,7 +170,7 @@ async def test_auth_secret_is_resolved_into_basic_auth_credentials() -> None:
 
 async def test_explicit_auth_username_overrides_the_default() -> None:
     service, _skills, store = _service(
-        _skill(repo_auth_secret="git-token/token", repo_auth_username="git")
+        _skill(repo_auth_password="git-token/token", repo_auth_username="git")
     )
 
     await service.sync("skill-1", user_id="alice")
@@ -178,7 +178,7 @@ async def test_explicit_auth_username_overrides_the_default() -> None:
     assert store.clone.await_args.kwargs["auth"] == ("git", "tok-123")
 
 
-async def test_skill_without_auth_secret_clones_anonymously() -> None:
+async def test_skill_without_auth_password_clones_anonymously() -> None:
     service, _skills, store = _service(_skill())
 
     await service.sync("skill-1", user_id="alice")

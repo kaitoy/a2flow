@@ -97,7 +97,7 @@ SecretEntryKey = Annotated[
 #: Reference to one entry of a secret, in ``NAME/KEY`` form. The key is
 #: mandatory: a secret holds a map of entries, so a bare name never identifies a
 #: single value. Used by fields that name a secret directly rather than through
-#: a ``${secret:...}`` placeholder (e.g. ``AgentSkill.repo_auth_secret``).
+#: a ``${secret:...}`` placeholder (e.g. ``AgentSkill.repo_auth_password``).
 SECRET_REF_PATTERN = r"^[a-zA-Z0-9._-]+/[^{}]+$"
 SecretRef = Annotated[
     str, StringConstraints(min_length=3, max_length=385, pattern=SECRET_REF_PATTERN)

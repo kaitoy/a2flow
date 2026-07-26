@@ -40,7 +40,7 @@ from repositories.tenant_bootstrap import resolve_agent_skill_tenant
 logger = logging.getLogger(__name__)
 
 #: Basic-auth username used for a skill clone when the skill names an auth
-#: secret but no explicit ``repo_auth_username``. Works for GitHub PATs, where
+#: password but no explicit ``repo_auth_username``. Works for GitHub PATs, where
 #: the username is ignored as long as the token is the password.
 _DEFAULT_GIT_USERNAME = "x-access-token"
 
@@ -69,7 +69,7 @@ class AgentSkillSyncService:
                 still pin, so a prune does not delete code a session needs.
             planning_sessions: Repository used to find which revisions planning
                 sessions still pin, for the same reason.
-            resolver: Resolver turning a skill's ``repo_auth_secret`` into the
+            resolver: Resolver turning a skill's ``repo_auth_password`` into the
                 clone credential.
             skill_manager: Store that publishes and prunes revision directories.
         """
@@ -110,8 +110,8 @@ class AgentSkillSyncService:
                 skill_sync_key(skill_id), wait_seconds=_LOCK_WAIT_SECONDS
             ):
                 auth: tuple[str, str] | None = None
-                if skill.repo_auth_secret is not None:
-                    token = await self._resolver.resolve_ref(skill.repo_auth_secret)
+                if skill.repo_auth_password is not None:
+                    token = await self._resolver.resolve_ref(skill.repo_auth_password)
                     auth = (skill.repo_auth_username or _DEFAULT_GIT_USERNAME, token)
 
                 commit_sha = await self._skill_manager.clone(skill, auth=auth)
