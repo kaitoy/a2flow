@@ -93,14 +93,14 @@ describe("UserMenu", () => {
 
   it("moves focus into the menu when it opens", async () => {
     render(<Harness user={makeUser()} onClose={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveFocus());
   });
 
   it("closes and returns focus to the anchor on Escape", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     render(<Harness user={makeUser()} onClose={onClose} />);
-    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveFocus());
 
     await user.keyboard("{Escape}");
 
@@ -111,7 +111,7 @@ describe("UserMenu", () => {
   it("closes on an outside pointerdown and returns focus to the anchor", async () => {
     const onClose = vi.fn();
     render(<Harness user={makeUser()} onClose={onClose} />);
-    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveFocus());
 
     fireEvent.pointerDown(document.body);
 
@@ -122,12 +122,12 @@ describe("UserMenu", () => {
   it("wraps Tab from the last item back to the first", async () => {
     const user = userEvent.setup();
     render(<Harness user={makeUser()} onClose={vi.fn()} />);
-    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveFocus());
 
     await user.tab();
     expect(screen.getByRole("menuitem", { name: "Log out" })).toHaveFocus();
     await user.tab();
 
-    expect(screen.getByRole("menuitem", { name: "Account" })).toHaveFocus();
+    expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveFocus();
   });
 });

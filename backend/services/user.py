@@ -34,7 +34,7 @@ from repositories.exceptions import ForbiddenError, NotFoundError, UserValidatio
 from repositories.query import FilterSpec, SortSpec
 
 #: Fields a non-admin user may update on their own record via ``PATCH``.
-#: Matches what the self-service ``/account`` page sends (avatar customization
+#: Matches what the self-service ``/profile`` page sends (avatar customization
 #: only); everything else requires the ``admin`` role.
 _SELF_SERVICE_FIELDS = frozenset({"avatar_config"})
 
@@ -273,7 +273,7 @@ class UserService:
         acting user to be a super admin. Any other caller may update only
         their own record, and only its self-service fields
         (:data:`_SELF_SERVICE_FIELDS` — the avatar customization edited from
-        the ``/account`` page).
+        the ``/profile`` page).
 
         A blank or omitted password leaves the stored password unchanged; a
         non-empty password is hashed before persistence.

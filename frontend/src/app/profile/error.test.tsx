@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import RouteError from "./error";
 
-describe("Account RouteError", () => {
+describe("Profile RouteError", () => {
   it("renders the fallback and wires the reset action", async () => {
     const reset = vi.fn();
     render(<RouteError error={new Error("boom")} reset={reset} />);

@@ -1,4 +1,4 @@
-/** @module AvatarCustomizer — Self-service editor for a user's avatar (uploaded image and generated default). */
+/** @module AvatarCustomizer — Editable avatar section of the profile page (uploaded image and generated default). */
 "use client";
 
 import { useState } from "react";
@@ -18,12 +18,16 @@ interface AvatarCustomizerProps {
 }
 
 /**
- * Editor for a signed-in user's avatar. The top section uploads or removes a
- * custom image (which takes priority everywhere it is shown); the lower section
- * customizes the generated avatar by editing the color palette it is drawn
- * from, used when no image is uploaded. Both an upload/removal and a saved
- * {@link AvatarConfig} refresh the auth slice so every avatar across the app
- * (including the header button) updates immediately.
+ * The one editable section of the profile page: a signed-in user's avatar. The
+ * top part uploads or removes a custom image (which takes priority everywhere
+ * it is shown); the lower part customizes the generated avatar by editing the
+ * color palette it is drawn from, used when no image is uploaded. Both an
+ * upload/removal and a saved {@link AvatarConfig} refresh the auth slice so
+ * every avatar across the app (including the header button) updates
+ * immediately.
+ *
+ * Renders as a self-contained card; the surrounding page owns the page title
+ * and the column layout.
  */
 export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
   const dispatch = useAppDispatch();
@@ -69,54 +73,48 @@ export function AvatarCustomizer({ user }: AvatarCustomizerProps) {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-8">
-      <h1 className="font-display text-3xl font-semibold tracking-tight text-gradient-accent">
-        Customize Avatar
-      </h1>
+    <section className="flex flex-col gap-6 rounded-2xl glass-panel-strong p-6">
+      <h2 className="font-display text-lg font-semibold tracking-tight text-on-surface">Avatar</h2>
 
-      <div className="flex flex-col gap-6 rounded-2xl glass-panel-strong p-6">
-        <AvatarField user={user} onChange={(updated) => dispatch(setUser(updated))} />
+      <AvatarField user={user} onChange={(updated) => dispatch(setUser(updated))} />
 
-        <div className="flex flex-col gap-1 border-t border-glass-border pt-6">
-          <h2 className="font-display text-sm font-semibold tracking-tight text-on-surface">
-            Generated avatar
-          </h2>
-          <p className="text-xs text-on-surface-variant">Used when no image is uploaded.</p>
-        </div>
+      <div className="flex flex-col gap-1 border-t border-glass-border pt-6">
+        <h3 className="text-sm font-semibold text-on-surface">Generated avatar</h3>
+        <p className="text-xs text-on-surface-variant">Used when no image is uploaded.</p>
+      </div>
 
-        <div className="flex items-center gap-4">
-          <Avatar user={previewUser} size={96} />
-        </div>
+      <div className="flex items-center gap-4">
+        <Avatar user={previewUser} size={96} />
+      </div>
 
-        <PalettePicker colors={colors} onChange={setColorAt} />
+      <PalettePicker colors={colors} onChange={setColorAt} />
 
-        <div className="flex flex-col items-end gap-2">
-          {error && <p className="text-xs text-error">{error}</p>}
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="primary"
-              onClick={handleSave}
-              disabled={action.inFlight}
-              status={pendingAction === "save" ? action.status : "idle"}
-              pendingLabel="Saving…"
-              doneLabel="Saved!"
-            >
-              Save
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={handleReset}
-              disabled={action.inFlight}
-              status={pendingAction === "reset" ? action.status : "idle"}
-              pendingLabel="Resetting…"
-              doneLabel="Reset!"
-            >
-              Reset to default
-            </Button>
-          </div>
+      <div className="flex flex-col items-end gap-2">
+        {error && <p className="text-xs text-error">{error}</p>}
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            variant="primary"
+            onClick={handleSave}
+            disabled={action.inFlight}
+            status={pendingAction === "save" ? action.status : "idle"}
+            pendingLabel="Saving…"
+            doneLabel="Saved!"
+          >
+            Save
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={handleReset}
+            disabled={action.inFlight}
+            status={pendingAction === "reset" ? action.status : "idle"}
+            pendingLabel="Resetting…"
+            doneLabel="Reset!"
+          >
+            Reset to default
+          </Button>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 

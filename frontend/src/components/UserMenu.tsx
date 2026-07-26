@@ -1,4 +1,4 @@
-/** @module UserMenu — Account dropdown showing the signed-in user and a logout action. */
+/** @module UserMenu — Profile dropdown showing the signed-in user and a logout action. */
 "use client";
 
 import { animated, useTransition } from "@react-spring/web";
@@ -48,7 +48,7 @@ function displayName(user: User): string {
 }
 
 /**
- * Floating account menu anchored beneath the toolbar profile button. Shows the
+ * Floating profile menu anchored beneath the toolbar profile button. Shows the
  * signed-in user's name and username and a logout action. Rendered via a portal
  * so it is never clipped by the header, and animated in/out with the project's
  * motion preset.
@@ -120,7 +120,7 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
             id="user-menu"
             role="menu"
             tabIndex={-1}
-            aria-label="Account menu"
+            aria-label="Profile menu"
             style={{
               position: "fixed",
               top: coords.top,
@@ -159,11 +159,11 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
                 role="menuitem"
                 onClick={() => {
                   onClose();
-                  router.push("/account");
+                  router.push("/profile");
                 }}
                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               >
-                Account
+                Profile
               </button>
             )}
             <button

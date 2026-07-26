@@ -27,13 +27,13 @@ function makeUser(overrides: Partial<User> = {}): User {
 }
 
 describe("UserProfileButton", () => {
-  it("opens the account menu when clicked", async () => {
+  it("opens the profile menu when clicked", async () => {
     const user = userEvent.setup();
     render(<UserProfileButton />, {
       preloadedState: { auth: { user: makeUser(), status: "authenticated" } },
     });
 
-    await user.click(screen.getByRole("button", { name: "Account" }));
+    await user.click(screen.getByRole("button", { name: "Profile" }));
 
     await waitFor(() => expect(screen.getByRole("menu")).toBeInTheDocument());
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();

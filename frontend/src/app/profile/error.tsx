@@ -5,7 +5,7 @@ import { RouteErrorFallback } from "@/components/ui/route-error-fallback";
 import logger from "@/lib/logger";
 
 /**
- * Error boundary for `/account`. Renders inside `AccountLayout` (not the
+ * Error boundary for `/profile`. Renders inside `ProfileLayout` (not the
  * layout itself), so the shared `AppHeader` stays mounted — only the page
  * content swaps to this fallback.
  */

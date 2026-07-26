@@ -1,4 +1,4 @@
-/** @module AppHeader — Shared top bar with logo, title, and account actions. */
+/** @module AppHeader — Shared top bar with logo, title, and profile actions. */
 "use client";
 
 import { Menu } from "lucide-react";
@@ -30,7 +30,7 @@ export interface AppHeaderProps {
 /**
  * Application top bar shared by the chat, admin, and standalone shells. Renders
  * the A2Flow logo and title (linking to the welcome page) on the left and the
- * notification, theme, and account profile controls on the right. Any
+ * notification, theme, and user profile controls on the right. Any
  * `children` render next to the title as contextual content. Shells with a
  * sidebar pass `onMenuClick` to expose it as a drawer on mobile.
  */

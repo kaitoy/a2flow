@@ -1,8 +1,9 @@
 /** @module AuditMeta — Read-only audit footer resolving created/updated user IDs to names. */
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { DateTime } from "@/components/ui/date-time";
+import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { getUserNames } from "@/lib/api";
 
 /** Props for {@link AuditMeta}: the audit fields shared by every persistent entity. */
@@ -15,16 +16,6 @@ export interface AuditMetaProps {
   createdAt?: string;
   /** ISO timestamp the record was last updated, if available. */
   updatedAt?: string;
-}
-
-/** Render a single labelled metadata cell. The value may be text or a node (e.g. a {@link DateTime}). */
-function MetaItem({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-xs uppercase tracking-wide text-on-surface-variant">{label}</dt>
-      <dd className="text-sm text-on-surface">{value}</dd>
-    </div>
-  );
 }
 
 /**
@@ -52,11 +43,11 @@ export function AuditMeta({ createdBy, updatedBy, createdAt, updatedAt }: AuditM
   const nameOf = (id: string) => names.get(id) ?? id;
 
   return (
-    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl glass-panel p-4 text-on-surface-variant">
-      <MetaItem label="Created by" value={nameOf(createdBy)} />
-      <MetaItem label="Updated by" value={nameOf(updatedBy)} />
-      {createdAt && <MetaItem label="Created at" value={<DateTime value={createdAt} />} />}
-      {updatedAt && <MetaItem label="Updated at" value={<DateTime value={updatedAt} />} />}
-    </dl>
+    <DetailList className="rounded-xl glass-panel p-4 text-on-surface-variant">
+      <DetailItem label="Created by" value={nameOf(createdBy)} />
+      <DetailItem label="Updated by" value={nameOf(updatedBy)} />
+      {createdAt && <DetailItem label="Created at" value={<DateTime value={createdAt} />} />}
+      {updatedAt && <DetailItem label="Updated at" value={<DateTime value={updatedAt} />} />}
+    </DetailList>
   );
 }

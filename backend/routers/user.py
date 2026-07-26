@@ -106,7 +106,7 @@ async def update_user(
     """Apply a partial update to a user and return it without the password hash.
 
     Admins may update any user; other callers may update only their own
-    avatar customization (the self-service ``/account`` page). The
+    avatar customization (the self-service ``/profile`` page). The
     authorization rules live in :meth:`UserService.update`.
     """
     user = await service.update(user_id, body, acting_user=acting_user)

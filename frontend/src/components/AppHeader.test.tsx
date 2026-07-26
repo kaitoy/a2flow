@@ -18,7 +18,7 @@ describe("AppHeader", () => {
     render(<AppHeader />);
     expect(screen.getByAltText("A2Flow logo")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /account/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /profile/i })).toBeInTheDocument();
     expect(screen.getByTestId("theme-toggle-mock")).toBeInTheDocument();
   });
 

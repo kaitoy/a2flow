@@ -1,4 +1,4 @@
-/** @module UserProfileButton — Toolbar account button opening the user menu. */
+/** @module UserProfileButton — Toolbar profile button opening the user menu. */
 "use client";
 
 import { useCallback, useRef, useState } from "react";
@@ -13,7 +13,7 @@ interface UserProfileButtonProps {
 }
 
 /**
- * Toolbar button showing a user glyph that opens the account menu.
+ * Toolbar button showing a user glyph that opens the profile menu.
  *
  * Reads the signed-in user from the Redux auth slice and toggles a
  * {@link UserMenu} dropdown anchored to the button. The button always renders so
@@ -40,13 +40,13 @@ export function UserProfileButton({ className }: UserProfileButtonProps) {
 
   return (
     <>
-      <Tooltip label="Account" placement="bottom">
+      <Tooltip label="Profile" placement="bottom">
         <button
           ref={buttonRef}
           type="button"
           onClick={toggle}
           className={cls}
-          aria-label="Account"
+          aria-label="Profile"
           aria-haspopup="menu"
           aria-expanded={open}
         >
