@@ -60,6 +60,8 @@ cd frontend && pnpm test --run
 
 All tests must pass. A change is not complete while tests are failing.
 
+Skip this manual run if you're about to commit immediately afterward — lefthook's pre-commit hook (see [git-workflow.md](.claude/rules/git-workflow.md)) already runs the full backend and frontend suites, so running them again first just duplicates that work. Run it manually when you want feedback mid-task, before the commit step.
+
 ## Keeping README.md up to date
 
 Whenever a change falls into any of the following categories, update [README.md](README.md) to reflect it before considering the change done:
