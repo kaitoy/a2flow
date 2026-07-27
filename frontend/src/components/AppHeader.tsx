@@ -65,13 +65,13 @@ export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
             className="h-10 w-auto"
             priority
           />
-          <h1 className="font-display text-[22px] leading-[32px] font-semibold tracking-tight text-gradient-accent">
+          <h1 className="max-md:hidden font-display text-[22px] leading-[32px] font-semibold tracking-tight text-gradient-accent">
             A2Flow
           </h1>
         </Link>
         {children}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <ImpersonationIndicator />
         <TenantSwitcher />
         <NotificationBell />
