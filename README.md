@@ -4,7 +4,7 @@
 
 A chat application that connects a [Google ADK](https://google.github.io/adk-docs/) agent to a Next.js UI using the [AG-UI protocol](https://docs.ag-ui.com/concepts/events). The agent supports [A2UI](https://a2ui.org/) — when it needs input from the user it renders interactive A2UI input components (text fields, choice pickers, buttons) so the user can see exactly what to provide, while purely informational replies stream token-by-token as Markdown-rendered text so the user never waits on a tool call.
 
-The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference. A **notification center** in the top toolbar surfaces workflow events such as generated drafts and approval requests (see [Notifications](#notifications)).
+The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference. A **notification center** in the top toolbar surfaces unread workflow events such as generated drafts and approval requests, with the full history available from a dedicated Notifications page reachable from the account menu (see [Notifications](#notifications)).
 
 The UI is **responsive**: below the `md` breakpoint every sidebar (chat session list, admin navigation, workflow task timeline) collapses into an off-canvas drawer opened from a hamburger button in the header, layouts use dynamic-viewport heights so mobile URL bars don't clip the chat input, and touch devices get always-visible controls, ~44px tap targets, 16px form fields (no iOS focus zoom), and Enter-as-newline in the chat input.
 
@@ -191,7 +191,7 @@ Navigate to [http://localhost:3000/admin/tenants](http://localhost:3000/admin/te
 | Create a new tenant | `GET /admin/tenants/new` |
 | Edit / delete a tenant | `GET /admin/tenants/{id}` |
 
-Each tenant record stores a unique `displayName` (human-readable label), a unique URL-safe `name` (lowercase kebab-case, intended for use in paths or subdomains by later tasks), and an `enabled` flag for deactivating a tenant without deleting it. A [user](#users) belongs to at most one tenant (`User.tenantId`); a tenant cannot be deleted while any user is still assigned to it — the API rejects the delete with HTTP 409 (`CONFLICT_REFERENCED`) instead. A **Default** tenant (`name: default`) is seeded automatically on first startup, holding the initial seeded `admin` user.
+Each tenant record stores a unique `displayName` (human-readable label), a unique URL-safe `name` (lowercase kebab-case, intended for use in paths or subdomains by later tasks), and an `enabled` flag for deactivating a tenant without deleting it — disabling a tenant blocks sign-in for its users and signs out anyone already logged in on their next request. A [user](#users) belongs to at most one tenant (`User.tenantId`); a tenant cannot be deleted while any user is still assigned to it — the API rejects the delete with HTTP 409 (`CONFLICT_REFERENCED`) instead. A **Default** tenant (`name: default`) is seeded automatically on first startup, holding the initial seeded `admin` user.
 
 ### Agent Skills
 
@@ -407,6 +407,8 @@ Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/
 
 A **bell icon** in the top toolbar (present on both the chat header and the admin sidebar) opens a notification center with an unread-count badge. Notifications are **per-user**, persisted in `a2flow.db`, and delivered by **polling** (the frontend refreshes every 30 seconds).
 
+The bell's dropdown lists **unread notifications only** — it is there to surface what still needs attention. The full history, read items included, lives on a dedicated [Notifications page](#notification-history-page), reachable from the account menu (toolbar profile button → **Notifications**), which is also the only place a notification can be deleted.
+
 Three workflow events generate a notification. The recipient depends on the event: a `request_approval` notification is addressed to that approval's **designated approver**, while the others are addressed to the **user who started the session or generation**:
 
 | Type | Raised when |
@@ -415,9 +417,13 @@ Three workflow events generate a notification. The recipient depends on the even
 | `approval_request` | The agent requests a mid-execution decision (`request_approval`) and waits for the designated approver. |
 | `session_completed` | Every `WorkflowTask` in the session has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per session. |
 
-Clicking a notification marks it read and deep-links to the relevant place: run-scoped events to the `/workflow-sessions/{id}` chat, `workflow_draft_ready` to the workflow's detail page. Each row also has a **dismiss (✕)** button that permanently deletes that notification, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once.
+Clicking a notification marks it read and deep-links to the relevant place: run-scoped events to the `/workflow-sessions/{id}` chat, `workflow_draft_ready` to the workflow's detail page. Each row also has a **"Mark as read" (✓)** button that clears it from the dropdown without navigating, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once. Nothing in the dropdown deletes a notification — marking it read only moves it out of the way.
 
-The list (`?unreadOnly=true` for unread), mark-read, mark-all-read, and delete endpoints are documented in the [API reference](http://localhost:3000/api-doc); all are scoped to the authenticated user, so reading, updating, or deleting another user's notification returns HTTP 404. Notifications cascade-delete with their recipient user and their linked `WorkflowSession` or `Workflow`.
+### Notification history page
+
+The [`/notifications`](http://localhost:3000/notifications) page, reachable from the toolbar profile button's account menu (**Notifications**), lists every notification the signed-in user has received, read ones included, as a sortable and filterable table (title, type, and creation time). An **All / Unread** switch above it toggles the read-state filter, each unread row offers the same **"Mark as read"** action, and every row has a **delete (✕)** button that permanently removes that notification after a confirmation dialog.
+
+`GET /api/v1/notifications` takes the same `limit` / `offset` / `s` / `q` [list query parameters](#list-query-parameters) as every other collection endpoint, so unread-only listing is `?q=read:eq:false` and ordering is e.g. `?s=-createdAt` (the default). `PATCH /api/v1/notifications/{id}` takes a request body and accepts `read` as its only mutable field, so `{"read": true}` marks a notification read and `{"read": false}` returns it to unread. Those endpoints, plus mark-all-read and delete, are documented in the [API reference](http://localhost:3000/api-doc); all are scoped to the authenticated user, so reading, updating, or deleting another user's notification returns HTTP 404 — and a `q` term naming `userId` can only narrow that scope, never escape it. Notifications cascade-delete with their recipient user and their linked `WorkflowSession` or `Workflow`.
 
 ## Agent activity in the chat
 

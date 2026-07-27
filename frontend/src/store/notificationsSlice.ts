@@ -1,4 +1,12 @@
-/** Redux slice holding the current user's notifications and unread count. */
+/**
+ * Redux slice holding the current user's unread notifications and their count.
+ *
+ * This backs the toolbar bell only, which polls for unread items alone. The
+ * notifications page's full history (read items included) keeps its own local
+ * state rather than sharing this slice, so paging through it cannot clobber
+ * the badge; it dispatches {@link markReadLocal} / {@link removeLocal} to keep
+ * the bell in step with what the user does there.
+ */
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { Notification } from "@/lib/api";
 
@@ -7,7 +15,12 @@ export type NotificationsStatus = "idle" | "loading" | "error";
 
 /** Redux state shape for the notification center. */
 interface NotificationsState {
-  /** All notifications for the current user, newest first. */
+  /**
+   * The current user's unread notifications, newest first. An item marked read
+   * through {@link markReadLocal} stays here with `read` flipped until the next
+   * poll drops it, so the bell's dropdown filters on `read` rather than
+   * assuming everything present is unread.
+   */
   items: Notification[];
   /** Number of `items` that are still unread (drives the toolbar badge). */
   unreadCount: number;

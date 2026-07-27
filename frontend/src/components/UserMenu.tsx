@@ -1,4 +1,4 @@
-/** @module UserMenu — Profile dropdown showing the signed-in user and a logout action. */
+/** @module UserMenu — Account dropdown with links to the signed-in user's profile and notifications, and a logout action. */
 "use client";
 
 import { animated, useTransition } from "@react-spring/web";
@@ -48,10 +48,10 @@ function displayName(user: User): string {
 }
 
 /**
- * Floating profile menu anchored beneath the toolbar profile button. Shows the
- * signed-in user's name and username and a logout action. Rendered via a portal
- * so it is never clipped by the header, and animated in/out with the project's
- * motion preset.
+ * Floating account menu anchored beneath the toolbar profile button. Shows the
+ * signed-in user's name and username, links to their Profile and Notifications
+ * pages, and a logout action. Rendered via a portal so it is never clipped by
+ * the header, and animated in/out with the project's motion preset.
  */
 export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
   const dispatch = useAppDispatch();
@@ -164,6 +164,19 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               >
                 Profile
+              </button>
+            )}
+            {user && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onClose();
+                  router.push("/notifications");
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                Notifications
               </button>
             )}
             <button

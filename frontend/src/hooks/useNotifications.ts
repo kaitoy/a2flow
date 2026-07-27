@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { listNotifications } from "@/lib/api";
+import { listNotifications, UNREAD_ONLY_FILTER } from "@/lib/api";
 import logger from "@/lib/logger";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
@@ -14,13 +14,16 @@ import {
 const POLL_INTERVAL_MS = 30_000;
 
 /**
- * Poll the notifications endpoint and keep the Redux notifications slice in sync.
+ * Poll the notifications endpoint for unread items and keep the Redux
+ * notifications slice in sync.
  *
  * Fetches immediately on mount and then every {@link POLL_INTERVAL_MS}, clearing
- * the interval on unmount. Components that mount this hook (the toolbar bell) can
- * read the resulting `items` / `unreadCount` from the store. Returns a `refresh`
- * callback so callers can force an out-of-band reload (e.g. after marking an item
- * read).
+ * the interval on unmount. Only unread notifications are requested, since the
+ * bell and its dropdown exist to surface what still needs attention — the full
+ * history, read items included, lives on the profile page instead. Components
+ * that mount this hook (the toolbar bell) can read the resulting `items` /
+ * `unreadCount` from the store. Returns a `refresh` callback so callers can
+ * force an out-of-band reload (e.g. after marking an item read).
  *
  * Notifications are tenant-scoped, so a platform-scoped (super_admin) caller with
  * no tenant selected yet has nothing to fetch -- polling is held off until the
@@ -36,7 +39,7 @@ export function useNotifications(): { refresh: () => Promise<void> } {
   const refresh = useCallback(async () => {
     dispatch(notificationsLoading());
     try {
-      const items = await listNotifications();
+      const items = await listNotifications({ filters: [UNREAD_ONLY_FILTER] });
       dispatch(setNotifications(items));
     } catch (err) {
       logger.error({ err }, "failed to fetch notifications");

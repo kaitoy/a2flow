@@ -34,6 +34,32 @@ export function formatFullTimestamp(value: string): string {
   return `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}:${get("second")} ${get("timeZoneName")}`;
 }
 
+/**
+ * Format an ISO timestamp as a short relative time such as "5m ago" or "2d ago".
+ *
+ * Used where a timestamp is glanced at rather than read precisely — notification
+ * rows in the toolbar dropdown and in the profile's notification list. Pair it
+ * with {@link formatFullTimestamp} in a tooltip so the exact time stays
+ * available. Anything a week or older falls back to a locale date, since "9d
+ * ago" stops being easier to place than the date itself.
+ *
+ * @param value - ISO timestamp string.
+ * @returns The relative time, or an empty string when `value` is not a valid date.
+ */
+export function formatRelativeTime(value: string): string {
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return "";
+  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(value).toLocaleDateString();
+}
+
 /** Props for {@link DateTime}. */
 export interface DateTimeProps {
   /** ISO timestamp to render. */

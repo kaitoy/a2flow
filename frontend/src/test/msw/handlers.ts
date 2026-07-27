@@ -378,8 +378,11 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/notifications`, () => envelope([])),
 
-  http.patch(`${BASE}/api/v1/notifications/:notificationId`, ({ params }) =>
-    envelope({
+  http.patch(`${BASE}/api/v1/notifications/:notificationId`, async ({ params, request }) => {
+    // `read` is the only mutable field; echo what the caller asked for so tests
+    // that flip it in either direction see a truthful response.
+    const body = (await request.json()) as { read?: boolean };
+    return envelope({
       id: params.notificationId as string,
       tenantId: "tenant-1",
       userId: "user",
@@ -387,13 +390,13 @@ export const handlers = [
       title: "Plan ready for approval",
       body: null,
       workflowSessionId: "ws-1",
-      read: true,
+      read: body.read ?? true,
       createdAt: "2026-01-01T00:00:00Z",
       updatedAt: "2026-01-01T00:00:00Z",
       createdBy: "",
       updatedBy: "",
-    })
-  ),
+    });
+  }),
 
   http.post(`${BASE}/api/v1/notifications/read-all`, () => envelope(null)),
 

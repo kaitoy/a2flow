@@ -5,6 +5,7 @@ takes a ``user_id`` and filters on it, so one user can never see another's
 notifications at the persistence layer.
 """
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from sqlmodel import col, select
@@ -18,6 +19,7 @@ from models.notification import (
 )
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import NotFoundError
+from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
 
 class NotificationRepository(Protocol):
@@ -31,7 +33,8 @@ class NotificationRepository(Protocol):
         user_id: str,
         limit: int,
         offset: int,
-        unread_only: bool = False,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
     ) -> list[Notification]: ...
 
     async def create(
@@ -78,26 +81,39 @@ class SqlNotificationRepository:
         user_id: str,
         limit: int,
         offset: int,
-        unread_only: bool = False,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
     ) -> list[Notification]:
-        """Return the recipient's notifications, newest first.
+        """Return the recipient's notifications, defaulting to newest first.
+
+        The recipient and tenant predicates are applied unconditionally, before
+        any caller-supplied ``filters``. Since :func:`apply_filters` only ever
+        adds conjunctions, a filter naming ``userId`` or ``tenantId`` can narrow
+        the result set but never widen it beyond this recipient's own
+        notifications.
 
         Args:
             user_id: Recipient whose notifications to return.
             limit: Maximum number of records.
             offset: Number of records to skip.
-            unread_only: When ``True``, exclude already-read notifications.
+            sort: Sort specifications; defaults to ``created_at`` descending.
+            filters: Filter specifications applied as a conjunction. Unread-only
+                listing is expressed as ``read:eq:false``.
 
         Returns:
-            The matching notifications ordered by ``created_at`` descending.
+            The matching notifications.
         """
         stmt = select(Notification).where(
             Notification.user_id == user_id,
             Notification.tenant_id == self._tenant_id,
         )
-        if unread_only:
-            stmt = stmt.where(col(Notification.read).is_(False))
-        stmt = stmt.order_by(col(Notification.created_at).desc())
+        stmt = apply_filters(stmt, Notification, filters)
+        stmt = apply_sort(
+            stmt,
+            Notification,
+            sort,
+            default=[col(Notification.created_at).desc()],
+        )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 

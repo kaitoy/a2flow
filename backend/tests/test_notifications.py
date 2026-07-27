@@ -1,11 +1,13 @@
 """Tests for the notifications API (``GET``/``PATCH /api/v1/notifications``).
 
 The endpoints are scoped to the authenticated user (the test auth override reads
-``X-User-Id``), so these tests focus on per-user isolation, the ``unread_only``
-filter, and the mark-read flow including the cross-user 404 guard.
+``X-User-Id``), so these tests focus on per-user isolation, the shared ``s`` /
+``q`` list query parameters, and the update flow including the cross-user 404
+guard.
 """
 
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest_asyncio
@@ -68,18 +70,27 @@ async def _insert_notification(
     title: str = "Hello",
     read: bool = False,
     notification_type: NotificationType = NotificationType.approval_request,
+    created_at: datetime | None = None,
 ) -> str:
-    """Insert a Notification addressed to ``user_id`` and return its id."""
+    """Insert a Notification addressed to ``user_id`` and return its id.
+
+    ``created_at`` overrides the default insert timestamp. Ordering tests need
+    it because back-to-back inserts can otherwise land on the same clock tick,
+    leaving the ``createdAt`` sort with nothing to distinguish the rows.
+    """
     async with AsyncSession(eng) as db:
-        notification = Notification(
-            user_id=user_id,
-            type=notification_type,
-            title=title,
-            read=read,
-            tenant_id=DEFAULT_TEST_TENANT_ID,
-            created_by=user_id,
-            updated_by=user_id,
-        )
+        fields: dict[str, Any] = {
+            "user_id": user_id,
+            "type": notification_type,
+            "title": title,
+            "read": read,
+            "tenant_id": DEFAULT_TEST_TENANT_ID,
+            "created_by": user_id,
+            "updated_by": user_id,
+        }
+        if created_at is not None:
+            fields["created_at"] = created_at
+        notification = Notification(**fields)
         db.add(notification)
         await db.commit()
         await db.refresh(notification)
@@ -107,11 +118,94 @@ async def test_list_unread_only_filter(
 
     res = await client.get(
         "/api/v1/notifications",
-        params={"unread_only": "true"},
+        params={"q": "read:eq:false"},
         headers={"X-User-Id": "alice"},
     )
     data = assert_ok(res)
     assert [n["title"] for n in data] == ["Unread one"]
+
+
+async def test_list_filters_by_type(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = notif_env
+    await _insert_notification(
+        eng,
+        user_id="alice",
+        title="Approve me",
+        notification_type=NotificationType.approval_request,
+    )
+    await _insert_notification(
+        eng,
+        user_id="alice",
+        title="All done",
+        notification_type=NotificationType.session_completed,
+    )
+
+    res = await client.get(
+        "/api/v1/notifications",
+        params={"q": "type:eq:approval_request"},
+        headers={"X-User-Id": "alice"},
+    )
+    assert [n["title"] for n in assert_ok(res)] == ["Approve me"]
+
+
+async def test_list_sorts_by_created_at_ascending(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = notif_env
+    await _insert_notification(
+        eng,
+        user_id="alice",
+        title="Older",
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    await _insert_notification(
+        eng,
+        user_id="alice",
+        title="Newer",
+        created_at=datetime(2026, 6, 1, tzinfo=UTC),
+    )
+
+    default_order = await client.get(
+        "/api/v1/notifications", headers={"X-User-Id": "alice"}
+    )
+    assert [n["title"] for n in assert_ok(default_order)] == ["Newer", "Older"]
+
+    ascending = await client.get(
+        "/api/v1/notifications",
+        params={"s": "createdAt"},
+        headers={"X-User-Id": "alice"},
+    )
+    assert [n["title"] for n in assert_ok(ascending)] == ["Older", "Newer"]
+
+
+async def test_list_filter_cannot_widen_scope_to_another_user(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A ``userId`` filter narrows the caller's own rows; it never reaches another user's."""
+    client, eng = notif_env
+    await _insert_notification(eng, user_id="bob", title="For Bob")
+
+    res = await client.get(
+        "/api/v1/notifications",
+        params={"q": "userId:eq:bob"},
+        headers={"X-User-Id": "alice"},
+    )
+    assert assert_ok(res) == []
+
+
+async def test_list_with_unknown_filter_field_is_400(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = notif_env
+
+    res = await client.get(
+        "/api/v1/notifications",
+        params={"q": "bogus:eq:1"},
+        headers={"X-User-Id": "alice"},
+    )
+    assert_err(res, "INVALID_QUERY", 400)
 
 
 async def test_mark_notification_read(
@@ -121,10 +215,42 @@ async def test_mark_notification_read(
     notif_id = await _insert_notification(eng, user_id="alice", read=False)
 
     res = await client.patch(
-        f"/api/v1/notifications/{notif_id}", headers={"X-User-Id": "alice"}
+        f"/api/v1/notifications/{notif_id}",
+        json={"read": True},
+        headers={"X-User-Id": "alice"},
     )
     data = assert_ok(res)
     assert data["read"] is True
+
+
+async def test_mark_notification_unread(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = notif_env
+    notif_id = await _insert_notification(eng, user_id="alice", read=True)
+
+    res = await client.patch(
+        f"/api/v1/notifications/{notif_id}",
+        json={"read": False},
+        headers={"X-User-Id": "alice"},
+    )
+    assert assert_ok(res)["read"] is False
+
+
+async def test_patch_ignores_fields_other_than_read(
+    notif_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = notif_env
+    notif_id = await _insert_notification(eng, user_id="alice", title="Original")
+
+    res = await client.patch(
+        f"/api/v1/notifications/{notif_id}",
+        json={"read": True, "title": "Hijacked"},
+        headers={"X-User-Id": "alice"},
+    )
+    data = assert_ok(res)
+    assert data["read"] is True
+    assert data["title"] == "Original"
 
 
 async def test_mark_other_users_notification_is_404(
@@ -134,7 +260,9 @@ async def test_mark_other_users_notification_is_404(
     notif_id = await _insert_notification(eng, user_id="bob")
 
     res = await client.patch(
-        f"/api/v1/notifications/{notif_id}", headers={"X-User-Id": "alice"}
+        f"/api/v1/notifications/{notif_id}",
+        json={"read": True},
+        headers={"X-User-Id": "alice"},
     )
     assert_err(res, "NOT_FOUND", 404)
 

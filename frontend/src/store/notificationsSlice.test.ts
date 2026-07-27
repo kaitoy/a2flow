@@ -13,6 +13,7 @@ import reducer, {
 function makeNotification(overrides: Partial<Notification> = {}): Notification {
   return {
     id: "n1",
+    tenantId: "tenant-1",
     userId: "user-1",
     type: "approval_request",
     title: "Plan ready for approval",

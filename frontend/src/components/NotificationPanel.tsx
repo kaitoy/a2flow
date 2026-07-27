@@ -1,19 +1,19 @@
 "use client";
 
 import { animated, useTransition } from "@react-spring/web";
-import { X } from "lucide-react";
+import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type RefObject, useCallback, useEffect, useState } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
-import { deleteNotification, markAllNotificationsRead, markNotificationRead } from "@/lib/api";
+import { markAllNotificationsRead, updateNotification } from "@/lib/api";
 import logger from "@/lib/logger";
 import { useMotionConfig } from "@/lib/motion";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { markAllReadLocal, markReadLocal, removeLocal } from "@/store/notificationsSlice";
+import { markAllReadLocal, markReadLocal } from "@/store/notificationsSlice";
 import { Button } from "./ui/button";
-import { formatFullTimestamp } from "./ui/date-time";
+import { formatFullTimestamp, formatRelativeTime } from "./ui/date-time";
 import { Tooltip } from "./ui/tooltip";
 
 /** Props for {@link NotificationPanel}. */
@@ -38,26 +38,14 @@ interface Coords {
   width: number;
 }
 
-/** Format an ISO timestamp as a short relative time such as "5m ago" or "2d ago". */
-function formatRelativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
 /**
- * Floating dropdown listing the current user's notifications, anchored beneath the
- * toolbar bell. Each row deep-links to the workflow session it concerns and is
- * marked read on click. Rendered via a portal so it is never clipped by the
- * header, and animated in/out with the project's motion preset.
+ * Floating dropdown listing the current user's **unread** notifications, anchored
+ * beneath the toolbar bell. Each row deep-links to the workflow session it
+ * concerns and is marked read on click; a trailing action marks it read without
+ * navigating. Marking read is the only way to clear a row here — deleting a
+ * notification for good is done from the profile page, where the full history is
+ * visible. Rendered via a portal so it is never clipped by the header, and
+ * animated in/out with the project's motion preset.
  */
 export function NotificationPanel({ anchorRef, open, onClose }: NotificationPanelProps) {
   const dispatch = useAppDispatch();
@@ -66,6 +54,12 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
   const unreadCount = useAppSelector((s) => s.notifications.unreadCount);
   const [coords, setCoords] = useState<Coords | null>(null);
   const config = useMotionConfig("snappy");
+
+  // The store is filled from an unread-only fetch, but marking an item read
+  // flips its flag in place and leaves it there until the next poll. Filtering
+  // here is what makes a row disappear the moment it is marked read, instead of
+  // lingering for up to the poll interval.
+  const unread = useMemo(() => items.filter((n) => !n.read), [items]);
 
   const computeCoords = useCallback((): Coords | null => {
     const anchor = anchorRef.current;
@@ -108,7 +102,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
       workflowId: string | null | undefined
     ) => {
       dispatch(markReadLocal(id));
-      markNotificationRead(id).catch((err) => {
+      updateNotification(id, { read: true }).catch((err) => {
         logger.error({ err, id }, "failed to mark notification read");
       });
       onClose();
@@ -123,11 +117,11 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
     [dispatch, router, onClose]
   );
 
-  const onDismiss = useCallback(
+  const onMarkRead = useCallback(
     (id: string) => {
-      dispatch(removeLocal(id));
-      deleteNotification(id).catch((err) => {
-        logger.error({ err, id }, "failed to delete notification");
+      dispatch(markReadLocal(id));
+      updateNotification(id, { read: true }).catch((err) => {
+        logger.error({ err, id }, "failed to mark notification read");
       });
     },
     [dispatch]
@@ -181,13 +175,13 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                 </Button>
               )}
             </div>
-            {items.length === 0 ? (
+            {unread.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-on-surface-variant">
-                No notifications
+                No unread notifications
               </div>
             ) : (
               <ul className="flex flex-col gap-1">
-                {items.map((n) => (
+                {unread.map((n) => (
                   <li key={n.id} className="flex items-start gap-1">
                     <button
                       type="button"
@@ -196,10 +190,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                     >
                       <span
                         aria-hidden="true"
-                        className={[
-                          "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                          n.read ? "bg-transparent" : "bg-accent",
-                        ].join(" ")}
+                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent"
                       />
                       <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate text-sm font-medium text-on-surface">
@@ -218,7 +209,11 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                       </span>
                     </button>
                     <span className="shrink-0 pt-2">
-                      <ActionIconButton icon={X} label="Dismiss" onClick={() => onDismiss(n.id)} />
+                      <ActionIconButton
+                        icon={Check}
+                        label="Mark as read"
+                        onClick={() => onMarkRead(n.id)}
+                      />
                     </span>
                   </li>
                 ))}

@@ -10,10 +10,12 @@ from fastapi import APIRouter
 from dependencies import (
     ApiMetaDep,
     CurrentUserIdDep,
+    FilterDep,
     NotificationServiceDep,
     PaginationDep,
+    SortDep,
 )
-from models.notification import Notification
+from models.notification import Notification, NotificationUpdate
 from models.response import ApiResponse
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -24,19 +26,22 @@ async def list_notifications(
     service: NotificationServiceDep,
     user_id: CurrentUserIdDep,
     pagination: PaginationDep,
+    sort: SortDep,
+    filters: FilterDep,
     meta: ApiMetaDep,
-    unread_only: bool = False,
 ) -> ApiResponse[list[Notification]]:
-    """Return the current user's notifications, newest first.
+    """Return the current user's notifications, defaulting to ``createdAt`` descending.
 
-    When ``unread_only`` is ``true`` only unread notifications are returned, which
-    the toolbar bell uses to drive its unread badge.
+    Accepts the shared ``limit`` / ``offset`` / ``s`` / ``q`` list query
+    parameters. The toolbar bell drives its unread badge with
+    ``?q=read:eq:false``.
     """
     items = await service.list(
         user_id=user_id,
         limit=pagination.limit,
         offset=pagination.offset,
-        unread_only=unread_only,
+        sort=sort.sort,
+        filters=filters.filters,
     )
     return ApiResponse(meta=meta, data=items)
 
@@ -53,17 +58,21 @@ async def mark_all_notifications_read(
 
 
 @router.patch("/{notification_id}", response_model=ApiResponse[Notification])
-async def mark_notification_read(
+async def update_notification(
     notification_id: str,
+    data: NotificationUpdate,
     service: NotificationServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Notification]:
-    """Mark one of the current user's notifications as read.
+    """Apply a partial update to one of the current user's notifications.
+
+    ``read`` is the only mutable field, so this is how a notification is marked
+    read (``{"read": true}``) or returned to the unread state.
 
     Raises HTTP 404 if the notification does not exist or belongs to another user.
     """
-    notification = await service.mark_read(notification_id, user_id=user_id)
+    notification = await service.update(notification_id, data, user_id=user_id)
     return ApiResponse(meta=meta, data=notification)
 
 

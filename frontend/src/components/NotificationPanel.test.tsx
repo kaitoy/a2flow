@@ -15,6 +15,7 @@ vi.mock("next/navigation", () => ({
 function makeNotification(overrides: Partial<Notification> = {}): Notification {
   return {
     id: "n1",
+    tenantId: "tenant-1",
     userId: "user-1",
     type: "approval_request",
     title: "Plan ready for approval",
@@ -76,7 +77,24 @@ describe("NotificationPanel", () => {
         notifications: { items: [], unreadCount: 0, status: "idle" },
       },
     });
-    await waitFor(() => expect(screen.getByText("No notifications")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("No unread notifications")).toBeInTheDocument());
+  });
+
+  it("hides notifications that are already read", async () => {
+    render(<Harness onClose={vi.fn()} />, {
+      preloadedState: {
+        notifications: {
+          items: [
+            makeNotification({ id: "a", title: "Already handled", read: true }),
+            makeNotification({ id: "b", title: "Still waiting", read: false }),
+          ],
+          unreadCount: 1,
+          status: "idle",
+        },
+      },
+    });
+    await waitFor(() => expect(screen.getByText("Still waiting")).toBeInTheDocument());
+    expect(screen.queryByText("Already handled")).not.toBeInTheDocument();
   });
 
   it("marks the item read, closes, and navigates to its workflow session", async () => {
@@ -125,7 +143,7 @@ describe("NotificationPanel", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("dismisses a single notification, removing it from the store", async () => {
+  it("marks a single notification read, dropping it from the list without deleting it", async () => {
     const { store } = render(<Harness onClose={vi.fn()} />, {
       preloadedState: {
         notifications: {
@@ -136,10 +154,14 @@ describe("NotificationPanel", () => {
       },
     });
     await waitFor(() => screen.getByText("Plan ready for approval"));
-    screen.getByRole("button", { name: "Dismiss" }).click();
+    screen.getByRole("button", { name: "Mark as read" }).click();
 
-    await waitFor(() => expect(store.getState().notifications.items).toHaveLength(0));
-    expect(store.getState().notifications.unreadCount).toBe(0);
+    await waitFor(() => expect(store.getState().notifications.unreadCount).toBe(0));
+    // The record survives -- only the popup stops showing it. Deleting is the
+    // profile list's job.
+    expect(store.getState().notifications.items).toHaveLength(1);
+    expect(store.getState().notifications.items[0].read).toBe(true);
+    expect(screen.queryByText("Plan ready for approval")).not.toBeInTheDocument();
   });
 
   it("marks all notifications read, clearing the unread count and hiding its button", async () => {
@@ -172,7 +194,8 @@ describe("NotificationPanel", () => {
         },
       },
     });
-    await waitFor(() => screen.getByText("Plan ready for approval"));
+    // An all-read store leaves the popup empty, since it only lists unread items.
+    await waitFor(() => screen.getByText("No unread notifications"));
     expect(screen.queryByRole("button", { name: "Mark all read" })).not.toBeInTheDocument();
   });
 
@@ -200,8 +223,8 @@ describe("NotificationPanel", () => {
     render(<Harness onClose={onClose} />, {
       preloadedState: {
         notifications: {
-          items: [makeNotification({ read: true })],
-          unreadCount: 0,
+          items: [makeNotification()],
+          unreadCount: 1,
           status: "idle",
         },
       },
@@ -219,8 +242,8 @@ describe("NotificationPanel", () => {
     render(<Harness onClose={onClose} />, {
       preloadedState: {
         notifications: {
-          items: [makeNotification({ read: true })],
-          unreadCount: 0,
+          items: [makeNotification()],
+          unreadCount: 1,
           status: "idle",
         },
       },
@@ -238,19 +261,18 @@ describe("NotificationPanel", () => {
     render(<Harness onClose={vi.fn()} />, {
       preloadedState: {
         notifications: {
-          items: [makeNotification({ read: true })],
-          unreadCount: 0,
+          items: [makeNotification()],
+          unreadCount: 1,
           status: "idle",
         },
       },
     });
-    // With no unread items, "Mark all read" is hidden: the only two focusable
-    // elements are the notification's select button (first) and its Dismiss
-    // button (last).
+    // Focus order inside the panel: "Mark all read" (first), the notification's
+    // select button, then its "Mark as read" button (last).
     await waitFor(() => screen.getByText("Plan ready for approval"));
 
     await user.tab({ shift: true });
 
-    expect(screen.getByRole("button", { name: "Dismiss" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Mark as read" })).toHaveFocus();
   });
 });

@@ -6,9 +6,10 @@ import { fireEvent, render, screen, waitFor } from "@/test/test-utils";
 import { UserMenu } from "./UserMenu";
 
 const replaceMock = vi.fn();
+const pushMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: replaceMock }),
+  useRouter: () => ({ replace: replaceMock, push: pushMock }),
 }));
 
 /** Build a User fixture with overridable fields. */
@@ -73,6 +74,8 @@ describe("UserMenu", () => {
     render(<Harness user={null} onClose={vi.fn()} />);
     await waitFor(() => expect(screen.getByText("Not signed in")).toBeInTheDocument());
     expect(screen.getByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Profile" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Notifications" })).not.toBeInTheDocument();
   });
 
   it("logs out: clears auth, closes, and navigates to /login", async () => {
@@ -94,6 +97,19 @@ describe("UserMenu", () => {
   it("moves focus into the menu when it opens", async () => {
     render(<Harness user={makeUser()} onClose={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveFocus());
+  });
+
+  it("navigates to /notifications and closes when the Notifications item is clicked", async () => {
+    const onClose = vi.fn();
+    pushMock.mockClear();
+    const user = userEvent.setup();
+    render(<Harness user={makeUser()} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveFocus());
+
+    await user.click(screen.getByRole("menuitem", { name: "Notifications" }));
+
+    expect(pushMock).toHaveBeenCalledWith("/notifications");
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("closes and returns focus to the anchor on Escape", async () => {
@@ -124,6 +140,8 @@ describe("UserMenu", () => {
     render(<Harness user={makeUser()} onClose={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole("menuitem", { name: "Profile" })).toHaveFocus());
 
+    await user.tab();
+    expect(screen.getByRole("menuitem", { name: "Notifications" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("menuitem", { name: "Log out" })).toHaveFocus();
     await user.tab();

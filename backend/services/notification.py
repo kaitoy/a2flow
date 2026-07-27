@@ -9,6 +9,7 @@ so the API never leaks the existence of other users' notifications.
 from models.notification import Notification, NotificationUpdate
 from repositories import NotificationRepository
 from repositories.exceptions import NotFoundError
+from repositories.query import FilterSpec, SortSpec
 
 
 class NotificationService:
@@ -28,21 +29,28 @@ class NotificationService:
         user_id: str,
         limit: int,
         offset: int,
-        unread_only: bool = False,
+        sort: tuple[SortSpec, ...] | list[SortSpec] = (),
+        filters: tuple[FilterSpec, ...] | list[FilterSpec] = (),
     ) -> list[Notification]:
-        """Return the requesting user's notifications, newest first.
+        """Return the requesting user's notifications, defaulting to newest first.
 
         Args:
             user_id: The recipient whose notifications to return.
             limit: Maximum number of records.
             offset: Number of records to skip.
-            unread_only: When ``True``, exclude already-read notifications.
+            sort: Sort specifications; defaults to ``created_at`` descending.
+            filters: Filter specifications applied as a conjunction. Unread-only
+                listing is expressed as ``read:eq:false``.
 
         Returns:
             The user's notifications.
         """
         return await self._repo.list(
-            user_id=user_id, limit=limit, offset=offset, unread_only=unread_only
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+            sort=sort,
+            filters=filters,
         )
 
     async def get(self, notification_id: str, *, user_id: str) -> Notification:
@@ -64,11 +72,17 @@ class NotificationService:
             raise NotFoundError("Notification", notification_id)
         return notification
 
-    async def mark_read(self, notification_id: str, *, user_id: str) -> Notification:
-        """Mark one of the user's notifications as read.
+    async def update(
+        self, notification_id: str, data: NotificationUpdate, *, user_id: str
+    ) -> Notification:
+        """Apply a partial update to one of the user's notifications.
+
+        Only the read flag is mutable, which :class:`NotificationUpdate` already
+        enforces by being the sole field it declares.
 
         Args:
             notification_id: Identifier of the notification to update.
+            data: Fields to apply; unset fields are left untouched.
             user_id: The requesting user; must be the notification's recipient.
 
         Returns:
@@ -79,9 +93,7 @@ class NotificationService:
                 to ``user_id``.
         """
         await self.get(notification_id, user_id=user_id)
-        return await self._repo.update(
-            notification_id, NotificationUpdate(read=True), user_id=user_id
-        )
+        return await self._repo.update(notification_id, data, user_id=user_id)
 
     async def mark_all_read(self, *, user_id: str) -> None:
         """Mark all of the requesting user's unread notifications as read.

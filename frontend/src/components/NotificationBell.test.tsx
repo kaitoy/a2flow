@@ -61,8 +61,23 @@ describe("NotificationBell", () => {
     render(<NotificationBell />);
 
     await user.click(screen.getByRole("button", { name: /notifications/i }));
-    await waitFor(() => expect(screen.getByText("No notifications")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("No unread notifications")).toBeInTheDocument());
     expect(screen.queryByText("0")).not.toBeInTheDocument();
+  });
+
+  it("polls for unread notifications only", async () => {
+    let requested: URL | null = null;
+    server.use(
+      http.get(`${BASE}/api/v1/notifications`, ({ request }) => {
+        requested = new URL(request.url);
+        return envelope([row("a", false)]);
+      })
+    );
+    render(<NotificationBell />);
+    await waitFor(() => screen.getByText("1"));
+
+    expect(requested).not.toBeNull();
+    expect((requested as unknown as URL).searchParams.getAll("q")).toEqual(["read:eq:false"]);
   });
 
   it("does not fetch for a platform-scoped user with no tenant selected", async () => {

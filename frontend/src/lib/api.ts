@@ -27,6 +27,7 @@ import type {
   McpTransport,
   Notification as NotificationModel,
   NotificationType,
+  NotificationUpdate,
   PlanningSession as PlanningSessionModel,
   SecretCreate,
   SecretRead as SecretModel,
@@ -108,7 +109,6 @@ import {
   zLoginApiV1AuthLoginPostResponse,
   zLogoutApiV1AuthLogoutPostResponse,
   zMarkAllNotificationsReadApiV1NotificationsReadAllPostResponse,
-  zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse,
   zMeApiV1AuthMeGetResponse,
   zPublishWorkflowApiV1WorkflowsWorkflowIdPublishPostResponse,
   zPullAgentSkillApiV1AgentSkillsSkillIdPullPostResponse,
@@ -118,6 +118,7 @@ import {
   zStopImpersonationApiV1AuthImpersonateDeleteResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
+  zUpdateNotificationApiV1NotificationsNotificationIdPatchResponse,
   zUpdateSecretApiV1SecretsSecretIdPatchResponse,
   zUpdateTenantApiV1TenantsTenantIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
@@ -1126,28 +1127,33 @@ export async function deleteWorkflowTask(taskId: string): Promise<void> {
 }
 
 /**
- * Fetch the current user's notifications (newest first). When ``unreadOnly`` is
- * true only unread notifications are returned, which the toolbar bell uses to
- * compute its unread badge.
+ * Filter directive selecting only unread notifications.
+ *
+ * Used by the toolbar bell, which polls for unread items alone.
  */
-export async function listNotifications(
-  unreadOnly = false,
-  limit = 20,
-  offset = 0
-): Promise<Notification[]> {
+export const UNREAD_ONLY_FILTER: FilterSpec = { field: "read", op: "eq", value: "false" };
+
+/** List the current user's notifications (newest first) with optional pagination, sort, and filters. */
+export async function listNotifications(query: ListQuery = {}): Promise<Notification[]> {
   return fetchEnvelope(
-    apiClient.get("/api/v1/notifications", {
-      params: { unread_only: unreadOnly, limit, offset },
-    }),
+    apiClient.get("/api/v1/notifications", listConfig(query)),
     zListNotificationsApiV1NotificationsGetResponse
   ) as Promise<Notification[]>;
 }
 
-/** Mark a single notification as read and return the updated record. */
-export async function markNotificationRead(id: string): Promise<Notification> {
+/**
+ * Apply a partial update to a single notification and return the updated record.
+ *
+ * `read` is the only mutable field, so this is how a notification is marked read
+ * (`{ read: true }`) or returned to the unread state.
+ */
+export async function updateNotification(
+  id: string,
+  data: NotificationUpdate
+): Promise<Notification> {
   return fetchEnvelope(
-    apiClient.patch(`/api/v1/notifications/${encodeURIComponent(id)}`),
-    zMarkNotificationReadApiV1NotificationsNotificationIdPatchResponse
+    apiClient.patch(`/api/v1/notifications/${encodeURIComponent(id)}`, data),
+    zUpdateNotificationApiV1NotificationsNotificationIdPatchResponse
   ) as Promise<Notification>;
 }
 
