@@ -65,9 +65,9 @@ class AuthService:
         """Verify credentials and create a new login session.
 
         The same generic :class:`UnauthorizedError` is raised for an unknown
-        username, an unknown tenant name, a wrong password, and a disabled or
-        soft-deleted account, so the response never reveals which users or
-        tenants exist.
+        username, an unknown or disabled tenant, a wrong password, and a
+        disabled or soft-deleted account, so the response never reveals which
+        users or tenants exist.
 
         Args:
             username: The submitted username.
@@ -83,13 +83,13 @@ class AuthService:
             session and CSRF tokens.
 
         Raises:
-            UnauthorizedError: If the credentials are invalid or the account
-                cannot log in.
+            UnauthorizedError: If the credentials are invalid, the account
+                cannot log in, or the submitted tenant is unknown or disabled.
         """
         tenant_id: str | None = None
         if tenant_name:
             tenant = await self._tenants.get_by_name(tenant_name)
-            if tenant is None:
+            if tenant is None or not tenant.enabled:
                 raise UnauthorizedError("Invalid username or password")
             tenant_id = tenant.id
         user = await self._users.get_by_username(username, tenant_id=tenant_id)
@@ -119,11 +119,14 @@ class AuthService:
             session_token: The raw token from the session cookie.
 
         Returns:
-            The authenticated, still-enabled user.
+            The authenticated, still-enabled user, whose tenant (if any) is
+            still enabled.
 
         Raises:
-            UnauthorizedError: If the session is missing, expired, or the
-                backing user is gone or disabled. Expired sessions are deleted.
+            UnauthorizedError: If the session is missing, expired, the
+                backing user is gone or disabled, or a tenant-scoped user's
+                tenant has been disabled. Expired and rejected sessions are
+                deleted.
         """
         if not session_token:
             raise UnauthorizedError()
@@ -144,6 +147,11 @@ class AuthService:
         if user is None or not user.enabled or user.deleted_at is not None:
             await self._sessions.delete_by_token_hash(token_hash)
             raise UnauthorizedError()
+        if user.tenant_id is not None:
+            tenant = await self._tenants.get(user.tenant_id)
+            if tenant is None or not tenant.enabled:
+                await self._sessions.delete_by_token_hash(token_hash)
+                raise UnauthorizedError()
 
         await self._sessions.touch(session, now)
         return user

@@ -19,6 +19,7 @@ from dependencies.auth import (
 )
 from infrastructure.password import hash_password
 from models.auth_session import AuthSession
+from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, User
 from repositories.auth_session import SqlAuthSessionRepository
 from repositories.exceptions import UnauthorizedError
@@ -219,4 +220,84 @@ async def test_authenticate_expires_idle_session(
         with pytest.raises(UnauthorizedError):
             await service.authenticate(result.session_token)
         # The expired session is deleted on rejection.
+        assert (await session.exec(stmt)).first() is None
+
+
+@pytest.mark.asyncio
+async def test_login_rejects_disabled_tenant(auth_service_engine: Any) -> None:
+    async with AsyncSession(auth_service_engine) as session:
+        session.add(
+            User(
+                username="tenantoff",
+                first_name="Tenant",
+                last_name="Off",
+                password=hash_password(AUTH_PASSWORD),
+                email="tenantoff@test.local",
+                enabled=True,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        tenant = await session.get(Tenant, DEFAULT_TEST_TENANT_ID)
+        assert tenant is not None
+        tenant.enabled = False
+        session.add(tenant)
+        await session.commit()
+
+    async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
+        service = AuthService(
+            SqlUserRepository(session),
+            SqlAuthSessionRepository(session),
+            SqlTenantRepository(session),
+        )
+        with pytest.raises(UnauthorizedError):
+            await service.login(
+                "tenantoff", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+            )
+
+
+@pytest.mark.asyncio
+async def test_authenticate_rejects_when_tenant_disabled_mid_session(
+    auth_service_engine: Any,
+) -> None:
+    async with AsyncSession(auth_service_engine) as session:
+        session.add(
+            User(
+                username="tenantuser",
+                first_name="Tenant",
+                last_name="User",
+                password=hash_password(AUTH_PASSWORD),
+                email="tenantuser@test.local",
+                enabled=True,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+
+    async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
+        service = AuthService(
+            SqlUserRepository(session),
+            SqlAuthSessionRepository(session),
+            SqlTenantRepository(session),
+        )
+        result = await service.login(
+            "tenantuser", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+        )
+        assert (
+            await service.authenticate(result.session_token)
+        ).username == "tenantuser"
+
+        tenant = await session.get(Tenant, DEFAULT_TEST_TENANT_ID)
+        assert tenant is not None
+        tenant.enabled = False
+        session.add(tenant)
+        await session.commit()
+
+        with pytest.raises(UnauthorizedError):
+            await service.authenticate(result.session_token)
+        # Rejected session is deleted, matching the disabled-user path.
+        stmt = select(AuthSession).where(col(AuthSession.user_id) == result.user.id)
         assert (await session.exec(stmt)).first() is None
