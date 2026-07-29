@@ -97,7 +97,14 @@ function buildColumns(
     {
       // Resolved from agentSkillId to a display name; not a real column, so no sort/filter.
       header: "Agent Skill",
-      cell: (w) => skillMap.get(w.agentSkillId) ?? w.agentSkillId,
+      cell: (w) => (
+        <Link
+          href={`/admin/agent-skills/${w.agentSkillId}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {skillMap.get(w.agentSkillId) ?? w.agentSkillId}
+        </Link>
+      ),
     },
     {
       header: "Status",
