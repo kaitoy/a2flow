@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
-import { MCP_SERVER_1, MCP_STDIO_SERVER } from "@/test/msw/handlers";
+import { MCP_SERVER_1, MCP_STDIO_SERVER, MCP_TOOL_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import EditMcpServerPage from "./page";
@@ -133,6 +133,16 @@ describe("EditMcpServerPage", () => {
 
     await waitFor(() => expect(deleteSpy).toHaveBeenCalled());
     expect(pushMock).toHaveBeenCalledWith("/admin/mcp-servers");
+  });
+
+  it("fetches and renders the server's tools on demand", async () => {
+    setup();
+    render(<EditMcpServerPage />);
+    await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
+
+    await userEvent.click(screen.getByRole("button", { name: /fetch tools/i }));
+
+    await waitFor(() => expect(screen.getByText(MCP_TOOL_1.name)).toBeInTheDocument());
   });
 
   it("shows error on load failure", async () => {

@@ -233,27 +233,40 @@ export class ApiClientError extends Error {
 }
 
 /**
- * Extract a user-facing message from a failed API call and show it as a red
- * toast. Called from the response interceptor (HTTP-level failures) and from
- * {@link fetchEnvelope} (2xx responses whose envelope still carries an error).
+ * Extract a user-facing message from a failed API call. Handles both shapes a
+ * call can fail with: an {@link ApiClientError} (a 2xx response whose envelope
+ * carries an error, thrown by {@link fetchEnvelope}) and a raw Axios error (an
+ * HTTP-level failure, e.g. a non-2xx status), which the response interceptor
+ * below reports but re-throws unconverted.
  */
-function reportApiError(error: unknown): void {
-  let message = "Something went wrong. Please try again.";
+export function getApiErrorMessage(error: unknown): string {
   if (error instanceof ApiClientError) {
-    message = error.message;
-  } else if (axios.isAxiosError(error)) {
+    return error.message;
+  }
+  if (axios.isAxiosError(error)) {
     const envelopeError = (error.response?.data as { error?: ApiError } | null | undefined)?.error;
     if (envelopeError?.message) {
-      message = envelopeError.message;
-    } else if (!error.response) {
-      message = "Unable to reach the server. Please check your connection and try again.";
-    } else if (error.message) {
-      message = error.message;
+      return envelopeError.message;
+    }
+    if (!error.response) {
+      return "Unable to reach the server. Please check your connection and try again.";
+    }
+    if (error.message) {
+      return error.message;
     }
   } else if (error instanceof Error) {
-    message = error.message;
+    return error.message;
   }
-  store.dispatch(showToast({ message, variant: "error" }));
+  return "Something went wrong. Please try again.";
+}
+
+/**
+ * Show a failed API call's message as a red toast. Called from the response
+ * interceptor (HTTP-level failures) and from {@link fetchEnvelope} (2xx
+ * responses whose envelope still carries an error).
+ */
+function reportApiError(error: unknown): void {
+  store.dispatch(showToast({ message: getApiErrorMessage(error), variant: "error" }));
 }
 
 /**

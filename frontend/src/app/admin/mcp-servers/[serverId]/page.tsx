@@ -20,6 +20,7 @@ import {
   mcpServerFormSchema,
   toMcpServerBody,
 } from "@/components/admin/mcp-server-fields";
+import { McpServerToolsPanel } from "@/components/admin/mcp-server-tools-panel";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -156,6 +157,7 @@ export default function EditMcpServerPage() {
             </Button>
           </div>
         </form>
+        <McpServerToolsPanel serverId={serverId} />
         {audit && (
           <div className="mt-4">
             <AuditMeta {...audit} />
