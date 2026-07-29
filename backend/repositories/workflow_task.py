@@ -133,7 +133,7 @@ class SqlWorkflowTaskRepository:
         stmt = select(WorkflowTask).where(WorkflowTask.tenant_id == self._tenant_id)
         if workflow_session_id is not None:
             stmt = stmt.where(WorkflowTask.workflow_session_id == workflow_session_id)
-        stmt = apply_filters(stmt, WorkflowTask, filters)
+        stmt = apply_filters(stmt, WorkflowTask, filters, readable=WorkflowTaskRead)
         stmt = apply_sort(
             stmt,
             WorkflowTask,
@@ -142,6 +142,7 @@ class SqlWorkflowTaskRepository:
                 col(WorkflowTask.position).asc(),
                 col(WorkflowTask.created_at).asc(),
             ],
+            readable=WorkflowTaskRead,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         tasks = list(result.all())

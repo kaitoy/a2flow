@@ -87,9 +87,13 @@ class SqlAgentSkillRepository:
         filters: Sequence[FilterSpec] = (),
     ) -> list[AgentSkill]:
         stmt = select(AgentSkill).where(AgentSkill.tenant_id == self._tenant_id)
-        stmt = apply_filters(stmt, AgentSkill, filters)
+        stmt = apply_filters(stmt, AgentSkill, filters, readable=AgentSkill)
         stmt = apply_sort(
-            stmt, AgentSkill, sort, default=[col(AgentSkill.created_at).desc()]
+            stmt,
+            AgentSkill,
+            sort,
+            default=[col(AgentSkill.created_at).desc()],
+            readable=AgentSkill,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())

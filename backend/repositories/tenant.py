@@ -89,8 +89,14 @@ class SqlTenantRepository:
         filters: Sequence[FilterSpec] = (),
     ) -> list[Tenant]:
         stmt = select(Tenant)
-        stmt = apply_filters(stmt, Tenant, filters)
-        stmt = apply_sort(stmt, Tenant, sort, default=[col(Tenant.created_at).desc()])
+        stmt = apply_filters(stmt, Tenant, filters, readable=Tenant)
+        stmt = apply_sort(
+            stmt,
+            Tenant,
+            sort,
+            default=[col(Tenant.created_at).desc()],
+            readable=Tenant,
+        )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 

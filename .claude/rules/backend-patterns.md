@@ -183,6 +183,12 @@ A cross-tenant fetch this way returns `None`, which the existing `NotFoundError`
 
 Enforcement is deliberately explicit at this layer rather than via `with_loader_criteria`/ORM event listeners: ADK agent tools and background jobs (`infrastructure/*_tools.py`, `services/workflow_planning.py`, `services/agent_skill_sync.py`) open their own `AsyncSession` on the module-level engine outside FastAPI's request scope, so a request-scoped listener would silently not apply to them — the most dangerous path. Those callers resolve `tenant_id` themselves via `repositories/tenant_bootstrap.py` (the single audited module of intentionally tenant-*unscoped* queries — an opaque ADK session id or bare entity id is all they start with) before constructing any repository.
 
+### List Query Field Exposure
+
+`apply_filters`/`apply_sort` (`repositories/query.py`) resolve a client-supplied camelCase field name against `model.model_fields` — the entire column set of the table class, not just what the router serializes. A field the table model carries but never returns to clients (e.g. `User.password`, a bcrypt hash; `Secret.entries`, Fernet ciphertext) must never be filterable or sortable: doing so lets a client reconstruct the value by observing which rows match or how they sort, without ever receiving it directly (a blind boolean-oracle side channel).
+
+Both helpers take a required keyword-only `readable: type[SQLModel]` argument: the schema the caller will actually serialize results as. A field only resolves when present on **both** `model` and `readable`; otherwise it's rejected the same way a nonexistent field name is — a client can't tell "hidden" from "nonexistent". Pass the table class itself when it doubles as the response model (`readable=Workflow`), or the narrower `*Read` schema otherwise (`readable=UserRead`, `readable=SecretRead`). There is no default, so every new entity's `list()` must consciously declare its readable schema.
+
 ### Audit Field Population
 
 `created_by` and `updated_by` are **never set by the model or by the router**. Only the repository sets them, receiving `user_id` as an explicit parameter:
@@ -453,6 +459,7 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
    - Define a `Protocol` with the standard five methods plus `exists()`.
    - Implement `SqlEntityRepository`. If tenant-isolated, add the `tenant_id` constructor parameter and the `_get_scoped` helper per "Tenant Scoping in the Repository Layer" above.
    - Raise `NotFoundError` / `ReferencedError` / `ForeignKeyViolationError` as appropriate.
+   - If `list()` calls `apply_filters`/`apply_sort`, pass `readable=<EntityRead>` (or `readable=Entity` when the table class doubles as the response model) — see "List Query Field Exposure" above.
 4. **Exceptions**: reuse existing exception types; add new ones to `repositories/exceptions.py` only if needed.
 5. **Service file** (`services/<entity>.py`): define `EntityService` as a concrete class wrapping the repository. Raise `NotFoundError` on missing single-entity fetches and host any multi-collaborator orchestration here.
 6. **Dependencies** (`dependencies/`): add the `EntityRepositoryDep` alias to `repository.py` **and** the `EntityServiceDep` alias to `service.py` (the service factory composes the repository deps), then re-export both from `__init__.py`. If tenant-isolated, the `get_entity_repository` factory also takes `tenant_id: CurrentTenantIdDep` and passes it to the `SqlEntityRepository` constructor.

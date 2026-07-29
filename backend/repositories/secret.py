@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from models.secret import Secret, SecretCreate, SecretUpdate
+from models.secret import Secret, SecretCreate, SecretRead, SecretUpdate
 from repositories._integrity import is_foreign_key_error
 from repositories.exceptions import (
     ForeignKeyViolationError,
@@ -93,8 +93,14 @@ class SqlSecretRepository:
     ) -> list[Secret]:
         """Return a page of Secrets, defaulting to ``created_at`` descending."""
         stmt = select(Secret).where(Secret.tenant_id == self._tenant_id)
-        stmt = apply_filters(stmt, Secret, filters)
-        stmt = apply_sort(stmt, Secret, sort, default=[col(Secret.created_at).desc()])
+        stmt = apply_filters(stmt, Secret, filters, readable=SecretRead)
+        stmt = apply_sort(
+            stmt,
+            Secret,
+            sort,
+            default=[col(Secret.created_at).desc()],
+            readable=SecretRead,
+        )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 

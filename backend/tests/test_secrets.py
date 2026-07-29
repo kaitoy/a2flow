@@ -254,6 +254,33 @@ async def test_get_secret_unknown_id_returns_404(secrets_client: AsyncClient) ->
     assert_err(response, code="NOT_FOUND", status=404)
 
 
+# ---------- hidden field query exposure (regression) ----------
+
+
+async def test_list_secrets_filter_entries_like_returns_400(
+    secrets_client: AsyncClient,
+) -> None:
+    """``like`` skips value coercion -- the field-visibility check is the only
+    thing guarding ``entries`` (stored Fernet ciphertext) from a substring oracle."""
+    await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY)
+    response = await secrets_client.get(
+        "/api/v1/secrets", params={"q": "entries:like:a"}
+    )
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_list_secrets_filter_entries_eq_returns_400(
+    secrets_client: AsyncClient,
+) -> None:
+    response = await secrets_client.get("/api/v1/secrets", params={"q": "entries:eq:a"})
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_sort_secrets_by_entries_returns_400(secrets_client: AsyncClient) -> None:
+    response = await secrets_client.get("/api/v1/secrets", params={"s": "entries"})
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
 # ---------- patch ----------
 
 

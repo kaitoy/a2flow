@@ -83,9 +83,13 @@ class SqlMCPServerRepository:
     ) -> list[MCPServer]:
         """Return a page of MCPServers, defaulting to ``created_at`` descending."""
         stmt = select(MCPServer).where(MCPServer.tenant_id == self._tenant_id)
-        stmt = apply_filters(stmt, MCPServer, filters)
+        stmt = apply_filters(stmt, MCPServer, filters, readable=MCPServer)
         stmt = apply_sort(
-            stmt, MCPServer, sort, default=[col(MCPServer.created_at).desc()]
+            stmt,
+            MCPServer,
+            sort,
+            default=[col(MCPServer.created_at).desc()],
+            readable=MCPServer,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())

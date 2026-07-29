@@ -95,12 +95,13 @@ class SqlApprovalRepository:
             The matching approvals.
         """
         stmt = select(Approval).where(Approval.tenant_id == self._tenant_id)
-        stmt = apply_filters(stmt, Approval, filters)
+        stmt = apply_filters(stmt, Approval, filters, readable=Approval)
         stmt = apply_sort(
             stmt,
             Approval,
             sort,
             default=[col(Approval.created_at).desc()],
+            readable=Approval,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())

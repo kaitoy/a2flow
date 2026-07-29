@@ -139,7 +139,9 @@ class SqlWorkflowTaskTemplateRepository:
         )
         if workflow_id is not None:
             stmt = stmt.where(WorkflowTaskTemplate.workflow_id == workflow_id)
-        stmt = apply_filters(stmt, WorkflowTaskTemplate, filters)
+        stmt = apply_filters(
+            stmt, WorkflowTaskTemplate, filters, readable=WorkflowTaskTemplateRead
+        )
         stmt = apply_sort(
             stmt,
             WorkflowTaskTemplate,
@@ -148,6 +150,7 @@ class SqlWorkflowTaskTemplateRepository:
                 col(WorkflowTaskTemplate.position).asc(),
                 col(WorkflowTaskTemplate.created_at).asc(),
             ],
+            readable=WorkflowTaskTemplateRead,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         templates = list(result.all())

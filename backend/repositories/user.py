@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from models.user import SYSTEM_USER_ID, User, UserCreate, UserUpdate
+from models.user import SYSTEM_USER_ID, User, UserCreate, UserRead, UserUpdate
 from repositories._integrity import is_foreign_key_error
 from repositories.exceptions import (
     ForeignKeyViolationError,
@@ -146,8 +146,14 @@ class SqlUserRepository:
             stmt = stmt.where(
                 or_(col(User.tenant_id) == visible_tenant_id, _IS_SUPER_ADMIN)
             )
-        stmt = apply_filters(stmt, User, filters)
-        stmt = apply_sort(stmt, User, sort, default=[col(User.created_at).desc()])
+        stmt = apply_filters(stmt, User, filters, readable=UserRead)
+        stmt = apply_sort(
+            stmt,
+            User,
+            sort,
+            default=[col(User.created_at).desc()],
+            readable=UserRead,
+        )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 

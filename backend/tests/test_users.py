@@ -206,6 +206,60 @@ async def test_list_users_respects_limit_param(user_client: AsyncClient) -> None
     assert len(assert_ok(response)) == 2
 
 
+# ---------- hidden field query exposure (regression) ----------
+
+
+async def test_list_users_filter_password_eq_returns_400(
+    user_client: AsyncClient,
+) -> None:
+    """Filtering on the hidden ``password`` column is rejected, not silently applied."""
+    response = await user_client.get(
+        "/api/v1/users", params={"q": "password:eq:totallyFakePassphrase123"}
+    )
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_list_users_filter_password_like_returns_400(
+    user_client: AsyncClient,
+) -> None:
+    """``like`` bypasses value coercion entirely -- the critical regression case."""
+    response = await user_client.get("/api/v1/users", params={"q": "password:like:a"})
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_list_users_filter_password_gt_returns_400(
+    user_client: AsyncClient,
+) -> None:
+    """``gt``/``lt`` would otherwise let a caller binary-search the hash by ordering."""
+    response = await user_client.get(
+        "/api/v1/users", params={"q": "password:gt:totallyFakePassphrase123"}
+    )
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_sort_users_by_password_returns_400(user_client: AsyncClient) -> None:
+    response = await user_client.get("/api/v1/users", params={"s": "password"})
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_list_users_hidden_field_error_matches_unknown_field_shape(
+    user_client: AsyncClient,
+) -> None:
+    """The hidden-field error is indistinguishable from a genuinely unknown field."""
+    hidden = assert_err(
+        await user_client.get("/api/v1/users", params={"q": "password:eq:x"}),
+        code="INVALID_QUERY",
+        status=400,
+    )
+    unknown = assert_err(
+        await user_client.get("/api/v1/users", params={"q": "notAField:eq:x"}),
+        code="INVALID_QUERY",
+        status=400,
+    )
+    assert hidden["message"].startswith("Unknown field")
+    assert unknown["message"].startswith("Unknown field")
+
+
 # ---------- get ----------
 
 

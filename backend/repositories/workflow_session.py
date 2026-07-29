@@ -95,12 +95,13 @@ class SqlWorkflowSessionRepository:
         stmt = select(WorkflowSession).where(
             WorkflowSession.tenant_id == self._tenant_id
         )
-        stmt = apply_filters(stmt, WorkflowSession, filters)
+        stmt = apply_filters(stmt, WorkflowSession, filters, readable=WorkflowSession)
         stmt = apply_sort(
             stmt,
             WorkflowSession,
             sort,
             default=[col(WorkflowSession.created_at).desc()],
+            readable=WorkflowSession,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())

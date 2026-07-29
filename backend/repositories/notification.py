@@ -107,12 +107,13 @@ class SqlNotificationRepository:
             Notification.user_id == user_id,
             Notification.tenant_id == self._tenant_id,
         )
-        stmt = apply_filters(stmt, Notification, filters)
+        stmt = apply_filters(stmt, Notification, filters, readable=Notification)
         stmt = apply_sort(
             stmt,
             Notification,
             sort,
             default=[col(Notification.created_at).desc()],
+            readable=Notification,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())

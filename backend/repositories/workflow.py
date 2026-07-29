@@ -84,9 +84,13 @@ class SqlWorkflowRepository:
         filters: Sequence[FilterSpec] = (),
     ) -> list[Workflow]:
         stmt = select(Workflow).where(Workflow.tenant_id == self._tenant_id)
-        stmt = apply_filters(stmt, Workflow, filters)
+        stmt = apply_filters(stmt, Workflow, filters, readable=Workflow)
         stmt = apply_sort(
-            stmt, Workflow, sort, default=[col(Workflow.created_at).desc()]
+            stmt,
+            Workflow,
+            sort,
+            default=[col(Workflow.created_at).desc()],
+            readable=Workflow,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
