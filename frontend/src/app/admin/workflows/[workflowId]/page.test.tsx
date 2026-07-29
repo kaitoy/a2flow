@@ -35,6 +35,15 @@ describe("EditWorkflowPage", () => {
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
   });
 
+  it("links the Agent Skill field to its detail page", async () => {
+    render(<EditWorkflowPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    expect(screen.getByRole("link", { name: "my-skill" })).toHaveAttribute(
+      "href",
+      "/admin/agent-skills/skill-1"
+    );
+  });
+
   it("links to the task template management page", async () => {
     render(<EditWorkflowPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));

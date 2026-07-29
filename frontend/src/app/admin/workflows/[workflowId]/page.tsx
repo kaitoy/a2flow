@@ -215,8 +215,13 @@ export default function EditWorkflowPage() {
           </FormField>
 
           <FormField htmlFor="agentSkill" label="Agent Skill">
-            <div className="py-1.5 text-sm text-on-surface">
-              {skillName ?? workflow.agentSkillId}
+            <div className="py-1.5">
+              <Link
+                href={`/admin/agent-skills/${workflow.agentSkillId}`}
+                className="text-sm font-medium text-accent transition-colors hover:underline"
+              >
+                {skillName ?? workflow.agentSkillId}
+              </Link>
             </div>
           </FormField>
 

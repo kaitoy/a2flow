@@ -88,6 +88,15 @@ describe("WorkflowsPage", () => {
     expect(screen.getByText("published")).toBeInTheDocument();
   });
 
+  it("links the Agent Skill cell to its detail page", async () => {
+    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-workflow"));
+    expect(screen.getByRole("link", { name: "my-skill" })).toHaveAttribute(
+      "href",
+      "/admin/agent-skills/skill-1"
+    );
+  });
+
   it("disables Run for a workflow that is not published", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows", () =>

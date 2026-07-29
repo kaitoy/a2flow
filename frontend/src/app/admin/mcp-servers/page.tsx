@@ -45,6 +45,7 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
     header: "Transport",
     sortField: "transport",
     filterField: "transport",
+    className: "text-center",
     cell: (s) => <Badge>{s.transport === "stdio" ? "stdio" : "HTTP"}</Badge>,
   },
   {
