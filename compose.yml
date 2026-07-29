@@ -54,7 +54,7 @@ services:
       # credentials are optional -- a placeholder is stored when they are
       # unset -- but note the demo MCP server can run mutating AWS CLI
       # commands, not only reads.
-      DEMO_DATA: ${DEMO_DATA:-}
+      DEMO_DATA: ${DEMO_DATA:-true}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       DEMO_AWS_ACCESS_KEY_ID: ${DEMO_AWS_ACCESS_KEY_ID:-}
       DEMO_AWS_SECRET_ACCESS_KEY: ${DEMO_AWS_SECRET_ACCESS_KEY:-}
