@@ -7,11 +7,13 @@ import { useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteSecret, listSecrets, type Secret } from "@/lib/api";
 
@@ -22,6 +24,7 @@ const STATIC_COLUMNS: ColumnDef<Secret>[] = [
     header: "Name",
     sortField: "name",
     filterField: "name",
+    visibility: "always",
     cell: (s) => (
       <Link
         href={`/admin/secrets/${s.id}`}
@@ -39,6 +42,7 @@ const STATIC_COLUMNS: ColumnDef<Secret>[] = [
   },
   {
     header: "Reference",
+    visibility: "optional",
     cell: (s) =>
       s.type === "vault" ? (
         `${s.vaultMount}/${s.vaultPath}`
@@ -91,6 +95,7 @@ export default function SecretsPage() {
     {
       header: "Actions",
       noTruncate: true,
+      visibility: "always",
       cell: (secret) => (
         <div className="flex justify-center gap-2">
           <DeleteIconButton onClick={() => handleDelete(secret.id, secret.name)} />
@@ -98,6 +103,11 @@ export default function SecretsPage() {
       ),
     },
   ];
+
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "secrets",
+    columns
+  );
 
   return (
     <AdminPageContainer>
@@ -109,9 +119,18 @@ export default function SecretsPage() {
         addLabel="+ Add secret"
         onRefresh={reload}
         refreshing={loading || refreshing}
+        columnPicker={
+          <ColumnPicker
+            options={options}
+            value={selected}
+            onChange={setSelected}
+            onReset={reset}
+            customized={customized}
+          />
+        }
       />
       <DataTable
-        columns={columns}
+        columns={visibleColumns}
         rows={rows}
         loading={loading}
         emptyMessage="No secrets registered yet."

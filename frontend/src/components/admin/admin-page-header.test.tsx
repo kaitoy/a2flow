@@ -33,4 +33,21 @@ describe("AdminPageHeader", () => {
     render(<AdminPageHeader title="Approvals" onRefresh={vi.fn()} refreshing />);
     expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled();
   });
+
+  it("renders the column picker between the refresh and secondary actions", () => {
+    render(
+      <AdminPageHeader
+        title="MCP Servers"
+        onRefresh={vi.fn()}
+        columnPicker={<button type="button">Columns</button>}
+        secondaryAction={<button type="button">Browse registry</button>}
+        addHref="/admin/mcp-servers/new"
+        addLabel="+ Add server"
+      />
+    );
+    const labels = screen
+      .getAllByRole("button")
+      .map((el) => el.getAttribute("aria-label") ?? el.textContent);
+    expect(labels).toEqual(["Refresh", "Columns", "Browse registry"]);
+  });
 });

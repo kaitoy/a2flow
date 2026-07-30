@@ -157,6 +157,8 @@ The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admi
 
 Every admin list table shares interactive features: **per-column sorting and filtering** (applied server-side via the list APIs' `s` and `q` query parameters, so they cover the whole dataset rather than just the current page), **drag-to-resize column widths** (kept for the session, not persisted), and **hover tooltips** that reveal the full text of any cell clipped to its column width.
 
+Each table also has a **column picker** — the ▥ button next to Refresh — listing every column the table can show, with a "Reset to default" action. Each table ships a default set, and some columns (an MCP server's transport, a secret's reference, an agent skill's ref and revision, a user's email and verification flag) start hidden so the columns that matter most get the width. The identifier column and the Actions column are always shown and are not listed. Choices are remembered per table in the browser's local storage, so they survive a reload; only the departures from the defaults are stored, which keeps a table's later columns arriving at their intended default. Hiding a column that a sort or filter is currently using clears that sort or filter, so the rows on screen are never ordered or narrowed by a criterion nothing on the page can show.
+
 ### Users
 
 Navigate to [http://localhost:3000/admin/users](http://localhost:3000/admin/users) to manage application users.

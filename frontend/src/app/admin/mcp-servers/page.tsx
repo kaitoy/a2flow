@@ -8,6 +8,7 @@ import { useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { RegistrySearchDialog } from "@/components/admin/registry-search-dialog";
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteMcpServer,
@@ -32,6 +34,7 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
     header: "Name",
     sortField: "name",
     filterField: "name",
+    visibility: "always",
     cell: (s) => (
       <Link
         href={`/admin/mcp-servers/${s.id}`}
@@ -46,6 +49,7 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
     sortField: "transport",
     filterField: "transport",
     className: "text-center",
+    visibility: "optional",
     cell: (s) => <Badge>{s.transport === "stdio" ? "stdio" : "HTTP"}</Badge>,
   },
   {
@@ -57,6 +61,7 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
   },
   {
     header: "Headers / Env",
+    visibility: "optional",
     cell: (s) => {
       const count = Object.keys((s.transport === "stdio" ? s.env : s.headers) ?? {}).length;
       if (count === 0) return <span className="text-on-surface-variant">—</span>;
@@ -115,6 +120,7 @@ export default function McpServersPage() {
     {
       header: "Actions",
       noTruncate: true,
+      visibility: "always",
       cell: (server) => (
         <div className="flex justify-center gap-2">
           <DeleteIconButton onClick={() => handleDelete(server.id, server.name)} />
@@ -122,6 +128,11 @@ export default function McpServersPage() {
       ),
     },
   ];
+
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "mcpServers",
+    columns
+  );
 
   return (
     <AdminPageContainer>
@@ -141,11 +152,20 @@ export default function McpServersPage() {
             Browse registry
           </Button>
         }
+        columnPicker={
+          <ColumnPicker
+            options={options}
+            value={selected}
+            onChange={setSelected}
+            onReset={reset}
+            customized={customized}
+          />
+        }
         onRefresh={reload}
         refreshing={loading || refreshing}
       />
       <DataTable
-        columns={columns}
+        columns={visibleColumns}
         rows={rows}
         loading={loading}
         emptyMessage="No MCP servers registered yet."

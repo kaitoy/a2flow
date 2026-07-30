@@ -16,7 +16,7 @@ export default function Loading() {
         addLabel="+ Add skill"
       />
       <AdminListSkeleton
-        columns={["Name", "Repo URL", "Repo Path", "Description", "Created At", "Actions"]}
+        columns={["Name", "Repo URL", "Repo Path", "Status", "Created At", "Actions"]}
       />
     </AdminPageContainer>
   );

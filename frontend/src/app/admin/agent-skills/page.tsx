@@ -9,12 +9,14 @@ import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   formatRevision,
@@ -60,6 +62,7 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
     header: "Name",
     sortField: "name",
     filterField: "name",
+    visibility: "always",
     cell: (s) => (
       <Link
         href={`/admin/agent-skills/${s.id}`}
@@ -88,6 +91,7 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
     sortField: "repoRef",
     filterField: "repoRef",
     className: "font-mono",
+    visibility: "optional",
     cell: (s) => s.repoRef || "—",
   },
   {
@@ -101,6 +105,7 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
     header: "Revision",
     sortField: "commitSha",
     className: "font-mono",
+    visibility: "optional",
     cell: (s) => formatRevision(s.commitSha),
   },
   {
@@ -177,6 +182,7 @@ export default function AgentSkillsPage() {
           {
             header: "Actions",
             noTruncate: true,
+            visibility: "always" as const,
             cell: (skill: AgentSkill) => (
               <div className="flex justify-center gap-2">
                 <ActionIconButton
@@ -202,6 +208,11 @@ export default function AgentSkillsPage() {
       : []),
   ];
 
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "agentSkills",
+    columns
+  );
+
   return (
     <AdminPageContainer>
       <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Agent Skills" }]} />
@@ -212,9 +223,18 @@ export default function AgentSkillsPage() {
         addLabel="+ Add skill"
         onRefresh={reload}
         refreshing={loading || refreshing}
+        columnPicker={
+          <ColumnPicker
+            options={options}
+            value={selected}
+            onChange={setSelected}
+            onReset={reset}
+            customized={customized}
+          />
+        }
       />
       <DataTable
-        columns={columns}
+        columns={visibleColumns}
         rows={rows}
         loading={loading}
         emptyMessage="No agent skills registered yet."

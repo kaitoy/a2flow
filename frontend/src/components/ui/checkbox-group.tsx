@@ -32,6 +32,12 @@ export interface CheckboxGroupProps {
   emptyMessage?: string;
   /** Optional name applied to each checkbox input. */
   name?: string;
+  /**
+   * Drop the surrounding glass panel, leaving a bare list of rows. Set this when
+   * the group already sits inside a glass surface of its own (a popover, say),
+   * where a second panel would stack two elevation tiers on top of each other.
+   */
+  flush?: boolean;
 }
 
 const ROW =
@@ -53,7 +59,8 @@ const DIVIDER_BEFORE = "mt-1.5 border-t border-divider/60 pt-2.5";
  * checkbox's accessible name is its option label, so it can be queried by role
  * and name. Options marked `disabled` render as read-only checkboxes that keep
  * their current state. An option marked `dividerBefore` renders a thin divider
- * above it, splitting the list into visually distinct groups.
+ * above it, splitting the list into visually distinct groups. Pass `flush` to
+ * drop the glass panel when the group is already inside one.
  */
 export function CheckboxGroup({
   options,
@@ -61,10 +68,17 @@ export function CheckboxGroup({
   onChange,
   emptyMessage = "No options available.",
   name,
+  flush = false,
 }: CheckboxGroupProps) {
   if (options.length === 0) {
     return (
-      <p className="rounded-xl glass-panel px-4 py-3 text-sm text-on-surface-variant">
+      <p
+        className={
+          flush
+            ? "px-3 py-2 text-sm text-on-surface-variant"
+            : "rounded-xl glass-panel px-4 py-3 text-sm text-on-surface-variant"
+        }
+      >
         {emptyMessage}
       </p>
     );
@@ -83,7 +97,11 @@ export function CheckboxGroup({
   }
 
   return (
-    <div className="flex flex-col gap-0.5 rounded-xl glass-panel p-1.5">
+    <div
+      className={
+        flush ? "flex flex-col gap-0.5" : "flex flex-col gap-0.5 rounded-xl glass-panel p-1.5"
+      }
+    >
       {options.map((option) => (
         <label
           key={option.value}

@@ -7,9 +7,11 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { type Approval, type ApprovalStatus, getUserNames, listApprovals } from "@/lib/api";
 
@@ -65,6 +67,7 @@ export default function ApprovalsPage() {
         header: "Title",
         sortField: "title",
         filterField: "title",
+        visibility: "always",
         cell: (a) => <span className="font-medium">{a.title}</span>,
       },
       {
@@ -109,6 +112,11 @@ export default function ApprovalsPage() {
     [names]
   );
 
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "approvals",
+    columns
+  );
+
   return (
     <AdminPageContainer>
       <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Approvals" }]} />
@@ -117,9 +125,18 @@ export default function ApprovalsPage() {
         icon={CheckCircle2}
         onRefresh={reload}
         refreshing={loading || refreshing}
+        columnPicker={
+          <ColumnPicker
+            options={options}
+            value={selected}
+            onChange={setSelected}
+            onReset={reset}
+            customized={customized}
+          />
+        }
       />
       <DataTable
-        columns={columns}
+        columns={visibleColumns}
         rows={rows}
         loading={loading}
         emptyMessage="No approval requests yet."

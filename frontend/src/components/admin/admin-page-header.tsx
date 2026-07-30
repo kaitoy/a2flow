@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
+import { HeaderIconButton } from "./header-icon-button";
 
 interface AdminPageHeaderProps {
   title: string;
@@ -12,6 +12,13 @@ interface AdminPageHeaderProps {
   addLabel?: string;
   /** Optional extra action rendered before the "Add" button (e.g. a dialog trigger). */
   secondaryAction?: ReactNode;
+  /**
+   * Optional column-visibility control (a `ColumnPicker`) for the page's table,
+   * rendered immediately after the refresh button. It has its own slot rather
+   * than sharing `secondaryAction` so the action cluster reads the same way on
+   * every list page, including the ones already using that slot.
+   */
+  columnPicker?: ReactNode;
   /** When provided, render a refresh button that re-runs the table fetch on click. */
   onRefresh?: () => void;
   /** True while a refresh is in flight; disables the button and spins the icon. */
@@ -19,13 +26,16 @@ interface AdminPageHeaderProps {
 }
 
 /**
- * Admin list-page header with a title, an optional refresh button, and an
- * optional "Add" link button.
+ * Admin list-page header with a title, an optional refresh button, an optional
+ * column picker, and an optional "Add" link button.
  *
  * Pass `onRefresh` (typically the `reload` returned by `useTableQuery`) to show
  * a refresh control; pass `refreshing` (typically the hook's `loading ||
  * refreshing`) so the button disables and its icon spins while a fetch is in
  * flight. Silent background refreshes deliberately leave the button at rest.
+ *
+ * The right-hand cluster always reads refresh → column picker → secondary
+ * action → "Add", whichever of them a page supplies.
  */
 export function AdminPageHeader({
   title,
@@ -33,6 +43,7 @@ export function AdminPageHeader({
   addHref,
   addLabel,
   secondaryAction,
+  columnPicker,
   onRefresh,
   refreshing = false,
 }: AdminPageHeaderProps) {
@@ -50,27 +61,17 @@ export function AdminPageHeader({
       </div>
       <div className="flex items-center gap-2">
         {onRefresh && (
-          <Tooltip label="Refresh" placement="bottom">
-            <button
-              type="button"
-              // Called with no argument on purpose: `reload` takes options, and
-              // the click event must not land in them.
-              onClick={() => onRefresh()}
-              disabled={refreshing}
-              aria-label="Refresh"
-              className={[
-                "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full",
-                "glass-panel text-on-surface",
-                "transition-[transform,translate,scale,box-shadow,color,background-color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
-                "hover:shadow-glow hover:text-accent motion-safe:hover:scale-105 motion-safe:active:scale-95",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
-                "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100",
-              ].join(" ")}
-            >
-              <RefreshIcon spinning={refreshing} />
-            </button>
-          </Tooltip>
+          <HeaderIconButton
+            label="Refresh"
+            // Called with no argument on purpose: `reload` takes options, and
+            // the click event must not land in them.
+            onClick={() => onRefresh()}
+            disabled={refreshing}
+          >
+            <RefreshIcon spinning={refreshing} />
+          </HeaderIconButton>
         )}
+        {columnPicker}
         {secondaryAction}
         {addHref && addLabel && (
           <Button variant="primary" href={addHref}>

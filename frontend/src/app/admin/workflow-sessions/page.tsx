@@ -8,11 +8,13 @@ import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteWorkflowSession,
@@ -36,6 +38,7 @@ function buildColumns(
       header: "Workflow",
       sortField: "workflowName",
       filterField: "workflowName",
+      visibility: "always",
       cell: (s) => <span className="font-medium">{s.workflowName}</span>,
     },
     {
@@ -67,6 +70,7 @@ function buildColumns(
     {
       header: "Actions",
       noTruncate: true,
+      visibility: "always",
       cell: (s) => (
         <div className="flex justify-center gap-2">
           <ActionIconButton
@@ -130,6 +134,11 @@ export default function WorkflowSessionsPage() {
       });
   }, [rows]);
 
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "workflowSessions",
+    buildColumns(userMap, handleDelete)
+  );
+
   return (
     <AdminPageContainer>
       <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Workflow Sessions" }]} />
@@ -138,9 +147,18 @@ export default function WorkflowSessionsPage() {
         icon={ListChecks}
         onRefresh={reload}
         refreshing={loading || refreshing}
+        columnPicker={
+          <ColumnPicker
+            options={options}
+            value={selected}
+            onChange={setSelected}
+            onReset={reset}
+            customized={customized}
+          />
+        }
       />
       <DataTable
-        columns={buildColumns(userMap, handleDelete)}
+        columns={visibleColumns}
         rows={rows}
         loading={loading}
         emptyMessage="No workflow sessions yet. Run a workflow to create one."

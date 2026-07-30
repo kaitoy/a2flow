@@ -17,6 +17,17 @@ afterEach(() => {
   }
 });
 
+// `useColumnVisibility` persists the viewer's column choices, and the jsdom
+// environment (with its localStorage) is shared by every test in a file — so a
+// test that opens the column picker would otherwise decide which columns the
+// next test's table renders. Only the column keys are cleared: tests around the
+// theme and the selected tenant manage their own keys.
+afterEach(() => {
+  for (const key of Object.keys(window.localStorage)) {
+    if (key.startsWith("a2flow.columns.")) window.localStorage.removeItem(key);
+  }
+});
+
 Element.prototype.scrollIntoView = vi.fn();
 
 // jsdom doesn't implement matchMedia. React Spring's useReducedMotion

@@ -8,12 +8,14 @@ import { useCallback, useEffect, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import {
   deleteWorkflowTaskTemplate,
   type FilterSpec,
@@ -58,12 +60,14 @@ function buildColumns(
       header: "#",
       className: "w-12 font-mono text-on-surface-variant",
       sortField: "position",
+      visibility: "always",
       cell: (t) => t.position ?? 0,
     },
     {
       header: "Title",
       sortField: "title",
       filterField: "title",
+      visibility: "always",
       cell: (t) => (
         <Link
           href={`/admin/workflows/${workflowId}/task-templates/${t.id}`}
@@ -119,6 +123,7 @@ function buildColumns(
     {
       header: "Actions",
       noTruncate: true,
+      visibility: "always",
       cell: (t) => (
         <div className="flex justify-center gap-2">
           <DeleteIconButton onClick={() => onDelete(t.id, t.title)} />
@@ -201,6 +206,17 @@ export default function WorkflowTaskTemplatesPage() {
     }
   }
 
+  const columns = buildColumns(
+    workflowId,
+    new Map(templates.map((t) => [t.id, t.title])),
+    serverNameById,
+    handleDelete
+  );
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "taskTemplates",
+    columns
+  );
+
   return (
     <AdminPageContainer>
       <Breadcrumbs
@@ -218,6 +234,18 @@ export default function WorkflowTaskTemplatesPage() {
         addLabel="+ Add template"
         onRefresh={load}
         refreshing={loading}
+        columnPicker={
+          // The graph view has no columns to choose from.
+          view === "table" ? (
+            <ColumnPicker
+              options={options}
+              value={selected}
+              onChange={setSelected}
+              onReset={reset}
+              customized={customized}
+            />
+          ) : undefined
+        }
       />
       <div className="mb-4">
         <SegmentedControl
@@ -232,12 +260,7 @@ export default function WorkflowTaskTemplatesPage() {
       ) : (
         <>
           <DataTable
-            columns={buildColumns(
-              workflowId,
-              new Map(templates.map((t) => [t.id, t.title])),
-              serverNameById,
-              handleDelete
-            )}
+            columns={visibleColumns}
             rows={templates}
             loading={loading}
             emptyMessage="No task templates for this workflow yet."

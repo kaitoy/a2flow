@@ -16,7 +16,7 @@ export default function Loading() {
         addLabel="+ Add user"
       />
       <AdminListSkeleton
-        columns={["", "Username", "Name", "Email", "Enabled", "Verified", "Actions"]}
+        columns={["", "Username", "Name", "Roles", "Enabled", "Created At", "Actions"]}
       />
     </AdminPageContainer>
   );

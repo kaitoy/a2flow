@@ -23,9 +23,26 @@ describe("SecretsPage", () => {
     render(<SecretsPage />);
     await waitFor(() => expect(screen.getByText("github-token")).toBeInTheDocument());
     expect(screen.getByText("Local")).toBeInTheDocument();
-    expect(screen.getByText("1 entry")).toBeInTheDocument();
     expect(screen.getByText("vault-token")).toBeInTheDocument();
     expect(screen.getByText("Vault")).toBeInTheDocument();
+  });
+
+  it("hides the reference column by default", async () => {
+    render(<SecretsPage />);
+    await waitFor(() => screen.getByText("github-token"));
+    expect(screen.queryByText("1 entry")).not.toBeInTheDocument();
+    expect(screen.queryByText("secret/myapp/github")).not.toBeInTheDocument();
+  });
+
+  it("renders each secret's reference once the column is shown", async () => {
+    const user = userEvent.setup();
+    render(<SecretsPage />);
+    await waitFor(() => screen.getByText("github-token"));
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Reference" }));
+
+    expect(screen.getByText("1 entry")).toBeInTheDocument();
     expect(screen.getByText("secret/myapp/github")).toBeInTheDocument();
   });
 

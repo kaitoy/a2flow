@@ -7,10 +7,13 @@ import { useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { DateTime } from "@/components/ui/date-time";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteTenant, listTenants, type Tenant } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
@@ -29,6 +32,7 @@ const STATIC_COLUMNS: ColumnDef<Tenant>[] = [
     header: "Display Name",
     sortField: "displayName",
     filterField: "displayName",
+    visibility: "always",
     cell: (t) => (
       <Link
         href={`/admin/tenants/${t.id}`}
@@ -52,6 +56,11 @@ const STATIC_COLUMNS: ColumnDef<Tenant>[] = [
     filterOptions: BOOL_FILTER_OPTIONS,
     className: "text-center",
     cell: (t) => (t.enabled ? "✓" : "—"),
+  },
+  {
+    header: "Created At",
+    sortField: "createdAt",
+    cell: (t) => <DateTime value={t.createdAt} className="text-on-surface-variant" />,
   },
 ];
 
@@ -93,6 +102,7 @@ export default function TenantsPage() {
     {
       header: "Actions",
       noTruncate: true,
+      visibility: "always",
       cell: (tenant) => (
         <div className="flex justify-center gap-2">
           <DeleteIconButton onClick={() => handleDelete(tenant.id, tenant.displayName)} />
@@ -100,6 +110,11 @@ export default function TenantsPage() {
       ),
     },
   ];
+
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "tenants",
+    columns
+  );
 
   return (
     <AdminPageContainer>
@@ -111,9 +126,18 @@ export default function TenantsPage() {
         addLabel="+ Add tenant"
         onRefresh={reload}
         refreshing={loading || refreshing}
+        columnPicker={
+          <ColumnPicker
+            options={options}
+            value={selected}
+            onChange={setSelected}
+            onReset={reset}
+            customized={customized}
+          />
+        }
       />
       <DataTable
-        columns={columns}
+        columns={visibleColumns}
         rows={rows}
         loading={loading}
         emptyMessage="No tenants registered yet."

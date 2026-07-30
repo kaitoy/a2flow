@@ -15,7 +15,7 @@ export default function Loading() {
         addHref="/admin/mcp-servers/new"
         addLabel="+ Add server"
       />
-      <AdminListSkeleton columns={["Name", "URL", "Headers", "Created At", "Actions"]} />
+      <AdminListSkeleton columns={["Name", "Endpoint", "Created At", "Actions"]} />
     </AdminPageContainer>
   );
 }

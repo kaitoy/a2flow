@@ -345,6 +345,68 @@ describe("DataTable", () => {
     );
     expect(container.querySelector('[data-filter-indicator="active"]')).toBeInTheDocument();
   });
+
+  it("clears the sort when its column stops being rendered", () => {
+    const onSortChange = vi.fn();
+    const withName: ColumnDef<Row>[] = [
+      { header: "Name", sortField: "name", cell: (r) => r.name },
+      { header: "Value", cell: (r) => String(r.value) },
+    ];
+    const { rerender } = render(
+      <DataTable
+        columns={withName}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        sort={{ field: "name", descending: false }}
+        onSortChange={onSortChange}
+      />
+    );
+    expect(onSortChange).not.toHaveBeenCalled();
+
+    rerender(
+      <DataTable
+        columns={withName.slice(1)}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        sort={{ field: "name", descending: false }}
+        onSortChange={onSortChange}
+      />
+    );
+    expect(onSortChange).toHaveBeenCalledWith(null);
+  });
+
+  it("drops only the filters whose column stops being rendered", () => {
+    const onFilterChange = vi.fn();
+    const columns: ColumnDef<Row>[] = [
+      { header: "Name", filterField: "name", cell: (r) => r.name },
+      { header: "Value", filterField: "value", cell: (r) => String(r.value) },
+    ];
+    const filters = [
+      { field: "name", op: "like", value: "a" },
+      { field: "value", op: "like", value: "1" },
+    ];
+    const { rerender } = render(
+      <DataTable
+        columns={columns}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        filters={filters}
+        onFilterChange={onFilterChange}
+      />
+    );
+    expect(onFilterChange).not.toHaveBeenCalled();
+
+    rerender(
+      <DataTable
+        columns={columns.slice(1)}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        filters={filters}
+        onFilterChange={onFilterChange}
+      />
+    );
+    expect(onFilterChange).toHaveBeenCalledWith([{ field: "value", op: "like", value: "1" }]);
+  });
 });
 
 /**

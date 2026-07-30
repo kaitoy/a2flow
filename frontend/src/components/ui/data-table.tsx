@@ -35,6 +35,17 @@ export interface ColumnDef<T> {
   filterOptions?: FilterOption[];
   /** Optional fixed initial width in pixels; otherwise the natural width is measured. */
   width?: number;
+  /**
+   * How the column participates in the column picker (see `useColumnVisibility`).
+   *
+   * - `"always"` — not offered in the picker and always rendered. Use for the
+   *   identifier column linking to the detail page, the actions column, and any
+   *   column whose `header` is empty (there would be nothing to label it with).
+   * - `"default"` — offered in the picker and shown unless the viewer turns it
+   *   off. The default when unset.
+   * - `"optional"` — offered in the picker but hidden until the viewer turns it on.
+   */
+  visibility?: "always" | "default" | "optional";
 }
 
 /** Props for {@link DataTable}. */
@@ -202,6 +213,14 @@ export function fitColumnWidths<T>(
  * automatic refit. The panel scrolls horizontally only when the columns
  * genuinely cannot fit, so content is never clipped out of reach. Widths are
  * held in component state and are not persisted.
+ *
+ * `columns` is the set actually on screen: callers that let the viewer choose
+ * which columns to show (see `useColumnVisibility`) pass the filtered list, and
+ * the table treats it as a fresh layout — measurements are re-taken and any
+ * hand-dragged widths are released, since the columns sharing the panel have
+ * changed. A sort or filter left pointing at a column that is no longer in
+ * `columns` is dropped through `onSortChange`/`onFilterChange`, so the rows on
+ * screen are never ordered or narrowed by an invisible criterion.
  */
 export function DataTable<T>({
   columns,
@@ -249,6 +268,24 @@ export function DataTable<T>({
     manualRef.current = false;
     setWidths(null);
   }, [columnsKey]);
+
+  // Drop any sort or filter aimed at a column that is no longer on screen.
+  // Hiding a column through the column picker would otherwise leave the list
+  // ordered — or, worse, narrowed — by a criterion with nothing on the page to
+  // reveal or undo it: rows are missing and the table looks broken. The
+  // directives are only emitted from a visible header's menu, so a change of
+  // columns is the only thing that can strand one.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: columnsKey captures the relevant change
+  useEffect(() => {
+    const current = columnsRef.current;
+    if (onSortChange && sort && !current.some((col) => col.sortField === sort.field)) {
+      onSortChange(null);
+    }
+    if (onFilterChange && filters?.length) {
+      const kept = filters.filter((f) => current.some((col) => col.filterField === f.field));
+      if (kept.length !== filters.length) onFilterChange(kept);
+    }
+  }, [columnsKey, sort, filters, onSortChange, onFilterChange]);
 
   // Measure natural column widths once real rows have painted, then fit them to
   // the panel. Header-only widths (while loading, or an empty table rendering a

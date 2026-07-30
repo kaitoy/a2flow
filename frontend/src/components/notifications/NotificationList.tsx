@@ -4,12 +4,14 @@
 import { Bell, Check } from "lucide-react";
 import { useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { formatFullTimestamp, formatRelativeTime } from "@/components/ui/date-time";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteNotification,
@@ -89,6 +91,7 @@ export function NotificationList() {
       header: "Title",
       sortField: "title",
       filterField: "title",
+      visibility: "always",
       cell: (n) => n.title,
     },
     {
@@ -120,6 +123,7 @@ export function NotificationList() {
     {
       header: "Actions",
       noTruncate: true,
+      visibility: "always",
       cell: (n) => (
         <div className="flex justify-center gap-2">
           {!n.read && (
@@ -135,16 +139,32 @@ export function NotificationList() {
     },
   ];
 
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "notifications",
+    columns
+  );
+
   return (
     // This section is deliberately not wrapped in a `glass-panel-strong`:
     // `DataTable` brings its own glass panel, and nesting one inside another
     // breaks the elevation tiers described in DESIGN.md.
     <section className="flex flex-col gap-4">
-      <h2 className="font-display text-lg font-semibold tracking-tight text-on-surface">
-        Notifications
-      </h2>
+      {/* There is no `AdminPageHeader` here to host the column picker, so the
+          section title doubles as the toolbar row. */}
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-display text-lg font-semibold tracking-tight text-on-surface">
+          Notifications
+        </h2>
+        <ColumnPicker
+          options={options}
+          value={selected}
+          onChange={setSelected}
+          onReset={reset}
+          customized={customized}
+        />
+      </div>
       <DataTable
-        columns={columns}
+        columns={visibleColumns}
         rows={rows}
         loading={loading}
         emptyMessage="No notifications yet."

@@ -13,6 +13,12 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+/** Turn on a column hidden by default, through the page's own column picker. */
+async function showColumn(user: ReturnType<typeof userEvent.setup>, label: string) {
+  await user.click(screen.getByRole("button", { name: "Columns" }));
+  await user.click(await screen.findByRole("checkbox", { name: label }));
+}
+
 describe("McpServersPage", () => {
   it("shows loading state initially", () => {
     render(<McpServersPage />);
@@ -23,16 +29,41 @@ describe("McpServersPage", () => {
     render(<McpServersPage />);
     await waitFor(() => expect(screen.getByText("my-mcp-server")).toBeInTheDocument());
     expect(screen.getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
-    expect(screen.getByText("1 header")).toBeInTheDocument();
-    expect(screen.getByText("HTTP")).toBeInTheDocument();
   });
 
-  it("renders a stdio server's command line and variable count", async () => {
+  it("renders a stdio server's command line", async () => {
     render(<McpServersPage />);
     await waitFor(() => expect(screen.getByText("local-files")).toBeInTheDocument());
     expect(screen.getByText("npx -y files-mcp@0.3.0")).toBeInTheDocument();
-    expect(screen.getByText("1 variable")).toBeInTheDocument();
+  });
+
+  it("hides the transport and headers columns by default", async () => {
+    render(<McpServersPage />);
+    await waitFor(() => screen.getByText("my-mcp-server"));
+    expect(screen.queryByText("HTTP")).not.toBeInTheDocument();
+    expect(screen.queryByText("1 header")).not.toBeInTheDocument();
+  });
+
+  it("renders each server's transport once the column is shown", async () => {
+    const user = userEvent.setup();
+    render(<McpServersPage />);
+    await waitFor(() => screen.getByText("my-mcp-server"));
+
+    await showColumn(user, "Transport");
+
+    expect(screen.getByText("HTTP")).toBeInTheDocument();
     expect(screen.getByText("stdio")).toBeInTheDocument();
+  });
+
+  it("renders the header and variable counts once the column is shown", async () => {
+    const user = userEvent.setup();
+    render(<McpServersPage />);
+    await waitFor(() => screen.getByText("my-mcp-server"));
+
+    await showColumn(user, "Headers / Env");
+
+    expect(screen.getByText("1 header")).toBeInTheDocument();
+    expect(screen.getByText("1 variable")).toBeInTheDocument();
   });
 
   it("name links to the edit page", async () => {

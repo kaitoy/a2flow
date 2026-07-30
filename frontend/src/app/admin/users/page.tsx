@@ -9,12 +9,15 @@ import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { DateTime } from "@/components/ui/date-time";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteUser, listUsers, startImpersonation, type User } from "@/lib/api";
 import { persistImpersonatedUserId } from "@/lib/impersonation";
@@ -39,12 +42,14 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
   {
     header: "",
     noTruncate: true,
+    visibility: "always",
     cell: (u) => <Avatar user={u} size={28} />,
   },
   {
     header: "Username",
     sortField: "username",
     filterField: "username",
+    visibility: "always",
     cell: (u) => (
       <Link
         href={`/admin/users/${u.id}`}
@@ -64,6 +69,7 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
     header: "Email",
     sortField: "email",
     filterField: "email",
+    visibility: "optional",
     cell: (u) => u.email,
   },
   {
@@ -100,7 +106,13 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
     filterOp: "eq",
     filterOptions: BOOL_FILTER_OPTIONS,
     className: "text-center",
+    visibility: "optional",
     cell: (u) => boolCell(u.emailVerified),
+  },
+  {
+    header: "Created At",
+    sortField: "createdAt",
+    cell: (u) => <DateTime value={u.createdAt} className="text-on-surface-variant" />,
   },
 ];
 
@@ -183,6 +195,7 @@ export default function UsersPage() {
     {
       header: "Actions",
       noTruncate: true,
+      visibility: "always",
       cell: (user) => (
         <div className="flex justify-center gap-2">
           {canImpersonate(user) && (
@@ -198,6 +211,11 @@ export default function UsersPage() {
     },
   ];
 
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "users",
+    columns
+  );
+
   return (
     <AdminPageContainer>
       <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Users" }]} />
@@ -208,9 +226,18 @@ export default function UsersPage() {
         addLabel="+ Add user"
         onRefresh={reload}
         refreshing={loading || refreshing}
+        columnPicker={
+          <ColumnPicker
+            options={options}
+            value={selected}
+            onChange={setSelected}
+            onReset={reset}
+            customized={customized}
+          />
+        }
       />
       <DataTable
-        columns={columns}
+        columns={visibleColumns}
         rows={rows}
         loading={loading}
         emptyMessage="No users registered yet."

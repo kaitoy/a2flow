@@ -15,7 +15,7 @@ export default function Loading() {
         addHref="/admin/secrets/new"
         addLabel="+ Add secret"
       />
-      <AdminListSkeleton columns={["Name", "Type", "Reference", "Created At", "Actions"]} />
+      <AdminListSkeleton columns={["Name", "Type", "Created At", "Actions"]} />
     </AdminPageContainer>
   );
 }

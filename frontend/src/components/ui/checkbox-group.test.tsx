@@ -50,4 +50,31 @@ describe("CheckboxGroup", () => {
     );
     expect(screen.getByText("No other tasks available.")).toBeInTheDocument();
   });
+
+  it("wraps the rows in a glass panel by default", () => {
+    const { container } = render(<CheckboxGroup options={OPTIONS} value={[]} onChange={vi.fn()} />);
+    expect(container.firstElementChild?.className).toContain("glass-panel");
+  });
+
+  it("drops the glass panel when flush", () => {
+    const { container } = render(
+      <CheckboxGroup flush options={OPTIONS} value={[]} onChange={vi.fn()} />
+    );
+    expect(container.firstElementChild?.className).not.toContain("glass-panel");
+    expect(screen.getByRole("checkbox", { name: "Alpha" })).toBeInTheDocument();
+  });
+
+  it("drops the glass panel from the empty message when flush", () => {
+    const { container } = render(
+      <CheckboxGroup
+        flush
+        options={[]}
+        value={[]}
+        onChange={vi.fn()}
+        emptyMessage="Nothing here."
+      />
+    );
+    expect(screen.getByText("Nothing here.")).toBeInTheDocument();
+    expect(container.firstElementChild?.className).not.toContain("glass-panel");
+  });
 });

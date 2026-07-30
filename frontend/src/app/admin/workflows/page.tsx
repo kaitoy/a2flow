@@ -9,12 +9,14 @@ import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteWorkflow,
@@ -81,6 +83,7 @@ function buildColumns(
       header: "Name",
       sortField: "name",
       filterField: "name",
+      visibility: "always",
       // Only developers can open the edit form; everyone else sees a plain name.
       cell: (w) =>
         permissions.canEdit ? (
@@ -132,6 +135,7 @@ function buildColumns(
     {
       header: "Actions",
       noTruncate: true,
+      visibility: "always",
       cell: (w) => (
         <div className="flex justify-center gap-2">
           {permissions.canRun && (
@@ -221,6 +225,12 @@ export default function WorkflowsPage() {
     }
   }
 
+  const columns = buildColumns(skillMap, handleRun, runningId, handleDelete, { canRun, canEdit });
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "workflows",
+    columns
+  );
+
   return (
     <AdminPageContainer>
       <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Workflows" }]} />
@@ -229,12 +239,18 @@ export default function WorkflowsPage() {
         icon={WorkflowIcon}
         onRefresh={reload}
         refreshing={loading || refreshing}
+        columnPicker={
+          <ColumnPicker
+            options={options}
+            value={selected}
+            onChange={setSelected}
+            onReset={reset}
+            customized={customized}
+          />
+        }
       />
       <DataTable
-        columns={buildColumns(skillMap, handleRun, runningId, handleDelete, {
-          canRun,
-          canEdit,
-        })}
+        columns={visibleColumns}
         rows={rows}
         loading={loading}
         emptyMessage="No workflows registered yet."

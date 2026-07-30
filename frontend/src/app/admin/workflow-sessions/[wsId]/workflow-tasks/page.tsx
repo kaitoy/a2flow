@@ -7,10 +7,12 @@ import { useCallback, useEffect, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { ColumnPicker } from "@/components/admin/column-picker";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import {
   type FilterSpec,
   listMcpServers,
@@ -65,12 +67,14 @@ function buildColumns(
       header: "#",
       className: "w-12 font-mono text-on-surface-variant",
       sortField: "position",
+      visibility: "always",
       cell: (t) => t.position ?? 0,
     },
     {
       header: "Title",
       sortField: "title",
       filterField: "title",
+      visibility: "always",
       cell: (t) => <span className="font-medium text-on-surface">{t.title}</span>,
     },
     {
@@ -196,6 +200,12 @@ export default function WorkflowTasksPage() {
       });
   }, []);
 
+  const columns = buildColumns(new Map(tasks.map((t) => [t.id, t.title])), serverNameById);
+  const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
+    "workflowTasks",
+    columns
+  );
+
   return (
     <AdminPageContainer>
       <Breadcrumbs
@@ -210,6 +220,18 @@ export default function WorkflowTasksPage() {
         icon={ListTree}
         onRefresh={load}
         refreshing={loading}
+        columnPicker={
+          // The graph view has no columns to choose from.
+          view === "table" ? (
+            <ColumnPicker
+              options={options}
+              value={selected}
+              onChange={setSelected}
+              onReset={reset}
+              customized={customized}
+            />
+          ) : undefined
+        }
       />
       <div className="mb-4">
         <SegmentedControl
@@ -224,7 +246,7 @@ export default function WorkflowTasksPage() {
       ) : (
         <>
           <DataTable
-            columns={buildColumns(new Map(tasks.map((t) => [t.id, t.title])), serverNameById)}
+            columns={visibleColumns}
             rows={tasks}
             loading={loading}
             emptyMessage="No tasks for this session yet."

@@ -77,18 +77,46 @@ describe("AgentSkillsPage", () => {
     );
   });
 
-  it("shows the sync status and the short revision", async () => {
+  it("shows the sync status", async () => {
     render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-skill"));
     expect(screen.getByText("ready")).toBeInTheDocument();
-    expect(screen.getByText("a1b2c3d")).toBeInTheDocument();
   });
 
-  it("shows an em dash as the revision of a skill that has never published one", async () => {
+  it("shows a still-cloning skill's sync status", async () => {
     server.use(http.get(SKILL_URL, () => envelope([CLONING_SKILL])));
     render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-skill"));
     expect(screen.getByText("Cloning")).toBeInTheDocument();
+  });
+
+  it("hides the revision column by default", async () => {
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.queryByText("a1b2c3d")).not.toBeInTheDocument();
+  });
+
+  it("shows the short revision once the column is shown", async () => {
+    const user = userEvent.setup();
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Revision" }));
+
+    expect(screen.getByText("a1b2c3d")).toBeInTheDocument();
+  });
+
+  it("shows an em dash as the revision of a skill that has never published one", async () => {
+    const user = userEvent.setup();
+    server.use(http.get(SKILL_URL, () => envelope([CLONING_SKILL])));
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Revision" }));
+
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
   });
 
   it("shows empty state when no skills", async () => {
