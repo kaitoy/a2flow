@@ -139,6 +139,17 @@ function SecretReferenceHint() {
   );
 }
 
+/** Note shown under the arguments editor about referencing this server's own env vars. */
+function EnvArgReferenceHint() {
+  return (
+    <p className="mt-1 text-xs text-on-surface-variant">
+      An argument may reuse this server's own Environment Variables by name as{" "}
+      {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
+      {"${env:NAME}"}, expanded when connecting.
+    </p>
+  );
+}
+
 /**
  * Name, transport switch, and the transport-specific fields of a registered
  * MCP server: URL plus HTTP headers for a remote server, or command, arguments,
@@ -247,6 +258,7 @@ export function McpServerFields({
               One entry per argument, in order. Passed straight to the process — never through a
               shell, so quoting and globs are not interpreted.
             </p>
+            <EnvArgReferenceHint />
           </FormField>
 
           <FormField htmlFor="env" label="Environment Variables">

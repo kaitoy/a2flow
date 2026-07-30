@@ -431,6 +431,101 @@ async def test_stdio_server_unreachable_error_omits_env(
     assert "tok" not in response.text
 
 
+# ---------- ${env:NAME} in args ----------
+
+
+async def test_create_stdio_server_with_env_arg_reference_returns_201(
+    mcp_client: AsyncClient,
+) -> None:
+    body = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers",
+            json={**_STDIO_BODY, "args": ["--token", "${env:API_KEY}"]},
+        ),
+        status=201,
+    )
+    assert body["args"] == ["--token", "${env:API_KEY}"]
+
+
+async def test_create_stdio_server_with_undefined_env_arg_reference_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers",
+        json={**_STDIO_BODY, "args": ["${env:MISSING}"]},
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_patch_stdio_server_args_referencing_undefined_env_var_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_STDIO_BODY), status=201
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}",
+        json={"args": ["${env:MISSING}"]},
+    )
+    err = assert_err(response, code="INVALID_MCP_SERVER", status=422)
+    assert "MISSING" in err["details"]["reason"]
+
+
+async def test_patch_stdio_server_removing_referenced_env_var_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers",
+            json={**_STDIO_BODY, "args": ["${env:API_KEY}"]},
+        ),
+        status=201,
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}", json={"env": {}}
+    )
+    assert_err(response, code="INVALID_MCP_SERVER", status=422)
+
+
+async def test_list_stdio_server_tools_expands_env_placeholder_in_args(
+    mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``${env:NAME}`` in ``args`` picks up the secret-resolved ``env`` value,
+    and the resulting connection's label never echoes it back."""
+    assert_ok(
+        await mcp_client.post(
+            "/api/v1/secrets",
+            json={"name": "files-key", "type": "local", "entries": {"k": "tok-xyz"}},
+        ),
+        status=201,
+    )
+    created = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers",
+            json={
+                **_STDIO_BODY,
+                "args": ["-y", "files-mcp@0.3.0", "--token", "${env:API_KEY}"],
+                "env": {"API_KEY": "${secret:files-key/k}"},
+            },
+        ),
+        status=201,
+    )
+    seen: dict[str, Any] = {}
+
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        seen["connection"] = connection
+        return []
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    assert_ok(await mcp_client.get(f"/api/v1/mcp-servers/{created['id']}/tools"))
+    connection = seen["connection"]
+    assert isinstance(connection, StdioConnection)
+    assert connection.args == ["-y", "files-mcp@0.3.0", "--token", "tok-xyz"]
+    assert "tok-xyz" not in connection.label
+
+
 # ---------- delete ----------
 
 

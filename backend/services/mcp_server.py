@@ -19,6 +19,7 @@ from models.mcp_server import (
     MCPServerUpdate,
     McpToolInfo,
     McpTransport,
+    referenced_env_names,
 )
 from repositories import MCPServerRepository
 from repositories.exceptions import McpServerValidationError, NotFoundError
@@ -106,7 +107,10 @@ class MCPServerService:
         stored one. Fields explicitly sent in the PATCH must fit the effective
         transport's shape; fields belonging to the *other* transport that
         merely remain on the stored record (a transport switch) are cleared
-        automatically.
+        automatically. For a stdio server, any ``${env:NAME}`` placeholder in
+        the effective ``args`` must name a key of the effective ``env`` — both
+        computed the same way as ``effective`` itself, since a PATCH may touch
+        only one of the two fields.
 
         Args:
             server_id: Identifier of the server to update.
@@ -119,7 +123,9 @@ class MCPServerService:
         Raises:
             NotFoundError: If no server exists with the given ID.
             McpServerValidationError: If the merged result violates the
-                effective transport's shape.
+                effective transport's shape, or its ``args`` embed a
+                ``${env:NAME}`` placeholder naming a key absent from the
+                effective ``env``.
         """
         existing = await self.get(server_id)
         effective = data.transport or existing.transport
@@ -147,6 +153,13 @@ class MCPServerService:
                         "Switching to a stdio server requires a command"
                     )
                 updates.update({"url": None, "headers": {}})
+            effective_args = data.args if data.args is not None else existing.args
+            effective_env = data.env if data.env is not None else existing.env
+            missing = referenced_env_names(effective_args) - effective_env.keys()
+            if missing:
+                raise McpServerValidationError(
+                    "args reference undefined env vars: " + ", ".join(sorted(missing))
+                )
 
         if updates:
             data = data.model_copy(update=updates)

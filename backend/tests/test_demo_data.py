@@ -337,7 +337,7 @@ async def test_demo_mcp_server_proxies_the_managed_aws_server(
         "--region",
         "us-east-1",
         "--metadata",
-        "AWS_REGION=ap-northeast-1",
+        "AWS_REGION=${env:AWS_REGION}",
     ]
     assert server.url is None
     assert server.headers == {}
@@ -348,6 +348,7 @@ async def test_demo_mcp_server_proxies_the_managed_aws_server(
         "AWS_SECRET_ACCESS_KEY": (
             f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_SECRET_KEY_ENTRY_KEY}}}"
         ),
+        "AWS_REGION": "ap-northeast-1",
     }
 
 
@@ -359,7 +360,8 @@ async def test_demo_mcp_server_defaults_the_region(
     async with AsyncSession(engine) as session:
         server = await session.get(MCPServer, DEMO_MCP_SERVER_ID)
     assert server is not None
-    assert server.args[-2:] == ["--metadata", "AWS_REGION=us-east-1"]
+    assert server.args[-2:] == ["--metadata", "AWS_REGION=${env:AWS_REGION}"]
+    assert server.env["AWS_REGION"] == "us-east-1"
 
 
 async def test_demo_agent_skill_points_at_the_sample_skill(

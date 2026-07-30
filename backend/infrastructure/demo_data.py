@@ -430,9 +430,11 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
     :class:`infrastructure.secret_resolver.SecretResolver`, so the plaintext
     never lands in the ``mcp_servers`` row.
 
-    ``DEMO_AWS_REGION`` rides along as ``--metadata AWS_REGION=...`` — the
-    remote server reads it to pick the region its tools act on — and is kept
-    apart from ``--region``, which only governs the signature.
+    ``DEMO_AWS_REGION`` is carried in this row's own ``env`` (as
+    ``AWS_REGION``) and referenced from ``args`` via ``${env:AWS_REGION}`` —
+    the remote server reads that metadata value to pick the region its tools
+    act on — kept apart from ``--region``, which only governs the signature
+    and is not configurable through ``env``.
 
     Args:
         session: Database session used to read and insert the server.
@@ -440,6 +442,7 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
     """
     if await session.get(MCPServer, DEMO_MCP_SERVER_ID) is not None:
         return
+    settings = get_settings()
     await _insert(
         session,
         MCPServer(
@@ -454,7 +457,7 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
                 "--region",
                 _DEMO_MCP_ENDPOINT_REGION,
                 "--metadata",
-                f"AWS_REGION={get_settings().demo_aws_region}",
+                "AWS_REGION=${env:AWS_REGION}",
             ],
             headers={},
             env={
@@ -464,6 +467,7 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
                 "AWS_SECRET_ACCESS_KEY": (
                     f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_SECRET_KEY_ENTRY_KEY}}}"
                 ),
+                "AWS_REGION": settings.demo_aws_region,
             },
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,

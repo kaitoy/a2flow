@@ -61,6 +61,11 @@ describe("McpServerFields", () => {
     expect(screen.getByRole("tab", { name: "npx" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "uvx" })).toHaveAttribute("aria-selected", "false");
   });
+
+  it("shows a hint that arguments may reference the server's own env vars", () => {
+    render(<Host defaults={{ transport: "stdio" }} />);
+    expect(screen.getByText(/\$\{env:NAME\}/)).toBeInTheDocument();
+  });
 });
 
 describe("mcpServerFormSchema", () => {

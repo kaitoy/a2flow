@@ -25,6 +25,7 @@ Design notes:
 """
 
 import asyncio
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -39,7 +40,7 @@ from mcp.shared.message import SessionMessage
 
 from infrastructure.secret_resolver import SecretResolver
 from infrastructure.url_safety import assert_public_http_url
-from models.mcp_server import MCPServer, McpTransport
+from models.mcp_server import ENV_ARG_PLACEHOLDER_PATTERN, MCPServer, McpTransport
 from repositories.exceptions import McpConnectionError
 
 #: Upper bound, in seconds, for one whole streamable-HTTP MCP operation
@@ -86,26 +87,37 @@ class StdioConnection:
 
     Attributes:
         command: The executable to run: ``npx`` or ``uvx``.
-        args: ``argv`` entries passed to the executable. Handed to the SDK as a
-            list and spawned without a shell, so nothing here is word-split or
-            interpreted by a shell.
+        args: ``argv`` entries passed to the executable, with any
+            ``${env:NAME}`` placeholders already expanded against ``env``.
+            Handed to the SDK as a list and spawned without a shell, so
+            nothing here is word-split or interpreted by a shell.
         env: Environment variables merged over the small safe-to-inherit set
             :func:`mcp.client.stdio.get_default_environment` provides, with any
             ``${secret:NAME/KEY}`` placeholders already resolved. The backend's own
             environment (API keys, ``DB_URL``, …) is *not* inherited.
+        raw_args: ``args`` before ``${env:NAME}`` expansion — used only for
+            :attr:`label`, so an expanded value that came from a secret-backed
+            ``env`` entry never appears in an error message or log line.
+            Falls back to ``args`` when omitted (e.g. by tests constructing a
+            connection directly).
     """
 
     command: str
     args: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
+    raw_args: list[str] | None = field(default=None, compare=False)
 
     @property
     def label(self) -> str:
         """Short identification of this server for error messages and logs.
 
-        Deliberately excludes ``env``, whose values may hold resolved secrets.
+        Deliberately excludes ``env``, whose values may hold resolved
+        secrets — and uses ``raw_args`` rather than ``args`` for the same
+        reason, since an ``args`` entry may itself have been expanded from a
+        secret-backed ``env`` value.
         """
-        return " ".join([self.command, *self.args])
+        display_args = self.raw_args if self.raw_args is not None else self.args
+        return " ".join([self.command, *display_args])
 
     @property
     def timeout_seconds(self) -> float:
@@ -115,6 +127,37 @@ class StdioConnection:
 
 #: Everything needed to open a session against one registered MCP server.
 McpConnection = HttpConnection | StdioConnection
+
+
+def _expand_env_args(
+    args: list[str], env: dict[str, str], server_name: str
+) -> list[str]:
+    """Substitute ``${env:NAME}`` in each ``args`` entry with its ``env`` value.
+
+    Args:
+        args: The raw ``argv`` entries, possibly containing placeholders.
+        env: The server's *resolved* env mapping (secrets already expanded).
+        server_name: Identifies the server in a raised error.
+
+    Returns:
+        ``args`` with every placeholder replaced by its ``env`` value.
+
+    Raises:
+        McpConnectionError: If a placeholder names a key absent from ``env``
+            — only reachable for a row written outside the API, since both
+            create and update validate every reference against the server's
+            own ``env`` keys.
+    """
+
+    def _replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name not in env:
+            raise McpConnectionError(
+                server_name, f"args reference unknown env var: {name}"
+            )
+        return env[name]
+
+    return [ENV_ARG_PLACEHOLDER_PATTERN.sub(_replace, arg) for arg in args]
 
 
 async def resolve_connection(
@@ -133,18 +176,22 @@ async def resolve_connection(
 
     Raises:
         McpConnectionError: If the row is missing the field its transport
-            requires — only reachable for a row written outside the API, since
-            both create and update validate the per-transport shape.
+            requires, or a stdio row's ``args`` embed a ``${env:NAME}``
+            placeholder naming a key absent from ``env`` — both only
+            reachable for a row written outside the API, since create and
+            update validate the per-transport shape and env references.
         repositories.exceptions.SecretResolutionError: If a referenced secret
             cannot be resolved.
     """
     if server.transport is McpTransport.stdio:
         if not server.command:
             raise McpConnectionError(server.name, "stdio server has no command")
+        resolved_env = await resolver.resolve_mapping(server.env)
         return StdioConnection(
             command=server.command,
-            args=list(server.args),
-            env=await resolver.resolve_mapping(server.env),
+            args=_expand_env_args(list(server.args), resolved_env, server.name),
+            env=resolved_env,
+            raw_args=list(server.args),
         )
     if not server.url:
         raise McpConnectionError(server.name, "streamable_http server has no url")

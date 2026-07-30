@@ -21,8 +21,19 @@ Two transports exist, discriminated by ``transport``:
 resolved at connection time (see :mod:`infrastructure.secret_resolver`);
 anything else is stored in plaintext, which is acceptable for this app's
 local, single-operator deployment model.
+
+A stdio server's ``args`` entries may additionally embed ``${env:NAME}``,
+referencing a key of that same server's ``env`` map — useful for a launcher
+that expects a value as a CLI flag rather than reading it from the process
+environment. ``NAME`` must be a key of ``env``, checked eagerly at write time
+(:func:`referenced_env_names`, used by this module's ``_validate_shape`` and
+by :class:`services.mcp_server.MCPServerService.update`); expansion itself
+happens at connection time in :func:`infrastructure.mcp_client.resolve_connection`,
+after ``env``'s own ``${secret:NAME/KEY}`` placeholders are resolved — so
+``${env:NAME}`` transparently picks up secret-resolved values too.
 """
 
+import re
 from enum import StrEnum
 from typing import Any
 
@@ -52,6 +63,27 @@ _MAX_ENV_VALUE_LENGTH = 4096
 
 #: Maximum number of ``argv`` entries allowed on a stdio MCP server.
 _MAX_ARGS = 100
+
+#: Matches ``${env:NAME}`` in an ``args`` entry, referencing a key of this
+#: same server's ``env`` mapping. ``NAME`` uses the POSIX env-var charset so
+#: the closing ``}`` is unambiguous even though ``env`` keys themselves carry
+#: no charset restriction of their own.
+ENV_ARG_PLACEHOLDER_PATTERN = re.compile(r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def referenced_env_names(args: list[str]) -> set[str]:
+    """Return every name referenced via ``${env:NAME}`` across ``args``.
+
+    Args:
+        args: The ``argv`` entries to scan.
+
+    Returns:
+        The set of referenced names, deduplicated.
+    """
+    names: set[str] = set()
+    for arg in args:
+        names.update(ENV_ARG_PLACEHOLDER_PATTERN.findall(arg))
+    return names
 
 
 class McpTransport(StrEnum):
@@ -160,8 +192,9 @@ class MCPServerCreate(MCPServerUpdate):
 
         Raises:
             ValueError: If a ``streamable_http`` server is missing ``url`` or
-                carries stdio fields, or a ``stdio`` server is missing
-                ``command`` or carries remote fields.
+                carries stdio fields, a ``stdio`` server is missing
+                ``command`` or carries remote fields, or its ``args`` embed a
+                ``${env:NAME}`` placeholder naming a key absent from ``env``.
         """
         if self.transport is McpTransport.streamable_http:
             if self.url is None:
@@ -175,6 +208,11 @@ class MCPServerCreate(MCPServerUpdate):
                 raise ValueError("A stdio server requires a command")
             if self.url is not None or self.headers:
                 raise ValueError("A stdio server must not set url or headers")
+            missing = referenced_env_names(self.args) - self.env.keys()
+            if missing:
+                raise ValueError(
+                    "args reference undefined env vars: " + ", ".join(sorted(missing))
+                )
         return self
 
 
