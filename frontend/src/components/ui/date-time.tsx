@@ -1,10 +1,7 @@
-/** @module DateTime — Shared timestamp display with an absolute, hover tooltip. */
+/** @module DateTime — Shared timestamp display showing relative time with an absolute hover tooltip. */
 "use client";
 
 import { Tooltip, type TooltipPlacement } from "./tooltip";
-
-/** Compact display format: medium date plus hour/minute, e.g. "Jun 14, 2026, 3:45 PM". */
-const DISPLAY_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
 
 /** Parts used to assemble the full timestamp as `YYYY/MM/DD HH:mm:ss TZ`. */
 const FULL_FORMAT = new Intl.DateTimeFormat("ja-JP", {
@@ -71,7 +68,7 @@ export interface DateTimeProps {
 }
 
 /**
- * Render a timestamp showing the date down to the minute, with a hover/focus
+ * Render a timestamp as short relative time (e.g. "5m ago"), with a hover/focus
  * tooltip revealing the full timestamp including seconds and time zone. Invalid
  * values render an em dash with no tooltip. Timestamps are machine-formatted
  * data, so they render in the mono data face (JetBrains Mono) per DESIGN.md;
@@ -83,7 +80,7 @@ export function DateTime({ value, placement = "top", className }: DateTimeProps)
   if (Number.isNaN(date.getTime())) {
     return <span className={cls}>—</span>;
   }
-  const display = date.toLocaleString(undefined, DISPLAY_FORMAT);
+  const display = formatRelativeTime(value);
   const full = formatFullTimestamp(value);
   return (
     <Tooltip label={full} placement={placement}>

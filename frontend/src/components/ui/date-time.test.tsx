@@ -1,5 +1,6 @@
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatFullTimestamp, formatRelativeTime } from "./date-time";
+import { DateTime, formatFullTimestamp, formatRelativeTime } from "./date-time";
 
 /** Fixed "now" the relative-time cases are measured against. */
 const NOW = new Date("2026-06-14T12:00:00Z");
@@ -73,5 +74,38 @@ describe("formatFullTimestamp", () => {
 
   it("returns an empty string for an unparseable value", () => {
     expect(formatFullTimestamp("not a date")).toBe("");
+  });
+});
+
+describe("DateTime", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function freeze() {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  }
+
+  it("shows the relative time as visible text and the full timestamp in a tooltip on hover", async () => {
+    freeze();
+    const value = ago(HOUR);
+    render(<DateTime value={value} />);
+
+    expect(screen.getByText("1h ago")).toBeInTheDocument();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    // The tooltip's show delay and open/close animation run on real timers
+    // (react-spring drives them via requestAnimationFrame), so switch off the
+    // frozen clock before triggering the hover.
+    vi.useRealTimers();
+    fireEvent.mouseEnter(screen.getByText("1h ago"));
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(formatFullTimestamp(value));
+  });
+
+  it("renders an em dash for an unparseable value", () => {
+    render(<DateTime value="not a date" />);
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 });
