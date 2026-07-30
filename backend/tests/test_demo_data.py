@@ -318,7 +318,7 @@ async def test_demo_secrets_fall_back_to_a_placeholder(
     assert decrypted == "REPLACE_ME"
 
 
-async def test_demo_mcp_server_is_a_stdio_uvx_launcher(
+async def test_demo_mcp_server_proxies_the_managed_aws_server(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
@@ -331,11 +331,17 @@ async def test_demo_mcp_server_is_a_stdio_uvx_launcher(
     assert server.tenant_id == TENANT_ID
     assert server.transport is McpTransport.stdio
     assert server.command is McpCommand.uvx
-    assert server.args == ["awslabs.aws-api-mcp-server@latest"]
+    assert server.args == [
+        "mcp-proxy-for-aws@1.6.4",
+        "https://aws-mcp.us-east-1.api.aws/mcp",
+        "--region",
+        "us-east-1",
+        "--metadata",
+        "AWS_REGION=ap-northeast-1",
+    ]
     assert server.url is None
     assert server.headers == {}
     assert server.env == {
-        "AWS_REGION": "ap-northeast-1",
         "AWS_ACCESS_KEY_ID": (
             f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_ACCESS_KEY_ENTRY_KEY}}}"
         ),
@@ -353,7 +359,7 @@ async def test_demo_mcp_server_defaults_the_region(
     async with AsyncSession(engine) as session:
         server = await session.get(MCPServer, DEMO_MCP_SERVER_ID)
     assert server is not None
-    assert server.env["AWS_REGION"] == "us-east-1"
+    assert server.args[-2:] == ["--metadata", "AWS_REGION=us-east-1"]
 
 
 async def test_demo_agent_skill_points_at_the_sample_skill(

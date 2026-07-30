@@ -7,8 +7,9 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
 
 * one Secret holding the AWS access key id and secret access key as two
   entries,
-* one stdio MCPServer launching the AWS API MCP server through ``uvx``,
-  referencing those entries from its ``env`` via ``${secret:NAME/KEY}``,
+* one stdio MCPServer reaching the managed AWS MCP Server through the
+  ``mcp-proxy-for-aws`` proxy launched with ``uvx``, referencing those
+  entries from its ``env`` via ``${secret:NAME/KEY}``,
 * one AgentSkill pointing at ``sample_skills/aws-ec2-launch`` in this
   repository,
 * two Users: a ``demo-approver`` (the manager the skill asks for approval)
@@ -61,7 +62,7 @@ DEMO_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d002"
 #: Fixed identifier of the demo Secret holding the AWS credentials.
 DEMO_AWS_SECRET_ID = "00000000-0000-0000-0000-00000000d101"
 
-#: Fixed identifier of the demo AWS API MCP server.
+#: Fixed identifier of the demo AWS MCP server.
 DEMO_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d201"
 
 #: Fixed identifier of the demo ``aws-ec2-launch`` agent skill.
@@ -79,14 +80,26 @@ DEMO_ACCESS_KEY_ENTRY_KEY = "AWS_ACCESS_KEY_ID"
 DEMO_SECRET_KEY_ENTRY_KEY = "AWS_SECRET_ACCESS_KEY"
 
 #: Name of the demo MCP server as shown in the admin UI.
-DEMO_MCP_SERVER_NAME = "Demo AWS API"
+DEMO_MCP_SERVER_NAME = "AWS MCP Server"
 
 #: Name of the demo agent skill as shown in the admin UI.
 DEMO_AGENT_SKILL_NAME = "Demo AWS EC2 Launch"
 
-#: Package the demo MCP server is launched from. Pinned to ``@latest`` the same
-#: way the upstream ``awslabs/mcp`` README documents it.
-_DEMO_MCP_PACKAGE = "awslabs.aws-api-mcp-server@latest"
+#: Proxy package the demo MCP server is launched from. Pinned to an exact
+#: version rather than ``@latest``, which is what the upstream migration guide
+#: recommends.
+_DEMO_MCP_PROXY_PACKAGE = "mcp-proxy-for-aws@1.6.4"
+
+#: Managed AWS MCP Server endpoint the proxy forwards SigV4-signed requests to.
+#: It replaces the deprecated self-hosted ``awslabs.aws-api-mcp-server``.
+_DEMO_MCP_ENDPOINT = "https://aws-mcp.us-east-1.api.aws/mcp"
+
+#: Region :data:`_DEMO_MCP_ENDPOINT` lives in, and therefore the region the
+#: proxy must sign for. Deliberately independent of ``DEMO_AWS_REGION``, which
+#: selects the region the *tools* operate on: the proxy does not derive the
+#: signing region from the endpoint URL, it falls back to ``AWS_REGION``, so
+#: leaving it implicit would break signing as soon as the two differ.
+_DEMO_MCP_ENDPOINT_REGION = "us-east-1"
 
 #: Repository the demo agent skill is cloned from, and the path within it.
 _DEMO_SKILL_REPO_URL = "https://github.com/kaitoy/a2flow"
@@ -228,7 +241,7 @@ async def _default_tenant_id(session: AsyncSession) -> str | None:
 async def _insert(session: AsyncSession, row: SQLModel, *, label: str) -> bool:
     """Insert one demo row, skipping it when it collides with existing data.
 
-    The demo names (``demo-approver``, ``Demo AWS API``, ...) are not reserved,
+    The demo names (``demo-approver``, ``AWS MCP Server``, ...) are not reserved,
     so an operator may already have a record of their own under one of them.
     The per-tenant unique constraint catches that; the collision is reported
     and the remaining demo records are still registered, rather than the
@@ -406,13 +419,20 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
 
 
 async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo AWS API MCP server.
+    """Create the demo AWS MCP server.
 
-    Registered as a ``stdio`` server launched with ``uvx``, which the backend
-    image already provides. Its AWS credentials are ``${secret:NAME/KEY}``
-    placeholders resolved at connection time by
+    The AWS MCP Server is a managed remote endpoint rather than something to
+    self-host, so the row is registered as a ``stdio`` server launching the
+    ``mcp-proxy-for-aws`` bridge with ``uvx``, which the backend image already
+    provides. The proxy signs every request to :data:`_DEMO_MCP_ENDPOINT` with
+    SigV4 using the AWS credentials it finds in its environment; those are
+    ``${secret:NAME/KEY}`` placeholders resolved at connection time by
     :class:`infrastructure.secret_resolver.SecretResolver`, so the plaintext
     never lands in the ``mcp_servers`` row.
+
+    ``DEMO_AWS_REGION`` rides along as ``--metadata AWS_REGION=...`` — the
+    remote server reads it to pick the region its tools act on — and is kept
+    apart from ``--region``, which only governs the signature.
 
     Args:
         session: Database session used to read and insert the server.
@@ -428,10 +448,16 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
             name=DEMO_MCP_SERVER_NAME,
             transport=McpTransport.stdio,
             command=McpCommand.uvx,
-            args=[_DEMO_MCP_PACKAGE],
+            args=[
+                _DEMO_MCP_PROXY_PACKAGE,
+                _DEMO_MCP_ENDPOINT,
+                "--region",
+                _DEMO_MCP_ENDPOINT_REGION,
+                "--metadata",
+                f"AWS_REGION={get_settings().demo_aws_region}",
+            ],
             headers={},
             env={
-                "AWS_REGION": get_settings().demo_aws_region,
                 "AWS_ACCESS_KEY_ID": (
                     f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_ACCESS_KEY_ENTRY_KEY}}}"
                 ),

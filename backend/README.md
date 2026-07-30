@@ -201,7 +201,7 @@ If either is unset (or empty), a random password is generated instead and logged
 | Resource | Name | Details |
 |---|---|---|
 | Secret | `demo-aws-credentials` | `local` type with two entries, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, each Fernet-encrypted like any other secret |
-| MCP server | `Demo AWS API` | `stdio` transport, `uvx awslabs.aws-api-mcp-server@latest`; its `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars are `${secret:demo-aws-credentials/…}` references to the two entries above, and `AWS_REGION` comes from `DEMO_AWS_REGION` |
+| MCP server | `AWS MCP Server` | `stdio` transport, `uvx mcp-proxy-for-aws@1.6.4 https://aws-mcp.us-east-1.api.aws/mcp --region us-east-1 --metadata AWS_REGION=…`; its `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars are `${secret:demo-aws-credentials/…}` references to the two entries above, and the `--metadata AWS_REGION` argument comes from `DEMO_AWS_REGION` |
 | Agent skill | `Demo AWS EC2 Launch` | `sample_skills/aws-ec2-launch` in this repository (see [Agent skills](#agent-skills)) |
 | User | `demo-approver` | holds `approver` — the manager the sample skill routes its approval request to |
 | User | `demo-requester` | holds `requester` — may execute the workflow |
@@ -217,13 +217,15 @@ DEMO_AWS_REGION=us-east-1
 ```
 
 - `DEMO_PASSWORD` is shared by both demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
-- The AWS credentials are optional. Left unset, a `REPLACE_ME` placeholder is stored instead, so the demo is complete in shape and you fill the real values in from the Secrets page. Set them here to have the demo reach AWS straight after startup.
+- **AWS MCP Server** is a managed remote server AWS hosts, not something this project runs, so the registered `stdio` server actually launches [`mcp-proxy-for-aws`](https://github.com/aws/mcp-proxy-for-aws) — a thin bridge that SigV4-signs each request with the credentials it finds in its environment and forwards it to the endpoint. It supersedes the deprecated self-hosted `awslabs.aws-api-mcp-server`; see the upstream [migration guide](https://github.com/awslabs/mcp/blob/main/src/aws-api-mcp-server/MIGRATION.md).
 
-  > **The demo MCP server is not restricted to read-only AWS CLI commands.** Whatever credentials you give it can create, modify, and delete real resources — including running instances that cost money. Point it at a throwaway account, or scope the IAM policy down.
+  The two regions in the arguments are not the same knob. `--region us-east-1` is the region the *signature* is computed for and is fixed to wherever the endpoint lives, while `--metadata AWS_REGION=…` (from `DEMO_AWS_REGION`) is the region the server's *tools* act on. The proxy does not infer the signing region from the endpoint URL, so it stays explicit.
+
+- The AWS credentials are optional. Left unset, a `REPLACE_ME` placeholder is stored instead, so the demo is complete in shape and you fill the real values in from the Secrets page. Set them here to have the demo reach AWS straight after startup. They need permission to call the managed endpoint (the `aws-mcp` service) on top of the permissions for whatever the tools go on to do.
+
+  > **The demo MCP server is not restricted to read-only operations.** Whatever credentials you give it can create, modify, and delete real resources — including running instances that cost money. Point it at a throwaway account, or scope the IAM policy down. (`mcp-proxy-for-aws` has a `--read-only` flag, but the sample workflow launches an instance, so the demo deliberately does not pass it.)
 
 - The agent skill's repository is cloned in the background after startup, so a slow or unreachable remote never delays the server coming up. The skill shows as `pending` until the clone lands, exactly as a skill registered through the API does; a failure is recorded on the skill row with its reason.
-
-> **Running the backend natively on Windows?** The demo MCP server's `uvx awslabs.aws-api-mcp-server@latest` is the form upstream documents, and it is what the backend container runs. On Windows, `uv` cannot match that package's dotted console-script name and fails with *"The executable `awslabs.aws-api-mcp-server` was not found"*. Edit the server's arguments on its admin page to `--from`, `awslabs.aws-api-mcp-server@latest`, `awslabs.aws-api-mcp-server.exe` to launch it there.
 
 Turning the flag off (`DEMO_DATA=false`, or removing it) **removes those records again** on the next startup — the flag is declarative in both directions. Each record is tracked by a fixed id, not by name, so renaming one in the admin UI does not strand it.
 
