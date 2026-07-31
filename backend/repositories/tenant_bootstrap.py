@@ -53,6 +53,37 @@ async def resolve_planning_session_tenant(
     return (row[0], row[1]) if row is not None else None
 
 
+async def resolve_agent_run_tenant(db: AsyncSession, session_id: str) -> str | None:
+    """Return the tenant_id owning an ADK session id, run or planning alike.
+
+    Agent tools that only need the tenant -- not the WorkflowSession primary key
+    -- must accept both kinds of run: an execution run keys its ADK session on a
+    :class:`models.workflow_session.WorkflowSession`, while workflow generation
+    and the plan-refinement chat key theirs on a
+    :class:`models.planning_session.PlanningSession`. Resolving through only one
+    of the two makes the tool fail outright in the other phase.
+
+    Use this for tenant-only tools such as
+    :func:`infrastructure.mcp_tools.list_mcp_tools`. Tools that enforce
+    something against the run's tasks (``call_mcp_tool``) still need the
+    WorkflowSession id and must keep using
+    :func:`resolve_workflow_session_tenant`.
+
+    Args:
+        db: The database session to resolve against.
+        session_id: The ADK session id of the current run.
+
+    Returns:
+        The owning tenant_id, or ``None`` when the id matches neither a
+        WorkflowSession nor a PlanningSession.
+    """
+    resolved = await resolve_workflow_session_tenant(db, session_id)
+    if resolved is not None:
+        return resolved[1]
+    planning = await resolve_planning_session_tenant(db, session_id)
+    return planning[1] if planning is not None else None
+
+
 async def resolve_workflow_tenant(db: AsyncSession, workflow_id: str) -> str | None:
     """Return the tenant_id of a Workflow, or ``None`` if it does not exist."""
     stmt = select(Workflow.tenant_id).where(Workflow.id == workflow_id)

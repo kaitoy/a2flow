@@ -216,13 +216,16 @@ def keep_a2ui_context(context: Sequence[Context]) -> list[Context]:
 #: Shared description of the plan-registration call, used by both planning
 #: instructions so the DAG/tool-binding rules stay identical.
 _PLAN_REGISTRATION_RULES = (
-    "Before registering the plan, call `list_mcp_tools` to see the MCP tools "
-    "available on the registered MCP servers. If a step needs an external tool, "
-    'bind it by adding a `tools` entry (`[{"server_id": ..., "tool_name": ...}]`) '
-    "to that task in `register_planning_tasks`. Only bind tools a task actually "
-    "needs. Express the steps as a DAG and register them in ONE call to "
-    "`register_planning_tasks`, using each task's `key` and `depends_on` to "
-    "encode ordering."
+    "ALWAYS call `list_mcp_tools` exactly once before registering the plan, to "
+    "see the tools available on the registered MCP servers. A task can only use "
+    "an MCP tool at run time if you bind it here, so decide this now: if a step "
+    "needs an external tool, bind it by adding a `tools` entry "
+    '(`[{"server_id": ..., "tool_name": ...}]`) to that task in '
+    "`register_planning_tasks`. Bind only the tools a task actually needs. If "
+    "the listing comes back with no servers, or none of the tools fit, simply "
+    "register the plan without any `tools` entries. Express the steps as a DAG "
+    "and register them in ONE call to `register_planning_tasks`, using each "
+    "task's `key` and `depends_on` to encode ordering."
 )
 
 INITIAL_PLANNING_AGENT_INSTRUCTION = (

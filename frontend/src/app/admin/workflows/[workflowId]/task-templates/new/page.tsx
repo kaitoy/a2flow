@@ -12,6 +12,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
+import { McpToolPicker } from "@/components/admin/mcp-tool-picker";
 import { Button } from "@/components/ui/button";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ import {
   listWorkflowTaskTemplates,
   type WorkflowTaskTemplate,
 } from "@/lib/api";
-import { loadMcpToolOptions, type McpToolOption, valueToBinding } from "@/lib/mcp-tool-options";
+import { valueToBinding } from "@/lib/mcp-tool-options";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -52,7 +53,6 @@ export default function NewWorkflowTaskTemplatePage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [candidates, setCandidates] = useState<WorkflowTaskTemplate[]>([]);
-  const [toolOptions, setToolOptions] = useState<McpToolOption[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -79,14 +79,6 @@ export default function NewWorkflowTaskTemplatePage() {
         // Candidate list is non-essential; the picker simply renders empty.
       });
   }, [workflowId]);
-
-  useEffect(() => {
-    loadMcpToolOptions()
-      .then((catalog) => setToolOptions(catalog.options))
-      .catch(() => {
-        // Tool catalog is non-essential; the picker simply renders empty.
-      });
-  }, []);
 
   async function onSubmit(values: FormValues) {
     try {
@@ -162,13 +154,7 @@ export default function NewWorkflowTaskTemplatePage() {
               control={control}
               name="toolBindings"
               render={({ field }) => (
-                <CheckboxGroup
-                  name="toolBindings"
-                  options={toolOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                  emptyMessage="No MCP tools available. Register MCP servers first."
-                />
+                <McpToolPicker value={field.value} onChange={field.onChange} />
               )}
             />
           </FormField>

@@ -22,9 +22,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.secret_cipher import get_secret_cipher
+from models.agent_skill import AgentSkill
 from models.mcp_server import MCPServer, McpTransport
+from models.planning_session import PlanningSession
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
+from models.workflow import Workflow
 from models.workflow_session import WorkflowSession
 from models.workflow_task import (
     WorkflowTask,
@@ -33,6 +36,60 @@ from models.workflow_task import (
 )
 from repositories.exceptions import McpConnectionError
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+
+
+async def _seed_planning_session(
+    eng: AsyncEngine,
+    *,
+    session_id: str = "plan-abc",
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
+) -> str:
+    """Insert a skill + workflow + PlanningSession chain; return the workflow PK.
+
+    Workflow generation and the plan-refinement chat run against a
+    PlanningSession rather than a WorkflowSession, so this is what the tools see
+    during the whole planning phase.
+    """
+    async with AsyncSession(eng) as db:
+        skill = AgentSkill(
+            name=f"skill-{session_id}",
+            repo_url="https://example.com/repo",
+            repo_path="",
+            tenant_id=tenant_id,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        db.add(skill)
+        await db.commit()
+        await db.refresh(skill)
+        skill_id = skill.id
+
+        workflow = Workflow(
+            name=f"wf-{session_id}",
+            agent_skill_id=skill_id,
+            tenant_id=tenant_id,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        db.add(workflow)
+        await db.commit()
+        await db.refresh(workflow)
+        workflow_id = workflow.id
+
+        db.add(
+            PlanningSession(
+                session_id=session_id,
+                workflow_id=workflow_id,
+                agent_skill_id=skill_id,
+                agent_skill_commit_sha="a" * 40,
+                user_id=SYSTEM_USER_ID,
+                tenant_id=tenant_id,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await db.commit()
+        return workflow_id
 
 
 @pytest_asyncio.fixture()
@@ -67,6 +124,7 @@ async def _seed_server(
     name: str = "srv",
     url: str = "https://mcp.example.com/mcp",
     headers: dict[str, str] | None = None,
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
 ) -> str:
     """Insert a streamable-HTTP MCPServer and return its id."""
     async with AsyncSession(eng) as db:
@@ -75,7 +133,7 @@ async def _seed_server(
             transport=McpTransport.streamable_http,
             url=url,
             headers=headers or {},
-            tenant_id=DEFAULT_TEST_TENANT_ID,
+            tenant_id=tenant_id,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )
@@ -380,6 +438,65 @@ async def test_list_mcp_tools_empty_registry(engine: AsyncEngine) -> None:
     await _seed_session(engine)
     result = await list_mcp_tools(_ctx())
     assert result == {"servers": []}
+
+
+async def test_list_mcp_tools_works_in_a_planning_session(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The planning agents must see the registry: that is where tools get bound.
+
+    Their ADK session is keyed on a PlanningSession, not a WorkflowSession, so
+    resolving the run through WorkflowSession alone silently left every
+    generated plan without tool bindings.
+    """
+    await _seed_planning_session(engine)
+    server_id = await _seed_server(engine, name="planning-visible")
+
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        return [
+            SimpleNamespace(
+                name="search",
+                description="Search the web",
+                inputSchema={"type": "object"},
+            )
+        ]
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    result = await list_mcp_tools(_ctx("plan-abc"))
+    assert "error" not in result
+    assert [entry["server_id"] for entry in result["servers"]] == [server_id]
+    assert result["servers"][0]["tools"][0]["name"] == "search"
+
+
+async def test_list_mcp_tools_from_planning_session_stays_tenant_scoped(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Widening the resolver must not widen which tenant's servers are visible."""
+    await seed_tenant(engine, "tenant-other")
+    await _seed_planning_session(engine, session_id="plan-mine")
+    mine = await _seed_server(engine, name="mine")
+    await _seed_server(engine, name="theirs", tenant_id="tenant-other")
+
+    async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
+        return []
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    result = await list_mcp_tools(_ctx("plan-mine"))
+    assert [entry["server_id"] for entry in result["servers"]] == [mine]
+
+
+async def test_call_mcp_tool_still_rejects_a_planning_session(
+    engine: AsyncEngine,
+) -> None:
+    """Planning may bind tools, but only an execution run may invoke them."""
+    await _seed_planning_session(engine, session_id="plan-only")
+    server_id = await _seed_server(engine)
+    result = await call_mcp_tool(server_id, "search", {}, _ctx("plan-only"))
+    assert "error" in result
 
 
 async def test_list_mcp_tools_aggregates_and_isolates_failures(

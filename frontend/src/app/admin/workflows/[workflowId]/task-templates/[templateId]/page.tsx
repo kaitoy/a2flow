@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ListTree } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
@@ -14,6 +14,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { McpToolPicker } from "@/components/admin/mcp-tool-picker";
 import { Button } from "@/components/ui/button";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -29,13 +30,7 @@ import {
   updateWorkflowTaskTemplate,
   type WorkflowTaskTemplate,
 } from "@/lib/api";
-import {
-  bindingToValue,
-  loadMcpToolOptions,
-  type McpToolCatalog,
-  mergeBindingOptions,
-  valueToBinding,
-} from "@/lib/mcp-tool-options";
+import { bindingToValue, valueToBinding } from "@/lib/mcp-tool-options";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -68,15 +63,6 @@ export default function EditWorkflowTaskTemplatePage() {
   const [candidates, setCandidates] = useState<WorkflowTaskTemplate[]>([]);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [templateBindings, setTemplateBindings] = useState<ToolBinding[]>([]);
-  const [toolCatalog, setToolCatalog] = useState<McpToolCatalog>({
-    options: [],
-    serverNames: new Map(),
-  });
-
-  const toolOptions = useMemo(
-    () => mergeBindingOptions(toolCatalog.options, templateBindings, toolCatalog.serverNames),
-    [toolCatalog, templateBindings]
-  );
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -129,14 +115,6 @@ export default function EditWorkflowTaskTemplatePage() {
         // Candidate list is non-essential; the picker simply renders empty.
       });
   }, [workflowId]);
-
-  useEffect(() => {
-    loadMcpToolOptions()
-      .then(setToolCatalog)
-      .catch(() => {
-        // Tool catalog is non-essential; already-bound tools still render.
-      });
-  }, []);
 
   async function onSubmit(values: FormValues) {
     try {
@@ -234,12 +212,10 @@ export default function EditWorkflowTaskTemplatePage() {
               control={control}
               name="toolBindings"
               render={({ field }) => (
-                <CheckboxGroup
-                  name="toolBindings"
-                  options={toolOptions}
+                <McpToolPicker
                   value={field.value}
                   onChange={field.onChange}
-                  emptyMessage="No MCP tools available. Register MCP servers first."
+                  boundBindings={templateBindings}
                 />
               )}
             />

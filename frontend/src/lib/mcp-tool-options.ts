@@ -8,7 +8,12 @@
  * option catalog from every registered MCP server.
  */
 
-import { listMcpServers, listMcpServerTools, type ToolBinding } from "@/lib/api";
+import {
+  getApiErrorMessage,
+  listMcpServers,
+  listMcpServerTools,
+  type ToolBinding,
+} from "@/lib/api";
 
 /** Separator between the server id and the tool name inside a composite value. */
 const SEPARATOR = "::";
@@ -20,6 +25,8 @@ const SERVER_LIMIT = 1000;
 export interface McpToolOption {
   value: string;
   label: string;
+  /** Id of the server advertising this tool, so options can be grouped by server. */
+  serverId: string;
 }
 
 /** Encode a tool binding as a composite option value (`<serverId>::<toolName>`). */
@@ -36,20 +43,39 @@ export function valueToBinding(value: string): ToolBinding {
   };
 }
 
+/** One registered server whose tool listing could not be fetched. */
+export interface McpToolLoadFailure {
+  serverId: string;
+  serverName: string;
+  /** Human-readable reason, as returned by the API. */
+  message: string;
+}
+
 /** Result of {@link loadMcpToolOptions}. */
 export interface McpToolCatalog {
   /** Selectable tools across all reachable registered servers. */
   options: McpToolOption[];
   /** Registered server names by id (includes servers whose tool fetch failed). */
   serverNames: Map<string, string>;
+  /**
+   * Servers that are registered but could not be queried. Surfaced so the
+   * picker can say *why* a server's tools are missing instead of rendering an
+   * empty list that looks like "no MCP servers are registered".
+   */
+  failures: McpToolLoadFailure[];
 }
 
 /**
  * Load the MCP tool picker catalog: every registered server's advertised tools.
  *
- * Servers that cannot be reached are skipped (their tools simply do not appear)
- * but still contribute their name to {@link McpToolCatalog.serverNames} so
- * already-bound tools can be labeled.
+ * Each server is queried live and independently, so one unreachable server
+ * never hides the others' tools. Servers that fail are reported in
+ * {@link McpToolCatalog.failures} — and still contribute their name to
+ * {@link McpToolCatalog.serverNames} so already-bound tools can be labeled.
+ *
+ * A failure to list the registry itself is not caught here: it means the whole
+ * catalog is unknown rather than partially known, so it propagates to the
+ * caller.
  */
 export async function loadMcpToolOptions(): Promise<McpToolCatalog> {
   const servers = await listMcpServers({ limit: SERVER_LIMIT });
@@ -60,13 +86,26 @@ export async function loadMcpToolOptions(): Promise<McpToolCatalog> {
       return tools.map((tool) => ({
         value: bindingToValue({ mcpServerId: server.id, toolName: tool.name }),
         label: `${server.name}: ${tool.name}`,
+        serverId: server.id,
       }));
     })
   );
-  const options = results
-    .filter((r): r is PromiseFulfilledResult<McpToolOption[]> => r.status === "fulfilled")
-    .flatMap((r) => r.value);
-  return { options, serverNames };
+
+  const options: McpToolOption[] = [];
+  const failures: McpToolLoadFailure[] = [];
+  results.forEach((result, index) => {
+    const server = servers[index];
+    if (result.status === "fulfilled") {
+      options.push(...result.value);
+    } else {
+      failures.push({
+        serverId: server.id,
+        serverName: server.name,
+        message: getApiErrorMessage(result.reason),
+      });
+    }
+  });
+  return { options, serverNames, failures };
 }
 
 /**
@@ -85,6 +124,7 @@ export function mergeBindingOptions(
     .map((b) => ({
       value: bindingToValue(b),
       label: `${serverNames.get(b.mcpServerId) ?? `${b.mcpServerId.slice(0, 8)}…`}: ${b.toolName}`,
+      serverId: b.mcpServerId,
     }));
   return [...options, ...extras];
 }
