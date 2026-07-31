@@ -3,7 +3,6 @@
 
 import { RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
@@ -11,6 +10,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
+import { GenerateWorkflowDialog } from "@/components/admin/generate-workflow-dialog";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
@@ -116,7 +116,6 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
 ];
 
 export default function AgentSkillsPage() {
-  const router = useRouter();
   const canEdit = useHasRole(Role.DEVELOPER);
   const {
     rows,
@@ -131,6 +130,7 @@ export default function AgentSkillsPage() {
     reload,
   } = useTableQuery<AgentSkill>(listAgentSkills, { limit: LIMIT });
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
+  const [generateTarget, setGenerateTarget] = useState<{ id: string; name: string } | null>(null);
   const [pullingId, setPullingId] = useState<string | null>(null);
 
   const anyPending = rows.some((s) => s.syncStatus === "pending");
@@ -188,7 +188,7 @@ export default function AgentSkillsPage() {
                 <ActionIconButton
                   icon={Sparkles}
                   label="Generate workflow"
-                  onClick={() => router.push(`/admin/agent-skills/${skill.id}/generate-workflow`)}
+                  onClick={() => setGenerateTarget({ id: skill.id, name: skill.name })}
                   // A skill can only back a planning run once its clone has
                   // published a revision.
                   disabled={skill.syncStatus !== "ready"}
@@ -258,6 +258,12 @@ export default function AgentSkillsPage() {
         description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
+      />
+      <GenerateWorkflowDialog
+        open={generateTarget !== null}
+        skillId={generateTarget?.id ?? ""}
+        defaultName={generateTarget?.name ?? ""}
+        onClose={() => setGenerateTarget(null)}
       />
     </AdminPageContainer>
   );

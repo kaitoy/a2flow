@@ -204,7 +204,7 @@ Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/adm
 | List all skills | `GET /admin/agent-skills` |
 | Register a new skill | `GET /admin/agent-skills/new` |
 | Edit / delete a skill | `GET /admin/agent-skills/{id}` |
-
+| Generate a workflow from a skill | "Generate workflow" in the list's Actions column, or the Generate Workflow icon button in the edit page's header (see [Generating a workflow](#generating-a-workflow)) |
 | Pull a skill's repository | `POST /api/v1/agent-skills/{id}/pull` |
 
 Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, an optional **Ref** (a branch or tag name), and description.
@@ -309,7 +309,7 @@ Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/
 
 | Operation | Path |
 |-----------|------|
-| Generate a workflow from a skill | "Generate workflow" button on [Agent Skills](#agent-skills) (calls `POST /agent-skills/{id}/workflows`) |
+| Generate a workflow from a skill | "Generate workflow" on [Agent Skills](#agent-skills) — the list's row action or the edit page header's icon button (both calling `POST /agent-skills/{id}/workflows`) |
 | List all workflows | `GET /admin/workflows` |
 | Edit a workflow / publish / open its planning session | `GET /admin/workflows/{id}` |
 | Manage its task templates | `GET /admin/workflows/{id}/task-templates` |
@@ -319,7 +319,9 @@ Each workflow record stores a name, a reference to an Agent Skill, a lifecycle *
 
 #### Generating a workflow
 
-Clicking **Generate workflow** on an Agent Skill opens a small form: the workflow **name** (prefilled with the skill name) and the **prompt** describing the work. Submitting it:
+**Generate workflow** is reachable from two places, both opening the same modal dialog without leaving the page: the row action in the [Agent Skills](#agent-skills) list, and the Generate Workflow icon button in the header of a skill's edit page. Either is disabled until the skill's clone has published a revision. The dialog asks for the workflow **name** (prefilled with the skill name) and the **prompt** describing the work. Because generating navigates away to the new workflow, the edit page offers to save unsaved edits first — declining the prompt leaves the page untouched and does not generate.
+
+Submitting the dialog:
 
 1. Checks that the skill has a published revision (`commitSha`); otherwise HTTP 409 (`SKILL_NOT_READY`). The new workflow (`status: "generating"`) and its **PlanningSession** — pinned to that revision — are registered immediately (HTTP 201), and the frontend navigates to the workflow's detail page, which polls while generation runs.
 2. A **background planning run** sends the prompt as the planning session's first chat message and drives an *initial-planning* agent: following the skill, it breaks the request into steps and registers them as the workflow's **task templates** in one `register_planning_tasks` call (a DAG — each step declares a `key` and its `depends_on` predecessors, plus optional MCP `tools` bindings).

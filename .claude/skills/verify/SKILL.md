@@ -54,7 +54,7 @@ with `WinError 3` mid-clone.
 The scratchpad path is itself deep, so `"$sp\st\sk"` above only survives a
 shallow clone target like `octocat/Hello-World`. Adding `$env:DEMO_DATA = "true"`
 clones **this** repository, whose own paths run to
-`frontend/src/app/admin/agent-skills/[skillId]/generate-workflow/page.test.tsx`,
+`frontend/src/app/admin/workflows/[workflowId]/task-templates/[templateId]/page.test.tsx`,
 and that overflows — the clone dies with `FileNotFoundError` (not `WinError 3`)
 and the demo skill lands in `syncStatus: failed`. Everything else in the demo
 dataset still seeds, so ignore it unless you need the skill; otherwise point

@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { RefreshCw, Wand2 } from "lucide-react";
+import { RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -20,6 +20,8 @@ import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { GenerateWorkflowDialog } from "@/components/admin/generate-workflow-dialog";
+import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -57,6 +59,8 @@ export default function EditAgentSkillPage() {
   const canEdit = useHasRole(Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saveBeforeGenerateOpen, setSaveBeforeGenerateOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [sync, setSync] = useState<SyncState | null>(null);
 
@@ -68,7 +72,7 @@ export default function EditAgentSkillPage() {
     handleSubmit,
     reset,
     getValues,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm({
     resolver: zodResolver(agentSkillFormSchema),
     mode: "onBlur",
@@ -133,16 +137,51 @@ export default function EditAgentSkillPage() {
     }
   }
 
+  /**
+   * Persist the form and clear its dirty state. Throws when the request fails
+   * so callers can skip whatever they meant to do next.
+   */
+  async function persist(values: AgentSkillFormValues) {
+    await save.run(async () => {
+      await updateAgentSkill(skillId, toAgentSkillUpdateBody(values));
+      dispatch(showToast({ message: "Agent skill updated" }));
+      // Re-seed the form with what was just saved so `isDirty` goes back to
+      // false — the generation flow reads it to decide whether to ask.
+      reset(values);
+    });
+  }
+
   async function onSubmit(values: AgentSkillFormValues) {
     try {
-      await save.run(async () => {
-        await updateAgentSkill(skillId, toAgentSkillUpdateBody(values));
-        dispatch(showToast({ message: "Agent skill updated" }));
-        router.push("/admin/agent-skills");
-      });
+      await persist(values);
+      router.push("/admin/agent-skills");
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
     }
+  }
+
+  // Generating navigates away to the new workflow, so unsaved edits would be
+  // lost. Offer to save them first rather than dropping them silently.
+  function handleGenerateClick() {
+    if (isDirty) {
+      setSaveBeforeGenerateOpen(true);
+      return;
+    }
+    setGenerateOpen(true);
+  }
+
+  function confirmSaveBeforeGenerate() {
+    setSaveBeforeGenerateOpen(false);
+    // Route through handleSubmit so the edits are validated before they are
+    // saved; an invalid form surfaces its errors and the dialog stays shut.
+    void handleSubmit(async (values) => {
+      try {
+        await persist(values);
+        setGenerateOpen(true);
+      } catch {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
+      }
+    })();
   }
 
   function handleDelete() {
@@ -180,7 +219,23 @@ export default function EditAgentSkillPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="Edit Agent Skill" icon={Wand2} />
+      <AdminPageHeader
+        title="Edit Agent Skill"
+        icon={Wand2}
+        secondaryAction={
+          canEdit ? (
+            <HeaderIconButton
+              label="Generate Workflow"
+              onClick={handleGenerateClick}
+              // A skill can only back a planning run once its clone has
+              // published a revision.
+              disabled={sync?.status !== "ready"}
+            >
+              <Sparkles size={18} strokeWidth={1.8} aria-hidden="true" />
+            </HeaderIconButton>
+          ) : undefined
+        }
+      />
 
       <FormColumn>
         {sync && (
@@ -248,6 +303,7 @@ export default function EditAgentSkillPage() {
             )}
           </div>
         </form>
+
         {audit && (
           <div className="mt-4">
             <AuditMeta {...audit} />
@@ -260,6 +316,21 @@ export default function EditAgentSkillPage() {
         description={`Delete "${getValues("name")}"?`}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
+      />
+      <ConfirmDialog
+        open={saveBeforeGenerateOpen}
+        title="Save changes?"
+        description="Generating opens the new workflow, leaving this page. Save your changes to this skill first?"
+        confirmLabel="Save and continue"
+        confirmVariant="primary"
+        onConfirm={confirmSaveBeforeGenerate}
+        onCancel={() => setSaveBeforeGenerateOpen(false)}
+      />
+      <GenerateWorkflowDialog
+        open={generateOpen}
+        skillId={skillId}
+        defaultName={getValues("name")}
+        onClose={() => setGenerateOpen(false)}
       />
     </AdminPageContainer>
   );

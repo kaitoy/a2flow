@@ -162,23 +162,17 @@ describe("AgentSkillsPage", () => {
     expect(deleteSpy).toHaveBeenCalled();
   });
 
-  it("navigates to the generate-workflow form", async () => {
+  it("opens the generate-workflow dialog seeded with the skill name", async () => {
     const user = userEvent.setup();
-    const pushMock = vi.fn();
-    const { useRouter } = await import("next/navigation");
-    vi.mocked(useRouter).mockReturnValue({
-      push: pushMock,
-      replace: vi.fn(),
-      back: vi.fn(),
-      prefetch: vi.fn(),
-      refresh: vi.fn(),
-      forward: vi.fn(),
-    });
-
     render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-skill"));
     await user.click(screen.getByRole("button", { name: "Generate workflow" }));
-    expect(pushMock).toHaveBeenCalledWith("/admin/agent-skills/skill-1/generate-workflow");
+
+    const dialog = await screen.findByRole("dialog", { name: /generate workflow/i });
+    expect(within(dialog).getByLabelText(/workflow name/i)).toHaveValue("my-skill");
+
+    await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("disables Generate workflow while the skill has no published revision", async () => {

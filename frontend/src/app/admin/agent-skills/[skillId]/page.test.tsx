@@ -249,7 +249,80 @@ describe("EditAgentSkillPage", () => {
     expect(screen.queryByRole("button", { name: /pull/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /generate workflow/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /^workflow$/i })).not.toBeInTheDocument();
     // The sync state is still readable — only the actions are gated.
     expect(screen.getByRole("region", { name: /repository sync/i })).toBeInTheDocument();
+  });
+
+  it("opens the generate dialog without asking when nothing was edited", async () => {
+    setup();
+    const user = userEvent.setup();
+    const patchSpy = vi.fn(() => envelope(FULL_SKILL));
+    server.use(http.patch(SKILL_URL, patchSpy));
+
+    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
+    await user.click(screen.getByRole("button", { name: /generate workflow/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Generate Workflow")).toBeInTheDocument();
+    // The workflow name is prefilled from the skill.
+    expect(within(dialog).getByLabelText(/workflow name/i)).toHaveValue("my-skill");
+    expect(patchSpy).not.toHaveBeenCalled();
+  });
+
+  it("disables generation while the skill has no published revision", async () => {
+    setup();
+    server.use(
+      http.get(SKILL_URL, () => envelope({ ...FULL_SKILL, syncStatus: "pending", commitSha: null }))
+    );
+
+    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
+    expect(screen.getByRole("button", { name: /generate workflow/i })).toBeDisabled();
+  });
+
+  it("offers to save unsaved edits before generating, then opens the dialog", async () => {
+    setup();
+    const user = userEvent.setup();
+    const patchSpy = vi.fn(() => envelope({ ...FULL_SKILL, name: "renamed-skill" }));
+    server.use(http.patch(SKILL_URL, patchSpy));
+
+    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
+    const nameInput = screen.getByDisplayValue("my-skill");
+    await user.clear(nameInput);
+    await user.type(nameInput, "renamed-skill");
+    await user.click(screen.getByRole("button", { name: /generate workflow/i }));
+
+    const confirm = await screen.findByRole("dialog");
+    expect(within(confirm).getByText("Save changes?")).toBeInTheDocument();
+    await user.click(within(confirm).getByRole("button", { name: /save and continue/i }));
+
+    await waitFor(() => expect(patchSpy).toHaveBeenCalled());
+    // The generate dialog takes over, seeded with the name that was just saved.
+    await waitFor(() =>
+      expect(screen.getByRole("dialog", { name: /generate workflow/i })).toBeInTheDocument()
+    );
+    expect(screen.getByLabelText(/workflow name/i)).toHaveValue("renamed-skill");
+  });
+
+  it("aborts generation entirely when the save prompt is declined", async () => {
+    setup();
+    const user = userEvent.setup();
+    const patchSpy = vi.fn(() => envelope(FULL_SKILL));
+    server.use(http.patch(SKILL_URL, patchSpy));
+
+    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
+    await user.type(screen.getByDisplayValue("my-skill"), "-edited");
+    await user.click(screen.getByRole("button", { name: /generate workflow/i }));
+
+    const confirm = await screen.findByRole("dialog");
+    await user.click(within(confirm).getByRole("button", { name: /cancel/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(patchSpy).not.toHaveBeenCalled();
   });
 });
