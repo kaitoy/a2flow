@@ -129,7 +129,15 @@ export function GenerateWorkflowDialog({
                   opacity: style.opacity,
                   transform: style.scale.to((s) => `scale(${s})`),
                 }}
-                className="w-full max-w-lg rounded-2xl glass-panel-overlay p-6 pointer-events-auto"
+                className={[
+                  "w-full max-w-lg rounded-2xl glass-panel-overlay p-6 pointer-events-auto",
+                  // Signature "live edge" while the planning run is being
+                  // handed to the agent. Gated on the 200ms `pending` stage so
+                  // a fast registration never flashes the light.
+                  save.status === "pending" ? "live-edge" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <h2
                   id="generate-workflow-title"

@@ -219,7 +219,18 @@ export default function EditWorkflowPage() {
       >
         <section
           aria-label="Workflow status"
-          className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4"
+          className={[
+            "mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4",
+            // Signature "live edge": publishing runs the description summarizer
+            // synchronously and `generating` means the background planning run
+            // is still going — both are the agent at work, so the card carries
+            // the same travelling light the chat bubbles do. Gated on the
+            // 200ms `pending` stage rather than `inFlight` so a fast rejection
+            // (409 with no task templates) never flashes it.
+            publish.status === "pending" || generating ? "live-edge" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           <StatusLine workflow={workflow} />
           <div className="ml-auto">

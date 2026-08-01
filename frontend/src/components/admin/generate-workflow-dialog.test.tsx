@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { http } from "msw";
+import { delay, http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { GenerateWorkflowDialog } from "@/components/admin/generate-workflow-dialog";
@@ -79,6 +79,33 @@ describe("GenerateWorkflowDialog", () => {
 
     await waitFor(() => expect(receivedBody).toEqual({ name: "my-flow", prompt: "Do the thing" }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows/new-wf-id"));
+  });
+
+  it("lights the dialog edge while the generation request is in flight", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useRouter).mockReturnValue({
+      push: vi.fn(),
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+      forward: vi.fn(),
+    });
+    server.use(
+      http.post(GENERATE_URL, async () => {
+        // Outlast useAsyncAction's 200ms pending gate so the light is reached.
+        await delay(400);
+        return envelope(NEW_WORKFLOW, 201);
+      })
+    );
+
+    renderOpen();
+    expect(screen.getByRole("dialog")).not.toHaveClass("live-edge");
+    await user.type(screen.getByLabelText(/prompt/i), "Do the thing");
+    await user.click(screen.getByRole("button", { name: /generate/i }));
+
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveClass("live-edge"));
+    await waitFor(() => expect(screen.getByRole("dialog")).not.toHaveClass("live-edge"));
   });
 
   it("rejects an empty prompt without calling the api", async () => {

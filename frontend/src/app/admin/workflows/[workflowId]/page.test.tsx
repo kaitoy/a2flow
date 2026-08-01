@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { http } from "msw";
+import { delay, http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
@@ -33,6 +33,71 @@ describe("EditWorkflowPage", () => {
   it("shows the workflow status", async () => {
     render(<EditWorkflowPage />);
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+  });
+
+  it("leaves the status bar unlit while nothing is generating", async () => {
+    render(<EditWorkflowPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    expect(screen.getByRole("region", { name: "Workflow status" })).not.toHaveClass("live-edge");
+  });
+
+  it("lights the status bar while the plan is still generating", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          status: "generating",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<EditWorkflowPage />);
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "Workflow status" })).toHaveClass("live-edge")
+    );
+  });
+
+  it("lights the status bar while publish summarizes, then unlights it", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflows/:id/publish", async () => {
+        // Outlast useAsyncAction's 200ms pending gate so the light is reached.
+        await delay(400);
+        return envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: "Summarized",
+          agentSkillId: "skill-1",
+          status: "published",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        });
+      })
+    );
+
+    render(<EditWorkflowPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    await user.click(screen.getByRole("button", { name: /publish/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "Workflow status" })).toHaveClass("live-edge")
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "Workflow status" })).not.toHaveClass("live-edge")
+    );
   });
 
   it("links the Agent Skill field to its detail page", async () => {
