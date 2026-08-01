@@ -37,6 +37,7 @@ from repositories import (
 from repositories.exceptions import (
     NotFoundError,
     SkillNotReadyError,
+    WorkflowNotDeactivatableError,
     WorkflowNotModifiedError,
     WorkflowNotRunnableError,
 )
@@ -398,4 +399,33 @@ class WorkflowService:
         )
         return await self._workflows.set_status(
             workflow_id, WorkflowStatus.published, user_id=user_id
+        )
+
+    async def deactivate(self, workflow_id: str, *, user_id: str) -> Workflow:
+        """Return a published workflow to draft, revoking requester execute access.
+
+        Only ``published`` or ``modified`` workflows can be deactivated. The
+        workflow's task templates, description, and any published snapshot are
+        left untouched — deactivating only changes ``status``, so the workflow
+        can be published again later exactly as it was, and a developer can
+        keep executing/adjusting it in the meantime (draft workflows remain
+        runnable by developer/super_admin — see :meth:`execute`).
+
+        Args:
+            workflow_id: Identifier of the workflow to deactivate.
+            user_id: ID of the user deactivating the workflow.
+
+        Returns:
+            The deactivated Workflow, now ``draft``.
+
+        Raises:
+            NotFoundError: If no workflow exists with the given ID.
+            WorkflowNotDeactivatableError: If the workflow is not
+                ``published`` or ``modified``.
+        """
+        workflow = await self.get(workflow_id)
+        if workflow.status not in (WorkflowStatus.published, WorkflowStatus.modified):
+            raise WorkflowNotDeactivatableError(workflow_id)
+        return await self._workflows.set_status(
+            workflow_id, WorkflowStatus.draft, user_id=user_id
         )

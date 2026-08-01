@@ -327,6 +327,7 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `SkillNotReadyError` | 409 | `SKILL_NOT_READY` | The skill has no published revision to run against (its clone is still in flight, or it failed); `details` carries `skillId`. Raised by `POST /agent-skills/{id}/workflows`, `POST /workflows/{id}/execute`, and the `resolve_agent` methods |
 | `WorkflowNotRunnableError` | 409 | `WORKFLOW_NOT_RUNNABLE` | The workflow cannot be executed or published in its current state (neither `published` nor `modified` on execute; still `generating` or without task templates on publish); `details` carries `workflowId` and `reason` |
 | `WorkflowNotModifiedError` | 409 | `WORKFLOW_NOT_MODIFIED` | The workflow has no unpublished changes to discard (it is not `modified`); `details` carries `workflowId` |
+| `WorkflowNotDeactivatableError` | 409 | `WORKFLOW_NOT_DEACTIVATABLE` | The workflow is not `published`/`modified`, so there is nothing to deactivate; `details` carries `workflowId` |
 | `RegistryUnavailableError` | 502 | `REGISTRY_UNREACHABLE` | Official MCP registry unreachable; no `details` — the raw failure reason is logged server-side only |
 | `HTTPException` (any other raise) | passthrough | `HTTP_<status>` | Fallback for callers still raising `HTTPException` |
 | Uncaught `Exception` | 500 | `INTERNAL_ERROR` | Logged with `request_id` |

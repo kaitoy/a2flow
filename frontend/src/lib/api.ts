@@ -62,6 +62,7 @@ import {
   zCreateUserApiV1UsersPostResponse,
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zCreateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPostResponse,
+  zDeactivateWorkflowApiV1WorkflowsWorkflowIdDeactivatePostResponse,
   zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse,
   zDeleteMcpServerApiV1McpServersServerIdDeleteResponse,
   zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse,
@@ -896,6 +897,17 @@ export async function discardWorkflowChanges(id: string): Promise<Workflow> {
   return fetchEnvelope(
     apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/discard-changes`),
     zDiscardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPostResponse
+  ) as Promise<Workflow>;
+}
+
+/**
+ * Deactivate a workflow, returning it to draft. Task templates, description,
+ * and the published snapshot are left untouched.
+ */
+export async function deactivateWorkflow(id: string): Promise<Workflow> {
+  return fetchEnvelope(
+    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/deactivate`),
+    zDeactivateWorkflowApiV1WorkflowsWorkflowIdDeactivatePostResponse
   ) as Promise<Workflow>;
 }
 

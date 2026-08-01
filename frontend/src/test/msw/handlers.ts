@@ -287,6 +287,10 @@ export const handlers = [
     envelope({ ...WORKFLOW_1, status: "published" })
   ),
 
+  http.post(`${BASE}/api/v1/workflows/:id/deactivate`, () =>
+    envelope({ ...WORKFLOW_1, status: "draft" })
+  ),
+
   http.get(`${BASE}/api/v1/workflows/:id/planning-session`, () => envelope(PLANNING_SESSION_1)),
 
   http.get(`${BASE}/api/v1/workflows/:id/task-templates`, () =>

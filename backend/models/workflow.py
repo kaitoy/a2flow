@@ -37,7 +37,12 @@ class WorkflowStatus(StrEnum):
     """The background planning run that fills in the task templates is in flight."""
 
     draft = "draft"
-    """The initial plan exists (or generation was skipped); not yet executable."""
+    """The initial plan exists (or generation was skipped); not yet executable.
+
+    Also reachable from ``published``/``modified`` via
+    ``POST /workflows/{id}/deactivate``, which revokes ``requester`` execute
+    access while leaving the plan and any published snapshot untouched.
+    """
 
     failed = "failed"
     """The background planning run failed; ``generation_error`` carries the reason."""
@@ -88,9 +93,10 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     on the table class only, so they are absent from ``WorkflowCreate`` /
     ``WorkflowUpdate`` and cannot be written through the API. They are set by
     the generation background job (``services/workflow_generation.py``), by
-    ``POST /workflows/{id}/publish`` and ``.../discard-changes``, and — for the
-    ``published`` → ``modified`` transition — by any save that edits a
-    published workflow or one of its task templates.
+    ``POST /workflows/{id}/publish``, ``.../discard-changes``, and
+    ``.../deactivate``, and — for the ``published`` → ``modified``
+    transition — by any save that edits a published workflow or one of its
+    task templates.
     """
 
     __tablename__ = "workflows"

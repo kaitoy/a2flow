@@ -164,6 +164,24 @@ class WorkflowNotModifiedError(RepositoryError):
         super().__init__(f"Workflow {workflow_id!r} has no unpublished changes")
 
 
+class WorkflowNotDeactivatableError(RepositoryError):
+    """Raised when a Workflow is not published/modified, so there is nothing to deactivate.
+
+    ``POST /workflows/{id}/deactivate`` only makes sense for a workflow that is
+    currently ``published`` or ``modified`` — returning it to ``draft`` revokes
+    the ``requester`` role's execute access until it is published again. Any
+    other status (``draft``, ``generating``, ``failed``) has nothing to
+    deactivate.
+
+    Carries the ``workflow_id`` so the HTTP layer can surface it in the error
+    envelope's ``details`` block when returning HTTP 409.
+    """
+
+    def __init__(self, workflow_id: str) -> None:
+        self.workflow_id = workflow_id
+        super().__init__(f"Workflow {workflow_id!r} is not published")
+
+
 class RegistryUnavailableError(Exception):
     """Raised when the official MCP registry cannot be reached or errors out.
 

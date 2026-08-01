@@ -35,6 +35,7 @@ from repositories.exceptions import (
     UnauthorizedError,
     UniqueViolationError,
     UserValidationError,
+    WorkflowNotDeactivatableError,
     WorkflowNotModifiedError,
     WorkflowNotRunnableError,
 )
@@ -292,6 +293,20 @@ async def workflow_not_modified_exception_handler(
     return _envelope_error(
         request,
         code="WORKFLOW_NOT_MODIFIED",
+        message=str(exc),
+        status_code=409,
+        details={"workflowId": exc.workflow_id},
+    )
+
+
+async def workflow_not_deactivatable_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with WORKFLOW_NOT_DEACTIVATABLE code when there is nothing to deactivate."""
+    assert isinstance(exc, WorkflowNotDeactivatableError)
+    return _envelope_error(
+        request,
+        code="WORKFLOW_NOT_DEACTIVATABLE",
         message=str(exc),
         status_code=409,
         details={"workflowId": exc.workflow_id},

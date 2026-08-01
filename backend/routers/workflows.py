@@ -1,11 +1,12 @@
-"""Endpoints for Workflow resources: reads, updates, publication, and execution.
+"""Endpoints for Workflow resources: reads, updates, publication, deactivation, and execution.
 
 Workflows are not created here — they are born from
 ``POST /agent-skills/{skill_id}/workflows`` ("Generate workflow", see
 ``routers/agent_skills.py``), which registers a draft and generates its task
 templates in the background. This router covers everything after that:
 inspecting a workflow and its templates, editing name/description, opening its
-planning session, publishing it, and executing it.
+planning session, publishing it, deactivating it back to draft, and executing
+it.
 """
 
 from fastapi import APIRouter, Depends
@@ -184,6 +185,26 @@ async def discard_workflow_changes(
     (``WORKFLOW_NOT_MODIFIED``) when the workflow has no unpublished changes.
     """
     workflow = await service.discard_changes(workflow_id, user_id=user_id)
+    return ApiResponse(meta=meta, data=workflow)
+
+
+@router.post(
+    "/{workflow_id}/deactivate",
+    response_model=ApiResponse[Workflow],
+    dependencies=_requires_developer,
+)
+async def deactivate_workflow(
+    workflow_id: str,
+    service: WorkflowServiceDep,
+    user_id: CurrentUserIdDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[Workflow]:
+    """Deactivate a workflow, returning it to draft.
+
+    Raises HTTP 409 (``WORKFLOW_NOT_DEACTIVATABLE``) unless the workflow is
+    currently ``published`` or ``modified``.
+    """
+    workflow = await service.deactivate(workflow_id, user_id=user_id)
     return ApiResponse(meta=meta, data=workflow)
 
 

@@ -9,6 +9,7 @@ from tests._workflow import (
     add_template,
     create_published_workflow,
     create_skill,
+    deactivate_workflow,
     discard_workflow_changes,
     generate_workflow,
     publish_workflow,
@@ -674,6 +675,121 @@ async def test_discard_changes_unknown_id_returns_404(
         "/api/v1/workflows/nonexistent/discard-changes"
     )
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+# ---------- deactivate ----------
+
+
+async def test_deactivate_published_workflow_returns_to_draft(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    body = await deactivate_workflow(workflow_client, wf["id"])
+    assert body["status"] == "draft"
+
+
+async def test_deactivate_modified_workflow_returns_to_draft(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflows/{wf['id']}", json={"name": "Renamed"}
+        )
+    )
+    body = await deactivate_workflow(workflow_client, wf["id"])
+    assert body["status"] == "draft"
+
+
+async def test_deactivate_leaves_task_templates_and_description_unchanged(
+    workflow_client: AsyncClient,
+) -> None:
+    """Unlike discard-changes, deactivating rewrites nothing but ``status``."""
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    await add_template(workflow_client, wf["id"], title="Only step")
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflows/{wf['id']}", json={"description": "Approved"}
+        )
+    )
+    await publish_workflow(workflow_client, wf["id"])
+
+    body = await deactivate_workflow(workflow_client, wf["id"])
+    assert body["description"] == "Approved"
+
+    templates = assert_ok(
+        await workflow_client.get(f"/api/v1/workflows/{wf['id']}/task-templates")
+    )
+    assert [t["title"] for t in templates] == ["Only step"]
+
+
+async def test_deactivated_workflow_can_be_republished(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    await deactivate_workflow(workflow_client, wf["id"])
+    body = await publish_workflow(workflow_client, wf["id"])
+    assert body["status"] == "published"
+
+
+async def test_deactivate_a_draft_workflow_returns_409(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.post(f"/api/v1/workflows/{wf['id']}/deactivate")
+    err = assert_err(response, code="WORKFLOW_NOT_DEACTIVATABLE", status=409)
+    assert err["details"]["workflowId"] == wf["id"]
+
+
+async def test_deactivate_a_generating_workflow_returns_409(
+    workflow_client: AsyncClient, mock_generation_job: AsyncMock
+) -> None:
+    mock_generation_job.side_effect = None  # the generation run never finishes
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.post(f"/api/v1/workflows/{wf['id']}/deactivate")
+    assert_err(response, code="WORKFLOW_NOT_DEACTIVATABLE", status=409)
+
+
+async def test_deactivate_unknown_id_returns_404(
+    workflow_client: AsyncClient,
+) -> None:
+    response = await workflow_client.post("/api/v1/workflows/nonexistent/deactivate")
+    assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_requester_cannot_execute_a_deactivated_workflow(
+    workflow_client: AsyncClient,
+) -> None:
+    """Deactivating a published workflow revokes the ``requester`` execute path."""
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    await deactivate_workflow(workflow_client, wf["id"])
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute",
+        headers={"X-User-Roles": "requester"},
+    )
+    err = assert_err(response, code="WORKFLOW_NOT_RUNNABLE", status=409)
+    assert err["details"]["workflowId"] == wf["id"]
+
+
+async def test_developer_can_still_execute_a_deactivated_workflow(
+    workflow_client: AsyncClient,
+) -> None:
+    """A deactivated (now ``draft``) workflow stays testable by a developer."""
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    await deactivate_workflow(workflow_client, wf["id"])
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute",
+        headers={"X-User-Roles": "developer"},
+    )
+    assert_ok(response, status=201)
 
 
 # ---------- execute ----------

@@ -59,6 +59,11 @@ async def discard_workflow_changes(client: AsyncClient, workflow_id: str) -> Any
     )
 
 
+async def deactivate_workflow(client: AsyncClient, workflow_id: str) -> Any:
+    """Deactivate a published/modified workflow, returning it to draft."""
+    return assert_ok(await client.post(f"/api/v1/workflows/{workflow_id}/deactivate"))
+
+
 async def create_published_workflow(
     client: AsyncClient, skill_id: str, **overrides: object
 ) -> Any:

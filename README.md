@@ -116,7 +116,7 @@ Every user holds a set of **roles** granting the operations they may perform. Ro
 |---|---|
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the designated-approver checks described under [Human approval](#human-approval)) |
 | `admin` | User CRUD, secrets CRUD |
-| `developer` | MCP server CRUD, agent-skill CRUD, workflow generation/editing/publishing, task-template CRUD, planning-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
+| `developer` | MCP server CRUD, agent-skill CRUD, workflow generation/editing/publishing/deactivating, task-template CRUD, planning-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
 | `requester` | Running **published** (and `modified`) workflows (`POST /workflows/{id}/execute`) |
 | `approver` | Eligibility to be a workflow approval's designated approver, and resolving their own approvals |
 
@@ -311,7 +311,7 @@ Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/
 |-----------|------|
 | Generate a workflow from a skill | "Generate workflow" on [Agent Skills](#agent-skills) — the list's row action or the edit page header's icon button (both calling `POST /agent-skills/{id}/workflows`) |
 | List all workflows | `GET /admin/workflows` |
-| Edit a workflow / publish / discard changes / open its planning session | `GET /admin/workflows/{id}` |
+| Edit a workflow / publish / deactivate / discard changes / open its planning session | `GET /admin/workflows/{id}` |
 | Manage its task templates | `GET /admin/workflows/{id}/task-templates` |
 | Run a workflow | "Run" button in the list (calls `POST /workflows/{id}/execute`) |
 
@@ -352,6 +352,10 @@ Editing a workflow after it has been published does not silently change what run
 - **Discard changes** (the undo icon that appears in the detail page's status bar next to Publish, `POST /workflows/{id}/discard-changes`, developer-gated) throws the edits away instead: the task templates are rewritten from the published version — original template ids reused, so the dependency edges survive — the name and description are restored, and the workflow returns to `published`. Discarding a workflow that has no unpublished changes returns HTTP 409 (`WORKFLOW_NOT_MODIFIED`).
 
 Refining the plan through the **planning chat** is deliberately exempt: the planning agent's tools write templates directly and leave the status alone, since chatting about the plan is part of authoring it.
+
+#### Deactivating a workflow
+
+**Deactivate** (the power-off icon that appears in the detail page's status bar next to Publish whenever the workflow is `published` or `modified`, `POST /workflows/{id}/deactivate`, developer-gated) returns a workflow to **`draft`**. This revokes the `requester` role's execute access — the same gate a never-published workflow starts under — while a `developer`/`super_admin` can still run it for testing and the task templates, description, and published snapshot are left exactly as they were. Publishing again promotes it straight back to `published`. Deactivating a workflow that is not currently `published`/`modified` returns HTTP 409 (`WORKFLOW_NOT_DEACTIVATABLE`).
 
 #### Running a workflow
 

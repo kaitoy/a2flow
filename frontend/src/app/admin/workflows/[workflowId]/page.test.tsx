@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { render, screen, waitFor } from "@/test/test-utils";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import EditWorkflowPage from "./page";
 
 vi.mock("next/link", () => ({
@@ -277,5 +277,64 @@ describe("EditWorkflowPage", () => {
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows"));
+  });
+
+  it("offers a Deactivate action while the workflow is published", async () => {
+    render(<EditWorkflowPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    expect(screen.getByRole("button", { name: /deactivate/i })).toBeInTheDocument();
+  });
+
+  it("hides the Deactivate action once the workflow is draft", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          status: "draft",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<EditWorkflowPage />);
+    await waitFor(() => expect(screen.getByText("draft")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /deactivate/i })).not.toBeInTheDocument();
+  });
+
+  it("deactivates the workflow via the deactivate endpoint", async () => {
+    const user = userEvent.setup();
+    const deactivateSpy = vi.fn(() =>
+      envelope({
+        id: "wf-1",
+        tenantId: "tenant-1",
+        name: "my-workflow",
+        description: null,
+        agentSkillId: "skill-1",
+        status: "draft",
+        generationError: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        createdBy: "",
+        updatedBy: "",
+      })
+    );
+    server.use(http.post("http://localhost:8000/api/v1/workflows/:id/deactivate", deactivateSpy));
+
+    render(<EditWorkflowPage />);
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /deactivate/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^deactivate$/i }));
+
+    await waitFor(() => expect(deactivateSpy).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText("draft")).toBeInTheDocument());
   });
 });

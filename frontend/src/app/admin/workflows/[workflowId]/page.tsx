@@ -2,7 +2,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ListTree, MessageSquareText, Rocket, Undo2, Workflow as WorkflowIcon } from "lucide-react";
+import {
+  ListTree,
+  MessageSquareText,
+  PowerOff,
+  Rocket,
+  Undo2,
+  Workflow as WorkflowIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -24,6 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { zGenerateWorkflowRequest } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
+  deactivateWorkflow,
   deleteWorkflow,
   discardWorkflowChanges,
   getAgentSkill,
@@ -72,7 +80,9 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * Editing a published workflow moves it to `modified` — runs keep using the
  * last published version — so the status bar then also offers "Discard
  * changes", which restores that version and returns the workflow to
- * `published`.
+ * `published`. A `published`/`modified` workflow can also be "Deactivated"
+ * back to `draft`, revoking `requester` execute access until it is published
+ * again.
  */
 export default function EditWorkflowPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -83,11 +93,13 @@ export default function EditWorkflowPage() {
   const [skillName, setSkillName] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
   const save = useAsyncAction({ showDone: false });
   const publish = useAsyncAction({ showDone: false });
   const discard = useAsyncAction({ showDone: false });
+  const deactivate = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -181,6 +193,19 @@ export default function EditWorkflowPage() {
     }
   }
 
+  async function handleDeactivate() {
+    setConfirmDeactivateOpen(false);
+    try {
+      await deactivate.run(async () => {
+        const deactivated = await deactivateWorkflow(workflowId);
+        applyWorkflow(deactivated);
+        dispatch(showToast({ message: "Workflow deactivated" }));
+      });
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
+    }
+  }
+
   async function handleOpenPlanning() {
     try {
       const ps = await getWorkflowPlanningSession(workflowId);
@@ -217,6 +242,8 @@ export default function EditWorkflowPage() {
     );
   }
 
+  const canDeactivate = workflow.status === "published" || workflow.status === "modified";
+
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
@@ -248,7 +275,10 @@ export default function EditWorkflowPage() {
             // the same travelling light the chat bubbles do. Gated on the
             // 200ms `pending` stage rather than `inFlight` so a fast rejection
             // (409 with no task templates) never flashes it.
-            publish.status === "pending" || discard.status === "pending" || generating
+            publish.status === "pending" ||
+            discard.status === "pending" ||
+            deactivate.status === "pending" ||
+            generating
               ? "live-edge"
               : "",
           ]
@@ -264,6 +294,15 @@ export default function EditWorkflowPage() {
                 onClick={() => setConfirmDiscardOpen(true)}
                 disabled={discard.inFlight}
                 spinning={discard.inFlight}
+              />
+            )}
+            {canDeactivate && (
+              <ActionIconButton
+                icon={PowerOff}
+                label="Deactivate"
+                onClick={() => setConfirmDeactivateOpen(true)}
+                disabled={deactivate.inFlight}
+                spinning={deactivate.inFlight}
               />
             )}
             <ActionIconButton
@@ -361,6 +400,14 @@ export default function EditWorkflowPage() {
         confirmLabel="Discard"
         onConfirm={handleDiscard}
         onCancel={() => setConfirmDiscardOpen(false)}
+      />
+      <ConfirmDialog
+        open={confirmDeactivateOpen}
+        title="Deactivate Workflow"
+        description="Return this workflow to draft? Only developers will be able to run it for testing until it's published again."
+        confirmLabel="Deactivate"
+        onConfirm={handleDeactivate}
+        onCancel={() => setConfirmDeactivateOpen(false)}
       />
     </AdminPageContainer>
   );
