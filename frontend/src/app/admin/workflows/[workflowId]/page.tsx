@@ -229,6 +229,7 @@ export default function EditWorkflowPage() {
               onClick={handlePublish}
               disabled={generating || publish.inFlight}
               spinning={publish.inFlight}
+              spinAnimation="rocket-launch"
             />
           </div>
           {workflow.status === "failed" && workflow.generationError && (

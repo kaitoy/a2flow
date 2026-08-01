@@ -17,8 +17,15 @@ interface ActionIconButtonProps {
   onClick?: () => void;
   /** When true, the button is disabled and does not respond to clicks. */
   disabled?: boolean;
-  /** When true, the icon spins (e.g. while an action is in flight). */
+  /** When true, the icon animates (e.g. while an action is in flight). */
   spinning?: boolean;
+  /**
+   * Animation played while `spinning` is true. `"spin"` (default) rotates the
+   * icon continuously; `"rocket-launch"` stretches/squashes it along its own
+   * diagonal heading instead, for icons (like the publish rocket) whose
+   * orientation is meaningful and shouldn't rotate.
+   */
+  spinAnimation?: "spin" | "rocket-launch";
 }
 
 /**
@@ -36,6 +43,7 @@ export function ActionIconButton({
   onClick,
   disabled,
   spinning,
+  spinAnimation = "spin",
 }: ActionIconButtonProps) {
   const className = [
     "glass-panel flex size-8 shrink-0 items-center justify-center rounded-lg",
@@ -47,9 +55,12 @@ export function ActionIconButton({
     "disabled:hover:translate-y-0 disabled:hover:border-[var(--color-glass-border)] disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",
   ].join(" ");
 
-  const iconEl = (
-    <Icon aria-hidden="true" className={spinning ? "size-4 motion-safe:animate-spin" : "size-4"} />
-  );
+  const spinningClassName =
+    spinAnimation === "rocket-launch"
+      ? "size-4 motion-safe:animate-rocket-launch"
+      : "size-4 motion-safe:animate-spin";
+
+  const iconEl = <Icon aria-hidden="true" className={spinning ? spinningClassName : "size-4"} />;
 
   return (
     <Tooltip label={label}>

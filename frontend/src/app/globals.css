@@ -92,6 +92,7 @@
   --animate-spin-occasional: spin-occasional 8s ease-in-out infinite;
   --animate-wiggle: wiggle 0.7s ease-in-out;
   --animate-attention: attention 3s ease-in-out infinite;
+  --animate-rocket-launch: rocket-launch 0.9s ease-in-out infinite;
 
   /* Motion tokens (durations & Material You "emphasized" easing). */
   --motion-duration-fast: 150ms;
@@ -454,6 +455,20 @@ body::after {
   }
   80% {
     transform: rotate(3deg);
+  }
+}
+
+/* Rocket launch pulse — stretches/squashes along the rocket's own diagonal
+   heading (up-right) instead of rotating, so it reads as thrust rather than
+   a spinner. The paired rotate(-45deg)/rotate(45deg) wrap re-aims scale's
+   axes onto that diagonal without leaving a net rotation. */
+@keyframes rocket-launch {
+  0%,
+  100% {
+    transform: rotate(-45deg) scale(1, 1) rotate(45deg);
+  }
+  50% {
+    transform: rotate(-45deg) scale(1.35, 0.8) rotate(45deg);
   }
 }
 
