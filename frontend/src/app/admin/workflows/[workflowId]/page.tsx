@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
@@ -15,6 +16,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -198,22 +200,48 @@ export default function EditWorkflowPage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />}
+        header={
+          <AdminPageHeader
+            title="Edit Workflow"
+            icon={WorkflowIcon}
+            secondaryAction={
+              <HeaderIconButton
+                label="Open planning session"
+                onClick={handleOpenPlanning}
+                disabled={generating}
+              >
+                <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
+              </HeaderIconButton>
+            }
+          />
+        }
         aside={audit && <AuditMeta {...audit} />}
       >
+        <section
+          aria-label="Workflow status"
+          className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4"
+        >
+          <StatusLine workflow={workflow} />
+          <div className="ml-auto">
+            <ActionIconButton
+              icon={Rocket}
+              label="Publish"
+              onClick={handlePublish}
+              disabled={generating || publish.inFlight}
+              spinning={publish.inFlight}
+            />
+          </div>
+          {workflow.status === "failed" && workflow.generationError && (
+            <p className="w-full break-words font-mono text-error text-xs">
+              {workflow.generationError}
+            </p>
+          )}
+        </section>
+
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="status" label="Status">
-            <div className="flex items-center gap-4 py-1.5">
-              <StatusLine workflow={workflow} />
-              {workflow.status === "failed" && workflow.generationError && (
-                <span className="text-sm text-error">{workflow.generationError}</span>
-              )}
-            </div>
-          </FormField>
-
           <FormField htmlFor="agentSkill" label="Agent Skill">
             <div className="py-1.5">
               <Link
@@ -247,26 +275,6 @@ export default function EditWorkflowPage() {
               pendingLabel="Saving…"
             >
               Save
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleOpenPlanning}
-              disabled={generating}
-            >
-              <MessageSquareText size={16} strokeWidth={1.8} aria-hidden="true" />
-              Open planning session
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handlePublish}
-              disabled={generating || publish.inFlight}
-              status={publish.status}
-              pendingLabel="Publishing…"
-            >
-              <Rocket size={16} strokeWidth={1.8} aria-hidden="true" />
-              Publish
             </Button>
             <Button
               type="button"
