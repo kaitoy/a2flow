@@ -36,7 +36,18 @@ describe("DetailList", () => {
       </DetailList>
     );
 
-    expect(container.querySelector("dl")?.className).toBe("grid grid-cols-1 sm:grid-cols-2 gap-4");
+    expect(container.querySelector("dl")?.className).toBe("grid grid-cols-1 @xl:grid-cols-2 gap-4");
+  });
+
+  it("wraps the list in a query container so the column count follows its own width", () => {
+    const { container } = render(
+      <DetailList className="glass-panel p-4">
+        <DetailItem label="Username" value="alice" />
+      </DetailList>
+    );
+
+    const wrapper = container.querySelector("dl")?.parentElement;
+    expect(wrapper).toHaveClass("@container");
   });
 
   it("accepts a node as the item value", () => {

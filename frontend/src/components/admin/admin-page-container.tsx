@@ -10,9 +10,9 @@ interface AdminPageContainerProps {
  * screens alike. Keeping the same max-width and horizontal centering across
  * all of them means breadcrumbs and page titles sit at the same x-position
  * everywhere, so they don't shift when navigating between a wide list page
- * and a narrower detail form. Detail/create pages that need a narrower,
- * centered form card should nest a `FormColumn` inside this container
- * instead of narrowing the container itself.
+ * and a narrower detail form. Pages that hold a form nest a column component
+ * inside this container instead of narrowing the container itself: create
+ * pages use `FormColumn`, detail/edit pages use `FormLayout`.
  */
 export function AdminPageContainer({ children }: AdminPageContainerProps) {
   return <div className="mx-auto max-w-6xl p-4 sm:p-8">{children}</div>;

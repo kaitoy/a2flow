@@ -2,7 +2,7 @@ import { Building2 } from "lucide-react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { FormColumn } from "@/components/admin/form-column";
+import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 
 /** Route-transition fallback for the edit-tenant page, matching its own post-mount `FormSkeleton`. */
@@ -16,10 +16,9 @@ export default function Loading() {
           { label: "Edit" },
         ]}
       />
-      <AdminPageHeader title="Edit Tenant" icon={Building2} />
-      <FormColumn>
+      <FormLayout header={<AdminPageHeader title="Edit Tenant" icon={Building2} />}>
         <FormSkeleton fields={3} />
-      </FormColumn>
+      </FormLayout>
     </AdminPageContainer>
   );
 }

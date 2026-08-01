@@ -11,8 +11,8 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
+import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { McpToolPicker } from "@/components/admin/mcp-tool-picker";
 import { Button } from "@/components/ui/button";
@@ -155,10 +155,9 @@ export default function EditWorkflowTaskTemplatePage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <AdminPageHeader title="Edit Task Template" icon={ListTree} />
-        <FormColumn>
+        <FormLayout header={<AdminPageHeader title="Edit Task Template" icon={ListTree} />}>
           <FormSkeleton fields={5} />
-        </FormColumn>
+        </FormLayout>
       </AdminPageContainer>
     );
   }
@@ -166,9 +165,10 @@ export default function EditWorkflowTaskTemplatePage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="Edit Task Template" icon={ListTree} />
-
-      <FormColumn>
+      <FormLayout
+        header={<AdminPageHeader title="Edit Task Template" icon={ListTree} />}
+        aside={audit && <AuditMeta {...audit} />}
+      >
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
@@ -248,12 +248,7 @@ export default function EditWorkflowTaskTemplatePage() {
             </Button>
           </div>
         </form>
-        {audit && (
-          <div className="mt-4">
-            <AuditMeta {...audit} />
-          </div>
-        )}
-      </FormColumn>
+      </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Task Template"

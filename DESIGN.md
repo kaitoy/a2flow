@@ -167,12 +167,21 @@ Headings keep **tight letter-spacing** (`tracking-tight`) to lean into the futur
 
 ## Layout & Spacing
 
-The app keeps the **Fixed Sidebar + Fluid Content** model. Sidebars are 256px wide and rendered as glass panels. Main content panels are centered with a max-width (`max-w-3xl` for chat, `max-w-6xl` for admin lists, `max-w-2xl` for forms) so glass panels feel like floating cards over the gradient canvas.
+The app keeps the **Fixed Sidebar + Fluid Content** model. Sidebars are 256px wide and rendered as glass panels. Main content panels are centered with a max-width (`max-w-3xl` for chat, `max-w-6xl` for admin lists, `max-w-2xl` for forms) so glass panels feel like floating cards over the gradient canvas. The one form that grows past `max-w-2xl` is an admin edit form once it has earned a second column — see below.
 
 The 8px base spacing unit is preserved. Padding inside glass cards is 24px (`p-6`).
 
+### Admin form pages
+
+Admin create pages nest a `FormColumn` (`max-w-2xl`, centered) inside `AdminPageContainer`, so the form reads as a narrow floating card while the breadcrumb and title above it stay flush left at the page's full width.
+
+Admin **edit** pages nest a `FormLayout` instead. It stacks exactly like `FormColumn` while cramped, then splits into a fluid main column plus a fixed **16rem** trailing column once it has `@4xl` (56rem) of room. The trailing column carries read-only record metadata (`AuditMeta`) that would otherwise push the form's actions off screen. Its 16rem matches the `sidebar-width` token, and the 24px gutter is the standard `gutter`.
+
+The page header goes *inside* `FormLayout`'s main column rather than above it. Its right-hand action cluster then lines up with the form's right edge instead of the page's, so a page-level action (the Edit Agent Skill page's "Generate Workflow", say) reads as belonging to the form rather than to the metadata column.
+
 ### Responsive & touch
 
+- **Container queries** — the admin shell reserves a 256px sidebar, so viewport width overstates how much room a page actually has. Anything that reflows because *the content area* got wider (`FormLayout`'s second column, `DetailList`'s second column) uses `@container` + an `@`-prefixed variant rather than a viewport breakpoint, and the component renders its own `@container` wrapper so it behaves correctly wherever it is dropped. Viewport breakpoints stay for shell-level and device-level decisions.
 - **Breakpoint** — `md` (768px) is the shell breakpoint: below it every fixed sidebar hides (`max-md:hidden`) and is reachable instead through a hamburger button in the `AppHeader` that opens the same sidebar component inside the shared `SidebarDrawer` (an off-canvas panel over a dimmed scrim, dismissed by scrim tap or Escape, with the modal focus wiring from `useDialogA11y`). Never build a page-specific drawer — pass the sidebar into `SidebarDrawer`.
 - **Viewport height** — full-screen shells use `h-dvh`/`min-h-dvh`, never `h-screen` (100vh), so mobile URL bars don't clip the bottom of the layout. The chat input pads its bottom with `env(safe-area-inset-bottom)`.
 - **Touch (`pointer-coarse:`)** — hover-revealed controls must also be reachable on touch: make them always visible under `pointer-coarse:` (see the session delete button). Icon buttons grow to ~44px hit targets under `pointer-coarse:`. Form fields render at 16px below `sm` so iOS Safari doesn't auto-zoom on focus. In the chat input, Enter inserts a newline on coarse pointers (sending is the Send button's job there).

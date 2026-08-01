@@ -11,8 +11,8 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
+import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -122,10 +122,9 @@ export default function EditTenantPage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <AdminPageHeader title="Edit Tenant" icon={Building2} />
-        <FormColumn>
+        <FormLayout header={<AdminPageHeader title="Edit Tenant" icon={Building2} />}>
           <FormSkeleton fields={3} />
-        </FormColumn>
+        </FormLayout>
       </AdminPageContainer>
     );
   }
@@ -133,9 +132,10 @@ export default function EditTenantPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="Edit Tenant" icon={Building2} />
-
-      <FormColumn>
+      <FormLayout
+        header={<AdminPageHeader title="Edit Tenant" icon={Building2} />}
+        aside={audit && <AuditMeta {...audit} />}
+      >
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
@@ -173,12 +173,7 @@ export default function EditTenantPage() {
             </Button>
           </div>
         </form>
-        {audit && (
-          <div className="mt-4">
-            <AuditMeta {...audit} />
-          </div>
-        )}
-      </FormColumn>
+      </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Tenant"

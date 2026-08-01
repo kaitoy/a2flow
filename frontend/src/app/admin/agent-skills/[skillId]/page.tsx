@@ -18,7 +18,7 @@ import {
 } from "@/components/admin/agent-skill-fields";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { FormColumn } from "@/components/admin/form-column";
+import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { GenerateWorkflowDialog } from "@/components/admin/generate-workflow-dialog";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
@@ -208,10 +208,9 @@ export default function EditAgentSkillPage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <AdminPageHeader title="Edit Agent Skill" icon={Wand2} />
-        <FormColumn>
+        <FormLayout header={<AdminPageHeader title="Edit Agent Skill" icon={Wand2} />}>
           <FormSkeleton fields={4} />
-        </FormColumn>
+        </FormLayout>
       </AdminPageContainer>
     );
   }
@@ -219,25 +218,28 @@ export default function EditAgentSkillPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader
-        title="Edit Agent Skill"
-        icon={Wand2}
-        secondaryAction={
-          canEdit ? (
-            <HeaderIconButton
-              label="Generate Workflow"
-              onClick={handleGenerateClick}
-              // A skill can only back a planning run once its clone has
-              // published a revision.
-              disabled={sync?.status !== "ready"}
-            >
-              <Sparkles size={18} strokeWidth={1.8} aria-hidden="true" />
-            </HeaderIconButton>
-          ) : undefined
+      <FormLayout
+        header={
+          <AdminPageHeader
+            title="Edit Agent Skill"
+            icon={Wand2}
+            secondaryAction={
+              canEdit ? (
+                <HeaderIconButton
+                  label="Generate Workflow"
+                  onClick={handleGenerateClick}
+                  // A skill can only back a planning run once its clone has
+                  // published a revision.
+                  disabled={sync?.status !== "ready"}
+                >
+                  <Sparkles size={18} strokeWidth={1.8} aria-hidden="true" />
+                </HeaderIconButton>
+              ) : undefined
+            }
+          />
         }
-      />
-
-      <FormColumn>
+        aside={audit && <AuditMeta {...audit} />}
+      >
         {sync && (
           <section
             aria-label="Repository sync"
@@ -303,13 +305,7 @@ export default function EditAgentSkillPage() {
             )}
           </div>
         </form>
-
-        {audit && (
-          <div className="mt-4">
-            <AuditMeta {...audit} />
-          </div>
-        )}
-      </FormColumn>
+      </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Agent Skill"

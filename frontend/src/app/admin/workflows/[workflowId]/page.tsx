@@ -12,8 +12,8 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
+import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -187,10 +187,9 @@ export default function EditWorkflowPage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />
-        <FormColumn>
+        <FormLayout header={<AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />}>
           <FormSkeleton fields={4} />
-        </FormColumn>
+        </FormLayout>
       </AdminPageContainer>
     );
   }
@@ -198,9 +197,10 @@ export default function EditWorkflowPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />
-
-      <FormColumn>
+      <FormLayout
+        header={<AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />}
+        aside={audit && <AuditMeta {...audit} />}
+      >
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
@@ -291,13 +291,7 @@ export default function EditWorkflowPage() {
             Manage templates
           </Link>
         </div>
-
-        {audit && (
-          <div className="mt-4">
-            <AuditMeta {...audit} />
-          </div>
-        )}
-      </FormColumn>
+      </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Workflow"

@@ -10,7 +10,7 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { FormColumn } from "@/components/admin/form-column";
+import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import {
   buildSecretFormSchema,
@@ -117,10 +117,9 @@ export default function EditSecretPage() {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <AdminPageHeader title="Edit Secret" icon={KeyRound} />
-        <FormColumn>
+        <FormLayout header={<AdminPageHeader title="Edit Secret" icon={KeyRound} />}>
           <FormSkeleton fields={3} />
-        </FormColumn>
+        </FormLayout>
       </AdminPageContainer>
     );
   }
@@ -128,9 +127,10 @@ export default function EditSecretPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="Edit Secret" icon={KeyRound} />
-
-      <FormColumn>
+      <FormLayout
+        header={<AdminPageHeader title="Edit Secret" icon={KeyRound} />}
+        aside={audit && <AuditMeta {...audit} />}
+      >
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
@@ -155,12 +155,7 @@ export default function EditSecretPage() {
             </Button>
           </div>
         </form>
-        {audit && (
-          <div className="mt-4">
-            <AuditMeta {...audit} />
-          </div>
-        )}
-      </FormColumn>
+      </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Secret"
