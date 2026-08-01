@@ -144,4 +144,22 @@ describe("EditWorkflowPage", () => {
 
     await waitFor(() => expect(receivedBody).toEqual({ name: "Renamed", description: null }));
   });
+
+  it("cancels back to the workflow list", async () => {
+    const user = userEvent.setup();
+    const pushMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+      forward: vi.fn(),
+    });
+
+    render(<EditWorkflowPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows"));
+  });
 });

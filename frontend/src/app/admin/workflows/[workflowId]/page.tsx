@@ -276,6 +276,9 @@ export default function EditWorkflowPage() {
             >
               Save
             </Button>
+            <Button type="button" variant="ghost" onClick={() => router.push("/admin/workflows")}>
+              Cancel
+            </Button>
             <Button
               type="button"
               variant="danger"
