@@ -65,10 +65,23 @@ function StatusCell({ workflow }: { workflow: Workflow }) {
 
 /** Per-role capabilities driving which row actions the table renders. */
 interface WorkflowPermissions {
-  /** True when the viewer may execute workflows (`requester`). */
+  /** True when the viewer may execute workflows (`requester` or `developer`). */
   canRun: boolean;
   /** True when the viewer may create, edit, and delete workflows (`developer`). */
   canEdit: boolean;
+}
+
+/**
+ * True when `w` is runnable by a viewer holding `permissions`.
+ *
+ * Mirrors the backend's rule (`WorkflowService.execute`): `published`
+ * workflows are runnable by anyone with the Run action at all, while `draft`
+ * workflows are runnable only by someone who can also edit workflows
+ * (`developer`, or `super_admin` via `canEdit`'s bypass) — pre-publish
+ * testing.
+ */
+function canExecute(w: Workflow, permissions: WorkflowPermissions): boolean {
+  return w.status === "published" || (w.status === "draft" && permissions.canEdit);
 }
 
 function buildColumns(
@@ -143,9 +156,10 @@ function buildColumns(
               icon={runningId === w.id ? Loader2 : Play}
               label="Run"
               onClick={() => onRun(w.id)}
-              // Only published workflows are executable; drafts are still
-              // being planned or awaiting review.
-              disabled={runningId !== null || w.status !== "published"}
+              // Published workflows are executable by anyone with Run access;
+              // drafts are executable only by someone who can also edit
+              // workflows (developer/super_admin), for pre-publish testing.
+              disabled={runningId !== null || !canExecute(w, permissions)}
               spinning={runningId === w.id}
             />
           )}
@@ -158,7 +172,7 @@ function buildColumns(
 
 export default function WorkflowsPage() {
   const router = useRouter();
-  const canRun = useHasRole(Role.REQUESTER);
+  const canRun = useHasRole(Role.REQUESTER, Role.DEVELOPER);
   const canEdit = useHasRole(Role.DEVELOPER);
   const {
     rows,

@@ -475,10 +475,19 @@ async def test_execute_workflow_unknown_id_returns_404(
 async def test_execute_unpublished_workflow_returns_409(
     workflow_client: AsyncClient,
 ) -> None:
+    """A plain ``requester`` cannot run a ``draft`` workflow.
+
+    ``developer``/``super_admin`` callers can (see
+    ``test_authz.py::test_execute_draft_workflow_allowed_for_developer``), so
+    this test pins the caller to ``requester`` to isolate the status check.
+    """
     skill = await create_skill(workflow_client)
     wf = await generate_workflow(workflow_client, skill["id"])
     await add_template(workflow_client, wf["id"])
-    response = await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute")
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute",
+        headers={"X-User-Roles": "requester"},
+    )
     err = assert_err(response, code="WORKFLOW_NOT_RUNNABLE", status=409)
     assert err["details"]["workflowId"] == wf["id"]
 

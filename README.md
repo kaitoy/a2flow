@@ -116,8 +116,8 @@ Every user holds a set of **roles** granting the operations they may perform. Ro
 |---|---|
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the designated-approver checks described under [Human approval](#human-approval)) |
 | `admin` | User CRUD, secrets CRUD |
-| `developer` | MCP server CRUD, agent-skill CRUD, workflow generation/editing/publishing, task-template CRUD, planning-session chat |
-| `requester` | Running workflows (`POST /workflows/{id}/execute`) |
+| `developer` | MCP server CRUD, agent-skill CRUD, workflow generation/editing/publishing, task-template CRUD, planning-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
+| `requester` | Running **published** workflows (`POST /workflows/{id}/execute`) |
 | `approver` | Eligibility to be a workflow approval's designated approver, and resolving their own approvals |
 
 **Reads stay open.** Only writes, workflow execution, and approvals are role-gated; every authenticated user may `GET` the collections (the UI needs them to resolve names, pick approvers, and list workflows). Secret *values* are never returned by the API regardless of role. Roles are assigned from the [Users](#users) admin page; only a Super Admin may grant or revoke `super_admin`. A rejected request returns HTTP 403 (`FORBIDDEN`), and the admin UI hides the actions and nav entries a user's roles do not allow.
@@ -344,9 +344,9 @@ Templates mirror session tasks structurally — title, description, `position`, 
 
 #### Running a workflow
 
-Clicking **Run** on a **published** workflow creates a **WorkflowSession** — an independent entity that captures a snapshot of the workflow configuration at execution time:
+Clicking **Run** on a **published** workflow — or, for a `developer`/`super_admin` caller, a **draft** one too, for pre-publish testing — creates a **WorkflowSession** — an independent entity that captures a snapshot of the workflow configuration at execution time:
 
-1. The backend rejects non-`published` workflows with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`) and re-checks the skill's published revision (`SKILL_NOT_READY` otherwise) — the repository was cloned when the skill was registered, so **nothing is cloned here**.
+1. The backend rejects a non-`published`, non-`draft` workflow outright, and rejects a `draft` workflow for any caller who isn't `developer`/`super_admin`, with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`); it also re-checks the skill's published revision (`SKILL_NOT_READY` otherwise) — the repository was cloned when the skill was registered, so **nothing is cloned here**.
 2. A `WorkflowSession` record is persisted, capturing the workflow name, its summarized description, skill details, the ADK session ID, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). The workflow's task templates are **copied into the session as `pending` WorkflowTasks** (dependency edges and tool bindings included, ids remapped), so later template edits never affect this run. The ADK session itself is created lazily on the first agent call.
 3. The backend returns the `WorkflowSession` (HTTP 201). The frontend redirects to `/workflow-sessions/{workflowSession.id}`.
 4. On mount, the `/workflow-sessions/{id}` page fetches the `WorkflowSession`, and if no prior messages exist it auto-sends a fixed kickoff message via `POST /workflow-sessions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](#welcome-page).

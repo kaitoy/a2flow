@@ -25,8 +25,12 @@ _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 class WorkflowStatus(StrEnum):
     """Lifecycle states a Workflow can occupy.
 
-    Only ``published`` workflows may be executed; every other state rejects
-    ``POST /workflows/{id}/execute`` with ``WORKFLOW_NOT_RUNNABLE``.
+    ``published`` workflows may be executed by any caller holding the
+    ``requester`` or ``developer`` role; ``draft`` workflows may additionally
+    be executed, but only by a ``developer`` (or ``super_admin``), for
+    pre-publish testing. Every other combination rejects
+    ``POST /workflows/{id}/execute`` with ``WORKFLOW_NOT_RUNNABLE`` — see
+    :meth:`services.workflow.WorkflowService.execute`.
     """
 
     generating = "generating"

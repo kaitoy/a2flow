@@ -97,7 +97,8 @@ describe("WorkflowsPage", () => {
     );
   });
 
-  it("disables Run for a workflow that is not published", async () => {
+  /** Serve a single `draft`-status workflow row for the draft-execution tests below. */
+  function mockDraftWorkflowRow() {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows", () =>
         envelope([
@@ -117,13 +118,24 @@ describe("WorkflowsPage", () => {
         ])
       )
     );
-    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
+  }
+
+  it("disables Run for a requester on a workflow that is not published", async () => {
+    mockDraftWorkflowRow();
+    render(<WorkflowsPage />, { preloadedState: authState(["requester"]) });
     await waitFor(() => screen.getByText("my-workflow"));
     expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
   });
 
-  it("hides the Run button from a user without the requester role", async () => {
+  it("enables Run for a developer on a draft workflow, for pre-publish testing", async () => {
+    mockDraftWorkflowRow();
     render(<WorkflowsPage />, { preloadedState: authState(["developer"]) });
+    await waitFor(() => screen.getByText("my-workflow"));
+    expect(screen.getByRole("button", { name: "Run" })).not.toBeDisabled();
+  });
+
+  it("hides the Run button from a user without the requester or developer role", async () => {
+    render(<WorkflowsPage />, { preloadedState: authState(["approver"]) });
     await waitFor(() => screen.getByText("my-workflow"));
     expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument();
   });

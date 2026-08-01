@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends
 
 from dependencies import (
     ApiMetaDep,
+    CurrentUserDep,
     CurrentUserIdDep,
     FilterDep,
     PaginationDep,
@@ -34,8 +35,11 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 #: Route dependency gating workflow writes behind the ``developer`` role.
 _requires_developer = [Depends(require_roles(Role.developer))]
 
-#: Route dependency gating workflow execution behind the ``requester`` role.
-_requires_requester = [Depends(require_roles(Role.requester))]
+#: Route dependency gating workflow execution behind the ``requester`` or
+#: ``developer`` role. ``developer`` (and, via the ``super_admin`` bypass,
+#: ``super_admin``) additionally unlocks executing ``draft`` workflows — see
+#: ``WorkflowService.execute``.
+_requires_execute = [Depends(require_roles(Role.requester, Role.developer))]
 
 
 @router.get("", response_model=ApiResponse[list[Workflow]])
@@ -166,19 +170,22 @@ async def publish_workflow(
     "/{workflow_id}/execute",
     response_model=ApiResponse[WorkflowSession],
     status_code=201,
-    dependencies=_requires_requester,
+    dependencies=_requires_execute,
 )
 async def execute_workflow(
     workflow_id: str,
     service: WorkflowServiceDep,
-    user_id: CurrentUserIdDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowSession]:
     """Create a WorkflowSession pre-filled with the workflow's task templates.
 
-    Only ``published`` workflows can be executed (HTTP 409
-    ``WORKFLOW_NOT_RUNNABLE`` otherwise). The ADK session is created lazily on
-    the first agent call, which starts executing immediately.
+    ``published`` workflows can be executed by any caller who reaches this
+    route. ``draft`` workflows can additionally be executed, but only by a
+    caller holding the ``developer`` role (or ``super_admin``), for
+    pre-publish testing (HTTP 409 ``WORKFLOW_NOT_RUNNABLE`` otherwise). The ADK
+    session is created lazily on the first agent call, which starts executing
+    immediately.
     """
-    ws = await service.execute(workflow_id, user_id=user_id)
+    ws = await service.execute(workflow_id, caller=caller)
     return ApiResponse(meta=meta, data=ws)

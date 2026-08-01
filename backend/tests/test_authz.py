@@ -13,7 +13,7 @@ from typing import Any
 from httpx import AsyncClient
 
 from tests._envelope import assert_err, assert_ok
-from tests._workflow import create_published_workflow
+from tests._workflow import add_template, create_published_workflow, generate_workflow
 
 _SKILL_BODY = {"name": "authz-skill", "repo_url": "https://github.com/x/y"}
 _SECRET_BODY = {
@@ -44,6 +44,18 @@ async def _create_workflow(client: AsyncClient) -> Any:
     return await create_published_workflow(
         client, skill["id"], name="authz-wf", prompt="do it"
     )
+
+
+async def _create_draft_workflow(client: AsyncClient) -> Any:
+    """Create a workflow with one task template, left ``draft`` (never published)."""
+    skill = assert_ok(
+        await client.post("/api/v1/agent-skills", json=_SKILL_BODY), status=201
+    )
+    wf = await generate_workflow(
+        client, skill["id"], name="authz-draft-wf", prompt="do it"
+    )
+    await add_template(client, wf["id"])
+    return wf
 
 
 # ---------- users: admin ----------
@@ -194,15 +206,15 @@ async def test_delete_workflow_requires_developer_role(
     assert_err(res, "FORBIDDEN", 403)
 
 
-# ---------- workflow execution: requester ----------
+# ---------- workflow execution: requester, developer ----------
 
 
-async def test_execute_workflow_requires_requester_role(
+async def test_execute_workflow_requires_requester_or_developer_role(
     workflow_client: AsyncClient,
 ) -> None:
     wf = await _create_workflow(workflow_client)
     res = await workflow_client.post(
-        f"/api/v1/workflows/{wf['id']}/execute", headers=_roles("developer")
+        f"/api/v1/workflows/{wf['id']}/execute", headers=_roles("approver")
     )
     assert_err(res, "FORBIDDEN", 403)
 
@@ -217,10 +229,54 @@ async def test_execute_workflow_allowed_for_requester(
     assert_ok(res, status=201)
 
 
+async def test_execute_workflow_allowed_for_developer(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute", headers=_roles("developer")
+    )
+    assert_ok(res, status=201)
+
+
 async def test_execute_workflow_allowed_for_super_admin(
     workflow_client: AsyncClient,
 ) -> None:
     wf = await _create_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute", headers=_roles("super_admin")
+    )
+    assert_ok(res, status=201)
+
+
+# ---------- draft workflow execution: developer, super_admin only ----------
+
+
+async def test_execute_draft_workflow_forbidden_for_requester(
+    workflow_client: AsyncClient,
+) -> None:
+    """A plain ``requester`` passes the route's role gate but still can't run a draft."""
+    wf = await _create_draft_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute", headers=_roles("requester")
+    )
+    assert_err(res, "WORKFLOW_NOT_RUNNABLE", 409)
+
+
+async def test_execute_draft_workflow_allowed_for_developer(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_draft_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute", headers=_roles("developer")
+    )
+    assert_ok(res, status=201)
+
+
+async def test_execute_draft_workflow_allowed_for_super_admin(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_draft_workflow(workflow_client)
     res = await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/execute", headers=_roles("super_admin")
     )

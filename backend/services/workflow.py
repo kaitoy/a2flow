@@ -10,6 +10,7 @@ not created here: they are born from the generation flow in
 import uuid
 from collections.abc import Sequence
 
+from models.user import Role, User, has_role
 from models.workflow import Workflow, WorkflowStatus, WorkflowUpdate
 from models.workflow_session import WorkflowSession, WorkflowSessionCreate
 from models.workflow_task import WorkflowTaskCreate, WorkflowTaskStatus
@@ -165,7 +166,7 @@ class WorkflowService:
         """
         await self._workflows.delete(workflow_id)
 
-    async def execute(self, workflow_id: str, *, user_id: str) -> WorkflowSession:
+    async def execute(self, workflow_id: str, *, caller: User) -> WorkflowSession:
         """Start a workflow run by creating a WorkflowSession with its tasks.
 
         Resolves the workflow and its skill, records a new WorkflowSession
@@ -174,7 +175,8 @@ class WorkflowService:
         WorkflowTasks (dependency edges and tool bindings included), so later
         template edits never affect this run. The ADK session is created
         lazily on the first agent call, which starts executing immediately —
-        the plan was approved by publishing the workflow.
+        the plan was approved by publishing the workflow (or, for a
+        ``developer``/``super_admin`` caller, is still being tested pre-publish).
 
         No cloning happens here: the skill's repository was published into the
         shared store when it was registered (and re-published by each pull), so
@@ -184,20 +186,28 @@ class WorkflowService:
 
         Args:
             workflow_id: Identifier of the workflow to execute.
-            user_id: ID of the user starting the run (empty falls back to
-                ``"user"``).
+            caller: The authenticated user starting the run. A ``draft``
+                workflow is only runnable when this user holds the
+                ``developer`` role (``super_admin`` bypasses via
+                :func:`~models.user.has_role`); a ``published`` workflow is
+                runnable by any caller who reached this route (role-gated to
+                ``requester``/``developer`` at the router).
 
         Returns:
             The created WorkflowSession.
 
         Raises:
             NotFoundError: If the workflow or its skill does not exist.
-            WorkflowNotRunnableError: If the workflow is not ``published`` or
-                has no task templates.
+            WorkflowNotRunnableError: If the workflow is not ``published``
+                (and, for a non-``developer`` caller, not ``draft`` either),
+                or has no task templates.
             SkillNotReadyError: If the skill has no published revision yet.
         """
         workflow = await self.get(workflow_id)
-        if workflow.status is not WorkflowStatus.published:
+        runnable = workflow.status is WorkflowStatus.published or (
+            workflow.status is WorkflowStatus.draft and has_role(caller, Role.developer)
+        )
+        if not runnable:
             raise WorkflowNotRunnableError(
                 workflow_id, "only published workflows can be executed"
             )
@@ -212,7 +222,7 @@ class WorkflowService:
         if not templates:
             raise WorkflowNotRunnableError(workflow_id, "it has no task templates")
 
-        user = user_id or "user"
+        user = caller.id or "user"
         session_id = str(uuid.uuid4())
 
         ws_create = WorkflowSessionCreate(

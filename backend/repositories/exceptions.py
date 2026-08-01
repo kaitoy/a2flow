@@ -130,9 +130,11 @@ class SkillNotReadyError(RepositoryError):
 class WorkflowNotRunnableError(RepositoryError):
     """Raised when a Workflow cannot be executed or published in its current state.
 
-    Executing requires a ``published`` workflow, and publishing requires at
-    least one task template — a workflow still ``generating``, left in
-    ``draft``/``failed``, or holding an empty plan has nothing runnable.
+    Executing requires a ``published`` workflow — or, for a caller holding the
+    ``developer`` or ``super_admin`` role, a ``draft`` workflow — and
+    publishing requires at least one task template. A workflow still
+    ``generating``, left in ``failed``, holding an empty plan, or a ``draft``
+    run attempted by a plain ``requester`` has nothing runnable.
 
     Carries the ``workflow_id`` and a human-readable ``reason`` so the HTTP
     layer can surface them in the error envelope's ``details`` block when
