@@ -130,11 +130,11 @@ class SkillNotReadyError(RepositoryError):
 class WorkflowNotRunnableError(RepositoryError):
     """Raised when a Workflow cannot be executed or published in its current state.
 
-    Executing requires a ``published`` workflow — or, for a caller holding the
-    ``developer`` or ``super_admin`` role, a ``draft`` workflow — and
-    publishing requires at least one task template. A workflow still
-    ``generating``, left in ``failed``, holding an empty plan, or a ``draft``
-    run attempted by a plain ``requester`` has nothing runnable.
+    Executing requires a ``published`` or ``modified`` workflow — or, for a
+    caller holding the ``developer`` or ``super_admin`` role, a ``draft``
+    workflow — and publishing requires at least one task template. A workflow
+    still ``generating``, left in ``failed``, holding an empty plan, or a
+    ``draft`` run attempted by a plain ``requester`` has nothing runnable.
 
     Carries the ``workflow_id`` and a human-readable ``reason`` so the HTTP
     layer can surface them in the error envelope's ``details`` block when
@@ -145,6 +145,23 @@ class WorkflowNotRunnableError(RepositoryError):
         self.workflow_id = workflow_id
         self.reason = reason
         super().__init__(f"Workflow {workflow_id!r} is not runnable: {reason}")
+
+
+class WorkflowNotModifiedError(RepositoryError):
+    """Raised when a Workflow has no unpublished changes to discard.
+
+    ``POST /workflows/{id}/discard-changes`` only makes sense for a workflow in
+    the ``modified`` state — one that was published and then edited, so a
+    published snapshot exists to restore. Any other status (including a
+    ``published`` workflow that is already in sync) has nothing to discard.
+
+    Carries the ``workflow_id`` so the HTTP layer can surface it in the error
+    envelope's ``details`` block when returning HTTP 409.
+    """
+
+    def __init__(self, workflow_id: str) -> None:
+        self.workflow_id = workflow_id
+        super().__init__(f"Workflow {workflow_id!r} has no unpublished changes")
 
 
 class RegistryUnavailableError(Exception):

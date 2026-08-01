@@ -26,6 +26,7 @@ from models.notification import NotificationCreate, NotificationType
 from models.planning_session import PlanningSessionCreate
 from models.secret import SecretCreate, SecretType
 from models.workflow import WorkflowCreate
+from models.workflow_published_version import dump_templates, snapshot_template
 from models.workflow_session import WorkflowSessionCreate
 from models.workflow_task import WorkflowTaskCreate
 from models.workflow_task_template import WorkflowTaskTemplateCreate
@@ -37,6 +38,7 @@ from repositories import (
     SqlNotificationRepository,
     SqlPlanningSessionRepository,
     SqlSecretRepository,
+    SqlWorkflowPublishedVersionRepository,
     SqlWorkflowRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
@@ -181,6 +183,15 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
         user_id="owner",
     )
     rows.workflow_task_template = template.id
+
+    versions = SqlWorkflowPublishedVersionRepository(db, tenant_id=tenant_id)
+    await versions.upsert(
+        workflow.id,
+        name=workflow.name,
+        description=None,
+        templates=dump_templates([snapshot_template(template)]),
+        user_id="owner",
+    )
 
     meta = SqlMessageMetaRepository(db, tenant_id=tenant_id)
     rows.message_meta_event_id = f"event-{suffix}"
@@ -329,6 +340,16 @@ async def test_planning_session_isolation(
         assert await repo_a.get_by_workflow_id(b.workflow) is None
         with pytest.raises(NotFoundError):
             await repo_a.delete(b.planning_session)
+
+
+async def test_workflow_published_version_isolation(
+    engine: AsyncEngine, seeded: tuple[_Rows, _Rows]
+) -> None:
+    a, b = seeded
+    async with AsyncSession(engine, expire_on_commit=False) as db:
+        repo_a = SqlWorkflowPublishedVersionRepository(db, tenant_id=TENANT_A)
+        assert await repo_a.get(b.workflow) is None
+        assert await repo_a.get(a.workflow) is not None
 
 
 async def test_workflow_task_template_isolation(

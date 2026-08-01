@@ -134,6 +134,31 @@ describe("WorkflowsPage", () => {
     expect(screen.getByRole("button", { name: "Run" })).not.toBeDisabled();
   });
 
+  it("enables Run for a requester on a modified workflow (its published version runs)", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows", () =>
+        envelope([
+          {
+            id: "wf-1",
+            tenantId: "tenant-1",
+            name: "my-workflow",
+            description: null,
+            agentSkillId: "skill-1",
+            status: "modified",
+            generationError: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+    render(<WorkflowsPage />, { preloadedState: authState(["requester"]) });
+    await waitFor(() => screen.getByText("my-workflow"));
+    expect(screen.getByRole("button", { name: "Run" })).not.toBeDisabled();
+  });
+
   it("hides the Run button from a user without the requester or developer role", async () => {
     render(<WorkflowsPage />, { preloadedState: authState(["approver"]) });
     await waitFor(() => screen.getByText("my-workflow"));

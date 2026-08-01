@@ -47,6 +47,7 @@ from repositories.exceptions import (
     UnauthorizedError,
     UniqueViolationError,
     UserValidationError,
+    WorkflowNotModifiedError,
     WorkflowNotRunnableError,
 )
 from routers import api_router
@@ -73,6 +74,7 @@ from routers.exception_handlers import (
     unique_violation_exception_handler,
     user_validation_exception_handler,
     validation_exception_handler,
+    workflow_not_modified_exception_handler,
     workflow_not_runnable_exception_handler,
 )
 from services.agent_skill_sync import sync_agent_skill
@@ -173,6 +175,9 @@ app.add_exception_handler(SkillCloneError, skill_clone_exception_handler)
 app.add_exception_handler(SkillNotReadyError, skill_not_ready_exception_handler)
 app.add_exception_handler(
     WorkflowNotRunnableError, workflow_not_runnable_exception_handler
+)
+app.add_exception_handler(
+    WorkflowNotModifiedError, workflow_not_modified_exception_handler
 )
 app.add_exception_handler(
     RegistryUnavailableError, registry_unavailable_exception_handler

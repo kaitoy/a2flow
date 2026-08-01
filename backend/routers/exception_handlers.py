@@ -35,6 +35,7 @@ from repositories.exceptions import (
     UnauthorizedError,
     UniqueViolationError,
     UserValidationError,
+    WorkflowNotModifiedError,
     WorkflowNotRunnableError,
 )
 
@@ -280,6 +281,20 @@ async def workflow_not_runnable_exception_handler(
         message=str(exc),
         status_code=409,
         details={"workflowId": exc.workflow_id, "reason": exc.reason},
+    )
+
+
+async def workflow_not_modified_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with WORKFLOW_NOT_MODIFIED code when there is nothing to discard."""
+    assert isinstance(exc, WorkflowNotModifiedError)
+    return _envelope_error(
+        request,
+        code="WORKFLOW_NOT_MODIFIED",
+        message=str(exc),
+        status_code=409,
+        details={"workflowId": exc.workflow_id},
     )
 
 

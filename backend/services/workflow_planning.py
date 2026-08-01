@@ -9,8 +9,10 @@ the chat endpoints use, so the prompt and the agent's reply land in the same
 ADK session the planning chat later reopens.
 
 ``WorkflowPlanningService.publish`` gates execution: it re-summarizes the
-planning conversation into the workflow's ``description`` and marks the
-workflow ``published``, the only status ``WorkflowService.execute`` accepts.
+planning conversation into the workflow's ``description``, freezes the current
+plan into a ``WorkflowPublishedVersion`` snapshot, and marks the workflow
+``published``. Later edits move it to ``modified`` and keep running against
+that snapshot until it is published again.
 """
 
 import logging
@@ -32,9 +34,12 @@ from infrastructure.summarizer import summarize_planning_transcript
 from models.notification import NotificationCreate, NotificationType
 from models.planning_session import PlanningSessionCreate
 from models.workflow import Workflow, WorkflowCreate, WorkflowStatus
+from models.workflow_published_version import dump_templates, snapshot_template
 from repositories import (
+    MAX_TASK_TEMPLATES,
     AgentSkillRepository,
     PlanningSessionRepository,
+    WorkflowPublishedVersionRepository,
     WorkflowRepository,
     WorkflowTaskTemplateRepository,
 )
@@ -64,6 +69,7 @@ class WorkflowPlanningService:
         skills: AgentSkillRepository,
         ps_repo: PlanningSessionRepository,
         templates: WorkflowTaskTemplateRepository,
+        versions: WorkflowPublishedVersionRepository,
         session_service: BaseSessionService,
         app_name: str,
         summarize: Summarizer = summarize_planning_transcript,
@@ -75,6 +81,8 @@ class WorkflowPlanningService:
             skills: Repository providing AgentSkill persistence.
             ps_repo: Repository providing PlanningSession persistence.
             templates: Repository providing WorkflowTaskTemplate persistence.
+            versions: Repository storing the published-plan snapshot written by
+                :meth:`publish`.
             session_service: ADK session store, read to build the planning
                 transcript at publish time.
             app_name: ADK application name keying sessions in the store.
@@ -85,6 +93,7 @@ class WorkflowPlanningService:
         self._skills = skills
         self._ps_repo = ps_repo
         self._templates = templates
+        self._versions = versions
         self._session_service = session_service
         self._app_name = app_name
         self._summarize = summarize
@@ -155,6 +164,12 @@ class WorkflowPlanningService:
         agent always receives the latest intent; a summarization failure keeps
         the previous description rather than blocking the publish.
 
+        The workflow's name, resulting description, and full task-template list
+        are then frozen into its ``WorkflowPublishedVersion`` snapshot,
+        replacing the previous one. Runs started while the workflow is
+        ``modified`` use that snapshot instead of the live templates, so a
+        published plan keeps executing exactly as it was approved.
+
         Args:
             workflow_id: Identifier of the workflow to publish.
             user_id: ID of the user publishing the workflow.
@@ -174,8 +189,13 @@ class WorkflowPlanningService:
             raise WorkflowNotRunnableError(
                 workflow_id, "plan generation is still in progress"
             )
+        # Capture before the commits below: each commit on the shared request
+        # session expires loaded instances, and a plain attribute read on an
+        # expired instance fails outside an explicit refresh.
+        name = workflow.name
+        previous_description = workflow.description
         templates = await self._templates.list(
-            limit=1, offset=0, workflow_id=workflow_id
+            limit=MAX_TASK_TEMPLATES, offset=0, workflow_id=workflow_id
         )
         if not templates:
             raise WorkflowNotRunnableError(workflow_id, "it has no task templates")
@@ -192,6 +212,17 @@ class WorkflowPlanningService:
                 workflow_id,
                 exc_info=True,
             )
+        await self._versions.upsert(
+            workflow_id,
+            name=name,
+            description=description
+            if description is not None
+            else previous_description,
+            templates=dump_templates(
+                [snapshot_template(t) for t in templates],
+            ),
+            user_id=user_id,
+        )
         return await self._workflows.set_status(
             workflow_id,
             WorkflowStatus.published,

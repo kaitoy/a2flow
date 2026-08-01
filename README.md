@@ -117,7 +117,7 @@ Every user holds a set of **roles** granting the operations they may perform. Ro
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the designated-approver checks described under [Human approval](#human-approval)) |
 | `admin` | User CRUD, secrets CRUD |
 | `developer` | MCP server CRUD, agent-skill CRUD, workflow generation/editing/publishing, task-template CRUD, planning-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
-| `requester` | Running **published** workflows (`POST /workflows/{id}/execute`) |
+| `requester` | Running **published** (and `modified`) workflows (`POST /workflows/{id}/execute`) |
 | `approver` | Eligibility to be a workflow approval's designated approver, and resolving their own approvals |
 
 **Reads stay open.** Only writes, workflow execution, and approvals are role-gated; every authenticated user may `GET` the collections (the UI needs them to resolve names, pick approvers, and list workflows). Secret *values* are never returned by the API regardless of role. Roles are assigned from the [Users](#users) admin page; only a Super Admin may grant or revoke `super_admin`. A rejected request returns HTTP 403 (`FORBIDDEN`), and the admin UI hides the actions and nav entries a user's roles do not allow.
@@ -311,11 +311,11 @@ Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/
 |-----------|------|
 | Generate a workflow from a skill | "Generate workflow" on [Agent Skills](#agent-skills) — the list's row action or the edit page header's icon button (both calling `POST /agent-skills/{id}/workflows`) |
 | List all workflows | `GET /admin/workflows` |
-| Edit a workflow / publish / open its planning session | `GET /admin/workflows/{id}` |
+| Edit a workflow / publish / discard changes / open its planning session | `GET /admin/workflows/{id}` |
 | Manage its task templates | `GET /admin/workflows/{id}/task-templates` |
 | Run a workflow | "Run" button in the list (calls `POST /workflows/{id}/execute`) |
 
-Each workflow record stores a name, a reference to an Agent Skill, a lifecycle **status** (`generating` / `draft` / `failed` / `published`), and a description that is **summarized from the planning conversation** at publish time and handed to the execution agent as run context. Workflows are persisted in `a2flow.db`; there is no bare `POST /workflows` — generation is the only way a workflow is born.
+Each workflow record stores a name, a reference to an Agent Skill, a lifecycle **status** (`generating` / `draft` / `failed` / `published` / `modified`), and a description that is **summarized from the planning conversation** at publish time and handed to the execution agent as run context. Workflows are persisted in `a2flow.db`; there is no bare `POST /workflows` — generation is the only way a workflow is born.
 
 #### Generating a workflow
 
@@ -340,14 +340,25 @@ Templates mirror session tasks structurally — title, description, `position`, 
 
 #### Publishing
 
-**Publish** (on the workflow detail page, `POST /workflows/{id}/publish`, developer-gated) is what makes a workflow executable. It requires at least one template (and no generation in flight) — otherwise HTTP 409 (`WORKFLOW_NOT_RUNNABLE`) — and **re-summarizes the planning conversation** into the workflow's description so the latest intent reaches future runs. Re-adjust → re-publish is allowed at any time; runs already started are unaffected because they copied the plan (below).
+**Publish** (on the workflow detail page, `POST /workflows/{id}/publish`, developer-gated) is what makes a workflow executable. It requires at least one template (and no generation in flight) — otherwise HTTP 409 (`WORKFLOW_NOT_RUNNABLE`) — and **re-summarizes the planning conversation** into the workflow's description so the latest intent reaches future runs. Publishing also **freezes the plan**: the workflow's name, description, and full template list (edges and tool bindings included) are captured as its published version, replacing the previous one. Re-adjust → re-publish is allowed at any time; runs already started are unaffected because they copied the plan (below).
+
+#### Editing a published workflow — `modified`
+
+Editing a workflow after it has been published does not silently change what runs. Saving the detail form, or adding / editing / deleting one of its **task templates**, moves the workflow to **`modified`**:
+
+- Runs keep using the **last published version** — its name, description, and templates — not the edits.
+- The workflow stays runnable by anyone who could run it while `published`; the Run button in the list is not gated differently.
+- **Publish** again to promote the edits into future runs.
+- **Discard changes** (the undo icon that appears in the detail page's status bar next to Publish, `POST /workflows/{id}/discard-changes`, developer-gated) throws the edits away instead: the task templates are rewritten from the published version — original template ids reused, so the dependency edges survive — the name and description are restored, and the workflow returns to `published`. Discarding a workflow that has no unpublished changes returns HTTP 409 (`WORKFLOW_NOT_MODIFIED`).
+
+Refining the plan through the **planning chat** is deliberately exempt: the planning agent's tools write templates directly and leave the status alone, since chatting about the plan is part of authoring it.
 
 #### Running a workflow
 
-Clicking **Run** on a **published** workflow — or, for a `developer`/`super_admin` caller, a **draft** one too, for pre-publish testing — creates a **WorkflowSession** — an independent entity that captures a snapshot of the workflow configuration at execution time:
+Clicking **Run** on a **published** or **modified** workflow — or, for a `developer`/`super_admin` caller, a **draft** one too, for pre-publish testing — creates a **WorkflowSession** — an independent entity that captures a snapshot of the workflow configuration at execution time:
 
-1. The backend rejects a non-`published`, non-`draft` workflow outright, and rejects a `draft` workflow for any caller who isn't `developer`/`super_admin`, with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`); it also re-checks the skill's published revision (`SKILL_NOT_READY` otherwise) — the repository was cloned when the skill was registered, so **nothing is cloned here**.
-2. A `WorkflowSession` record is persisted, capturing the workflow name, its summarized description, skill details, the ADK session ID, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). The workflow's task templates are **copied into the session as `pending` WorkflowTasks** (dependency edges and tool bindings included, ids remapped), so later template edits never affect this run. The ADK session itself is created lazily on the first agent call.
+1. The backend rejects any other status outright, and rejects a `draft` workflow for any caller who isn't `developer`/`super_admin`, with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`); it also re-checks the skill's published revision (`SKILL_NOT_READY` otherwise) — the repository was cloned when the skill was registered, so **nothing is cloned here**.
+2. A `WorkflowSession` record is persisted, capturing the workflow name, its summarized description, skill details, the ADK session ID, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). The workflow's task templates are **copied into the session as `pending` WorkflowTasks** (dependency edges and tool bindings included, ids remapped), so later template edits never affect this run. For a `modified` workflow the name, description, and templates all come from its **last published version** rather than the edited rows. The ADK session itself is created lazily on the first agent call.
 3. The backend returns the `WorkflowSession` (HTTP 201). The frontend redirects to `/workflow-sessions/{workflowSession.id}`.
 4. On mount, the `/workflow-sessions/{id}` page fetches the `WorkflowSession`, and if no prior messages exist it auto-sends a fixed kickoff message via `POST /workflow-sessions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](#welcome-page).
 5. The `/workflow-sessions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id`, the pinned revision, **and the agent role**) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under an **execute-only** instruction — the plan was approved by publishing, so it **begins immediately**, with the workflow's description injected server-side as trusted run context.
@@ -366,7 +377,7 @@ WorkflowTasks can use tools from the MCP servers registered in the [MCP Servers]
 
 Bound tools appear as chips in the **Tools** column of the Task Templates and Workflow Tasks lists, and the template forms include an **MCP Tools** picker populated live from the registered servers (already-bound tools stay visible even if their server is unreachable).
 
-Workflow sessions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowSession` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains). Deleting a workflow **does** delete its planning session and task templates (cascade).
+Workflow sessions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowSession` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains). Deleting a workflow **does** delete its planning session, task templates, and published version (cascade).
 
 The individual tasks of a run are persisted as `WorkflowTask` records. Each task carries a status (`pending` / `in_progress` / `completed` / `failed` / `skipped`) and an integer `position` for stable layout ordering. See [backend/README.md](backend/README.md#workflow-tasks) for the API reference. Deleting a `WorkflowSession` cascades to its tasks.
 

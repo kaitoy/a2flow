@@ -9,6 +9,7 @@ from tests._workflow import (
     add_template,
     create_published_workflow,
     create_skill,
+    discard_workflow_changes,
     generate_workflow,
     publish_workflow,
 )
@@ -448,6 +449,231 @@ async def test_republish_after_adjustment_is_allowed(
     await add_template(workflow_client, wf["id"], title="Extra step")
     body = await publish_workflow(workflow_client, wf["id"])
     assert body["status"] == "published"
+
+
+# ---------- modified ----------
+
+
+async def test_patching_a_published_workflow_marks_it_modified(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    body = assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflows/{wf['id']}", json={"name": "Renamed"}
+        )
+    )
+    assert body["status"] == "modified"
+    assert body["name"] == "Renamed"
+
+
+async def test_patching_a_draft_workflow_leaves_it_draft(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    body = assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflows/{wf['id']}", json={"name": "Renamed"}
+        )
+    )
+    assert body["status"] == "draft"
+
+
+async def test_empty_patch_keeps_a_published_workflow_published(
+    workflow_client: AsyncClient,
+) -> None:
+    """A PATCH that sets no fields changes nothing, so nothing has drifted."""
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    body = assert_ok(
+        await workflow_client.patch(f"/api/v1/workflows/{wf['id']}", json={})
+    )
+    assert body["status"] == "published"
+
+
+async def test_modified_workflow_executes_its_published_version(
+    workflow_client: AsyncClient,
+) -> None:
+    """Edits made after publishing do not reach a new run."""
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    template = await add_template(workflow_client, wf["id"], title="Published step")
+    await publish_workflow(workflow_client, wf["id"])
+
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-task-templates/{template['id']}",
+            json={"title": "Edited step"},
+        )
+    )
+    await add_template(workflow_client, wf["id"], title="Brand new step")
+
+    ws = assert_ok(
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
+    )
+    tasks = assert_ok(
+        await workflow_client.get(
+            f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks"
+        )
+    )
+    assert [t["title"] for t in tasks] == ["Published step"]
+
+
+async def test_modified_workflow_run_snapshots_the_published_name(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflows/{wf['id']}",
+            json={"name": "Renamed", "description": "Edited description"},
+        )
+    )
+    ws = assert_ok(
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
+    )
+    assert ws["workflowName"] == "my-workflow"
+    assert ws["workflowDescription"] != "Edited description"
+
+
+async def test_republishing_promotes_the_edits_into_runs(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    template = await add_template(workflow_client, wf["id"], title="Published step")
+    await publish_workflow(workflow_client, wf["id"])
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-task-templates/{template['id']}",
+            json={"title": "Edited step"},
+        )
+    )
+    republished = await publish_workflow(workflow_client, wf["id"])
+    assert republished["status"] == "published"
+
+    ws = assert_ok(
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
+    )
+    tasks = assert_ok(
+        await workflow_client.get(
+            f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks"
+        )
+    )
+    assert [t["title"] for t in tasks] == ["Edited step"]
+
+
+async def test_requester_can_execute_a_modified_workflow(
+    workflow_client: AsyncClient,
+) -> None:
+    """``modified`` is still released: the last published version runs."""
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflows/{wf['id']}", json={"name": "Renamed"}
+        )
+    )
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute",
+        headers={"X-User-Roles": "requester"},
+    )
+    assert_ok(response, status=201)
+
+
+# ---------- discard changes ----------
+
+
+async def test_discard_changes_restores_the_published_plan(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    first = await add_template(workflow_client, wf["id"], title="First")
+    second = await add_template(
+        workflow_client, wf["id"], title="Second", depends_on_ids=[first["id"]]
+    )
+    await publish_workflow(workflow_client, wf["id"])
+
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-task-templates/{first['id']}", json={"title": "Edited"}
+        )
+    )
+    assert_ok(
+        await workflow_client.delete(f"/api/v1/workflow-task-templates/{second['id']}")
+    )
+
+    body = await discard_workflow_changes(workflow_client, wf["id"])
+    assert body["status"] == "published"
+
+    templates = assert_ok(
+        await workflow_client.get(f"/api/v1/workflows/{wf['id']}/task-templates")
+    )
+    assert [t["title"] for t in templates] == ["First", "Second"]
+    # The original template ids are reused, so the restored edges resolve.
+    by_title = {t["title"]: t for t in templates}
+    assert by_title["First"]["id"] == first["id"]
+    assert by_title["Second"]["dependsOnIds"] == [first["id"]]
+
+
+async def test_discard_changes_restores_the_published_name_and_description(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    await add_template(workflow_client, wf["id"])
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflows/{wf['id']}", json={"description": "Approved"}
+        )
+    )
+    await publish_workflow(workflow_client, wf["id"])
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflows/{wf['id']}",
+            json={"name": "Renamed", "description": "Draft edit"},
+        )
+    )
+
+    body = await discard_workflow_changes(workflow_client, wf["id"])
+    assert body["name"] == "my-workflow"
+    assert body["description"] == "Approved"
+
+
+async def test_discard_changes_on_a_published_workflow_returns_409(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/discard-changes"
+    )
+    err = assert_err(response, code="WORKFLOW_NOT_MODIFIED", status=409)
+    assert err["details"]["workflowId"] == wf["id"]
+
+
+async def test_discard_changes_on_a_draft_workflow_returns_409(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/discard-changes"
+    )
+    assert_err(response, code="WORKFLOW_NOT_MODIFIED", status=409)
+
+
+async def test_discard_changes_unknown_id_returns_404(
+    workflow_client: AsyncClient,
+) -> None:
+    response = await workflow_client.post(
+        "/api/v1/workflows/nonexistent/discard-changes"
+    )
+    assert_err(response, code="NOT_FOUND", status=404)
 
 
 # ---------- execute ----------

@@ -9,7 +9,13 @@ operations live under ``/workflow-task-templates``.
 from httpx import AsyncClient
 
 from tests._envelope import assert_err, assert_ok
-from tests._workflow import add_template, create_skill, generate_workflow
+from tests._workflow import (
+    add_template,
+    create_published_workflow,
+    create_skill,
+    generate_workflow,
+    publish_workflow,
+)
 
 
 async def _draft_workflow(client: AsyncClient) -> str:
@@ -193,3 +199,68 @@ async def test_templates_cascade_with_workflow(workflow_client: AsyncClient) -> 
         f"/api/v1/workflow-task-templates/{created['id']}"
     )
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+# ---------- parent workflow status ----------
+
+
+async def _published_workflow(client: AsyncClient) -> str:
+    skill = await create_skill(client)
+    wf = await create_published_workflow(client, skill["id"])
+    return str(wf["id"])
+
+
+async def _status_of(client: AsyncClient, workflow_id: str) -> str:
+    body = assert_ok(await client.get(f"/api/v1/workflows/{workflow_id}"))
+    return str(body["status"])
+
+
+async def test_creating_a_template_marks_a_published_workflow_modified(
+    workflow_client: AsyncClient,
+) -> None:
+    wf_id = await _published_workflow(workflow_client)
+    await add_template(workflow_client, wf_id, title="Extra step")
+    assert await _status_of(workflow_client, wf_id) == "modified"
+
+
+async def test_updating_a_template_marks_a_published_workflow_modified(
+    workflow_client: AsyncClient,
+) -> None:
+    wf_id = await _published_workflow(workflow_client)
+    templates = assert_ok(
+        await workflow_client.get(f"/api/v1/workflows/{wf_id}/task-templates")
+    )
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-task-templates/{templates[0]['id']}",
+            json={"title": "Edited"},
+        )
+    )
+    assert await _status_of(workflow_client, wf_id) == "modified"
+
+
+async def test_deleting_a_template_marks_a_published_workflow_modified(
+    workflow_client: AsyncClient,
+) -> None:
+    wf_id = await _published_workflow(workflow_client)
+    extra = await add_template(workflow_client, wf_id, title="Extra step")
+    await publish_workflow(workflow_client, wf_id)
+    assert_ok(
+        await workflow_client.delete(f"/api/v1/workflow-task-templates/{extra['id']}")
+    )
+    assert await _status_of(workflow_client, wf_id) == "modified"
+
+
+async def test_editing_a_template_leaves_a_draft_workflow_draft(
+    workflow_client: AsyncClient,
+) -> None:
+    """Only a released plan can drift; a draft is still being authored."""
+    wf_id = await _draft_workflow(workflow_client)
+    created = await add_template(workflow_client, wf_id)
+    assert await _status_of(workflow_client, wf_id) == "draft"
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-task-templates/{created['id']}", json={"title": "Edited"}
+        )
+    )
+    assert await _status_of(workflow_client, wf_id) == "draft"

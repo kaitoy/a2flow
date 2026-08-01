@@ -44,6 +44,7 @@ from .repository import (
     TenantRepositoryDep,
     UserAvatarRepositoryDep,
     UserRepositoryDep,
+    WorkflowPublishedVersionRepositoryDep,
     WorkflowRepositoryDep,
     WorkflowSessionRepositoryDep,
     WorkflowTaskRepositoryDep,
@@ -171,9 +172,10 @@ def get_workflow_service(
     ws_repo: WorkflowSessionRepositoryDep,
     templates: WorkflowTaskTemplateRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
+    versions: WorkflowPublishedVersionRepositoryDep,
 ) -> WorkflowService:
     """Create a WorkflowService wiring the repositories it orchestrates."""
-    return WorkflowService(workflows, skills, ws_repo, templates, tasks)
+    return WorkflowService(workflows, skills, ws_repo, templates, tasks, versions)
 
 
 WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
@@ -184,11 +186,12 @@ def get_workflow_planning_service(
     skills: AgentSkillRepositoryDep,
     ps_repo: PlanningSessionRepositoryDep,
     templates: WorkflowTaskTemplateRepositoryDep,
+    versions: WorkflowPublishedVersionRepositoryDep,
     session_service: SessionServiceDep,
 ) -> WorkflowPlanningService:
     """Create a WorkflowPlanningService wiring the repositories and the session store."""
     return WorkflowPlanningService(
-        workflows, skills, ps_repo, templates, session_service, APP_NAME
+        workflows, skills, ps_repo, templates, versions, session_service, APP_NAME
     )
 
 

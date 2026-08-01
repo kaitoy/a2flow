@@ -1,9 +1,16 @@
 """Use case service for WorkflowTaskTemplate resources.
 
-Thin wrapper over the repository for the manual template-editing endpoints
-(the admin UI's workflow plan editor). Authorization is role-based only —
-template writes are developer-gated at the route — because templates belong to
-a workflow, not to a per-user session.
+Wraps the repository for the manual template-editing endpoints (the admin UI's
+workflow plan editor). Authorization is role-based only — template writes are
+developer-gated at the route — because templates belong to a workflow, not to a
+per-user session.
+
+Every write here also moves a ``published`` parent workflow to ``modified``:
+the plan has drifted from the snapshot taken at publish time, and runs keep
+using that snapshot until the workflow is published again. The planning
+agent's tools (``infrastructure/planning_task_tools.py``) go straight to the
+repository and deliberately do not trigger this — refining a plan by chat is
+part of authoring it, not an edit to a released workflow.
 """
 
 import builtins
@@ -32,7 +39,8 @@ class WorkflowTaskTemplateService:
         Args:
             repo: Repository providing WorkflowTaskTemplate persistence.
             workflows: Repository used to 404 template listings of a
-                nonexistent workflow.
+                nonexistent workflow, and to move a published parent workflow
+                to ``modified`` after a write.
         """
         self._repo = repo
         self._workflows = workflows
@@ -95,6 +103,8 @@ class WorkflowTaskTemplateService:
     ) -> WorkflowTaskTemplateRead:
         """Create a new template belonging to the workflow named in ``data``.
 
+        Moves a ``published`` parent workflow to ``modified``.
+
         Args:
             data: Fields for the new template.
             user_id: ID of the user creating the template.
@@ -102,12 +112,19 @@ class WorkflowTaskTemplateService:
         Returns:
             The created template.
         """
-        return await self._repo.create(data, user_id=user_id)
+        template = await self._repo.create(data, user_id=user_id)
+        # Capture before the status commit expires the instance: reading an
+        # expired attribute outside the request's greenlet context would fail.
+        template_id = template.id
+        await self._workflows.mark_modified(data.workflow_id, user_id=user_id)
+        return await self.get(template_id)
 
     async def update(
         self, template_id: str, data: WorkflowTaskTemplateUpdate, *, user_id: str
     ) -> WorkflowTaskTemplateRead:
         """Apply a partial update to a template.
+
+        Moves a ``published`` parent workflow to ``modified``.
 
         Args:
             template_id: Identifier of the template to update.
@@ -120,15 +137,24 @@ class WorkflowTaskTemplateService:
         Raises:
             NotFoundError: If no template exists with the given ID.
         """
-        return await self._repo.update(template_id, data, user_id=user_id)
+        updated = await self._repo.update(template_id, data, user_id=user_id)
+        workflow_id = updated.workflow_id
+        await self._workflows.mark_modified(workflow_id, user_id=user_id)
+        return await self.get(template_id)
 
-    async def delete(self, template_id: str) -> None:
+    async def delete(self, template_id: str, *, user_id: str) -> None:
         """Delete a template.
+
+        Moves a ``published`` parent workflow to ``modified``.
 
         Args:
             template_id: Identifier of the template to delete.
+            user_id: ID of the user deleting the template.
 
         Raises:
             NotFoundError: If no template exists with the given ID.
         """
+        template = await self.get(template_id)
+        workflow_id = template.workflow_id
         await self._repo.delete(template_id)
+        await self._workflows.mark_modified(workflow_id, user_id=user_id)

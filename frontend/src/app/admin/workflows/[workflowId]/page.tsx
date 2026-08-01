@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ListTree, MessageSquareText, Rocket, Workflow as WorkflowIcon } from "lucide-react";
+import { ListTree, MessageSquareText, Rocket, Undo2, Workflow as WorkflowIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -25,6 +25,7 @@ import { zGenerateWorkflowRequest } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
   deleteWorkflow,
+  discardWorkflowChanges,
   getAgentSkill,
   getWorkflow,
   getWorkflowPlanningSession,
@@ -67,6 +68,11 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * Detail page of a generated workflow: edit name/description, watch the plan
  * generation settle, open the planning session to adjust the plan by chat,
  * manage the task templates, and publish the workflow to make it executable.
+ *
+ * Editing a published workflow moves it to `modified` — runs keep using the
+ * last published version — so the status bar then also offers "Discard
+ * changes", which restores that version and returns the workflow to
+ * `published`.
  */
 export default function EditWorkflowPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -76,10 +82,12 @@ export default function EditWorkflowPage() {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [skillName, setSkillName] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
   const save = useAsyncAction({ showDone: false });
   const publish = useAsyncAction({ showDone: false });
+  const discard = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -160,6 +168,19 @@ export default function EditWorkflowPage() {
     }
   }
 
+  async function handleDiscard() {
+    setConfirmDiscardOpen(false);
+    try {
+      await discard.run(async () => {
+        const restored = await discardWorkflowChanges(workflowId);
+        applyWorkflow(restored);
+        dispatch(showToast({ message: "Changes discarded" }));
+      });
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
+    }
+  }
+
   async function handleOpenPlanning() {
     try {
       const ps = await getWorkflowPlanningSession(workflowId);
@@ -227,13 +248,24 @@ export default function EditWorkflowPage() {
             // the same travelling light the chat bubbles do. Gated on the
             // 200ms `pending` stage rather than `inFlight` so a fast rejection
             // (409 with no task templates) never flashes it.
-            publish.status === "pending" || generating ? "live-edge" : "",
+            publish.status === "pending" || discard.status === "pending" || generating
+              ? "live-edge"
+              : "",
           ]
             .filter(Boolean)
             .join(" ")}
         >
           <StatusLine workflow={workflow} />
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {workflow.status === "modified" && (
+              <ActionIconButton
+                icon={Undo2}
+                label="Discard changes"
+                onClick={() => setConfirmDiscardOpen(true)}
+                disabled={discard.inFlight}
+                spinning={discard.inFlight}
+              />
+            )}
             <ActionIconButton
               icon={Rocket}
               label="Publish"
@@ -321,6 +353,14 @@ export default function EditWorkflowPage() {
         description={`Delete "${getValues("name")}"?`}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
+      />
+      <ConfirmDialog
+        open={confirmDiscardOpen}
+        title="Discard Changes"
+        description="Restore this workflow and its task templates to the last published version? Unpublished edits are lost."
+        confirmLabel="Discard"
+        onConfirm={handleDiscard}
+        onCancel={() => setConfirmDiscardOpen(false)}
       />
     </AdminPageContainer>
   );

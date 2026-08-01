@@ -74,14 +74,18 @@ interface WorkflowPermissions {
 /**
  * True when `w` is runnable by a viewer holding `permissions`.
  *
- * Mirrors the backend's rule (`WorkflowService.execute`): `published`
- * workflows are runnable by anyone with the Run action at all, while `draft`
- * workflows are runnable only by someone who can also edit workflows
- * (`developer`, or `super_admin` via `canEdit`'s bypass) — pre-publish
- * testing.
+ * Mirrors the backend's rule (`WorkflowService.execute`): `published` and
+ * `modified` workflows are runnable by anyone with the Run action at all — a
+ * `modified` run uses the last published version — while `draft` workflows are
+ * runnable only by someone who can also edit workflows (`developer`, or
+ * `super_admin` via `canEdit`'s bypass) — pre-publish testing.
  */
 function canExecute(w: Workflow, permissions: WorkflowPermissions): boolean {
-  return w.status === "published" || (w.status === "draft" && permissions.canEdit);
+  return (
+    w.status === "published" ||
+    w.status === "modified" ||
+    (w.status === "draft" && permissions.canEdit)
+  );
 }
 
 function buildColumns(

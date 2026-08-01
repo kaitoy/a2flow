@@ -9,14 +9,27 @@
 import type { WorkflowStatus } from "@/lib/api";
 
 /** Every workflow lifecycle status, in lifecycle order (for filter options). */
-export const WORKFLOW_STATUSES: WorkflowStatus[] = ["generating", "draft", "failed", "published"];
+export const WORKFLOW_STATUSES: WorkflowStatus[] = [
+  "generating",
+  "draft",
+  "failed",
+  "published",
+  "modified",
+];
 
-/** Tailwind background-color class for the small status dot of each status. */
+/**
+ * Tailwind background-color class for the small status dot of each status.
+ *
+ * `modified` reuses the published hue at lower opacity: the workflow is still
+ * released and runnable — its last published version is what runs — but it
+ * carries edits that have not been published yet.
+ */
 export const WORKFLOW_STATUS_DOT_CLASS: Record<WorkflowStatus, string> = {
   generating: "bg-accent",
   draft: "bg-on-surface-variant",
   failed: "bg-error",
   published: "bg-success/80",
+  modified: "bg-success/40",
 };
 
 /**

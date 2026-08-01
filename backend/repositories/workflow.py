@@ -48,6 +48,8 @@ class WorkflowRepository(Protocol):
         user_id: str,
     ) -> Workflow: ...
 
+    async def mark_modified(self, workflow_id: str, *, user_id: str) -> None: ...
+
     async def delete(self, workflow_id: str) -> None: ...
 
 
@@ -185,6 +187,27 @@ class SqlWorkflowRepository:
         await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(workflow)
         return workflow
+
+    async def mark_modified(self, workflow_id: str, *, user_id: str) -> None:
+        """Move a ``published`` workflow to ``modified``; leave any other state alone.
+
+        Called after an edit lands on a workflow or one of its task templates,
+        to record that the live plan has drifted from the published snapshot.
+        Every other status is a no-op: a ``draft`` is not published yet, a
+        workflow already ``modified`` has nothing to change, and ``generating``
+        / ``failed`` are owned by the generation job.
+
+        Args:
+            workflow_id: Identifier of the workflow that was edited.
+            user_id: ID of the acting user recorded on ``updated_by``.
+        """
+        workflow = await self._get_scoped(workflow_id)
+        if workflow is None or workflow.status is not WorkflowStatus.published:
+            return
+        workflow.status = WorkflowStatus.modified
+        workflow.updated_by = user_id
+        self._db.add(workflow)
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
 
     async def delete(self, workflow_id: str) -> None:
         workflow = await self._get_scoped(workflow_id)

@@ -31,6 +31,7 @@ from repositories import (
     SqlTenantRepository,
     SqlUserAvatarRepository,
     SqlUserRepository,
+    SqlWorkflowPublishedVersionRepository,
     SqlWorkflowRepository,
     SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
@@ -38,6 +39,7 @@ from repositories import (
     TenantRepository,
     UserAvatarRepository,
     UserRepository,
+    WorkflowPublishedVersionRepository,
     WorkflowRepository,
     WorkflowSessionRepository,
     WorkflowTaskRepository,
@@ -145,6 +147,19 @@ def get_workflow_repository(
 
 
 WorkflowRepositoryDep = Annotated[WorkflowRepository, Depends(get_workflow_repository)]
+
+
+def get_workflow_published_version_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> WorkflowPublishedVersionRepository:
+    """Create a WorkflowPublishedVersionRepository backed by the current database session."""
+    return SqlWorkflowPublishedVersionRepository(db, tenant_id=tenant_id)
+
+
+WorkflowPublishedVersionRepositoryDep = Annotated[
+    WorkflowPublishedVersionRepository,
+    Depends(get_workflow_published_version_repository),
+]
 
 
 def get_workflow_session_repository(

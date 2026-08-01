@@ -83,8 +83,9 @@ async def update_workflow_task_template(
 async def delete_workflow_task_template(
     template_id: str,
     service: WorkflowTaskTemplateServiceDep,
+    user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
     """Delete the template with the given ID, raising 404 if it does not exist."""
-    await service.delete(template_id)
+    await service.delete(template_id, user_id=user_id)
     return ApiResponse(meta=meta, data=None)

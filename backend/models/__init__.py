@@ -27,6 +27,13 @@ from .workflow import (
     WorkflowStatus,
     WorkflowUpdate,
 )
+from .workflow_published_version import (
+    WorkflowPublishedVersion,
+    WorkflowPublishedVersionTemplate,
+    dump_templates,
+    parse_templates,
+    snapshot_template,
+)
 from .workflow_session import WorkflowSession, WorkflowSessionCreate
 from .workflow_task import (
     ToolBinding,
@@ -78,6 +85,8 @@ __all__ = [
     "UserAvatar",
     "Workflow",
     "WorkflowCreate",
+    "WorkflowPublishedVersion",
+    "WorkflowPublishedVersionTemplate",
     "WorkflowStatus",
     "WorkflowUpdate",
     "WorkflowSession",
@@ -95,4 +104,7 @@ __all__ = [
     "WorkflowTaskTemplateToolBinding",
     "WorkflowTaskTemplateUpdate",
     "WorkflowTaskUpdate",
+    "dump_templates",
+    "parse_templates",
+    "snapshot_template",
 ]

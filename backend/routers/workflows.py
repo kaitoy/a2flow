@@ -167,6 +167,27 @@ async def publish_workflow(
 
 
 @router.post(
+    "/{workflow_id}/discard-changes",
+    response_model=ApiResponse[Workflow],
+    dependencies=_requires_developer,
+)
+async def discard_workflow_changes(
+    workflow_id: str,
+    service: WorkflowServiceDep,
+    user_id: CurrentUserIdDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[Workflow]:
+    """Drop a modified workflow's edits, restoring its last published version.
+
+    Rewrites the task templates from the snapshot taken at publish time and
+    returns the workflow to ``published``. Raises HTTP 409
+    (``WORKFLOW_NOT_MODIFIED``) when the workflow has no unpublished changes.
+    """
+    workflow = await service.discard_changes(workflow_id, user_id=user_id)
+    return ApiResponse(meta=meta, data=workflow)
+
+
+@router.post(
     "/{workflow_id}/execute",
     response_model=ApiResponse[WorkflowSession],
     status_code=201,

@@ -23,9 +23,14 @@ from .tenant import SqlTenantRepository, TenantRepository
 from .user import SqlUserRepository, UserRepository
 from .user_avatar import SqlUserAvatarRepository, UserAvatarRepository
 from .workflow import SqlWorkflowRepository, WorkflowRepository
+from .workflow_published_version import (
+    SqlWorkflowPublishedVersionRepository,
+    WorkflowPublishedVersionRepository,
+)
 from .workflow_session import SqlWorkflowSessionRepository, WorkflowSessionRepository
 from .workflow_task import SqlWorkflowTaskRepository, WorkflowTaskRepository
 from .workflow_task_template import (
+    MAX_TASK_TEMPLATES,
     SqlWorkflowTaskTemplateRepository,
     WorkflowTaskTemplateRepository,
 )
@@ -36,6 +41,7 @@ __all__ = [
     "AuthSessionRepository",
     "CsrfError",
     "ForeignKeyViolationError",
+    "MAX_TASK_TEMPLATES",
     "ImpersonationEventRepository",
     "MCPServerRepository",
     "MessageMetaRepository",
@@ -57,6 +63,7 @@ __all__ = [
     "SqlTenantRepository",
     "SqlUserAvatarRepository",
     "SqlUserRepository",
+    "SqlWorkflowPublishedVersionRepository",
     "SqlWorkflowRepository",
     "SqlWorkflowSessionRepository",
     "SqlWorkflowTaskRepository",
@@ -66,6 +73,7 @@ __all__ = [
     "UniqueViolationError",
     "UserAvatarRepository",
     "UserRepository",
+    "WorkflowPublishedVersionRepository",
     "WorkflowRepository",
     "WorkflowSessionRepository",
     "WorkflowTaskRepository",

@@ -210,6 +210,57 @@ describe("EditWorkflowPage", () => {
     await waitFor(() => expect(receivedBody).toEqual({ name: "Renamed", description: null }));
   });
 
+  it("offers no Discard changes action while the workflow is published", async () => {
+    render(<EditWorkflowPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    expect(screen.queryByRole("button", { name: /discard changes/i })).not.toBeInTheDocument();
+  });
+
+  it("discards a modified workflow's edits back to the published version", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          status: "modified",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+    const discardSpy = vi.fn(() =>
+      envelope({
+        id: "wf-1",
+        tenantId: "tenant-1",
+        name: "my-workflow",
+        description: null,
+        agentSkillId: "skill-1",
+        status: "published",
+        generationError: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        createdBy: "",
+        updatedBy: "",
+      })
+    );
+    server.use(http.post("http://localhost:8000/api/v1/workflows/:id/discard-changes", discardSpy));
+
+    render(<EditWorkflowPage />);
+    await waitFor(() => expect(screen.getByText("modified")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /discard changes/i }));
+    await user.click(screen.getByRole("button", { name: /^discard$/i }));
+
+    await waitFor(() => expect(discardSpy).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+  });
+
   it("cancels back to the workflow list", async () => {
     const user = userEvent.setup();
     const pushMock = vi.fn();

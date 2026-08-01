@@ -74,6 +74,7 @@ import {
   zDeleteWorkflowSessionApiV1WorkflowSessionsWsIdDeleteResponse,
   zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
   zDeleteWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdDeleteResponse,
+  zDiscardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPostResponse,
   zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse,
   zGenerateWorkflowApiV1AgentSkillsSkillIdWorkflowsPostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
@@ -884,6 +885,17 @@ export async function publishWorkflow(id: string): Promise<Workflow> {
   return fetchEnvelope(
     apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/publish`),
     zPublishWorkflowApiV1WorkflowsWorkflowIdPublishPostResponse
+  ) as Promise<Workflow>;
+}
+
+/**
+ * Drop a modified workflow's unpublished edits, restoring the task templates,
+ * name, and description captured the last time it was published.
+ */
+export async function discardWorkflowChanges(id: string): Promise<Workflow> {
+  return fetchEnvelope(
+    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/discard-changes`),
+    zDiscardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPostResponse
   ) as Promise<Workflow>;
 }
 

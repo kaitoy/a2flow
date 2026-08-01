@@ -52,6 +52,13 @@ async def publish_workflow(client: AsyncClient, workflow_id: str) -> Any:
     return assert_ok(await client.post(f"/api/v1/workflows/{workflow_id}/publish"))
 
 
+async def discard_workflow_changes(client: AsyncClient, workflow_id: str) -> Any:
+    """Drop a modified workflow's edits, restoring its last published version."""
+    return assert_ok(
+        await client.post(f"/api/v1/workflows/{workflow_id}/discard-changes")
+    )
+
+
 async def create_published_workflow(
     client: AsyncClient, skill_id: str, **overrides: object
 ) -> Any:

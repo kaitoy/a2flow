@@ -20,6 +20,7 @@ from typing import Protocol
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.workflow_published_version import WorkflowPublishedVersionTemplate
 from models.workflow_task import ToolBinding
 from models.workflow_task_template import (
     WorkflowTaskTemplate,
@@ -47,6 +48,14 @@ from repositories.workflow_task import _dedupe, _dedupe_bindings, _sorted_bindin
 _StrList = list[str]
 _BindingList = list[ToolBinding]
 
+MAX_TASK_TEMPLATES = 1000
+"""Page size used when a caller needs a workflow's *whole* plan in one read.
+
+Publishing and executing both work on the complete template list rather than a
+page of it. This matches the maximum ``limit`` the list endpoints accept, so no
+plan that the API can produce is silently truncated here.
+"""
+
 
 class WorkflowTaskTemplateRepository(Protocol):
     """Interface for WorkflowTaskTemplate persistence operations."""
@@ -72,6 +81,14 @@ class WorkflowTaskTemplateRepository(Protocol):
     ) -> WorkflowTaskTemplateRead: ...
 
     async def delete(self, template_id: str) -> None: ...
+
+    async def replace_all_for_workflow(
+        self,
+        workflow_id: str,
+        templates: Sequence[WorkflowPublishedVersionTemplate],
+        *,
+        user_id: str,
+    ) -> None: ...
 
 
 class SqlWorkflowTaskTemplateRepository:
@@ -249,6 +266,85 @@ class SqlWorkflowTaskTemplateRepository:
             raise NotFoundError("WorkflowTaskTemplate", template_id)
         await self._db.delete(template)
         await self._db.commit()
+
+    async def replace_all_for_workflow(
+        self,
+        workflow_id: str,
+        templates: Sequence[WorkflowPublishedVersionTemplate],
+        *,
+        user_id: str,
+    ) -> None:
+        """Replace a workflow's whole template set with the given snapshot.
+
+        Used by ``POST /workflows/{id}/discard-changes`` to restore the plan
+        captured at publish time. Every current template of the workflow is
+        deleted (edges and bindings cascade) and the snapshot is re-inserted
+        keeping each template's **original ID**, so the recorded
+        ``depends_on_ids`` stay valid without remapping.
+
+        Dependency edges are not re-validated: the snapshot was a valid DAG of
+        this workflow when it was captured, and it is written back whole.
+        Tool bindings *are* re-validated, since a bound MCP server may have
+        been deleted in the meantime.
+
+        Args:
+            workflow_id: Identifier of the workflow whose templates to replace.
+            templates: The snapshot templates to restore.
+            user_id: ID of the user performing the restore.
+
+        Raises:
+            ForeignKeyViolationError: If a snapshot binding references an MCP
+                server that no longer exists.
+        """
+        bindings_by_template = {
+            t.id: _dedupe_bindings(t.tool_bindings) for t in templates
+        }
+        for bindings in bindings_by_template.values():
+            await self._validate_bindings(bindings)
+
+        existing = await self._db.exec(
+            select(WorkflowTaskTemplate).where(
+                WorkflowTaskTemplate.tenant_id == self._tenant_id,
+                WorkflowTaskTemplate.workflow_id == workflow_id,
+            )
+        )
+        for row in existing.all():
+            await self._db.delete(row)
+        # Flush the deletions before re-inserting: the restored rows reuse the
+        # snapshot's primary keys, which would collide with the rows still
+        # pending removal in the session.
+        await self._db.flush()
+
+        for snapshot in templates:
+            self._db.add(
+                WorkflowTaskTemplate(
+                    id=snapshot.id,
+                    workflow_id=workflow_id,
+                    title=snapshot.title,
+                    description=snapshot.description,
+                    position=snapshot.position,
+                    tenant_id=self._tenant_id,
+                    created_by=user_id,
+                    updated_by=user_id,
+                )
+            )
+        await self._db.flush()
+        for snapshot in templates:
+            for dep_id in _dedupe(snapshot.depends_on_ids):
+                self._db.add(
+                    WorkflowTaskTemplateDependency(
+                        template_id=snapshot.id, depends_on_id=dep_id
+                    )
+                )
+            for binding in bindings_by_template[snapshot.id]:
+                self._db.add(
+                    WorkflowTaskTemplateToolBinding(
+                        template_id=snapshot.id,
+                        mcp_server_id=binding.mcp_server_id,
+                        tool_name=binding.tool_name,
+                    )
+                )
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
 
     # -- tool-binding helpers ------------------------------------------------
 

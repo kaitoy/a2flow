@@ -25,10 +25,10 @@ _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 class WorkflowStatus(StrEnum):
     """Lifecycle states a Workflow can occupy.
 
-    ``published`` workflows may be executed by any caller holding the
-    ``requester`` or ``developer`` role; ``draft`` workflows may additionally
-    be executed, but only by a ``developer`` (or ``super_admin``), for
-    pre-publish testing. Every other combination rejects
+    ``published`` and ``modified`` workflows may be executed by any caller
+    holding the ``requester`` or ``developer`` role; ``draft`` workflows may
+    additionally be executed, but only by a ``developer`` (or
+    ``super_admin``), for pre-publish testing. Every other combination rejects
     ``POST /workflows/{id}/execute`` with ``WORKFLOW_NOT_RUNNABLE`` — see
     :meth:`services.workflow.WorkflowService.execute`.
     """
@@ -44,6 +44,17 @@ class WorkflowStatus(StrEnum):
 
     published = "published"
     """Explicitly published by a developer; executable."""
+
+    modified = "modified"
+    """Published, then edited: runs still use the last published version.
+
+    Set when a ``published`` workflow's own fields or task templates are saved
+    through the API. Execution keeps using the snapshot captured at publish
+    time (``models.workflow_published_version.WorkflowPublishedVersion``) until
+    the workflow is published again — or the edits are dropped through
+    ``POST /workflows/{id}/discard-changes``, which restores the snapshot and
+    returns the workflow to ``published``.
+    """
 
 
 class WorkflowUpdate(SQLModel):
@@ -76,8 +87,10 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     ``status`` and ``generation_error`` are server-managed: they are declared
     on the table class only, so they are absent from ``WorkflowCreate`` /
     ``WorkflowUpdate`` and cannot be written through the API. They are set by
-    the generation background job (``services/workflow_generation.py``) and by
-    ``POST /workflows/{id}/publish``.
+    the generation background job (``services/workflow_generation.py``), by
+    ``POST /workflows/{id}/publish`` and ``.../discard-changes``, and — for the
+    ``published`` → ``modified`` transition — by any save that edits a
+    published workflow or one of its task templates.
     """
 
     __tablename__ = "workflows"
