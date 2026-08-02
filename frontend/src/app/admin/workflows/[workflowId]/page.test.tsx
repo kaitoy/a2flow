@@ -100,6 +100,22 @@ describe("WorkflowDetailPage", () => {
   it("lights the status bar while publishing, then unlights it", async () => {
     const user = userEvent.setup();
     server.use(
+      // The Publish action is only offered while there is something to promote.
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          status: "draft",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      ),
       http.post("http://localhost:8000/api/v1/workflows/:id/publish", async () => {
         // Outlast useAsyncAction's 200ms pending gate so the light is reached.
         await delay(400);
@@ -165,7 +181,25 @@ describe("WorkflowDetailPage", () => {
         updatedBy: "",
       })
     );
-    server.use(http.post("http://localhost:8000/api/v1/workflows/:id/publish", publishSpy));
+    server.use(
+      // The Publish action is only offered while there is something to promote.
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          status: "draft",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      ),
+      http.post("http://localhost:8000/api/v1/workflows/:id/publish", publishSpy)
+    );
 
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
@@ -176,6 +210,22 @@ describe("WorkflowDetailPage", () => {
   it("shows an error toast when publish is rejected (no templates yet)", async () => {
     const user = userEvent.setup();
     server.use(
+      // The Publish action is only offered while there is something to promote.
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          status: "draft",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      ),
       http.post("http://localhost:8000/api/v1/workflows/:id/publish", () =>
         envelopeErr("WORKFLOW_NOT_RUNNABLE", "Workflow has no task templates", 409)
       )
@@ -646,6 +696,12 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.queryByRole("button", { name: /discard changes/i })).not.toBeInTheDocument();
+  });
+
+  it("hides the Publish action while the workflow is published", async () => {
+    render(<WorkflowDetailPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
   });
 
   it("discards a modified workflow's edits back to the published version", async () => {

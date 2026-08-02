@@ -165,8 +165,12 @@ class WorkflowPlanningService:
     async def publish(self, workflow_id: str, *, user_id: str) -> Workflow:
         """Publish a workflow, making it executable.
 
-        Requires the plan to be settled: generation must not be in flight and
-        at least one task template must exist. No LLM runs here — the
+        Requires the plan to be settled and worth promoting: generation must
+        not be in flight, at least one task template must exist, and the
+        workflow must not already be ``published`` — an in-sync snapshot has
+        nothing new to freeze, so re-publishing it is rejected rather than
+        rewritten. Editing a published workflow moves it to ``modified``, which
+        publishes again normally. No LLM runs here — the
         ``generated_description`` is whatever the initial generation job wrote
         or the user last produced through :meth:`generate_description`, so
         publishing is a pure snapshot-and-promote step.
@@ -188,8 +192,10 @@ class WorkflowPlanningService:
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
-            WorkflowNotRunnableError: If generation is still in progress or the
-                workflow has no task templates.
+            WorkflowNotRunnableError: If generation is still in progress, the
+                workflow is already ``published`` (its snapshot is in sync, so
+                re-publishing would only rewrite it with identical content), or
+                it has no task templates.
         """
         workflow = await self._workflows.get(workflow_id)
         if workflow is None:
@@ -197,6 +203,10 @@ class WorkflowPlanningService:
         if workflow.status is WorkflowStatus.generating:
             raise WorkflowNotRunnableError(
                 workflow_id, "plan generation is still in progress"
+            )
+        if workflow.status is WorkflowStatus.published:
+            raise WorkflowNotRunnableError(
+                workflow_id, "it is already published with no changes to promote"
             )
         # Capture before the commits below: each commit on the shared request
         # session expires loaded instances, and a plain attribute read on an

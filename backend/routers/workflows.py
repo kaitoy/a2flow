@@ -166,8 +166,9 @@ async def publish_workflow(
     """Publish a workflow, making it executable.
 
     Freezes the current plan into the workflow's published snapshot. Raises
-    HTTP 409 (``WORKFLOW_NOT_RUNNABLE``) while generation is in flight or when
-    the workflow has no task templates.
+    HTTP 409 (``WORKFLOW_NOT_RUNNABLE``) while generation is in flight, when
+    the workflow has no task templates, or when it is already ``published``
+    and therefore has no changes to promote.
     """
     workflow = await service.publish(workflow_id, user_id=user_id)
     return ApiResponse(meta=meta, data=workflow)

@@ -440,6 +440,16 @@ async def test_publish_workflow_while_generating_returns_409(
     assert_err(response, code="WORKFLOW_NOT_RUNNABLE", status=409)
 
 
+async def test_publish_already_published_workflow_returns_409(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    response = await workflow_client.post(f"/api/v1/workflows/{wf['id']}/publish")
+    err = assert_err(response, code="WORKFLOW_NOT_RUNNABLE", status=409)
+    assert err["details"]["workflowId"] == wf["id"]
+
+
 async def test_publish_workflow_sets_status_published(
     workflow_client: AsyncClient,
 ) -> None:

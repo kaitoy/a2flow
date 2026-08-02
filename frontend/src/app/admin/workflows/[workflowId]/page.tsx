@@ -408,14 +408,16 @@ export default function WorkflowDetailPage() {
                 spinning={deactivate.inFlight}
               />
             )}
-            <ActionIconButton
-              icon={Rocket}
-              label="Publish"
-              onClick={handlePublish}
-              disabled={generating || publish.inFlight}
-              spinning={publish.inFlight}
-              spinAnimation="rocket-launch"
-            />
+            {workflow.status !== "published" && (
+              <ActionIconButton
+                icon={Rocket}
+                label="Publish"
+                onClick={handlePublish}
+                disabled={generating || publish.inFlight}
+                spinning={publish.inFlight}
+                spinAnimation="rocket-launch"
+              />
+            )}
           </div>
           {workflow.status === "failed" && workflow.generationError && (
             <p className="w-full break-words font-mono text-error text-xs">
