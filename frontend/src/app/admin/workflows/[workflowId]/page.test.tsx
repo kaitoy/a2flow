@@ -29,6 +29,8 @@ function authState(roles: string[]): Partial<RootState> {
 }
 
 const SUPER_ADMIN = authState(["super_admin"]);
+const REQUESTER = authState(["requester"]);
+const DEVELOPER = authState(["developer"]);
 
 /** Accessible name of the action opening the description diff dialog. */
 const DIFF_BUTTON = "Show diff from the generated description";
@@ -203,6 +205,97 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /open planning session/i }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/planning-sessions/ps-1"));
+  });
+
+  it("hides the Run action from a viewer without the requester or developer role", async () => {
+    render(<WorkflowDetailPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    expect(screen.queryByRole("button", { name: /run workflow/i })).not.toBeInTheDocument();
+  });
+
+  it("runs the workflow and navigates to the new session", async () => {
+    const user = userEvent.setup();
+    const pushMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+      forward: vi.fn(),
+    });
+
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    await user.click(screen.getByRole("button", { name: /run workflow/i }));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/ws-1"));
+  });
+
+  it("shows an error toast when Run fails", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflows/:id/execute", () =>
+        envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    await user.click(screen.getByRole("button", { name: /run workflow/i }));
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Internal server error",
+        variant: "error",
+      })
+    );
+  });
+
+  it("disables Run for a requester on a draft workflow", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          status: "draft",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await waitFor(() => expect(screen.getByText("draft")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /run workflow/i })).toBeDisabled();
+  });
+
+  it("enables Run for a developer on a draft workflow, for pre-publish testing", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          status: "draft",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() => expect(screen.getByText("draft")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /run workflow/i })).not.toBeDisabled();
   });
 
   it("saves name and description only", async () => {

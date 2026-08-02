@@ -41,3 +41,29 @@ export const WORKFLOW_STATUS_DOT_CLASS: Record<WorkflowStatus, string> = {
 export function formatWorkflowStatusLabel(status: WorkflowStatus): string {
   return status;
 }
+
+/** Permissions gating whether the current viewer may execute a given workflow. */
+export interface WorkflowExecutePermissions {
+  /** True when the viewer may execute workflows (`requester` or `developer`). */
+  canRun: boolean;
+  /** True when the viewer may create, edit, and delete workflows (`developer`). */
+  canEdit: boolean;
+}
+
+/**
+ * True when a workflow in `status` is runnable by a viewer holding `permissions`.
+ *
+ * Mirrors the backend's rule (`WorkflowService.execute`): `published` and
+ * `modified` workflows are runnable by anyone with the Run action at all — a
+ * `modified` run uses the last published version — while `draft` workflows are
+ * runnable only by someone who can also edit workflows (`developer`, or
+ * `super_admin` via `canEdit`'s bypass) — pre-publish testing.
+ */
+export function canExecuteWorkflow(
+  status: WorkflowStatus | undefined,
+  permissions: WorkflowExecutePermissions
+): boolean {
+  return (
+    status === "published" || status === "modified" || (status === "draft" && permissions.canEdit)
+  );
+}

@@ -28,9 +28,11 @@ import {
 } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import {
+  canExecuteWorkflow,
   formatWorkflowStatusLabel,
   WORKFLOW_STATUS_DOT_CLASS,
   WORKFLOW_STATUSES,
+  type WorkflowExecutePermissions,
 } from "@/lib/workflow-status";
 
 const LIMIT = 20;
@@ -63,37 +65,12 @@ function StatusCell({ workflow }: { workflow: Workflow }) {
   );
 }
 
-/** Per-role capabilities driving which row actions the table renders. */
-interface WorkflowPermissions {
-  /** True when the viewer may execute workflows (`requester` or `developer`). */
-  canRun: boolean;
-  /** True when the viewer may create, edit, and delete workflows (`developer`). */
-  canEdit: boolean;
-}
-
-/**
- * True when `w` is runnable by a viewer holding `permissions`.
- *
- * Mirrors the backend's rule (`WorkflowService.execute`): `published` and
- * `modified` workflows are runnable by anyone with the Run action at all — a
- * `modified` run uses the last published version — while `draft` workflows are
- * runnable only by someone who can also edit workflows (`developer`, or
- * `super_admin` via `canEdit`'s bypass) — pre-publish testing.
- */
-function canExecute(w: Workflow, permissions: WorkflowPermissions): boolean {
-  return (
-    w.status === "published" ||
-    w.status === "modified" ||
-    (w.status === "draft" && permissions.canEdit)
-  );
-}
-
 function buildColumns(
   skillMap: Map<string, string>,
   onRun: (id: string) => void,
   runningId: string | null,
   onDelete: (id: string, name: string) => void,
-  permissions: WorkflowPermissions
+  permissions: WorkflowExecutePermissions
 ): ColumnDef<Workflow>[] {
   return [
     {
@@ -165,7 +142,7 @@ function buildColumns(
               // Published workflows are executable by anyone with Run access;
               // drafts are executable only by someone who can also edit
               // workflows (developer/super_admin), for pre-publish testing.
-              disabled={runningId !== null || !canExecute(w, permissions)}
+              disabled={runningId !== null || !canExecuteWorkflow(w.status, permissions)}
               spinning={runningId === w.id}
             />
           )}

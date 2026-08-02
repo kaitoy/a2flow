@@ -5,7 +5,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   GitCompare,
   ListTree,
+  Loader2,
   MessageSquareText,
+  Play,
   PowerOff,
   Rocket,
   Undo2,
@@ -36,6 +38,7 @@ import {
   deactivateWorkflow,
   deleteWorkflow,
   discardWorkflowChanges,
+  executeWorkflow,
   getAgentSkill,
   getWorkflow,
   getWorkflowPlanningSession,
@@ -45,7 +48,11 @@ import {
   type WorkflowStatus,
 } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
-import { formatWorkflowStatusLabel, WORKFLOW_STATUS_DOT_CLASS } from "@/lib/workflow-status";
+import {
+  canExecuteWorkflow,
+  formatWorkflowStatusLabel,
+  WORKFLOW_STATUS_DOT_CLASS,
+} from "@/lib/workflow-status";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -82,8 +89,14 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
 /**
  * Detail page of a generated workflow, titled with the workflow's own name:
  * edit name/description, watch the plan generation settle, open the planning
- * session to adjust the plan by chat, manage the task templates, and publish
- * the workflow to make it executable.
+ * session to adjust the plan by chat, run the workflow, manage the task
+ * templates, and publish the workflow to make it executable.
+ *
+ * The header's Run button follows the same `canExecuteWorkflow` rule as the
+ * workflows list — hidden for viewers who can't execute workflows at all, and
+ * disabled for a `draft` workflow unless the viewer can also edit workflows
+ * (pre-publish testing) — and, on success, navigates to the new run's
+ * `WorkflowSession` page just like the list's Run action.
  *
  * `description` is a free-form field any developer can set; the workflow
  * session falls back to the AI-generated `generatedDescription` whenever it's
@@ -105,6 +118,8 @@ export default function WorkflowDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
+  const canRun = useHasRole(Role.REQUESTER, Role.DEVELOPER);
+  const canEdit = useHasRole(Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [skillName, setSkillName] = useState<string | null>(null);
@@ -118,6 +133,7 @@ export default function WorkflowDetailPage() {
   const publish = useAsyncAction({ showDone: false });
   const discard = useAsyncAction({ showDone: false });
   const deactivate = useAsyncAction({ showDone: false });
+  const run = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -245,6 +261,17 @@ export default function WorkflowDetailPage() {
     }
   }
 
+  async function handleRun() {
+    try {
+      await run.run(async () => {
+        const workflowSession = await executeWorkflow(workflowId);
+        router.push(`/workflow-sessions/${workflowSession.id}`);
+      });
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
+    }
+  }
+
   async function executeDelete() {
     setConfirmOpen(false);
     try {
@@ -285,13 +312,37 @@ export default function WorkflowDetailPage() {
             title={workflow.name}
             icon={WorkflowIcon}
             secondaryAction={
-              <HeaderIconButton
-                label="Open planning session"
-                onClick={handleOpenPlanning}
-                disabled={generating}
-              >
-                <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
-              </HeaderIconButton>
+              <>
+                <HeaderIconButton
+                  label="Open planning session"
+                  onClick={handleOpenPlanning}
+                  disabled={generating}
+                >
+                  <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
+                </HeaderIconButton>
+                {canRun && (
+                  <HeaderIconButton
+                    label="Run workflow"
+                    onClick={handleRun}
+                    disabled={
+                      generating ||
+                      run.inFlight ||
+                      !canExecuteWorkflow(workflow.status, { canRun, canEdit })
+                    }
+                  >
+                    {run.inFlight ? (
+                      <Loader2
+                        size={18}
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                        className="motion-safe:animate-spin"
+                      />
+                    ) : (
+                      <Play size={18} strokeWidth={1.8} aria-hidden="true" />
+                    )}
+                  </HeaderIconButton>
+                )}
+              </>
             }
           />
         }
