@@ -1,11 +1,11 @@
 /** @module PlanningSessionPage — Loads a PlanningSession and renders the plan-refinement chat. */
 "use client";
 
-import { AlertTriangle, ExternalLink } from "lucide-react";
-import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
@@ -100,20 +100,18 @@ function PlanningSessionView({ ps, workflow }: { ps: PlanningSession; workflow: 
         />
       </SidebarDrawer>
       <div className="flex flex-col flex-1 min-w-0">
-        <AppHeader onMenuClick={() => setTimelineDrawerOpen(true)}>
-          <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />
-          <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-accent shadow-glow animate-pulse" />
-          <span className="font-display truncate text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">
-            Planning: {workflow.name}
-          </span>
-          <Link
-            href={`/admin/workflows/${encodeURIComponent(workflow.id)}`}
-            className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
-          >
-            <ExternalLink size={14} strokeWidth={1.8} aria-hidden="true" />
-            Open workflow
-          </Link>
-        </AppHeader>
+        <AppHeader onMenuClick={() => setTimelineDrawerOpen(true)} />
+
+        <div className="shrink-0 px-4 pt-3 sm:px-6">
+          <Breadcrumbs
+            items={[
+              { label: "Admin", href: "/admin" },
+              { label: "Workflows", href: "/admin/workflows" },
+              { label: workflow.name, href: `/admin/workflows/${encodeURIComponent(workflow.id)}` },
+              { label: "Planning" },
+            ]}
+          />
+        </div>
 
         {error && (
           <div className="shrink-0 mx-4 mt-3">

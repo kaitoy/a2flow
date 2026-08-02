@@ -54,14 +54,19 @@ beforeEach(() => {
 });
 
 describe("PlanningSessionPage", () => {
-  it("renders the planning header with the workflow name", async () => {
+  it("renders a breadcrumb trail ending in Planning, with the workflow name linking back to it", async () => {
     render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
-    await waitFor(() => expect(screen.getByText(/Planning: my-workflow/)).toBeInTheDocument());
+    const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByRole("link", { name: "my-workflow" })).toHaveAttribute(
+      "href",
+      "/admin/workflows/wf-1"
+    );
+    expect(within(nav).getByText("Planning")).toHaveAttribute("aria-current", "page");
   });
 
   it("drives the chat hook in planning mode with no kickoff prompt", async () => {
     render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
-    await waitFor(() => screen.getByText(/Planning: my-workflow/));
+    await screen.findByRole("link", { name: "my-workflow" });
     expect(useWorkflowSessionChatMock).toHaveBeenCalledWith(
       "ps-1",
       "planning-session-id",
@@ -105,14 +110,5 @@ describe("PlanningSessionPage", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("search")).toBeInTheDocument();
     expect(await within(dialog).findByText("my-mcp-server")).toBeInTheDocument();
-  });
-
-  it("links back to the workflow detail page", async () => {
-    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
-    await waitFor(() => screen.getByText(/Planning: my-workflow/));
-    expect(screen.getByRole("link", { name: /open workflow/i })).toHaveAttribute(
-      "href",
-      "/admin/workflows/wf-1"
-    );
   });
 });
