@@ -29,9 +29,29 @@ from infrastructure.planning_task_tools import (
 )
 from models.agent_skill import AgentSkill
 from models.planning_session import PlanningSession
-from models.workflow import Workflow
+from models.workflow import Workflow, WorkflowStatus
 from repositories.tenant_bootstrap import resolve_planning_session_tenant
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+
+
+async def _workflow_status(eng: AsyncEngine, workflow_id: str) -> WorkflowStatus:
+    """Read a workflow's current lifecycle status straight from the database."""
+    async with AsyncSession(eng) as db:
+        workflow = await db.get(Workflow, workflow_id)
+        assert workflow is not None
+        return workflow.status
+
+
+async def _set_workflow_status(
+    eng: AsyncEngine, workflow_id: str, status: WorkflowStatus
+) -> None:
+    """Force a workflow's lifecycle status, for tests that publish after seeding."""
+    async with AsyncSession(eng) as db:
+        workflow = await db.get(Workflow, workflow_id)
+        assert workflow is not None
+        workflow.status = status
+        db.add(workflow)
+        await db.commit()
 
 
 @pytest_asyncio.fixture()
@@ -56,9 +76,17 @@ async def engine(
 
 
 async def _seed_planning_session(
-    eng: AsyncEngine, *, session_id: str = "plan-abc", user_id: str = "owner"
+    eng: AsyncEngine,
+    *,
+    session_id: str = "plan-abc",
+    user_id: str = "owner",
+    status: WorkflowStatus = WorkflowStatus.draft,
 ) -> str:
-    """Insert a skill + workflow + PlanningSession chain; return the workflow PK."""
+    """Insert a skill + workflow + PlanningSession chain; return the workflow PK.
+
+    ``status`` seeds the workflow's lifecycle state so tests can exercise the
+    ``published`` → ``modified`` transition the write tools trigger.
+    """
     async with AsyncSession(eng) as db:
         skill = AgentSkill(
             name=f"skill-{session_id}",
@@ -76,6 +104,7 @@ async def _seed_planning_session(
         workflow = Workflow(
             name=f"wf-{session_id}",
             agent_skill_id=skill_id,
+            status=status,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
@@ -344,3 +373,71 @@ async def test_update_replaces_tool_bindings(engine: AsyncEngine) -> None:
         tool_bindings=[{"server_id": server_id, "tool_name": "fetch"}],
     )
     assert result["tool_bindings"] == [{"server_id": server_id, "tool_name": "fetch"}]
+
+
+# ---------- published -> modified ----------
+
+
+async def test_register_marks_published_workflow_modified(engine: AsyncEngine) -> None:
+    workflow_id = await _seed_planning_session(engine, status=WorkflowStatus.published)
+    result = await register_planning_tasks([{"key": "t0", "title": "First"}], _ctx())
+    assert "error" not in result
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.modified
+
+
+async def test_create_marks_published_workflow_modified(engine: AsyncEngine) -> None:
+    workflow_id = await _seed_planning_session(engine, status=WorkflowStatus.published)
+    await create_planning_task("Solo", _ctx())
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.modified
+
+
+async def test_update_marks_published_workflow_modified(engine: AsyncEngine) -> None:
+    workflow_id = await _seed_planning_session(engine)
+    created = await create_planning_task("Solo", _ctx())
+    await _set_workflow_status(engine, workflow_id, WorkflowStatus.published)
+
+    await update_planning_task(created["id"], _ctx(), title="Renamed")
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.modified
+
+
+async def test_delete_marks_published_workflow_modified(engine: AsyncEngine) -> None:
+    workflow_id = await _seed_planning_session(engine)
+    created = await create_planning_task("Temp", _ctx())
+    await _set_workflow_status(engine, workflow_id, WorkflowStatus.published)
+
+    await delete_planning_task(created["id"], _ctx())
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.modified
+
+
+async def test_reads_leave_published_workflow_alone(engine: AsyncEngine) -> None:
+    workflow_id = await _seed_planning_session(engine)
+    created = await create_planning_task("Solo", _ctx())
+    await _set_workflow_status(engine, workflow_id, WorkflowStatus.published)
+
+    await list_planning_tasks(_ctx())
+    await get_planning_task(created["id"], _ctx())
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.published
+
+
+async def test_failed_write_leaves_published_workflow_alone(
+    engine: AsyncEngine,
+) -> None:
+    workflow_id = await _seed_planning_session(engine, status=WorkflowStatus.published)
+    result = await create_planning_task("Bad", _ctx(), depends_on_ids=["ghost"])
+    assert "error" in result
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.published
+
+
+async def test_draft_workflow_stays_draft(engine: AsyncEngine) -> None:
+    workflow_id = await _seed_planning_session(engine)
+    await create_planning_task("Solo", _ctx())
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.draft
+
+
+async def test_generating_workflow_stays_generating(engine: AsyncEngine) -> None:
+    # The initial background planning run registers the plan while the workflow
+    # is still ``generating``; that status is owned by the generation job.
+    workflow_id = await _seed_planning_session(engine, status=WorkflowStatus.generating)
+    result = await register_planning_tasks([{"key": "t0", "title": "First"}], _ctx())
+    assert "error" not in result
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.generating

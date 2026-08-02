@@ -57,8 +57,12 @@ clones **this** repository, whose own paths run to
 `frontend/src/app/admin/workflows/[workflowId]/task-templates/[templateId]/page.test.tsx`,
 and that overflows — the clone dies with `FileNotFoundError` (not `WinError 3`)
 and the demo skill lands in `syncStatus: failed`. Everything else in the demo
-dataset still seeds, so ignore it unless you need the skill; otherwise point
-`SKILLS_DIR` at a short root such as `C:\a2f\sk`.
+dataset still seeds, so ignore it unless you need the skill.
+
+Since any agent-running verification needs a repo with a `SKILL.md` (see
+"Picking the skill repository" below), and the one to hand is this repository,
+just default to `$env:SKILLS_DIR = "C:\a2f\sk"` — it clones a2flow without
+overflowing.
 
 Frontend (only needed for UI work):
 
@@ -118,12 +122,64 @@ constraint), so it can never pass a tenant-scoped route's authorization check
 at all. Only reach for `root` to verify something genuinely platform-wide,
 e.g. the Tenants admin page.
 
-`https://github.com/octocat/Hello-World` is a good clone target: tiny, public,
-stable HEAD (`7fd1a60b01f91b314f59955a4e4d4e80d8edf11d`).
-
 Registering a skill clones **in the background**, so poll
 `GET /api/v1/agent-skills/{id}` until `syncStatus` leaves `pending`. A clone
 takes ~4s.
+
+### Picking the skill repository
+
+Which repo you register depends on how far you need to get:
+
+- **Registration / clone plumbing only** — `https://github.com/octocat/Hello-World`
+  with `repoPath: ""`. Tiny, public, stable HEAD
+  (`7fd1a60b01f91b314f59955a4e4d4e80d8edf11d`), and shallow enough to clone under
+  a scratchpad-deep `SKILLS_DIR`. It reaches `syncStatus: ready`.
+- **Anything that actually runs an agent** — Hello-World is useless: it has no
+  `SKILL.md`. The skill still clones fine, but the first thing that resolves an
+  agent fails. Workflow generation, for instance, lands in
+  `status: "failed"` with
+  `generationError: SKILL.md not found in '<skills_dir>/<skill_id>/<sha>'`,
+  which reads like a clone problem and is not one.
+
+  Use this repository's own sample skill instead:
+
+  ```json
+  {"name":"s","repoUrl":"https://github.com/kaitoy/a2flow",
+   "repoPath":"sample_skills/aws-ec2-launch"}
+  ```
+
+  `repoPath` is the subdirectory holding `SKILL.md`, so a monorepo works as long
+  as it points at the skill folder. This is the same skill the demo dataset
+  registers. It clones fine **only with a short `SKILLS_DIR`** such as
+  `C:\a2f\sk` (see the `MAX_PATH` note under Launch) — verified working there.
+
+### Generating a workflow
+
+`POST /api/v1/agent-skills/{id}/workflows` (`{"name":…,"prompt":…}`) creates the
+workflow in `status: "generating"` and runs the initial planning agent in the
+**background**, so poll `GET /api/v1/workflows/{id}` until the status leaves
+`generating` (`draft` on success, `failed` with `generationError` otherwise).
+This calls the real LLM configured in `backend/.env` and takes ~30-60s. The
+resulting plan is on `GET /api/v1/workflows/{id}/task-templates`.
+
+### Driving the planning chat
+
+`POST /api/v1/planning-sessions/{ps_id}/agent` is an AG-UI SSE stream, not an
+envelope route. Find the session with
+`GET /api/v1/workflows/{id}/planning-session`, then post a `RunAgentInput` whose
+`threadId` is that record's `sessionId`:
+
+```json
+{"threadId":"<sessionId>","runId":"r1","state":{},
+ "messages":[{"id":"m1","role":"user","content":"Add a task that …"}],
+ "tools":[],"context":[],"forwardedProps":{"userId":"<ADMIN_ID>"}}
+```
+
+To see which tools the agent actually called, grep the stream for
+`"toolCallName":"…"` rather than trying to parse the whole SSE body. The agent
+may do less than you asked in one turn — a request to change *and* delete
+something often comes back as one edit plus a question — so assert on the tool
+calls you observed, not on the ones you hoped for.
 
 ## Gotchas
 

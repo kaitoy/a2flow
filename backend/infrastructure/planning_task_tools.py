@@ -14,6 +14,15 @@ module-level engine (the tools run during an agent run, outside FastAPI's
 per-request dependency-injection scope) and returns plain JSON-serializable
 values, mapping repository errors to an ``{"error": ...}`` payload the agent
 can react to instead of raising.
+
+Every write here also moves a ``published`` parent workflow to ``modified``,
+exactly like the REST edit surfaces in
+:mod:`services.workflow_task_template`: a plan refined by chat has drifted
+from the snapshot taken at publish time just as much as one edited through the
+admin UI, and runs keep using that snapshot until the workflow is published
+again. During the initial background generation run the workflow is still
+``generating``, so :meth:`repositories.workflow.SqlWorkflowRepository.mark_modified`
+is a no-op there and needs no special casing.
 """
 
 import logging
@@ -45,6 +54,7 @@ from repositories import (
     SqlPlanningSessionRepository,
     SqlWorkflowRepository,
     SqlWorkflowTaskTemplateRepository,
+    WorkflowRepository,
     WorkflowTaskTemplateRepository,
 )
 from repositories.exceptions import (
@@ -72,6 +82,22 @@ class _Scope:
     tenant_id: str
     ps_repo: PlanningSessionRepository
     template_repo: WorkflowTaskTemplateRepository
+    workflow_repo: WorkflowRepository
+
+    async def mark_modified(self, tool_context: ToolContext) -> None:
+        """Move the plan's parent workflow to ``modified`` if it is ``published``.
+
+        Called after every write so a chat-refined plan records the same drift
+        from the published snapshot that a REST edit does. Any other status is
+        left alone by the repository.
+
+        Args:
+            tool_context: The ADK tool context for the current invocation, read
+                for the acting user id.
+        """
+        await self.workflow_repo.mark_modified(
+            self.workflow_id, user_id=_user_id(tool_context)
+        )
 
 
 @asynccontextmanager
@@ -80,8 +106,9 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
 
     Opens a fresh ``AsyncSession`` on the module-level engine (the tools run
     outside FastAPI's request scope), resolves the current run's workflow id
-    and tenant id, and wires a PlanningSession repository and a
-    WorkflowTaskTemplate repository to it, both scoped to the resolved tenant.
+    and tenant id, and wires a PlanningSession repository, a
+    WorkflowTaskTemplate repository, and the Workflow repository backing
+    :meth:`_Scope.mark_modified` to it, all scoped to the resolved tenant.
     The engine is referenced through the ``database`` module so tests can
     monkeypatch ``database.engine``.
 
@@ -105,20 +132,22 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
         if resolved is None:
             raise NoTenantSessionError()
         workflow_id, tenant_id = resolved
+        workflow_repo = SqlWorkflowRepository(
+            db,
+            SqlAgentSkillRepository(db, tenant_id=tenant_id),
+            tenant_id=tenant_id,
+        )
         yield _Scope(
             workflow_id=workflow_id,
             tenant_id=tenant_id,
             ps_repo=SqlPlanningSessionRepository(db, tenant_id=tenant_id),
             template_repo=SqlWorkflowTaskTemplateRepository(
                 db,
-                SqlWorkflowRepository(
-                    db,
-                    SqlAgentSkillRepository(db, tenant_id=tenant_id),
-                    tenant_id=tenant_id,
-                ),
+                workflow_repo,
                 SqlMCPServerRepository(db, tenant_id=tenant_id),
                 tenant_id=tenant_id,
             ),
+            workflow_repo=workflow_repo,
         )
 
 
@@ -171,6 +200,8 @@ async def register_planning_tasks(
     the template may invoke those tools (and only those) via ``call_mcp_tool``.
     Discover the available servers and tools with ``list_mcp_tools`` first, and
     only bind tools a task actually needs.
+
+    Moves a ``published`` parent workflow to ``modified``.
 
     Args:
         tasks: The plan entries described above.
@@ -245,12 +276,17 @@ async def register_planning_tasks(
                 try:
                     template = await s.template_repo.create(data, user_id=user_id)
                 except (ForeignKeyViolationError, DependencyCycleError) as exc:
+                    if created:
+                        await s.mark_modified(tool_context)
                     return {
                         "error": f"failed to create task {key!r}: {exc}",
                         "created": created,
                     }
                 key_to_id[key] = template.id
                 created.append({"key": key, "id": template.id, "title": template.title})
+            # Once, after the batch: the first call already flips the status, so
+            # per-template calls would only add redundant reads.
+            await s.mark_modified(tool_context)
             return {"created": created}
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
@@ -268,6 +304,8 @@ async def create_planning_task(
     Use this to add a task incrementally after the initial plan was registered.
     ``depends_on_ids`` must reference ids of templates that already exist in the
     same plan (use :func:`list_planning_tasks` to find them).
+
+    Moves a ``published`` parent workflow to ``modified``.
 
     Args:
         title: The task title (required).
@@ -299,6 +337,7 @@ async def create_planning_task(
             template = await s.template_repo.create(
                 data, user_id=_user_id(tool_context)
             )
+            await s.mark_modified(tool_context)
             return _template_to_dict(template)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
@@ -368,6 +407,8 @@ async def update_planning_task(
     ``tool_bindings`` likewise replaces the template's full set of bound MCP
     tools.
 
+    Moves a ``published`` parent workflow to ``modified``.
+
     Args:
         template_id: Id of the template to update.
         tool_context: Injected by ADK; identifies the current session. Not shown
@@ -416,6 +457,7 @@ async def update_planning_task(
                 )
             except NotFoundError:
                 return _not_in_plan_error(template_id)
+            await s.mark_modified(tool_context)
             return _template_to_dict(template)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
@@ -427,6 +469,8 @@ async def delete_planning_task(
     template_id: str, tool_context: ToolContext
 ) -> dict[str, Any]:
     """Delete a task template from the current workflow's plan.
+
+    Moves a ``published`` parent workflow to ``modified``.
 
     Args:
         template_id: Id of the template to delete.
@@ -444,6 +488,7 @@ async def delete_planning_task(
             if existing is None or existing.workflow_id != s.workflow_id:
                 return _not_in_plan_error(template_id)
             await s.template_repo.delete(template_id)
+            await s.mark_modified(tool_context)
             return {"deleted": template_id}
     except NoTenantSessionError:
         return {"error": _NO_SESSION}

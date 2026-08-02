@@ -353,7 +353,7 @@ Editing a workflow after it has been published does not silently change what run
 - **Publish** again to promote the edits into future runs.
 - **Discard changes** (the undo icon that appears in the detail page's status bar next to Publish, `POST /workflows/{id}/discard-changes`, developer-gated) throws the edits away instead: the task templates are rewritten from the published version — original template ids reused, so the dependency edges survive — the name is restored and the published version's frozen effective description is written back into the workflow's `description` field (`generatedDescription` is left untouched), and the workflow returns to `published`. Discarding a workflow that has no unpublished changes returns HTTP 409 (`WORKFLOW_NOT_MODIFIED`).
 
-Refining the plan through the **planning chat** is deliberately exempt: the planning agent's tools write templates directly and leave the status alone, since chatting about the plan is part of authoring it.
+Refining the plan through the **planning chat** counts as an edit too: when the planning agent adds, changes, or removes a task template of a `published` workflow, the workflow moves to `modified` exactly as a manual edit would.
 
 #### Deactivating a workflow
 

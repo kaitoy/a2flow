@@ -9,8 +9,8 @@ Every write here also moves a ``published`` parent workflow to ``modified``:
 the plan has drifted from the snapshot taken at publish time, and runs keep
 using that snapshot until the workflow is published again. The planning
 agent's tools (``infrastructure/planning_task_tools.py``) go straight to the
-repository and deliberately do not trigger this — refining a plan by chat is
-part of authoring it, not an edit to a released workflow.
+repository, so they call ``mark_modified`` themselves to record the same
+drift — a plan refined by chat is no more published than one edited here.
 """
 
 import builtins

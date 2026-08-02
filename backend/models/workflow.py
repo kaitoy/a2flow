@@ -54,9 +54,10 @@ class WorkflowStatus(StrEnum):
     """Published, then edited: runs still use the last published version.
 
     Set when a ``published`` workflow's own fields or task templates are saved
-    through the API. Execution keeps using the snapshot captured at publish
-    time (``models.workflow_published_version.WorkflowPublishedVersion``) until
-    the workflow is published again — or the edits are dropped through
+    through the API, or when the planning agent edits its task templates from
+    the workflow's planning chat. Execution keeps using the snapshot captured
+    at publish time (``models.workflow_published_version.WorkflowPublishedVersion``)
+    until the workflow is published again — or the edits are dropped through
     ``POST /workflows/{id}/discard-changes``, which restores the snapshot and
     returns the workflow to ``published``.
     """
@@ -103,8 +104,9 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     the generation background job (``services/workflow_generation.py``), by
     ``POST /workflows/{id}/publish``, ``.../discard-changes``, and
     ``.../deactivate``, and — for the ``published`` → ``modified``
-    transition — by any save that edits a published workflow or one of its
-    task templates.
+    transition — by any edit to a published workflow or one of its task
+    templates, whether it arrives through the API or through the planning
+    agent's tools (``infrastructure/planning_task_tools.py``).
 
     ``generated_description`` is written only by the planning generation job
     and by ``POST /workflows/{id}/publish``'s re-summarization (or, as a
