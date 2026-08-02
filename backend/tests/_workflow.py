@@ -8,8 +8,13 @@ helpers keep that chain out of individual test bodies.
 
 from typing import Any
 
+from google.adk.events.event import Event
+from google.adk.sessions import BaseSessionService
+from google.genai import types
 from httpx import AsyncClient
 
+from dependencies import APP_NAME
+from infrastructure.agent import tenant_app_name
 from tests._envelope import assert_ok
 
 SKILL_BODY = {"name": "skill-a", "repo_url": "https://github.com/x/y"}
@@ -62,6 +67,35 @@ async def discard_workflow_changes(client: AsyncClient, workflow_id: str) -> Any
 async def deactivate_workflow(client: AsyncClient, workflow_id: str) -> Any:
     """Deactivate a published/modified workflow, returning it to draft."""
     return assert_ok(await client.post(f"/api/v1/workflows/{workflow_id}/deactivate"))
+
+
+async def seed_planning_transcript(
+    client: AsyncClient,
+    session_service: BaseSessionService,
+    workflow_id: str,
+    text: str = "Build me a report",
+) -> None:
+    """Give a workflow's planning session a one-turn ADK conversation.
+
+    The mocked generation job never opens an ADK session, so a workflow created
+    through these helpers has an empty transcript. Tests that need one — the
+    description summarizer reads it — seed it here.
+    """
+    ps = assert_ok(
+        await client.get(f"/api/v1/workflows/{workflow_id}/planning-session")
+    )
+    session = await session_service.create_session(
+        app_name=tenant_app_name(APP_NAME, ps["tenantId"]),
+        user_id=ps["userId"],
+        session_id=ps["sessionId"],
+    )
+    await session_service.append_event(
+        session,
+        Event(
+            author="user",
+            content=types.Content(role="user", parts=[types.Part(text=text)]),
+        ),
+    )
 
 
 async def create_published_workflow(

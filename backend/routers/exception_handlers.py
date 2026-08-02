@@ -32,9 +32,11 @@ from repositories.exceptions import (
     SessionRunInProgressError,
     SkillCloneError,
     SkillNotReadyError,
+    SummarizationFailedError,
     UnauthorizedError,
     UniqueViolationError,
     UserValidationError,
+    WorkflowDescriptionNotGeneratableError,
     WorkflowNotDeactivatableError,
     WorkflowNotModifiedError,
     WorkflowNotRunnableError,
@@ -309,6 +311,39 @@ async def workflow_not_deactivatable_exception_handler(
         code="WORKFLOW_NOT_DEACTIVATABLE",
         message=str(exc),
         status_code=409,
+        details={"workflowId": exc.workflow_id},
+    )
+
+
+async def workflow_description_not_generatable_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with WORKFLOW_DESCRIPTION_NOT_GENERATABLE when there is nothing to summarize."""
+    assert isinstance(exc, WorkflowDescriptionNotGeneratableError)
+    return _envelope_error(
+        request,
+        code="WORKFLOW_DESCRIPTION_NOT_GENERATABLE",
+        message=str(exc),
+        status_code=409,
+        details={"workflowId": exc.workflow_id, "reason": exc.reason},
+    )
+
+
+async def summarization_failed_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 502 with SUMMARIZATION_FAILED code when the summarizer LLM call fails."""
+    assert isinstance(exc, SummarizationFailedError)
+    logger.warning(
+        "Failed to summarize the planning conversation of workflow %s: %s",
+        exc.workflow_id,
+        exc.reason,
+    )
+    return _envelope_error(
+        request,
+        code="SUMMARIZATION_FAILED",
+        message=f"Failed to summarize the planning conversation of workflow {exc.workflow_id!r}",
+        status_code=502,
         details={"workflowId": exc.workflow_id},
     )
 

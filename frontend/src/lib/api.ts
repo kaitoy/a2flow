@@ -78,6 +78,7 @@ import {
   zDiscardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPostResponse,
   zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse,
   zGenerateWorkflowApiV1AgentSkillsSkillIdWorkflowsPostResponse,
+  zGenerateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
@@ -879,13 +880,25 @@ export async function generateWorkflow(
 }
 
 /**
- * Publish a workflow, making it executable. Re-summarizes the planning
- * conversation into the workflow's description on the backend.
+ * Publish a workflow, making it executable. Freezes the current plan into the
+ * workflow's published snapshot on the backend.
  */
 export async function publishWorkflow(id: string): Promise<Workflow> {
   return fetchEnvelope(
     apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/publish`),
     zPublishWorkflowApiV1WorkflowsWorkflowIdPublishPostResponse
+  ) as Promise<Workflow>;
+}
+
+/**
+ * Summarize a workflow's planning conversation into its AI-generated
+ * description, overwriting the previous summary. A published workflow becomes
+ * `modified`.
+ */
+export async function generateWorkflowDescription(id: string): Promise<Workflow> {
+  return fetchEnvelope(
+    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/generate-description`),
+    zGenerateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPostResponse
   ) as Promise<Workflow>;
 }
 

@@ -328,6 +328,8 @@ Repository (and service) exceptions propagate to global exception handlers (`bac
 | `WorkflowNotRunnableError` | 409 | `WORKFLOW_NOT_RUNNABLE` | The workflow cannot be executed or published in its current state (neither `published` nor `modified` on execute; still `generating` or without task templates on publish); `details` carries `workflowId` and `reason` |
 | `WorkflowNotModifiedError` | 409 | `WORKFLOW_NOT_MODIFIED` | The workflow has no unpublished changes to discard (it is not `modified`); `details` carries `workflowId` |
 | `WorkflowNotDeactivatableError` | 409 | `WORKFLOW_NOT_DEACTIVATABLE` | The workflow is not `published`/`modified`, so there is nothing to deactivate; `details` carries `workflowId` |
+| `WorkflowDescriptionNotGeneratableError` | 409 | `WORKFLOW_DESCRIPTION_NOT_GENERATABLE` | The workflow's description cannot be summarized in its current state (generation still in flight, or no planning conversation to summarize); `details` carries `workflowId` and `reason`. Raised by `POST /workflows/{id}/generate-description` |
+| `SummarizationFailedError` | 502 | `SUMMARIZATION_FAILED` | The summarizer LLM call behind `POST /workflows/{id}/generate-description` failed; `details` carries `workflowId` only — the raw failure reason is logged server-side, never returned to the client |
 | `RegistryUnavailableError` | 502 | `REGISTRY_UNREACHABLE` | Official MCP registry unreachable; no `details` — the raw failure reason is logged server-side only |
 | `HTTPException` (any other raise) | passthrough | `HTTP_<status>` | Fallback for callers still raising `HTTPException` |
 | Uncaught `Exception` | 500 | `INTERNAL_ERROR` | Logged with `request_id` |

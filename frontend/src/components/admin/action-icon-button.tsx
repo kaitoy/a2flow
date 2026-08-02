@@ -21,11 +21,13 @@ interface ActionIconButtonProps {
   spinning?: boolean;
   /**
    * Animation played while `spinning` is true. `"spin"` (default) rotates the
-   * icon continuously; `"rocket-launch"` stretches/squashes it along its own
-   * diagonal heading instead, for icons (like the publish rocket) whose
-   * orientation is meaningful and shouldn't rotate.
+   * icon continuously in the plane of the page; `"spin-y"` rotates it around
+   * the vertical axis at the same 1s/turn cadence for a 3D-flip feel;
+   * `"rocket-launch"` stretches/squashes it along its own diagonal heading
+   * instead, for icons (like the publish rocket) whose orientation is
+   * meaningful and shouldn't rotate.
    */
-  spinAnimation?: "spin" | "rocket-launch";
+  spinAnimation?: "spin" | "rocket-launch" | "spin-y";
 }
 
 /**
@@ -60,7 +62,9 @@ export function ActionIconButton({
   const spinningClassName =
     spinAnimation === "rocket-launch"
       ? "size-4 motion-safe:animate-rocket-launch"
-      : "size-4 motion-safe:animate-spin";
+      : spinAnimation === "spin-y"
+        ? "size-4 motion-safe:animate-spin-y"
+        : "size-4 motion-safe:animate-spin";
 
   const iconEl = <Icon aria-hidden="true" className={spinning ? spinningClassName : "size-4"} />;
 

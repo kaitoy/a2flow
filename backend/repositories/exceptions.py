@@ -182,6 +182,50 @@ class WorkflowNotDeactivatableError(RepositoryError):
         super().__init__(f"Workflow {workflow_id!r} is not published")
 
 
+class WorkflowDescriptionNotGeneratableError(RepositoryError):
+    """Raised when a Workflow's description cannot be generated in its current state.
+
+    ``POST /workflows/{id}/generate-description`` summarizes the workflow's
+    planning conversation, so it needs that conversation to exist and to be
+    settled: a workflow still ``generating`` has a planning run in flight, and
+    one without a planning session (or with an empty one) has nothing to
+    summarize.
+
+    Carries the ``workflow_id`` and a human-readable ``reason`` so the HTTP
+    layer can surface them in the error envelope's ``details`` block when
+    returning HTTP 409.
+    """
+
+    def __init__(self, workflow_id: str, reason: str) -> None:
+        self.workflow_id = workflow_id
+        self.reason = reason
+        super().__init__(
+            f"Workflow {workflow_id!r} has no description to generate: {reason}"
+        )
+
+
+class SummarizationFailedError(RepositoryError):
+    """Raised when the LLM call summarizing a planning conversation fails.
+
+    Unlike the background generation job — which records the failure on the
+    workflow row and moves on — the on-demand
+    ``POST /workflows/{id}/generate-description`` has nothing else to deliver,
+    so the failure surfaces as HTTP 502.
+
+    Carries the ``workflow_id`` and a ``reason``. The HTTP layer logs ``reason``
+    server-side but never returns it to the client, since it echoes the raw
+    caught exception text.
+    """
+
+    def __init__(self, workflow_id: str, reason: str) -> None:
+        self.workflow_id = workflow_id
+        self.reason = reason
+        super().__init__(
+            f"Failed to summarize the planning conversation of workflow "
+            f"{workflow_id!r}: {reason}"
+        )
+
+
 class RegistryUnavailableError(Exception):
     """Raised when the official MCP registry cannot be reached or errors out.
 

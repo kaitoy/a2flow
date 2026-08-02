@@ -5,7 +5,9 @@ task templates generated for it by a planning session. Workflows are never
 created directly through a plain POST — they are born from
 ``POST /agent-skills/{skill_id}/workflows`` ("Generate workflow"), which
 registers a draft row and schedules a background planning run that fills in
-the task templates and the conversation summary (``generated_description``).
+the task templates and the first conversation summary
+(``generated_description``); later summaries are produced on demand by
+``POST /workflows/{id}/generate-description``.
 """
 
 from enum import StrEnum
@@ -109,9 +111,10 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     agent's tools (``infrastructure/planning_task_tools.py``).
 
     ``generated_description`` is written only by the planning generation job
-    and by ``POST /workflows/{id}/publish``'s re-summarization (or, as a
-    correction, by a ``super_admin`` through ``PATCH``); ``description`` is
-    the free-form field any ``developer`` can set to override it. See
+    and by ``POST /workflows/{id}/generate-description``, the on-demand
+    re-summarization a ``developer`` triggers from the UI (or, as a correction,
+    by a ``super_admin`` through ``PATCH``); ``description`` is the free-form
+    field any ``developer`` can set to override it. See
     :attr:`effective_description`.
     """
 

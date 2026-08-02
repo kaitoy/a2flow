@@ -116,7 +116,7 @@ Every user holds a set of **roles** granting the operations they may perform. Ro
 |---|---|
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the designated-approver checks described under [Human approval](#human-approval)) |
 | `admin` | User CRUD, secrets CRUD |
-| `developer` | MCP server CRUD, agent-skill CRUD, workflow generation/editing/publishing/deactivating — except a workflow's AI-generated `generatedDescription`, which only a Super Admin may edit directly — task-template CRUD, planning-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
+| `developer` | MCP server CRUD, agent-skill CRUD, workflow generation/editing/publishing/deactivating — including regenerating a workflow's AI-generated `generatedDescription`, though only a Super Admin may edit that field directly — task-template CRUD, planning-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
 | `requester` | Running **published** (and `modified`) workflows (`POST /workflows/{id}/execute`) |
 | `approver` | Eligibility to be a workflow approval's designated approver, and resolving their own approvals |
 
@@ -317,7 +317,7 @@ Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/
 | Manage its task templates | `GET /admin/workflows/{id}/task-templates` |
 | Run a workflow | "Run" button in the list (calls `POST /workflows/{id}/execute`) |
 
-Each workflow record stores a name, a reference to an Agent Skill, a lifecycle **status** (`generating` / `draft` / `failed` / `published` / `modified`), and two description fields: `generatedDescription` — **summarized from the planning conversation** by the AI at generation and publish time, editable directly only by a **Super Admin** — and `description`, a free-form field any `developer` can set to override it. Whichever is non-empty (`description` takes precedence, else `generatedDescription`) is handed to the execution agent as run context. Since the override is usually a hand-edit of the AI's summary, the Description field on the detail page carries a **diff action** opening a dialog with a word-level diff from `generatedDescription` to `description`; it reads the values currently in the form, so unsaved edits are diffed too. Workflows are persisted in `a2flow.db`; there is no bare `POST /workflows` — generation is the only way a workflow is born.
+Each workflow record stores a name, a reference to an Agent Skill, a lifecycle **status** (`generating` / `draft` / `failed` / `published` / `modified`), and two description fields: `generatedDescription` — **summarized from the planning conversation** by the AI when the workflow is generated and again whenever a `developer` presses the field's **generate action**, editable directly only by a **Super Admin** — and `description`, a free-form field any `developer` can set to override it. Whichever is non-empty (`description` takes precedence, else `generatedDescription`) is handed to the execution agent as run context. Since the override is usually a hand-edit of the AI's summary, the Description field on the detail page carries a **diff action** opening a dialog with a word-level diff from `generatedDescription` to `description`; it reads the values currently in the form, so unsaved edits are diffed too. Workflows are persisted in `a2flow.db`; there is no bare `POST /workflows` — generation is the only way a workflow is born.
 
 #### Generating a workflow
 
@@ -329,7 +329,13 @@ Submitting the dialog:
 2. A **background planning run** sends the prompt as the planning session's first chat message and drives an *initial-planning* agent: following the skill, it breaks the request into steps and registers them as the workflow's **task templates** in one `register_planning_tasks` call (a DAG — each step declares a `key` and its `depends_on` predecessors, plus optional MCP `tools` bindings).
 3. When the run finishes, the planning conversation is summarized (one LLM call) into the workflow's `generatedDescription`, the status becomes **`draft`**, and a **workflow-draft-ready notification** deep-links back to the workflow. Any failure — including a run that registered no templates — lands on the row as **`failed`** with the reason; the planning chat stays usable to fix the plan by hand.
 
-The prompt itself is not stored on the workflow: it lives on as the first message of the planning conversation, and the publish-time summary carries the intent forward.
+The prompt itself is not stored on the workflow: it lives on as the first message of the planning conversation, and the generated summary carries the intent forward.
+
+#### Regenerating the description
+
+The AI summary goes stale as the plan is adjusted, so the **Generated description** field on the workflow detail page carries a **generate action** (`POST /workflows/{id}/generate-description`, developer-gated) that re-summarizes the planning conversation on demand — one LLM call — and saves the result straight away. There is no summarization at publish time: whether and when to refresh the summary is the user's call.
+
+A `published` workflow becomes `modified` when the summary is rewritten, since a run whose `description` is empty falls back to it and would otherwise drift from the published version. The action returns HTTP 409 (`WORKFLOW_DESCRIPTION_NOT_GENERATABLE`) while generation is still in flight or when there is no planning conversation to summarize, and HTTP 502 (`SUMMARIZATION_FAILED`) if the LLM call fails.
 
 #### Adjusting the plan
 
@@ -342,11 +348,11 @@ Templates mirror session tasks structurally — title, description, `position`, 
 
 #### Publishing
 
-**Publish** (on the workflow detail page, `POST /workflows/{id}/publish`, developer-gated) is what makes a workflow executable. It requires at least one template (and no generation in flight) — otherwise HTTP 409 (`WORKFLOW_NOT_RUNNABLE`) — and **re-summarizes the planning conversation** into the workflow's `generatedDescription`, so the latest AI intent reaches future runs whenever no user-set `description` overrides it. Publishing also **freezes the plan**: the workflow's name, effective description (`description` if set, else the resulting `generatedDescription`), and full template list (edges and tool bindings included) are captured as its published version, replacing the previous one. Re-adjust → re-publish is allowed at any time; runs already started are unaffected because they copied the plan (below).
+**Publish** (on the workflow detail page, `POST /workflows/{id}/publish`, developer-gated) is what makes a workflow executable. It requires at least one template (and no generation in flight) — otherwise HTTP 409 (`WORKFLOW_NOT_RUNNABLE`). Publishing **freezes the plan**: the workflow's name, effective description (`description` if set, else `generatedDescription`), and full template list (edges and tool bindings included) are captured as its published version, replacing the previous one. No LLM runs here — refreshing the AI summary is a [separate, user-triggered action](#regenerating-the-description). Re-adjust → re-publish is allowed at any time; runs already started are unaffected because they copied the plan (below).
 
 #### Editing a published workflow — `modified`
 
-Editing a workflow after it has been published does not silently change what runs. Saving the detail form, or adding / editing / deleting one of its **task templates**, moves the workflow to **`modified`**:
+Editing a workflow after it has been published does not silently change what runs. Saving the detail form, regenerating its AI description, or adding / editing / deleting one of its **task templates**, moves the workflow to **`modified`**:
 
 - Runs keep using the **last published version** — its name, effective description, and templates — not the edits.
 - The workflow stays runnable by anyone who could run it while `published`; the Run button in the list is not gated differently.

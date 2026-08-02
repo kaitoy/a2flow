@@ -184,6 +184,17 @@ async def test_publish_workflow_requires_developer_role(
     assert_err(res, "FORBIDDEN", 403)
 
 
+async def test_generate_workflow_description_requires_developer_role(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/generate-description",
+        headers=_roles("requester"),
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
 async def test_deactivate_workflow_requires_developer_role(
     workflow_client: AsyncClient,
 ) -> None:

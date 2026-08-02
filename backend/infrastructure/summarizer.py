@@ -1,8 +1,9 @@
 """One-shot LLM summarization of a workflow's planning conversation.
 
-Used by the workflow generation job and the publish use case to distill a
-planning session's transcript into the workflow's ``description``, which is
-later handed to the execution agent as context. Reuses the application's model
+Used by the workflow generation job and by ``POST
+/workflows/{id}/generate-description`` to distill a planning session's
+transcript into the workflow's ``generated_description``, which is later handed
+to the execution agent as context. Reuses the application's model
 selection (``config.Settings.llm_model`` via
 :func:`infrastructure.agent.resolve_model`) so the summarizer always runs on
 the same LLM as the agents.
@@ -70,8 +71,8 @@ async def summarize_planning_transcript(
     Raises:
         ValueError: If the LLM returned no usable text.
         Exception: Whatever the underlying LLM client raises on failure —
-            callers decide the fallback (the generation job records the error,
-            publish keeps the previous description).
+            callers decide the fallback (the generation job falls back to the
+            transcript head; the on-demand endpoint surfaces HTTP 502).
     """
     llm = build_llm()
     prompt = _SUMMARY_PROMPT.format(transcript=transcript[:_TRANSCRIPT_MAX_CHARS])

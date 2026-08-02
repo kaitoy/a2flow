@@ -284,6 +284,10 @@ export const handlers = [
     envelope({ ...WORKFLOW_1, status: "published" })
   ),
 
+  http.post(`${BASE}/api/v1/workflows/:id/generate-description`, () =>
+    envelope({ ...WORKFLOW_1, generatedDescription: "A freshly generated summary" })
+  ),
+
   http.post(`${BASE}/api/v1/workflows/:id/discard-changes`, () =>
     envelope({ ...WORKFLOW_1, status: "published" })
   ),

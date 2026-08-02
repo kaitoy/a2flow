@@ -1,5 +1,8 @@
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+from google.adk.sessions import InMemorySessionService
 from httpx import AsyncClient
 
 from models.secret import Secret as _Secret  # noqa: F401 — registers model
@@ -13,8 +16,20 @@ from tests._workflow import (
     discard_workflow_changes,
     generate_workflow,
     publish_workflow,
+    seed_planning_transcript,
 )
 from tests.conftest import FAKE_COMMIT_SHA
+
+
+async def _fake_summarize(transcript: str, **_: Any) -> str:
+    """Stand in for the summarizer LLM call."""
+    return "A summary of the plan"
+
+
+async def _boom_summarize(transcript: str, **_: Any) -> str:
+    """Summarizer that always fails, for the paths that must not call it."""
+    raise RuntimeError("LLM down")
+
 
 # ---------- generate ----------
 
@@ -450,6 +465,127 @@ async def test_republish_after_adjustment_is_allowed(
     await add_template(workflow_client, wf["id"], title="Extra step")
     body = await publish_workflow(workflow_client, wf["id"])
     assert body["status"] == "published"
+
+
+async def test_publish_workflow_does_not_resummarize(
+    workflow_client: AsyncClient,
+    real_session_service: InMemorySessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Publishing freezes the plan; it never runs the summarizer."""
+    monkeypatch.setattr(
+        "services.workflow_planning.summarize_planning_transcript", _boom_summarize
+    )
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+    await add_template(workflow_client, wf["id"])
+
+    body = await publish_workflow(workflow_client, wf["id"])
+    assert body["status"] == "published"
+    assert body["generatedDescription"] is None
+
+
+# ---------- generate description ----------
+
+
+async def test_generate_description_summarizes_the_planning_conversation(
+    workflow_client: AsyncClient,
+    real_session_service: InMemorySessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "services.workflow_planning.summarize_planning_transcript", _fake_summarize
+    )
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+
+    body = assert_ok(
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/generate-description")
+    )
+    assert body["generatedDescription"] == "A summary of the plan"
+    # The user's own description is left alone -- the two fields are separate.
+    assert body["description"] is None
+    assert body["status"] == "draft"
+
+
+async def test_generate_description_marks_a_published_workflow_modified(
+    workflow_client: AsyncClient,
+    real_session_service: InMemorySessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The run-time fallback text changed, so the live plan has drifted."""
+    monkeypatch.setattr(
+        "services.workflow_planning.summarize_planning_transcript", _fake_summarize
+    )
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+
+    body = assert_ok(
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/generate-description")
+    )
+    assert body["status"] == "modified"
+    assert body["generatedDescription"] == "A summary of the plan"
+
+
+async def test_generate_description_without_a_conversation_returns_409(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/generate-description"
+    )
+    err = assert_err(response, code="WORKFLOW_DESCRIPTION_NOT_GENERATABLE", status=409)
+    assert err["details"]["workflowId"] == wf["id"]
+
+
+async def test_generate_description_while_generating_returns_409(
+    workflow_client: AsyncClient,
+    real_session_service: InMemorySessionService,
+    mock_generation_job: AsyncMock,
+) -> None:
+    mock_generation_job.side_effect = None  # the generation run never finishes
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/generate-description"
+    )
+    assert_err(response, code="WORKFLOW_DESCRIPTION_NOT_GENERATABLE", status=409)
+
+
+async def test_generate_description_unknown_id_returns_404(
+    workflow_client: AsyncClient,
+) -> None:
+    response = await workflow_client.post(
+        "/api/v1/workflows/nonexistent/generate-description"
+    )
+    assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_generate_description_summarizer_failure_returns_502(
+    workflow_client: AsyncClient,
+    real_session_service: InMemorySessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unlike publish, this endpoint has nothing to deliver without the summary."""
+    monkeypatch.setattr(
+        "services.workflow_planning.summarize_planning_transcript", _boom_summarize
+    )
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/generate-description"
+    )
+    err = assert_err(response, code="SUMMARIZATION_FAILED", status=502)
+    assert err["details"] == {"workflowId": wf["id"]}
+    # The raw LLM failure never reaches the client.
+    assert "LLM down" not in err["message"]
 
 
 # ---------- modified ----------

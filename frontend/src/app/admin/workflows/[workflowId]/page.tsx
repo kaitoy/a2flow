@@ -10,6 +10,7 @@ import {
   Play,
   PowerOff,
   Rocket,
+  Sparkles,
   Undo2,
   Workflow as WorkflowIcon,
 } from "lucide-react";
@@ -39,6 +40,7 @@ import {
   deleteWorkflow,
   discardWorkflowChanges,
   executeWorkflow,
+  generateWorkflowDescription,
   getAgentSkill,
   getWorkflow,
   getWorkflowPlanningSession,
@@ -101,7 +103,10 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * `description` is a free-form field any developer can set; the workflow
  * session falls back to the AI-generated `generatedDescription` whenever it's
  * empty. `generatedDescription` itself is read-only for everyone except a
- * super admin, who can edit it directly to correct the AI's summary. Since the
+ * super admin, who can edit it directly to correct the AI's summary. Any
+ * developer can instead re-derive it from the planning conversation through
+ * the field's own generate button, which saves the new summary server-side
+ * right away (and so moves a published workflow to `modified`). Since the
  * override is usually a hand-edit of that summary, the Description field also
  * carries a button opening a word-level diff of the two current (possibly
  * unsaved) values.
@@ -134,6 +139,7 @@ export default function WorkflowDetailPage() {
   const discard = useAsyncAction({ showDone: false });
   const deactivate = useAsyncAction({ showDone: false });
   const run = useAsyncAction({ showDone: false });
+  const generateDescription = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -220,6 +226,18 @@ export default function WorkflowDetailPage() {
         const published = await publishWorkflow(workflowId);
         applyWorkflow(published);
         dispatch(showToast({ message: "Workflow published" }));
+      });
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
+    }
+  }
+
+  async function handleGenerateDescription() {
+    try {
+      await generateDescription.run(async () => {
+        const updated = await generateWorkflowDescription(workflowId);
+        applyWorkflow(updated);
+        dispatch(showToast({ message: "Description generated" }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -352,12 +370,14 @@ export default function WorkflowDetailPage() {
           aria-label="Workflow status"
           className={[
             "mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4",
-            // Signature "live edge": publishing runs the description summarizer
-            // synchronously and `generating` means the background planning run
-            // is still going — both are the agent at work, so the card carries
-            // the same travelling light the chat bubbles do. Gated on the
-            // 200ms `pending` stage rather than `inFlight` so a fast rejection
-            // (409 with no task templates) never flashes it.
+            // Signature "live edge": a lifecycle transition is being written
+            // server-side, or `generating` means the background planning run is
+            // still going, so the card carries the same travelling light the
+            // chat bubbles do. Gated on the 200ms `pending` stage rather than
+            // `inFlight` so a fast rejection (409 with no task templates) never
+            // flashes it. Generating the description is deliberately absent:
+            // it belongs to the field below, which spins its own button and
+            // lights its own live edge.
             publish.status === "pending" ||
             discard.status === "pending" ||
             deactivate.status === "pending" ||
@@ -445,19 +465,43 @@ export default function WorkflowDetailPage() {
             />
           </FormField>
 
-          <FormField htmlFor="generatedDescription" label="Generated description">
-            {isSuperAdmin ? (
-              <Textarea
-                id="generatedDescription"
-                rows={4}
-                placeholder="Summarized from the planning conversation on publish"
-                {...register("generatedDescription")}
-              />
-            ) : (
-              <p className="whitespace-pre-wrap py-1.5 text-sm text-on-surface">
-                {workflow.generatedDescription || "—"}
-              </p>
-            )}
+          <FormField
+            htmlFor="generatedDescription"
+            label="Generated description"
+            action={
+              canEdit ? (
+                <ActionIconButton
+                  icon={Sparkles}
+                  label="Generate from the planning conversation"
+                  onClick={handleGenerateDescription}
+                  // While the plan is still generating the background job owns
+                  // this field and there is no settled conversation to
+                  // summarize yet.
+                  disabled={generating || generateDescription.inFlight}
+                  spinning={generateDescription.inFlight}
+                  spinAnimation="spin-y"
+                />
+              ) : undefined
+            }
+          >
+            <div
+              className={["rounded-xl", generateDescription.status === "pending" ? "live-edge" : ""]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {isSuperAdmin ? (
+                <Textarea
+                  id="generatedDescription"
+                  rows={4}
+                  placeholder="Summarized from the planning conversation"
+                  {...register("generatedDescription")}
+                />
+              ) : (
+                <p className="whitespace-pre-wrap py-1.5 text-sm text-on-surface">
+                  {workflow.generatedDescription || "—"}
+                </p>
+              )}
+            </div>
             <p className="text-xs text-on-surface-variant">
               {isSuperAdmin
                 ? "AI-generated summary. Only a super admin can edit it directly."

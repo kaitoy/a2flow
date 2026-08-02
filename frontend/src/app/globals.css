@@ -93,6 +93,7 @@
   --animate-wiggle: wiggle 0.7s ease-in-out;
   --animate-attention: attention 3s ease-in-out infinite;
   --animate-rocket-launch: rocket-launch 0.9s ease-in-out infinite;
+  --animate-spin-y: spin-y 1s linear infinite;
 
   /* Motion tokens (durations & Material You "emphasized" easing). */
   --motion-duration-fast: 150ms;
@@ -469,6 +470,18 @@ body::after {
   }
   50% {
     transform: rotate(-45deg) scale(1.35, 0.8) rotate(45deg);
+  }
+}
+
+/* Continuous Y-axis spin — same 1s/turn cadence as Tailwind's animate-spin,
+   but rotating in depth instead of flat on the page. perspective(...) gives
+   the turn visible depth instead of a horizontal squish at 90deg/270deg. */
+@keyframes spin-y {
+  from {
+    transform: perspective(200px) rotateY(0deg);
+  }
+  to {
+    transform: perspective(200px) rotateY(360deg);
   }
 }
 

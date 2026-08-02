@@ -35,6 +35,9 @@ const DEVELOPER = authState(["developer"]);
 /** Accessible name of the action opening the description diff dialog. */
 const DIFF_BUTTON = "Show diff from the generated description";
 
+/** Accessible name of the action re-summarizing the planning conversation. */
+const GENERATE_BUTTON = "Generate from the planning conversation";
+
 beforeEach(() => {
   vi.mocked(useParams).mockReturnValue({ workflowId: "wf-1" });
 });
@@ -94,7 +97,7 @@ describe("WorkflowDetailPage", () => {
     );
   });
 
-  it("lights the status bar while publish summarizes, then unlights it", async () => {
+  it("lights the status bar while publishing, then unlights it", async () => {
     const user = userEvent.setup();
     server.use(
       http.post("http://localhost:8000/api/v1/workflows/:id/publish", async () => {
@@ -432,6 +435,138 @@ describe("WorkflowDetailPage", () => {
         description: null,
         generatedDescription: "Edited by admin",
       })
+    );
+  });
+
+  it("generates the description from the planning conversation", async () => {
+    const user = userEvent.setup();
+    const generateSpy = vi.fn(() =>
+      envelope({
+        id: "wf-1",
+        tenantId: "tenant-1",
+        name: "my-workflow",
+        description: null,
+        generatedDescription: "A freshly generated summary",
+        agentSkillId: "skill-1",
+        status: "modified",
+        generationError: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        createdBy: "",
+        updatedBy: "",
+      })
+    );
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", generateSpy)
+    );
+
+    // Success toasts go through the component's own dispatch, so they land in
+    // the render store rather than the global one api.ts reports errors to.
+    const { store: renderStore } = render(<WorkflowDetailPage />, {
+      preloadedState: DEVELOPER,
+    });
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    await user.click(screen.getByRole("button", { name: GENERATE_BUTTON }));
+
+    await waitFor(() => expect(generateSpy).toHaveBeenCalled());
+    // The developer sees the read-only rendering, so the fresh summary lands as
+    // text rather than in a textarea.
+    expect(await screen.findByText("A freshly generated summary")).toBeInTheDocument();
+    expect(renderStore.getState().toast.items.at(-1)).toMatchObject({
+      message: "Description generated",
+    });
+  });
+
+  it("lights the generated-description field while a summary is generating, then unlights it", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", async () => {
+        // Outlast useAsyncAction's 200ms pending gate so the light is reached.
+        await delay(400);
+        return envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          generatedDescription: "A freshly generated summary",
+          agentSkillId: "skill-1",
+          status: "modified",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        });
+      })
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: SUPER_ADMIN });
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    await user.click(screen.getByRole("button", { name: GENERATE_BUTTON }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Generated description").parentElement).toHaveClass("live-edge")
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Generated description").parentElement).not.toHaveClass(
+        "live-edge"
+      )
+    );
+  });
+
+  it("shows an error toast when there is no planning conversation to summarize", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", () =>
+        envelopeErr(
+          "WORKFLOW_DESCRIPTION_NOT_GENERATABLE",
+          "Workflow has no planning conversation to summarize",
+          409
+        )
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    await user.click(screen.getByRole("button", { name: GENERATE_BUTTON }));
+
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Workflow has no planning conversation to summarize",
+        variant: "error",
+      })
+    );
+  });
+
+  it("hides the generate action from a viewer who cannot edit workflows", async () => {
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    expect(screen.queryByRole("button", { name: GENERATE_BUTTON })).not.toBeInTheDocument();
+  });
+
+  it("disables the generate action while the plan is still generating", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          generatedDescription: null,
+          agentSkillId: "skill-1",
+          status: "generating",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: GENERATE_BUTTON })).toBeDisabled()
     );
   });
 

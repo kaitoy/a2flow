@@ -165,11 +165,34 @@ async def publish_workflow(
 ) -> ApiResponse[Workflow]:
     """Publish a workflow, making it executable.
 
-    Re-summarizes the planning conversation into the workflow's description.
-    Raises HTTP 409 (``WORKFLOW_NOT_RUNNABLE``) while generation is in flight
-    or when the workflow has no task templates.
+    Freezes the current plan into the workflow's published snapshot. Raises
+    HTTP 409 (``WORKFLOW_NOT_RUNNABLE``) while generation is in flight or when
+    the workflow has no task templates.
     """
     workflow = await service.publish(workflow_id, user_id=user_id)
+    return ApiResponse(meta=meta, data=workflow)
+
+
+@router.post(
+    "/{workflow_id}/generate-description",
+    response_model=ApiResponse[Workflow],
+    dependencies=_requires_developer,
+)
+async def generate_workflow_description(
+    workflow_id: str,
+    service: WorkflowPlanningServiceDep,
+    user_id: CurrentUserIdDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[Workflow]:
+    """Summarize the workflow's planning conversation into its description.
+
+    Overwrites the workflow's AI-generated description and returns the updated
+    workflow; a ``published`` workflow becomes ``modified``. Raises HTTP 409
+    (``WORKFLOW_DESCRIPTION_NOT_GENERATABLE``) while generation is in flight or
+    when there is no planning conversation to summarize, and HTTP 502
+    (``SUMMARIZATION_FAILED``) when the summarizer call fails.
+    """
+    workflow = await service.generate_description(workflow_id, user_id=user_id)
     return ApiResponse(meta=meta, data=workflow)
 
 
