@@ -125,10 +125,16 @@ async def update_workflow(
     workflow_id: str,
     body: WorkflowUpdate,
     service: WorkflowServiceDep,
-    user_id: CurrentUserIdDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Workflow]:
-    workflow = await service.update(workflow_id, body, user_id=user_id)
+    """Apply a partial update to a Workflow.
+
+    Changing ``generated_description`` is restricted to a ``super_admin``
+    (HTTP 403 ``FORBIDDEN`` otherwise); every other field stays open to any
+    caller who reaches this route.
+    """
+    workflow = await service.update(workflow_id, body, caller=caller)
     return ApiResponse(meta=meta, data=workflow)
 
 

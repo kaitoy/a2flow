@@ -324,6 +324,9 @@ def upgrade() -> None:
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column(
+            "generated_description", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
         sa.Column("agent_skill_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column(
             "status",

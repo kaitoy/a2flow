@@ -193,7 +193,8 @@ async def test_generation_job_success_sets_draft_and_notifies(
     workflow = await _workflow_row(engine, wf_id)
     assert workflow.status is WorkflowStatus.draft
     assert workflow.generation_error is None
-    assert workflow.description == "A summary of the plan"
+    assert workflow.generated_description == "A summary of the plan"
+    assert workflow.description is None
 
     # The run went through the initial-planning agent with the prompt as the
     # user message, keyed by the session owner.

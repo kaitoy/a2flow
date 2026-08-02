@@ -142,7 +142,9 @@ function buildColumns(
       header: "Description",
       sortField: "description",
       filterField: "description",
-      cell: (w) => w.description || "—",
+      // Falls back to the AI-generated summary, mirroring the workflow
+      // session's own fallback rule (see WorkflowDetailPage).
+      cell: (w) => w.description || w.generatedDescription || "—",
     },
     {
       header: "Created At",

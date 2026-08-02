@@ -44,7 +44,7 @@ class WorkflowRepository(Protocol):
         status: WorkflowStatus,
         *,
         generation_error: str | None = None,
-        description: str | None = None,
+        generated_description: str | None = None,
         user_id: str,
     ) -> Workflow: ...
 
@@ -149,7 +149,7 @@ class SqlWorkflowRepository:
         status: WorkflowStatus,
         *,
         generation_error: str | None = None,
-        description: str | None = None,
+        generated_description: str | None = None,
         user_id: str,
     ) -> Workflow:
         """Set the server-managed lifecycle fields of a workflow.
@@ -158,15 +158,16 @@ class SqlWorkflowRepository:
         so they cannot be written through the API; the generation job and the
         publish use case go through this method instead. ``generation_error``
         is always overwritten (a successful transition clears a stale error).
-        ``description`` is only written when non-``None`` — the callers pass
-        the freshly generated conversation summary here so it lands in the same
-        commit as the status change.
+        ``generated_description`` is only written when non-``None`` — the
+        callers pass the freshly generated conversation summary here so it
+        lands in the same commit as the status change.
 
         Args:
             workflow_id: Identifier of the workflow to update.
             status: The new lifecycle status.
             generation_error: Failure reason to record, or ``None`` to clear.
-            description: New summary description, or ``None`` to keep as is.
+            generated_description: New AI-generated summary, or ``None`` to
+                keep as is.
             user_id: ID of the acting user recorded on ``updated_by``.
 
         Returns:
@@ -180,8 +181,8 @@ class SqlWorkflowRepository:
             raise NotFoundError("Workflow", workflow_id)
         workflow.status = status
         workflow.generation_error = generation_error
-        if description is not None:
-            workflow.description = description
+        if generated_description is not None:
+            workflow.generated_description = generated_description
         workflow.updated_by = user_id
         self._db.add(workflow)
         await commit_or_translate_user_fk(self._db, user_id=user_id)

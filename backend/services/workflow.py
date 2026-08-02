@@ -35,6 +35,7 @@ from repositories import (
     WorkflowTaskTemplateRepository,
 )
 from repositories.exceptions import (
+    ForbiddenError,
     NotFoundError,
     SkillNotReadyError,
     WorkflowNotDeactivatableError,
@@ -166,30 +167,47 @@ class WorkflowService:
         )
 
     async def update(
-        self, workflow_id: str, data: WorkflowUpdate, *, user_id: str
+        self, workflow_id: str, data: WorkflowUpdate, *, caller: User
     ) -> Workflow:
-        """Apply a partial update to a Workflow.
+        """Apply a partial update to a Workflow, authorizing the acting user.
 
         Editing a ``published`` workflow moves it to ``modified``, so runs keep
         using the snapshot taken at publish time until it is published again.
         An update that sets no fields changes nothing and leaves the status
         alone.
 
+        ``generated_description`` may only be changed by a ``super_admin``
+        (see :class:`~models.workflow.WorkflowUpdate`); every other field
+        stays open to any caller who reached this route (gated to the
+        ``developer`` role at the router).
+
         Args:
             workflow_id: Identifier of the workflow to update.
             data: Fields to update.
-            user_id: ID of the user performing the update.
+            caller: The authenticated user performing the update.
 
         Returns:
             The updated Workflow.
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
+            ForbiddenError: If the update would change ``generated_description``
+                and the caller is not a super admin.
         """
-        updated = await self._workflows.update(workflow_id, data, user_id=user_id)
-        if not data.model_dump(exclude_unset=True):
+        current = await self.get(workflow_id)
+        update = data.model_dump(exclude_unset=True)
+        if (
+            "generated_description" in update
+            and update["generated_description"] != current.generated_description
+            and not has_role(caller, Role.super_admin)
+        ):
+            raise ForbiddenError(
+                "Only a super admin can edit the generated description"
+            )
+        updated = await self._workflows.update(workflow_id, data, user_id=caller.id)
+        if not update:
             return updated
-        await self._workflows.mark_modified(workflow_id, user_id=user_id)
+        await self._workflows.mark_modified(workflow_id, user_id=caller.id)
         # Re-read after the status commit: it expires the instance returned
         # above, and serializing an expired one outside the request's greenlet
         # context would fail.
@@ -348,7 +366,7 @@ class WorkflowService:
         )
         return (
             workflow.name,
-            workflow.description,
+            workflow.effective_description,
             [snapshot_template(t) for t in live],
         )
 

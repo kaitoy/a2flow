@@ -160,15 +160,20 @@ class WorkflowPlanningService:
 
         Requires the plan to be settled: generation must not be in flight and
         at least one task template must exist. The planning conversation is
-        re-summarized into the workflow's ``description`` so the execution
-        agent always receives the latest intent; a summarization failure keeps
-        the previous description rather than blocking the publish.
+        re-summarized into the workflow's ``generated_description`` so the
+        execution agent's fallback context always reflects the latest intent
+        when the user hasn't overridden it with their own ``description``; a
+        summarization failure keeps the previous generated description rather
+        than blocking the publish.
 
-        The workflow's name, resulting description, and full task-template list
-        are then frozen into its ``WorkflowPublishedVersion`` snapshot,
-        replacing the previous one. Runs started while the workflow is
-        ``modified`` use that snapshot instead of the live templates, so a
-        published plan keeps executing exactly as it was approved.
+        The workflow's name, effective description (the user's ``description``
+        override if set, else the resulting ``generated_description`` — see
+        :attr:`~models.workflow.Workflow.effective_description`), and full
+        task-template list are then frozen into its
+        ``WorkflowPublishedVersion`` snapshot, replacing the previous one.
+        Runs started while the workflow is ``modified`` use that snapshot
+        instead of the live templates, so a published plan keeps executing
+        exactly as it was approved.
 
         Args:
             workflow_id: Identifier of the workflow to publish.
@@ -193,31 +198,35 @@ class WorkflowPlanningService:
         # session expires loaded instances, and a plain attribute read on an
         # expired instance fails outside an explicit refresh.
         name = workflow.name
-        previous_description = workflow.description
+        user_description = workflow.description
+        previous_generated_description = workflow.generated_description
         templates = await self._templates.list(
             limit=MAX_TASK_TEMPLATES, offset=0, workflow_id=workflow_id
         )
         if not templates:
             raise WorkflowNotRunnableError(workflow_id, "it has no task templates")
 
-        description: str | None = None
+        generated_description: str | None = None
         try:
             transcript = await self._planning_transcript(workflow_id)
             if transcript:
-                description = await self._summarize(transcript)
+                generated_description = await self._summarize(transcript)
         except Exception:
             logger.warning(
                 "Failed to summarize the planning conversation of workflow %s; "
-                "keeping its previous description.",
+                "keeping its previous generated description.",
                 workflow_id,
                 exc_info=True,
             )
+        effective_generated_description = (
+            generated_description
+            if generated_description is not None
+            else previous_generated_description
+        )
         await self._versions.upsert(
             workflow_id,
             name=name,
-            description=description
-            if description is not None
-            else previous_description,
+            description=user_description or effective_generated_description,
             templates=dump_templates(
                 [snapshot_template(t) for t in templates],
             ),
@@ -226,7 +235,7 @@ class WorkflowPlanningService:
         return await self._workflows.set_status(
             workflow_id,
             WorkflowStatus.published,
-            description=description,
+            generated_description=generated_description,
             user_id=user_id,
         )
 
@@ -269,9 +278,9 @@ async def generate_workflow_plan(
     message of the workflow's planning session and drives the
     ``initial_planning`` agent to completion; the agent registers the task
     templates through its planning tools. Afterwards the conversation is
-    summarized into the workflow's ``description``, the status becomes
-    ``draft``, and a ``workflow_draft_ready`` notification is sent to the
-    generating user. Any failure — including a run that registered no
+    summarized into the workflow's ``generated_description``, the status
+    becomes ``draft``, and a ``workflow_draft_ready`` notification is sent to
+    the generating user. Any failure — including a run that registered no
     templates — lands on the row as ``status=failed`` plus the reason, which
     the admin UI polls; like the skill sync job, this function never raises.
 
@@ -386,9 +395,9 @@ async def generate_workflow_plan(
             app_name=scoped_app_name, user_id=ps.user_id, session_id=ps.session_id
         )
         transcript = build_planning_transcript(session.events) if session else ""
-        description: str | None
+        generated_description: str | None
         try:
-            description = await summarize_planning_transcript(transcript)
+            generated_description = await summarize_planning_transcript(transcript)
         except Exception:
             logger.warning(
                 "Failed to summarize the planning conversation of workflow %s; "
@@ -396,7 +405,7 @@ async def generate_workflow_plan(
                 workflow_id,
                 exc_info=True,
             )
-            description = transcript[:2000].rstrip() or None
+            generated_description = transcript[:2000].rstrip() or None
 
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
             workflows = SqlWorkflowRepository(
@@ -407,7 +416,7 @@ async def generate_workflow_plan(
             await workflows.set_status(
                 workflow_id,
                 WorkflowStatus.draft,
-                description=description,
+                generated_description=generated_description,
                 user_id=user_id,
             )
             try:

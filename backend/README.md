@@ -122,7 +122,7 @@ Database URL for REST API data and ADK session storage — both live in the same
 | `agent_skills` | Agent skill definitions (incl. optional `repo_auth_password` / `repo_auth_username` for private-repo clones) |
 | `mcp_servers` | Registered MCP servers (name, `transport`, then either streamable HTTP URL + request headers or stdio command + args + env — header and env values may embed `${secret:NAME/KEY}` placeholders) |
 | `secrets` | Named key/value credential bundles: an `entries` map of Fernet-encrypted local values, or a HashiCorp Vault KV v2 path reference; see [Secrets](#secrets) |
-| `workflows` | Workflow definitions (name, skill reference, lifecycle `status`, summarized description) |
+| `workflows` | Workflow definitions (name, skill reference, lifecycle `status`, AI-summarized `generatedDescription`, user-editable `description`) |
 | `workflow_task_templates` | The pre-planned task list of a workflow (`workflow_id` FK with `ON DELETE CASCADE`; dependency edges and MCP tool bindings live in their own `workflow_task_template_*` join tables) |
 | `workflow_published_versions` | At most one per workflow: the name, description, and task templates (as JSON) frozen at publish time, which a `modified` workflow runs against; see [Workflows](#workflows) |
 | `planning_sessions` | One per workflow: the chat in which its task templates are produced and refined |

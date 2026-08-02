@@ -50,6 +50,7 @@ const WORKFLOW_1 = {
   tenantId: "tenant-1",
   name: "my-workflow",
   description: null,
+  generatedDescription: null,
   agentSkillId: "skill-1",
   status: "published",
   generationError: null,

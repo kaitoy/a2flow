@@ -2,7 +2,8 @@ import userEvent from "@testing-library/user-event";
 import { delay, http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { store } from "@/store";
+import type { User } from "@/lib/api";
+import { type RootState, store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -13,6 +14,21 @@ vi.mock("next/link", () => ({
     <a href={href}>{children}</a>
   ),
 }));
+
+/** Build a preloaded auth slice for a signed-in user holding the given roles. */
+function authState(roles: string[]): Partial<RootState> {
+  return {
+    auth: {
+      user: { id: "u1", roles } as User,
+      status: "authenticated",
+      selectedTenantId: null,
+      impersonatedUserId: null,
+      impersonatedBy: null,
+    },
+  };
+}
+
+const SUPER_ADMIN = authState(["super_admin"]);
 
 beforeEach(() => {
   vi.mocked(useParams).mockReturnValue({ workflowId: "wf-1" });
@@ -215,6 +231,110 @@ describe("WorkflowDetailPage", () => {
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(receivedBody).toEqual({ name: "Renamed", description: null }));
+  });
+
+  it("shows the generated description as read-only text for a non-super-admin", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          generatedDescription: "AI summary of the plan",
+          agentSkillId: "skill-1",
+          status: "published",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />);
+    await waitFor(() => expect(screen.getByText("AI summary of the plan")).toBeInTheDocument());
+    expect(screen.queryByLabelText(/generated description/i)).not.toBeInTheDocument();
+  });
+
+  it("lets a super admin edit the generated description", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          generatedDescription: "AI summary of the plan",
+          agentSkillId: "skill-1",
+          status: "published",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: SUPER_ADMIN });
+    const field = await screen.findByLabelText(/generated description/i);
+    await waitFor(() => expect(field).toHaveValue("AI summary of the plan"));
+  });
+
+  it("includes generatedDescription in the save payload for a super admin", async () => {
+    const user = userEvent.setup();
+    let receivedBody: unknown;
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          generatedDescription: "AI summary",
+          agentSkillId: "skill-1",
+          status: "published",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      ),
+      http.patch("http://localhost:8000/api/v1/workflows/:id", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope({
+          id: "wf-1",
+          name: "my-workflow",
+          description: null,
+          generatedDescription: "Edited by admin",
+          agentSkillId: "skill-1",
+          status: "published",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        });
+      })
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: SUPER_ADMIN });
+    const field = await screen.findByLabelText(/generated description/i);
+    await waitFor(() => expect(field).toHaveValue("AI summary"));
+    await user.clear(field);
+    await user.type(field, "Edited by admin");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "my-workflow",
+        description: null,
+        generatedDescription: "Edited by admin",
+      })
+    );
   });
 
   it("offers no Discard changes action while the workflow is published", async () => {

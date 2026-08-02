@@ -105,6 +105,57 @@ describe("WorkflowsPage", () => {
     );
   });
 
+  it("falls back to the generated description when the user description is empty", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows", () =>
+        envelope([
+          {
+            id: "wf-1",
+            tenantId: "tenant-1",
+            name: "my-workflow",
+            description: null,
+            generatedDescription: "AI summary of the plan",
+            agentSkillId: "skill-1",
+            status: "published",
+            generationError: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => expect(screen.getByText("AI summary of the plan")).toBeInTheDocument());
+  });
+
+  it("prefers the user description over the generated description", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows", () =>
+        envelope([
+          {
+            id: "wf-1",
+            tenantId: "tenant-1",
+            name: "my-workflow",
+            description: "User's own summary",
+            generatedDescription: "AI summary of the plan",
+            agentSkillId: "skill-1",
+            status: "published",
+            generationError: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => expect(screen.getByText("User's own summary")).toBeInTheDocument());
+    expect(screen.queryByText("AI summary of the plan")).not.toBeInTheDocument();
+  });
+
   /** Serve a single `draft`-status workflow row for the draft-execution tests below. */
   function mockDraftWorkflowRow() {
     server.use(

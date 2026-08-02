@@ -5,7 +5,7 @@ task templates generated for it by a planning session. Workflows are never
 created directly through a plain POST — they are born from
 ``POST /agent-skills/{skill_id}/workflows`` ("Generate workflow"), which
 registers a draft row and schedules a background planning run that fills in
-the task templates and the conversation summary (``description``).
+the task templates and the conversation summary (``generated_description``).
 """
 
 from enum import StrEnum
@@ -65,14 +65,22 @@ class WorkflowStatus(StrEnum):
 class WorkflowUpdate(SQLModel):
     """Partial update payload for a Workflow — all fields are optional.
 
-    Only ``name`` and ``description`` are client-writable: the bound skill is
-    fixed at generation time (the task templates were planned against it), and
-    ``status`` is server-managed via generation and publish.
+    ``name`` and ``description`` are client-writable by any ``developer``: the
+    bound skill is fixed at generation time (the task templates were planned
+    against it), and ``status`` is server-managed via generation and publish.
+
+    ``generated_description`` is also client-writable here, but only by a
+    ``super_admin`` — see the guard in
+    :meth:`services.workflow.WorkflowService.update`. It holds the AI-produced
+    conversation summary; ``description`` is the free-form field a user can
+    set to override it. See :attr:`Workflow.effective_description` for how the
+    two combine.
     """
 
     model_config = _alias_config
     name: EntityName | None = None
     description: DescText | None = None
+    generated_description: DescText | None = None
 
 
 class WorkflowCreate(WorkflowUpdate):
@@ -97,6 +105,12 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     ``.../deactivate``, and — for the ``published`` → ``modified``
     transition — by any save that edits a published workflow or one of its
     task templates.
+
+    ``generated_description`` is written only by the planning generation job
+    and by ``POST /workflows/{id}/publish``'s re-summarization (or, as a
+    correction, by a ``super_admin`` through ``PATCH``); ``description`` is
+    the free-form field any ``developer`` can set to override it. See
+    :attr:`effective_description`.
     """
 
     __tablename__ = "workflows"
@@ -112,6 +126,15 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
             ["agent_skill_id"], ["agent_skills.id"], ondelete="RESTRICT"
         ),
     )
+
+    @property
+    def effective_description(self) -> str | None:
+        """Return the description a workflow session should use.
+
+        ``description`` wins whenever a user has set it; otherwise falls back
+        to the AI-generated ``generated_description``.
+        """
+        return self.description or self.generated_description
 
 
 class GenerateWorkflowRequest(SQLModel):

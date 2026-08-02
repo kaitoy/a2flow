@@ -42,6 +42,7 @@ import {
   type Workflow,
   type WorkflowStatus,
 } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 import { formatWorkflowStatusLabel, WORKFLOW_STATUS_DOT_CLASS } from "@/lib/workflow-status";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -49,11 +50,15 @@ import { showToast } from "@/store/toastSlice";
 /** How often (ms) to re-fetch the workflow while its plan is still generating. */
 const POLL_INTERVAL_MS = 2000;
 
-// Only name and description are client-writable; reuse the generated name
-// constraint and allow a free-form (bounded) description.
+// name and description are client-writable by any developer; reuse the
+// generated name constraint and allow a free-form (bounded) description.
+// generatedDescription is only ever submitted for a super_admin caller (see
+// isSuperAdmin below), but stays part of the schema so register()/reset() can
+// address it regardless of role.
 const schema = z.object({
   name: zGenerateWorkflowRequest.shape.name,
   description: z.string().max(2000),
+  generatedDescription: z.string().max(2000),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -78,6 +83,11 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * session to adjust the plan by chat, manage the task templates, and publish
  * the workflow to make it executable.
  *
+ * `description` is a free-form field any developer can set; the workflow
+ * session falls back to the AI-generated `generatedDescription` whenever it's
+ * empty. `generatedDescription` itself is read-only for everyone except a
+ * super admin, who can edit it directly to correct the AI's summary.
+ *
  * Editing a published workflow moves it to `modified` — runs keep using the
  * last published version — so the status bar then also offers "Discard
  * changes", which restores that version and returns the workflow to
@@ -89,6 +99,7 @@ export default function WorkflowDetailPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   const [loading, setLoading] = useState(true);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [skillName, setSkillName] = useState<string | null>(null);
@@ -110,13 +121,17 @@ export default function WorkflowDetailPage() {
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: { name: "", description: "" },
+    defaultValues: { name: "", description: "", generatedDescription: "" },
   });
 
   const applyWorkflow = useCallback(
     (wf: Workflow) => {
       setWorkflow(wf);
-      reset({ name: wf.name, description: wf.description ?? "" });
+      reset({
+        name: wf.name,
+        description: wf.description ?? "",
+        generatedDescription: wf.generatedDescription ?? "",
+      });
       setAudit({
         createdBy: wf.createdBy,
         updatedBy: wf.updatedBy,
@@ -160,6 +175,7 @@ export default function WorkflowDetailPage() {
         const updated = await updateWorkflow(workflowId, {
           name: values.name,
           description: values.description || null,
+          ...(isSuperAdmin ? { generatedDescription: values.generatedDescription || null } : {}),
         });
         applyWorkflow(updated);
         dispatch(showToast({ message: "Workflow updated" }));
@@ -347,9 +363,30 @@ export default function WorkflowDetailPage() {
             <Textarea
               id="description"
               rows={4}
-              placeholder="Summarized from the planning conversation on publish"
+              placeholder="Overrides the generated description below for the workflow session"
               {...register("description")}
             />
+          </FormField>
+
+          <FormField htmlFor="generatedDescription" label="Generated description">
+            {isSuperAdmin ? (
+              <Textarea
+                id="generatedDescription"
+                rows={4}
+                placeholder="Summarized from the planning conversation on publish"
+                {...register("generatedDescription")}
+              />
+            ) : (
+              <p className="whitespace-pre-wrap py-1.5 text-sm text-on-surface">
+                {workflow.generatedDescription || "—"}
+              </p>
+            )}
+            <p className="text-xs text-on-surface-variant">
+              {isSuperAdmin
+                ? "AI-generated summary. Only a super admin can edit it directly."
+                : "AI-generated summary, read-only."}{" "}
+              Used for the workflow session whenever Description above is empty.
+            </p>
           </FormField>
 
           <div className="flex flex-wrap gap-2">
