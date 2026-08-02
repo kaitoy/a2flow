@@ -30,6 +30,9 @@ function authState(roles: string[]): Partial<RootState> {
 
 const SUPER_ADMIN = authState(["super_admin"]);
 
+/** Accessible name of the action opening the description diff dialog. */
+const DIFF_BUTTON = "Show diff from the generated description";
+
 beforeEach(() => {
   vi.mocked(useParams).mockReturnValue({ workflowId: "wf-1" });
 });
@@ -255,7 +258,9 @@ describe("WorkflowDetailPage", () => {
 
     render(<WorkflowDetailPage />);
     await waitFor(() => expect(screen.getByText("AI summary of the plan")).toBeInTheDocument());
-    expect(screen.queryByLabelText(/generated description/i)).not.toBeInTheDocument();
+    // Anchored so the diff button — whose accessible name mentions the
+    // generated description — isn't mistaken for the textarea.
+    expect(screen.queryByLabelText(/^generated description$/i)).not.toBeInTheDocument();
   });
 
   it("lets a super admin edit the generated description", async () => {
@@ -279,7 +284,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />, { preloadedState: SUPER_ADMIN });
-    const field = await screen.findByLabelText(/generated description/i);
+    const field = await screen.findByLabelText(/^generated description$/i);
     await waitFor(() => expect(field).toHaveValue("AI summary of the plan"));
   });
 
@@ -322,7 +327,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />, { preloadedState: SUPER_ADMIN });
-    const field = await screen.findByLabelText(/generated description/i);
+    const field = await screen.findByLabelText(/^generated description$/i);
     await waitFor(() => expect(field).toHaveValue("AI summary"));
     await user.clear(field);
     await user.type(field, "Edited by admin");
@@ -335,6 +340,78 @@ describe("WorkflowDetailPage", () => {
         generatedDescription: "Edited by admin",
       })
     );
+  });
+
+  it("disables the diff action while there is no generated description to compare against", async () => {
+    render(<WorkflowDetailPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    expect(screen.getByRole("button", { name: DIFF_BUTTON })).toBeDisabled();
+  });
+
+  it("diffs the description against the generated description", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: "Collects the weekly sales report.",
+          generatedDescription: "Collects the monthly sales report.",
+          agentSkillId: "skill-1",
+          status: "published",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+    await user.click(screen.getByRole("button", { name: DIFF_BUTTON }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(Array.from(dialog.querySelectorAll("del")).map((el) => el.textContent?.trim())).toEqual([
+      "monthly",
+    ]);
+    expect(Array.from(dialog.querySelectorAll("ins")).map((el) => el.textContent?.trim())).toEqual([
+      "weekly",
+    ]);
+  });
+
+  it("diffs unsaved edits to the description", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          generatedDescription: "Runs monthly.",
+          agentSkillId: "skill-1",
+          status: "published",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />);
+    const description = await screen.findByLabelText(/^description/i);
+    await user.type(description, "Runs weekly.");
+    await user.click(screen.getByRole("button", { name: DIFF_BUTTON }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(Array.from(dialog.querySelectorAll("ins")).map((el) => el.textContent?.trim())).toEqual([
+      "weekly",
+    ]);
   });
 
   it("offers no Discard changes action while the workflow is published", async () => {

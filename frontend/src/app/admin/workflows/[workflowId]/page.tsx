@@ -3,6 +3,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  GitCompare,
   ListTree,
   MessageSquareText,
   PowerOff,
@@ -20,6 +21,7 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { DescriptionDiffDialog } from "@/components/admin/description-diff-dialog";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
@@ -86,7 +88,10 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * `description` is a free-form field any developer can set; the workflow
  * session falls back to the AI-generated `generatedDescription` whenever it's
  * empty. `generatedDescription` itself is read-only for everyone except a
- * super admin, who can edit it directly to correct the AI's summary.
+ * super admin, who can edit it directly to correct the AI's summary. Since the
+ * override is usually a hand-edit of that summary, the Description field also
+ * carries a button opening a word-level diff of the two current (possibly
+ * unsaved) values.
  *
  * Editing a published workflow moves it to `modified` — runs keep using the
  * last published version — so the status bar then also offers "Discard
@@ -106,6 +111,7 @@ export default function WorkflowDetailPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+  const [diffOpen, setDiffOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
   const save = useAsyncAction({ showDone: false });
@@ -117,12 +123,19 @@ export default function WorkflowDetailPage() {
     handleSubmit,
     reset,
     getValues,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
     defaultValues: { name: "", description: "", generatedDescription: "" },
   });
+
+  // Subscribed rather than read through getValues() so the diff dialog — and
+  // the enabled state of the button that opens it — track what is in the
+  // textareas right now, including edits that have not been saved yet.
+  const descriptionValue = watch("description");
+  const generatedDescriptionValue = watch("generatedDescription");
 
   const applyWorkflow = useCallback(
     (wf: Workflow) => {
@@ -359,7 +372,20 @@ export default function WorkflowDetailPage() {
             <Input id="name" {...register("name")} />
           </FormField>
 
-          <FormField htmlFor="description" label="Description">
+          <FormField
+            htmlFor="description"
+            label="Description"
+            action={
+              <ActionIconButton
+                icon={GitCompare}
+                label="Show diff from the generated description"
+                onClick={() => setDiffOpen(true)}
+                // Without a generated description there is no baseline to diff
+                // against, so the dialog would have nothing to show.
+                disabled={generatedDescriptionValue.trim() === ""}
+              />
+            }
+          >
             <Textarea
               id="description"
               rows={4}
@@ -448,6 +474,12 @@ export default function WorkflowDetailPage() {
         confirmLabel="Deactivate"
         onConfirm={handleDeactivate}
         onCancel={() => setConfirmDeactivateOpen(false)}
+      />
+      <DescriptionDiffDialog
+        open={diffOpen}
+        generated={generatedDescriptionValue}
+        description={descriptionValue}
+        onClose={() => setDiffOpen(false)}
       />
     </AdminPageContainer>
   );

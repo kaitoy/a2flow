@@ -1,4 +1,4 @@
-/** @module ActionIconButton — Icon-only action for admin list tables (link or button). */
+/** @module ActionIconButton — Compact icon-only action for admin list rows and form field labels (link or button). */
 "use client";
 
 import type { LucideIcon } from "lucide-react";
@@ -29,7 +29,9 @@ interface ActionIconButtonProps {
 }
 
 /**
- * Compact, label-less action button for the Actions column of admin list tables.
+ * Compact, label-less action button — the Actions column of admin list tables,
+ * and any other tight row that needs a secondary action (e.g. a `FormField`
+ * label row).
  *
  * Renders a lucide icon inside a glass panel, wrapped in a {@link Tooltip} that
  * reveals the label on hover/focus. Renders a {@link Link} when `href` is given,
