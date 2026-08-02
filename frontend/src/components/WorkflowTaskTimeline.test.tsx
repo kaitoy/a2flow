@@ -1,14 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { WorkflowTask } from "@/lib/api";
+import type { ToolBinding, WorkflowTask } from "@/lib/api";
 import { WorkflowTaskTimeline } from "./WorkflowTaskTimeline";
 
 const makeTask = (
   id: string,
   title: string,
   status: WorkflowTask["status"] = "pending",
-  position = 0
+  position = 0,
+  toolBindings: ToolBinding[] = []
 ): WorkflowTask => ({
   id,
   workflowSessionId: "ws",
@@ -16,7 +17,7 @@ const makeTask = (
   status,
   position,
   dependsOnIds: [],
-  toolBindings: [],
+  toolBindings,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -105,6 +106,71 @@ describe("WorkflowTaskTimeline", () => {
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("shows a tool-count indicator for a task with bound tools", () => {
+    const withTools = [
+      makeTask("t1", "Gather sources", "completed", 0, [
+        { mcpServerId: "srv-1", toolName: "extract_text" },
+        { mcpServerId: "srv-1", toolName: "ocr_scan" },
+      ]),
+      makeTask("t2", "Draft", "in_progress", 1),
+    ];
+    render(
+      <WorkflowTaskTimeline
+        tasks={withTools}
+        activeTaskId="t2"
+        onSelectTask={vi.fn()}
+        collapsed={false}
+        onToggle={vi.fn()}
+      />
+    );
+    expect(screen.getByLabelText("2 bound tools")).toBeInTheDocument();
+    const draftRow = screen.getByRole("button", { name: /Draft/ }).closest("li") as HTMLElement;
+    expect(within(draftRow).queryByLabelText(/bound tool/)).not.toBeInTheDocument();
+  });
+
+  it("opens a dialog listing the bound tools and their servers on click", async () => {
+    const user = userEvent.setup();
+    const withTools = [
+      makeTask("t1", "Gather sources", "completed", 0, [
+        { mcpServerId: "mcp-1", toolName: "extract_text" },
+      ]),
+    ];
+    render(
+      <WorkflowTaskTimeline
+        tasks={withTools}
+        activeTaskId={null}
+        onSelectTask={vi.fn()}
+        collapsed={false}
+        onToggle={vi.fn()}
+      />
+    );
+    await user.click(screen.getByLabelText("1 bound tool"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("extract_text")).toBeInTheDocument();
+    expect(await within(dialog).findByText("my-mcp-server")).toBeInTheDocument();
+  });
+
+  it("falls back to 'Unknown server' when the bound server isn't registered", async () => {
+    const user = userEvent.setup();
+    const withTools = [
+      makeTask("t1", "Gather sources", "completed", 0, [
+        { mcpServerId: "missing-server", toolName: "extract_text" },
+      ]),
+    ];
+    render(
+      <WorkflowTaskTimeline
+        tasks={withTools}
+        activeTaskId={null}
+        onSelectTask={vi.fn()}
+        collapsed={false}
+        onToggle={vi.fn()}
+      />
+    );
+    await user.click(screen.getByLabelText("1 bound tool"));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("Unknown server")).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no tasks", () => {

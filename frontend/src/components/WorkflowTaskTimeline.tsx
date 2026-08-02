@@ -1,8 +1,13 @@
 "use client";
 
-import { ChevronLeft, ListTree } from "lucide-react";
-import type { WorkflowTaskStatus } from "@/lib/api";
+import { ChevronLeft, ListTree, Wrench } from "lucide-react";
+import { useRef, useState } from "react";
+import { TaskToolsDialog } from "@/components/TaskToolsDialog";
+import { listMcpServers, type ToolBinding, type WorkflowTaskStatus } from "@/lib/api";
 import { formatStatusLabel, STATUS_RAIL_CLASS } from "@/lib/workflow-task-status";
+
+/** Upper bound used to fetch the whole MCP server registry for the tools dialog's labels. */
+const SERVER_LIMIT = 1000;
 
 /**
  * One entry of the timeline: a session's WorkflowTask, or — in a planning
@@ -16,6 +21,8 @@ export interface TimelineTask {
   title: string;
   /** Lifecycle status, or absent for status-less entries (task templates). */
   status?: WorkflowTaskStatus | null;
+  /** MCP tools bound to this task/template, shown as a small count indicator when non-empty. */
+  toolBindings?: ToolBinding[];
 }
 
 /** Expanded panel's outer `aside` class, shared with {@link WorkflowSessionSkeleton} so its loading chrome can't drift from the real sidebar. */
@@ -60,7 +67,10 @@ export interface WorkflowTaskTimelineProps {
  * a numbered status badge and the task's title, highlights the in-progress task,
  * follows the chat's scroll position / hover, and scrolls the chat to the
  * matching {@link WorkflowTaskGroup} when clicked. The badge number matches the
- * chat group's heading so the two views can be paired at a glance.
+ * chat group's heading so the two views can be paired at a glance. When a task
+ * or template has bound MCP tools, a small tool icon and count appear below
+ * the title/status; clicking it opens a dialog listing each tool and its
+ * owning MCP server.
  */
 export function WorkflowTaskTimeline({
   tasks,
@@ -73,6 +83,24 @@ export function WorkflowTaskTimeline({
   onToggle,
   className,
 }: WorkflowTaskTimelineProps) {
+  const [openToolsTask, setOpenToolsTask] = useState<TimelineTask | null>(null);
+  const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
+  const [serverNamesLoading, setServerNamesLoading] = useState(false);
+  const serverNamesFetched = useRef(false);
+
+  function openToolsDialog(task: TimelineTask) {
+    setOpenToolsTask(task);
+    if (serverNamesFetched.current) return;
+    serverNamesFetched.current = true;
+    setServerNamesLoading(true);
+    listMcpServers({ limit: SERVER_LIMIT })
+      .then((servers) => setServerNames(new Map(servers.map((s) => [s.id, s.name]))))
+      .catch(() => {
+        // Server names are cosmetic; the dialog falls back to each binding's raw id.
+      })
+      .finally(() => setServerNamesLoading(false));
+  }
+
   if (collapsed) {
     return (
       <div
@@ -114,6 +142,7 @@ export function WorkflowTaskTimeline({
             const isActive = task.id === activeTaskId;
             const isHighlighted = task.id === highlightedTaskId;
             const index = taskIndexById?.get(task.id) ?? i + 1;
+            const toolBindings = task.toolBindings ?? [];
             return (
               <li key={task.id} className="relative">
                 {i < tasks.length - 1 && (
@@ -122,13 +151,11 @@ export function WorkflowTaskTimeline({
                     className="absolute bottom-0 left-[1.125rem] top-[1.85rem] w-px bg-glass-border"
                   />
                 )}
-                <button
-                  type="button"
-                  onClick={() => onSelectTask(task.id)}
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: hover is a non-essential visual link to the chat; the core linkage is click + aria-current */}
+                <div
                   onMouseEnter={() => onHoverTask?.(task.id)}
                   onMouseLeave={() => onHoverTask?.(null)}
-                  aria-current={isActive ? "true" : undefined}
-                  className={`relative flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left transition-all ${
+                  className={`relative flex flex-col items-start rounded-xl px-2 py-2 transition-all ${
                     isActive
                       ? "bg-accent-soft text-on-surface"
                       : isHighlighted
@@ -136,30 +163,54 @@ export function WorkflowTaskTimeline({
                         : "text-on-surface-variant hover:bg-glass hover:text-on-surface"
                   } ${isHighlighted ? "ring-2 ring-inset ring-accent/50" : ""}`}
                 >
-                  <span
-                    className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-2 bg-surface text-[11px] font-semibold leading-none text-on-surface ${STATUS_RAIL_CLASS[status ?? "pending"]} ${
-                      isActive ? "shadow-glow" : ""
-                    }`}
-                    aria-hidden="true"
+                  <button
+                    type="button"
+                    onClick={() => onSelectTask(task.id)}
+                    aria-current={isActive ? "true" : undefined}
+                    className="flex w-full items-start gap-2.5 text-left"
                   >
-                    {index}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium leading-snug">
-                      {task.title}
+                    <span
+                      className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-2 bg-surface text-[11px] font-semibold leading-none text-on-surface ${STATUS_RAIL_CLASS[status ?? "pending"]} ${
+                        isActive ? "shadow-glow" : ""
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {index}
                     </span>
-                    {status !== null && (
-                      <span className="block text-xs text-on-surface-variant">
-                        {formatStatusLabel(status)}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium leading-snug">
+                        {task.title}
                       </span>
-                    )}
-                  </span>
-                </button>
+                      {status !== null && (
+                        <span className="block text-xs text-on-surface-variant">
+                          {formatStatusLabel(status)}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  {toolBindings.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => openToolsDialog(task)}
+                      aria-label={`${toolBindings.length} bound tool${toolBindings.length === 1 ? "" : "s"}`}
+                      className="ml-[1.875rem] mt-0.5 inline-flex items-center gap-1 rounded-full glass-panel px-1.5 py-0.5 text-xs text-on-surface-variant transition-all hover:text-accent hover:shadow-glow motion-safe:hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                    >
+                      <Wrench size={11} strokeWidth={1.8} aria-hidden="true" />
+                      {toolBindings.length}
+                    </button>
+                  )}
+                </div>
               </li>
             );
           })
         )}
       </ol>
+      <TaskToolsDialog
+        task={openToolsTask}
+        serverNames={serverNames}
+        serverNamesLoading={serverNamesLoading}
+        onClose={() => setOpenToolsTask(null)}
+      />
     </aside>
   );
 }
