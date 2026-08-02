@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 
-/** Route-transition fallback for the edit-tenant page, matching its own post-mount `FormSkeleton`. */
+/** Route-transition fallback for the tenant detail page, matching its own post-mount `FormSkeleton`. */
 export default function Loading() {
   return (
     <AdminPageContainer>
@@ -13,10 +13,10 @@ export default function Loading() {
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Tenants", href: "/admin/tenants" },
-          { label: "Edit" },
+          { label: "…" },
         ]}
       />
-      <FormLayout header={<AdminPageHeader title="Edit Tenant" icon={Building2} />}>
+      <FormLayout header={<AdminPageHeader icon={Building2} />}>
         <FormSkeleton fields={3} />
       </FormLayout>
     </AdminPageContainer>

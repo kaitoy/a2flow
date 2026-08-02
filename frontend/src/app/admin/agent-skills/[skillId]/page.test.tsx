@@ -9,7 +9,7 @@ import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
-import EditAgentSkillPage from "./page";
+import AgentSkillDetailPage from "./page";
 
 const FULL_SKILL = {
   id: "skill-1",
@@ -44,10 +44,18 @@ function setup() {
   vi.mocked(useParams).mockReturnValue({ skillId: "skill-1" });
 }
 
-describe("EditAgentSkillPage", () => {
+describe("AgentSkillDetailPage", () => {
+  it("titles the page and ends the breadcrumb trail with the skill's name", async () => {
+    setup();
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    expect(await screen.findByRole("heading", { name: "my-skill" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByText("my-skill")).toHaveAttribute("aria-current", "page");
+  });
+
   it("prefills form with skill data", async () => {
     setup();
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => expect(screen.getByDisplayValue("my-skill")).toBeInTheDocument());
     expect(screen.getByDisplayValue("https://github.com/example/repo")).toBeInTheDocument();
   });
@@ -57,7 +65,7 @@ describe("EditAgentSkillPage", () => {
     const patchSpy = vi.fn(() => envelope(FULL_SKILL));
     server.use(http.patch("http://localhost:8000/api/v1/agent-skills/:skillId", patchSpy));
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -83,7 +91,7 @@ describe("EditAgentSkillPage", () => {
       })
     );
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() =>
       expect(screen.getByRole("combobox", { name: "Auth Password" })).toHaveTextContent(
         "github-token"
@@ -123,7 +131,7 @@ describe("EditAgentSkillPage", () => {
       })
     );
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     expect(await screen.findByText(/no secret named "gone" is registered/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -142,7 +150,7 @@ describe("EditAgentSkillPage", () => {
       forward: vi.fn(),
     });
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -163,7 +171,7 @@ describe("EditAgentSkillPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/agent-skills/:skillId", deleteSpy));
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     const dialog = screen.getByRole("dialog");
@@ -176,7 +184,7 @@ describe("EditAgentSkillPage", () => {
   it("shows validation error on blur when required field is cleared", async () => {
     setup();
     const user = userEvent.setup();
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     const nameInput = screen.getByLabelText(/^name/i);
     await user.clear(nameInput);
@@ -192,7 +200,7 @@ describe("EditAgentSkillPage", () => {
       )
     );
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "AgentSkill not found",
@@ -203,7 +211,7 @@ describe("EditAgentSkillPage", () => {
 
   it("shows the sync status and short revision", async () => {
     setup();
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     const panel = screen.getByRole("region", { name: /repository sync/i });
     expect(within(panel).getByText("ready")).toBeInTheDocument();
@@ -222,7 +230,7 @@ describe("EditAgentSkillPage", () => {
       )
     );
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     expect(screen.getByText(/clone of .* failed: not found/)).toBeInTheDocument();
     // The old revision is still published, so the skill still runs on it.
@@ -235,7 +243,7 @@ describe("EditAgentSkillPage", () => {
     const pullSpy = vi.fn(() => envelope({ ...FULL_SKILL, syncStatus: "pending" }, 202));
     server.use(http.post(`${SKILL_URL}/pull`, pullSpy));
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await user.click(screen.getByRole("button", { name: /pull/i }));
 
@@ -244,7 +252,7 @@ describe("EditAgentSkillPage", () => {
 
   it("hides write actions from a user without the developer role", async () => {
     setup();
-    render(<EditAgentSkillPage />, { preloadedState: READ_ONLY });
+    render(<AgentSkillDetailPage />, { preloadedState: READ_ONLY });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     expect(screen.queryByRole("button", { name: /pull/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
@@ -261,7 +269,7 @@ describe("EditAgentSkillPage", () => {
     const patchSpy = vi.fn(() => envelope(FULL_SKILL));
     server.use(http.patch(SKILL_URL, patchSpy));
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await user.click(screen.getByRole("button", { name: /generate workflow/i }));
 
@@ -278,7 +286,7 @@ describe("EditAgentSkillPage", () => {
       http.get(SKILL_URL, () => envelope({ ...FULL_SKILL, syncStatus: "pending", commitSha: null }))
     );
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     expect(screen.getByRole("button", { name: /generate workflow/i })).toBeDisabled();
   });
@@ -289,7 +297,7 @@ describe("EditAgentSkillPage", () => {
     const patchSpy = vi.fn(() => envelope({ ...FULL_SKILL, name: "renamed-skill" }));
     server.use(http.patch(SKILL_URL, patchSpy));
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     const nameInput = screen.getByDisplayValue("my-skill");
     await user.clear(nameInput);
@@ -314,7 +322,7 @@ describe("EditAgentSkillPage", () => {
     const patchSpy = vi.fn(() => envelope(FULL_SKILL));
     server.use(http.patch(SKILL_URL, patchSpy));
 
-    render(<EditAgentSkillPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await user.type(screen.getByDisplayValue("my-skill"), "-edited");
     await user.click(screen.getByRole("button", { name: /generate workflow/i }));

@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 
-/** Route-transition fallback for the edit-workflow page, matching its own post-mount `FormSkeleton`. */
+/** Route-transition fallback for the workflow detail page, matching its own post-mount `FormSkeleton`. */
 export default function Loading() {
   return (
     <AdminPageContainer>
@@ -13,10 +13,10 @@ export default function Loading() {
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Workflows", href: "/admin/workflows" },
-          { label: "Edit" },
+          { label: "…" },
         ]}
       />
-      <FormLayout header={<AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />}>
+      <FormLayout header={<AdminPageHeader icon={WorkflowIcon} />}>
         <FormSkeleton fields={4} />
       </FormLayout>
     </AdminPageContainer>

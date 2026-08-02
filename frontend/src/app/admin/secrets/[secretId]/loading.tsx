@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 
-/** Route-transition fallback for the edit-secret page. */
+/** Route-transition fallback for the secret detail page. */
 export default function Loading() {
   return (
     <AdminPageContainer>
@@ -13,10 +13,10 @@ export default function Loading() {
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Secrets", href: "/admin/secrets" },
-          { label: "Edit" },
+          { label: "…" },
         ]}
       />
-      <FormLayout header={<AdminPageHeader title="Edit Secret" icon={KeyRound} />}>
+      <FormLayout header={<AdminPageHeader icon={KeyRound} />}>
         <FormSkeleton fields={3} />
       </FormLayout>
     </AdminPageContainer>

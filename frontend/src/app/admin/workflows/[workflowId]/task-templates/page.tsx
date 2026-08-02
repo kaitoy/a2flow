@@ -19,6 +19,7 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import {
   deleteWorkflowTaskTemplate,
   type FilterSpec,
+  getWorkflow,
   listMcpServers,
   listWorkflowTaskTemplates,
   type SortSpec,
@@ -148,6 +149,8 @@ export default function WorkflowTaskTemplatesPage() {
   const [view, setView] = useState<View>("table");
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
+  // Only needed to name the parent workflow in the breadcrumb trail.
+  const [workflowName, setWorkflowName] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -190,6 +193,14 @@ export default function WorkflowTaskTemplatesPage() {
       });
   }, []);
 
+  useEffect(() => {
+    getWorkflow(workflowId)
+      .then((wf) => setWorkflowName(wf.name))
+      .catch(() => {
+        // The name only labels a breadcrumb; the crumb keeps its placeholder.
+      });
+  }, [workflowId]);
+
   function handleDelete(id: string, title: string) {
     setConfirmTarget({ id, title });
   }
@@ -223,7 +234,7 @@ export default function WorkflowTaskTemplatesPage() {
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Workflows", href: "/admin/workflows" },
-          { label: "Edit", href: `/admin/workflows/${workflowId}` },
+          { label: workflowName || "…", href: `/admin/workflows/${workflowId}` },
           { label: "Task Templates" },
         ]}
       />

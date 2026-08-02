@@ -1,5 +1,5 @@
 /**
- * @module UserDetailPage — Admin edit/view form for an existing user.
+ * @module UserDetailPage — Admin detail page for an existing user.
  *
  * A tenant already assigned to the target is immutable (see `tenantId`
  * below), so this form never lets it be picked. For a still-tenant-less
@@ -51,7 +51,12 @@ const schema = zUserCreate.omit({ username: true, password: true }).extend({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function EditUserPage() {
+/**
+ * Detail page of a user account: avatar, profile fields, roles, and flags. The
+ * page is titled with the user's username — the identifier its row carries in
+ * the list, and the one attribute that cannot change.
+ */
+export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -181,14 +186,16 @@ export default function EditUserPage() {
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Users", href: "/admin/users" },
-    { label: "Edit" },
+    // The user itself is the current page; an ellipsis stands in until the
+    // username has loaded.
+    { label: username || "…" },
   ];
 
   if (loading) {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <FormLayout header={<AdminPageHeader title="Edit User" icon={UsersIcon} />}>
+        <FormLayout header={<AdminPageHeader icon={UsersIcon} />}>
           <FormSkeleton fields={6} />
         </FormLayout>
       </AdminPageContainer>
@@ -199,7 +206,7 @@ export default function EditUserPage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title="Edit User" icon={UsersIcon} />}
+        header={<AdminPageHeader title={username} icon={UsersIcon} />}
         aside={audit && <AuditMeta {...audit} />}
       >
         <form

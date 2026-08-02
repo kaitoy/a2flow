@@ -7,16 +7,24 @@ import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { SECRET_1, SECRET_VAULT_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
-import EditSecretPage from "./page";
+import SecretDetailPage from "./page";
 
 function setup() {
   vi.mocked(useParams).mockReturnValue({ secretId: "secret-1" });
 }
 
-describe("EditSecretPage", () => {
+describe("SecretDetailPage", () => {
+  it("titles the page and ends the breadcrumb trail with the secret's name", async () => {
+    setup();
+    render(<SecretDetailPage />);
+    expect(await screen.findByRole("heading", { name: "github-token" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByText("github-token")).toHaveAttribute("aria-current", "page");
+  });
+
   it("prefills one blank-valued row per stored entry key", async () => {
     setup();
-    render(<EditSecretPage />);
+    render(<SecretDetailPage />);
     await waitFor(() => expect(screen.getByDisplayValue("github-token")).toBeInTheDocument());
     expect(screen.getByLabelText("entries key 1")).toHaveValue("token");
     expect(screen.getByLabelText("entries value 1")).toHaveValue("");
@@ -27,7 +35,7 @@ describe("EditSecretPage", () => {
     server.use(
       http.get("http://localhost:8000/api/v1/secrets/:secretId", () => envelope(SECRET_VAULT_1))
     );
-    render(<EditSecretPage />);
+    render(<SecretDetailPage />);
     await waitFor(() => expect(screen.getByDisplayValue("vault-token")).toBeInTheDocument());
     expect(screen.getByDisplayValue("secret")).toBeInTheDocument();
     expect(screen.getByDisplayValue("myapp/github")).toBeInTheDocument();
@@ -44,7 +52,7 @@ describe("EditSecretPage", () => {
       })
     );
 
-    render(<EditSecretPage />);
+    render(<SecretDetailPage />);
     await waitFor(() => screen.getByDisplayValue("github-token"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -67,7 +75,7 @@ describe("EditSecretPage", () => {
       })
     );
 
-    render(<EditSecretPage />);
+    render(<SecretDetailPage />);
     await waitFor(() => screen.getByDisplayValue("github-token"));
     await userEvent.type(screen.getByLabelText("entries value 1"), "tok-456");
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -94,7 +102,7 @@ describe("EditSecretPage", () => {
       })
     );
 
-    render(<EditSecretPage />);
+    render(<SecretDetailPage />);
     await waitFor(() => screen.getByDisplayValue("github-token"));
     await userEvent.click(screen.getByRole("button", { name: /remove entries row 2/i }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -120,7 +128,7 @@ describe("EditSecretPage", () => {
       forward: vi.fn(),
     });
 
-    render(<EditSecretPage />);
+    render(<SecretDetailPage />);
     await waitFor(() => screen.getByDisplayValue("github-token"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -141,7 +149,7 @@ describe("EditSecretPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/secrets/:secretId", deleteSpy));
 
-    render(<EditSecretPage />);
+    render(<SecretDetailPage />);
     await waitFor(() => screen.getByDisplayValue("github-token"));
     await userEvent.click(screen.getByRole("button", { name: /^delete$/i }));
     const dialog = screen.getByRole("dialog");
@@ -159,7 +167,7 @@ describe("EditSecretPage", () => {
       )
     );
 
-    render(<EditSecretPage />);
+    render(<SecretDetailPage />);
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "Secret not found",

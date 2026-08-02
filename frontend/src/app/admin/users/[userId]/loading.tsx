@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 
-/** Route-transition fallback for the edit-user page, matching its own post-mount `FormSkeleton`. */
+/** Route-transition fallback for the user detail page, matching its own post-mount `FormSkeleton`. */
 export default function Loading() {
   return (
     <AdminPageContainer>
@@ -13,10 +13,10 @@ export default function Loading() {
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Users", href: "/admin/users" },
-          { label: "Edit" },
+          { label: "…" },
         ]}
       />
-      <FormLayout header={<AdminPageHeader title="Edit User" icon={UsersIcon} />}>
+      <FormLayout header={<AdminPageHeader icon={UsersIcon} />}>
         <FormSkeleton fields={6} />
       </FormLayout>
     </AdminPageContainer>

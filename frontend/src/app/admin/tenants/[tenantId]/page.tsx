@@ -1,4 +1,4 @@
-/** @module TenantDetailPage — Admin edit/view form for an existing tenant. */
+/** @module TenantDetailPage — Admin detail page for an existing tenant. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,13 +31,20 @@ const schema = zTenantCreate.omit({ name: true });
 
 type FormValues = z.infer<typeof schema>;
 
-export default function EditTenantPage() {
+/**
+ * Detail page of a tenant: its display name, its immutable URL-safe name, and
+ * whether it is enabled. The page is titled with the tenant's display name —
+ * the same label its row carries in the list.
+ */
+export default function TenantDetailPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
+  // The persisted display name, which titles the page. Kept out of the form so
+  // the heading names the saved record rather than following every keystroke.
   const [displayName, setDisplayName] = useState("");
   // name is immutable after creation, so it lives outside the form state and
   // is rendered read-only.
@@ -115,14 +122,16 @@ export default function EditTenantPage() {
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Tenants", href: "/admin/tenants" },
-    { label: "Edit" },
+    // The tenant itself is the current page; an ellipsis stands in until its
+    // display name has loaded.
+    { label: displayName || "…" },
   ];
 
   if (loading) {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <FormLayout header={<AdminPageHeader title="Edit Tenant" icon={Building2} />}>
+        <FormLayout header={<AdminPageHeader icon={Building2} />}>
           <FormSkeleton fields={3} />
         </FormLayout>
       </AdminPageContainer>
@@ -133,7 +142,7 @@ export default function EditTenantPage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title="Edit Tenant" icon={Building2} />}
+        header={<AdminPageHeader title={displayName} icon={Building2} />}
         aside={audit && <AuditMeta {...audit} />}
       >
         <form

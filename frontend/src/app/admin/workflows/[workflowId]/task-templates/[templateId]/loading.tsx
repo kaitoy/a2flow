@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 
-/** Route-transition fallback for the edit-template form, matching its own post-mount `FormSkeleton`. */
+/** Route-transition fallback for the task-template detail page, matching its own post-mount `FormSkeleton`. */
 export default function Loading() {
   return (
     <AdminPageContainer>
@@ -14,10 +14,10 @@ export default function Loading() {
           { label: "Admin", href: "/admin" },
           { label: "Workflows", href: "/admin/workflows" },
           { label: "Task Templates" },
-          { label: "Edit" },
+          { label: "…" },
         ]}
       />
-      <FormLayout header={<AdminPageHeader title="Edit Task Template" icon={ListTree} />}>
+      <FormLayout header={<AdminPageHeader icon={ListTree} />}>
         <FormSkeleton fields={5} />
       </FormLayout>
     </AdminPageContainer>

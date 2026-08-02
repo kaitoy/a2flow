@@ -6,7 +6,7 @@ import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
-import EditWorkflowPage from "./page";
+import WorkflowDetailPage from "./page";
 
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -18,25 +18,32 @@ beforeEach(() => {
   vi.mocked(useParams).mockReturnValue({ workflowId: "wf-1" });
 });
 
-describe("EditWorkflowPage", () => {
+describe("WorkflowDetailPage", () => {
+  it("titles the page and ends the breadcrumb trail with the workflow's name", async () => {
+    render(<WorkflowDetailPage />);
+    expect(await screen.findByRole("heading", { name: "my-workflow" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByText("my-workflow")).toHaveAttribute("aria-current", "page");
+  });
+
   it("loads the workflow into the form", async () => {
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => expect(screen.getByLabelText(/^name/i)).toHaveValue("my-workflow"));
   });
 
   it("has no prompt field (workflows carry a plan, not a prompt)", async () => {
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.queryByLabelText(/prompt/i)).not.toBeInTheDocument();
   });
 
   it("shows the workflow status", async () => {
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
   });
 
   it("leaves the status bar unlit while nothing is generating", async () => {
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.getByRole("region", { name: "Workflow status" })).not.toHaveClass("live-edge");
   });
@@ -60,7 +67,7 @@ describe("EditWorkflowPage", () => {
       )
     );
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() =>
       expect(screen.getByRole("region", { name: "Workflow status" })).toHaveClass("live-edge")
     );
@@ -88,7 +95,7 @@ describe("EditWorkflowPage", () => {
       })
     );
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
 
@@ -101,7 +108,7 @@ describe("EditWorkflowPage", () => {
   });
 
   it("links the Agent Skill field to its detail page", async () => {
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.getByRole("link", { name: "my-skill" })).toHaveAttribute(
       "href",
@@ -110,7 +117,7 @@ describe("EditWorkflowPage", () => {
   });
 
   it("links to the task template management page", async () => {
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.getByRole("link", { name: /manage templates/i })).toHaveAttribute(
       "href",
@@ -136,7 +143,7 @@ describe("EditWorkflowPage", () => {
     );
     server.use(http.post("http://localhost:8000/api/v1/workflows/:id/publish", publishSpy));
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
     await waitFor(() => expect(publishSpy).toHaveBeenCalled());
@@ -150,7 +157,7 @@ describe("EditWorkflowPage", () => {
       )
     );
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
     await waitFor(() =>
@@ -173,7 +180,7 @@ describe("EditWorkflowPage", () => {
       forward: vi.fn(),
     });
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /open planning session/i }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/planning-sessions/ps-1"));
@@ -200,7 +207,7 @@ describe("EditWorkflowPage", () => {
       })
     );
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     const nameInput = await screen.findByLabelText(/^name/i);
     await waitFor(() => expect(nameInput).toHaveValue("my-workflow"));
     await user.clear(nameInput);
@@ -211,7 +218,7 @@ describe("EditWorkflowPage", () => {
   });
 
   it("offers no Discard changes action while the workflow is published", async () => {
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.queryByRole("button", { name: /discard changes/i })).not.toBeInTheDocument();
   });
@@ -252,7 +259,7 @@ describe("EditWorkflowPage", () => {
     );
     server.use(http.post("http://localhost:8000/api/v1/workflows/:id/discard-changes", discardSpy));
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => expect(screen.getByText("modified")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /discard changes/i }));
     await user.click(screen.getByRole("button", { name: /^discard$/i }));
@@ -273,14 +280,14 @@ describe("EditWorkflowPage", () => {
       forward: vi.fn(),
     });
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows"));
   });
 
   it("offers a Deactivate action while the workflow is published", async () => {
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.getByRole("button", { name: /deactivate/i })).toBeInTheDocument();
   });
@@ -304,7 +311,7 @@ describe("EditWorkflowPage", () => {
       )
     );
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => expect(screen.getByText("draft")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /deactivate/i })).not.toBeInTheDocument();
   });
@@ -328,7 +335,7 @@ describe("EditWorkflowPage", () => {
     );
     server.use(http.post("http://localhost:8000/api/v1/workflows/:id/deactivate", deactivateSpy));
 
-    render(<EditWorkflowPage />);
+    render(<WorkflowDetailPage />);
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /deactivate/i }));
     const dialog = await screen.findByRole("dialog");

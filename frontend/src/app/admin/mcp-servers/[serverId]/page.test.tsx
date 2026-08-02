@@ -7,16 +7,24 @@ import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { MCP_SERVER_1, MCP_STDIO_SERVER, MCP_TOOL_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
-import EditMcpServerPage from "./page";
+import McpServerDetailPage from "./page";
 
 function setup() {
   vi.mocked(useParams).mockReturnValue({ serverId: "mcp-1" });
 }
 
-describe("EditMcpServerPage", () => {
+describe("McpServerDetailPage", () => {
+  it("titles the page and ends the breadcrumb trail with the server's name", async () => {
+    setup();
+    render(<McpServerDetailPage />);
+    expect(await screen.findByRole("heading", { name: "my-mcp-server" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByText("my-mcp-server")).toHaveAttribute("aria-current", "page");
+  });
+
   it("prefills form with server data including headers", async () => {
     setup();
-    render(<EditMcpServerPage />);
+    render(<McpServerDetailPage />);
     await waitFor(() => expect(screen.getByDisplayValue("my-mcp-server")).toBeInTheDocument());
     expect(screen.getByDisplayValue("https://mcp.example.com/mcp")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Authorization")).toBeInTheDocument();
@@ -33,7 +41,7 @@ describe("EditMcpServerPage", () => {
       })
     );
 
-    render(<EditMcpServerPage />);
+    render(<McpServerDetailPage />);
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("button", { name: "Remove headers row 1" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -56,7 +64,7 @@ describe("EditMcpServerPage", () => {
       )
     );
 
-    render(<EditMcpServerPage />);
+    render(<McpServerDetailPage />);
     await waitFor(() => expect(screen.getByDisplayValue("local-files")).toBeInTheDocument());
     expect(screen.getByRole("tab", { name: "npx" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByDisplayValue("-y")).toBeInTheDocument();
@@ -75,7 +83,7 @@ describe("EditMcpServerPage", () => {
       })
     );
 
-    render(<EditMcpServerPage />);
+    render(<McpServerDetailPage />);
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("tab", { name: "stdio" }));
     await userEvent.click(screen.getByRole("tab", { name: "uvx" }));
@@ -104,7 +112,7 @@ describe("EditMcpServerPage", () => {
       forward: vi.fn(),
     });
 
-    render(<EditMcpServerPage />);
+    render(<McpServerDetailPage />);
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -125,7 +133,7 @@ describe("EditMcpServerPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/mcp-servers/:serverId", deleteSpy));
 
-    render(<EditMcpServerPage />);
+    render(<McpServerDetailPage />);
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("button", { name: /^delete$/i }));
     const dialog = screen.getByRole("dialog");
@@ -137,7 +145,7 @@ describe("EditMcpServerPage", () => {
 
   it("fetches and renders the server's tools on demand", async () => {
     setup();
-    render(<EditMcpServerPage />);
+    render(<McpServerDetailPage />);
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
 
     await userEvent.click(screen.getByRole("button", { name: /fetch tools/i }));
@@ -153,7 +161,7 @@ describe("EditMcpServerPage", () => {
       )
     );
 
-    render(<EditMcpServerPage />);
+    render(<McpServerDetailPage />);
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "McpServer not found",

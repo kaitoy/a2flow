@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 
-/** Route-transition fallback for the edit-agent-skill page, matching its own post-mount `FormSkeleton`. */
+/** Route-transition fallback for the agent-skill detail page, matching its own post-mount `FormSkeleton`. */
 export default function Loading() {
   return (
     <AdminPageContainer>
@@ -13,10 +13,10 @@ export default function Loading() {
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Agent Skills", href: "/admin/agent-skills" },
-          { label: "Edit" },
+          { label: "…" },
         ]}
       />
-      <FormLayout header={<AdminPageHeader title="Edit Agent Skill" icon={Wand2} />}>
+      <FormLayout header={<AdminPageHeader icon={Wand2} />}>
         <FormSkeleton fields={4} />
       </FormLayout>
     </AdminPageContainer>

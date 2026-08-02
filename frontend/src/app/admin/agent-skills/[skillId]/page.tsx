@@ -1,4 +1,4 @@
-/** @module AgentSkillDetailPage — Admin edit/view form for an existing agent skill. */
+/** @module AgentSkillDetailPage — Admin detail page for a registered agent skill. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,14 +45,19 @@ import { showToast } from "@/store/toastSlice";
 /** How often the page re-fetches the skill while its clone is still running. */
 const POLL_INTERVAL_MS = 2000;
 
-/** The server-managed clone/pull state of the skill being edited. */
+/** The server-managed clone/pull state of the skill on display. */
 interface SyncState {
   status: SkillSyncStatus;
   error: string | null;
   commitSha: string | null;
 }
 
-export default function EditAgentSkillPage() {
+/**
+ * Detail page of a registered agent skill: its repository fields, the clone /
+ * pull state of the skill store, and the entry point to generating a workflow
+ * from it. The page is titled with the skill's own name.
+ */
+export default function AgentSkillDetailPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -63,6 +68,9 @@ export default function EditAgentSkillPage() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [sync, setSync] = useState<SyncState | null>(null);
+  // The persisted name, which titles the page. Kept out of the form so the
+  // heading names the saved record rather than following every keystroke.
+  const [name, setName] = useState("");
 
   const save = useAsyncAction({ showDone: false });
   const pull = useAsyncAction({ showDone: false });
@@ -90,6 +98,7 @@ export default function EditAgentSkillPage() {
   useEffect(() => {
     getAgentSkill(skillId)
       .then((skill) => {
+        setName(skill.name);
         reset({
           name: skill.name,
           repoUrl: skill.repoUrl,
@@ -144,6 +153,7 @@ export default function EditAgentSkillPage() {
   async function persist(values: AgentSkillFormValues) {
     await save.run(async () => {
       await updateAgentSkill(skillId, toAgentSkillUpdateBody(values));
+      setName(values.name);
       dispatch(showToast({ message: "Agent skill updated" }));
       // Re-seed the form with what was just saved so `isDirty` goes back to
       // false — the generation flow reads it to decide whether to ask.
@@ -201,14 +211,16 @@ export default function EditAgentSkillPage() {
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Agent Skills", href: "/admin/agent-skills" },
-    { label: "Edit" },
+    // The skill itself is the current page; an ellipsis stands in until its
+    // name has loaded.
+    { label: name || "…" },
   ];
 
   if (loading) {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <FormLayout header={<AdminPageHeader title="Edit Agent Skill" icon={Wand2} />}>
+        <FormLayout header={<AdminPageHeader icon={Wand2} />}>
           <FormSkeleton fields={4} />
         </FormLayout>
       </AdminPageContainer>
@@ -221,7 +233,7 @@ export default function EditAgentSkillPage() {
       <FormLayout
         header={
           <AdminPageHeader
-            title="Edit Agent Skill"
+            title={name}
             icon={Wand2}
             secondaryAction={
               canEdit ? (

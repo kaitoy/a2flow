@@ -2,10 +2,16 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { HeaderIconButton } from "./header-icon-button";
 
 interface AdminPageHeaderProps {
-  title: string;
+  /**
+   * Heading text. A detail page titles itself with its record's own name, so
+   * leave this undefined while that record is still loading — a placeholder
+   * bar then holds the heading's space until the name arrives.
+   */
+  title?: string;
   /** Optional accent icon shown to the left of the title; twirls occasionally. */
   icon?: LucideIcon;
   addHref?: string;
@@ -26,8 +32,10 @@ interface AdminPageHeaderProps {
 }
 
 /**
- * Admin list-page header with a title, an optional refresh button, an optional
- * column picker, and an optional "Add" link button.
+ * Admin page header with a title, an optional refresh button, an optional
+ * column picker, and an optional "Add" link button. List pages title
+ * themselves with the collection name; detail pages with the record's own
+ * name, omitting `title` until it has loaded.
  *
  * Pass `onRefresh` (typically the `reload` returned by `useTableQuery`) to show
  * a refresh control; pass `refreshing` (typically the hook's `loading ||
@@ -48,18 +56,29 @@ export function AdminPageHeader({
   refreshing = false,
 }: AdminPageHeaderProps) {
   return (
-    <div className="mb-6 flex items-center justify-between">
-      <div className="flex items-center gap-3">
+    <div className="mb-6 flex items-center justify-between gap-3">
+      {/* A detail page's title is a user-provided record name, so the heading
+          truncates rather than pushing the action cluster off the page. */}
+      <div className="flex min-w-0 items-center gap-3">
         {icon && (
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl glass-panel-strong text-accent shadow-glow">
             <AnimatedIcon icon={icon} animation="spin-occasional" size={22} />
           </span>
         )}
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-gradient-accent">
-          {title}
+        <h1
+          className={[
+            "min-w-0 truncate font-display text-3xl font-semibold tracking-tight",
+            // The gradient paints through `background-clip: text`, which has
+            // nothing to clip to while the placeholder stands in for the name.
+            title === undefined ? "" : "text-gradient-accent",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {title ?? <Skeleton className="h-8 w-48 rounded-lg" />}
         </h1>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {onRefresh && (
           <HeaderIconButton
             label="Refresh"

@@ -1,4 +1,4 @@
-/** @module WorkflowDetailPage — Admin edit/view form for an existing workflow and its plan. */
+/** @module WorkflowDetailPage — Admin detail page for an existing workflow and its plan. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -73,9 +73,10 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
 }
 
 /**
- * Detail page of a generated workflow: edit name/description, watch the plan
- * generation settle, open the planning session to adjust the plan by chat,
- * manage the task templates, and publish the workflow to make it executable.
+ * Detail page of a generated workflow, titled with the workflow's own name:
+ * edit name/description, watch the plan generation settle, open the planning
+ * session to adjust the plan by chat, manage the task templates, and publish
+ * the workflow to make it executable.
  *
  * Editing a published workflow moves it to `modified` — runs keep using the
  * last published version — so the status bar then also offers "Discard
@@ -84,7 +85,7 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * back to `draft`, revoking `requester` execute access until it is published
  * again.
  */
-export default function EditWorkflowPage() {
+export default function WorkflowDetailPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -228,14 +229,16 @@ export default function EditWorkflowPage() {
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Workflows", href: "/admin/workflows" },
-    { label: "Edit" },
+    // The workflow itself is the current page; an ellipsis stands in until its
+    // name has loaded.
+    { label: workflow?.name || "…" },
   ];
 
   if (loading || !workflow) {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <FormLayout header={<AdminPageHeader title="Edit Workflow" icon={WorkflowIcon} />}>
+        <FormLayout header={<AdminPageHeader icon={WorkflowIcon} />}>
           <FormSkeleton fields={4} />
         </FormLayout>
       </AdminPageContainer>
@@ -250,7 +253,7 @@ export default function EditWorkflowPage() {
       <FormLayout
         header={
           <AdminPageHeader
-            title="Edit Workflow"
+            title={workflow.name}
             icon={WorkflowIcon}
             secondaryAction={
               <HeaderIconButton

@@ -19,6 +19,15 @@ beforeEach(() => {
 });
 
 describe("WorkflowTaskTemplatesPage", () => {
+  it("names the parent workflow in the breadcrumb trail", async () => {
+    render(<WorkflowTaskTemplatesPage />);
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(await within(nav).findByRole("link", { name: "my-workflow" })).toHaveAttribute(
+      "href",
+      "/admin/workflows/wf-1"
+    );
+  });
+
   it("renders template row after load", async () => {
     render(<WorkflowTaskTemplatesPage />);
     await waitFor(() => expect(screen.getByText("Template Step 1")).toBeInTheDocument());

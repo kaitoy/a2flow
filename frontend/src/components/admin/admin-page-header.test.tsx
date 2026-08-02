@@ -9,6 +9,11 @@ describe("AdminPageHeader", () => {
     expect(screen.getByRole("heading", { name: "Agent Skills" })).toBeInTheDocument();
   });
 
+  it("holds the heading's space with a placeholder when the title is still loading", () => {
+    render(<AdminPageHeader />);
+    expect(screen.getByRole("heading").querySelector(".skeleton")).toBeInTheDocument();
+  });
+
   it("renders the Add link when addHref and addLabel are provided", () => {
     render(<AdminPageHeader title="Users" addHref="/admin/users/new" addLabel="+ Add user" />);
     const link = screen.getByRole("link", { name: "+ Add user" });

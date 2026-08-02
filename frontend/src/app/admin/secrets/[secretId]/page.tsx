@@ -1,4 +1,4 @@
-/** @module EditSecretPage — Admin edit/view form for a registered secret. */
+/** @module SecretDetailPage — Admin detail page for a registered secret. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,13 +32,20 @@ import { showToast } from "@/store/toastSlice";
  */
 const schema = buildSecretFormSchema(false);
 
-export default function EditSecretPage() {
+/**
+ * Detail page of a registered secret: its type and the entry keys it holds
+ * (values are write-only). The page is titled with the secret's own name.
+ */
+export default function SecretDetailPage() {
   const { secretId } = useParams<{ secretId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
+  // The persisted name, which titles the page. Kept out of the form so the
+  // heading names the saved record rather than following every keystroke.
+  const [name, setName] = useState("");
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -59,6 +66,7 @@ export default function EditSecretPage() {
   useEffect(() => {
     getSecret(secretId)
       .then((secret) => {
+        setName(secret.name);
         reset({
           name: secret.name,
           type: secret.type,
@@ -110,14 +118,16 @@ export default function EditSecretPage() {
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Secrets", href: "/admin/secrets" },
-    { label: "Edit" },
+    // The secret itself is the current page; an ellipsis stands in until its
+    // name has loaded.
+    { label: name || "…" },
   ];
 
   if (loading) {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <FormLayout header={<AdminPageHeader title="Edit Secret" icon={KeyRound} />}>
+        <FormLayout header={<AdminPageHeader icon={KeyRound} />}>
           <FormSkeleton fields={3} />
         </FormLayout>
       </AdminPageContainer>
@@ -128,7 +138,7 @@ export default function EditSecretPage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title="Edit Secret" icon={KeyRound} />}
+        header={<AdminPageHeader title={name} icon={KeyRound} />}
         aside={audit && <AuditMeta {...audit} />}
       >
         <form

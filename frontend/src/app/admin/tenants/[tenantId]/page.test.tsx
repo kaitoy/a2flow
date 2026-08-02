@@ -6,7 +6,7 @@ import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
-import EditTenantPage from "./page";
+import TenantDetailPage from "./page";
 
 const FULL_TENANT = {
   id: "tenant-1",
@@ -23,10 +23,18 @@ function setup() {
   vi.mocked(useParams).mockReturnValue({ tenantId: "tenant-1" });
 }
 
-describe("EditTenantPage", () => {
+describe("TenantDetailPage", () => {
+  it("titles the page and ends the breadcrumb trail with the tenant's display name", async () => {
+    setup();
+    render(<TenantDetailPage />);
+    expect(await screen.findByRole("heading", { name: "Acme Corp" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByText("Acme Corp")).toHaveAttribute("aria-current", "page");
+  });
+
   it("prefills form with tenant data", async () => {
     setup();
-    render(<EditTenantPage />);
+    render(<TenantDetailPage />);
     await waitFor(() => expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument());
     expect(screen.getByDisplayValue("acme-corp")).toBeInTheDocument();
   });
@@ -36,7 +44,7 @@ describe("EditTenantPage", () => {
     const patchSpy = vi.fn(() => envelope(FULL_TENANT));
     server.use(http.patch("http://localhost:8000/api/v1/tenants/:tenantId", patchSpy));
 
-    render(<EditTenantPage />);
+    render(<TenantDetailPage />);
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -55,7 +63,7 @@ describe("EditTenantPage", () => {
       forward: vi.fn(),
     });
 
-    render(<EditTenantPage />);
+    render(<TenantDetailPage />);
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -68,7 +76,7 @@ describe("EditTenantPage", () => {
       http.patch("http://localhost:8000/api/v1/tenants/:tenantId", () => envelope(FULL_TENANT))
     );
 
-    const { store } = render(<EditTenantPage />);
+    const { store } = render(<TenantDetailPage />);
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -79,7 +87,7 @@ describe("EditTenantPage", () => {
     setup();
     server.use(http.delete("http://localhost:8000/api/v1/tenants/:tenantId", () => envelope(null)));
 
-    const { store } = render(<EditTenantPage />);
+    const { store } = render(<TenantDetailPage />);
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     const dialog = screen.getByRole("dialog");
@@ -102,7 +110,7 @@ describe("EditTenantPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/tenants/:tenantId", deleteSpy));
 
-    render(<EditTenantPage />);
+    render(<TenantDetailPage />);
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     const dialog = screen.getByRole("dialog");
@@ -114,7 +122,7 @@ describe("EditTenantPage", () => {
 
   it("renders name as a read-only field", async () => {
     setup();
-    render(<EditTenantPage />);
+    render(<TenantDetailPage />);
     await waitFor(() => screen.getByDisplayValue("acme-corp"));
     expect(screen.getByRole("textbox", { name: /^name/i })).toBeDisabled();
   });
@@ -129,7 +137,7 @@ describe("EditTenantPage", () => {
       })
     );
 
-    render(<EditTenantPage />);
+    render(<TenantDetailPage />);
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -145,7 +153,7 @@ describe("EditTenantPage", () => {
       )
     );
 
-    render(<EditTenantPage />);
+    render(<TenantDetailPage />);
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "Tenant not found",

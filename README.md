@@ -157,6 +157,8 @@ The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admi
 
 Every admin list table shares interactive features: **per-column sorting and filtering** (applied server-side via the list APIs' `s` and `q` query parameters, so they cover the whole dataset rather than just the current page), **drag-to-resize column widths** (kept for the session, not persisted), and **hover tooltips** that reveal the full text of any cell clipped to its column width.
 
+Where a record has a **detail page**, the list's identifier column links to it. That page is the one screen for the record: its attributes plus every action it supports — saving edits, deleting it, and whatever else the record type offers (publishing a workflow, pulling a skill's repository). A detail page is titled with the **record's own name** rather than with the operation, and the breadcrumb trail above the title ends on that same name, so the path reads `Admin › Workflows › my-workflow` and every crumb before the last links back up. [Workflow sessions](#workflow-sessions) are the exception: a run is a history rather than a record to edit, so its row opens the chat or its read-only task list instead.
+
 Each table also has a **column picker** — the ▥ button next to Refresh — listing every column the table can show, with a "Reset to default" action. Each table ships a default set, and some columns (an MCP server's transport, a secret's reference, an agent skill's ref and revision, a user's email and verification flag) start hidden so the columns that matter most get the width. The identifier column and the Actions column are always shown and are not listed. Choices are remembered per table in the browser's local storage, so they survive a reload; only the departures from the defaults are stored, which keeps a table's later columns arriving at their intended default. Hiding a column that a sort or filter is currently using clears that sort or filter, so the rows on screen are never ordered or narrowed by a criterion nothing on the page can show.
 
 ### Users
@@ -167,17 +169,17 @@ Navigate to [http://localhost:3000/admin/users](http://localhost:3000/admin/user
 |-----------|------|
 | List all users | `GET /admin/users` |
 | Create a new user | `GET /admin/users/new` |
-| Edit / delete a user | `GET /admin/users/{id}` |
+| A user's detail page — edit / delete | `GET /admin/users/{id}` |
 
 Each user record stores a username (unique within its tenant, and separately unique among platform-scoped users with no tenant), first name, last name, email, an `enabled` flag, an `emailVerified` flag, and the user's [roles](#roles-and-authorization). Passwords are hashed with [bcrypt](https://pypi.org/project/bcrypt/) before persistence and are never returned by the API. On edit, leaving the password field blank keeps the existing password. Users are persisted in `a2flow.db`.
 
-**Roles.** The create and edit forms include a roles picker (one checkbox per role); the list shows each user's roles in a **Roles** column. Roles are stored as a JSON list, so they cannot be sorted or filtered server-side via the list API's `s` / `q` parameters. The **Super Admin** checkbox is disabled unless the signed-in user is a Super Admin — the backend rejects granting or revoking it otherwise. Because Super Admin is mutually exclusive with every other role, checking it disables every other role checkbox (and vice versa), with a divider and hint explaining why — the backend rejects any combination of the two regardless.
+**Roles.** The create form and the detail page include a roles picker (one checkbox per role); the list shows each user's roles in a **Roles** column. Roles are stored as a JSON list, so they cannot be sorted or filtered server-side via the list API's `s` / `q` parameters. The **Super Admin** checkbox is disabled unless the signed-in user is a Super Admin — the backend rejects granting or revoking it otherwise. Because Super Admin is mutually exclusive with every other role, checking it disables every other role checkbox (and vice versa), with a divider and hint explaining why — the backend rejects any combination of the two regardless.
 
 **Impersonate.** Each row eligible under the [impersonation rules](#roles-and-authorization) shows an **Impersonate** action — hidden for the signed-in user's own row, for any `super_admin` row, and, unless the viewer is a Super Admin, for any `admin` row; confirming navigates to the welcome page acting as that user. See [Roles and authorization](#roles-and-authorization) for who can impersonate whom and how to stop.
 
-**Profile.** A signed-in user reviews their own account from the **Profile** page (toolbar profile button → **Profile**, at `/profile`). Their username, email, first and last name, roles, and the `enabled` / `emailVerified` flags are shown **read-only** — the backend only accepts self-service updates to the avatar (everything else requires the `admin` role and the admin user editor), so the page renders these attributes as plain text rather than disabled inputs. The avatar section below them is the one editable part.
+**Profile.** A signed-in user reviews their own account from the **Profile** page (toolbar profile button → **Profile**, at `/profile`). Their username, email, first and last name, roles, and the `enabled` / `emailVerified` flags are shown **read-only** — the backend only accepts self-service updates to the avatar (everything else requires the `admin` role and the admin user detail page), so the page renders these attributes as plain text rather than disabled inputs. The avatar section below them is the one editable part.
 
-**Avatars.** Every user has an avatar shown on the toolbar profile button and in the admin user list and editor. By default it is a deterministic SVG generated client-side with [boring-avatars](https://github.com/boringdesigners/boring-avatars) (the `beam` variant) — no image is stored and no network call is made. The seed is the user's tenant and username (`{tenantId}/{username}`), since usernames are only unique within a tenant: the same username in two tenants gets two distinct faces. A platform-scoped user (a `super_admin`, and the seeded system user) has no tenant and is seeded from the username alone. A signed-in user manages their own avatar from the avatar section of the [Profile page](#users): **upload** a custom image (PNG, JPEG, WebP, or GIF, up to 2 MB) or remove it, and **customize** the generated avatar by editing the color palette it is drawn from. The palette is stored as `UserRead.avatarConfig.colors` (an ordered list of up to eight `#rrggbb` values) and applied wherever the avatar renders; the seed still decides which colors land where, so each user stays visually distinct even on a shared palette. When no palette is saved, the application default from `frontend/src/lib/avatar-palette.ts` is used. Avatar editing is self-service only — the admin user editor shows the avatar read-only, with no upload or customization controls. An uploaded image is stored in a dedicated `user_avatars` table and served from `GET /api/v1/users/{id}/avatar`, with `UserRead.avatarUpdatedAt` acting as a presence marker and cache-busting key; uploading or removing it refreshes the signed-in user everywhere, so the toolbar profile button updates immediately. Precedence is **uploaded image → custom-palette avatar → default-palette avatar**; removing the image or resetting the palette falls back to the next option.
+**Avatars.** Every user has an avatar shown on the toolbar profile button and in the admin user list and detail page. By default it is a deterministic SVG generated client-side with [boring-avatars](https://github.com/boringdesigners/boring-avatars) (the `beam` variant) — no image is stored and no network call is made. The seed is the user's tenant and username (`{tenantId}/{username}`), since usernames are only unique within a tenant: the same username in two tenants gets two distinct faces. A platform-scoped user (a `super_admin`, and the seeded system user) has no tenant and is seeded from the username alone. A signed-in user manages their own avatar from the avatar section of the [Profile page](#users): **upload** a custom image (PNG, JPEG, WebP, or GIF, up to 2 MB) or remove it, and **customize** the generated avatar by editing the color palette it is drawn from. The palette is stored as `UserRead.avatarConfig.colors` (an ordered list of up to eight `#rrggbb` values) and applied wherever the avatar renders; the seed still decides which colors land where, so each user stays visually distinct even on a shared palette. When no palette is saved, the application default from `frontend/src/lib/avatar-palette.ts` is used. Avatar editing is self-service only — the admin user detail page shows the avatar read-only, with no upload or customization controls. An uploaded image is stored in a dedicated `user_avatars` table and served from `GET /api/v1/users/{id}/avatar`, with `UserRead.avatarUpdatedAt` acting as a presence marker and cache-busting key; uploading or removing it refreshes the signed-in user everywhere, so the toolbar profile button updates immediately. Precedence is **uploaded image → custom-palette avatar → default-palette avatar**; removing the image or resetting the palette falls back to the next option.
 
 **Audit ownership.** Every persistent record stores `createdBy` / `updatedBy` as a foreign key to `users.id`, populated from the **authenticated session** (see [Authentication](#authentication)). A write whose acting user does not exist is rejected with HTTP 422 (`FOREIGN_KEY_VIOLATION`). To resolve the bootstrap "who creates the first user" problem, a hidden, login-disabled **system user** is seeded on startup when the `users` table is empty, and it owns the initial seeded `root` and `admin` users. In the admin UI the raw IDs are never shown — each detail page resolves `createdBy` / `updatedBy` to the user's `first last` name, and list views resolve user IDs the same way.
 
@@ -191,7 +193,7 @@ Navigate to [http://localhost:3000/admin/tenants](http://localhost:3000/admin/te
 |-----------|------|
 | List all tenants | `GET /admin/tenants` |
 | Create a new tenant | `GET /admin/tenants/new` |
-| Edit / delete a tenant | `GET /admin/tenants/{id}` |
+| A tenant's detail page — edit / delete | `GET /admin/tenants/{id}` |
 
 Each tenant record stores a unique `displayName` (human-readable label), a unique URL-safe `name` (lowercase kebab-case, intended for use in paths or subdomains by later tasks), and an `enabled` flag for deactivating a tenant without deleting it — disabling a tenant blocks sign-in for its users and signs out anyone already logged in on their next request. A [user](#users) belongs to at most one tenant (`User.tenantId`); a tenant cannot be deleted while any user is still assigned to it — the API rejects the delete with HTTP 409 (`CONFLICT_REFERENCED`) instead. A **Default** tenant (`name: default`) is seeded automatically on first startup, holding the initial seeded `admin` user.
 
@@ -203,8 +205,8 @@ Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/adm
 |-----------|------|
 | List all skills | `GET /admin/agent-skills` |
 | Register a new skill | `GET /admin/agent-skills/new` |
-| Edit / delete a skill | `GET /admin/agent-skills/{id}` |
-| Generate a workflow from a skill | "Generate workflow" in the list's Actions column, or the Generate Workflow icon button in the edit page's header (see [Generating a workflow](#generating-a-workflow)) |
+| A skill's detail page — edit / delete | `GET /admin/agent-skills/{id}` |
+| Generate a workflow from a skill | "Generate workflow" in the list's Actions column, or the Generate Workflow icon button in the detail page's header (see [Generating a workflow](#generating-a-workflow)) |
 | Pull a skill's repository | `POST /api/v1/agent-skills/{id}/pull` |
 
 Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, an optional **Ref** (a branch or tag name), and description.
@@ -219,7 +221,7 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 The clone is staged in a temporary sibling directory and moved into place with a single atomic rename, so a replica reading the store never sees a half-written revision. A published revision is then **never modified** — a pull only ever adds a sibling.
 
-The list and edit pages show each skill's **Status** (`Cloning` / `ready` / `failed`, with the failure reason) and the short **Revision** it has published. Two fields carry that state, and they mean different things:
+The list and detail pages show each skill's **Status** (`Cloning` / `ready` / `failed`, with the failure reason) and the short **Revision** it has published. Two fields carry that state, and they mean different things:
 
 - **`commitSha`** — the published revision. A skill is runnable **only** once this is set; a workflow started against a skill with no revision is rejected with HTTP 409 (`SKILL_NOT_READY`).
 - **`syncStatus`** — how the *last* clone or pull went. A pull that fails does **not** clear `commitSha`, so a skill that was working keeps working at its previous revision; only the status and the error change.
@@ -230,7 +232,7 @@ Under `docker compose`, `SKILLS_DIR` is `/var/lib/a2flow/skills`, persisted in t
 
 Private repositories are supported through the optional **Auth Password** field. It is not typed in: pick a registered [Secret](#secrets) and one **Entry Key** within it from the two dropdowns, and that entry's value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. Both secret types are offered — a `vault` secret's entry keys are read live from its KV v2 path, since they are not stored locally. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name.
 
-The secret is stored as a `name/key` reference and resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill. The edit form does not quietly drop such a stale reference: it stays selected, marked `(not found)`, with a warning — clearing it is your call.
+The secret is stored as a `name/key` reference and resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill. The detail page does not quietly drop such a stale reference: it stays selected, marked `(not found)`, with a warning — clearing it is your call.
 
 ### MCP Servers
 
@@ -240,7 +242,7 @@ Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admi
 |-----------|------|
 | List all servers | `GET /admin/mcp-servers` |
 | Register a new server | `GET /admin/mcp-servers/new` |
-| Edit / delete a server | `GET /admin/mcp-servers/{id}` |
+| A server's detail page — edit / delete | `GET /admin/mcp-servers/{id}` |
 
 Each record stores a unique name plus a **transport**, which decides the rest of the form:
 
@@ -278,11 +280,11 @@ The key is **always required**, even when the secret holds a single entry — a 
 |-----------|------|
 | List all secrets | `GET /admin/secrets` |
 | Register a new secret | `GET /admin/secrets/new` |
-| Edit / delete a secret | `GET /admin/secrets/{id}` |
+| A secret's detail page — edit / delete | `GET /admin/secrets/{id}` |
 
 A secret has one of two types:
 
-- **Local (encrypted)** — the entries are submitted once and stored in `a2flow.db` with each value encrypted with [Fernet](https://cryptography.io/en/latest/fernet/) (AES-128-CBC + HMAC). Keys are stored in plaintext so they can be listed without decrypting anything. The API is **write-only**: a response carries the entry keys but never a value (neither plaintext nor ciphertext). The edit form therefore shows every stored key with a blank value — leave one blank to keep the stored value, retype it to replace it, or remove the row to delete that entry.
+- **Local (encrypted)** — the entries are submitted once and stored in `a2flow.db` with each value encrypted with [Fernet](https://cryptography.io/en/latest/fernet/) (AES-128-CBC + HMAC). Keys are stored in plaintext so they can be listed without decrypting anything. The API is **write-only**: a response carries the entry keys but never a value (neither plaintext nor ciphertext). The detail page therefore shows every stored key with a blank value — leave one blank to keep the stored value, retype it to replace it, or remove the row to delete that entry.
 - **HashiCorp Vault** — only a KV v2 reference (mount and path) is stored; every key at that path is readable, and each value is fetched live from Vault when it is resolved.
 
 `GET /api/v1/secrets/{id}/keys` lists one secret's entry keys — and only its keys — for both types alike: from the stored map for a `local` secret, from a live KV v2 read for a `vault` one (which yields HTTP 502 `SECRET_RESOLUTION_FAILED` when Vault is unreachable or unconfigured). The Agent Skill auth-password picker uses it; the `keys` field on a secret read cannot serve that purpose, since it is always empty for a `vault` secret.
@@ -309,9 +311,9 @@ Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/
 
 | Operation | Path |
 |-----------|------|
-| Generate a workflow from a skill | "Generate workflow" on [Agent Skills](#agent-skills) — the list's row action or the edit page header's icon button (both calling `POST /agent-skills/{id}/workflows`) |
+| Generate a workflow from a skill | "Generate workflow" on [Agent Skills](#agent-skills) — the list's row action or the detail page header's icon button (both calling `POST /agent-skills/{id}/workflows`) |
 | List all workflows | `GET /admin/workflows` |
-| Edit a workflow / publish / deactivate / discard changes / open its planning session | `GET /admin/workflows/{id}` |
+| A workflow's detail page — edit / publish / deactivate / discard changes / open its planning session | `GET /admin/workflows/{id}` |
 | Manage its task templates | `GET /admin/workflows/{id}/task-templates` |
 | Run a workflow | "Run" button in the list (calls `POST /workflows/{id}/execute`) |
 
@@ -319,7 +321,7 @@ Each workflow record stores a name, a reference to an Agent Skill, a lifecycle *
 
 #### Generating a workflow
 
-**Generate workflow** is reachable from two places, both opening the same modal dialog without leaving the page: the row action in the [Agent Skills](#agent-skills) list, and the Generate Workflow icon button in the header of a skill's edit page. Either is disabled until the skill's clone has published a revision. The dialog asks for the workflow **name** (prefilled with the skill name) and the **prompt** describing the work. Because generating navigates away to the new workflow, the edit page offers to save unsaved edits first — declining the prompt leaves the page untouched and does not generate.
+**Generate workflow** is reachable from two places, both opening the same modal dialog without leaving the page: the row action in the [Agent Skills](#agent-skills) list, and the Generate Workflow icon button in the header of a skill's detail page. Either is disabled until the skill's clone has published a revision. The dialog asks for the workflow **name** (prefilled with the skill name) and the **prompt** describing the work. Because generating navigates away to the new workflow, the detail page offers to save unsaved edits first — declining the prompt leaves the page untouched and does not generate.
 
 Submitting the dialog:
 
@@ -334,7 +336,7 @@ The prompt itself is not stored on the workflow: it lives on as the first messag
 A draft's task templates can be refined in two ways, in any mix:
 
 - **By chat** — the workflow detail page's **Open planning session** button opens `/planning-sessions/{id}`: the same chat UI as a run, with the template list down the left edge, driven by an interactive *planning* agent whose tools (`register_planning_tasks`, `create_planning_task`, `list_planning_tasks`, `get_planning_task`, `update_planning_task`, `delete_planning_task`) edit the workflow's templates directly. The planning agent never executes anything. The planning session is owner-only (plus Super Admins) and reuses the shared chat plumbing (history poll, A2UI surfaces).
-- **By hand** — the **Task Templates** admin pages (`/admin/workflows/{id}/task-templates`) offer the familiar Table / Graph views plus create/edit/delete forms with **Depends on** and **MCP Tools** pickers, backed by `GET /workflows/{id}/task-templates` and the `POST`/`PATCH`/`DELETE /workflow-task-templates` endpoints (developer-gated).
+- **By hand** — the **Task Templates** admin pages (`/admin/workflows/{id}/task-templates`) offer the familiar Table / Graph views plus a create form and a per-template detail page with **Depends on** and **MCP Tools** pickers, backed by `GET /workflows/{id}/task-templates` and the `POST`/`PATCH`/`DELETE /workflow-task-templates` endpoints (developer-gated).
 
 Templates mirror session tasks structurally — title, description, `position`, DAG edges (`workflow_task_template_dependencies`), and MCP tool bindings (`workflow_task_template_tool_bindings`, server side `RESTRICT`) — but carry **no status**: the lifecycle belongs to a run, not the plan. The same DAG rules apply (same-workflow targets, cycles rejected with HTTP 409 `DEPENDENCY_CYCLE`).
 

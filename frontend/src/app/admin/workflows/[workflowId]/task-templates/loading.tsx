@@ -20,7 +20,7 @@ export default function Loading() {
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Workflows", href: "/admin/workflows" },
-          { label: "Edit", href: `/admin/workflows/${workflowId}` },
+          { label: "…", href: `/admin/workflows/${workflowId}` },
           { label: "Task Templates" },
         ]}
       />

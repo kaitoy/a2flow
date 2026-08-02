@@ -1,4 +1,4 @@
-/** @module EditWorkflowTaskTemplatePage — Admin form to edit or delete a task template. */
+/** @module WorkflowTaskTemplateDetailPage — Admin detail page for a single task template. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -53,8 +53,12 @@ const schema = zWorkflowTaskTemplateCreate
 
 type FormValues = z.infer<typeof schema>;
 
-/** Form page that loads, updates, and deletes a single task template. */
-export default function EditWorkflowTaskTemplatePage() {
+/**
+ * Detail page of a single task template — one step of a workflow's plan — with
+ * its dependency and MCP tool pickers. The page is titled with the template's
+ * own title, the label its row carries in the list.
+ */
+export default function WorkflowTaskTemplateDetailPage() {
   const { workflowId, templateId } = useParams<{ workflowId: string; templateId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -63,6 +67,9 @@ export default function EditWorkflowTaskTemplatePage() {
   const [candidates, setCandidates] = useState<WorkflowTaskTemplate[]>([]);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [templateBindings, setTemplateBindings] = useState<ToolBinding[]>([]);
+  // The persisted title, which names the page. Kept out of the form so the
+  // heading names the saved record rather than following every keystroke.
+  const [title, setTitle] = useState("");
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -87,6 +94,7 @@ export default function EditWorkflowTaskTemplatePage() {
   useEffect(() => {
     getWorkflowTaskTemplate(templateId)
       .then((template) => {
+        setTitle(template.title);
         reset({
           title: template.title,
           description: template.description ?? "",
@@ -148,14 +156,16 @@ export default function EditWorkflowTaskTemplatePage() {
     { label: "Admin", href: "/admin" },
     { label: "Workflows", href: "/admin/workflows" },
     { label: "Task Templates", href: `/admin/workflows/${workflowId}/task-templates` },
-    { label: "Edit" },
+    // The template itself is the current page; an ellipsis stands in until its
+    // title has loaded.
+    { label: title || "…" },
   ];
 
   if (loading) {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <FormLayout header={<AdminPageHeader title="Edit Task Template" icon={ListTree} />}>
+        <FormLayout header={<AdminPageHeader icon={ListTree} />}>
           <FormSkeleton fields={5} />
         </FormLayout>
       </AdminPageContainer>
@@ -166,7 +176,7 @@ export default function EditWorkflowTaskTemplatePage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title="Edit Task Template" icon={ListTree} />}
+        header={<AdminPageHeader title={title} icon={ListTree} />}
         aside={audit && <AuditMeta {...audit} />}
       >
         <form

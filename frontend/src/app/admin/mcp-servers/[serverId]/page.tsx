@@ -1,4 +1,4 @@
-/** @module EditMcpServerPage — Admin edit/view form for a registered MCP server. */
+/** @module McpServerDetailPage — Admin detail page for a registered MCP server. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,13 +28,20 @@ import { deleteMcpServer, getMcpServer, updateMcpServer } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
-export default function EditMcpServerPage() {
+/**
+ * Detail page of a registered MCP server: its connection fields and the tools
+ * it advertises. The page is titled with the server's own name.
+ */
+export default function McpServerDetailPage() {
   const { serverId } = useParams<{ serverId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
+  // The persisted name, which titles the page. Kept out of the form so the
+  // heading names the saved record rather than following every keystroke.
+  const [name, setName] = useState("");
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -55,6 +62,7 @@ export default function EditMcpServerPage() {
   useEffect(() => {
     getMcpServer(serverId)
       .then((server) => {
+        setName(server.name);
         reset({
           ...emptyMcpServerFormValues(),
           name: server.name,
@@ -107,14 +115,16 @@ export default function EditMcpServerPage() {
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "MCP Servers", href: "/admin/mcp-servers" },
-    { label: "Edit" },
+    // The server itself is the current page; an ellipsis stands in until its
+    // name has loaded.
+    { label: name || "…" },
   ];
 
   if (loading) {
     return (
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
-        <FormLayout header={<AdminPageHeader title="Edit MCP Server" icon={Server} />}>
+        <FormLayout header={<AdminPageHeader icon={Server} />}>
           <FormSkeleton fields={4} />
         </FormLayout>
       </AdminPageContainer>
@@ -125,7 +135,7 @@ export default function EditMcpServerPage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title="Edit MCP Server" icon={Server} />}
+        header={<AdminPageHeader title={name} icon={Server} />}
         aside={audit && <AuditMeta {...audit} />}
       >
         <form

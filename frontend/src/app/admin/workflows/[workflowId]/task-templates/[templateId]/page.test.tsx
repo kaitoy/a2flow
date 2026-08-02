@@ -4,8 +4,8 @@ import { useParams } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { render, screen, waitFor } from "@/test/test-utils";
-import EditWorkflowTaskTemplatePage from "./page";
+import { render, screen, waitFor, within } from "@/test/test-utils";
+import WorkflowTaskTemplateDetailPage from "./page";
 
 const BASE = "http://localhost:8000";
 
@@ -42,10 +42,18 @@ function capturePatch() {
   return captured;
 }
 
-describe("EditWorkflowTaskTemplatePage", () => {
+describe("WorkflowTaskTemplateDetailPage", () => {
+  it("titles the page and ends the breadcrumb trail with the template's title", async () => {
+    setup();
+    render(<WorkflowTaskTemplateDetailPage />);
+    expect(await screen.findByRole("heading", { name: "Template Step 1" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(nav).getByText("Template Step 1")).toHaveAttribute("aria-current", "page");
+  });
+
   it("prefills the template's bound MCP tools", async () => {
     setup();
-    render(<EditWorkflowTaskTemplatePage />);
+    render(<WorkflowTaskTemplateDetailPage />);
 
     await waitFor(() => expect(screen.getByDisplayValue("Template Step 1")).toBeInTheDocument());
     expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeChecked();
@@ -56,7 +64,7 @@ describe("EditWorkflowTaskTemplatePage", () => {
     setup({ ...TEMPLATE, toolBindings: [] });
     const captured = capturePatch();
 
-    render(<EditWorkflowTaskTemplatePage />);
+    render(<WorkflowTaskTemplateDetailPage />);
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
     await userEvent.click(await screen.findByRole("checkbox", { name: "local-files: search" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -73,7 +81,7 @@ describe("EditWorkflowTaskTemplatePage", () => {
     setup();
     const captured = capturePatch();
 
-    render(<EditWorkflowTaskTemplatePage />);
+    render(<WorkflowTaskTemplateDetailPage />);
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
     await userEvent.click(await screen.findByRole("checkbox", { name: "my-mcp-server: search" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -90,7 +98,7 @@ describe("EditWorkflowTaskTemplatePage", () => {
     );
     const captured = capturePatch();
 
-    render(<EditWorkflowTaskTemplatePage />);
+    render(<WorkflowTaskTemplateDetailPage />);
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
 
     // The bound tool is still listed (and checked) even though no server
