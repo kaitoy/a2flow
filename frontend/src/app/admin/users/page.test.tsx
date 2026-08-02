@@ -20,7 +20,13 @@ vi.mock("next/link", () => ({
 /** Build a preloaded auth slice for a signed-in viewer holding the given roles/tenant. */
 function authState(roles: Role[], tenantId?: string): Partial<RootState> {
   return {
-    auth: { user: { id: "viewer-1", roles, tenantId } as User, status: "authenticated" },
+    auth: {
+      user: { id: "viewer-1", roles, tenantId } as User,
+      status: "authenticated",
+      selectedTenantId: null,
+      impersonatedUserId: null,
+      impersonatedBy: null,
+    },
   };
 }
 
@@ -227,6 +233,9 @@ describe("UsersPage", () => {
           auth: {
             user: { id: "user-1", roles: ["super_admin"] } as User,
             status: "authenticated",
+            selectedTenantId: null,
+            impersonatedUserId: null,
+            impersonatedBy: null,
           },
         },
       });

@@ -30,7 +30,15 @@ describe("UserProfileButton", () => {
   it("opens the profile menu when clicked", async () => {
     const user = userEvent.setup();
     render(<UserProfileButton />, {
-      preloadedState: { auth: { user: makeUser(), status: "authenticated" } },
+      preloadedState: {
+        auth: {
+          user: makeUser(),
+          status: "authenticated",
+          selectedTenantId: null,
+          impersonatedUserId: null,
+          impersonatedBy: null,
+        },
+      },
     });
 
     await user.click(screen.getByRole("button", { name: "Profile" }));

@@ -34,7 +34,13 @@ const TENANT_2: Tenant = {
 /** Build a preloaded auth slice for a signed-in user holding the given roles. */
 function authState(roles: Role[], selectedTenantId: string | null = null): Partial<RootState> {
   return {
-    auth: { user: { id: "u1", roles } as User, status: "authenticated", selectedTenantId },
+    auth: {
+      user: { id: "u1", roles } as User,
+      status: "authenticated",
+      selectedTenantId,
+      impersonatedUserId: null,
+      impersonatedBy: null,
+    },
   };
 }
 

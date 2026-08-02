@@ -24,7 +24,15 @@ vi.mock("next/navigation", () => ({
 
 /** Build a preloaded auth slice for a signed-in user holding the given roles. */
 function authState(roles: Role[]): Partial<RootState> {
-  return { auth: { user: { id: "u1", roles } as User, status: "authenticated" } };
+  return {
+    auth: {
+      user: { id: "u1", roles } as User,
+      status: "authenticated",
+      selectedTenantId: null,
+      impersonatedUserId: null,
+      impersonatedBy: null,
+    },
+  };
 }
 
 /** Roles granting every workflow action (run plus create/edit/delete). */

@@ -31,7 +31,13 @@ vi.mock("@/components/ChatInput", () => ({
 
 /** Preloaded auth slice so AuthProvider renders its children immediately. */
 const AUTH_STATE: Partial<RootState> = {
-  auth: { user: { id: "user", roles: ["developer"] } as User, status: "authenticated" },
+  auth: {
+    user: { id: "user", roles: ["developer"] } as User,
+    status: "authenticated",
+    selectedTenantId: null,
+    impersonatedUserId: null,
+    impersonatedBy: null,
+  },
 };
 
 beforeEach(() => {

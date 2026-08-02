@@ -15,7 +15,15 @@ vi.mock("@/lib/api", () => ({
 
 /** Build a preloaded auth slice for the signed-in user with the given id and roles. */
 function authState(userId: string, roles: Role[] = []): Partial<RootState> {
-  return { auth: { user: { id: userId, roles } as User, status: "authenticated" } };
+  return {
+    auth: {
+      user: { id: userId, roles } as User,
+      status: "authenticated",
+      selectedTenantId: null,
+      impersonatedUserId: null,
+      impersonatedBy: null,
+    },
+  };
 }
 
 beforeEach(() => {

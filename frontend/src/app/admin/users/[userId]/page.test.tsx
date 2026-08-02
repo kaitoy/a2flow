@@ -17,6 +17,8 @@ function superAdminState(selectedTenantId: string | null): Partial<RootState> {
       user: { id: "u1", roles: ["super_admin"] } as User,
       status: "authenticated",
       selectedTenantId,
+      impersonatedUserId: null,
+      impersonatedBy: null,
     },
   };
 }
@@ -262,7 +264,7 @@ describe("UserDetailPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(capturedBody?.tenantId).toBe("tenant-1"));
-    expect(capturedBody?.roles).toEqual([]);
+    expect(capturedBody).toMatchObject({ roles: [] });
   });
 
   it("keeps a super admin's tenantId null on save regardless of the app-bar selection", async () => {

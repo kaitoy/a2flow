@@ -206,7 +206,11 @@ export function WorkflowTaskTimeline({
         )}
       </ol>
       <TaskToolsDialog
-        task={openToolsTask}
+        task={
+          openToolsTask
+            ? { title: openToolsTask.title, toolBindings: openToolsTask.toolBindings ?? [] }
+            : null
+        }
         serverNames={serverNames}
         serverNamesLoading={serverNamesLoading}
         onClose={() => setOpenToolsTask(null)}

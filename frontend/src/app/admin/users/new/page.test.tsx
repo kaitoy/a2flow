@@ -17,6 +17,8 @@ function superAdminState(selectedTenantId: string | null): Partial<RootState> {
       user: { id: "u1", roles: ["super_admin"] } as User,
       status: "authenticated",
       selectedTenantId,
+      impersonatedUserId: null,
+      impersonatedBy: null,
     },
   };
 }

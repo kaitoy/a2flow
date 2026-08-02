@@ -94,6 +94,8 @@ describe("NotificationBell", () => {
           user: { id: "u1", roles: ["super_admin"], tenantId: null } as User,
           status: "authenticated",
           selectedTenantId: null,
+          impersonatedUserId: null,
+          impersonatedBy: null,
         },
       },
     });
@@ -109,6 +111,8 @@ describe("NotificationBell", () => {
           user: { id: "u1", roles: ["super_admin"], tenantId: null } as User,
           status: "authenticated",
           selectedTenantId: null,
+          impersonatedUserId: null,
+          impersonatedBy: null,
         },
       },
     });

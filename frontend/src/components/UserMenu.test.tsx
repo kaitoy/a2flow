@@ -83,7 +83,15 @@ describe("UserMenu", () => {
     replaceMock.mockClear();
     const user = userEvent.setup();
     const { store } = render(<Harness user={makeUser()} onClose={onClose} />, {
-      preloadedState: { auth: { user: makeUser(), status: "authenticated" } },
+      preloadedState: {
+        auth: {
+          user: makeUser(),
+          status: "authenticated",
+          selectedTenantId: null,
+          impersonatedUserId: null,
+          impersonatedBy: null,
+        },
+      },
     });
 
     await user.click(screen.getByRole("menuitem", { name: "Log out" }));

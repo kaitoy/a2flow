@@ -33,6 +33,8 @@ describe("AppHeader", () => {
         user: { id: "u1", roles: ["admin"] } as User,
         status: "authenticated",
         selectedTenantId: null,
+        impersonatedUserId: null,
+        impersonatedBy: null,
       },
     };
     render(<AppHeader />, { preloadedState });
@@ -45,6 +47,8 @@ describe("AppHeader", () => {
         user: { id: "u1", roles: ["super_admin"] } as User,
         status: "authenticated",
         selectedTenantId: null,
+        impersonatedUserId: null,
+        impersonatedBy: null,
       },
     };
     render(<AppHeader />, { preloadedState });
@@ -61,7 +65,7 @@ describe("AppHeader", () => {
   it("renders the impersonation indicator when impersonating", () => {
     const preloadedState: Partial<RootState> = {
       auth: {
-        user: { id: "target-1", username: "target", roles: [] } as User,
+        user: { id: "target-1", username: "target", roles: [] as string[] } as User,
         status: "authenticated",
         selectedTenantId: null,
         impersonatedUserId: "target-1",

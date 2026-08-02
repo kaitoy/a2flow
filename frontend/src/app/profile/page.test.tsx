@@ -33,7 +33,15 @@ const USER: User = {
 describe("ProfilePage", () => {
   it("renders the read-only details above the editable avatar section", () => {
     render(<ProfilePage />, {
-      preloadedState: { auth: { user: USER, status: "authenticated" } },
+      preloadedState: {
+        auth: {
+          user: USER,
+          status: "authenticated",
+          selectedTenantId: null,
+          impersonatedUserId: null,
+          impersonatedBy: null,
+        },
+      },
     });
 
     expect(screen.getByRole("heading", { level: 1, name: "Profile" })).toBeInTheDocument();
