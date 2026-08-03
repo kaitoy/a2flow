@@ -335,6 +335,8 @@ The prompt itself is not stored on the workflow: it lives on as the first messag
 
 The AI summary goes stale as the plan is adjusted, so the **Generated description** field on the workflow detail page carries a **generate action** (`POST /workflows/{id}/generate-description`, developer-gated) that re-summarizes the planning conversation on demand — one LLM call — and saves the result straight away. There is no summarization at publish time: whether and when to refresh the summary is the user's call.
 
+The same action is also reachable from the planning session's chat input: its "+" menu (developer-gated, hidden while the workflow's plan is still generating) offers **Generate description**, which previews the change through the same description-diff dialog as the detail page before it's saved — handy for regenerating without leaving the conversation.
+
 A `published` workflow becomes `modified` when the summary is rewritten, since a run whose `description` is empty falls back to it and would otherwise drift from the published version. The action returns HTTP 409 (`WORKFLOW_DESCRIPTION_NOT_GENERATABLE`) while generation is still in flight or when there is no planning conversation to summarize, and HTTP 502 (`SUMMARIZATION_FAILED`) if the LLM call fails.
 
 #### Adjusting the plan

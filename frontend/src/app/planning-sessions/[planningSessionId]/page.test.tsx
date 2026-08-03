@@ -1,6 +1,7 @@
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { useParams } from "next/navigation";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { RootState } from "@/store";
@@ -26,19 +27,56 @@ vi.mock("@/components/MessageList", () => ({
 }));
 
 vi.mock("@/components/ChatInput", () => ({
-  ChatInput: () => <div data-testid="chat-input-mock" />,
+  ChatInput: ({ leading }: { leading?: ReactNode }) => (
+    <div data-testid="chat-input-mock">{leading}</div>
+  ),
 }));
 
-/** Preloaded auth slice so AuthProvider renders its children immediately. */
-const AUTH_STATE: Partial<RootState> = {
-  auth: {
-    user: { id: "user", roles: ["developer"] } as User,
-    status: "authenticated",
-    selectedTenantId: null,
-    impersonatedUserId: null,
-    impersonatedBy: null,
-  },
-};
+/** Builds a preloaded auth slice with the given roles, so AuthProvider renders its children immediately. */
+function authState(roles: string[]): Partial<RootState> {
+  return {
+    auth: {
+      user: { id: "user", roles } as User,
+      status: "authenticated",
+      selectedTenantId: null,
+      impersonatedUserId: null,
+      impersonatedBy: null,
+    },
+  };
+}
+
+const AUTH_STATE = authState(["developer"]);
+
+/**
+ * Overrides the global `/auth/me` handler so the session keeps the given
+ * roles. `AuthProvider` re-fetches the current user on mount and overwrites
+ * the preloaded auth state with whatever it resolves — the default handler's
+ * user carries no roles at all, which would otherwise reset `canEdit` to
+ * false moments after the initial render.
+ */
+function mockMe(roles: string[]) {
+  server.use(
+    http.get("http://localhost:8000/api/v1/auth/me", () =>
+      envelope({
+        user: {
+          id: "user-1",
+          username: "alice",
+          firstName: "Alice",
+          lastName: "Smith",
+          email: "alice@example.com",
+          enabled: true,
+          emailVerified: false,
+          roles,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        },
+        impersonatedBy: null,
+      })
+    )
+  );
+}
 
 beforeEach(() => {
   vi.mocked(useParams).mockReturnValue({ planningSessionId: "ps-1" });
@@ -116,5 +154,78 @@ describe("PlanningSessionPage", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("search")).toBeInTheDocument();
     expect(await within(dialog).findByText("my-mcp-server")).toBeInTheDocument();
+  });
+
+  it("shows the chat actions menu for a developer", async () => {
+    mockMe(["developer"]);
+    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    const chatInputMock = await screen.findByTestId("chat-input-mock");
+    expect(
+      await within(chatInputMock).findByRole("button", { name: "Chat actions" })
+    ).toBeInTheDocument();
+  });
+
+  it("hides the chat actions menu for a non-developer", async () => {
+    mockMe(["requester"]);
+    render(<PlanningSessionPage />, { preloadedState: authState(["requester"]) });
+    const chatInputMock = await screen.findByTestId("chat-input-mock");
+    await screen.findByRole("link", { name: "my-workflow" });
+    expect(
+      within(chatInputMock).queryByRole("button", { name: "Chat actions" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("generates a description, shows a toast, and opens the diff preview", async () => {
+    mockMe(["developer"]);
+    const { store } = render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    const chatInputMock = await screen.findByTestId("chat-input-mock");
+    const menuTrigger = await within(chatInputMock).findByRole("button", {
+      name: "Chat actions",
+    });
+
+    await userEvent.click(menuTrigger);
+    await userEvent.click(screen.getByRole("menuitem", { name: /Generate description/ }));
+
+    await waitFor(() =>
+      expect(store.getState().toast.items.at(-1)).toMatchObject({
+        message: "Description generated",
+      })
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Description diff" });
+    // WORKFLOW_1's `description` stays null after generation (only
+    // `generatedDescription` is set), so the dialog falls back to its
+    // empty-description copy instead of rendering a word-level diff.
+    expect(within(dialog).getByText(/Description is empty/)).toBeInTheDocument();
+  });
+
+  it("disables the generate-description item while the workflow is generating", async () => {
+    mockMe(["developer"]);
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          generatedDescription: null,
+          agentSkillId: "skill-1",
+          status: "generating",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    const chatInputMock = await screen.findByTestId("chat-input-mock");
+    const menuTrigger = await within(chatInputMock).findByRole("button", {
+      name: "Chat actions",
+    });
+
+    await userEvent.click(menuTrigger);
+
+    expect(screen.getByRole("menuitem", { name: /Generate description/ })).toBeDisabled();
   });
 });

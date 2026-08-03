@@ -3,9 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ChatInput } from "./ChatInput";
 
-/** Make `(pointer: coarse)` match, emulating a touch device; other queries stay false. */
+/**
+ * Make `(pointer: coarse)` match, emulating a touch device; other queries stay
+ * false. Saves and restores `window.matchMedia` manually rather than via
+ * `vi.spyOn(...).mockRestore()`: `window.matchMedia` is already a `vi.fn()`
+ * (see `src/test/setup.ts`), and spying on an existing mock leaves it
+ * cleared — not restored to the setup stub — once the spy is torn down,
+ * breaking every later test in this file that mounts `ChatInput`.
+ */
 function stubCoarsePointer() {
-  return vi.spyOn(window, "matchMedia").mockImplementation(
+  const original = window.matchMedia;
+  window.matchMedia = vi.fn().mockImplementation(
     (query: string) =>
       ({
         matches: query === "(pointer: coarse)",
@@ -18,6 +26,7 @@ function stubCoarsePointer() {
         dispatchEvent: vi.fn(),
       }) as unknown as MediaQueryList
   );
+  return { mockRestore: () => (window.matchMedia = original) };
 }
 
 describe("ChatInput", () => {
@@ -94,5 +103,17 @@ describe("ChatInput", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it("renders the leading slot when provided", () => {
+    render(
+      <ChatInput onSend={vi.fn()} disabled={false} leading={<button type="button">extra</button>} />
+    );
+    expect(screen.getByRole("button", { name: "extra" })).toBeInTheDocument();
+  });
+
+  it("omits the leading slot when not provided", () => {
+    render(<ChatInput onSend={vi.fn()} disabled={false} />);
+    expect(screen.queryByRole("button", { name: "extra" })).not.toBeInTheDocument();
   });
 });

@@ -6,8 +6,10 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { DescriptionDiffDialog } from "@/components/admin/description-diff-dialog";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
+import { ChatInputMenu } from "@/components/ChatInputMenu";
 import { MessageList } from "@/components/MessageList";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -15,8 +17,10 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import {
+  generateWorkflowDescription,
   getPlanningSession,
   getWorkflow,
   listWorkflowTaskTemplates,
@@ -25,8 +29,10 @@ import {
   type WorkflowTaskTemplate,
 } from "@/lib/api";
 import logger from "@/lib/logger";
+import { Role, useHasRole } from "@/lib/roles";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
 
 /** How often (ms) to re-fetch the workflow's task templates while planning. */
 const TEMPLATE_POLL_INTERVAL_MS = 10_000;
@@ -35,10 +41,24 @@ const TEMPLATE_POLL_INTERVAL_MS = 10_000;
  * The plan-refinement chat of a workflow's planning session: the template
  * timeline on the left, the conversation with the planning agent on the right.
  * Templates are re-fetched after every agent turn (and on an interval) so the
- * timeline follows the plan the agent is editing.
+ * timeline follows the plan the agent is editing. A developer can also open
+ * the chat input's action menu to re-summarize the conversation into the
+ * workflow's description, then review the change through
+ * `DescriptionDiffDialog`.
  */
-function PlanningSessionView({ ps, workflow }: { ps: PlanningSession; workflow: Workflow }) {
+function PlanningSessionView({
+  ps,
+  workflow,
+  onWorkflowUpdate,
+}: {
+  ps: PlanningSession;
+  workflow: Workflow;
+  onWorkflowUpdate: (wf: Workflow) => void;
+}) {
   const dispatch = useAppDispatch();
+  const canEdit = useHasRole(Role.DEVELOPER);
+  const generateDescription = useAsyncAction({ showDone: false });
+  const [diffOpen, setDiffOpen] = useState(false);
   const {
     messages,
     isRunning,
@@ -73,6 +93,22 @@ function PlanningSessionView({ ps, workflow }: { ps: PlanningSession; workflow: 
   }, [refreshTemplates]);
 
   const taskIndexById = useMemo(() => new Map(templates.map((t, i) => [t.id, i + 1])), [templates]);
+
+  async function handleGenerateDescription() {
+    try {
+      await generateDescription.run(async () => {
+        const updated = await generateWorkflowDescription(workflow.id);
+        // These three calls stay synchronous (no `await` between them) so
+        // React batches them into one render — the diff dialog's props
+        // already reflect `updated` by the time `diffOpen` flips true.
+        onWorkflowUpdate(updated);
+        dispatch(showToast({ message: "Description generated" }));
+        setDiffOpen(true);
+      });
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
+    }
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -127,8 +163,26 @@ function PlanningSessionView({ ps, workflow }: { ps: PlanningSession; workflow: 
           onApprovalResolved={sendApprovalResult}
           pendingRenderCalls={pendingRenderCalls}
         />
-        <ChatInput onSend={sendMessage} disabled={isRunning} />
+        <ChatInput
+          onSend={sendMessage}
+          disabled={isRunning}
+          leading={
+            canEdit ? (
+              <ChatInputMenu
+                onGenerateDescription={handleGenerateDescription}
+                disabled={workflow.status === "generating" || generateDescription.inFlight}
+                pending={generateDescription.inFlight}
+              />
+            ) : undefined
+          }
+        />
       </div>
+      <DescriptionDiffDialog
+        open={diffOpen}
+        generated={workflow.generatedDescription ?? ""}
+        description={workflow.description ?? ""}
+        onClose={() => setDiffOpen(false)}
+      />
     </div>
   );
 }
@@ -182,7 +236,11 @@ export default function PlanningSessionPage() {
   return (
     <AuthProvider>
       {planningSession && workflow ? (
-        <PlanningSessionView ps={planningSession} workflow={workflow} />
+        <PlanningSessionView
+          ps={planningSession}
+          workflow={workflow}
+          onWorkflowUpdate={setWorkflow}
+        />
       ) : loadFailed ? (
         <PlanningSessionLoadError onRetry={retry} />
       ) : (

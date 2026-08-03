@@ -1,7 +1,7 @@
 "use client";
 
 import { animated, useSpring } from "@react-spring/web";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMotionConfig } from "@/lib/motion";
 import { Button } from "./ui/button";
@@ -10,6 +10,12 @@ import { Textarea } from "./ui/textarea";
 interface Props {
   onSend: (message: string) => void;
   disabled: boolean;
+  /**
+   * Optional control rendered before the textarea (e.g. a menu of extra
+   * chat actions). Carries its own alignment classes, matching how the Send
+   * button aligns itself to the bottom of a multi-line textarea.
+   */
+  leading?: ReactNode;
 }
 
 /**
@@ -18,7 +24,7 @@ interface Props {
  * instead — soft keyboards have no Shift+Enter, so Enter must stay usable
  * for line breaks and sending happens through the Send button.
  */
-export function ChatInput({ onSend, disabled }: Props) {
+export function ChatInput({ onSend, disabled, leading }: Props) {
   const coarsePointer = useMediaQuery("(pointer: coarse)");
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -68,6 +74,7 @@ export function ChatInput({ onSend, disabled }: Props) {
         }}
         className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl glass-panel-strong p-2"
       >
+        {leading}
         <Textarea
           ref={textareaRef}
           value={value}
