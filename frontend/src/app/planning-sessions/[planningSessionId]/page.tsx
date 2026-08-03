@@ -43,8 +43,9 @@ const TEMPLATE_POLL_INTERVAL_MS = 10_000;
  * Templates are re-fetched after every agent turn (and on an interval) so the
  * timeline follows the plan the agent is editing. A developer can also open
  * the chat input's action menu to re-summarize the conversation into the
- * workflow's description, then review the change through
- * `DescriptionDiffDialog`.
+ * workflow's description; `DescriptionDiffDialog` opens immediately (showing
+ * a loading skeleton and the live edge while the request is in flight) and
+ * then reviews the change once it lands.
  */
 function PlanningSessionView({
   ps,
@@ -95,18 +96,19 @@ function PlanningSessionView({
   const taskIndexById = useMemo(() => new Map(templates.map((t, i) => [t.id, i + 1])), [templates]);
 
   async function handleGenerateDescription() {
+    // Open the dialog immediately, before the request resolves, so the
+    // skeleton + live edge give feedback the moment the action starts.
+    setDiffOpen(true);
     try {
       await generateDescription.run(async () => {
         const updated = await generateWorkflowDescription(workflow.id);
-        // These three calls stay synchronous (no `await` between them) so
-        // React batches them into one render — the diff dialog's props
-        // already reflect `updated` by the time `diffOpen` flips true.
         onWorkflowUpdate(updated);
         dispatch(showToast({ message: "Description generated" }));
-        setDiffOpen(true);
       });
     } catch {
-      // Failure toast is shown globally by api.ts; nothing else to do here.
+      // Failure toast is shown globally by api.ts; close the dialog rather
+      // than leaving it stuck on the loading skeleton.
+      setDiffOpen(false);
     }
   }
 
@@ -182,6 +184,14 @@ function PlanningSessionView({
         generated={workflow.generatedDescription ?? ""}
         description={workflow.description ?? ""}
         onClose={() => setDiffOpen(false)}
+        // Unlike the live-edge convention elsewhere (gated on the 200ms
+        // `status === "pending"` stage to avoid flashing on fast responses),
+        // this has to flip true the instant the dialog opens: `open`,
+        // `generated`, and `description` above are still last render's
+        // (stale, usually empty) values until the request resolves, so a
+        // `pending`-gated `loading` would show a misleading "no diff" beat
+        // before the skeleton ever appears.
+        loading={generateDescription.inFlight}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import { diffWords } from "diff";
 import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
 import { useMotionConfig } from "@/lib/motion";
 
@@ -19,6 +20,13 @@ export interface DescriptionDiffDialogProps {
   description: string;
   /** Called when the dialog requests to close (backdrop, Escape, or Close button). */
   onClose: () => void;
+  /**
+   * Whether the generated description is still being summarized server-side.
+   * Shows a placeholder skeleton in place of the diff and, matching the
+   * streaming chat bubbles, the signature "live edge" around the panel,
+   * instead of diffing whatever stale text is still in `generated`.
+   */
+  loading?: boolean;
 }
 
 /** A single word-level change produced by {@link diffWords}. */
@@ -44,6 +52,34 @@ function DiffPart({ part }: DiffPartProps) {
     );
   }
   return <span className="text-on-surface">{part.value}</span>;
+}
+
+/**
+ * Placeholder shown in place of the legend and diff body while the generated
+ * description is still being summarized server-side. Mirrors the shape of
+ * the real content (a legend-height row, then a multi-line block in a
+ * `glass-panel`) so the dialog doesn't jump when the diff swaps in.
+ */
+function DiffSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      aria-label="Generating"
+      className="flex flex-1 flex-col gap-3"
+    >
+      <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <Skeleton className="h-3 w-40" />
+        <Skeleton className="h-3 w-32" />
+      </div>
+      <div className="flex flex-1 flex-col gap-2 rounded-xl glass-panel p-4">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-5/6" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+    </div>
+  );
 }
 
 /** Colour key shown above the diff body. */
@@ -75,6 +111,7 @@ export function DescriptionDiffDialog({
   generated,
   description,
   onClose,
+  loading = false,
 }: DescriptionDiffDialogProps) {
   const config = useMotionConfig("gentle");
   const transitions = useTransition(open, {
@@ -125,7 +162,15 @@ export function DescriptionDiffDialog({
                   opacity: style.opacity,
                   transform: style.scale.to((s) => `scale(${s})`),
                 }}
-                className="flex max-h-[80vh] w-full max-w-2xl flex-col glass-panel-overlay rounded-2xl p-6 pointer-events-auto"
+                className={[
+                  "flex max-h-[80vh] w-full max-w-2xl flex-col glass-panel-overlay rounded-2xl p-6 pointer-events-auto",
+                  // Signature "live edge" — matches the streaming chat
+                  // bubbles — while the server is still summarizing the
+                  // planning conversation into the generated description.
+                  loading ? "live-edge" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <h2
                   id="description-diff-dialog-title"
@@ -136,7 +181,9 @@ export function DescriptionDiffDialog({
                 <p className="mb-4 text-sm text-on-surface-variant">
                   Changes the description makes to the generated description.
                 </p>
-                {emptyDescription ? (
+                {loading ? (
+                  <DiffSkeleton />
+                ) : emptyDescription ? (
                   <p className="text-sm text-on-surface-variant">
                     Description is empty, so the generated description is used as is.
                   </p>

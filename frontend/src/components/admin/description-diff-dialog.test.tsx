@@ -6,7 +6,15 @@ import { DescriptionDiffDialog } from "./description-diff-dialog";
 
 /** Wraps {@link DescriptionDiffDialog} with a real trigger button, matching how
  * it's opened in practice, so focus restoration on close is testable. */
-function TriggerHarness({ generated, description }: { generated: string; description: string }) {
+function TriggerHarness({
+  generated,
+  description,
+  loading,
+}: {
+  generated: string;
+  description: string;
+  loading?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -18,15 +26,16 @@ function TriggerHarness({ generated, description }: { generated: string; descrip
         generated={generated}
         description={description}
         onClose={() => setOpen(false)}
+        loading={loading}
       />
     </>
   );
 }
 
 /** Opens the harness dialog and returns its panel. */
-async function openDialog(generated: string, description: string) {
+async function openDialog(generated: string, description: string, loading?: boolean) {
   const user = userEvent.setup();
-  render(<TriggerHarness generated={generated} description={description} />);
+  render(<TriggerHarness generated={generated} description={description} loading={loading} />);
   await user.click(screen.getByText("open dialog"));
   return { user, dialog: await screen.findByRole("dialog") };
 }
@@ -69,6 +78,22 @@ describe("DescriptionDiffDialog", () => {
       within(dialog).getByText("Description is empty, so the generated description is used as is.")
     ).toBeInTheDocument();
     expect(dialog.querySelectorAll("del")).toHaveLength(0);
+  });
+
+  it("shows a loading skeleton and the live edge instead of the diff while generating", async () => {
+    const { dialog } = await openDialog("Runs monthly.", "Runs weekly.", true);
+
+    expect(dialog.className).toContain("live-edge");
+    expect(within(dialog).getByRole("status", { name: "Generating" })).toBeInTheDocument();
+    expect(dialog.querySelectorAll("del")).toHaveLength(0);
+    expect(dialog.querySelectorAll("ins")).toHaveLength(0);
+    expect(within(dialog).queryByText(/No differences/)).not.toBeInTheDocument();
+  });
+
+  it("does not carry the live edge once loading is done", async () => {
+    const { dialog } = await openDialog("Runs monthly.", "Runs weekly.", false);
+
+    expect(dialog.className).not.toContain("live-edge");
   });
 
   it("closes and returns focus to the trigger on Escape", async () => {

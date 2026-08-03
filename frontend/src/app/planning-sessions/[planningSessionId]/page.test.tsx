@@ -1,14 +1,30 @@
 import userEvent from "@testing-library/user-event";
-import { http } from "msw";
+import { delay, http } from "msw";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { RootState } from "@/store";
-import { envelope } from "@/test/msw/envelope";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import PlanningSessionPage from "./page";
+
+/** The default `/workflows/wf-1` handler's payload, for `server.use` overrides. */
+const WORKFLOW_1 = {
+  id: "wf-1",
+  tenantId: "tenant-1",
+  name: "my-workflow",
+  description: null,
+  generatedDescription: null,
+  agentSkillId: "skill-1",
+  status: "published",
+  generationError: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
 
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -196,6 +212,59 @@ describe("PlanningSessionPage", () => {
     // `generatedDescription` is set), so the dialog falls back to its
     // empty-description copy instead of rendering a word-level diff.
     expect(within(dialog).getByText(/Description is empty/)).toBeInTheDocument();
+  });
+
+  it("opens the diff dialog immediately with a loading skeleton, then swaps in the diff", async () => {
+    mockMe(["developer"]);
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", async () => {
+        // Outlast useAsyncAction's 200ms pending gate so the loading state is reached.
+        await delay(400);
+        return envelope({ ...WORKFLOW_1, generatedDescription: "A freshly generated summary" });
+      })
+    );
+    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    const chatInputMock = await screen.findByTestId("chat-input-mock");
+    const menuTrigger = await within(chatInputMock).findByRole("button", {
+      name: "Chat actions",
+    });
+
+    await userEvent.click(menuTrigger);
+    await userEvent.click(screen.getByRole("menuitem", { name: /Generate description/ }));
+
+    // The dialog opens right away, while the request is still in flight.
+    const dialog = await screen.findByRole("dialog", { name: "Description diff" });
+    expect(within(dialog).getByRole("status", { name: "Generating" })).toBeInTheDocument();
+    await waitFor(() => expect(dialog).toHaveClass("live-edge"));
+
+    // Once the request resolves, the skeleton is replaced by the diff content.
+    await waitFor(() =>
+      expect(within(dialog).queryByRole("status", { name: "Generating" })).not.toBeInTheDocument()
+    );
+    expect(dialog).not.toHaveClass("live-edge");
+    expect(within(dialog).getByText(/Description is empty/)).toBeInTheDocument();
+  });
+
+  it("closes the diff dialog if generating the description fails", async () => {
+    mockMe(["developer"]);
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", () =>
+        envelopeErr("INTERNAL", "Something went wrong", 500)
+      )
+    );
+    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    const chatInputMock = await screen.findByTestId("chat-input-mock");
+    const menuTrigger = await within(chatInputMock).findByRole("button", {
+      name: "Chat actions",
+    });
+
+    await userEvent.click(menuTrigger);
+    await userEvent.click(screen.getByRole("menuitem", { name: /Generate description/ }));
+
+    await screen.findByRole("dialog", { name: "Description diff" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Description diff" })).not.toBeInTheDocument()
+    );
   });
 
   it("disables the generate-description item while the workflow is generating", async () => {
