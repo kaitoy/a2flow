@@ -25,6 +25,30 @@ describe("AuditMeta", () => {
     expect(screen.getByText("Updated at")).toBeInTheDocument();
   });
 
+  it("lays out the fields as a fixed two-column grid, pairing at/by rows", async () => {
+    const { container } = render(
+      <AuditMeta
+        createdBy="user-1"
+        updatedBy="user-2"
+        createdAt="2026-01-02T03:04:05Z"
+        updatedAt="2026-01-02T03:04:05Z"
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Alice Smith").length).toBeGreaterThanOrEqual(2)
+    );
+
+    const dl = container.querySelector("dl");
+    expect(dl).toHaveClass("grid", "grid-cols-2");
+    expect(Array.from(dl?.querySelectorAll("dt") ?? []).map((dt) => dt.textContent)).toEqual([
+      "Created at",
+      "Created by",
+      "Updated at",
+      "Updated by",
+    ]);
+  });
+
   it("falls back to the raw ID when the user cannot be resolved", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/users/:userId", () =>
