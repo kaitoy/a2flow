@@ -42,7 +42,7 @@ class MessageMeta(TenantScoped, BaseEntity, table=True):
     recorded, so a row's presence on a tool response means a genuine action. ``workflow_task_id`` references the WorkflowTask
     that was in progress when the event was produced (``ON DELETE CASCADE``)
     and is null for messages produced outside any task (for example the
-    initial planning exchange). ``(workflow_session_id, adk_event_id)`` is
+    initial design exchange). ``(workflow_session_id, adk_event_id)`` is
     unique so each event has at most one metadata row and re-recording is
     idempotent.
     """

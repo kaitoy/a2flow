@@ -16,14 +16,14 @@ from tests._workflow import (
     discard_workflow_changes,
     generate_workflow,
     publish_workflow,
-    seed_planning_transcript,
+    seed_design_transcript,
 )
 from tests.conftest import FAKE_COMMIT_SHA
 
 
 async def _fake_summarize(transcript: str, **_: Any) -> str:
     """Stand in for the summarizer LLM call."""
-    return "A summary of the plan"
+    return "A summary of the design"
 
 
 async def _boom_summarize(transcript: str, **_: Any) -> str:
@@ -76,17 +76,17 @@ async def test_generate_workflow_becomes_draft_after_job(
     assert body["status"] == "draft"
 
 
-async def test_generate_workflow_creates_planning_session(
+async def test_generate_workflow_creates_design_session(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await create_skill(workflow_client)
     wf = await generate_workflow(workflow_client, skill["id"])
-    ps = assert_ok(
-        await workflow_client.get(f"/api/v1/workflows/{wf['id']}/planning-session")
+    ds = assert_ok(
+        await workflow_client.get(f"/api/v1/workflows/{wf['id']}/design-session")
     )
-    assert ps["workflowId"] == wf["id"]
-    assert ps["agentSkillId"] == skill["id"]
-    assert ps["agentSkillCommitSha"] == FAKE_COMMIT_SHA
+    assert ds["workflowId"] == wf["id"]
+    assert ds["agentSkillId"] == skill["id"]
+    assert ds["agentSkillCommitSha"] == FAKE_COMMIT_SHA
 
 
 async def test_generate_workflow_missing_name_returns_422(
@@ -121,7 +121,7 @@ async def test_generate_workflow_unknown_skill_returns_404(
 async def test_generate_workflow_with_unpublished_skill_returns_409(
     workflow_client: AsyncClient, mock_sync_job: AsyncMock
 ) -> None:
-    """A skill whose clone has not published a revision cannot plan a workflow."""
+    """A skill whose clone has not published a revision cannot design a workflow."""
     mock_sync_job.side_effect = None  # the clone never publishes anything
     skill = await create_skill(workflow_client)
     response = await workflow_client.post(
@@ -482,13 +482,13 @@ async def test_publish_workflow_does_not_resummarize(
     real_session_service: InMemorySessionService,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Publishing freezes the plan; it never runs the summarizer."""
+    """Publishing freezes the design; it never runs the summarizer."""
     monkeypatch.setattr(
-        "services.workflow_planning.summarize_planning_transcript", _boom_summarize
+        "services.workflow_design.summarize_design_transcript", _boom_summarize
     )
     skill = await create_skill(workflow_client)
     wf = await generate_workflow(workflow_client, skill["id"])
-    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+    await seed_design_transcript(workflow_client, real_session_service, wf["id"])
     await add_template(workflow_client, wf["id"])
 
     body = await publish_workflow(workflow_client, wf["id"])
@@ -499,22 +499,22 @@ async def test_publish_workflow_does_not_resummarize(
 # ---------- generate description ----------
 
 
-async def test_generate_description_summarizes_the_planning_conversation(
+async def test_generate_description_summarizes_the_design_conversation(
     workflow_client: AsyncClient,
     real_session_service: InMemorySessionService,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "services.workflow_planning.summarize_planning_transcript", _fake_summarize
+        "services.workflow_design.summarize_design_transcript", _fake_summarize
     )
     skill = await create_skill(workflow_client)
     wf = await generate_workflow(workflow_client, skill["id"])
-    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+    await seed_design_transcript(workflow_client, real_session_service, wf["id"])
 
     body = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/generate-description")
     )
-    assert body["generatedDescription"] == "A summary of the plan"
+    assert body["generatedDescription"] == "A summary of the design"
     # The user's own description is left alone -- the two fields are separate.
     assert body["description"] is None
     assert body["status"] == "draft"
@@ -525,19 +525,19 @@ async def test_generate_description_marks_a_published_workflow_modified(
     real_session_service: InMemorySessionService,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The run-time fallback text changed, so the live plan has drifted."""
+    """The run-time fallback text changed, so the live task templates have drifted."""
     monkeypatch.setattr(
-        "services.workflow_planning.summarize_planning_transcript", _fake_summarize
+        "services.workflow_design.summarize_design_transcript", _fake_summarize
     )
     skill = await create_skill(workflow_client)
     wf = await create_published_workflow(workflow_client, skill["id"])
-    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+    await seed_design_transcript(workflow_client, real_session_service, wf["id"])
 
     body = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/generate-description")
     )
     assert body["status"] == "modified"
-    assert body["generatedDescription"] == "A summary of the plan"
+    assert body["generatedDescription"] == "A summary of the design"
 
 
 async def test_generate_description_without_a_conversation_returns_409(
@@ -560,7 +560,7 @@ async def test_generate_description_while_generating_returns_409(
     mock_generation_job.side_effect = None  # the generation run never finishes
     skill = await create_skill(workflow_client)
     wf = await generate_workflow(workflow_client, skill["id"])
-    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+    await seed_design_transcript(workflow_client, real_session_service, wf["id"])
     response = await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/generate-description"
     )
@@ -583,11 +583,11 @@ async def test_generate_description_summarizer_failure_returns_502(
 ) -> None:
     """Unlike publish, this endpoint has nothing to deliver without the summary."""
     monkeypatch.setattr(
-        "services.workflow_planning.summarize_planning_transcript", _boom_summarize
+        "services.workflow_design.summarize_design_transcript", _boom_summarize
     )
     skill = await create_skill(workflow_client)
     wf = await generate_workflow(workflow_client, skill["id"])
-    await seed_planning_transcript(workflow_client, real_session_service, wf["id"])
+    await seed_design_transcript(workflow_client, real_session_service, wf["id"])
 
     response = await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/generate-description"
@@ -734,7 +734,7 @@ async def test_requester_can_execute_a_modified_workflow(
 # ---------- discard changes ----------
 
 
-async def test_discard_changes_restores_the_published_plan(
+async def test_discard_changes_restores_the_published_design(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await create_skill(workflow_client)

@@ -43,7 +43,7 @@ def _service(
     clone: AsyncMock | None = None,
     resolve: AsyncMock | None = None,
     pinned: set[str] | None = None,
-    planning_pinned: set[str] | None = None,
+    design_pinned: set[str] | None = None,
 ) -> tuple[AgentSkillSyncService, MagicMock, MagicMock]:
     skills = MagicMock()
     skills.get = AsyncMock(return_value=skill)
@@ -52,9 +52,9 @@ def _service(
     sessions = MagicMock()
     sessions.commit_shas_for_skill = AsyncMock(return_value=pinned or set())
 
-    planning_sessions = MagicMock()
-    planning_sessions.commit_shas_for_skill = AsyncMock(
-        return_value=planning_pinned or set()
+    design_sessions = MagicMock()
+    design_sessions.commit_shas_for_skill = AsyncMock(
+        return_value=design_pinned or set()
     )
 
     resolver = MagicMock()
@@ -64,9 +64,7 @@ def _service(
     store.clone = clone or AsyncMock(return_value=_SHA)
     store.prune = AsyncMock()
 
-    service = AgentSkillSyncService(
-        skills, sessions, planning_sessions, resolver, store
-    )
+    service = AgentSkillSyncService(skills, sessions, design_sessions, resolver, store)
     return service, skills, store
 
 
@@ -93,16 +91,16 @@ async def test_successful_clone_prunes_revisions_no_session_still_needs() -> Non
     store.prune.assert_awaited_once_with("skill-1", {_OLD_SHA, _SHA})
 
 
-async def test_successful_clone_prunes_spare_planning_session_pins() -> None:
-    """Pruning must also spare the revisions planning sessions are pinned to."""
-    planning_sha = "c" * 40
+async def test_successful_clone_prunes_spare_design_session_pins() -> None:
+    """Pruning must also spare the revisions design sessions are pinned to."""
+    design_sha = "c" * 40
     service, _skills, store = _service(
-        _skill(), pinned={_OLD_SHA}, planning_pinned={planning_sha}
+        _skill(), pinned={_OLD_SHA}, design_pinned={design_sha}
     )
 
     await service.sync("skill-1", user_id="alice")
 
-    store.prune.assert_awaited_once_with("skill-1", {_OLD_SHA, planning_sha, _SHA})
+    store.prune.assert_awaited_once_with("skill-1", {_OLD_SHA, design_sha, _SHA})
 
 
 async def test_failed_clone_is_recorded_and_leaves_the_published_revision_alone() -> (

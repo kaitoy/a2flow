@@ -160,7 +160,7 @@ export function MessageList({
     // always a continuation of it: carry the last resolved task forward instead
     // of falling back to `null`, which would eject the bubble (e.g. an A2UI
     // surface) from its group and split the run into duplicate headings. Only
-    // the initial pre-task planning messages stay `null` and ungrouped.
+    // the initial pre-task design messages stay `null` and ungrouped.
     let lastTaskId: string | null = null;
     for (const msg of messages) {
       const taskId: string | null = messageTasks?.get(msg.id) ?? lastTaskId;

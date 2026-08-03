@@ -23,8 +23,8 @@ from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnec
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
+from models.design_session import DesignSession
 from models.mcp_server import MCPServer, McpTransport
-from models.planning_session import PlanningSession
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
 from models.workflow import Workflow
@@ -38,17 +38,17 @@ from repositories.exceptions import McpConnectionError
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
-async def _seed_planning_session(
+async def _seed_design_session(
     eng: AsyncEngine,
     *,
-    session_id: str = "plan-abc",
+    session_id: str = "design-abc",
     tenant_id: str = DEFAULT_TEST_TENANT_ID,
 ) -> str:
-    """Insert a skill + workflow + PlanningSession chain; return the workflow PK.
+    """Insert a skill + workflow + DesignSession chain; return the workflow PK.
 
-    Workflow generation and the plan-refinement chat run against a
-    PlanningSession rather than a WorkflowSession, so this is what the tools see
-    during the whole planning phase.
+    Workflow generation and the design chat run against a
+    DesignSession rather than a WorkflowSession, so this is what the tools see
+    during the whole design phase.
     """
     async with AsyncSession(eng) as db:
         skill = AgentSkill(
@@ -77,7 +77,7 @@ async def _seed_planning_session(
         workflow_id = workflow.id
 
         db.add(
-            PlanningSession(
+            DesignSession(
                 session_id=session_id,
                 workflow_id=workflow_id,
                 agent_skill_id=skill_id,
@@ -440,17 +440,17 @@ async def test_list_mcp_tools_empty_registry(engine: AsyncEngine) -> None:
     assert result == {"servers": []}
 
 
-async def test_list_mcp_tools_works_in_a_planning_session(
+async def test_list_mcp_tools_works_in_a_design_session(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The planning agents must see the registry: that is where tools get bound.
+    """The design agents must see the registry: that is where tools get bound.
 
-    Their ADK session is keyed on a PlanningSession, not a WorkflowSession, so
+    Their ADK session is keyed on a DesignSession, not a WorkflowSession, so
     resolving the run through WorkflowSession alone silently left every
-    generated plan without tool bindings.
+    generated task templates without tool bindings.
     """
-    await _seed_planning_session(engine)
-    server_id = await _seed_server(engine, name="planning-visible")
+    await _seed_design_session(engine)
+    server_id = await _seed_server(engine, name="design-visible")
 
     async def fake_list_server_tools(connection: McpConnection) -> list[Any]:
         return [
@@ -464,18 +464,18 @@ async def test_list_mcp_tools_works_in_a_planning_session(
     monkeypatch.setattr(
         "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
     )
-    result = await list_mcp_tools(_ctx("plan-abc"))
+    result = await list_mcp_tools(_ctx("design-abc"))
     assert "error" not in result
     assert [entry["server_id"] for entry in result["servers"]] == [server_id]
     assert result["servers"][0]["tools"][0]["name"] == "search"
 
 
-async def test_list_mcp_tools_from_planning_session_stays_tenant_scoped(
+async def test_list_mcp_tools_from_design_session_stays_tenant_scoped(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Widening the resolver must not widen which tenant's servers are visible."""
     await seed_tenant(engine, "tenant-other")
-    await _seed_planning_session(engine, session_id="plan-mine")
+    await _seed_design_session(engine, session_id="design-mine")
     mine = await _seed_server(engine, name="mine")
     await _seed_server(engine, name="theirs", tenant_id="tenant-other")
 
@@ -485,17 +485,17 @@ async def test_list_mcp_tools_from_planning_session_stays_tenant_scoped(
     monkeypatch.setattr(
         "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
     )
-    result = await list_mcp_tools(_ctx("plan-mine"))
+    result = await list_mcp_tools(_ctx("design-mine"))
     assert [entry["server_id"] for entry in result["servers"]] == [mine]
 
 
-async def test_call_mcp_tool_still_rejects_a_planning_session(
+async def test_call_mcp_tool_still_rejects_a_design_session(
     engine: AsyncEngine,
 ) -> None:
-    """Planning may bind tools, but only an execution run may invoke them."""
-    await _seed_planning_session(engine, session_id="plan-only")
+    """Design may bind tools, but only an execution run may invoke them."""
+    await _seed_design_session(engine, session_id="design-only")
     server_id = await _seed_server(engine)
-    result = await call_mcp_tool(server_id, "search", {}, _ctx("plan-only"))
+    result = await call_mcp_tool(server_id, "search", {}, _ctx("design-only"))
     assert "error" in result
 
 

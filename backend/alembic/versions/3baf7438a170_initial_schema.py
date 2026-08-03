@@ -357,7 +357,7 @@ def upgrade() -> None:
         "ix_workflows_tenant_id_name", "workflows", ["tenant_id", "name"], unique=False
     )
     op.create_table(
-        "planning_sessions",
+        "design_sessions",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
@@ -379,17 +379,17 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("workflow_id", name="uq_planning_sessions_workflow_id"),
+        sa.UniqueConstraint("workflow_id", name="uq_design_sessions_workflow_id"),
     )
     op.create_index(
-        "ix_planning_sessions_session_id",
-        "planning_sessions",
+        "ix_design_sessions_session_id",
+        "design_sessions",
         ["session_id"],
         unique=False,
     )
     op.create_index(
-        "ix_planning_sessions_tenant_id",
-        "planning_sessions",
+        "ix_design_sessions_tenant_id",
+        "design_sessions",
         ["tenant_id"],
         unique=False,
     )
@@ -846,9 +846,9 @@ def downgrade() -> None:
         table_name="workflow_task_templates",
     )
     op.drop_table("workflow_task_templates")
-    op.drop_index("ix_planning_sessions_session_id", table_name="planning_sessions")
-    op.drop_index("ix_planning_sessions_tenant_id", table_name="planning_sessions")
-    op.drop_table("planning_sessions")
+    op.drop_index("ix_design_sessions_session_id", table_name="design_sessions")
+    op.drop_index("ix_design_sessions_tenant_id", table_name="design_sessions")
+    op.drop_table("design_sessions")
     op.drop_index(
         "ix_workflow_task_tool_bindings_mcp_server_id",
         table_name="workflow_task_tool_bindings",

@@ -10,9 +10,9 @@ import { useMotionConfig } from "@/lib/motion";
 
 /** Props for {@link ChatInputMenu}. */
 interface ChatInputMenuProps {
-  /** Re-summarizes the planning conversation into the workflow's generated description. */
+  /** Re-summarizes the design conversation into the workflow's generated description. */
   onGenerateDescription: () => void;
-  /** Disables the "Generate description" item (e.g. while the workflow's plan is still generating). */
+  /** Disables the "Generate description" item (e.g. while the workflow's task templates are still generating). */
   disabled?: boolean;
   /** Shows a spin animation on the item's icon while the generate request is in flight. */
   pending?: boolean;

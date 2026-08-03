@@ -1,4 +1,4 @@
-/** @module WorkflowDetailPage — Admin detail page for an existing workflow and its plan. */
+/** @module WorkflowDetailPage — Admin detail page for an existing workflow and its task templates. */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,7 +43,7 @@ import {
   generateWorkflowDescription,
   getAgentSkill,
   getWorkflow,
-  getWorkflowPlanningSession,
+  getWorkflowDesignSession,
   publishWorkflow,
   updateWorkflow,
   type Workflow,
@@ -58,7 +58,7 @@ import {
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
-/** How often (ms) to re-fetch the workflow while its plan is still generating. */
+/** How often (ms) to re-fetch the workflow while its task templates are still generating. */
 const POLL_INTERVAL_MS = 2000;
 
 // name and description are client-writable by any developer; reuse the
@@ -90,8 +90,8 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
 
 /**
  * Detail page of a generated workflow, titled with the workflow's own name:
- * edit name/description, watch the plan generation settle, open the planning
- * session to adjust the plan by chat, run the workflow, manage the task
+ * edit name/description, watch the design run settle, open the design
+ * session to adjust the task templates by chat, run the workflow, manage the task
  * templates, and publish the workflow to make it executable.
  *
  * The header's Run button follows the same `canExecuteWorkflow` rule as the
@@ -104,7 +104,7 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * session falls back to the AI-generated `generatedDescription` whenever it's
  * empty. `generatedDescription` itself is read-only for everyone except a
  * super admin, who can edit it directly to correct the AI's summary. Any
- * developer can instead re-derive it from the planning conversation through
+ * developer can instead re-derive it from the design conversation through
  * the field's own generate button, which saves the new summary server-side
  * right away (and so moves a published workflow to `modified`). Since the
  * override is usually a hand-edit of that summary, the Description field also
@@ -189,7 +189,7 @@ export default function WorkflowDetailPage() {
       .finally(() => setLoading(false));
   }, [workflowId, applyWorkflow]);
 
-  // Plan generation settles server-side with nothing to notify us, so poll
+  // Design generation settles server-side with nothing to notify us, so poll
   // until the workflow leaves `generating`.
   const generating = workflow?.status === "generating";
   useEffect(() => {
@@ -270,10 +270,10 @@ export default function WorkflowDetailPage() {
     }
   }
 
-  async function handleOpenPlanning() {
+  async function handleOpenDesign() {
     try {
-      const ps = await getWorkflowPlanningSession(workflowId);
-      router.push(`/planning-sessions/${ps.id}`);
+      const ds = await getWorkflowDesignSession(workflowId);
+      router.push(`/design-sessions/${ds.id}`);
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
     }
@@ -332,8 +332,8 @@ export default function WorkflowDetailPage() {
             secondaryAction={
               <>
                 <HeaderIconButton
-                  label="Open planning session"
-                  onClick={handleOpenPlanning}
+                  label="Open design session"
+                  onClick={handleOpenDesign}
                   disabled={generating}
                 >
                   <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
@@ -371,7 +371,7 @@ export default function WorkflowDetailPage() {
           className={[
             "mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4",
             // Signature "live edge": a lifecycle transition is being written
-            // server-side, or `generating` means the background planning run is
+            // server-side, or `generating` means the background design run is
             // still going, so the card carries the same travelling light the
             // chat bubbles do. Gated on the 200ms `pending` stage rather than
             // `inFlight` so a fast rejection (409 with no task templates) never
@@ -474,9 +474,9 @@ export default function WorkflowDetailPage() {
               canEdit ? (
                 <ActionIconButton
                   icon={Sparkles}
-                  label="Generate from the planning conversation"
+                  label="Generate from the design conversation"
                   onClick={handleGenerateDescription}
-                  // While the plan is still generating the background job owns
+                  // While the task templates are still generating the background job owns
                   // this field and there is no settled conversation to
                   // summarize yet.
                   disabled={generating || generateDescription.inFlight}
@@ -495,7 +495,7 @@ export default function WorkflowDetailPage() {
                 <Textarea
                   id="generatedDescription"
                   rows={4}
-                  placeholder="Summarized from the planning conversation"
+                  placeholder="Summarized from the design conversation"
                   {...register("generatedDescription")}
                 />
               ) : (
@@ -539,7 +539,7 @@ export default function WorkflowDetailPage() {
         <div className="mt-4 flex items-center justify-between rounded-2xl glass-panel-strong p-4">
           <div className="flex items-center gap-2 text-sm text-on-surface">
             <ListTree size={16} strokeWidth={1.8} aria-hidden="true" />
-            Task templates — the plan copied into every run of this workflow.
+            Task templates — the design copied into every run of this workflow.
           </div>
           <Link
             href={`/admin/workflows/${workflowId}/task-templates`}

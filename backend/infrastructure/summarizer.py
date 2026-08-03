@@ -1,7 +1,7 @@
-"""One-shot LLM summarization of a workflow's planning conversation.
+"""One-shot LLM summarization of a workflow's design conversation.
 
 Used by the workflow generation job and by ``POST
-/workflows/{id}/generate-description`` to distill a planning session's
+/workflows/{id}/generate-description`` to distill a design session's
 transcript into the workflow's ``generated_description``, which is later handed
 to the execution agent as context. Reuses the application's model
 selection (``config.Settings.llm_model`` via
@@ -22,14 +22,14 @@ from infrastructure.agent import resolve_model
 logger = logging.getLogger(__name__)
 
 #: Hard cap on the transcript text handed to the LLM, so an arbitrarily long
-#: planning conversation cannot blow the request up; the head carries the
-#: original request and the registered plan, which is what the summary needs.
+#: design conversation cannot blow the request up; the head carries the
+#: original request and the registered task templates, which is what the summary needs.
 _TRANSCRIPT_MAX_CHARS = 24_000
 
 _SUMMARY_PROMPT = (
-    "Summarize the following workflow-planning conversation into a concise "
+    "Summarize the following workflow-design conversation into a concise "
     "description of the workflow it produced: what the workflow does, the "
-    "inputs or context it needs, and the main steps of its plan. Write plain "
+    "inputs or context it needs, and its main steps. Write plain "
     "prose (no headings, no lists), in the language the conversation was held "
     "in, and keep it under 1500 characters.\n\n"
     "Conversation:\n{transcript}"
@@ -49,10 +49,8 @@ def build_llm() -> BaseLlm:
     return LLMRegistry.new_llm(model)
 
 
-async def summarize_planning_transcript(
-    transcript: str, *, max_chars: int = 2000
-) -> str:
-    """Summarize a planning-session transcript into a workflow description.
+async def summarize_design_transcript(transcript: str, *, max_chars: int = 2000) -> str:
+    """Summarize a design-session transcript into a workflow description.
 
     Sends a single user turn to the configured LLM and concatenates the text
     parts of its response. The transcript is truncated to
@@ -60,7 +58,7 @@ async def summarize_planning_transcript(
     ``max_chars`` so it always fits the ``DescText`` column constraint.
 
     Args:
-        transcript: The planning conversation as plain text (one line per
+        transcript: The design conversation as plain text (one line per
             message, speaker-prefixed).
         max_chars: Upper bound on the returned summary length; defaults to the
             ``DescText`` maximum.

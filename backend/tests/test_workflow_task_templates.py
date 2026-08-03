@@ -1,7 +1,7 @@
 """Integration tests for the WorkflowTaskTemplate endpoints.
 
-Templates are the workflow's pre-planned task list, edited manually through
-these endpoints (and by the planning agent through its tools). Listing lives on
+Templates are the workflow's pre-designed task list, edited manually through
+these endpoints (and by the design agent through its tools). Listing lives on
 the workflow router (``GET /workflows/{id}/task-templates``); single-template
 operations live under ``/workflow-task-templates``.
 """
@@ -254,7 +254,7 @@ async def test_deleting_a_template_marks_a_published_workflow_modified(
 async def test_editing_a_template_leaves_a_draft_workflow_draft(
     workflow_client: AsyncClient,
 ) -> None:
-    """Only a released plan can drift; a draft is still being authored."""
+    """Only released task templates can drift; a draft is still being authored."""
     wf_id = await _draft_workflow(workflow_client)
     created = await add_template(workflow_client, wf_id)
     assert await _status_of(workflow_client, wf_id) == "draft"

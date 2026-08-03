@@ -240,7 +240,7 @@ export default function AgentSkillDetailPage() {
                 <HeaderIconButton
                   label="Generate Workflow"
                   onClick={handleGenerateClick}
-                  // A skill can only back a planning run once its clone has
+                  // A skill can only back a design run once its clone has
                   // published a revision.
                   disabled={sync?.status !== "ready"}
                 >

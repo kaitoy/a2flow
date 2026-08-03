@@ -3,9 +3,9 @@
 These callables are attached to the skill-driven execution agent (see
 :func:`infrastructure.agent.create_agent`) so it can iterate the run's tasks —
 copied from the workflow's published templates at execute time — updating
-their status as it works, and adjust the plan mid-run when needed. Bulk plan
-registration lives in :mod:`infrastructure.planning_task_tools`, which the
-planning agents use to write the workflow's templates.
+their status as it works, and adjust the task list mid-run when needed. Bulk template
+registration lives in :mod:`infrastructure.design_task_tools`, which the
+design agents use to write the workflow's templates.
 
 Two facts shape the implementation:
 
@@ -371,7 +371,7 @@ async def create_workflow_task(
 ) -> dict[str, Any]:
     """Create a single WorkflowTask in the current session.
 
-    Use this to add a task incrementally after the initial plan was registered.
+    Use this to add a task incrementally after the initial task templates were registered.
     ``depends_on_ids`` must reference ids of tasks that already exist in the same
     session (use :func:`list_workflow_tasks` to find them).
 

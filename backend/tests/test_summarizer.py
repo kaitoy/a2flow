@@ -1,4 +1,4 @@
-"""Tests for the one-shot planning-transcript summarizer."""
+"""Tests for the one-shot design-transcript summarizer."""
 
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -10,7 +10,7 @@ from infrastructure import summarizer
 from infrastructure.summarizer import (
     _TRANSCRIPT_MAX_CHARS,
     build_llm,
-    summarize_planning_transcript,
+    summarize_design_transcript,
 )
 
 
@@ -41,7 +41,7 @@ async def test_summarize_concatenates_text_parts(
     llm = _FakeLlm(["A workflow that ", "does the thing."])
     monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
 
-    result = await summarize_planning_transcript("User: do the thing")
+    result = await summarize_design_transcript("User: do the thing")
 
     assert result == "A workflow that does the thing."
     prompt = llm.requests[0].contents[0].parts[0].text
@@ -54,7 +54,7 @@ async def test_summarize_truncates_to_max_chars(
     llm = _FakeLlm(["x" * 5000])
     monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
 
-    result = await summarize_planning_transcript("t", max_chars=100)
+    result = await summarize_design_transcript("t", max_chars=100)
 
     assert len(result) == 100
 
@@ -65,7 +65,7 @@ async def test_summarize_caps_the_transcript_it_sends(
     llm = _FakeLlm(["ok"])
     monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
 
-    await summarize_planning_transcript("y" * (_TRANSCRIPT_MAX_CHARS + 10_000))
+    await summarize_design_transcript("y" * (_TRANSCRIPT_MAX_CHARS + 10_000))
 
     prompt = llm.requests[0].contents[0].parts[0].text
     assert len(prompt) < _TRANSCRIPT_MAX_CHARS + 1_000
@@ -78,7 +78,7 @@ async def test_summarize_raises_on_empty_response(
     monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
 
     with pytest.raises(ValueError):
-        await summarize_planning_transcript("t")
+        await summarize_design_transcript("t")
 
 
 def test_build_llm_uses_litellm_for_prefixed_models(

@@ -1,10 +1,10 @@
 """Workflow data models for update, generation, and database persistence.
 
-A Workflow is a reusable, pre-planned unit of work: an agent skill plus the
-task templates generated for it by a planning session. Workflows are never
+A Workflow is a reusable, pre-designed unit of work: an agent skill plus the
+task templates generated for it by a design session. Workflows are never
 created directly through a plain POST — they are born from
 ``POST /agent-skills/{skill_id}/workflows`` ("Generate workflow"), which
-registers a draft row and schedules a background planning run that fills in
+registers a draft row and schedules a background design run that fills in
 the task templates and the first conversation summary
 (``generated_description``); later summaries are produced on demand by
 ``POST /workflows/{id}/generate-description``.
@@ -36,18 +36,18 @@ class WorkflowStatus(StrEnum):
     """
 
     generating = "generating"
-    """The background planning run that fills in the task templates is in flight."""
+    """The background design run that fills in the task templates is in flight."""
 
     draft = "draft"
-    """The initial plan exists (or generation was skipped); not yet executable.
+    """The initial task templates exist (or generation was skipped); not yet executable.
 
     Also reachable from ``published``/``modified`` via
     ``POST /workflows/{id}/deactivate``, which revokes ``requester`` execute
-    access while leaving the plan and any published snapshot untouched.
+    access while leaving the task templates and any published snapshot untouched.
     """
 
     failed = "failed"
-    """The background planning run failed; ``generation_error`` carries the reason."""
+    """The background design run failed; ``generation_error`` carries the reason."""
 
     published = "published"
     """Explicitly published by a developer; executable."""
@@ -56,8 +56,8 @@ class WorkflowStatus(StrEnum):
     """Published, then edited: runs still use the last published version.
 
     Set when a ``published`` workflow's own fields or task templates are saved
-    through the API, or when the planning agent edits its task templates from
-    the workflow's planning chat. Execution keeps using the snapshot captured
+    through the API, or when the design agent edits its task templates from
+    the workflow's design chat. Execution keeps using the snapshot captured
     at publish time (``models.workflow_published_version.WorkflowPublishedVersion``)
     until the workflow is published again — or the edits are dropped through
     ``POST /workflows/{id}/discard-changes``, which restores the snapshot and
@@ -69,7 +69,7 @@ class WorkflowUpdate(SQLModel):
     """Partial update payload for a Workflow — all fields are optional.
 
     ``name`` and ``description`` are client-writable by any ``developer``: the
-    bound skill is fixed at generation time (the task templates were planned
+    bound skill is fixed at generation time (the task templates were designed
     against it), and ``status`` is server-managed via generation and publish.
 
     ``generated_description`` is also client-writable here, but only by a
@@ -107,10 +107,10 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     ``POST /workflows/{id}/publish``, ``.../discard-changes``, and
     ``.../deactivate``, and — for the ``published`` → ``modified``
     transition — by any edit to a published workflow or one of its task
-    templates, whether it arrives through the API or through the planning
-    agent's tools (``infrastructure/planning_task_tools.py``).
+    templates, whether it arrives through the API or through the design
+    agent's tools (``infrastructure/design_task_tools.py``).
 
-    ``generated_description`` is written only by the planning generation job
+    ``generated_description`` is written only by the design generation job
     and by ``POST /workflows/{id}/generate-description``, the on-demand
     re-summarization a ``developer`` triggers from the UI (or, as a correction,
     by a ``super_admin`` through ``PATCH``); ``description`` is the free-form
@@ -147,7 +147,7 @@ class GenerateWorkflowRequest(SQLModel):
 
     ``name`` becomes the new workflow's unique name (the UI prefills it with
     the skill name); ``prompt`` is the user's request that the background
-    planning run breaks into task templates.
+    design run breaks into task templates.
     """
 
     model_config = _alias_config

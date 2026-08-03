@@ -1,8 +1,8 @@
 """WorkflowTaskTemplate data models for create, update, read, and persistence.
 
-A WorkflowTaskTemplate is one step of a Workflow's pre-planned task list. The
-templates are produced by the workflow's planning session (the agent registers
-them via the planning tools) and may also be edited manually through the admin
+A WorkflowTaskTemplate is one step of a Workflow's pre-designed task list. The
+templates are produced by the workflow's design session (the agent registers
+them via the design tools) and may also be edited manually through the admin
 API. When the workflow is executed, its templates are copied into status-ful
 :class:`models.workflow_task.WorkflowTask` rows belonging to the new
 WorkflowSession, so later template edits never affect runs already started.
@@ -13,7 +13,7 @@ models as ``depends_on_ids``. ``position`` is retained purely for layout and
 implies no execution order. MCP tool bindings live in
 :class:`WorkflowTaskTemplateToolBinding` and are surfaced as ``tool_bindings``;
 they are copied onto the run's tasks at execute time. Templates carry no
-``status`` — status is a property of a run, not of the plan.
+``status`` — status is a property of a run, not of the design.
 """
 
 from pydantic.alias_generators import to_camel

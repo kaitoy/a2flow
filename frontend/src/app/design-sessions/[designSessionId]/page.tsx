@@ -1,4 +1,4 @@
-/** @module PlanningSessionPage — Loads a PlanningSession and renders the plan-refinement chat. */
+/** @module DesignSessionPage — Loads a DesignSession and renders the design chat. */
 "use client";
 
 import { AlertTriangle } from "lucide-react";
@@ -20,11 +20,11 @@ import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import {
+  type DesignSession,
   generateWorkflowDescription,
-  getPlanningSession,
+  getDesignSession,
   getWorkflow,
   listWorkflowTaskTemplates,
-  type PlanningSession,
   type Workflow,
   type WorkflowTaskTemplate,
 } from "@/lib/api";
@@ -34,25 +34,25 @@ import { clearError } from "@/store/chatSlice";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
-/** How often (ms) to re-fetch the workflow's task templates while planning. */
+/** How often (ms) to re-fetch the workflow's task templates while designing. */
 const TEMPLATE_POLL_INTERVAL_MS = 10_000;
 
 /**
- * The plan-refinement chat of a workflow's planning session: the template
- * timeline on the left, the conversation with the planning agent on the right.
+ * The design chat of a workflow's design session: the template
+ * timeline on the left, the conversation with the design agent on the right.
  * Templates are re-fetched after every agent turn (and on an interval) so the
- * timeline follows the plan the agent is editing. A developer can also open
+ * timeline follows the task templates the agent is editing. A developer can also open
  * the chat input's action menu to re-summarize the conversation into the
  * workflow's description; `DescriptionDiffDialog` opens immediately (showing
  * a loading skeleton and the live edge while the request is in flight) and
  * then reviews the change once it lands.
  */
-function PlanningSessionView({
-  ps,
+function DesignSessionView({
+  ds,
   workflow,
   onWorkflowUpdate,
 }: {
-  ps: PlanningSession;
+  ds: DesignSession;
   workflow: Workflow;
   onWorkflowUpdate: (wf: Workflow) => void;
 }) {
@@ -69,22 +69,22 @@ function PlanningSessionView({
     sendMessage,
     sendA2uiAction,
     sendApprovalResult,
-  } = useWorkflowSessionChat(ps.id, ps.sessionId, null, ps.userId, "planning");
+  } = useWorkflowSessionChat(ds.id, ds.sessionId, null, ds.userId, "design");
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [timelineDrawerOpen, setTimelineDrawerOpen] = useState(false);
   const [templates, setTemplates] = useState<WorkflowTaskTemplate[]>([]);
 
   const refreshTemplates = useCallback(async () => {
     try {
-      setTemplates(await listWorkflowTaskTemplates(ps.workflowId));
+      setTemplates(await listWorkflowTaskTemplates(ds.workflowId));
     } catch (err) {
       logger.error(err, "failed to load task templates");
     }
-  }, [ps.workflowId]);
+  }, [ds.workflowId]);
 
-  // Load on mount and re-fetch whenever an agent turn finishes (the planning
+  // Load on mount and re-fetch whenever an agent turn finishes (the design
   // agent edits the templates through its tools), plus a slow interval so
-  // edits made elsewhere (the admin plan editor) appear too.
+  // edits made elsewhere (the admin template editor) appear too.
   useEffect(() => {
     if (!isRunning) void refreshTemplates();
   }, [isRunning, refreshTemplates]);
@@ -126,7 +126,7 @@ function PlanningSessionView({
       <SidebarDrawer
         open={timelineDrawerOpen}
         onClose={() => setTimelineDrawerOpen(false)}
-        label="Plan tasks"
+        label="Design tasks"
       >
         <WorkflowTaskTimeline
           tasks={templates}
@@ -146,7 +146,7 @@ function PlanningSessionView({
               { label: "Admin", href: "/admin" },
               { label: "Workflows", href: "/admin/workflows" },
               { label: workflow.name, href: `/admin/workflows/${encodeURIComponent(workflow.id)}` },
-              { label: "Planning" },
+              { label: "Design" },
             ]}
           />
         </div>
@@ -197,15 +197,15 @@ function PlanningSessionView({
   );
 }
 
-/** Full-screen error state shown when the PlanningSession record fails to load, with a retry action. */
-function PlanningSessionLoadError({ onRetry }: { onRetry: () => void }) {
+/** Full-screen error state shown when the DesignSession record fails to load, with a retry action. */
+function DesignSessionLoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex h-dvh flex-col items-center justify-center gap-4">
       <EmptyState
         icon={AlertTriangle}
         animation="wiggle"
-        title="Couldn't load this planning session"
-        description="Something went wrong while loading this planning session."
+        title="Couldn't load this design session"
+        description="Something went wrong while loading this design session."
       />
       <Button variant="secondary" onClick={onRetry}>
         Retry
@@ -215,13 +215,13 @@ function PlanningSessionLoadError({ onRetry }: { onRetry: () => void }) {
 }
 
 /**
- * Page shell: loads the PlanningSession record and its workflow, then renders
- * the plan-refinement chat (or a skeleton / retryable error state).
+ * Page shell: loads the DesignSession record and its workflow, then renders
+ * the design chat (or a skeleton / retryable error state).
  */
-export default function PlanningSessionPage() {
-  const params = useParams<{ planningSessionId: string }>();
-  const planningSessionId = params.planningSessionId;
-  const [planningSession, setPlanningSession] = useState<PlanningSession | null>(null);
+export default function DesignSessionPage() {
+  const params = useParams<{ designSessionId: string }>();
+  const designSessionId = params.designSessionId;
+  const [designSession, setDesignSession] = useState<DesignSession | null>(null);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -229,30 +229,26 @@ export default function PlanningSessionPage() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: retryCount is a bump counter that re-triggers the fetch, not a data dependency
   useEffect(() => {
     setLoadFailed(false);
-    getPlanningSession(planningSessionId)
-      .then(async (ps) => {
-        const wf = await getWorkflow(ps.workflowId);
-        setPlanningSession(ps);
+    getDesignSession(designSessionId)
+      .then(async (ds) => {
+        const wf = await getWorkflow(ds.workflowId);
+        setDesignSession(ds);
         setWorkflow(wf);
       })
       .catch((err: unknown) => {
-        logger.error(err, "failed to load planning session");
+        logger.error(err, "failed to load design session");
         setLoadFailed(true);
       });
-  }, [planningSessionId, retryCount]);
+  }, [designSessionId, retryCount]);
 
   const retry = useCallback(() => setRetryCount((c) => c + 1), []);
 
   return (
     <AuthProvider>
-      {planningSession && workflow ? (
-        <PlanningSessionView
-          ps={planningSession}
-          workflow={workflow}
-          onWorkflowUpdate={setWorkflow}
-        />
+      {designSession && workflow ? (
+        <DesignSessionView ds={designSession} workflow={workflow} onWorkflowUpdate={setWorkflow} />
       ) : loadFailed ? (
-        <PlanningSessionLoadError onRetry={retry} />
+        <DesignSessionLoadError onRetry={retry} />
       ) : (
         <WorkflowSessionSkeleton />
       )}

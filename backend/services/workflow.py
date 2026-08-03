@@ -4,9 +4,9 @@ Holds the Workflow read/update/delete operations plus the multi-collaborator
 ``execute`` orchestration (resolve workflow → resolve skill → create a
 WorkflowSession and copy the published task templates into it). Workflows are
 not created here: they are born from the generation flow in
-``services/workflow_planning.py``.
+``services/workflow_design.py``.
 
-Editing a ``published`` workflow moves it to ``modified``: the live plan has
+Editing a ``published`` workflow moves it to ``modified``: the live task templates have
 drifted from the one approved at publish time, so runs keep using the
 ``WorkflowPublishedVersion`` snapshot until the workflow is published again or
 the edits are dropped through :meth:`WorkflowService.discard_changes`.
@@ -112,9 +112,9 @@ class WorkflowService:
             skills: Repository providing AgentSkill persistence.
             ws_repo: Repository providing WorkflowSession persistence.
             templates: Repository providing WorkflowTaskTemplate persistence,
-                read at execute time to copy the plan into the new session.
+                read at execute time to copy the task templates into the new session.
             tasks: Repository providing WorkflowTask persistence, written at
-                execute time with the copied plan.
+                execute time with the copied tasks.
             versions: Repository holding the snapshot taken at publish time,
                 which a ``modified`` workflow runs against and
                 :meth:`discard_changes` restores from.
@@ -233,7 +233,7 @@ class WorkflowService:
         WorkflowTasks (dependency edges and tool bindings included), so later
         template edits never affect this run. The ADK session is created
         lazily on the first agent call, which starts executing immediately —
-        the plan was approved by publishing the workflow (or, for a
+        the tasks were approved by publishing the workflow (or, for a
         ``developer``/``super_admin`` caller, is still being tested pre-publish).
 
         A ``modified`` workflow runs its **last published version**: name,
@@ -282,7 +282,7 @@ class WorkflowService:
             raise NotFoundError("AgentSkill", workflow.agent_skill_id)
         if skill.commit_sha is None:
             raise SkillNotReadyError(skill.id)
-        name, description, templates = await self._resolve_plan(workflow)
+        name, description, templates = await self._resolve_design(workflow)
         if not templates:
             raise WorkflowNotRunnableError(workflow_id, "it has no task templates")
 
@@ -305,7 +305,7 @@ class WorkflowService:
         )
         ws_id = ws.id
 
-        # Copy the plan in dependency order, remapping template ids to the
+        # Copy the task templates in dependency order, remapping template ids to the
         # freshly created task ids so the edges land on the copies.
         template_to_task: dict[str, str] = {}
         for template in _topo_order(templates):
@@ -334,7 +334,7 @@ class WorkflowService:
             raise NotFoundError("WorkflowSession", ws_id)
         return created
 
-    async def _resolve_plan(
+    async def _resolve_design(
         self, workflow: Workflow
     ) -> tuple[str, str | None, _SnapshotTemplateList]:
         """Return the name, description, and task templates a run should use.
@@ -343,7 +343,7 @@ class WorkflowService:
         status runs the live rows (for ``published`` the two are identical by
         construction). A ``modified`` workflow without a snapshot should not
         exist — the status is only reachable from ``published``, which always
-        writes one — so that case is logged and falls back to the live plan
+        writes one — so that case is logged and falls back to the live task templates
         rather than refusing to run.
 
         Args:
@@ -377,7 +377,7 @@ class WorkflowService:
         publish time (reusing the original template IDs), restores the name and
         description recorded alongside them, and returns the workflow to
         ``published``. Runs already started are untouched — they copied their
-        plan when they began.
+        task templates when they began.
 
         Args:
             workflow_id: Identifier of the workflow to restore.

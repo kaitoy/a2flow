@@ -5,7 +5,7 @@ Workflows are not created here — they are born from
 ``routers/agent_skills.py``), which registers a draft and generates its task
 templates in the background. This router covers everything after that:
 inspecting a workflow and its templates, editing name/description, opening its
-planning session, publishing it, deactivating it back to draft, and executing
+design session, publishing it, deactivating it back to draft, and executing
 it.
 """
 
@@ -15,16 +15,16 @@ from dependencies import (
     ApiMetaDep,
     CurrentUserDep,
     CurrentUserIdDep,
+    DesignSessionServiceDep,
     FilterDep,
     PaginationDep,
-    PlanningSessionServiceDep,
     SortDep,
-    WorkflowPlanningServiceDep,
+    WorkflowDesignServiceDep,
     WorkflowServiceDep,
     WorkflowTaskTemplateServiceDep,
     require_roles,
 )
-from models.planning_session import PlanningSession
+from models.design_session import DesignSession
 from models.response import ApiResponse
 from models.user import Role
 from models.workflow import Workflow, WorkflowUpdate
@@ -99,21 +99,21 @@ async def list_workflow_task_templates(
 
 
 @router.get(
-    "/{workflow_id}/planning-session",
-    response_model=ApiResponse[PlanningSession],
+    "/{workflow_id}/design-session",
+    response_model=ApiResponse[DesignSession],
 )
-async def get_workflow_planning_session(
+async def get_workflow_design_session(
     workflow_id: str,
-    service: PlanningSessionServiceDep,
+    service: DesignSessionServiceDep,
     meta: ApiMetaDep,
-) -> ApiResponse[PlanningSession]:
-    """Return the planning session of the given Workflow.
+) -> ApiResponse[DesignSession]:
+    """Return the design session of the given Workflow.
 
     Every generated workflow has exactly one; raises HTTP 404 when the
     workflow (or its session) does not exist.
     """
-    ps = await service.get_for_workflow(workflow_id)
-    return ApiResponse(meta=meta, data=ps)
+    ds = await service.get_for_workflow(workflow_id)
+    return ApiResponse(meta=meta, data=ds)
 
 
 @router.patch(
@@ -159,13 +159,13 @@ async def delete_workflow(
 )
 async def publish_workflow(
     workflow_id: str,
-    service: WorkflowPlanningServiceDep,
+    service: WorkflowDesignServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Workflow]:
     """Publish a workflow, making it executable.
 
-    Freezes the current plan into the workflow's published snapshot. Raises
+    Freezes the current design into the workflow's published snapshot. Raises
     HTTP 409 (``WORKFLOW_NOT_RUNNABLE``) while generation is in flight, when
     the workflow has no task templates, or when it is already ``published``
     and therefore has no changes to promote.
@@ -181,16 +181,16 @@ async def publish_workflow(
 )
 async def generate_workflow_description(
     workflow_id: str,
-    service: WorkflowPlanningServiceDep,
+    service: WorkflowDesignServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Workflow]:
-    """Summarize the workflow's planning conversation into its description.
+    """Summarize the workflow's design conversation into its description.
 
     Overwrites the workflow's AI-generated description and returns the updated
     workflow; a ``published`` workflow becomes ``modified``. Raises HTTP 409
     (``WORKFLOW_DESCRIPTION_NOT_GENERATABLE``) while generation is in flight or
-    when there is no planning conversation to summarize, and HTTP 502
+    when there is no design conversation to summarize, and HTTP 502
     (``SUMMARIZATION_FAILED``) when the summarizer call fails.
     """
     workflow = await service.generate_description(workflow_id, user_id=user_id)

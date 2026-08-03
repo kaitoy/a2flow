@@ -15,18 +15,18 @@ from repositories import (
     AgentSkillRepository,
     ApprovalRepository,
     AuthSessionRepository,
+    DesignSessionRepository,
     MCPServerRepository,
     MessageMetaRepository,
     NotificationRepository,
-    PlanningSessionRepository,
     SecretRepository,
     SqlAgentSkillRepository,
     SqlApprovalRepository,
     SqlAuthSessionRepository,
+    SqlDesignSessionRepository,
     SqlMCPServerRepository,
     SqlMessageMetaRepository,
     SqlNotificationRepository,
-    SqlPlanningSessionRepository,
     SqlSecretRepository,
     SqlTenantRepository,
     SqlUserAvatarRepository,
@@ -228,15 +228,15 @@ WorkflowTaskTemplateRepositoryDep = Annotated[
 ]
 
 
-def get_planning_session_repository(
+def get_design_session_repository(
     db: DBSessionDep, tenant_id: CurrentTenantIdDep
-) -> PlanningSessionRepository:
-    """Create a PlanningSessionRepository backed by the current database session."""
-    return SqlPlanningSessionRepository(db, tenant_id=tenant_id)
+) -> DesignSessionRepository:
+    """Create a DesignSessionRepository backed by the current database session."""
+    return SqlDesignSessionRepository(db, tenant_id=tenant_id)
 
 
-PlanningSessionRepositoryDep = Annotated[
-    PlanningSessionRepository, Depends(get_planning_session_repository)
+DesignSessionRepositoryDep = Annotated[
+    DesignSessionRepository, Depends(get_design_session_repository)
 ]
 
 

@@ -5,10 +5,10 @@ generic tools:
 
 * :func:`list_mcp_tools` — discover the tools advertised by every MCP server
   registered in A2Flow, so the agent can bind the ones a task needs. It is
-  available in every phase: the planning agents call it before writing the plan
-  (binding through the ``tools`` entries of ``register_planning_tasks`` or the
-  ``tool_bindings`` argument of ``create_planning_task`` /
-  ``update_planning_task``), and the execution agent calls it when adjusting a
+  available in every phase: the design agents call it before registering the task templates
+  (binding through the ``tools`` entries of ``register_design_tasks`` or the
+  ``tool_bindings`` argument of ``create_design_task`` /
+  ``update_design_task``), and the execution agent calls it when adjusting a
   run's tasks (``create_workflow_task`` / ``update_workflow_task``).
 * :func:`call_mcp_tool` — invoke one tool on one registered server. The call is
   validated server-side: it must target a tool bound to a task that is currently
@@ -18,10 +18,10 @@ generic tools:
 
 Because of that difference the two tools resolve the current run differently.
 ``list_mcp_tools`` only needs the tenant, so it accepts both an execution run
-(keyed on a WorkflowSession) and a planning run (keyed on a PlanningSession).
+(keyed on a WorkflowSession) and a design run (keyed on a DesignSession).
 ``call_mcp_tool`` has to check the run's in-progress tasks, so it still requires
-a WorkflowSession and is unavailable while merely planning — the plan may bind
-tools, but only a run may invoke them.
+a WorkflowSession and is unavailable while merely designing — a task template
+may bind tools, but only a run may invoke them.
 
 Like :mod:`infrastructure.workflow_task_tools`, these callables run during the
 AG-UI SSE stream outside FastAPI's request scope, so they open their own
@@ -85,13 +85,13 @@ def _build_resolver(db: AsyncSession, tenant_id: str) -> SecretResolver:
 
 
 async def _resolve_tenant(tool_context: ToolContext, db: AsyncSession) -> str:
-    """Resolve the tenant owning the current run, planning or execution alike.
+    """Resolve the tenant owning the current run, design or execution alike.
 
     ``list_mcp_tools`` only needs to know which tenant's registry to read, so
     unlike :func:`infrastructure.workflow_task_tools._resolve_scope` it accepts
-    a run keyed on either a WorkflowSession or a PlanningSession. Resolving
+    a run keyed on either a WorkflowSession or a DesignSession. Resolving
     through WorkflowSession alone would make the tool fail for the whole
-    planning phase — exactly where the plan's tool bindings are decided.
+    design phase — exactly where the templates' tool bindings are decided.
 
     Args:
         tool_context: The ADK tool context for the current invocation.
@@ -102,7 +102,7 @@ async def _resolve_tenant(tool_context: ToolContext, db: AsyncSession) -> str:
 
     Raises:
         NoTenantSessionError: If the session id is missing or matches neither a
-            WorkflowSession nor a PlanningSession.
+            WorkflowSession nor a DesignSession.
     """
     session = getattr(tool_context, "session", None)
     session_id = getattr(session, "id", None)
@@ -114,7 +114,7 @@ async def _resolve_tenant(tool_context: ToolContext, db: AsyncSession) -> str:
 
 _NO_SESSION = "no workflow session is bound to the current run; cannot use MCP tools"
 _NO_TENANT = (
-    "the current run is not bound to a workflow or planning session; "
+    "the current run is not bound to a workflow or design session; "
     "cannot list MCP tools"
 )
 _NO_TASK_IN_PROGRESS = (
@@ -203,10 +203,10 @@ def _result_to_dict(result: types.CallToolResult) -> dict[str, Any]:
 async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
     """List the tools advertised by every MCP server registered in A2Flow.
 
-    Call this during planning to discover what external tools exist before
-    binding them to tasks: while planning a workflow, bind them through the
-    ``tools`` entries of ``register_planning_tasks`` or the ``tool_bindings``
-    argument of ``create_planning_task``/``update_planning_task``; while
+    Call this during design to discover what external tools exist before
+    binding them to tasks: while designing a workflow, bind them through the
+    ``tools`` entries of ``register_design_tasks`` or the ``tool_bindings``
+    argument of ``create_design_task``/``update_design_task``; while
     executing a run, through ``create_workflow_task``/``update_workflow_task``.
     Each server is queried live and concurrently; a server that cannot be
     reached is reported with an ``error`` field instead of failing the whole

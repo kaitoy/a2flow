@@ -1,7 +1,7 @@
-"""Use case service for PlanningSession resources.
+"""Use case service for DesignSession resources.
 
-Exposes PlanningSession reads and resolution of the planning agent bound to a
-session. A planning session is the chat in which a workflow's task templates
+Exposes DesignSession reads and resolution of the design agent bound to a
+session. A design session is the chat in which a workflow's task templates
 are produced and refined; unlike workflow sessions it has no approver sharing —
 only the owner (and super admins) may use it — so no separate access policy is
 needed.
@@ -17,9 +17,9 @@ from google.adk.sessions import BaseSessionService
 
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
-from models.planning_session import PlanningSession
+from models.design_session import DesignSession
 from models.user import Role, User, has_role
-from repositories import AgentSkillRepository, PlanningSessionRepository
+from repositories import AgentSkillRepository, DesignSessionRepository
 from repositories.exceptions import (
     ForbiddenError,
     NotFoundError,
@@ -29,8 +29,8 @@ from repositories.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-def build_planning_transcript(events: list[Event]) -> str:
-    """Render a planning session's ADK events as a plain-text transcript.
+def build_design_transcript(events: list[Event]) -> str:
+    """Render a design session's ADK events as a plain-text transcript.
 
     Keeps only plain-text ``user`` and ``assistant`` turns (tool calls and
     their results are noise for summarization) and prefixes each line with its
@@ -55,12 +55,12 @@ def build_planning_transcript(events: list[Event]) -> str:
     return "\n\n".join(lines)
 
 
-class PlanningSessionService:
-    """Application service orchestrating PlanningSession operations."""
+class DesignSessionService:
+    """Application service orchestrating DesignSession operations."""
 
     def __init__(
         self,
-        ps_repo: PlanningSessionRepository,
+        ds_repo: DesignSessionRepository,
         skills: AgentSkillRepository,
         skills_store: SkillManager,
         registry: AgentRegistry,
@@ -70,7 +70,7 @@ class PlanningSessionService:
         """Initialize the service.
 
         Args:
-            ps_repo: Repository providing PlanningSession persistence.
+            ds_repo: Repository providing DesignSession persistence.
             skills: Repository providing AgentSkill persistence, read to
                 resolve the ``repo_path`` and fallback revision of a session's
                 skill.
@@ -79,7 +79,7 @@ class PlanningSessionService:
             session_service: ADK session store holding the chat history.
             app_name: ADK application name keying sessions in the store.
         """
-        self._ps_repo = ps_repo
+        self._ds_repo = ds_repo
         self._skills = skills
         self._skills_store = skills_store
         self._registry = registry
@@ -87,92 +87,92 @@ class PlanningSessionService:
         self._app_name = app_name
 
     @staticmethod
-    def _assert_owner(ps: PlanningSession, caller: User) -> None:
+    def _assert_owner(ds: DesignSession, caller: User) -> None:
         """Reject callers who are neither the session owner nor a super admin.
 
         Args:
-            ps: The planning session being operated on.
+            ds: The design session being operated on.
             caller: The authenticated user performing the operation.
 
         Raises:
             ForbiddenError: If the caller is not the session owner and not a
                 super admin.
         """
-        if caller.id == ps.user_id or has_role(caller, Role.super_admin):
+        if caller.id == ds.user_id or has_role(caller, Role.super_admin):
             return
-        raise ForbiddenError("Only the session owner can access this planning session")
+        raise ForbiddenError("Only the session owner can access this design session")
 
-    async def _get(self, ps_id: str) -> PlanningSession:
-        """Return the PlanningSession with the given ID, without authorization.
+    async def _get(self, ds_id: str) -> DesignSession:
+        """Return the DesignSession with the given ID, without authorization.
 
         Args:
-            ps_id: Identifier of the session to fetch.
+            ds_id: Identifier of the session to fetch.
 
         Returns:
-            The matching PlanningSession.
+            The matching DesignSession.
 
         Raises:
             NotFoundError: If no session exists with the given ID.
         """
-        ps = await self._ps_repo.get(ps_id)
-        if ps is None:
-            raise NotFoundError("PlanningSession", ps_id)
-        return ps
+        ds = await self._ds_repo.get(ds_id)
+        if ds is None:
+            raise NotFoundError("DesignSession", ds_id)
+        return ds
 
-    async def get(self, ps_id: str, *, caller: User) -> PlanningSession:
-        """Return the PlanningSession with the given ID, authorizing the caller.
+    async def get(self, ds_id: str, *, caller: User) -> DesignSession:
+        """Return the DesignSession with the given ID, authorizing the caller.
 
         Args:
-            ps_id: Identifier of the session to fetch.
+            ds_id: Identifier of the session to fetch.
             caller: The authenticated user requesting the session.
 
         Returns:
-            The matching PlanningSession.
+            The matching DesignSession.
 
         Raises:
             NotFoundError: If no session exists with the given ID.
             ForbiddenError: If the caller is neither the session owner nor a
                 super admin.
         """
-        ps = await self._get(ps_id)
-        self._assert_owner(ps, caller)
-        return ps
+        ds = await self._get(ds_id)
+        self._assert_owner(ds, caller)
+        return ds
 
-    async def get_for_workflow(self, workflow_id: str) -> PlanningSession:
-        """Return the planning session belonging to a workflow.
+    async def get_for_workflow(self, workflow_id: str) -> DesignSession:
+        """Return the design session belonging to a workflow.
 
         Args:
             workflow_id: Identifier of the workflow whose session to fetch.
 
         Returns:
-            The workflow's PlanningSession.
+            The workflow's DesignSession.
 
         Raises:
-            NotFoundError: If the workflow has no planning session (or does not
+            NotFoundError: If the workflow has no design session (or does not
                 exist).
         """
-        ps = await self._ps_repo.get_by_workflow_id(workflow_id)
-        if ps is None:
-            raise NotFoundError("PlanningSession", workflow_id)
-        return ps
+        ds = await self._ds_repo.get_by_workflow_id(workflow_id)
+        if ds is None:
+            raise NotFoundError("DesignSession", workflow_id)
+        return ds
 
     async def resolve_agent(
-        self, ps_id: str, *, caller: User
-    ) -> tuple[ADKAgent, PlanningSession]:
-        """Resolve the planning agent bound to a PlanningSession and the record.
+        self, ds_id: str, *, caller: User
+    ) -> tuple[ADKAgent, DesignSession]:
+        """Resolve the design agent bound to a DesignSession and the record.
 
         Mirrors ``WorkflowSessionService.resolve_agent``: the skill revision
         pinned on the record is loaded from the shared store, falling back to
         the skill's current revision (loudly) when the pinned directory is
-        gone, and the agent is resolved with :attr:`AgentKind.planning` so the
-        chat runs under the interactive planning instruction and toolset.
+        gone, and the agent is resolved with :attr:`AgentKind.design` so the
+        chat runs under the interactive design instruction and toolset.
 
         Args:
-            ps_id: Identifier of the session whose agent to resolve.
+            ds_id: Identifier of the session whose agent to resolve.
             caller: The authenticated user driving the agent run.
 
         Returns:
-            An ``(agent, planning_session)`` tuple.
+            An ``(agent, design_session)`` tuple.
 
         Raises:
             NotFoundError: If no session exists with the given ID.
@@ -181,12 +181,12 @@ class PlanningSessionService:
             SkillNotReadyError: If neither the pinned revision nor the skill's
                 current revision is present in the store.
         """
-        ps = await self.get(ps_id, caller=caller)
-        skill = await self._skills.get(ps.agent_skill_id)
+        ds = await self.get(ds_id, caller=caller)
+        skill = await self._skills.get(ds.agent_skill_id)
         if skill is None:
-            raise SkillNotReadyError(ps.agent_skill_id)
+            raise SkillNotReadyError(ds.agent_skill_id)
 
-        commit_sha = ps.agent_skill_commit_sha
+        commit_sha = ds.agent_skill_commit_sha
         skill_dir = self._skills_store.skill_dir(skill, commit_sha)
         if not skill_dir.exists():
             logger.warning(
@@ -204,18 +204,18 @@ class PlanningSessionService:
                 raise SkillNotReadyError(skill.id)
 
         agent = self._registry.get(
-            ps.agent_skill_id,
+            ds.agent_skill_id,
             commit_sha,
             skill_dir,
-            tenant_id=ps.tenant_id,
-            kind=AgentKind.planning,
+            tenant_id=ds.tenant_id,
+            kind=AgentKind.design,
         )
-        return agent, ps
+        return agent, ds
 
     async def get_messages(
-        self, ps_id: str, *, caller: User
+        self, ds_id: str, *, caller: User
     ) -> builtins.list[dict[str, Any]]:
-        """Return the chat history of a PlanningSession's ADK session.
+        """Return the chat history of a DesignSession's ADK session.
 
         The history is keyed by the session's owner. Returns an empty list when
         the ADK session does not exist yet (the background generation run has
@@ -224,22 +224,22 @@ class PlanningSessionService:
         endpoint and the frontend chat components can be reused unchanged.
 
         Args:
-            ps_id: Identifier of the PlanningSession whose messages to fetch.
+            ds_id: Identifier of the DesignSession whose messages to fetch.
             caller: The authenticated user requesting the history.
 
         Returns:
             The session's messages as plain JSON-serializable dicts.
 
         Raises:
-            NotFoundError: If no PlanningSession exists with the given ID.
+            NotFoundError: If no DesignSession exists with the given ID.
             ForbiddenError: If the caller is neither the session owner nor a
                 super admin.
         """
-        ps = await self.get(ps_id, caller=caller)
+        ds = await self.get(ds_id, caller=caller)
         session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, ps.tenant_id),
-            user_id=ps.user_id,
-            session_id=ps.session_id,
+            app_name=tenant_app_name(self._app_name, ds.tenant_id),
+            user_id=ds.user_id,
+            session_id=ds.session_id,
         )
         if session is None:
             return []

@@ -79,10 +79,10 @@ const WORKFLOW_SESSION_1 = {
   updatedBy: "",
 };
 
-const PLANNING_SESSION_1 = {
-  id: "ps-1",
+const DESIGN_SESSION_1 = {
+  id: "ds-1",
   tenantId: "tenant-1",
-  sessionId: "planning-session-id",
+  sessionId: "design-session-id",
   workflowId: "wf-1",
   agentSkillId: "skill-1",
   agentSkillCommitSha: "a".repeat(40),
@@ -296,7 +296,7 @@ export const handlers = [
     envelope({ ...WORKFLOW_1, status: "draft" })
   ),
 
-  http.get(`${BASE}/api/v1/workflows/:id/planning-session`, () => envelope(PLANNING_SESSION_1)),
+  http.get(`${BASE}/api/v1/workflows/:id/design-session`, () => envelope(DESIGN_SESSION_1)),
 
   http.get(`${BASE}/api/v1/workflows/:id/task-templates`, () =>
     envelope([WORKFLOW_TASK_TEMPLATE_1])
@@ -316,9 +316,9 @@ export const handlers = [
 
   http.delete(`${BASE}/api/v1/workflow-task-templates/:templateId`, () => envelope(null)),
 
-  http.get(`${BASE}/api/v1/planning-sessions/:psId`, () => envelope(PLANNING_SESSION_1)),
+  http.get(`${BASE}/api/v1/design-sessions/:dsId`, () => envelope(DESIGN_SESSION_1)),
 
-  http.get(`${BASE}/api/v1/planning-sessions/:psId/messages`, () => envelope([])),
+  http.get(`${BASE}/api/v1/design-sessions/:dsId/messages`, () => envelope([])),
 
   http.post(`${BASE}/api/v1/workflows/:id/execute`, () => envelope(WORKFLOW_SESSION_1, 201)),
 

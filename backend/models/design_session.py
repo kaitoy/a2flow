@@ -1,6 +1,6 @@
-"""PlanningSession data models representing a workflow's planning chat.
+"""DesignSession data models representing a workflow's design chat.
 
-A PlanningSession is the chat in which a Workflow's task templates are
+A DesignSession is the chat in which a Workflow's task templates are
 produced and refined. Exactly one exists per workflow: it is created together
 with the draft workflow by the generation flow, its first exchange is driven
 by a background agent run, and the user can reopen it later to adjust the
@@ -16,12 +16,12 @@ from models.base import BaseEntity
 from models.tenant_scoped import TenantScoped
 
 
-class PlanningSessionCreate(SQLModel):
-    """Creation payload recorded when a workflow's planning session is opened.
+class DesignSessionCreate(SQLModel):
+    """Creation payload recorded when a workflow's design session is opened.
 
     ``agent_skill_commit_sha`` pins the session to the skill revision that was
     published when generation started, so a later ``pull`` of the skill cannot
-    swap the planning agent's code mid-conversation. Generation requires a
+    swap the design agent's code mid-conversation. Generation requires a
     published revision, so unlike WorkflowSession the pin is always present.
     """
 
@@ -32,19 +32,19 @@ class PlanningSessionCreate(SQLModel):
     user_id: str
 
 
-class PlanningSession(PlanningSessionCreate, TenantScoped, BaseEntity, table=True):
+class DesignSession(DesignSessionCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted record linking an ADK chat session to its workflow.
 
-    ``workflow_id`` is unique — a workflow has exactly one planning session —
+    ``workflow_id`` is unique — a workflow has exactly one design session —
     and cascade-deletes with the workflow. ``session_id`` is the ADK/AG-UI
     thread id, indexed so agent tools can map the session they run in back to
     this record (and through it to the workflow whose templates they edit).
     """
 
-    __tablename__ = "planning_sessions"
+    __tablename__ = "design_sessions"
     __table_args__ = (
-        UniqueConstraint("workflow_id", name="uq_planning_sessions_workflow_id"),
-        Index("ix_planning_sessions_session_id", "session_id"),
+        UniqueConstraint("workflow_id", name="uq_design_sessions_workflow_id"),
+        Index("ix_design_sessions_session_id", "session_id"),
         ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="CASCADE"),
         ForeignKeyConstraint(
             ["agent_skill_id"], ["agent_skills.id"], ondelete="RESTRICT"

@@ -189,7 +189,7 @@ export default function AgentSkillsPage() {
                   icon={Sparkles}
                   label="Generate workflow"
                   onClick={() => setGenerateTarget({ id: skill.id, name: skill.name })}
-                  // A skill can only back a planning run once its clone has
+                  // A skill can only back a design run once its clone has
                   // published a revision.
                   disabled={skill.syncStatus !== "ready"}
                 />

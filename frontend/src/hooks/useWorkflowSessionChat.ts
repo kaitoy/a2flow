@@ -6,9 +6,9 @@ import { useStore } from "react-redux";
 import { buildRenderAckMessages, type PendingRenderCall } from "@/lib/a2uiAction";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
-  createPlanningSessionAgent,
+  createDesignSessionAgent,
   createWorkflowSessionAgent,
-  getPlanningSessionMessages,
+  getDesignSessionMessages,
   getUsersByIds,
   getWorkflowSessionMessageSenders,
   getWorkflowSessionMessages,
@@ -79,16 +79,16 @@ function makeEventHandlers(
 
 /**
  * Which session-scoped chat backend the hook talks to: a workflow session
- * (execution run, shared with approvers) or a planning session (the owner-only
+ * (execution run, shared with approvers) or a design session (the owner-only
  * chat that refines a workflow's task templates).
  */
-export type SessionChatVariant = "workflow" | "planning";
+export type SessionChatVariant = "workflow" | "design";
 
 /**
- * Manage the agent interaction for a workflow or planning session.
+ * Manage the agent interaction for a workflow or design session.
  *
  * On mount, loads prior message history and — when `kickoffPrompt` is non-null
- * and the session is new — auto-sends it to start the run; planning sessions
+ * and the session is new — auto-sends it to start the run; design sessions
  * pass `null` because their first exchange happened in the background
  * generation run (or the user types it). Subsequent user messages and A2UI
  * user actions (e.g. a button click inside a rendered surface) are routed to
@@ -98,7 +98,7 @@ export type SessionChatVariant = "workflow" | "planning";
  * post into it), the history is also re-fetched every {@link POLL_INTERVAL_MS}
  * so messages from other participants appear without a reload. Polling pauses
  * while the current viewer's own run is in flight and skips re-applying an
- * unchanged history. Planning sessions keep the same polling (the background
+ * unchanged history. Design sessions keep the same polling (the background
  * generation run's messages appear the same way) but have no sender
  * attribution or task association — the chat belongs to its owner alone.
  */
@@ -109,9 +109,9 @@ export function useWorkflowSessionChat(
   ownerUserId: string,
   variant: SessionChatVariant = "workflow"
 ) {
-  const isPlanning = variant === "planning";
-  const fetchMessages = isPlanning ? getPlanningSessionMessages : getWorkflowSessionMessages;
-  const buildAgent = isPlanning ? createPlanningSessionAgent : createWorkflowSessionAgent;
+  const isDesign = variant === "design";
+  const fetchMessages = isDesign ? getDesignSessionMessages : getWorkflowSessionMessages;
+  const buildAgent = isDesign ? createDesignSessionAgent : createWorkflowSessionAgent;
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
   const { messages, isRunning, isStreaming, error, pendingRenderCalls } = useAppSelector(
@@ -151,9 +151,9 @@ export function useWorkflowSessionChat(
 
   const refreshSenders = useCallback(async () => {
     try {
-      // Planning sessions have no sender attribution (the owner is the only
+      // Design sessions have no sender attribution (the owner is the only
       // human in the chat); resolve just the owner for the avatar fallback.
-      const senders = isPlanning
+      const senders = isDesign
         ? new Map<string, string>()
         : await getWorkflowSessionMessageSenders(workflowSessionId);
       const users = await getUsersByIds([ownerUserId, ...senders.values()]);
@@ -162,12 +162,12 @@ export function useWorkflowSessionChat(
     } catch (err) {
       logger.error(err, "failed to load message senders");
     }
-  }, [workflowSessionId, ownerUserId, isPlanning]);
+  }, [workflowSessionId, ownerUserId, isDesign]);
 
   const refreshTasks = useCallback(async () => {
-    // Planning sessions edit the workflow's task templates, which the page
+    // Design sessions edit the workflow's task templates, which the page
     // fetches itself; there are no status-ful session tasks to track here.
-    if (isPlanning) return;
+    if (isDesign) return;
     try {
       const [taskList, taskMap] = await Promise.all([
         listWorkflowTasks(workflowSessionId),
@@ -178,7 +178,7 @@ export function useWorkflowSessionChat(
     } catch (err) {
       logger.error(err, "failed to load workflow tasks");
     }
-  }, [workflowSessionId, isPlanning]);
+  }, [workflowSessionId, isDesign]);
 
   const refreshMessages = useCallback(async () => {
     // Never merge mid-run: syncPolledMessages rebuilds the message array from the

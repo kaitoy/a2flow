@@ -49,11 +49,11 @@ _StrList = list[str]
 _BindingList = list[ToolBinding]
 
 MAX_TASK_TEMPLATES = 1000
-"""Page size used when a caller needs a workflow's *whole* plan in one read.
+"""Page size used when a caller needs a workflow's *whole* set of task templates in one read.
 
 Publishing and executing both work on the complete template list rather than a
 page of it. This matches the maximum ``limit`` the list endpoints accept, so no
-plan that the API can produce is silently truncated here.
+template list that the API can produce is silently truncated here.
 """
 
 
@@ -276,7 +276,7 @@ class SqlWorkflowTaskTemplateRepository:
     ) -> None:
         """Replace a workflow's whole template set with the given snapshot.
 
-        Used by ``POST /workflows/{id}/discard-changes`` to restore the plan
+        Used by ``POST /workflows/{id}/discard-changes`` to restore the task templates
         captured at publish time. Every current template of the workflow is
         deleted (edges and bindings cascade) and the snapshot is re-inserted
         keeping each template's **original ID**, so the recorded

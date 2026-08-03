@@ -156,17 +156,17 @@ Which repo you register depends on how far you need to get:
 ### Generating a workflow
 
 `POST /api/v1/agent-skills/{id}/workflows` (`{"name":…,"prompt":…}`) creates the
-workflow in `status: "generating"` and runs the initial planning agent in the
+workflow in `status: "generating"` and runs the initial design agent in the
 **background**, so poll `GET /api/v1/workflows/{id}` until the status leaves
 `generating` (`draft` on success, `failed` with `generationError` otherwise).
 This calls the real LLM configured in `backend/.env` and takes ~30-60s. The
-resulting plan is on `GET /api/v1/workflows/{id}/task-templates`.
+resulting task templates are on `GET /api/v1/workflows/{id}/task-templates`.
 
-### Driving the planning chat
+### Driving the design chat
 
-`POST /api/v1/planning-sessions/{ps_id}/agent` is an AG-UI SSE stream, not an
+`POST /api/v1/design-sessions/{ds_id}/agent` is an AG-UI SSE stream, not an
 envelope route. Find the session with
-`GET /api/v1/workflows/{id}/planning-session`, then post a `RunAgentInput` whose
+`GET /api/v1/workflows/{id}/design-session`, then post a `RunAgentInput` whose
 `threadId` is that record's `sessionId`:
 
 ```json

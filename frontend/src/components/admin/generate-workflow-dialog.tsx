@@ -39,7 +39,7 @@ export interface GenerateWorkflowDialogProps {
 
 /**
  * Modal dialog that starts "Generate workflow" for an agent skill: the workflow
- * name (prefilled with `defaultName`) plus the prompt the background planning
+ * name (prefilled with `defaultName`) plus the prompt the background design
  * run breaks into the workflow's task templates.
  *
  * On submit the draft workflow is registered immediately and the app navigates
@@ -131,7 +131,7 @@ export function GenerateWorkflowDialog({
                 }}
                 className={[
                   "w-full max-w-lg rounded-2xl glass-panel-overlay p-6 pointer-events-auto",
-                  // Signature "live edge" while the planning run is being
+                  // Signature "live edge" while the design run is being
                   // handed to the agent. Gated on the 200ms `pending` stage so
                   // a fast registration never flashes the light.
                   save.status === "pending" ? "live-edge" : "",
@@ -146,7 +146,7 @@ export function GenerateWorkflowDialog({
                   Generate Workflow
                 </h2>
                 <p className="mb-4 text-sm text-on-surface-variant">
-                  A planning agent follows this skill to break the prompt into the workflow's task
+                  A design agent follows this skill to break the prompt into the workflow's task
                   list. The draft is registered right away and generation continues in the
                   background.
                 </p>
@@ -174,7 +174,7 @@ export function GenerateWorkflowDialog({
                     <Textarea
                       id="generate-workflow-prompt"
                       rows={6}
-                      placeholder="Describe the work; the planning agent breaks it into the workflow's task list"
+                      placeholder="Describe the work; the design agent breaks it into the workflow's task list"
                       {...register("prompt")}
                     />
                   </FormField>

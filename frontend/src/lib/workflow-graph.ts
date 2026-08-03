@@ -19,7 +19,7 @@ export const NODE_HEIGHT = 72;
 /**
  * One vertex of the DAG: a session's WorkflowTask, or a workflow's task
  * template, which has no status (the lifecycle belongs to a run, not the
- * plan). Both satisfy this shape structurally.
+ * design). Both satisfy this shape structurally.
  */
 export interface GraphTask {
   /** Node identifier; dependency edges reference these. */
@@ -56,7 +56,7 @@ export type WorkflowTaskFlowNode = Node<WorkflowTaskNodeData, "workflowTask">;
  * Returned nodes are positioned at the origin; call {@link layoutWorkflowGraph}
  * to assign real coordinates.
  *
- * @param tasks - The tasks of a single workflow session or plan.
+ * @param tasks - The tasks of a single workflow session or workflow design.
  * @returns The unpositioned nodes and the dependency edges between them.
  */
 export function buildWorkflowGraph(tasks: GraphTask[]): {
@@ -132,7 +132,7 @@ export function layoutWorkflowGraph(
 /**
  * Convenience wrapper that builds the graph and lays it out in one call.
  *
- * @param tasks - The tasks of a single workflow session or plan.
+ * @param tasks - The tasks of a single workflow session or workflow design.
  * @returns Positioned nodes and dependency edges ready for `<ReactFlow>`.
  */
 export function buildLayoutedWorkflowGraph(tasks: GraphTask[]): {

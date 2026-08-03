@@ -32,7 +32,7 @@ async def create_skill(client: AsyncClient, **overrides: object) -> Any:
 async def generate_workflow(
     client: AsyncClient, skill_id: str, **overrides: object
 ) -> Any:
-    """Generate a draft workflow from a skill (mocked background planning)."""
+    """Generate a draft workflow from a skill (mocked background design)."""
     return assert_ok(
         await client.post(
             f"/api/v1/agent-skills/{skill_id}/workflows",
@@ -69,25 +69,23 @@ async def deactivate_workflow(client: AsyncClient, workflow_id: str) -> Any:
     return assert_ok(await client.post(f"/api/v1/workflows/{workflow_id}/deactivate"))
 
 
-async def seed_planning_transcript(
+async def seed_design_transcript(
     client: AsyncClient,
     session_service: BaseSessionService,
     workflow_id: str,
     text: str = "Build me a report",
 ) -> None:
-    """Give a workflow's planning session a one-turn ADK conversation.
+    """Give a workflow's design session a one-turn ADK conversation.
 
     The mocked generation job never opens an ADK session, so a workflow created
     through these helpers has an empty transcript. Tests that need one — the
     description summarizer reads it — seed it here.
     """
-    ps = assert_ok(
-        await client.get(f"/api/v1/workflows/{workflow_id}/planning-session")
-    )
+    ds = assert_ok(await client.get(f"/api/v1/workflows/{workflow_id}/design-session"))
     session = await session_service.create_session(
-        app_name=tenant_app_name(APP_NAME, ps["tenantId"]),
-        user_id=ps["userId"],
-        session_id=ps["sessionId"],
+        app_name=tenant_app_name(APP_NAME, ds["tenantId"]),
+        user_id=ds["userId"],
+        session_id=ds["sessionId"],
     )
     await session_service.append_event(
         session,

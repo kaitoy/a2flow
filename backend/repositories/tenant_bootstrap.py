@@ -2,7 +2,7 @@
 
 Code that runs outside FastAPI's request-scoped DI -- the ADK agent tools in
 ``infrastructure/*_tools.py`` and the background jobs in
-``services/workflow_planning.py`` / ``services/agent_skill_sync.py`` -- opens
+``services/workflow_design.py`` / ``services/agent_skill_sync.py`` -- opens
 its own database session and has no ``CurrentTenantIdDep`` to construct a
 tenant-scoped repository with. Each entry point is handed a single opaque id
 (an ADK session id set when the run was dispatched, or a bare workflow_id /
@@ -18,7 +18,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
-from models.planning_session import PlanningSession
+from models.design_session import DesignSession
 from models.workflow import Workflow
 from models.workflow_session import WorkflowSession
 
@@ -40,13 +40,13 @@ async def resolve_workflow_session_tenant(
     return (row[0], row[1]) if row is not None else None
 
 
-async def resolve_planning_session_tenant(
+async def resolve_design_session_tenant(
     db: AsyncSession, session_id: str
 ) -> tuple[str, str] | None:
     """Return ``(workflow_id, tenant_id)`` for an ADK session id, or ``None``."""
     stmt = (
-        select(PlanningSession.workflow_id, PlanningSession.tenant_id)
-        .where(col(PlanningSession.session_id) == session_id)
+        select(DesignSession.workflow_id, DesignSession.tenant_id)
+        .where(col(DesignSession.session_id) == session_id)
         .limit(1)
     )
     row = (await db.exec(stmt)).first()
@@ -54,13 +54,13 @@ async def resolve_planning_session_tenant(
 
 
 async def resolve_agent_run_tenant(db: AsyncSession, session_id: str) -> str | None:
-    """Return the tenant_id owning an ADK session id, run or planning alike.
+    """Return the tenant_id owning an ADK session id, run or design alike.
 
     Agent tools that only need the tenant -- not the WorkflowSession primary key
     -- must accept both kinds of run: an execution run keys its ADK session on a
     :class:`models.workflow_session.WorkflowSession`, while workflow generation
-    and the plan-refinement chat key theirs on a
-    :class:`models.planning_session.PlanningSession`. Resolving through only one
+    and the design chat keys theirs on a
+    :class:`models.design_session.DesignSession`. Resolving through only one
     of the two makes the tool fail outright in the other phase.
 
     Use this for tenant-only tools such as
@@ -75,13 +75,13 @@ async def resolve_agent_run_tenant(db: AsyncSession, session_id: str) -> str | N
 
     Returns:
         The owning tenant_id, or ``None`` when the id matches neither a
-        WorkflowSession nor a PlanningSession.
+        WorkflowSession nor a DesignSession.
     """
     resolved = await resolve_workflow_session_tenant(db, session_id)
     if resolved is not None:
         return resolved[1]
-    planning = await resolve_planning_session_tenant(db, session_id)
-    return planning[1] if planning is not None else None
+    design = await resolve_design_session_tenant(db, session_id)
+    return design[1] if design is not None else None
 
 
 async def resolve_workflow_tenant(db: AsyncSession, workflow_id: str) -> str | None:

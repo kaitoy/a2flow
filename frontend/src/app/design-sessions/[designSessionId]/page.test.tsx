@@ -8,7 +8,7 @@ import type { RootState } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
-import PlanningSessionPage from "./page";
+import DesignSessionPage from "./page";
 
 /** The default `/workflows/wf-1` handler's payload, for `server.use` overrides. */
 const WORKFLOW_1 = {
@@ -95,7 +95,7 @@ function mockMe(roles: string[]) {
 }
 
 beforeEach(() => {
-  vi.mocked(useParams).mockReturnValue({ planningSessionId: "ps-1" });
+  vi.mocked(useParams).mockReturnValue({ designSessionId: "ds-1" });
   useWorkflowSessionChatMock.mockReturnValue({
     messages: [],
     isRunning: false,
@@ -113,31 +113,31 @@ beforeEach(() => {
   });
 });
 
-describe("PlanningSessionPage", () => {
-  it("renders a breadcrumb trail ending in Planning, with the workflow name linking back to it", async () => {
-    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+describe("DesignSessionPage", () => {
+  it("renders a breadcrumb trail ending in Design, with the workflow name linking back to it", async () => {
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByRole("link", { name: "my-workflow" })).toHaveAttribute(
       "href",
       "/admin/workflows/wf-1"
     );
-    expect(within(nav).getByText("Planning")).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByText("Design")).toHaveAttribute("aria-current", "page");
   });
 
-  it("drives the chat hook in planning mode with no kickoff prompt", async () => {
-    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+  it("drives the chat hook in design mode with no kickoff prompt", async () => {
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     await screen.findByRole("link", { name: "my-workflow" });
     expect(useWorkflowSessionChatMock).toHaveBeenCalledWith(
-      "ps-1",
-      "planning-session-id",
+      "ds-1",
+      "design-session-id",
       null,
       "user",
-      "planning"
+      "design"
     );
   });
 
   it("renders the template timeline entries", async () => {
-    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     // The global handlers serve WORKFLOW_TASK_TEMPLATE_1 for the workflow.
     await waitFor(() => expect(screen.getByText("Template Step 1")).toBeInTheDocument());
   });
@@ -162,7 +162,7 @@ describe("PlanningSessionPage", () => {
         ])
       )
     );
-    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     await waitFor(() => expect(screen.getByText("Template Step 1")).toBeInTheDocument());
     expect(screen.getByLabelText("1 bound tool")).toBeInTheDocument();
 
@@ -174,7 +174,7 @@ describe("PlanningSessionPage", () => {
 
   it("shows the chat actions menu for a developer", async () => {
     mockMe(["developer"]);
-    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     const chatInputMock = await screen.findByTestId("chat-input-mock");
     expect(
       await within(chatInputMock).findByRole("button", { name: "Chat actions" })
@@ -183,7 +183,7 @@ describe("PlanningSessionPage", () => {
 
   it("hides the chat actions menu for a non-developer", async () => {
     mockMe(["requester"]);
-    render(<PlanningSessionPage />, { preloadedState: authState(["requester"]) });
+    render(<DesignSessionPage />, { preloadedState: authState(["requester"]) });
     const chatInputMock = await screen.findByTestId("chat-input-mock");
     await screen.findByRole("link", { name: "my-workflow" });
     expect(
@@ -193,7 +193,7 @@ describe("PlanningSessionPage", () => {
 
   it("generates a description, shows a toast, and opens the diff preview", async () => {
     mockMe(["developer"]);
-    const { store } = render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    const { store } = render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     const chatInputMock = await screen.findByTestId("chat-input-mock");
     const menuTrigger = await within(chatInputMock).findByRole("button", {
       name: "Chat actions",
@@ -223,7 +223,7 @@ describe("PlanningSessionPage", () => {
         return envelope({ ...WORKFLOW_1, generatedDescription: "A freshly generated summary" });
       })
     );
-    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     const chatInputMock = await screen.findByTestId("chat-input-mock");
     const menuTrigger = await within(chatInputMock).findByRole("button", {
       name: "Chat actions",
@@ -252,7 +252,7 @@ describe("PlanningSessionPage", () => {
         envelopeErr("INTERNAL", "Something went wrong", 500)
       )
     );
-    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     const chatInputMock = await screen.findByTestId("chat-input-mock");
     const menuTrigger = await within(chatInputMock).findByRole("button", {
       name: "Chat actions",
@@ -287,7 +287,7 @@ describe("PlanningSessionPage", () => {
         })
       )
     );
-    render(<PlanningSessionPage />, { preloadedState: AUTH_STATE });
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     const chatInputMock = await screen.findByTestId("chat-input-mock");
     const menuTrigger = await within(chatInputMock).findByRole("button", {
       name: "Chat actions",

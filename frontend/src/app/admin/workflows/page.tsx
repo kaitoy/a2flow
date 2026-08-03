@@ -39,7 +39,7 @@ const LIMIT = 20;
 
 /**
  * How often the list re-fetches while any workflow is still generating its
- * plan. Generation runs in the background on the server, so nothing pushes
+ * task templates. Generation runs in the background on the server, so nothing
  * its result here.
  */
 const POLL_INTERVAL_MS = 2000;
@@ -184,7 +184,7 @@ export default function WorkflowsPage() {
 
   const anyGenerating = rows.some((w) => w.status === "generating");
 
-  // Plan generation settles server-side with nothing to notify us, so poll
+  // Design generation settles server-side with nothing to notify us, so poll
   // until every row has landed on draft or failed, then stop. Silently: only
   // the cells that changed re-render.
   useEffect(() => {

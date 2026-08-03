@@ -2,7 +2,7 @@
 
 A Notification is a per-user message surfaced in the GUI's notification center
 (the toolbar bell). Notifications are generated as a side effect of workflow
-activity — for example when the agent registers a plan and waits for human
+activity — for example when the agent registers task templates and waits for human
 approval (``approval_request``) or when every task in a workflow session reaches
 a terminal state (``session_completed``).
 

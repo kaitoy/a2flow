@@ -35,8 +35,8 @@ const DEVELOPER = authState(["developer"]);
 /** Accessible name of the action opening the description diff dialog. */
 const DIFF_BUTTON = "Show diff from the generated description";
 
-/** Accessible name of the action re-summarizing the planning conversation. */
-const GENERATE_BUTTON = "Generate from the planning conversation";
+/** Accessible name of the action re-summarizing the design conversation. */
+const GENERATE_BUTTON = "Generate from the design conversation";
 
 beforeEach(() => {
   vi.mocked(useParams).mockReturnValue({ workflowId: "wf-1" });
@@ -55,7 +55,7 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(screen.getByLabelText(/^name/i)).toHaveValue("my-workflow"));
   });
 
-  it("has no prompt field (workflows carry a plan, not a prompt)", async () => {
+  it("has no prompt field (workflows carry task templates, not a prompt)", async () => {
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.queryByLabelText(/prompt/i)).not.toBeInTheDocument();
@@ -72,7 +72,7 @@ describe("WorkflowDetailPage", () => {
     expect(screen.getByRole("region", { name: "Workflow status" })).not.toHaveClass("live-edge");
   });
 
-  it("lights the status bar while the plan is still generating", async () => {
+  it("lights the status bar while the task templates are still generating", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows/:id", () =>
         envelope({
@@ -242,7 +242,7 @@ describe("WorkflowDetailPage", () => {
     );
   });
 
-  it("opens the workflow's planning session", async () => {
+  it("opens the workflow's design session", async () => {
     const user = userEvent.setup();
     const pushMock = vi.fn();
     vi.mocked(useRouter).mockReturnValue({
@@ -256,8 +256,8 @@ describe("WorkflowDetailPage", () => {
 
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
-    await user.click(screen.getByRole("button", { name: /open planning session/i }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/planning-sessions/ps-1"));
+    await user.click(screen.getByRole("button", { name: /open design session/i }));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/design-sessions/ds-1"));
   });
 
   it("hides the Run action from a viewer without the requester or developer role", async () => {
@@ -390,7 +390,7 @@ describe("WorkflowDetailPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: "AI summary of the plan",
+          generatedDescription: "AI summary of the design",
           agentSkillId: "skill-1",
           status: "published",
           generationError: null,
@@ -403,7 +403,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />);
-    await waitFor(() => expect(screen.getByText("AI summary of the plan")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("AI summary of the design")).toBeInTheDocument());
     // Anchored so the diff button — whose accessible name mentions the
     // generated description — isn't mistaken for the textarea.
     expect(screen.queryByLabelText(/^generated description$/i)).not.toBeInTheDocument();
@@ -417,7 +417,7 @@ describe("WorkflowDetailPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: "AI summary of the plan",
+          generatedDescription: "AI summary of the design",
           agentSkillId: "skill-1",
           status: "published",
           generationError: null,
@@ -431,7 +431,7 @@ describe("WorkflowDetailPage", () => {
 
     render(<WorkflowDetailPage />, { preloadedState: SUPER_ADMIN });
     const field = await screen.findByLabelText(/^generated description$/i);
-    await waitFor(() => expect(field).toHaveValue("AI summary of the plan"));
+    await waitFor(() => expect(field).toHaveValue("AI summary of the design"));
   });
 
   it("includes generatedDescription in the save payload for a super admin", async () => {
@@ -488,7 +488,7 @@ describe("WorkflowDetailPage", () => {
     );
   });
 
-  it("generates the description from the planning conversation", async () => {
+  it("generates the description from the design conversation", async () => {
     const user = userEvent.setup();
     const generateSpy = vi.fn(() =>
       envelope({
@@ -564,13 +564,13 @@ describe("WorkflowDetailPage", () => {
     );
   });
 
-  it("shows an error toast when there is no planning conversation to summarize", async () => {
+  it("shows an error toast when there is no design conversation to summarize", async () => {
     const user = userEvent.setup();
     server.use(
       http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", () =>
         envelopeErr(
           "WORKFLOW_DESCRIPTION_NOT_GENERATABLE",
-          "Workflow has no planning conversation to summarize",
+          "Workflow has no design conversation to summarize",
           409
         )
       )
@@ -582,7 +582,7 @@ describe("WorkflowDetailPage", () => {
 
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
-        message: "Workflow has no planning conversation to summarize",
+        message: "Workflow has no design conversation to summarize",
         variant: "error",
       })
     );
@@ -594,7 +594,7 @@ describe("WorkflowDetailPage", () => {
     expect(screen.queryByRole("button", { name: GENERATE_BUTTON })).not.toBeInTheDocument();
   });
 
-  it("disables the generate action while the plan is still generating", async () => {
+  it("disables the generate action while the task templates are still generating", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows/:id", () =>
         envelope({

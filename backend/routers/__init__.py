@@ -6,11 +6,11 @@ from routers import (
     agent_skills,
     approvals,
     auth,
+    design_sessions,
     health,
     mcp_registry,
     mcp_servers,
     notifications,
-    planning_sessions,
     secrets,
     sessions,
     tenant,
@@ -40,7 +40,7 @@ api_router.include_router(approvals.router, dependencies=_protected)
 api_router.include_router(mcp_registry.router, dependencies=_protected)
 api_router.include_router(mcp_servers.router, dependencies=_protected)
 api_router.include_router(notifications.router, dependencies=_protected)
-api_router.include_router(planning_sessions.router, dependencies=_protected)
+api_router.include_router(design_sessions.router, dependencies=_protected)
 api_router.include_router(secrets.router, dependencies=_protected)
 api_router.include_router(sessions.router, dependencies=_protected)
 api_router.include_router(tenant.router, dependencies=_protected)

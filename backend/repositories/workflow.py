@@ -193,8 +193,8 @@ class SqlWorkflowRepository:
         """Move a ``published`` workflow to ``modified``; leave any other state alone.
 
         Called after an edit lands on a workflow or one of its task templates —
-        from the REST edit surfaces or from the planning agent's tools — to
-        record that the live plan has drifted from the published snapshot.
+        from the REST edit surfaces or from the design agent's tools — to
+        record that the live task templates have drifted from the published snapshot.
         Every other status is a no-op: a ``draft`` is not published yet, a
         workflow already ``modified`` has nothing to change, and ``generating``
         / ``failed`` are owned by the generation job.

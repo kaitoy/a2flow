@@ -166,7 +166,7 @@ export function DescriptionDiffDialog({
                   "flex max-h-[80vh] w-full max-w-2xl flex-col glass-panel-overlay rounded-2xl p-6 pointer-events-auto",
                   // Signature "live edge" — matches the streaming chat
                   // bubbles — while the server is still summarizing the
-                  // planning conversation into the generated description.
+                  // design conversation into the generated description.
                   loading ? "live-edge" : "",
                 ]
                   .filter(Boolean)

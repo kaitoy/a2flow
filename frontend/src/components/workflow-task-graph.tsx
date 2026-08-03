@@ -13,7 +13,7 @@ const NODE_TYPES: NodeTypes = { workflowTask: WorkflowTaskNode };
 
 /** Props for {@link WorkflowTaskGraph}. */
 export interface WorkflowTaskGraphProps {
-  /** Tasks of a single workflow session (or a plan's templates) to visualize as a DAG. */
+  /** Tasks of a single workflow session (or a workflow's task templates) to visualize as a DAG. */
   tasks: GraphTask[];
 }
 

@@ -1,6 +1,7 @@
 from .agent_skill import AgentSkillRepository, SqlAgentSkillRepository
 from .approval import ApprovalRepository, SqlApprovalRepository
 from .auth_session import AuthSessionRepository, SqlAuthSessionRepository
+from .design_session import DesignSessionRepository, SqlDesignSessionRepository
 from .exceptions import (
     CsrfError,
     ForeignKeyViolationError,
@@ -17,7 +18,6 @@ from .impersonation_event import (
 from .mcp_server import MCPServerRepository, SqlMCPServerRepository
 from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
 from .notification import NotificationRepository, SqlNotificationRepository
-from .planning_session import PlanningSessionRepository, SqlPlanningSessionRepository
 from .secret import SecretRepository, SqlSecretRepository
 from .tenant import SqlTenantRepository, TenantRepository
 from .user import SqlUserRepository, UserRepository
@@ -47,7 +47,7 @@ __all__ = [
     "MessageMetaRepository",
     "NotFoundError",
     "NotificationRepository",
-    "PlanningSessionRepository",
+    "DesignSessionRepository",
     "ReferencedError",
     "RepositoryError",
     "SecretRepository",
@@ -58,7 +58,7 @@ __all__ = [
     "SqlMCPServerRepository",
     "SqlMessageMetaRepository",
     "SqlNotificationRepository",
-    "SqlPlanningSessionRepository",
+    "SqlDesignSessionRepository",
     "SqlSecretRepository",
     "SqlTenantRepository",
     "SqlUserAvatarRepository",

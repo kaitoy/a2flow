@@ -18,15 +18,15 @@ from google.adk.tools.skill_toolset import SkillToolset
 
 from config import get_settings
 from infrastructure.approval_tools import get_approval, list_users, request_approval
-from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
-from infrastructure.planning_task_tools import (
-    create_planning_task,
-    delete_planning_task,
-    get_planning_task,
-    list_planning_tasks,
-    register_planning_tasks,
-    update_planning_task,
+from infrastructure.design_task_tools import (
+    create_design_task,
+    delete_design_task,
+    get_design_task,
+    list_design_tasks,
+    register_design_tasks,
+    update_design_task,
 )
+from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.workflow_task_tools import (
     create_workflow_task,
     delete_workflow_task,
@@ -43,16 +43,16 @@ LITELLM_PREFIX = "litellm:"
 class AgentKind(StrEnum):
     """Role a skill-backed agent plays, selecting its instruction and toolset.
 
-    ``initial_planning`` is the unattended background run that turns a
+    ``initial_design`` is the unattended background run that turns a
     "Generate workflow" prompt into the workflow's first task templates; it
     carries no A2UI toolset because no client is connected to execute frontend
-    tools. ``planning`` is the interactive planning-session chat used to refine
+    tools. ``design`` is the interactive design-session chat used to refine
     the templates. ``execution`` drives a WorkflowSession created from a
     published workflow.
     """
 
-    initial_planning = "initial_planning"
-    planning = "planning"
+    initial_design = "initial_design"
+    design = "design"
     execution = "execution"
 
 
@@ -213,56 +213,57 @@ def keep_a2ui_context(context: Sequence[Context]) -> list[Context]:
     return [entry for entry in context if entry.description in allowed]
 
 
-#: Shared description of the plan-registration call, used by both planning
+#: Shared description of the bulk-registration call, used by both design
 #: instructions so the DAG/tool-binding rules stay identical.
-_PLAN_REGISTRATION_RULES = (
-    "ALWAYS call `list_mcp_tools` exactly once before registering the plan, to "
-    "see the tools available on the registered MCP servers. A task can only use "
-    "an MCP tool at run time if you bind it here, so decide this now: if a step "
-    "needs an external tool, bind it by adding a `tools` entry "
+_DESIGN_REGISTRATION_RULES = (
+    "ALWAYS call `list_mcp_tools` exactly once before registering the task "
+    "templates, to see the tools available on the registered MCP servers. A task "
+    "can only use an MCP tool at run time if you bind it here, so decide this "
+    "now: if a step needs an external tool, bind it by adding a `tools` entry "
     '(`[{"server_id": ..., "tool_name": ...}]`) to that task in '
-    "`register_planning_tasks`. Bind only the tools a task actually needs. If "
+    "`register_design_tasks`. Bind only the tools a task actually needs. If "
     "the listing comes back with no servers, or none of the tools fit, simply "
-    "register the plan without any `tools` entries. Express the steps as a DAG "
-    "and register them in ONE call to `register_planning_tasks`, using each "
-    "task's `key` and `depends_on` to encode ordering."
+    "register the task templates without any `tools` entries. Express the steps "
+    "as a DAG and register them in ONE call to `register_design_tasks`, using "
+    "each task's `key` and `depends_on` to encode ordering."
 )
 
-INITIAL_PLANNING_AGENT_INSTRUCTION = (
-    "You are a workflow planning agent running unattended in the background: "
+INITIAL_DESIGN_AGENT_INSTRUCTION = (
+    "You are a workflow design agent running unattended in the background: "
     "nobody is watching this run and nobody can answer questions. A draft "
     "Workflow was just created from the user's request (the first message). "
     "Your only job is to turn that request into the workflow's task templates.\n\n"
     "Follow the Skill's instructions to break the request into concrete steps. "
-    + _PLAN_REGISTRATION_RULES
+    + _DESIGN_REGISTRATION_RULES
     + "\n\n"
-    "After registering, reply with a concise plain-text summary of the plan. "
-    "Do NOT execute any task, do NOT ask questions, and do NOT wait for input — "
-    "finish in this single run."
+    "After registering, reply with a concise plain-text summary of the task "
+    "templates. Do NOT execute any task, do NOT ask questions, and do NOT wait "
+    "for input — finish in this single run."
 )
 
-PLANNING_AGENT_INSTRUCTION = (
-    "You are a workflow planning agent. This chat is the planning session of a "
+DESIGN_AGENT_INSTRUCTION = (
+    "You are a workflow design agent. This chat is the design session of a "
     "Workflow: the task templates you manage here are the workflow's reusable "
-    "plan, executed later (and possibly many times) in separate workflow "
+    "design, executed later (and possibly many times) in separate workflow "
     "sessions once the workflow is published.\n\n"
-    "Use `list_planning_tasks` to see the current plan. Refine it as the user "
-    "asks with `create_planning_task`, `update_planning_task`, and "
-    "`delete_planning_task`; when the plan is still empty (or the user asks to "
-    "rebuild it from scratch), follow the Skill's instructions to break the "
-    "request into concrete steps. " + _PLAN_REGISTRATION_RULES + "\n\n"
-    "After changing the plan, present the result and ask whether further "
-    "adjustments are needed. Never execute a task: this session only shapes the "
-    "plan. Publishing the workflow and running it happen outside this chat."
+    "Use `list_design_tasks` to see the current task templates. Refine them as "
+    "the user asks with `create_design_task`, `update_design_task`, and "
+    "`delete_design_task`; when there are no task templates yet (or the user "
+    "asks to rebuild them from scratch), follow the Skill's instructions to "
+    "break the request into concrete steps. " + _DESIGN_REGISTRATION_RULES + "\n\n"
+    "After changing the task templates, present the result and ask whether "
+    "further adjustments are needed. Never execute a task: this session only "
+    "designs the templates. Publishing the workflow and running it happen "
+    "outside this chat."
 )
 
 EXECUTION_AGENT_INSTRUCTION = (
     "You are a workflow execution agent. You have a Skill that defines how to "
-    "do the work, plus tools to manage this run's WorkflowTasks. The plan was "
-    "prepared and approved in advance: this session already contains its tasks, "
+    "do the work, plus tools to manage this run's WorkflowTasks. The tasks were "
+    "designed and approved in advance: this session already contains them, "
     "copied from the workflow's published templates (the workflow's description "
-    "is provided as context). Begin executing immediately — do NOT re-plan and "
-    "do NOT ask for approval of the plan.\n\n"
+    "is provided as context). Begin executing immediately — do NOT redesign the "
+    "tasks and do NOT ask for approval of them.\n\n"
     "Execute: loop until no `pending` tasks remain:\n"
     "1. Call `list_workflow_tasks` to see the current tasks and their statuses.\n"
     "2. Pick the next runnable task: a `pending` task whose `depends_on_ids` are "
@@ -279,7 +280,7 @@ EXECUTION_AGENT_INSTRUCTION = (
     "Never start a task before its dependencies are completed. When every task is "
     "completed, failed, or skipped, summarize the outcome. Use "
     "`create_workflow_task`, `get_workflow_task`, and `delete_workflow_task` to "
-    "adjust the plan when needed.\n\n"
+    "adjust the task list when needed.\n\n"
     "Human approval: when a task requires a person's explicit go-ahead before you "
     "act (for example a destructive or irreversible operation), call "
     "`request_approval(title, approver, description, workflow_task_id)` to record a "
@@ -361,23 +362,23 @@ def resolve_model() -> LiteLlm | str:
     return model_env
 
 
-#: Task-management toolset per skill-backed agent kind. Planning kinds edit the
-#: workflow's task templates through the planning tools; the execution kind
-#: manages the run's WorkflowTasks (with no bulk registration — the plan comes
+#: Task-management toolset per skill-backed agent kind. Design kinds edit the
+#: workflow's task templates through the design tools; the execution kind
+#: manages the run's WorkflowTasks (with no bulk registration — the tasks come
 #: pre-copied from the templates) plus the approval and MCP invocation tools.
 _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
-    AgentKind.initial_planning: [
-        register_planning_tasks,
-        list_planning_tasks,
+    AgentKind.initial_design: [
+        register_design_tasks,
+        list_design_tasks,
         list_mcp_tools,
     ],
-    AgentKind.planning: [
-        register_planning_tasks,
-        create_planning_task,
-        list_planning_tasks,
-        get_planning_task,
-        update_planning_task,
-        delete_planning_task,
+    AgentKind.design: [
+        register_design_tasks,
+        create_design_task,
+        list_design_tasks,
+        get_design_task,
+        update_design_task,
+        delete_design_task,
         list_mcp_tools,
     ],
     AgentKind.execution: [
@@ -402,10 +403,10 @@ def create_agent(
 
     When ``skill_dir`` is provided, the directory is loaded as an ADK Skill and
     exposed to the agent via SkillToolset, and ``kind`` selects the instruction
-    and task toolset: planning kinds manage the workflow's task templates
-    (``*_planning_task`` tools), while the execution kind manages the run's
+    and task toolset: design kinds manage the workflow's task templates
+    (``*_design_task`` tools), while the execution kind manages the run's
     WorkflowTasks plus the approval and MCP invocation tools. The
-    ``initial_planning`` kind is built without the A2UI toolset (and without
+    ``initial_design`` kind is built without the A2UI toolset (and without
     the A2UI instruction rules) because its run happens in the background with
     no client connected to execute frontend tools. Without ``skill_dir`` the
     default skill-less chat agent is returned and ``kind`` is ignored.
@@ -418,13 +419,13 @@ def create_agent(
     tools: list[ToolUnion]
     if skill_dir is not None:
         skill = load_skill_from_dir(skill_dir)
-        tools = [] if kind is AgentKind.initial_planning else [AGUIToolset()]
+        tools = [] if kind is AgentKind.initial_design else [AGUIToolset()]
         tools.append(SkillToolset(skills=[skill]))
         tools.extend(_KIND_TOOLS[kind])
-        if kind is AgentKind.initial_planning:
-            instruction = INITIAL_PLANNING_AGENT_INSTRUCTION
-        elif kind is AgentKind.planning:
-            instruction = A2UIInstructionProvider(PLANNING_AGENT_INSTRUCTION)
+        if kind is AgentKind.initial_design:
+            instruction = INITIAL_DESIGN_AGENT_INSTRUCTION
+        elif kind is AgentKind.design:
+            instruction = A2UIInstructionProvider(DESIGN_AGENT_INSTRUCTION)
         else:
             instruction = A2UIInstructionProvider(EXECUTION_AGENT_INSTRUCTION)
     else:

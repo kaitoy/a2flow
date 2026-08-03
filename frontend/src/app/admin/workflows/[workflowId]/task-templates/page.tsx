@@ -136,7 +136,7 @@ function buildColumns(
 
 /**
  * Admin list of the task templates belonging to the workflow in the URL — the
- * workflow's reusable plan, copied into every run at execute time. Templates
+ * workflow's reusable design, copied into every run at execute time. Templates
  * carry no status; the lifecycle belongs to the runs.
  */
 export default function WorkflowTaskTemplatesPage() {

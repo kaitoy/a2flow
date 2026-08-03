@@ -132,9 +132,9 @@ class WorkflowNotRunnableError(RepositoryError):
 
     Executing requires a ``published`` or ``modified`` workflow — or, for a
     caller holding the ``developer`` or ``super_admin`` role, a ``draft``
-    workflow — and publishing requires at least one task template plus a plan
+    workflow — and publishing requires at least one task template plus a design
     that is not already published. A workflow still ``generating``, left in
-    ``failed``, holding an empty plan, already ``published`` with no changes to
+    ``failed``, holding no task templates, already ``published`` with no changes to
     promote, or a ``draft`` run attempted by a plain ``requester`` has nothing
     runnable.
 
@@ -188,9 +188,9 @@ class WorkflowDescriptionNotGeneratableError(RepositoryError):
     """Raised when a Workflow's description cannot be generated in its current state.
 
     ``POST /workflows/{id}/generate-description`` summarizes the workflow's
-    planning conversation, so it needs that conversation to exist and to be
-    settled: a workflow still ``generating`` has a planning run in flight, and
-    one without a planning session (or with an empty one) has nothing to
+    design conversation, so it needs that conversation to exist and to be
+    settled: a workflow still ``generating`` has a design run in flight, and
+    one without a design session (or with an empty one) has nothing to
     summarize.
 
     Carries the ``workflow_id`` and a human-readable ``reason`` so the HTTP
@@ -207,7 +207,7 @@ class WorkflowDescriptionNotGeneratableError(RepositoryError):
 
 
 class SummarizationFailedError(RepositoryError):
-    """Raised when the LLM call summarizing a planning conversation fails.
+    """Raised when the LLM call summarizing a design conversation fails.
 
     Unlike the background generation job — which records the failure on the
     workflow row and moves on — the on-demand
@@ -223,7 +223,7 @@ class SummarizationFailedError(RepositoryError):
         self.workflow_id = workflow_id
         self.reason = reason
         super().__init__(
-            f"Failed to summarize the planning conversation of workflow "
+            f"Failed to summarize the design conversation of workflow "
             f"{workflow_id!r}: {reason}"
         )
 

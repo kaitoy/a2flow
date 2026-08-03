@@ -1,12 +1,12 @@
 """Snapshot of a Workflow as it looked the last time it was published.
 
-Publishing a workflow freezes its plan: the workflow's name, its summarized
+Publishing a workflow freezes its design: the workflow's name, its summarized
 description, and its full task-template list (dependency edges and MCP tool
 bindings included) are copied into a
 :class:`WorkflowPublishedVersion` row. Editing the workflow afterwards moves it
 to :attr:`models.workflow.WorkflowStatus.modified`, and runs started from that
-point keep using this snapshot — so the plan that was approved by publishing is
-the plan that executes, until it is published again.
+point keep using this snapshot — so the design that was approved by publishing is
+the design that executes, until it is published again.
 
 There is at most one row per workflow: each publish replaces the previous
 snapshot. The templates are stored as a JSON list rather than as rows of their
@@ -34,7 +34,7 @@ class WorkflowPublishedVersionTemplate(SQLModel):
 
     Mirrors the fields of
     :class:`models.workflow_task_template.WorkflowTaskTemplateRead` that
-    describe the plan, minus the audit columns: ``id`` is kept so the
+    describe the design, minus the audit columns: ``id`` is kept so the
     dependency edges in ``depends_on_ids`` stay resolvable within the snapshot
     (and so restoring a snapshot can reuse the original template IDs).
     """
@@ -89,7 +89,7 @@ def snapshot_template(
         template: The template read model to capture.
 
     Returns:
-        The plan-describing fields of ``template``, without its audit columns.
+        The design-describing fields of ``template``, without its audit columns.
     """
     return WorkflowPublishedVersionTemplate(
         id=template.id,

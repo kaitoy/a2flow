@@ -436,23 +436,23 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
     # bakes its own instruction and toolset into the built agent.
     from infrastructure.agent import AgentKind
 
-    planning = registry.get(
+    design = registry.get(
         "skill-1",
         "a" * 40,
-        _skill_dir("planning"),
+        _skill_dir("design"),
         tenant_id="tenant-1",
-        kind=AgentKind.planning,
+        kind=AgentKind.design,
     )
-    assert planning is not old
+    assert design is not old
     assert (
         registry.get(
             "skill-1",
             "a" * 40,
             _skill_dir("x"),
             tenant_id="tenant-1",
-            kind=AgentKind.planning,
+            kind=AgentKind.design,
         )
-        is planning
+        is design
     )
 
 
@@ -617,37 +617,37 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
     assert "runnable" in rendered
     assert "A2UI Rules" in rendered
     assert "render_a2ui" in rendered
-    assert "register_planning_tasks" not in rendered
+    assert "register_design_tasks" not in rendered
 
 
-def test_create_agent_planning_kind_uses_planning_instruction(tmp_path: Any) -> None:
+def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None:
     from unittest.mock import MagicMock
 
     from infrastructure.agent import A2UIInstructionProvider, AgentKind, create_agent
 
-    agent = create_agent(skill_dir=_write_skill_md(tmp_path), kind=AgentKind.planning)
+    agent = create_agent(skill_dir=_write_skill_md(tmp_path), kind=AgentKind.design)
     provider = agent.instruction
     assert isinstance(provider, A2UIInstructionProvider)
 
     ctx = MagicMock()
     ctx.state.get.return_value = []
     rendered = provider(ctx)
-    assert "register_planning_tasks" in rendered
+    assert "register_design_tasks" in rendered
     assert "Never execute a task" in rendered
     assert "A2UI Rules" in rendered
 
 
-def test_create_agent_initial_planning_kind_has_no_a2ui(tmp_path: Any) -> None:
+def test_create_agent_initial_design_kind_has_no_a2ui(tmp_path: Any) -> None:
     """The background run has no client, so no A2UI toolset and no A2UI rules."""
     from ag_ui_adk import AGUIToolset
 
     from infrastructure.agent import AgentKind, create_agent
 
     agent = create_agent(
-        skill_dir=_write_skill_md(tmp_path), kind=AgentKind.initial_planning
+        skill_dir=_write_skill_md(tmp_path), kind=AgentKind.initial_design
     )
     assert isinstance(agent.instruction, str)
-    assert "register_planning_tasks" in agent.instruction
+    assert "register_design_tasks" in agent.instruction
     assert "unattended" in agent.instruction
     assert not any(isinstance(t, AGUIToolset) for t in agent.tools)
 
@@ -677,30 +677,30 @@ def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
         assert tool in agent.tools
 
 
-def test_create_agent_planning_kind_attaches_planning_tools(tmp_path: Any) -> None:
+def test_create_agent_design_kind_attaches_design_tools(tmp_path: Any) -> None:
     from infrastructure.agent import AgentKind, create_agent
     from infrastructure.approval_tools import request_approval
-    from infrastructure.mcp_tools import call_mcp_tool
-    from infrastructure.planning_task_tools import (
-        create_planning_task,
-        delete_planning_task,
-        get_planning_task,
-        list_planning_tasks,
-        register_planning_tasks,
-        update_planning_task,
+    from infrastructure.design_task_tools import (
+        create_design_task,
+        delete_design_task,
+        get_design_task,
+        list_design_tasks,
+        register_design_tasks,
+        update_design_task,
     )
+    from infrastructure.mcp_tools import call_mcp_tool
 
-    agent = create_agent(skill_dir=_write_skill_md(tmp_path), kind=AgentKind.planning)
+    agent = create_agent(skill_dir=_write_skill_md(tmp_path), kind=AgentKind.design)
     for tool in (
-        register_planning_tasks,
-        create_planning_task,
-        list_planning_tasks,
-        get_planning_task,
-        update_planning_task,
-        delete_planning_task,
+        register_design_tasks,
+        create_design_task,
+        list_design_tasks,
+        get_design_task,
+        update_design_task,
+        delete_design_task,
     ):
         assert tool in agent.tools
-    # Planning never executes: no MCP invocation and no approval flow.
+    # Design never executes: no MCP invocation and no approval flow.
     assert call_mcp_tool not in agent.tools
     assert request_approval not in agent.tools
 
@@ -708,7 +708,7 @@ def test_create_agent_planning_kind_attaches_planning_tools(tmp_path: Any) -> No
 def test_register_tool_excludes_tool_context_from_declaration() -> None:
     from google.adk.tools.function_tool import FunctionTool
 
-    from infrastructure.planning_task_tools import register_planning_tasks
+    from infrastructure.design_task_tools import register_design_tasks
 
-    tool = FunctionTool(func=register_planning_tasks)
+    tool = FunctionTool(func=register_design_tasks)
     assert tool._context_param_name == "tool_context"

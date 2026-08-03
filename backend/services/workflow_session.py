@@ -407,7 +407,7 @@ class WorkflowSessionService:
         therefore yields, for every event, the task that was in progress when it
         was produced. Each event from the first ``in_progress`` transition onward
         is recorded against its task (idempotently); events before any
-        transition (the initial planning exchange) are left unassociated.
+        transition (the initial design exchange) are left unassociated.
         Non-``in_progress`` transitions (e.g. ``completed``) do not change the
         current task, so a task's own wrap-up stays grouped under it. Does
         nothing when the ADK session does not exist.

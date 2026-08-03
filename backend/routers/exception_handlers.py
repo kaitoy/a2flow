@@ -335,14 +335,14 @@ async def summarization_failed_exception_handler(
     """Return HTTP 502 with SUMMARIZATION_FAILED code when the summarizer LLM call fails."""
     assert isinstance(exc, SummarizationFailedError)
     logger.warning(
-        "Failed to summarize the planning conversation of workflow %s: %s",
+        "Failed to summarize the design conversation of workflow %s: %s",
         exc.workflow_id,
         exc.reason,
     )
     return _envelope_error(
         request,
         code="SUMMARIZATION_FAILED",
-        message=f"Failed to summarize the planning conversation of workflow {exc.workflow_id!r}",
+        message=f"Failed to summarize the design conversation of workflow {exc.workflow_id!r}",
         status_code=502,
         details={"workflowId": exc.workflow_id},
     )

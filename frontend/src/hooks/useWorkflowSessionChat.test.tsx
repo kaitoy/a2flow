@@ -10,9 +10,9 @@ import { makeStore } from "@/test/test-utils";
 import { useWorkflowSessionChat } from "./useWorkflowSessionChat";
 
 vi.mock("@/lib/api", () => ({
-  createPlanningSessionAgent: vi.fn(),
+  createDesignSessionAgent: vi.fn(),
   createWorkflowSessionAgent: vi.fn(),
-  getPlanningSessionMessages: vi.fn(),
+  getDesignSessionMessages: vi.fn(),
   getWorkflowSessionMessages: vi.fn(),
   getWorkflowSessionMessageSenders: vi.fn(),
   getWorkflowSessionMessageTasks: vi.fn(),
@@ -36,11 +36,11 @@ function makeWrapper(store: ReturnType<typeof makeStore>) {
 beforeEach(() => {
   vi.mocked(api.createWorkflowSessionAgent).mockClear();
   vi.mocked(api.createWorkflowSessionAgent).mockReturnValue(mockAgent as never);
-  vi.mocked(api.createPlanningSessionAgent).mockClear();
-  vi.mocked(api.createPlanningSessionAgent).mockReturnValue(mockAgent as never);
+  vi.mocked(api.createDesignSessionAgent).mockClear();
+  vi.mocked(api.createDesignSessionAgent).mockReturnValue(mockAgent as never);
   vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
-  vi.mocked(api.getPlanningSessionMessages).mockClear();
-  vi.mocked(api.getPlanningSessionMessages).mockResolvedValue([]);
+  vi.mocked(api.getDesignSessionMessages).mockClear();
+  vi.mocked(api.getDesignSessionMessages).mockResolvedValue([]);
   vi.mocked(api.getWorkflowSessionMessageSenders).mockResolvedValue(new Map());
   vi.mocked(api.getWorkflowSessionMessageTasks).mockResolvedValue(new Map());
   vi.mocked(api.listWorkflowTasks).mockResolvedValue([]);
@@ -85,7 +85,7 @@ describe("useWorkflowSessionChat", () => {
     expect(messages.some((m) => m.role === "user" && m.content === "Do the thing")).toBe(true);
   });
 
-  it("does NOT auto-send when kickoffPrompt is null (planning sessions)", async () => {
+  it("does NOT auto-send when kickoffPrompt is null (design sessions)", async () => {
     vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
     const store = makeStore();
     renderHook(() => useWorkflowSessionChat("ws-1", "sess-abc", null, "owner-1"), {
@@ -96,33 +96,33 @@ describe("useWorkflowSessionChat", () => {
     expect(store.getState().chat.messages).toHaveLength(0);
   });
 
-  it("planning variant reads and sends through the planning-session endpoints", async () => {
+  it("design variant reads and sends through the design-session endpoints", async () => {
     vi.mocked(api.getWorkflowSessionMessages).mockClear();
     const store = makeStore();
     const { result } = renderHook(
-      () => useWorkflowSessionChat("ps-1", "plan-sess", null, "owner-1", "planning"),
+      () => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"),
       { wrapper: makeWrapper(store) }
     );
-    await waitFor(() => expect(api.getPlanningSessionMessages).toHaveBeenCalledWith("ps-1"));
+    await waitFor(() => expect(api.getDesignSessionMessages).toHaveBeenCalledWith("ds-1"));
     expect(api.getWorkflowSessionMessages).not.toHaveBeenCalled();
 
     await act(async () => {
       await result.current.sendMessage("add a step");
     });
-    expect(api.createPlanningSessionAgent).toHaveBeenCalledWith("ps-1", "plan-sess");
+    expect(api.createDesignSessionAgent).toHaveBeenCalledWith("ds-1", "design-sess");
     expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
   });
 
-  it("planning variant skips task and sender-attribution fetches", async () => {
+  it("design variant skips task and sender-attribution fetches", async () => {
     vi.mocked(api.listWorkflowTasks).mockClear();
     vi.mocked(api.getWorkflowSessionMessageTasks).mockClear();
     vi.mocked(api.getWorkflowSessionMessageSenders).mockClear();
     vi.mocked(api.getUsersByIds).mockClear();
     const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("ps-1", "plan-sess", null, "owner-1", "planning"), {
+    renderHook(() => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"), {
       wrapper: makeWrapper(store),
     });
-    await waitFor(() => expect(api.getPlanningSessionMessages).toHaveBeenCalled());
+    await waitFor(() => expect(api.getDesignSessionMessages).toHaveBeenCalled());
     expect(api.listWorkflowTasks).not.toHaveBeenCalled();
     expect(api.getWorkflowSessionMessageTasks).not.toHaveBeenCalled();
     expect(api.getWorkflowSessionMessageSenders).not.toHaveBeenCalled();

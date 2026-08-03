@@ -1,9 +1,9 @@
 """CRUD endpoints for WorkflowTaskTemplate resources.
 
-A WorkflowTaskTemplate is one step of a Workflow's pre-planned task list.
+A WorkflowTaskTemplate is one step of a Workflow's pre-designed task list.
 Listing the templates of a particular workflow is exposed on the Workflow
 router as ``GET /workflows/{workflow_id}/task-templates``; this router focuses
-on the create-and-act-on-a-single-template operations used by the admin plan
+on the create-and-act-on-a-single-template operations used by the admin template
 editor. Writes are developer-gated — templates belong to a workflow, not to a
 per-user session, so no ownership rule applies.
 """

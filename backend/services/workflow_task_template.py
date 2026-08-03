@@ -1,16 +1,16 @@
 """Use case service for WorkflowTaskTemplate resources.
 
 Wraps the repository for the manual template-editing endpoints (the admin UI's
-workflow plan editor). Authorization is role-based only — template writes are
+workflow template editor). Authorization is role-based only — template writes are
 developer-gated at the route — because templates belong to a workflow, not to a
 per-user session.
 
 Every write here also moves a ``published`` parent workflow to ``modified``:
-the plan has drifted from the snapshot taken at publish time, and runs keep
-using that snapshot until the workflow is published again. The planning
-agent's tools (``infrastructure/planning_task_tools.py``) go straight to the
+the task templates have drifted from the snapshot taken at publish time, and runs keep
+using that snapshot until the workflow is published again. The design
+agent's tools (``infrastructure/design_task_tools.py``) go straight to the
 repository, so they call ``mark_modified`` themselves to record the same
-drift — a plan refined by chat is no more published than one edited here.
+drift — task templates refined by chat are no more published than ones edited here.
 """
 
 import builtins

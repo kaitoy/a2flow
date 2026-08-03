@@ -14,21 +14,21 @@ from infrastructure.secret_resolver import SecretResolver
 from services import (
     AgentSkillService,
     ApprovalService,
+    DesignSessionService,
     MCPRegistryService,
     MCPServerService,
     NotificationService,
-    PlanningSessionService,
     SecretService,
     TenantService,
     UserAvatarService,
     UserService,
-    WorkflowPlanningService,
+    WorkflowDesignService,
     WorkflowService,
     WorkflowSessionAccessPolicy,
     WorkflowSessionService,
     WorkflowTaskService,
     WorkflowTaskTemplateService,
-    generate_workflow_plan,
+    generate_workflow_design,
     sync_agent_skill,
 )
 
@@ -36,10 +36,10 @@ from .context import APP_NAME
 from .repository import (
     AgentSkillRepositoryDep,
     ApprovalRepositoryDep,
+    DesignSessionRepositoryDep,
     MCPServerRepositoryDep,
     MessageMetaRepositoryDep,
     NotificationRepositoryDep,
-    PlanningSessionRepositoryDep,
     SecretRepositoryDep,
     TenantRepositoryDep,
     UserAvatarRepositoryDep,
@@ -181,25 +181,25 @@ def get_workflow_service(
 WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
 
 
-def get_workflow_planning_service(
+def get_workflow_design_service(
     workflows: WorkflowRepositoryDep,
     skills: AgentSkillRepositoryDep,
-    ps_repo: PlanningSessionRepositoryDep,
+    ds_repo: DesignSessionRepositoryDep,
     templates: WorkflowTaskTemplateRepositoryDep,
     versions: WorkflowPublishedVersionRepositoryDep,
     session_service: SessionServiceDep,
-) -> WorkflowPlanningService:
-    """Create a WorkflowPlanningService wiring the repositories and the session store."""
-    return WorkflowPlanningService(
-        workflows, skills, ps_repo, templates, versions, session_service, APP_NAME
+) -> WorkflowDesignService:
+    """Create a WorkflowDesignService wiring the repositories and the session store."""
+    return WorkflowDesignService(
+        workflows, skills, ds_repo, templates, versions, session_service, APP_NAME
     )
 
 
-WorkflowPlanningServiceDep = Annotated[
-    WorkflowPlanningService, Depends(get_workflow_planning_service)
+WorkflowDesignServiceDep = Annotated[
+    WorkflowDesignService, Depends(get_workflow_design_service)
 ]
 
-#: The background plan-generation job, as the agent-skills router hands it to
+#: The background design job, as the agent-skills router hands it to
 #: ``BackgroundTasks``.
 WorkflowGenerationJob = Callable[..., Awaitable[None]]
 
@@ -209,7 +209,7 @@ def get_workflow_generation_job(
     session_service: SessionServiceDep,
     skills_store: SkillManagerDep,
 ) -> WorkflowGenerationJob:
-    """Return the background job that generates a workflow's initial plan.
+    """Return the background job that generates a workflow's initial task templates.
 
     Injected rather than called by name so tests can override it: the real job
     runs a full agent turn against an LLM and opens database sessions of its
@@ -219,7 +219,7 @@ def get_workflow_generation_job(
     """
 
     async def job(workflow_id: str, prompt: str, *, user_id: str) -> None:
-        await generate_workflow_plan(
+        await generate_workflow_design(
             workflow_id,
             prompt,
             user_id=user_id,
@@ -237,21 +237,21 @@ WorkflowGenerationJobDep = Annotated[
 ]
 
 
-def get_planning_session_service(
-    ps_repo: PlanningSessionRepositoryDep,
+def get_design_session_service(
+    ds_repo: DesignSessionRepositoryDep,
     skills: AgentSkillRepositoryDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
-) -> PlanningSessionService:
-    """Create a PlanningSessionService wiring the repositories, skill store, agent registry, and session store."""
-    return PlanningSessionService(
-        ps_repo, skills, skills_store, registry, session_service, APP_NAME
+) -> DesignSessionService:
+    """Create a DesignSessionService wiring the repositories, skill store, agent registry, and session store."""
+    return DesignSessionService(
+        ds_repo, skills, skills_store, registry, session_service, APP_NAME
     )
 
 
-PlanningSessionServiceDep = Annotated[
-    PlanningSessionService, Depends(get_planning_session_service)
+DesignSessionServiceDep = Annotated[
+    DesignSessionService, Depends(get_design_session_service)
 ]
 
 

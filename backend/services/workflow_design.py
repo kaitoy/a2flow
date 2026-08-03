@@ -1,19 +1,19 @@
 """Workflow generation ("Generate workflow") and publication use cases.
 
-``WorkflowPlanningService.generate`` registers a draft Workflow plus its
-PlanningSession synchronously; the actual plan generation —
-:func:`generate_workflow_plan` — runs as a background job because it is a full
+``WorkflowDesignService.generate`` registers a draft Workflow plus its
+DesignSession synchronously; the actual design run —
+:func:`generate_workflow_design` — runs as a background job because it is a full
 agent run against an LLM and must not hold the HTTP request open. The job
-drives the ``initial_planning`` agent through the same ``ADKAgent`` machinery
+drives the ``initial_design`` agent through the same ``ADKAgent`` machinery
 the chat endpoints use, so the prompt and the agent's reply land in the same
-ADK session the planning chat later reopens.
+ADK session the design chat later reopens.
 
-``WorkflowPlanningService.publish`` gates execution: it freezes the current
-plan into a ``WorkflowPublishedVersion`` snapshot and marks the workflow
+``WorkflowDesignService.publish`` gates execution: it freezes the current
+design into a ``WorkflowPublishedVersion`` snapshot and marks the workflow
 ``published``. Later edits move it to ``modified`` and keep running against
 that snapshot until it is published again. Publishing runs no LLM of its own —
-re-summarizing the planning conversation is a separate, user-triggered step
-(``WorkflowPlanningService.generate_description``).
+re-summarizing the design conversation is a separate, user-triggered step
+(``WorkflowDesignService.generate_description``).
 """
 
 import logging
@@ -31,15 +31,15 @@ from infrastructure.agent import (
 )
 from infrastructure.locks import advisory_lock, agent_run_key
 from infrastructure.skill_manager import SkillManager
-from infrastructure.summarizer import summarize_planning_transcript
+from infrastructure.summarizer import summarize_design_transcript
+from models.design_session import DesignSessionCreate
 from models.notification import NotificationCreate, NotificationType
-from models.planning_session import PlanningSessionCreate
 from models.workflow import Workflow, WorkflowCreate, WorkflowStatus, WorkflowUpdate
 from models.workflow_published_version import dump_templates, snapshot_template
 from repositories import (
     MAX_TASK_TEMPLATES,
     AgentSkillRepository,
-    PlanningSessionRepository,
+    DesignSessionRepository,
     WorkflowPublishedVersionRepository,
     WorkflowRepository,
     WorkflowTaskTemplateRepository,
@@ -51,26 +51,26 @@ from repositories.exceptions import (
     WorkflowDescriptionNotGeneratableError,
     WorkflowNotRunnableError,
 )
-from services.planning_session import build_planning_transcript
+from services.design_session import build_design_transcript
 
 logger = logging.getLogger(__name__)
 
 #: Signature of the summarizer, injectable for tests.
 Summarizer = Callable[[str], Awaitable[str]]
 
-#: Signature of the background plan-generation job as the router hands it to
+#: Signature of the background design job as the router hands it to
 #: ``BackgroundTasks``.
 WorkflowGenerationJob = Callable[..., Awaitable[None]]
 
 
-class WorkflowPlanningService:
-    """Registers draft workflows from skills and publishes adjusted plans."""
+class WorkflowDesignService:
+    """Registers draft workflows from skills and publishes adjusted designs."""
 
     def __init__(
         self,
         workflows: WorkflowRepository,
         skills: AgentSkillRepository,
-        ps_repo: PlanningSessionRepository,
+        ds_repo: DesignSessionRepository,
         templates: WorkflowTaskTemplateRepository,
         versions: WorkflowPublishedVersionRepository,
         session_service: BaseSessionService,
@@ -82,37 +82,37 @@ class WorkflowPlanningService:
         Args:
             workflows: Repository providing Workflow persistence.
             skills: Repository providing AgentSkill persistence.
-            ps_repo: Repository providing PlanningSession persistence.
+            ds_repo: Repository providing DesignSession persistence.
             templates: Repository providing WorkflowTaskTemplate persistence.
-            versions: Repository storing the published-plan snapshot written by
+            versions: Repository storing the published-design snapshot written by
                 :meth:`publish`.
             session_service: ADK session store, read by
-                :meth:`generate_description` to build the planning transcript.
+                :meth:`generate_description` to build the design transcript.
             app_name: ADK application name keying sessions in the store.
             summarize: One-shot summarizer turning the transcript into the
                 workflow's ``generated_description``; injectable for tests.
-                Defaults to :func:`~infrastructure.summarizer.summarize_planning_transcript`,
+                Defaults to :func:`~infrastructure.summarizer.summarize_design_transcript`,
                 resolved here rather than as a parameter default so a test that
                 monkeypatches the module attribute reaches the service the
                 request-scoped factory builds.
         """
         self._workflows = workflows
         self._skills = skills
-        self._ps_repo = ps_repo
+        self._ds_repo = ds_repo
         self._templates = templates
         self._versions = versions
         self._session_service = session_service
         self._app_name = app_name
-        self._summarize = summarize or summarize_planning_transcript
+        self._summarize = summarize or summarize_design_transcript
 
     async def generate(self, skill_id: str, name: str, *, user_id: str) -> Workflow:
-        """Register a draft Workflow and its PlanningSession for a skill.
+        """Register a draft Workflow and its DesignSession for a skill.
 
-        Creates the workflow in ``generating`` status and a planning session
+        Creates the workflow in ``generating`` status and a design session
         pinned to the skill's current published revision, then returns; the
-        caller schedules :func:`generate_workflow_plan` as a background job to
+        caller schedules :func:`generate_workflow_design` as a background job to
         fill in the task templates. The prompt itself is not stored — it
-        becomes the planning session's first chat message.
+        becomes the design session's first chat message.
 
         Args:
             skill_id: Identifier of the skill to generate a workflow from.
@@ -144,8 +144,8 @@ class WorkflowPlanningService:
         await self._workflows.set_status(
             workflow_id, WorkflowStatus.generating, user_id=user_id
         )
-        await self._ps_repo.create(
-            PlanningSessionCreate(
+        await self._ds_repo.create(
+            DesignSessionCreate(
                 session_id=str(uuid.uuid4()),
                 workflow_id=workflow_id,
                 agent_skill_id=skill_id,
@@ -165,7 +165,7 @@ class WorkflowPlanningService:
     async def publish(self, workflow_id: str, *, user_id: str) -> Workflow:
         """Publish a workflow, making it executable.
 
-        Requires the plan to be settled and worth promoting: generation must
+        Requires the design to be settled and worth promoting: generation must
         not be in flight, at least one task template must exist, and the
         workflow must not already be ``published`` — an in-sync snapshot has
         nothing new to freeze, so re-publishing it is rejected rather than
@@ -181,7 +181,7 @@ class WorkflowPlanningService:
         task-template list are frozen into its ``WorkflowPublishedVersion``
         snapshot, replacing the previous one. Runs started while the workflow
         is ``modified`` use that snapshot instead of the live templates, so a
-        published plan keeps executing exactly as it was approved.
+        published design keeps executing exactly as it was approved.
 
         Args:
             workflow_id: Identifier of the workflow to publish.
@@ -202,7 +202,7 @@ class WorkflowPlanningService:
             raise NotFoundError("Workflow", workflow_id)
         if workflow.status is WorkflowStatus.generating:
             raise WorkflowNotRunnableError(
-                workflow_id, "plan generation is still in progress"
+                workflow_id, "the design run is still in progress"
             )
         if workflow.status is WorkflowStatus.published:
             raise WorkflowNotRunnableError(
@@ -235,11 +235,11 @@ class WorkflowPlanningService:
         )
 
     async def generate_description(self, workflow_id: str, *, user_id: str) -> Workflow:
-        """Re-summarize a workflow's planning conversation into its description.
+        """Re-summarize a workflow's design conversation into its description.
 
         The on-demand half of the AI summary: the initial generation job writes
         ``generated_description`` once, and this method rewrites it whenever the
-        user asks for it — after adjusting the plan through the planning chat,
+        user asks for it — after adjusting the task templates through the design chat,
         for instance. The summary is persisted immediately, so the caller gets
         back a workflow that already carries it.
 
@@ -257,7 +257,7 @@ class WorkflowPlanningService:
         Raises:
             NotFoundError: If no workflow exists with the given ID.
             WorkflowDescriptionNotGeneratableError: If generation is still in
-                progress, or the workflow has no planning conversation to
+                progress, or the workflow has no design conversation to
                 summarize.
             SummarizationFailedError: If the summarizer LLM call fails.
         """
@@ -266,12 +266,12 @@ class WorkflowPlanningService:
             raise NotFoundError("Workflow", workflow_id)
         if workflow.status is WorkflowStatus.generating:
             raise WorkflowDescriptionNotGeneratableError(
-                workflow_id, "its plan is still generating"
+                workflow_id, "its task templates are still generating"
             )
-        transcript = await self._planning_transcript(workflow_id)
+        transcript = await self._design_transcript(workflow_id)
         if not transcript:
             raise WorkflowDescriptionNotGeneratableError(
-                workflow_id, "it has no planning conversation to summarize"
+                workflow_id, "it has no design conversation to summarize"
             )
         try:
             summary = await self._summarize(transcript)
@@ -292,30 +292,30 @@ class WorkflowPlanningService:
             raise NotFoundError("Workflow", workflow_id)
         return updated
 
-    async def _planning_transcript(self, workflow_id: str) -> str:
-        """Return the workflow's planning conversation as plain text.
+    async def _design_transcript(self, workflow_id: str) -> str:
+        """Return the workflow's design conversation as plain text.
 
         Args:
             workflow_id: Identifier of the workflow whose conversation to read.
 
         Returns:
             The transcript, or an empty string when the workflow has no
-            planning session or the ADK session does not exist.
+            design session or the ADK session does not exist.
         """
-        ps = await self._ps_repo.get_by_workflow_id(workflow_id)
-        if ps is None:
+        ds = await self._ds_repo.get_by_workflow_id(workflow_id)
+        if ds is None:
             return ""
         session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, ps.tenant_id),
-            user_id=ps.user_id,
-            session_id=ps.session_id,
+            app_name=tenant_app_name(self._app_name, ds.tenant_id),
+            user_id=ds.user_id,
+            session_id=ds.session_id,
         )
         if session is None:
             return ""
-        return build_planning_transcript(session.events)
+        return build_design_transcript(session.events)
 
 
-async def generate_workflow_plan(
+async def generate_workflow_design(
     workflow_id: str,
     prompt: str,
     *,
@@ -325,12 +325,12 @@ async def generate_workflow_plan(
     skills_store: SkillManager,
     app_name: str,
 ) -> None:
-    """Run the unattended planning agent that fills in a workflow's templates.
+    """Run the unattended design agent that fills in a workflow's templates.
 
     The background half of "Generate workflow". Sends ``prompt`` as the user
-    message of the workflow's planning session and drives the
-    ``initial_planning`` agent to completion; the agent registers the task
-    templates through its planning tools. Afterwards the conversation is
+    message of the workflow's design session and drives the
+    ``initial_design`` agent to completion; the agent registers the task
+    templates through its design tools. Afterwards the conversation is
     summarized into the workflow's ``generated_description``, the status
     becomes ``draft``, and a ``workflow_draft_ready`` notification is sent to
     the generating user. Any failure — including a run that registered no
@@ -343,7 +343,7 @@ async def generate_workflow_plan(
     that builds the job.
 
     Args:
-        workflow_id: Identifier of the workflow to plan.
+        workflow_id: Identifier of the workflow to design.
         prompt: The user's request to break into task templates.
         user_id: ID of the user who triggered the generation.
         registry: Registry resolving ADK agents per skill revision and kind.
@@ -356,9 +356,9 @@ async def generate_workflow_plan(
     from infrastructure import database
     from repositories import (
         SqlAgentSkillRepository,
+        SqlDesignSessionRepository,
         SqlMCPServerRepository,
         SqlNotificationRepository,
-        SqlPlanningSessionRepository,
         SqlWorkflowRepository,
         SqlWorkflowTaskTemplateRepository,
     )
@@ -390,38 +390,38 @@ async def generate_workflow_plan(
     try:
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
             skills = SqlAgentSkillRepository(db, tenant_id=tenant_id)
-            ps = await SqlPlanningSessionRepository(
+            ds = await SqlDesignSessionRepository(
                 db, tenant_id=tenant_id
             ).get_by_workflow_id(workflow_id)
-            if ps is None:
-                raise NotFoundError("PlanningSession", workflow_id)
-            skill = await skills.get(ps.agent_skill_id)
+            if ds is None:
+                raise NotFoundError("DesignSession", workflow_id)
+            skill = await skills.get(ds.agent_skill_id)
             if skill is None:
-                raise NotFoundError("AgentSkill", ps.agent_skill_id)
+                raise NotFoundError("AgentSkill", ds.agent_skill_id)
 
-        skill_dir = skills_store.skill_dir(skill, ps.agent_skill_commit_sha)
+        skill_dir = skills_store.skill_dir(skill, ds.agent_skill_commit_sha)
         if not skill_dir.exists():
             raise SkillNotReadyError(skill.id)
         scoped_app_name = tenant_app_name(app_name, tenant_id)
         agent = registry.get(
             skill.id,
-            ps.agent_skill_commit_sha,
+            ds.agent_skill_commit_sha,
             skill_dir,
             tenant_id=tenant_id,
-            kind=AgentKind.initial_planning,
+            kind=AgentKind.initial_design,
         )
 
         input_data = RunAgentInput(
-            thread_id=ps.session_id,
+            thread_id=ds.session_id,
             run_id=str(uuid.uuid4()),
             state=None,
             messages=[UserMessage(id=str(uuid.uuid4()), role="user", content=prompt)],
             tools=[],
             context=[],
-            forwarded_props={USER_ID_PROP_KEY: ps.user_id},
+            forwarded_props={USER_ID_PROP_KEY: ds.user_id},
         )
         async with advisory_lock(
-            agent_run_key(scoped_app_name, ps.user_id, ps.session_id)
+            agent_run_key(scoped_app_name, ds.user_id, ds.session_id)
         ):
             async for _event in agent.run(input_data):
                 pass
@@ -441,19 +441,19 @@ async def generate_workflow_plan(
                 limit=1, offset=0, workflow_id=workflow_id
             )
         if not templates:
-            await _set_failed("The planning run registered no task templates.")
+            await _set_failed("The design run registered no task templates.")
             return
 
         session = await session_service.get_session(
-            app_name=scoped_app_name, user_id=ps.user_id, session_id=ps.session_id
+            app_name=scoped_app_name, user_id=ds.user_id, session_id=ds.session_id
         )
-        transcript = build_planning_transcript(session.events) if session else ""
+        transcript = build_design_transcript(session.events) if session else ""
         generated_description: str | None
         try:
-            generated_description = await summarize_planning_transcript(transcript)
+            generated_description = await summarize_design_transcript(transcript)
         except Exception:
             logger.warning(
-                "Failed to summarize the planning conversation of workflow %s; "
+                "Failed to summarize the design conversation of workflow %s; "
                 "falling back to the transcript head.",
                 workflow_id,
                 exc_info=True,
@@ -475,7 +475,7 @@ async def generate_workflow_plan(
             try:
                 await SqlNotificationRepository(db, tenant_id=tenant_id).create(
                     NotificationCreate(
-                        user_id=ps.user_id,
+                        user_id=ds.user_id,
                         type=NotificationType.workflow_draft_ready,
                         title="Workflow draft ready",
                         body="The initial task list has been generated. "

@@ -1,4 +1,4 @@
-"""Tests for the background plan-generation job in ``services.workflow_planning``.
+"""Tests for the background design job in ``services.workflow_design``.
 
 The job runs outside FastAPI's request scope: it opens database sessions of its
 own on ``infrastructure.database.engine``, so each test monkeypatches that
@@ -22,11 +22,11 @@ from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
+from models.design_session import DesignSession
 from models.notification import Notification, NotificationType
-from models.planning_session import PlanningSession
 from models.workflow import Workflow, WorkflowStatus
 from models.workflow_task_template import WorkflowTaskTemplate
-from services.workflow_planning import generate_workflow_plan
+from services.workflow_design import generate_workflow_design
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 _SHA = "a" * 40
@@ -54,7 +54,7 @@ async def engine(
 
 
 async def _seed(eng: AsyncEngine) -> tuple[str, str]:
-    """Insert a skill + generating workflow + planning session; return (wf_id, session_id)."""
+    """Insert a skill + generating workflow + design session; return (wf_id, session_id)."""
     async with AsyncSession(eng, expire_on_commit=False) as db:
         skill = AgentSkill(
             name="skill-a",
@@ -77,8 +77,8 @@ async def _seed(eng: AsyncEngine) -> tuple[str, str]:
         )
         db.add(workflow)
         await db.commit()
-        ps = PlanningSession(
-            session_id="plan-sess-1",
+        ds = DesignSession(
+            session_id="design-sess-1",
             workflow_id=workflow.id,
             agent_skill_id=skill.id,
             agent_skill_commit_sha=_SHA,
@@ -87,9 +87,9 @@ async def _seed(eng: AsyncEngine) -> tuple[str, str]:
             created_by="owner",
             updated_by="owner",
         )
-        db.add(ps)
+        db.add(ds)
         await db.commit()
-        return workflow.id, ps.session_id
+        return workflow.id, ds.session_id
 
 
 async def _add_template(eng: AsyncEngine, workflow_id: str) -> None:
@@ -112,8 +112,8 @@ def _fakes(
     """Build the (registry, session_service, skills_store) fakes for the job.
 
     When ``run_registers`` is set the fake agent run inserts one template into
-    the workflow's plan, standing in for the ``register_planning_tasks`` call a
-    real initial-planning run makes.
+    the workflow's task templates, standing in for the ``register_design_tasks`` call a
+    real initial-design run makes.
     """
     skill_dir = tmp_path / "skill"
     skill_dir.mkdir(exist_ok=True)
@@ -125,17 +125,17 @@ def _fakes(
         if run_registers:
             assert eng is not None
             async with AsyncSession(eng) as db:
-                ps = (
+                ds = (
                     await db.exec(
-                        select(PlanningSession).where(
-                            PlanningSession.session_id == input_data.thread_id
+                        select(DesignSession).where(
+                            DesignSession.session_id == input_data.thread_id
                         )
                     )
                 ).first()
-                assert ps is not None
+                assert ds is not None
                 db.add(
                     WorkflowTaskTemplate(
-                        workflow_id=ps.workflow_id,
+                        workflow_id=ds.workflow_id,
                         title="Generated step",
                         tenant_id=DEFAULT_TEST_TENANT_ID,
                         created_by="owner",
@@ -174,13 +174,13 @@ async def test_generation_job_success_sets_draft_and_notifies(
     registry, session_service, store = _fakes(tmp_path, run_registers=True, eng=engine)
 
     async def _fake_summarize(transcript: str, **_: Any) -> str:
-        return "A summary of the plan"
+        return "A summary of the design"
 
     monkeypatch.setattr(
-        "services.workflow_planning.summarize_planning_transcript", _fake_summarize
+        "services.workflow_design.summarize_design_transcript", _fake_summarize
     )
 
-    await generate_workflow_plan(
+    await generate_workflow_design(
         wf_id,
         "Build me a report",
         user_id="owner",
@@ -193,14 +193,14 @@ async def test_generation_job_success_sets_draft_and_notifies(
     workflow = await _workflow_row(engine, wf_id)
     assert workflow.status is WorkflowStatus.draft
     assert workflow.generation_error is None
-    assert workflow.generated_description == "A summary of the plan"
+    assert workflow.generated_description == "A summary of the design"
     assert workflow.description is None
 
-    # The run went through the initial-planning agent with the prompt as the
+    # The run went through the initial-design agent with the prompt as the
     # user message, keyed by the session owner.
-    assert registry.get.call_args.kwargs["kind"] is AgentKind.initial_planning
+    assert registry.get.call_args.kwargs["kind"] is AgentKind.initial_design
     input_data = registry.captured["input"]
-    assert input_data.thread_id == "plan-sess-1"
+    assert input_data.thread_id == "design-sess-1"
     assert input_data.messages[0].content == "Build me a report"
     assert input_data.forwarded_props["userId"] == "owner"
 
@@ -218,7 +218,7 @@ async def test_generation_job_without_templates_fails_the_workflow(
     wf_id, _session_id = await _seed(engine)
     registry, session_service, store = _fakes(tmp_path)
 
-    await generate_workflow_plan(
+    await generate_workflow_design(
         wf_id,
         "Build me a report",
         user_id="owner",
@@ -241,7 +241,7 @@ async def test_generation_job_failure_lands_on_the_row(
     registry, session_service, store = _fakes(tmp_path)
     store.skill_dir = MagicMock(return_value=tmp_path / "missing-revision")
 
-    await generate_workflow_plan(
+    await generate_workflow_design(
         wf_id,
         "Build me a report",
         user_id="owner",
@@ -259,18 +259,16 @@ async def test_generation_job_failure_lands_on_the_row(
 async def test_generation_job_summarizer_failure_falls_back(
     engine: AsyncEngine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A summarizer hiccup must not fail a generation that produced a plan."""
+    """A summarizer hiccup must not fail a generation that produced task templates."""
     wf_id, _session_id = await _seed(engine)
     registry, session_service, store = _fakes(tmp_path, run_registers=True, eng=engine)
 
     async def _boom(transcript: str, **_: Any) -> str:
         raise RuntimeError("LLM down")
 
-    monkeypatch.setattr(
-        "services.workflow_planning.summarize_planning_transcript", _boom
-    )
+    monkeypatch.setattr("services.workflow_design.summarize_design_transcript", _boom)
 
-    await generate_workflow_plan(
+    await generate_workflow_design(
         wf_id,
         "Build me a report",
         user_id="owner",

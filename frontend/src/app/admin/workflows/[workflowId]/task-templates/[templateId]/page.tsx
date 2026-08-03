@@ -54,7 +54,7 @@ const schema = zWorkflowTaskTemplateCreate
 type FormValues = z.infer<typeof schema>;
 
 /**
- * Detail page of a single task template — one step of a workflow's plan — with
+ * Detail page of a single task template — one step of a workflow's design — with
  * its dependency and MCP tool pickers. The page is titled with the template's
  * own title, the label its row carries in the list.
  */

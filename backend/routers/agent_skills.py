@@ -10,8 +10,8 @@ from dependencies import (
     PaginationDep,
     SkillSyncJobDep,
     SortDep,
+    WorkflowDesignServiceDep,
     WorkflowGenerationJobDep,
-    WorkflowPlanningServiceDep,
     require_roles,
 )
 from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
@@ -93,20 +93,20 @@ async def generate_workflow(
     skill_id: str,
     body: GenerateWorkflowRequest,
     background: BackgroundTasks,
-    service: WorkflowPlanningServiceDep,
+    service: WorkflowDesignServiceDep,
     generation_job: WorkflowGenerationJobDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Workflow]:
     """Generate a draft Workflow from this skill ("Generate workflow").
 
-    Registers the workflow (``status: "generating"``) and its planning session
+    Registers the workflow (``status: "generating"``) and its design session
     immediately, then breaks ``prompt`` into the workflow's task templates in a
     background agent run rather than holding the request open for an LLM
     round trip. The outcome lands on the row, which the admin UI polls:
     success leaves a ``draft`` with templates and a summarized description,
-    failure leaves ``failed`` with the reason — the planning chat stays usable
-    to fix the plan by hand. Requires the skill to have a published revision
+    failure leaves ``failed`` with the reason — the design chat stays usable
+    to fix the task templates by hand. Requires the skill to have a published revision
     (HTTP 409 ``SKILL_NOT_READY`` otherwise).
     """
     workflow = await service.generate(skill_id, body.name, user_id=user_id)

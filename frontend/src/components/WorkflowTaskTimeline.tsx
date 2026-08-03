@@ -10,9 +10,9 @@ import { formatStatusLabel, STATUS_RAIL_CLASS } from "@/lib/workflow-task-status
 const SERVER_LIMIT = 1000;
 
 /**
- * One entry of the timeline: a session's WorkflowTask, or — in a planning
+ * One entry of the timeline: a session's WorkflowTask, or — in a design
  * session — a workflow task template, which has no status (the lifecycle
- * belongs to a run, not the plan).
+ * belongs to a run, not the design).
  */
 export interface TimelineTask {
   /** Identifier used for selection, hover linkage, and chat-group anchors. */
@@ -39,7 +39,7 @@ export const TASK_TIMELINE_LIST_CLASS = "relative flex-1 overflow-y-auto px-3 pb
  * Props for {@link WorkflowTaskTimeline}.
  */
 export interface WorkflowTaskTimelineProps {
-  /** The session's workflow tasks (or a plan's templates), in position order. */
+  /** The session's workflow tasks (or a workflow's task templates), in position order. */
   tasks: TimelineTask[];
   /** Id of the task currently in progress, highlighted in the list. */
   activeTaskId: string | null;

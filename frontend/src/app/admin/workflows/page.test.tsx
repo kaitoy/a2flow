@@ -114,7 +114,7 @@ describe("WorkflowsPage", () => {
             tenantId: "tenant-1",
             name: "my-workflow",
             description: null,
-            generatedDescription: "AI summary of the plan",
+            generatedDescription: "AI summary of the design",
             agentSkillId: "skill-1",
             status: "published",
             generationError: null,
@@ -127,7 +127,7 @@ describe("WorkflowsPage", () => {
       )
     );
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
-    await waitFor(() => expect(screen.getByText("AI summary of the plan")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("AI summary of the design")).toBeInTheDocument());
   });
 
   it("prefers the user description over the generated description", async () => {
@@ -139,7 +139,7 @@ describe("WorkflowsPage", () => {
             tenantId: "tenant-1",
             name: "my-workflow",
             description: "User's own summary",
-            generatedDescription: "AI summary of the plan",
+            generatedDescription: "AI summary of the design",
             agentSkillId: "skill-1",
             status: "published",
             generationError: null,
@@ -153,7 +153,7 @@ describe("WorkflowsPage", () => {
     );
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => expect(screen.getByText("User's own summary")).toBeInTheDocument());
-    expect(screen.queryByText("AI summary of the plan")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI summary of the design")).not.toBeInTheDocument();
   });
 
   /** Serve a single `draft`-status workflow row for the draft-execution tests below. */

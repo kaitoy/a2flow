@@ -53,7 +53,7 @@ async def _create_workflow_session(client: AsyncClient) -> Any:
 
     Runs the full lifecycle (skill → generate → template → publish → execute),
     then deletes the task copied from the template so tests start from a
-    session with no tasks, as they did when planning happened inside the run.
+    session with no tasks, as they did when the design happened inside the run.
 
     A monotonic suffix is appended to the skill and workflow names so callers can
     invoke this multiple times within a single test (e.g., to verify per-session

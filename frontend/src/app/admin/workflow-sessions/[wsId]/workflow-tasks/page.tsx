@@ -146,7 +146,7 @@ function buildColumns(
 /**
  * Read-only admin list of a WorkflowSession's tasks. The tasks are copies of
  * the workflow's published templates, advanced by the execution agent (and
- * the approval flow) — the plan itself is edited on the workflow's task
+ * the approval flow) — the task templates themselves are edited on the workflow's task
  * templates, not here, so a run's history stays faithful to what actually ran.
  */
 export default function WorkflowTasksPage() {

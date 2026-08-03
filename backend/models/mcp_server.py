@@ -2,7 +2,7 @@
 
 An MCPServer is a Model Context Protocol server registered with A2Flow.
 Registered servers are the catalog the workflow agent draws from when it binds
-MCP tools to WorkflowTasks: at planning time the agent lists each server's
+MCP tools to WorkflowTasks: at design time the agent lists each server's
 tools, and at execution time bound tools are invoked through the
 ``call_mcp_tool`` proxy (see :mod:`infrastructure.mcp_tools`).
 

@@ -1,13 +1,13 @@
-"""ADK agent tools for managing a workflow's task templates from a planning session.
+"""ADK agent tools for managing a workflow's task templates from a design session.
 
-These callables are attached to the planning agents (see
+These callables are attached to the design agents (see
 :func:`infrastructure.agent.create_agent`) so the initial background run can
-register the generated plan as WorkflowTaskTemplates and the interactive
-planning chat can refine it. They mirror
+register the designed steps as WorkflowTaskTemplates and the interactive
+design chat can refine it. They mirror
 :mod:`infrastructure.workflow_task_tools`, with two differences: the tools
-resolve the current run's :class:`models.planning_session.PlanningSession` (by
+resolve the current run's :class:`models.design_session.DesignSession` (by
 the ADK session id) and operate on the linked workflow's *templates*, and
-templates carry no ``status`` — the lifecycle belongs to a run, not the plan.
+templates carry no ``status`` — the lifecycle belongs to a run, not the design.
 
 Like the session-task tools, every call opens its own ``AsyncSession`` on the
 module-level engine (the tools run during an agent run, outside FastAPI's
@@ -17,7 +17,7 @@ can react to instead of raising.
 
 Every write here also moves a ``published`` parent workflow to ``modified``,
 exactly like the REST edit surfaces in
-:mod:`services.workflow_task_template`: a plan refined by chat has drifted
+:mod:`services.workflow_task_template`: task templates refined by chat have drifted
 from the snapshot taken at publish time just as much as one edited through the
 admin UI, and runs keep using that snapshot until the workflow is published
 again. During the initial background generation run the workflow is still
@@ -48,10 +48,10 @@ from models.workflow_task_template import (
     WorkflowTaskTemplateUpdate,
 )
 from repositories import (
-    PlanningSessionRepository,
+    DesignSessionRepository,
     SqlAgentSkillRepository,
+    SqlDesignSessionRepository,
     SqlMCPServerRepository,
-    SqlPlanningSessionRepository,
     SqlWorkflowRepository,
     SqlWorkflowTaskTemplateRepository,
     WorkflowRepository,
@@ -64,13 +64,13 @@ from repositories.exceptions import (
 )
 from repositories.tenant_bootstrap import (
     NoTenantSessionError,
-    resolve_planning_session_tenant,
+    resolve_design_session_tenant,
 )
 
 logger = logging.getLogger(__name__)
 
 _NO_SESSION = (
-    "no planning session is bound to the current run; cannot manage task templates"
+    "no design session is bound to the current run; cannot manage task templates"
 )
 
 
@@ -80,14 +80,14 @@ class _Scope:
 
     workflow_id: str
     tenant_id: str
-    ps_repo: PlanningSessionRepository
+    ds_repo: DesignSessionRepository
     template_repo: WorkflowTaskTemplateRepository
     workflow_repo: WorkflowRepository
 
     async def mark_modified(self, tool_context: ToolContext) -> None:
-        """Move the plan's parent workflow to ``modified`` if it is ``published``.
+        """Move the templates' parent workflow to ``modified`` if it is ``published``.
 
-        Called after every write so a chat-refined plan records the same drift
+        Called after every write so chat-refined templates record the same drift
         from the published snapshot that a REST edit does. Any other status is
         left alone by the repository.
 
@@ -106,7 +106,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
 
     Opens a fresh ``AsyncSession`` on the module-level engine (the tools run
     outside FastAPI's request scope), resolves the current run's workflow id
-    and tenant id, and wires a PlanningSession repository, a
+    and tenant id, and wires a DesignSession repository, a
     WorkflowTaskTemplate repository, and the Workflow repository backing
     :meth:`_Scope.mark_modified` to it, all scoped to the resolved tenant.
     The engine is referenced through the ``database`` module so tests can
@@ -119,15 +119,13 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
         The resolved :class:`_Scope`.
 
     Raises:
-        NoTenantSessionError: If no PlanningSession is bound to the current run.
+        NoTenantSessionError: If no DesignSession is bound to the current run.
     """
     async with AsyncSession(database.engine) as db:
         session = getattr(tool_context, "session", None)
         session_id = getattr(session, "id", None)
         resolved = (
-            await resolve_planning_session_tenant(db, session_id)
-            if session_id
-            else None
+            await resolve_design_session_tenant(db, session_id) if session_id else None
         )
         if resolved is None:
             raise NoTenantSessionError()
@@ -140,7 +138,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
         yield _Scope(
             workflow_id=workflow_id,
             tenant_id=tenant_id,
-            ps_repo=SqlPlanningSessionRepository(db, tenant_id=tenant_id),
+            ds_repo=SqlDesignSessionRepository(db, tenant_id=tenant_id),
             template_repo=SqlWorkflowTaskTemplateRepository(
                 db,
                 workflow_repo,
@@ -166,19 +164,19 @@ def _template_to_dict(template: WorkflowTaskTemplateRead) -> dict[str, Any]:
     }
 
 
-def _not_in_plan_error(template_id: str) -> dict[str, Any]:
-    """Build the error payload for a template absent from the current workflow's plan."""
+def _not_in_design_error(template_id: str) -> dict[str, Any]:
+    """Build the error payload for a template absent from the current workflow's task templates."""
     return {
-        "error": f"planning task {template_id!r} not found in the current workflow's plan"
+        "error": f"design task {template_id!r} not found in the current workflow's task templates"
     }
 
 
-async def register_planning_tasks(
+async def register_design_tasks(
     tasks: list[dict[str, Any]], tool_context: ToolContext
 ) -> dict[str, Any]:
-    """Register a plan of task templates (a DAG) for the current workflow at once.
+    """Register a whole set of task templates (a DAG) for the current workflow at once.
 
-    Call this once, right after building the plan from the skill's steps. Each
+    Call this once, right after designing the task templates from the skill's steps. Each
     entry describes one task and may declare dependencies on other tasks *in the
     same batch* by their ``key``::
 
@@ -204,7 +202,7 @@ async def register_planning_tasks(
     Moves a ``published`` parent workflow to ``modified``.
 
     Args:
-        tasks: The plan entries described above.
+        tasks: The task-template entries described above.
         tool_context: Injected by ADK; identifies the current session. Not shown
             to the model.
 
@@ -292,18 +290,18 @@ async def register_planning_tasks(
         return {"error": _NO_SESSION}
 
 
-async def create_planning_task(
+async def create_design_task(
     title: str,
     tool_context: ToolContext,
     description: str | None = None,
     depends_on_ids: list[str] | None = None,
     tool_bindings: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Create a single task template in the current workflow's plan.
+    """Create a single task template in the current workflow's task templates.
 
-    Use this to add a task incrementally after the initial plan was registered.
+    Use this to add a task incrementally after the initial task templates were registered.
     ``depends_on_ids`` must reference ids of templates that already exist in the
-    same plan (use :func:`list_planning_tasks` to find them).
+    same workflow (use :func:`list_design_tasks` to find them).
 
     Moves a ``published`` parent workflow to ``modified``.
 
@@ -312,7 +310,7 @@ async def create_planning_task(
         tool_context: Injected by ADK; identifies the current session. Not shown
             to the model.
         description: Optional longer description.
-        depends_on_ids: Optional ids of existing same-plan templates this task
+        depends_on_ids: Optional ids of existing same-workflow templates this task
             depends on.
         tool_bindings: Optional MCP tools to bind to the task, each
             ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``.
@@ -345,8 +343,8 @@ async def create_planning_task(
         return {"error": str(exc)}
 
 
-async def list_planning_tasks(tool_context: ToolContext) -> dict[str, Any]:
-    """List all task templates of the current workflow's plan, in position order.
+async def list_design_tasks(tool_context: ToolContext) -> dict[str, Any]:
+    """List all task templates of the current workflow, in position order.
 
     Args:
         tool_context: Injected by ADK; identifies the current session. Not shown
@@ -367,10 +365,10 @@ async def list_planning_tasks(tool_context: ToolContext) -> dict[str, Any]:
         return {"error": _NO_SESSION}
 
 
-async def get_planning_task(
+async def get_design_task(
     template_id: str, tool_context: ToolContext
 ) -> dict[str, Any]:
-    """Fetch a single task template from the current workflow's plan.
+    """Fetch a single task template from the current workflow's task templates.
 
     Args:
         template_id: Id of the template to fetch.
@@ -379,19 +377,19 @@ async def get_planning_task(
 
     Returns:
         The task dict, or ``{"error": <message>}`` if the session cannot be
-        resolved or the template does not belong to the plan.
+        resolved or the template does not belong to the workflow.
     """
     try:
         async with _repos(tool_context) as s:
             template = await s.template_repo.get(template_id)
             if template is None or template.workflow_id != s.workflow_id:
-                return _not_in_plan_error(template_id)
+                return _not_in_design_error(template_id)
             return _template_to_dict(template)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
 
 
-async def update_planning_task(
+async def update_design_task(
     template_id: str,
     tool_context: ToolContext,
     title: str | None = None,
@@ -400,7 +398,7 @@ async def update_planning_task(
     depends_on_ids: list[str] | None = None,
     tool_bindings: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Update fields of a task template in the current workflow's plan.
+    """Update fields of a task template in the current workflow's task templates.
 
     Only the arguments you pass are changed. Passing ``depends_on_ids`` replaces
     the template's full dependency set, letting you edit the DAG after creation;
@@ -416,7 +414,7 @@ async def update_planning_task(
         title: New title, if changing.
         description: New description, if changing.
         position: New layout position, if changing.
-        depends_on_ids: Replacement dependency ids (existing same-plan
+        depends_on_ids: Replacement dependency ids (existing same-workflow
             templates), if changing.
         tool_bindings: Replacement MCP tool bindings, each
             ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``,
@@ -424,7 +422,7 @@ async def update_planning_task(
 
     Returns:
         The updated task dict, or ``{"error": <message>}`` on an unknown
-        template, cross-plan template, unknown dependency, unknown MCP server,
+        template, cross-workflow template, unknown dependency, unknown MCP server,
         cycle, or unresolved session.
     """
 
@@ -437,7 +435,7 @@ async def update_planning_task(
         async with _repos(tool_context) as s:
             existing = await s.template_repo.get(template_id)
             if existing is None or existing.workflow_id != s.workflow_id:
-                return _not_in_plan_error(template_id)
+                return _not_in_design_error(template_id)
             fields: dict[str, Any] = {}
             if title is not None:
                 fields["title"] = title
@@ -456,7 +454,7 @@ async def update_planning_task(
                     user_id=_user_id(tool_context),
                 )
             except NotFoundError:
-                return _not_in_plan_error(template_id)
+                return _not_in_design_error(template_id)
             await s.mark_modified(tool_context)
             return _template_to_dict(template)
     except NoTenantSessionError:
@@ -465,10 +463,10 @@ async def update_planning_task(
         return {"error": str(exc)}
 
 
-async def delete_planning_task(
+async def delete_design_task(
     template_id: str, tool_context: ToolContext
 ) -> dict[str, Any]:
-    """Delete a task template from the current workflow's plan.
+    """Delete a task template from the current workflow's task templates.
 
     Moves a ``published`` parent workflow to ``modified``.
 
@@ -480,13 +478,13 @@ async def delete_planning_task(
     Returns:
         ``{"deleted": <template_id>}`` on success, or ``{"error": <message>}``
         if the session cannot be resolved or the template does not belong to
-        the plan.
+        the workflow.
     """
     try:
         async with _repos(tool_context) as s:
             existing = await s.template_repo.get(template_id)
             if existing is None or existing.workflow_id != s.workflow_id:
-                return _not_in_plan_error(template_id)
+                return _not_in_design_error(template_id)
             await s.template_repo.delete(template_id)
             await s.mark_modified(tool_context)
             return {"deleted": template_id}

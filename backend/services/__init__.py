@@ -2,17 +2,17 @@ from .agent_skill import AgentSkillService
 from .agent_skill_sync import AgentSkillSyncService, sync_agent_skill
 from .approval import ApprovalService
 from .auth import AuthService
+from .design_session import DesignSessionService
 from .impersonation import ImpersonationService
 from .mcp_registry import MCPRegistryService
 from .mcp_server import MCPServerService
 from .notification import NotificationService
-from .planning_session import PlanningSessionService
 from .secret import SecretService
 from .tenant import TenantService
 from .user import UserService
 from .user_avatar import UserAvatarService
 from .workflow import WorkflowService
-from .workflow_planning import WorkflowPlanningService, generate_workflow_plan
+from .workflow_design import WorkflowDesignService, generate_workflow_design
 from .workflow_session import WorkflowSessionService
 from .workflow_session_access import WorkflowSessionAccessPolicy
 from .workflow_task import WorkflowTaskService
@@ -27,17 +27,17 @@ __all__ = [
     "MCPRegistryService",
     "MCPServerService",
     "NotificationService",
-    "PlanningSessionService",
+    "DesignSessionService",
     "SecretService",
     "TenantService",
     "UserAvatarService",
     "UserService",
-    "WorkflowPlanningService",
+    "WorkflowDesignService",
     "WorkflowService",
     "WorkflowSessionAccessPolicy",
     "WorkflowSessionService",
     "WorkflowTaskService",
     "WorkflowTaskTemplateService",
-    "generate_workflow_plan",
+    "generate_workflow_design",
     "sync_agent_skill",
 ]

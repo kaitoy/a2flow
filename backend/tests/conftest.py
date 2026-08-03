@@ -266,7 +266,7 @@ def mock_sync_job() -> AsyncMock:
 
 @pytest.fixture()
 def mock_generation_job() -> AsyncMock:
-    """Stand-in for the background plan-generation job ("Generate workflow").
+    """Stand-in for the background design job ("Generate workflow").
 
     The real job runs a full agent turn against an LLM and opens database
     sessions on the application engine, so it is replaced wholesale.
@@ -328,8 +328,8 @@ async def _workflow_client_env(
     from models.agent_skill import (
         AgentSkill as _AgentSkill,  # noqa: F401 — registers model
     )
-    from models.planning_session import (
-        PlanningSession as _PlanningSession,  # noqa: F401 — registers model
+    from models.design_session import (
+        DesignSession as _DesignSession,  # noqa: F401 — registers model
     )
     from models.workflow import Workflow as _Workflow  # noqa: F401 — registers model
     from models.workflow_session import (

@@ -23,7 +23,7 @@ describe("WorkflowTasksPage", () => {
     await waitFor(() => expect(screen.getByText("Step 1")).toBeInTheDocument());
   });
 
-  it("renders the task title as plain text (the run's plan is read-only)", async () => {
+  it("renders the task title as plain text (the run's task list is read-only)", async () => {
     render(<WorkflowTasksPage />);
     await waitFor(() => screen.getByText("Step 1"));
     expect(screen.queryByRole("link", { name: "Step 1" })).not.toBeInTheDocument();
