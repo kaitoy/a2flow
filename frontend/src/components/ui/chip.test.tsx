@@ -1,0 +1,88 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { Chip } from "./chip";
+
+/**
+ * Force `scrollWidth`/`clientWidth` for the duration of a test so the overflow
+ * measurement can be exercised — jsdom reports 0 for both, which reads as "not
+ * clipped".
+ */
+function stubOverflow(scrollWidth: number, clientWidth: number) {
+  const original = {
+    scrollWidth: Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollWidth"),
+    clientWidth: Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth"),
+  };
+  Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+    configurable: true,
+    value: scrollWidth,
+  });
+  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+    configurable: true,
+    value: clientWidth,
+  });
+  return () => {
+    if (original.scrollWidth) {
+      Object.defineProperty(HTMLElement.prototype, "scrollWidth", original.scrollWidth);
+    }
+    if (original.clientWidth) {
+      Object.defineProperty(HTMLElement.prototype, "clientWidth", original.clientWidth);
+    }
+  };
+}
+
+describe("Chip", () => {
+  it("renders its label", () => {
+    render(<Chip label="Gather sources" />);
+    expect(screen.getByText("Gather sources")).toBeInTheDocument();
+  });
+
+  it("clips to a single capped-width line with a modest radius", () => {
+    render(<Chip label="Validate the uploaded CSV schema against the contract" />);
+    const chip = screen.getByText("Validate the uploaded CSV schema against the contract");
+    expect(chip.className).toContain("truncate");
+    expect(chip.className).toContain("max-w-64");
+    expect(chip.className).toContain("rounded-md");
+    // A pill radius breaks open once the text wraps, so it must not be used here.
+    expect(chip.className).not.toContain("rounded-full");
+  });
+
+  it("reports hover to the caller", async () => {
+    const user = userEvent.setup();
+    const onMouseEnter = vi.fn();
+    const onMouseLeave = vi.fn();
+    render(<Chip label="Gather sources" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} />);
+
+    await user.hover(screen.getByText("Gather sources"));
+    expect(onMouseEnter).toHaveBeenCalledTimes(1);
+
+    await user.unhover(screen.getByText("Gather sources"));
+    expect(onMouseLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("reveals the full label in a tooltip once the text is clipped", async () => {
+    const restore = stubOverflow(400, 224);
+    try {
+      const user = userEvent.setup();
+      render(<Chip label="Validate the uploaded CSV schema against the contract" />);
+
+      await user.hover(screen.getByText("Validate the uploaded CSV schema against the contract"));
+      expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
+        "Validate the uploaded CSV schema against the contract"
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("stays hover-inert when the label fits", async () => {
+    const user = userEvent.setup();
+    const onMouseEnter = vi.fn();
+    render(<Chip label="Gather sources" onMouseEnter={onMouseEnter} />);
+
+    await user.hover(screen.getByText("Gather sources"));
+    // The caller's handler still fires; only the tooltip is suppressed.
+    expect(onMouseEnter).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+});

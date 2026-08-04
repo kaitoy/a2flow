@@ -199,6 +199,53 @@ async def test_register_rejects_missing_title(engine: AsyncEngine) -> None:
     assert "error" in result
 
 
+async def test_register_rejects_overlong_title(engine: AsyncEngine) -> None:
+    # A title long enough to blow out the "Depends on" chip comes back as a
+    # correctable error payload, with nothing written — not as a Pydantic
+    # ValidationError escaping the tool and failing the whole agent run.
+    await _seed_design_session(engine)
+    result = await register_design_tasks(
+        [
+            {"key": "a", "title": "Gather sources"},
+            {
+                "key": "b",
+                "title": "Validate the uploaded CSV schema against the contract",
+            },
+        ],
+        _ctx(),
+    )
+    assert "error" in result
+    assert "53 characters" in result["error"]
+    listed = await list_design_tasks(_ctx())
+    assert listed["tasks"] == []
+
+
+async def test_register_accepts_a_title_at_the_limit(engine: AsyncEngine) -> None:
+    await _seed_design_session(engine)
+    at_limit = "T" * 30
+    result = await register_design_tasks([{"key": "a", "title": at_limit}], _ctx())
+    assert "error" not in result
+    listed = await list_design_tasks(_ctx())
+    assert [t["title"] for t in listed["tasks"]] == [at_limit]
+
+
+async def test_create_rejects_overlong_title(engine: AsyncEngine) -> None:
+    await _seed_design_session(engine)
+    result = await create_design_task("T" * 31, _ctx())
+    assert "error" in result
+    listed = await list_design_tasks(_ctx())
+    assert listed["tasks"] == []
+
+
+async def test_update_rejects_overlong_title(engine: AsyncEngine) -> None:
+    await _seed_design_session(engine)
+    created = await create_design_task("Original", _ctx())
+    result = await update_design_task(created["id"], _ctx(), title="T" * 31)
+    assert "error" in result
+    unchanged = await get_design_task(created["id"], _ctx())
+    assert unchanged["title"] == "Original"
+
+
 async def test_register_without_session_errors(engine: AsyncEngine) -> None:
     result = await register_design_tasks(
         [{"key": "a", "title": "A"}], _ctx("unknown-session")

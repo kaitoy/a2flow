@@ -156,6 +156,34 @@ describe("DataTable", () => {
     expect(rows[0].className).toContain("even:bg-glass-strong/15");
   });
 
+  it("tags every body row with its row key", () => {
+    const { container } = render(
+      <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} />
+    );
+    expect(container.querySelector('tbody tr[data-row-key="1"]')).toBeInTheDocument();
+    expect(container.querySelector('tbody tr[data-row-key="2"]')).toBeInTheDocument();
+  });
+
+  it("calls out only the highlighted row", () => {
+    const { container } = render(
+      <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} highlightedRowKey="2" />
+    );
+    const rows = container.querySelectorAll("tbody tr");
+    expect(rows[0].className).not.toContain("ring-accent/50");
+    expect(rows[1].className).toContain("ring-accent/50");
+    // The zebra stripe is a :nth-child rule, so the highlight fill must be forced.
+    expect(rows[1].className).toContain("bg-accent-soft/40!");
+  });
+
+  it("highlights no row when highlightedRowKey is omitted", () => {
+    const { container } = render(
+      <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} />
+    );
+    for (const row of container.querySelectorAll("tbody tr")) {
+      expect(row.className).not.toContain("ring-accent/50");
+    }
+  });
+
   it("renders a resize handle for every column", () => {
     const { container } = render(
       <DataTable columns={COLUMNS} rows={ROWS} getRowKey={(r) => r.id} />

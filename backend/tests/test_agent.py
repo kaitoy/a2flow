@@ -635,6 +635,8 @@ def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None
     assert "register_design_tasks" in rendered
     assert "Never execute a task" in rendered
     assert "A2UI Rules" in rendered
+    # Titles are listed as chips, so the shared rules ask for short ones.
+    assert "at most 30 characters" in rendered
 
 
 def test_create_agent_initial_design_kind_has_no_a2ui(tmp_path: Any) -> None:
@@ -649,6 +651,7 @@ def test_create_agent_initial_design_kind_has_no_a2ui(tmp_path: Any) -> None:
     assert isinstance(agent.instruction, str)
     assert "register_design_tasks" in agent.instruction
     assert "unattended" in agent.instruction
+    assert "at most 30 characters" in agent.instruction
     assert not any(isinstance(t, AGUIToolset) for t in agent.tools)
 
 

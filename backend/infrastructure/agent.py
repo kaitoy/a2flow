@@ -225,7 +225,14 @@ _DESIGN_REGISTRATION_RULES = (
     "the listing comes back with no servers, or none of the tools fit, simply "
     "register the task templates without any `tools` entries. Express the steps "
     "as a DAG and register them in ONE call to `register_design_tasks`, using "
-    "each task's `key` and `depends_on` to encode ordering."
+    "each task's `key` and `depends_on` to encode ordering.\n\n"
+    "Title each task as a terse imperative label: 2 to 4 words, at most 30 "
+    'characters (e.g. "Gather sources", "Validate schema", "Publish report"). '
+    "Titles are listed as chips next to every task that depends on them, so "
+    "anything longer is clipped — never write a sentence, and drop articles and "
+    "qualifiers rather than spending words on them. Put the detail in "
+    "`description` instead, which has room for it. Titles over 30 characters "
+    "are rejected."
 )
 
 INITIAL_DESIGN_AGENT_INSTRUCTION = (

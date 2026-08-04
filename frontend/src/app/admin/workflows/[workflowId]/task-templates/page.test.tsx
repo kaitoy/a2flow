@@ -80,6 +80,71 @@ describe("WorkflowTaskTemplatesPage", () => {
     expect(screen.getAllByText("Template Step 1")).toHaveLength(2);
   });
 
+  it("highlights the dependency's own row while its chip is hovered", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id/task-templates", () =>
+        envelope([
+          {
+            id: "tmpl-1",
+            workflowId: "wf-1",
+            title: "Template Step 1",
+            description: null,
+            position: 0,
+            dependsOnIds: [],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+          {
+            id: "tmpl-2",
+            workflowId: "wf-1",
+            title: "Template Step 2",
+            description: null,
+            position: 1,
+            dependsOnIds: ["tmpl-1"],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+
+    const { container } = render(<WorkflowTaskTemplatesPage />);
+    await waitFor(() => screen.getByText("Template Step 2"));
+    const dependencyRow = container.querySelector('[data-row-key="tmpl-1"]');
+    expect(dependencyRow?.className).not.toContain("ring-accent/50");
+
+    // The chip is the second "Template Step 1" — the first is the row's own title.
+    await user.hover(screen.getAllByText("Template Step 1")[1]);
+    await waitFor(() => expect(dependencyRow?.className).toContain("ring-accent/50"));
+
+    await user.unhover(screen.getAllByText("Template Step 1")[1]);
+    await waitFor(() => expect(dependencyRow?.className).not.toContain("ring-accent/50"));
+  });
+
+  it("fetches every template in one unpaginated request", async () => {
+    const urls: string[] = [];
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id/task-templates", ({ request }) => {
+        urls.push(request.url);
+        return envelope([]);
+      })
+    );
+
+    render(<WorkflowTaskTemplatesPage />);
+    await waitFor(() => expect(urls).not.toHaveLength(0));
+    const params = new URL(urls[0]).searchParams;
+    expect(params.get("limit")).toBe("1000");
+    // The shared list helper always sends offset; it just never leaves 0 now.
+    expect(params.get("offset")).toBe("0");
+    expect(screen.queryByRole("button", { name: /previous/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
+  });
+
   it("has no Status column (templates carry no lifecycle)", async () => {
     render(<WorkflowTaskTemplatesPage />);
     await waitFor(() => screen.getByText("Template Step 1"));

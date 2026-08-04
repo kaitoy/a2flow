@@ -8,7 +8,7 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
-import { PaginationControls } from "@/components/admin/pagination-controls";
+import { Chip } from "@/components/ui/chip";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
@@ -27,10 +27,14 @@ import {
   WORKFLOW_TASK_STATUSES,
 } from "@/lib/workflow-task-status";
 
-/** Page size for the paginated table view. */
-const LIMIT = 20;
-/** Upper bound (backend maximum) used to fetch the whole DAG for the graph view. */
-const GRAPH_LIMIT = 1000;
+/**
+ * Upper bound (the backend maximum) used to fetch every task in one go.
+ *
+ * Both views want the whole set: the graph so dependency edges are not cut, and
+ * the table so a hovered "Depends on" chip can name — and highlight — its target
+ * row even when that row would have sat on another page.
+ */
+const ALL_LIMIT = 1000;
 /** Upper bound used to fetch the MCP server registry for tool-chip labels. */
 const SERVER_LIMIT = 1000;
 
@@ -49,18 +53,10 @@ function StatusDot({ status }: { status: WorkflowTaskStatus }) {
   );
 }
 
-/** Pill showing a single related item (dependency or bound tool) by label, in the mono data face. */
-function Chip({ label }: { label: string }) {
-  return (
-    <span className="inline-block rounded-full glass-panel px-2 py-0.5 font-mono text-xs text-on-surface-variant">
-      {label}
-    </span>
-  );
-}
-
 function buildColumns(
   titleById: Map<string, string>,
-  serverNameById: Map<string, string>
+  serverNameById: Map<string, string>,
+  onHoverDependency: (id: string | null) => void
 ): ColumnDef<WorkflowTask>[] {
   return [
     {
@@ -93,7 +89,12 @@ function buildColumns(
         return (
           <div className="flex flex-wrap gap-1">
             {deps.map((id) => (
-              <Chip key={id} label={titleById.get(id) ?? `${id.slice(0, 8)}…`} />
+              <Chip
+                key={id}
+                label={titleById.get(id) ?? `${id.slice(0, 8)}…`}
+                onMouseEnter={() => onHoverDependency(id)}
+                onMouseLeave={() => onHoverDependency(null)}
+              />
             ))}
           </div>
         );
@@ -153,44 +154,33 @@ export default function WorkflowTasksPage() {
   const { wsId } = useParams<{ wsId: string }>();
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
   const [loading, setLoading] = useState(false);
-  const [offset, setOffset] = useState(0);
   const [sort, setSort] = useState<SortSpec | null>(null);
   const [filters, setFilters] = useState<FilterSpec[]>([]);
   const [view, setView] = useState<View>("table");
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
+  // The task a hovered "Depends on" chip points at, called out in the table.
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // The graph needs every task (in position order) so dependency edges are
-      // not cut across pages or hidden by sort/filter.
+      // The graph needs every task in position order, so it takes no sort or
+      // filter at all; the table takes both but is likewise unpaginated.
       const data =
         view === "graph"
-          ? await listWorkflowTasks(wsId, { limit: GRAPH_LIMIT })
-          : await listWorkflowTasks(wsId, { limit: LIMIT, offset, sort, filters });
+          ? await listWorkflowTasks(wsId, { limit: ALL_LIMIT })
+          : await listWorkflowTasks(wsId, { limit: ALL_LIMIT, sort, filters });
       setTasks(data);
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
     } finally {
       setLoading(false);
     }
-  }, [wsId, offset, view, sort, filters]);
+  }, [wsId, view, sort, filters]);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  /** Set the sort directive and return to the first page. */
-  function handleSortChange(next: SortSpec | null) {
-    setSort(next);
-    setOffset(0);
-  }
-
-  /** Set the filter directives and return to the first page. */
-  function handleFilterChange(next: FilterSpec[]) {
-    setFilters(next);
-    setOffset(0);
-  }
 
   useEffect(() => {
     listMcpServers({ limit: SERVER_LIMIT })
@@ -200,7 +190,12 @@ export default function WorkflowTasksPage() {
       });
   }, []);
 
-  const columns = buildColumns(new Map(tasks.map((t) => [t.id, t.title])), serverNameById);
+  const columns = buildColumns(
+    // Unpaginated, so every dependency resolves to a real title.
+    new Map(tasks.map((t) => [t.id, t.title])),
+    serverNameById,
+    setHighlightedId
+  );
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowTasks",
     columns
@@ -242,29 +237,21 @@ export default function WorkflowTasksPage() {
         />
       </div>
       {view === "graph" ? (
-        <WorkflowTaskGraph tasks={tasks} />
+        <WorkflowTaskGraph tasks={tasks} serverNameById={serverNameById} />
       ) : (
-        <>
-          <DataTable
-            columns={visibleColumns}
-            rows={tasks}
-            loading={loading}
-            emptyMessage="No tasks for this session yet."
-            emptyIcon={ListTree}
-            getRowKey={(t) => t.id}
-            sort={sort}
-            onSortChange={handleSortChange}
-            filters={filters}
-            onFilterChange={handleFilterChange}
-          />
-          <PaginationControls
-            offset={offset}
-            limit={LIMIT}
-            count={tasks.length}
-            onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
-            onNext={() => setOffset((o) => o + LIMIT)}
-          />
-        </>
+        <DataTable
+          columns={visibleColumns}
+          rows={tasks}
+          loading={loading}
+          emptyMessage="No tasks for this session yet."
+          emptyIcon={ListTree}
+          getRowKey={(t) => t.id}
+          sort={sort}
+          onSortChange={setSort}
+          filters={filters}
+          onFilterChange={setFilters}
+          highlightedRowKey={highlightedId}
+        />
       )}
     </AdminPageContainer>
   );

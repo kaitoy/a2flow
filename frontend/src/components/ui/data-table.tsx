@@ -67,6 +67,11 @@ interface DataTableProps<T> {
   filters?: FilterSpec[];
   /** Called when the user edits a column filter. Required to enable filter UI. */
   onFilterChange?: (filters: FilterSpec[]) => void;
+  /**
+   * `getRowKey` value of the row to call out, e.g. the task a hovered dependency
+   * chip points at. No row is highlighted when null or omitted.
+   */
+  highlightedRowKey?: string | null;
 }
 
 /** Per-column skeleton widths cycle through this list for a natural, uneven look. */
@@ -202,6 +207,11 @@ export function fitColumnWidths<T>(
  * tooltip on overflow; columns that render interactive or multi-line content
  * opt out with `noTruncate`.
  *
+ * A caller can call one row out with `highlightedRowKey` — used to answer "which
+ * row is this reference pointing at?" when a cell names another row (a hovered
+ * dependency chip). Every row also carries its key as `data-row-key`, which is
+ * how such a caller, or a test, finds the row in the DOM.
+ *
  * Column widths are measured from the natural layout once real rows arrive, then
  * passed through {@link fitColumnWidths} so the whole table — including the
  * trailing actions column — stays inside the panel, and refitted whenever the
@@ -234,6 +244,7 @@ export function DataTable<T>({
   onSortChange,
   filters,
   onFilterChange,
+  highlightedRowKey = null,
 }: DataTableProps<T>) {
   const colSpan = columns.length;
 
@@ -489,7 +500,17 @@ export function DataTable<T>({
             rows.map((row) => (
               <tr
                 key={getRowKey(row)}
-                className="border-divider/60 border-t text-on-surface transition-colors even:bg-glass-strong/15 hover:bg-accent-soft/40"
+                data-row-key={getRowKey(row)}
+                className={[
+                  "border-divider/60 border-t text-on-surface transition-colors even:bg-glass-strong/15 hover:bg-accent-soft/40",
+                  // The zebra stripe is a `:nth-child(even)` rule, so it outranks a
+                  // plain background utility — the highlight fill has to be forced.
+                  highlightedRowKey === getRowKey(row)
+                    ? "bg-accent-soft/40! ring-2 ring-inset ring-accent/50"
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 {columns.map((col) => (
                   <td

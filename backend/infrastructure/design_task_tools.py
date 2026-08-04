@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from google.adk.tools.tool_context import ToolContext
+from pydantic import ValidationError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database
@@ -72,6 +73,30 @@ logger = logging.getLogger(__name__)
 _NO_SESSION = (
     "no design session is bound to the current run; cannot manage task templates"
 )
+
+#: Hard cap on a title written by a design agent, enforced here rather than
+#: taken from ``ShortText`` (200 chars, :mod:`models.constraints`) — that limit
+#: guards the column, this one guards the *list UI*, where a title is rendered
+#: as a chip beside every task depending on it and a long one is clipped to an
+#: ellipsis. It matches the 30-character budget the agent's instructions ask for
+#: (see ``_DESIGN_REGISTRATION_RULES`` in :mod:`infrastructure.agent`), so an
+#: agent that follows them never trips it, and one that drifts into writing
+#: sentences gets a correctable ``{"error": ...}`` back instead of quietly
+#: filling the column.
+#:
+#: It binds only the agent tools. A human editing a template through the REST
+#: API or the admin form is still held to ``ShortText`` alone.
+_TITLE_MAX_LENGTH = 30
+
+
+def _title_too_long_error(label: str, title: str) -> str:
+    """Build the error message for a title over :data:`_TITLE_MAX_LENGTH`."""
+    return (
+        f"{label} title is {len(title)} characters, over the "
+        f"{_TITLE_MAX_LENGTH} limit; use a terse imperative label of 2-4 words "
+        f"({title[:_TITLE_MAX_LENGTH].rstrip()!r} is the budget) and move the "
+        "detail into 'description'"
+    )
 
 
 @dataclass
@@ -182,14 +207,20 @@ async def register_design_tasks(
 
         {
           "key": "t1",                 # required, unique within this batch
-          "title": "Gather sources",   # required
-          "description": "...",        # optional
+          "title": "Gather sources",   # required, 2-4 words, max 30 characters
+          "description": "...",        # optional, where the detail belongs
           "position": 0,               # optional layout/order hint
           "depends_on": ["t0"],        # optional, other entries' "key" values
           "tools": [                   # optional MCP tools this task will use
             {"server_id": "<registered MCP server id>", "tool_name": "<tool>"}
           ]
         }
+
+    A ``title`` is a terse imperative label, not a sentence: 2 to 4 words and at
+    most 30 characters (e.g. "Gather sources", "Validate schema"), which is
+    enforced — a longer one is rejected. It is listed as a chip next to every
+    task that depends on it, so a long one is clipped. Anything that does not fit
+    belongs in ``description``.
 
     Templates are created in dependency order; ``depends_on`` keys are resolved
     to the real template ids before edges are written. When ``position`` is
@@ -209,9 +240,10 @@ async def register_design_tasks(
     Returns:
         On success ``{"created": [{"key", "id", "title"}, ...]}``. On failure
         ``{"error": <message>}`` (unknown dependency key, duplicate key, cycle,
-        missing title, or unresolved session); no templates are created when the
-        failure is detected before writing. If an unexpected repository error
-        occurs mid-batch, the partial ``created`` list is also returned.
+        missing or overlong title, or unresolved session); no templates are
+        created when the failure is detected before writing. If an unexpected
+        repository error occurs mid-batch, the partial ``created`` list is also
+        returned.
     """
 
     if not tasks:
@@ -230,6 +262,8 @@ async def register_design_tasks(
         title = entry.get("title")
         if not isinstance(title, str) or not title:
             return {"error": f"task {key!r} is missing a string 'title'"}
+        if len(title) > _TITLE_MAX_LENGTH:
+            return {"error": _title_too_long_error(f"task {key!r}", title)}
         by_key[key] = entry
         keys.append(key)
 
@@ -261,16 +295,27 @@ async def register_design_tasks(
                 entry = by_key[key]
                 dep_ids = [key_to_id[d] for d in (entry.get("depends_on") or [])]
                 declared_position = entry.get("position")
-                data = WorkflowTaskTemplateCreate(
-                    workflow_id=s.workflow_id,
-                    title=entry["title"],
-                    description=entry.get("description"),
-                    position=declared_position
-                    if declared_position is not None
-                    else position,
-                    depends_on_ids=dep_ids,
-                    tool_bindings=bindings_by_key[key],
-                )
+                try:
+                    data = WorkflowTaskTemplateCreate(
+                        workflow_id=s.workflow_id,
+                        title=entry["title"],
+                        description=entry.get("description"),
+                        position=declared_position
+                        if declared_position is not None
+                        else position,
+                        depends_on_ids=dep_ids,
+                        tool_bindings=bindings_by_key[key],
+                    )
+                except ValidationError as exc:
+                    # A field constraint the pre-checks above don't cover. Hand
+                    # it back for the agent to fix rather than letting it escape
+                    # the tool and fail the whole run.
+                    if created:
+                        await s.mark_modified(tool_context)
+                    return {
+                        "error": f"task {key!r} is invalid: {exc}",
+                        "created": created,
+                    }
                 try:
                     template = await s.template_repo.create(data, user_id=user_id)
                 except (ForeignKeyViolationError, DependencyCycleError) as exc:
@@ -306,7 +351,11 @@ async def create_design_task(
     Moves a ``published`` parent workflow to ``modified``.
 
     Args:
-        title: The task title (required).
+        title: The task title (required). A terse imperative label, not a
+            sentence: 2 to 4 words, at most 30 characters (e.g. "Gather
+            sources") — a longer one is rejected. It is listed as a chip next to
+            every task that depends on it, so a long one is clipped — put the
+            detail in ``description``.
         tool_context: Injected by ADK; identifies the current session. Not shown
             to the model.
         description: Optional longer description.
@@ -317,12 +366,15 @@ async def create_design_task(
 
     Returns:
         The created task dict, or ``{"error": <message>}`` on an unknown
-        dependency, unknown MCP server, cycle, or unresolved session.
+        dependency, unknown MCP server, cycle, overlong title, or unresolved
+        session.
     """
 
     bindings = _parse_tool_bindings(tool_bindings or [])
     if bindings is None:
         return _invalid_tools_error("tool_bindings")
+    if len(title) > _TITLE_MAX_LENGTH:
+        return {"error": _title_too_long_error("the", title)}
     try:
         async with _repos(tool_context) as s:
             data = WorkflowTaskTemplateCreate(
@@ -339,7 +391,7 @@ async def create_design_task(
             return _template_to_dict(template)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
-    except (ForeignKeyViolationError, DependencyCycleError) as exc:
+    except (ForeignKeyViolationError, DependencyCycleError, ValidationError) as exc:
         return {"error": str(exc)}
 
 
@@ -411,7 +463,11 @@ async def update_design_task(
         template_id: Id of the template to update.
         tool_context: Injected by ADK; identifies the current session. Not shown
             to the model.
-        title: New title, if changing.
+        title: New title, if changing. A terse imperative label, not a sentence:
+            2 to 4 words, at most 30 characters (e.g. "Gather sources") — a
+            longer one is rejected. It is listed as a chip next to every task
+            that depends on it, so a long one is clipped — put the detail in
+            ``description``.
         description: New description, if changing.
         position: New layout position, if changing.
         depends_on_ids: Replacement dependency ids (existing same-workflow
@@ -423,7 +479,7 @@ async def update_design_task(
     Returns:
         The updated task dict, or ``{"error": <message>}`` on an unknown
         template, cross-workflow template, unknown dependency, unknown MCP server,
-        cycle, or unresolved session.
+        cycle, overlong title, or unresolved session.
     """
 
     bindings = (
@@ -431,6 +487,8 @@ async def update_design_task(
     )
     if tool_bindings is not None and bindings is None:
         return _invalid_tools_error("tool_bindings")
+    if title is not None and len(title) > _TITLE_MAX_LENGTH:
+        return {"error": _title_too_long_error("the new", title)}
     try:
         async with _repos(tool_context) as s:
             existing = await s.template_repo.get(template_id)
@@ -459,7 +517,7 @@ async def update_design_task(
             return _template_to_dict(template)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
-    except (ForeignKeyViolationError, DependencyCycleError) as exc:
+    except (ForeignKeyViolationError, DependencyCycleError, ValidationError) as exc:
         return {"error": str(exc)}
 
 

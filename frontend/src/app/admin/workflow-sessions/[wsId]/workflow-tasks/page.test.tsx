@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { store as appStore } from "@/store";
@@ -69,6 +70,76 @@ describe("WorkflowTasksPage", () => {
     // "Step 1" appears twice: once as task-1's own title, once as task-2's
     // resolved dependency chip.
     expect(screen.getAllByText("Step 1")).toHaveLength(2);
+  });
+
+  it("highlights the dependency's own row while its chip is hovered", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks", () =>
+        envelope([
+          {
+            id: "task-1",
+            workflowSessionId: "ws-1",
+            title: "Step 1",
+            description: null,
+            status: "pending",
+            position: 0,
+            dependsOnIds: [],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+          {
+            id: "task-2",
+            workflowSessionId: "ws-1",
+            title: "Step 2",
+            description: null,
+            status: "pending",
+            position: 1,
+            dependsOnIds: ["task-1"],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+
+    const { container } = render(<WorkflowTasksPage />);
+    await waitFor(() => screen.getByText("Step 2"));
+    const dependencyRow = container.querySelector('[data-row-key="task-1"]');
+    expect(dependencyRow?.className).not.toContain("ring-accent/50");
+
+    // The chip is the second "Step 1" — the first is the row's own title.
+    await user.hover(screen.getAllByText("Step 1")[1]);
+    await waitFor(() => expect(dependencyRow?.className).toContain("ring-accent/50"));
+
+    await user.unhover(screen.getAllByText("Step 1")[1]);
+    await waitFor(() => expect(dependencyRow?.className).not.toContain("ring-accent/50"));
+  });
+
+  it("fetches every task in one unpaginated request", async () => {
+    const urls: string[] = [];
+    server.use(
+      http.get(
+        "http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks",
+        ({ request }) => {
+          urls.push(request.url);
+          return envelope([]);
+        }
+      )
+    );
+
+    render(<WorkflowTasksPage />);
+    await waitFor(() => expect(urls).not.toHaveLength(0));
+    const params = new URL(urls[0]).searchParams;
+    expect(params.get("limit")).toBe("1000");
+    // The shared list helper always sends offset; it just never leaves 0 now.
+    expect(params.get("offset")).toBe("0");
+    expect(screen.queryByRole("button", { name: /previous/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
   });
 
   it("renders a Tools column resolving server ids to names", async () => {

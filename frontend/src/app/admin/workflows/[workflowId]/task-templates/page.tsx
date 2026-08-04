@@ -10,7 +10,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
-import { PaginationControls } from "@/components/admin/pagination-controls";
+import { Chip } from "@/components/ui/chip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -26,10 +26,14 @@ import {
   type WorkflowTaskTemplate,
 } from "@/lib/api";
 
-/** Page size for the paginated table view. */
-const LIMIT = 20;
-/** Upper bound (backend maximum) used to fetch the whole DAG for the graph view. */
-const GRAPH_LIMIT = 1000;
+/**
+ * Upper bound (the backend maximum) used to fetch every template in one go.
+ *
+ * Both views want the whole set: the graph so dependency edges are not cut, and
+ * the table so a hovered "Depends on" chip can name — and highlight — its target
+ * row even when that row would have sat on another page.
+ */
+const ALL_LIMIT = 1000;
 /** Upper bound used to fetch the MCP server registry for tool-chip labels. */
 const SERVER_LIMIT = 1000;
 
@@ -41,20 +45,12 @@ const VIEW_OPTIONS = [
   { value: "graph" as const, label: "Graph" },
 ];
 
-/** Pill showing a single related item (dependency or bound tool) by label, in the mono data face. */
-function Chip({ label }: { label: string }) {
-  return (
-    <span className="inline-block rounded-full glass-panel px-2 py-0.5 font-mono text-xs text-on-surface-variant">
-      {label}
-    </span>
-  );
-}
-
 function buildColumns(
   workflowId: string,
   titleById: Map<string, string>,
   serverNameById: Map<string, string>,
-  onDelete: (id: string, title: string) => void
+  onDelete: (id: string, title: string) => void,
+  onHoverDependency: (id: string | null) => void
 ): ColumnDef<WorkflowTaskTemplate>[] {
   return [
     {
@@ -94,7 +90,12 @@ function buildColumns(
         return (
           <div className="flex flex-wrap gap-1">
             {deps.map((id) => (
-              <Chip key={id} label={titleById.get(id) ?? `${id.slice(0, 8)}…`} />
+              <Chip
+                key={id}
+                label={titleById.get(id) ?? `${id.slice(0, 8)}…`}
+                onMouseEnter={() => onHoverDependency(id)}
+                onMouseLeave={() => onHoverDependency(null)}
+              />
             ))}
           </div>
         );
@@ -143,10 +144,11 @@ export default function WorkflowTaskTemplatesPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const [templates, setTemplates] = useState<WorkflowTaskTemplate[]>([]);
   const [loading, setLoading] = useState(false);
-  const [offset, setOffset] = useState(0);
   const [sort, setSort] = useState<SortSpec | null>(null);
   const [filters, setFilters] = useState<FilterSpec[]>([]);
   const [view, setView] = useState<View>("table");
+  // The template a hovered "Depends on" chip points at, called out in the table.
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
   // Only needed to name the parent workflow in the breadcrumb trail.
@@ -155,35 +157,23 @@ export default function WorkflowTaskTemplatesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // The graph needs every template (in position order) so dependency edges
-      // are not cut across pages or hidden by sort/filter.
+      // The graph needs every template in position order, so it takes no sort or
+      // filter at all; the table takes both but is likewise unpaginated.
       const data =
         view === "graph"
-          ? await listWorkflowTaskTemplates(workflowId, { limit: GRAPH_LIMIT })
-          : await listWorkflowTaskTemplates(workflowId, { limit: LIMIT, offset, sort, filters });
+          ? await listWorkflowTaskTemplates(workflowId, { limit: ALL_LIMIT })
+          : await listWorkflowTaskTemplates(workflowId, { limit: ALL_LIMIT, sort, filters });
       setTemplates(data);
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
     } finally {
       setLoading(false);
     }
-  }, [workflowId, offset, view, sort, filters]);
+  }, [workflowId, view, sort, filters]);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  /** Set the sort directive and return to the first page. */
-  function handleSortChange(next: SortSpec | null) {
-    setSort(next);
-    setOffset(0);
-  }
-
-  /** Set the filter directives and return to the first page. */
-  function handleFilterChange(next: FilterSpec[]) {
-    setFilters(next);
-    setOffset(0);
-  }
 
   useEffect(() => {
     listMcpServers({ limit: SERVER_LIMIT })
@@ -219,9 +209,11 @@ export default function WorkflowTaskTemplatesPage() {
 
   const columns = buildColumns(
     workflowId,
+    // Unpaginated, so every dependency resolves to a real title.
     new Map(templates.map((t) => [t.id, t.title])),
     serverNameById,
-    handleDelete
+    handleDelete,
+    setHighlightedId
   );
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "taskTemplates",
@@ -267,29 +259,21 @@ export default function WorkflowTaskTemplatesPage() {
         />
       </div>
       {view === "graph" ? (
-        <WorkflowTaskGraph tasks={templates} />
+        <WorkflowTaskGraph tasks={templates} serverNameById={serverNameById} />
       ) : (
-        <>
-          <DataTable
-            columns={visibleColumns}
-            rows={templates}
-            loading={loading}
-            emptyMessage="No task templates for this workflow yet."
-            emptyIcon={ListTree}
-            getRowKey={(t) => t.id}
-            sort={sort}
-            onSortChange={handleSortChange}
-            filters={filters}
-            onFilterChange={handleFilterChange}
-          />
-          <PaginationControls
-            offset={offset}
-            limit={LIMIT}
-            count={templates.length}
-            onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
-            onNext={() => setOffset((o) => o + LIMIT)}
-          />
-        </>
+        <DataTable
+          columns={visibleColumns}
+          rows={templates}
+          loading={loading}
+          emptyMessage="No task templates for this workflow yet."
+          emptyIcon={ListTree}
+          getRowKey={(t) => t.id}
+          sort={sort}
+          onSortChange={setSort}
+          filters={filters}
+          onFilterChange={setFilters}
+          highlightedRowKey={highlightedId}
+        />
       )}
       <ConfirmDialog
         open={confirmTarget !== null}

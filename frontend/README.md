@@ -12,7 +12,7 @@ Chat UI for [A2Flow](../README.md). Streams responses from the backend via SSE a
 | Styling | Tailwind CSS v4 |
 | Animation | @react-spring/web (mount/unmount, list staggering, modals) + CSS keyframes |
 | Icons | lucide-react (wrapped by `AnimatedIcon` for subtle, motion-safe animation) |
-| Graph viz | @xyflow/react (React Flow) + @dagrejs/dagre (auto layout) |
+| Graph viz | @xyflow/react (React Flow) |
 | HTTP | Fetch API (REST) / @ag-ui/client (SSE streaming) |
 | Logging | pino (browser mode) |
 | AG-UI | @ag-ui/client + @ag-ui/core + @ag-ui/a2ui-middleware |
