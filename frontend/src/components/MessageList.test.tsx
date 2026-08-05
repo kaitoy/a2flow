@@ -59,9 +59,10 @@ vi.mock("./MessageBubble", () => ({
 }));
 
 /**
- * Records every constructed observer's callback and observed targets so a
- * test can manually fire the callback jsdom never invokes for real — the
- * global stub in `src/test/setup.ts` is an inert no-op for the whole suite.
+ * Records every constructed observer's callback and observed targets so a test
+ * can fire the callback by hand. happy-dom ships a real IntersectionObserver,
+ * but with no layout engine behind it nothing ever actually intersects, so the
+ * scroll-spy has to be driven explicitly.
  */
 class FakeIntersectionObserver {
   static instances: FakeIntersectionObserver[] = [];

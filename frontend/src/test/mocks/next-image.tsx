@@ -19,7 +19,7 @@ const Image = ({
   const resolvedWidth = width ?? (typeof src === "object" ? src.width : undefined);
   const resolvedHeight = height ?? (typeof src === "object" ? src.height : undefined);
   return (
-    // biome-ignore lint/performance/noImgElement: this is a jsdom stub for next/image; using <img> is the point.
+    // biome-ignore lint/performance/noImgElement: this is a test-DOM stub for next/image; using <img> is the point.
     <img
       src={resolvedSrc}
       alt={alt}

@@ -71,6 +71,6 @@ src/test/
 ### Mocking strategy
 
 - **Backend REST API** — intercepted via MSW
-- **Agent streaming** (`/agent` endpoint) — `HttpAgent` from `@ag-ui/client` is mocked at the module level (SSE streaming is not practical to simulate with MSW in jsdom)
+- **Agent streaming** (`/agent` endpoint) — `HttpAgent` from `@ag-ui/client` is mocked at the module level (SSE streaming is not practical to simulate with MSW in a headless DOM)
 - **`next/navigation`** — replaced with a stub via `resolve.alias` in `vitest.config.ts`
 - **`@a2ui/react` / `@a2ui/web_core`** — mocked per test file with `vi.mock()` at the `A2uiRenderer` boundary to avoid the complex dependency chain

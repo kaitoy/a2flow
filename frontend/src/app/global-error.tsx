@@ -25,7 +25,7 @@ const jetbrainsMono = JetBrains_Mono({
 /**
  * Fallback content shown when the root layout itself throws. Exported
  * separately from the `<html>`/`<body>` wrapper below so it can be
- * unit-tested without nesting a document inside jsdom's own document.
+ * unit-tested without nesting a document inside the test DOM's own document.
  */
 export function GlobalErrorContent({ reset }: { reset: () => void }) {
   return (

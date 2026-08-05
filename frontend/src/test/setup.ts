@@ -1,8 +1,18 @@
 import "@testing-library/jest-dom/vitest";
+import { configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 import { store } from "@/store";
 import { dismissToast } from "@/store/toastSlice";
 import { server } from "./msw/server";
+
+// Testing Library's 1000ms default for `findBy*` / `waitFor` is too tight for a
+// page that fetches on mount: the `pre-commit` hook runs this suite alongside
+// backend-pytest, and under that load the MSW round-trip plus re-render has
+// missed the deadline while the component was still showing its skeleton. The
+// budget only bounds a failure, so a generous one costs nothing on the passing
+// path. Vitest's own `testTimeout` (vitest.config.ts) is raised past this so a
+// genuine timeout reports as the failed assertion rather than a killed test.
+configure({ asyncUtilTimeout: 5_000 });
 
 beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
 afterEach(() => server.resetHandlers());
@@ -17,7 +27,7 @@ afterEach(() => {
   }
 });
 
-// `useColumnVisibility` persists the viewer's column choices, and the jsdom
+// `useColumnVisibility` persists the viewer's column choices, and the DOM
 // environment (with its localStorage) is shared by every test in a file — so a
 // test that opens the column picker would otherwise decide which columns the
 // next test's table renders. Only the column keys are cleared: tests around the
@@ -28,45 +38,15 @@ afterEach(() => {
   }
 });
 
+// happy-dom's scrollIntoView is a no-op anyway; a spy lets tests assert that a
+// component scrolled its target into view.
 Element.prototype.scrollIntoView = vi.fn();
 
-// jsdom doesn't implement matchMedia. React Spring's useReducedMotion
-// (via @react-spring/shared) calls it on mount, so provide a minimal stub.
-if (!window.matchMedia) {
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  }));
-}
-
-// jsdom doesn't implement ResizeObserver. SlidingIndicator uses it to track
-// layout changes for the active-item bar, so stub it with no-ops.
-if (!window.ResizeObserver) {
-  window.ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver;
-}
-
-// jsdom doesn't implement IntersectionObserver. MessageList uses it for the
-// workflow scroll-spy, so stub it with no-ops (it never fires under jsdom).
-if (!window.IntersectionObserver) {
-  window.IntersectionObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-    takeRecords() {
-      return [];
-    }
-  } as unknown as typeof IntersectionObserver;
-}
+// NOTE: `matchMedia`, `ResizeObserver`, and `IntersectionObserver` used to be
+// stubbed here because jsdom implements none of them. happy-dom ships all
+// three, so the stubs are gone. What happy-dom still lacks is a layout engine —
+// every measurement (`offsetWidth`, `getBoundingClientRect`, …) reads back
+// zero — so tests that depend on real sizes stub those per file.
 
 vi.mock("@/lib/logger", () => ({
   default: {

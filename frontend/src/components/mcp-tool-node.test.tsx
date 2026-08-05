@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { McpToolNodeData } from "@/lib/workflow-graph";
 
-// React Flow's Handle needs a provider context that jsdom tests don't set up.
+// React Flow's Handle needs a provider context that unit tests don't set up.
 vi.mock("@xyflow/react", () => ({
   Handle: () => null,
   Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },

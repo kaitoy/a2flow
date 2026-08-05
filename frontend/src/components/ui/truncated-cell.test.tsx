@@ -20,7 +20,7 @@ describe("TruncatedCell", () => {
 
   it("reveals the full text in a tooltip when the content overflows", async () => {
     const user = userEvent.setup();
-    // jsdom reports 0 for layout sizes; force an overflow by stubbing them.
+    // happy-dom reports 0 for layout sizes; force an overflow by stubbing them.
     vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(200);
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100);
 

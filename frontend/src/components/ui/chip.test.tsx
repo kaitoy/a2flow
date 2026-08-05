@@ -5,8 +5,8 @@ import { Chip } from "./chip";
 
 /**
  * Force `scrollWidth`/`clientWidth` for the duration of a test so the overflow
- * measurement can be exercised — jsdom reports 0 for both, which reads as "not
- * clipped".
+ * measurement can be exercised — happy-dom has no layout engine and reports 0
+ * for both, which reads as "not clipped".
  */
 function stubOverflow(scrollWidth: number, clientWidth: number) {
   const original = {

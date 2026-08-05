@@ -13,8 +13,9 @@ let keyboardModality = false;
  * press.
  *
  * This is the same distinction the CSS `:focus-visible` pseudo-class draws, and
- * it exists as a module because jsdom resolves `:focus-visible` as plain
- * `:focus` — a component that asks the selector directly cannot be tested.
+ * it exists as a module because the headless DOMs used in tests don't model
+ * `:focus-visible` faithfully — a component that asks the selector directly
+ * cannot be tested.
  *
  * Use it to decide whether focus landing on an element deserves visible
  * feedback. Focus that follows a click, or that a dialog restores to its

@@ -438,7 +438,7 @@ describe("DataTable", () => {
 });
 
 /**
- * jsdom has no layout engine (`offsetWidth`/`clientWidth` are always 0), so the
+ * happy-dom has no layout engine (`offsetWidth`/`clientWidth` are always 0), so the
  * fitting cannot be driven through a render — it is exercised as a pure function.
  */
 describe("fitColumnWidths", () => {
@@ -550,7 +550,7 @@ describe("fitColumnWidths", () => {
 });
 
 /**
- * The fitting is driven by real measurements, which jsdom never produces
+ * The fitting is driven by real measurements, which happy-dom never produces
  * (`offsetWidth`/`clientWidth` are always 0). Stub the layout so the measure →
  * fit → refit path can be exercised end to end through the component.
  */
@@ -615,7 +615,7 @@ describe("DataTable column fitting", () => {
   });
 
   afterEach(() => {
-    // Drop the overrides so the inherited (always-zero) jsdom getters come back
+    // Drop the overrides so the inherited (always-zero) getters come back
     // and the other suites in this file keep their unstubbed layout.
     Reflect.deleteProperty(HTMLTableCellElement.prototype, "offsetWidth");
     Reflect.deleteProperty(HTMLSpanElement.prototype, "offsetWidth");

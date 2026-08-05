@@ -76,7 +76,7 @@ describe("Tooltip", () => {
     await user.tab();
 
     // The chip unmounts only once its leave spring settles, which outlasts
-    // waitFor's 1s default in jsdom.
+    // waitFor's 1s default.
     await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(), {
       timeout: 3000,
     });

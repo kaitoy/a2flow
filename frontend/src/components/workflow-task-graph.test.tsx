@@ -5,7 +5,8 @@ import type { ToolBinding, WorkflowTask } from "@/lib/api";
 import type { WorkflowGraphNode } from "@/lib/workflow-graph";
 import { ThemeProvider } from "./ThemeProvider";
 
-// React Flow needs real layout/ResizeObserver that jsdom lacks, so we stub it
+// React Flow needs real layout measurements that a headless DOM never
+// produces, so we stub it
 // with a lightweight renderer that just prints each node's label. This still
 // exercises buildLayoutedWorkflowGraph (the real logic under test).
 vi.mock("@xyflow/react", () => ({

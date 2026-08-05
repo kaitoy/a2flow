@@ -24,8 +24,9 @@ pre-commit:
     # count capped at 50% of CPU cores by a pytest_xdist_auto_num_workers
     # hook in backend/tests/conftest.py), not just alongside the other
     # lefthook jobs below. The 50% cap leaves cores free for frontend-vitest
-    # (capped the same way, see frontend/vitest.config.ts) when a commit
-    # touches both backend and frontend files in the same pre-commit run.
+    # (capped the same way by the `--maxWorkers=50%` flag on its job below)
+    # when a commit touches both backend and frontend files in the same
+    # pre-commit run.
     - name: backend-pytest
       root: backend/
       glob: "backend/*.py"
@@ -40,10 +41,13 @@ pre-commit:
       glob: "frontend/src/*.{ts,tsx,js,jsx,json}"
       run: pnpm exec biome ci ./src
 
+    # `--maxWorkers=50%` overrides vitest.config.ts's standalone-run default of
+    # 75%, mirroring backend-pytest's cap so the two suites don't oversubscribe
+    # the CPU when a commit touches both sides.
     - name: frontend-vitest
       root: frontend/
       glob: "frontend/src/*.{ts,tsx}"
-      run: pnpm exec vitest run
+      run: pnpm exec vitest run --maxWorkers=50%
 
 pre-push:
   jobs:

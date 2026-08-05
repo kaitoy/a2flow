@@ -10,7 +10,7 @@ import {
 
 /**
  * Build a detached element with a fixed bounding rect and scroll offsets, since
- * jsdom reports zeros for every layout measurement.
+ * happy-dom reports zeros for every layout measurement.
  */
 function elementWith(
   rect: { top?: number; left?: number; width?: number; height?: number },

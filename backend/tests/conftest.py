@@ -36,16 +36,19 @@ for _finder, _module_name, _is_pkg in pkgutil.iter_modules(models.__path__):
     importlib.import_module(f"models.{_module_name}")
 configure_mappers()
 
-_WORKER_CPU_RATIO = 0.5  # matches frontend/vitest.config.ts's `maxWorkers: "50%"`
+_WORKER_CPU_RATIO = 0.5  # matches frontend-vitest's `--maxWorkers=50%` in lefthook.yml
 
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_xdist_auto_num_workers(config: pytest.Config) -> int:
     """Cap pytest-xdist's ``-n auto`` worker count at 50% of host CPU cores.
 
-    Mirrors ``frontend/vitest.config.ts``'s ``maxWorkers: "50%"`` so a
-    ``lefthook`` pre-commit run that spins up both suites concurrently
-    doesn't oversubscribe the CPU. As a conftest.py plugin this hookimpl
+    Mirrors the ``--maxWorkers=50%`` that ``lefthook.yml`` passes to the
+    frontend-vitest job so a ``lefthook`` pre-commit run that spins up both
+    suites concurrently doesn't oversubscribe the CPU. (Vitest's own default
+    in ``frontend/vitest.config.ts`` is higher -- it's tuned for a standalone
+    ``pnpm test``, which never competes with pytest.) As a conftest.py plugin
+    this hookimpl
     registers after xdist's own, and since the hookspec is
     ``firstresult=True``, its return value short-circuits xdist's own
     ``psutil``/``os.sched_getaffinity`` fallback chain before it runs.

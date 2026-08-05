@@ -26,7 +26,8 @@ const FULL_USER = {
 const AVATAR_USER = { id: "user-1", username: "alice", avatarUpdatedAt: null };
 
 beforeAll(() => {
-  // jsdom doesn't implement object URLs; the field uses them for the preview.
+  // The field turns the picked file into an object URL for the preview; pin it
+  // to a fixed value so the rendered src is assertable.
   URL.createObjectURL = vi.fn(() => "blob:preview");
   URL.revokeObjectURL = vi.fn();
 });

@@ -5,8 +5,8 @@ import { render, screen } from "@/test/test-utils";
 import ProfilePage from "./page";
 
 beforeAll(() => {
-  // jsdom doesn't implement object URLs; the embedded AvatarField uses them for
-  // the selected-file preview.
+  // The embedded AvatarField turns the picked file into an object URL for the
+  // selected-file preview; pin it to a fixed value so the src is assertable.
   URL.createObjectURL = vi.fn(() => "blob:preview");
   URL.revokeObjectURL = vi.fn();
 });

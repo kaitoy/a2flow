@@ -78,7 +78,7 @@ For the full end-to-end A2UI flow (build-time schema download → tool injection
 
 ## Testing
 
-Unit tests are implemented with [Vitest](https://vitest.dev/), [Testing Library](https://testing-library.com/), and [MSW](https://mswjs.io/).
+Unit tests are implemented with [Vitest](https://vitest.dev/), [Testing Library](https://testing-library.com/), and [MSW](https://mswjs.io/). They run against [happy-dom](https://github.com/capricorn86/happy-dom) rather than jsdom — the suite's cost is dominated by each of its ~140 files building a DOM from scratch, and happy-dom builds one far more cheaply. Like jsdom it has no layout engine, so tests that depend on real measurements stub them.
 
 ### Running tests
 
