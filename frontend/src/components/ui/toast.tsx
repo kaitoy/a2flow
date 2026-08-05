@@ -87,7 +87,7 @@ export function Toaster() {
   if (!mounted) return null;
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-2">
+    <div className="pointer-events-none fixed inset-x-0 top-4 z-[60] flex flex-col items-center gap-2">
       {transitions((style, item) => (
         <animated.div style={style} className="pointer-events-auto">
           <ToastCard toast={item} />
