@@ -5,12 +5,15 @@ workflow template editor). Authorization is role-based only — template writes 
 developer-gated at the route — because templates belong to a workflow, not to a
 per-user session.
 
-Every write here also moves a ``published`` parent workflow to ``modified``:
-the task templates have drifted from the snapshot taken at publish time, and runs keep
-using that snapshot until the workflow is published again. The design
-agent's tools (``infrastructure/design_task_tools.py``) go straight to the
-repository, so they call ``mark_modified`` themselves to record the same
-drift — task templates refined by chat are no more published than ones edited here.
+Every write here also settles the parent workflow's status through
+``mark_design_edited``: a ``published`` workflow moves to ``modified`` (the
+task templates have drifted from the snapshot taken at publish time, and runs
+keep using that snapshot until the workflow is published again), and one left
+``failed`` by its design run recovers to ``draft``, since rebuilding the
+templates is what repairs a failed design. The design agent's tools
+(``infrastructure/design_task_tools.py``) go straight to the repository, so
+they make the same call themselves — task templates refined by chat are no
+more published, and no more broken, than ones edited here.
 """
 
 import builtins
@@ -39,8 +42,8 @@ class WorkflowTaskTemplateService:
         Args:
             repo: Repository providing WorkflowTaskTemplate persistence.
             workflows: Repository used to 404 template listings of a
-                nonexistent workflow, and to move a published parent workflow
-                to ``modified`` after a write.
+                nonexistent workflow, and to settle the parent workflow's
+                status after a write.
         """
         self._repo = repo
         self._workflows = workflows
@@ -103,7 +106,8 @@ class WorkflowTaskTemplateService:
     ) -> WorkflowTaskTemplateRead:
         """Create a new template belonging to the workflow named in ``data``.
 
-        Moves a ``published`` parent workflow to ``modified``.
+        Moves a ``published`` parent workflow to ``modified``, and recovers a
+        ``failed`` one to ``draft``.
 
         Args:
             data: Fields for the new template.
@@ -116,7 +120,7 @@ class WorkflowTaskTemplateService:
         # Capture before the status commit expires the instance: reading an
         # expired attribute outside the request's greenlet context would fail.
         template_id = template.id
-        await self._workflows.mark_modified(data.workflow_id, user_id=user_id)
+        await self._workflows.mark_design_edited(data.workflow_id, user_id=user_id)
         return await self.get(template_id)
 
     async def update(
@@ -124,7 +128,8 @@ class WorkflowTaskTemplateService:
     ) -> WorkflowTaskTemplateRead:
         """Apply a partial update to a template.
 
-        Moves a ``published`` parent workflow to ``modified``.
+        Moves a ``published`` parent workflow to ``modified``, and recovers a
+        ``failed`` one to ``draft``.
 
         Args:
             template_id: Identifier of the template to update.
@@ -139,13 +144,14 @@ class WorkflowTaskTemplateService:
         """
         updated = await self._repo.update(template_id, data, user_id=user_id)
         workflow_id = updated.workflow_id
-        await self._workflows.mark_modified(workflow_id, user_id=user_id)
+        await self._workflows.mark_design_edited(workflow_id, user_id=user_id)
         return await self.get(template_id)
 
     async def delete(self, template_id: str, *, user_id: str) -> None:
         """Delete a template.
 
-        Moves a ``published`` parent workflow to ``modified``.
+        Moves a ``published`` parent workflow to ``modified``, and recovers a
+        ``failed`` one to ``draft``.
 
         Args:
             template_id: Identifier of the template to delete.
@@ -157,4 +163,4 @@ class WorkflowTaskTemplateService:
         template = await self.get(template_id)
         workflow_id = template.workflow_id
         await self._repo.delete(template_id)
-        await self._workflows.mark_modified(workflow_id, user_id=user_id)
+        await self._workflows.mark_design_edited(workflow_id, user_id=user_id)

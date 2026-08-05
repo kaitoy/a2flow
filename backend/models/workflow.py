@@ -43,11 +43,20 @@ class WorkflowStatus(StrEnum):
 
     Also reachable from ``published``/``modified`` via
     ``POST /workflows/{id}/deactivate``, which revokes ``requester`` execute
-    access while leaving the task templates and any published snapshot untouched.
+    access while leaving the task templates and any published snapshot untouched,
+    and from ``failed`` by any write to the task templates (see below).
     """
 
     failed = "failed"
-    """The background design run failed; ``generation_error`` carries the reason."""
+    """The background design run failed; ``generation_error`` carries the reason.
+
+    Not terminal: writing to the task templates — through the design chat's
+    agent tools or the admin template editor — recovers the workflow to
+    ``draft`` and clears ``generation_error``
+    (:meth:`repositories.workflow.SqlWorkflowRepository.mark_design_edited`).
+    Rebuilding the design is what repairs a failed design run, and the
+    generation job that recorded the failure only runs once, at creation.
+    """
 
     published = "published"
     """Explicitly published by a developer; executable."""
@@ -105,10 +114,11 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     ``WorkflowUpdate`` and cannot be written through the API. They are set by
     the generation background job (``services/workflow_generation.py``), by
     ``POST /workflows/{id}/publish``, ``.../discard-changes``, and
-    ``.../deactivate``, and — for the ``published`` → ``modified``
-    transition — by any edit to a published workflow or one of its task
+    ``.../deactivate``, and by any edit to a workflow or one of its task
     templates, whether it arrives through the API or through the design
-    agent's tools (``infrastructure/design_task_tools.py``).
+    agent's tools (``infrastructure/design_task_tools.py``) — such an edit
+    moves a ``published`` workflow to ``modified``, and a task-template write
+    additionally recovers a ``failed`` one to ``draft``.
 
     ``generated_description`` is written only by the design generation job
     and by ``POST /workflows/{id}/generate-description``, the on-demand

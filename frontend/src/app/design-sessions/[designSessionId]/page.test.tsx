@@ -7,8 +7,11 @@ import type { User } from "@/lib/api";
 import type { RootState } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { render, screen, waitFor, within } from "@/test/test-utils";
+import { act, render, screen, waitFor, within } from "@/test/test-utils";
 import DesignSessionPage from "./page";
+
+/** Matches the page's own workflow poll interval. */
+const WORKFLOW_POLL_INTERVAL_MS = 2000;
 
 /** The default `/workflows/wf-1` handler's payload, for `server.use` overrides. */
 const WORKFLOW_1 = {
@@ -296,5 +299,97 @@ describe("DesignSessionPage", () => {
     await userEvent.click(menuTrigger);
 
     expect(screen.getByRole("menuitem", { name: /Generate description/ })).toBeDisabled();
+  });
+
+  it("shows the reason a background design run failed", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          ...WORKFLOW_1,
+          status: "failed",
+          generationError: "The design agent run failed (EXECUTION_TIMEOUT).",
+        })
+      )
+    );
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
+
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent(
+      "Workflow generation failed: The design agent run failed (EXECUTION_TIMEOUT)."
+    );
+    // The failure is the workflow's state, not a dismissible one-off event.
+    expect(within(banner).queryByRole("button", { name: "Dismiss error" })).toBeNull();
+  });
+
+  it("drops the failure banner once a turn repairs the design", async () => {
+    // A template write recovers the workflow to `draft` server-side, so the
+    // page has to re-read it when the turn ends — otherwise the banner keeps
+    // reporting a failure the user has just fixed.
+    let calls = 0;
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () => {
+        calls += 1;
+        return calls === 1
+          ? envelope({
+              ...WORKFLOW_1,
+              status: "failed",
+              generationError: "The design run registered no task templates.",
+            })
+          : envelope({ ...WORKFLOW_1, status: "draft" });
+      })
+    );
+
+    const { rerender } = render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
+    await screen.findByRole("alert");
+
+    // A turn runs...
+    useWorkflowSessionChatMock.mockReturnValue({
+      ...useWorkflowSessionChatMock(),
+      isRunning: true,
+    });
+    rerender(<DesignSessionPage />);
+    // ...and finishes.
+    useWorkflowSessionChatMock.mockReturnValue({
+      ...useWorkflowSessionChatMock(),
+      isRunning: false,
+    });
+    rerender(<DesignSessionPage />);
+
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
+
+  it("surfaces a failure that lands while the page is already open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let calls = 0;
+      server.use(
+        http.get("http://localhost:8000/api/v1/workflows/:id", () => {
+          calls += 1;
+          return calls === 1
+            ? envelope({ ...WORKFLOW_1, status: "generating" })
+            : envelope({
+                ...WORKFLOW_1,
+                status: "failed",
+                generationError: "The design run registered no task templates.",
+              });
+        })
+      );
+
+      render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
+      await screen.findByTestId("message-list-mock");
+      expect(screen.queryByRole("alert")).toBeNull();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(WORKFLOW_POLL_INTERVAL_MS);
+      });
+
+      await waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          "Workflow generation failed: The design run registered no task templates."
+        )
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

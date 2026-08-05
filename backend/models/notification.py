@@ -32,6 +32,7 @@ class NotificationType(StrEnum):
     approval_request = "approval_request"
     session_completed = "session_completed"
     workflow_draft_ready = "workflow_draft_ready"
+    workflow_generation_failed = "workflow_generation_failed"
 
 
 class NotificationUpdate(SQLModel):

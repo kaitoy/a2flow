@@ -3,7 +3,7 @@
 
 import { AlertTriangle } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { DescriptionDiffDialog } from "@/components/admin/description-diff-dialog";
@@ -37,6 +37,9 @@ import { showToast } from "@/store/toastSlice";
 /** How often (ms) to re-fetch the workflow's task templates while designing. */
 const TEMPLATE_POLL_INTERVAL_MS = 10_000;
 
+/** How often (ms) to re-fetch the workflow itself while generation is in flight. */
+const WORKFLOW_POLL_INTERVAL_MS = 2_000;
+
 /**
  * The design chat of a workflow's design session: the template
  * timeline on the left, the conversation with the design agent on the right.
@@ -46,6 +49,10 @@ const TEMPLATE_POLL_INTERVAL_MS = 10_000;
  * workflow's description; `DescriptionDiffDialog` opens immediately (showing
  * a loading skeleton and the live edge while the request is in flight) and
  * then reviews the change once it lands.
+ *
+ * Two error paths land here: a live run error from the chat stream, and — for
+ * the unattended initial design run, which no client streams — the failure
+ * recorded on the workflow itself, polled while generation is in flight.
  */
 function DesignSessionView({
   ds,
@@ -82,16 +89,49 @@ function DesignSessionView({
     }
   }, [ds.workflowId]);
 
+  const refreshWorkflow = useCallback(async () => {
+    try {
+      onWorkflowUpdate(await getWorkflow(ds.workflowId));
+    } catch (err) {
+      logger.error(err, "failed to load workflow");
+    }
+  }, [ds.workflowId, onWorkflowUpdate]);
+
   // Load on mount and re-fetch whenever an agent turn finishes (the design
   // agent edits the templates through its tools), plus a slow interval so
-  // edits made elsewhere (the admin template editor) appear too.
+  // edits made elsewhere (the admin template editor) appear too. The workflow
+  // is re-read only after a turn — the page shell has just fetched it on
+  // mount, but a template write settles its status server-side (recovering it
+  // from `failed`, or moving `published` to `modified`), and the failure
+  // banner below would otherwise keep reporting a failure the user has just
+  // repaired.
+  const turnStarted = useRef(false);
   useEffect(() => {
-    if (!isRunning) void refreshTemplates();
-  }, [isRunning, refreshTemplates]);
+    if (isRunning) {
+      turnStarted.current = true;
+      return;
+    }
+    void refreshTemplates();
+    if (turnStarted.current) {
+      turnStarted.current = false;
+      void refreshWorkflow();
+    }
+  }, [isRunning, refreshTemplates, refreshWorkflow]);
   useEffect(() => {
     const id = setInterval(() => void refreshTemplates(), TEMPLATE_POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [refreshTemplates]);
+
+  // The initial design run settles server-side with nothing to notify this
+  // page, so poll until the workflow leaves `generating` — otherwise a run that
+  // fails while the user waits here leaves the failure banner (and the action
+  // menu's disabled state) stuck on the status read at mount.
+  const generating = workflow.status === "generating";
+  useEffect(() => {
+    if (!generating) return;
+    const id = setInterval(() => void refreshWorkflow(), WORKFLOW_POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [generating, refreshWorkflow]);
 
   const taskIndexById = useMemo(() => new Map(templates.map((t, i) => [t.id, i + 1])), [templates]);
 
@@ -150,6 +190,16 @@ function DesignSessionView({
             ]}
           />
         </div>
+
+        {/* The background design run has no client subscribed to it, so its
+            failure reaches this page only through the workflow row. Not
+            dismissible: it reflects the workflow's state, not a one-off event,
+            and would come straight back on the next render. */}
+        {workflow.status === "failed" && workflow.generationError && (
+          <div className="shrink-0 mx-4 mt-3">
+            <ErrorBanner error={`Workflow generation failed: ${workflow.generationError}`} />
+          </div>
+        )}
 
         {error && (
           <div className="shrink-0 mx-4 mt-3">

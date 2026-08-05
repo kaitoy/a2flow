@@ -327,7 +327,7 @@ Submitting the dialog:
 
 1. Checks that the skill has a published revision (`commitSha`); otherwise HTTP 409 (`SKILL_NOT_READY`). The new workflow (`status: "generating"`) and its **DesignSession** — pinned to that revision — are registered immediately (HTTP 201), and the frontend navigates to the workflow's detail page, which polls while generation runs.
 2. A **background design run** sends the prompt as the design session's first chat message and drives an *initial-design* agent: following the skill, it breaks the request into steps and registers them as the workflow's **task templates** in one `register_design_tasks` call (a DAG — each step declares a `key` and its `depends_on` predecessors, plus optional MCP `tools` bindings).
-3. When the run finishes, the design conversation is summarized (one LLM call) into the workflow's `generatedDescription`, the status becomes **`draft`**, and a **workflow-draft-ready notification** deep-links back to the workflow. Any failure — including a run that registered no templates — lands on the row as **`failed`** with the reason; the design chat stays usable to fix the task templates by hand.
+3. When the run finishes, the design conversation is summarized (one LLM call) into the workflow's `generatedDescription`, the status becomes **`draft`**, and a **workflow-draft-ready notification** deep-links back to the workflow. Any failure — an LLM error, or a run that registered no templates — lands on the row as **`failed`** with the reason and raises a **workflow-generation-failed notification**. The reason is shown on the workflow's detail page and as a banner in its design chat, which stays usable: writing the task templates from there (or from the admin template editor) recovers the workflow to **`draft`** and clears the failure, since rebuilding the design is what repairs it.
 
 The prompt itself is not stored on the workflow: it lives on as the first message of the design conversation, and the generated summary carries the intent forward.
 
@@ -442,15 +442,16 @@ A **bell icon** in the top toolbar (present on both the chat header and the admi
 
 The bell's dropdown lists **unread notifications only** — it is there to surface what still needs attention. The full history, read items included, lives on a dedicated [Notifications page](#notification-history-page), reachable from the account menu (toolbar profile button → **Notifications**), which is also the only place a notification can be deleted.
 
-Three workflow events generate a notification. The recipient depends on the event: a `request_approval` notification is addressed to that approval's **designated approver**, while the others are addressed to the **user who started the session or generation**:
+Four workflow events generate a notification. The recipient depends on the event: a `request_approval` notification is addressed to that approval's **designated approver**, while the others are addressed to the **user who started the session or generation**:
 
 | Type | Raised when |
 |---|---|
 | `workflow_draft_ready` | The background design run of ["Generate workflow"](#generating-a-workflow) finished and the draft's initial task templates are ready for review. |
+| `workflow_generation_failed` | That same design run failed. Since it runs unattended with no client watching it, this is how the user finds out; the reason is on the workflow's detail page and in its design chat. |
 | `approval_request` | The agent requests a mid-execution decision (`request_approval`) and waits for the designated approver. |
 | `session_completed` | Every `WorkflowTask` in the session has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per session. |
 
-Clicking a notification marks it read and deep-links to the relevant place: run-scoped events to the `/workflow-sessions/{id}` chat, `workflow_draft_ready` to the workflow's detail page. Each row also has a **"Mark as read" (✓)** button that clears it from the dropdown without navigating, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once. Nothing in the dropdown deletes a notification — marking it read only moves it out of the way.
+Clicking a notification marks it read and deep-links to the relevant place: run-scoped events to the `/workflow-sessions/{id}` chat, workflow-scoped ones (`workflow_draft_ready`, `workflow_generation_failed`) to the workflow's detail page. Each row also has a **"Mark as read" (✓)** button that clears it from the dropdown without navigating, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once. Nothing in the dropdown deletes a notification — marking it read only moves it out of the way.
 
 ### Notification history page
 

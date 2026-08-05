@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
+from ag_ui.core import EventType, RunErrorEvent
 from google.adk.sessions import InMemorySessionService
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -26,7 +27,12 @@ from models.design_session import DesignSession
 from models.notification import Notification, NotificationType
 from models.workflow import Workflow, WorkflowStatus
 from models.workflow_task_template import WorkflowTaskTemplate
-from services.workflow_design import generate_workflow_design
+from services.workflow_design import (
+    NO_TASK_TEMPLATES_REASON,
+    SKILL_NOT_READY_REASON,
+    _agent_run_failed_reason,
+    generate_workflow_design,
+)
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 _SHA = "a" * 40
@@ -107,13 +113,20 @@ async def _add_template(eng: AsyncEngine, workflow_id: str) -> None:
 
 
 def _fakes(
-    tmp_path: Path, *, run_registers: bool = False, eng: AsyncEngine | None = None
+    tmp_path: Path,
+    *,
+    run_registers: bool = False,
+    eng: AsyncEngine | None = None,
+    run_error: RunErrorEvent | None = None,
 ) -> tuple[MagicMock, InMemorySessionService, MagicMock]:
     """Build the (registry, session_service, skills_store) fakes for the job.
 
     When ``run_registers`` is set the fake agent run inserts one template into
     the workflow's task templates, standing in for the ``register_design_tasks`` call a
     real initial-design run makes.
+
+    When ``run_error`` is set the fake run yields it and ends normally, which is
+    how ``ADKAgent`` reports an LLM failure — it does not raise.
     """
     skill_dir = tmp_path / "skill"
     skill_dir.mkdir(exist_ok=True)
@@ -143,8 +156,8 @@ def _fakes(
                     )
                 )
                 await db.commit()
-        return
-        yield
+        if run_error is not None:
+            yield run_error
 
     agent = MagicMock()
     agent.run = _run
@@ -253,7 +266,104 @@ async def test_generation_job_failure_lands_on_the_row(
 
     workflow = await _workflow_row(engine, wf_id)
     assert workflow.status is WorkflowStatus.failed
-    assert workflow.generation_error
+    assert workflow.generation_error == SKILL_NOT_READY_REASON
+
+
+async def test_generation_job_failure_notifies_the_triggering_user(
+    engine: AsyncEngine, tmp_path: Path
+) -> None:
+    """A failure the user cannot see happen must reach them through the bell."""
+    wf_id, _session_id = await _seed(engine)
+    registry, session_service, store = _fakes(tmp_path)
+
+    await generate_workflow_design(
+        wf_id,
+        "Build me a report",
+        user_id="owner",
+        registry=registry,
+        session_service=session_service,
+        skills_store=store,
+        app_name="A2Flow",
+    )
+
+    async with AsyncSession(engine) as db:
+        notifications = (await db.exec(select(Notification))).all()
+    assert len(notifications) == 1
+    assert notifications[0].type is NotificationType.workflow_generation_failed
+    assert notifications[0].user_id == "owner"
+    assert notifications[0].workflow_id == wf_id
+    assert notifications[0].body == NO_TASK_TEMPLATES_REASON
+
+
+async def test_generation_job_run_error_reports_the_agent_failure(
+    engine: AsyncEngine, tmp_path: Path
+) -> None:
+    """An LLM failure arrives as an event, not an exception, and must be reported as one.
+
+    Without inspecting the stream the job would fall through to the
+    empty-templates check and blame the agent for registering nothing, hiding
+    the fact that the run never got off the ground.
+    """
+    wf_id, _session_id = await _seed(engine)
+    registry, session_service, store = _fakes(
+        tmp_path,
+        run_error=RunErrorEvent(
+            type=EventType.RUN_ERROR,
+            message="429 RESOURCE_EXHAUSTED: quota exceeded",
+            code="BACKGROUND_EXECUTION_ERROR",
+        ),
+    )
+
+    await generate_workflow_design(
+        wf_id,
+        "Build me a report",
+        user_id="owner",
+        registry=registry,
+        session_service=session_service,
+        skills_store=store,
+        app_name="A2Flow",
+    )
+
+    workflow = await _workflow_row(engine, wf_id)
+    assert workflow.status is WorkflowStatus.failed
+    assert workflow.generation_error == _agent_run_failed_reason(
+        "BACKGROUND_EXECUTION_ERROR"
+    )
+    # The raw provider text stays server-side.
+    assert "RESOURCE_EXHAUSTED" not in (workflow.generation_error or "")
+
+
+async def test_generation_job_run_error_wins_over_registered_templates(
+    engine: AsyncEngine, tmp_path: Path
+) -> None:
+    """A run that errored mid-way is not a draft, however much it managed to register."""
+    wf_id, _session_id = await _seed(engine)
+    registry, session_service, store = _fakes(
+        tmp_path,
+        run_registers=True,
+        eng=engine,
+        run_error=RunErrorEvent(
+            type=EventType.RUN_ERROR, message="stream died", code="EXECUTION_ERROR"
+        ),
+    )
+
+    await generate_workflow_design(
+        wf_id,
+        "Build me a report",
+        user_id="owner",
+        registry=registry,
+        session_service=session_service,
+        skills_store=store,
+        app_name="A2Flow",
+    )
+
+    workflow = await _workflow_row(engine, wf_id)
+    assert workflow.status is WorkflowStatus.failed
+    assert workflow.generation_error == _agent_run_failed_reason("EXECUTION_ERROR")
+    # The partial design survives, so the user can continue in the design chat.
+    async with AsyncSession(engine) as db:
+        templates = (await db.exec(select(WorkflowTaskTemplate))).all()
+    assert len(templates) == 1
 
 
 async def test_generation_job_summarizer_failure_falls_back(

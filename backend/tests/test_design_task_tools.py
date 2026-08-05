@@ -54,6 +54,26 @@ async def _set_workflow_status(
         await db.commit()
 
 
+async def _generation_error(eng: AsyncEngine, workflow_id: str) -> str | None:
+    """Read a workflow's recorded design-run failure reason."""
+    async with AsyncSession(eng) as db:
+        workflow = await db.get(Workflow, workflow_id)
+        assert workflow is not None
+        return workflow.generation_error
+
+
+async def _set_generation_error(
+    eng: AsyncEngine, workflow_id: str, reason: str
+) -> None:
+    """Record a design-run failure reason, as the generation job would."""
+    async with AsyncSession(eng) as db:
+        workflow = await db.get(Workflow, workflow_id)
+        assert workflow is not None
+        workflow.generation_error = reason
+        db.add(workflow)
+        await db.commit()
+
+
 @pytest_asyncio.fixture()
 async def engine(
     monkeypatch: pytest.MonkeyPatch,
@@ -488,3 +508,49 @@ async def test_generating_workflow_stays_generating(engine: AsyncEngine) -> None
     result = await register_design_tasks([{"key": "t0", "title": "First"}], _ctx())
     assert "error" not in result
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.generating
+
+
+# ---------- failed -> draft ----------
+
+
+async def test_register_recovers_a_failed_workflow(engine: AsyncEngine) -> None:
+    """The design chat is where a failed design run gets repaired.
+
+    Reproduces the user-visible bug: the workflow stayed ``failed`` with a
+    stale reason after the user rebuilt its task templates by hand, so the
+    design chat kept showing a failure banner for a design that no longer
+    existed.
+    """
+    workflow_id = await _seed_design_session(engine, status=WorkflowStatus.failed)
+    await _set_generation_error(engine, workflow_id, "The design agent run failed.")
+
+    result = await register_design_tasks([{"key": "t0", "title": "First"}], _ctx())
+    assert "error" not in result
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.draft
+    assert await _generation_error(engine, workflow_id) is None
+
+
+async def test_update_recovers_a_failed_workflow(engine: AsyncEngine) -> None:
+    workflow_id = await _seed_design_session(engine)
+    created = await create_design_task("Solo", _ctx())
+    await _set_workflow_status(engine, workflow_id, WorkflowStatus.failed)
+    await _set_generation_error(engine, workflow_id, "The design agent run failed.")
+
+    await update_design_task(created["id"], _ctx(), title="Renamed")
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.draft
+    assert await _generation_error(engine, workflow_id) is None
+
+
+async def test_failed_write_leaves_a_failed_workflow_failed(
+    engine: AsyncEngine,
+) -> None:
+    """Nothing landed, so there is nothing repaired to report."""
+    workflow_id = await _seed_design_session(engine, status=WorkflowStatus.failed)
+    await _set_generation_error(engine, workflow_id, "The design agent run failed.")
+
+    result = await create_design_task("Bad", _ctx(), depends_on_ids=["ghost"])
+    assert "error" in result
+    assert await _workflow_status(engine, workflow_id) is WorkflowStatus.failed
+    assert (
+        await _generation_error(engine, workflow_id) == "The design agent run failed."
+    )

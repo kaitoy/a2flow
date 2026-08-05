@@ -50,6 +50,8 @@ class WorkflowRepository(Protocol):
 
     async def mark_modified(self, workflow_id: str, *, user_id: str) -> None: ...
 
+    async def mark_design_edited(self, workflow_id: str, *, user_id: str) -> None: ...
+
     async def delete(self, workflow_id: str) -> None: ...
 
 
@@ -192,12 +194,14 @@ class SqlWorkflowRepository:
     async def mark_modified(self, workflow_id: str, *, user_id: str) -> None:
         """Move a ``published`` workflow to ``modified``; leave any other state alone.
 
-        Called after an edit lands on a workflow or one of its task templates —
-        from the REST edit surfaces or from the design agent's tools — to
-        record that the live task templates have drifted from the published snapshot.
-        Every other status is a no-op: a ``draft`` is not published yet, a
-        workflow already ``modified`` has nothing to change, and ``generating``
-        / ``failed`` are owned by the generation job.
+        Called after an edit lands on a workflow's own fields — its name,
+        description, or regenerated summary — to record that the live workflow
+        has drifted from the published snapshot. Every other status is a no-op:
+        a ``draft`` is not published yet, a workflow already ``modified`` has
+        nothing to change, and ``generating`` belongs to the generation job.
+        ``failed`` is deliberately untouched here: renaming a workflow does not
+        repair the design that failed. Use :meth:`mark_design_edited` for edits
+        to the task templates themselves, which does repair it.
 
         Args:
             workflow_id: Identifier of the workflow that was edited.
@@ -207,6 +211,44 @@ class SqlWorkflowRepository:
         if workflow is None or workflow.status is not WorkflowStatus.published:
             return
         workflow.status = WorkflowStatus.modified
+        workflow.updated_by = user_id
+        self._db.add(workflow)
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
+
+    async def mark_design_edited(self, workflow_id: str, *, user_id: str) -> None:
+        """Settle a workflow's status after a write to its task templates.
+
+        The task-template counterpart of :meth:`mark_modified`, called from
+        both edit surfaces — the design agent's tools and the REST template
+        endpoints. A ``published`` workflow drifts to ``modified`` exactly as
+        it does there.
+
+        A ``failed`` workflow additionally **recovers to ``draft``** with its
+        ``generation_error`` cleared. That reason describes a design run whose
+        output the user is now replacing by hand, and nothing else would ever
+        clear it: the generation job runs once, at creation, and there is no
+        endpoint to re-run it. Without this, a workflow whose design the user
+        has just fixed would keep reporting a failure that is no longer true.
+
+        A delete that empties the template list still recovers the workflow —
+        a ``draft`` with no templates is the same state as one whose generation
+        was skipped, and ``publish`` rejects it on its own emptiness check, so
+        an extra count query here would buy nothing.
+
+        Args:
+            workflow_id: Identifier of the workflow whose templates changed.
+            user_id: ID of the acting user recorded on ``updated_by``.
+        """
+        workflow = await self._get_scoped(workflow_id)
+        if workflow is None:
+            return
+        if workflow.status is WorkflowStatus.failed:
+            workflow.status = WorkflowStatus.draft
+            workflow.generation_error = None
+        elif workflow.status is WorkflowStatus.published:
+            workflow.status = WorkflowStatus.modified
+        else:
+            return
         workflow.updated_by = user_id
         self._db.add(workflow)
         await commit_or_translate_user_fk(self._db, user_id=user_id)

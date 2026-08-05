@@ -7,7 +7,10 @@ operations live under ``/workflow-task-templates``.
 """
 
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.workflow import Workflow, WorkflowStatus
 from tests._envelope import assert_err, assert_ok
 from tests._workflow import (
     add_template,
@@ -264,3 +267,24 @@ async def test_editing_a_template_leaves_a_draft_workflow_draft(
         )
     )
     assert await _status_of(workflow_client, wf_id) == "draft"
+
+
+async def test_creating_a_template_recovers_a_failed_workflow(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Rebuilding the design by hand repairs it, whichever surface does the writing."""
+    client, engine = workflow_client_with_engine
+    wf_id = await _draft_workflow(client)
+    async with AsyncSession(engine) as db:
+        workflow = await db.get(Workflow, wf_id)
+        assert workflow is not None
+        workflow.status = WorkflowStatus.failed
+        workflow.generation_error = "The design run registered no task templates."
+        db.add(workflow)
+        await db.commit()
+
+    await add_template(client, wf_id, title="Hand-written step")
+
+    body = assert_ok(await client.get(f"/api/v1/workflows/{wf_id}"))
+    assert body["status"] == "draft"
+    assert body["generationError"] is None

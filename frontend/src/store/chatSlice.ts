@@ -315,7 +315,12 @@ const chatSlice = createSlice({
       state.messages = merged;
       state.isRunning = false;
       state.isStreaming = false;
-      state.error = null;
+      // Deliberately not clearing `error`: a failed run persists no assistant
+      // message, so the poll that follows it carries no news about the failure
+      // — clearing here just made the banner vanish a few seconds after it
+      // appeared, which is the whole explanation the user gets. The banner has
+      // a dismiss button, and `addUserMessage` / `startRun` clear it when the
+      // user tries again.
       state.pendingRenderCalls = derivePendingRenderCalls(polled);
     },
     addUserMessage(state, action: PayloadAction<{ id: string; content: string }>) {

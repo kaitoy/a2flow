@@ -137,9 +137,11 @@ Which repo you register depends on how far you need to get:
 - **Anything that actually runs an agent** — Hello-World is useless: it has no
   `SKILL.md`. The skill still clones fine, but the first thing that resolves an
   agent fails. Workflow generation, for instance, lands in
-  `status: "failed"` with
-  `generationError: SKILL.md not found in '<skills_dir>/<skill_id>/<sha>'`,
-  which reads like a clone problem and is not one.
+  `status: "failed"` with `generationError: The design run failed
+  unexpectedly. Check the server log for details.` — `generationError` carries
+  a fixed summary, never the raw reason, so the actual cause (`SKILL.md not
+  found in '<skills_dir>/<skill_id>/<sha>'`, which reads like a clone problem
+  and is not one) is only in the backend log.
 
   Use this repository's own sample skill instead:
 

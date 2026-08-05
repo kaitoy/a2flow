@@ -344,6 +344,19 @@ describe("chatSlice", () => {
       ]);
     });
 
+    it("leaves a run error on screen instead of clearing it on the next poll", () => {
+      // A failed run persists no assistant message, so the poll that follows it
+      // says nothing about the failure. Clearing here used to wipe the banner a
+      // few seconds after it appeared — the only explanation the user gets.
+      const errored = {
+        ...emptyState,
+        sessionId: "sess-1",
+        error: "The model provider is unavailable.",
+      };
+      const state = chatReducer(errored, syncPolledMessages({ sessionId: "sess-1", messages: [] }));
+      expect(state.error).toBe("The model provider is unavailable.");
+    });
+
     it("preserves a live tool-call activity chip for an internal tool call across a poll", () => {
       // Reproduces the bug: onToolCallEndEvent (agentSubscriber.ts) adds a live
       // TOOL_CALL_ACTIVITY_TYPE chip for every non-hidden tool call, including

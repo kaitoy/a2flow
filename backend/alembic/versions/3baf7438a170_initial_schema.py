@@ -556,6 +556,7 @@ def upgrade() -> None:
                 "approval_request",
                 "session_completed",
                 "workflow_draft_ready",
+                "workflow_generation_failed",
                 name="notificationtype",
             ),
             nullable=False,

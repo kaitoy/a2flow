@@ -20,7 +20,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 
-from ag_ui.core import RunAgentInput, UserMessage
+from ag_ui.core import RunAgentInput, RunErrorEvent, UserMessage
 from google.adk.sessions import BaseSessionService
 
 from infrastructure.agent import (
@@ -61,6 +61,57 @@ Summarizer = Callable[[str], Awaitable[str]]
 #: Signature of the background design job as the router hands it to
 #: ``BackgroundTasks``.
 WorkflowGenerationJob = Callable[..., Awaitable[None]]
+
+#: Failure reason recorded when the run completed without registering anything.
+NO_TASK_TEMPLATES_REASON = "The design run registered no task templates."
+
+#: Failure reason recorded when no runnable revision of the skill is on disk.
+SKILL_NOT_READY_REASON = "The agent skill has no usable published revision."
+
+#: Failure reason recorded when the design session or its skill has vanished.
+MISSING_RECORD_REASON = "The workflow's design session or agent skill no longer exists."
+
+#: Failure reason recorded for a crash with no more specific classification.
+UNEXPECTED_FAILURE_REASON = (
+    "The design run failed unexpectedly. Check the server log for details."
+)
+
+
+def _agent_run_failed_reason(code: str | None) -> str:
+    """Return the reason to record when the design agent reports a run error.
+
+    The event's ``message`` is the raw text the model provider produced, so it
+    is logged server-side only — the row keeps a fixed summary plus the event's
+    coarse ``code`` (``EXECUTION_ERROR``, ``EXECUTION_TIMEOUT``, ...), which
+    names the failure class without putting the provider's wording in the UI.
+
+    Args:
+        code: The ``RunErrorEvent`` code, or ``None`` when it carries none.
+
+    Returns:
+        The summary to store as the workflow's ``generation_error``.
+    """
+    suffix = f" ({code})" if code else ""
+    return f"The design agent run failed{suffix}. Check the server log for details."
+
+
+def _crash_reason(exc: Exception) -> str:
+    """Return the reason to record for an exception raised by the design run.
+
+    Failures the user can act on get a message naming what to fix; anything
+    else gets a fixed summary, leaving the raw exception text to the log.
+
+    Args:
+        exc: The exception that ended the run.
+
+    Returns:
+        The summary to store as the workflow's ``generation_error``.
+    """
+    if isinstance(exc, SkillNotReadyError):
+        return SKILL_NOT_READY_REASON
+    if isinstance(exc, NotFoundError):
+        return MISSING_RECORD_REASON
+    return UNEXPECTED_FAILURE_REASON
 
 
 class WorkflowDesignService:
@@ -333,9 +384,20 @@ async def generate_workflow_design(
     templates through its design tools. Afterwards the conversation is
     summarized into the workflow's ``generated_description``, the status
     becomes ``draft``, and a ``workflow_draft_ready`` notification is sent to
-    the generating user. Any failure — including a run that registered no
-    templates — lands on the row as ``status=failed`` plus the reason, which
-    the admin UI polls; like the skill sync job, this function never raises.
+    the generating user. Like the skill sync job, this function never raises.
+
+    Any failure lands on the row as ``status=failed`` plus a reason (which the
+    admin UI and the design chat both show) and raises a
+    ``workflow_generation_failed`` notification. Three kinds of failure reach
+    that path, and the agent run is the subtle one: ``ADKAgent`` turns an LLM
+    error into a ``RunErrorEvent`` in the stream instead of raising, so the
+    loop below inspects the events rather than relying on ``except``. A run
+    that errors is failed even if it managed to register templates first — a
+    half-designed workflow handed over as ``draft`` would misreport itself as
+    complete. The templates and the design conversation survive either way, so
+    the user can carry on in the design chat or generate again. Recorded
+    reasons are fixed summaries; the raw provider/exception text is logged
+    server-side only.
 
     Opens its own database sessions (the request-scoped one is closed by the
     time it runs). Collaborators that are process-wide singletons (registry,
@@ -374,6 +436,17 @@ async def generate_workflow_design(
         return
 
     async def _set_failed(reason: str) -> None:
+        """Record the failure on the workflow and notify the triggering user.
+
+        Every failure path funnels through here, so the row and the bell stay
+        in step. The notification is addressed to ``user_id`` rather than the
+        design session's owner because the session may be exactly what could
+        not be loaded; the two are the same person in practice.
+
+        Args:
+            reason: Summarized failure reason to store and show. Raw failure
+                text belongs in the log, not here.
+        """
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
             workflows = SqlWorkflowRepository(
                 db,
@@ -386,6 +459,23 @@ async def generate_workflow_design(
                 generation_error=reason,
                 user_id=user_id,
             )
+            try:
+                await SqlNotificationRepository(db, tenant_id=tenant_id).create(
+                    NotificationCreate(
+                        user_id=user_id,
+                        type=NotificationType.workflow_generation_failed,
+                        title="Workflow generation failed",
+                        body=reason,
+                        workflow_id=workflow_id,
+                    ),
+                    user_id=user_id,
+                )
+            except Exception:
+                logger.exception(
+                    "failed to create workflow_generation_failed notification "
+                    "for workflow %s",
+                    workflow_id,
+                )
 
     try:
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
@@ -420,11 +510,28 @@ async def generate_workflow_design(
             context=[],
             forwarded_props={USER_ID_PROP_KEY: ds.user_id},
         )
+        run_error: RunErrorEvent | None = None
         async with advisory_lock(
             agent_run_key(scoped_app_name, ds.user_id, ds.session_id)
         ):
-            async for _event in agent.run(input_data):
-                pass
+            async for event in agent.run(input_data):
+                # ``ADKAgent`` never raises an LLM failure — it yields it as a
+                # ``RunErrorEvent`` and ends the stream normally. Keeping the
+                # first one preserves the root cause (later events, if any, are
+                # cascades), and the loop still drains so the agent's own
+                # session-persistence cleanup runs.
+                if isinstance(event, RunErrorEvent) and run_error is None:
+                    run_error = event
+
+        if run_error is not None:
+            logger.warning(
+                "The design run of workflow %s reported %s: %s",
+                workflow_id,
+                run_error.code or "an error",
+                run_error.message,
+            )
+            await _set_failed(_agent_run_failed_reason(run_error.code))
+            return
 
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
             templates_repo = SqlWorkflowTaskTemplateRepository(
@@ -441,7 +548,7 @@ async def generate_workflow_design(
                 limit=1, offset=0, workflow_id=workflow_id
             )
         if not templates:
-            await _set_failed("The design run registered no task templates.")
+            await _set_failed(NO_TASK_TEMPLATES_REASON)
             return
 
         session = await session_service.get_session(
@@ -498,7 +605,7 @@ async def generate_workflow_design(
             exc_info=True,
         )
         try:
-            await _set_failed(str(exc))
+            await _set_failed(_crash_reason(exc))
         except Exception:
             logger.exception(
                 "failed to record generation failure on workflow %s", workflow_id

@@ -4,8 +4,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from google.adk.sessions import InMemorySessionService
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.secret import Secret as _Secret  # noqa: F401 — registers model
+from models.workflow import Workflow, WorkflowStatus
 from tests._envelope import assert_err, assert_ok
 from tests._workflow import (
     GENERATE_BODY,
@@ -626,6 +629,33 @@ async def test_patching_a_draft_workflow_leaves_it_draft(
         )
     )
     assert body["status"] == "draft"
+
+
+async def test_patching_a_failed_workflow_leaves_it_failed(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Renaming a workflow repairs nothing, so it must not clear the failure.
+
+    Only a task-template write recovers a failed design (see
+    ``SqlWorkflowRepository.mark_design_edited``); the metadata edit surfaces
+    deliberately go through ``mark_modified``, which leaves ``failed`` alone.
+    """
+    client, engine = workflow_client_with_engine
+    skill = await create_skill(client)
+    wf = await generate_workflow(client, skill["id"])
+    async with AsyncSession(engine) as db:
+        workflow = await db.get(Workflow, wf["id"])
+        assert workflow is not None
+        workflow.status = WorkflowStatus.failed
+        workflow.generation_error = "The design agent run failed."
+        db.add(workflow)
+        await db.commit()
+
+    body = assert_ok(
+        await client.patch(f"/api/v1/workflows/{wf['id']}", json={"name": "Renamed"})
+    )
+    assert body["status"] == "failed"
+    assert body["generationError"] == "The design agent run failed."
 
 
 async def test_empty_patch_keeps_a_published_workflow_published(

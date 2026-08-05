@@ -15,14 +15,17 @@ per-request dependency-injection scope) and returns plain JSON-serializable
 values, mapping repository errors to an ``{"error": ...}`` payload the agent
 can react to instead of raising.
 
-Every write here also moves a ``published`` parent workflow to ``modified``,
-exactly like the REST edit surfaces in
-:mod:`services.workflow_task_template`: task templates refined by chat have drifted
-from the snapshot taken at publish time just as much as one edited through the
-admin UI, and runs keep using that snapshot until the workflow is published
-again. During the initial background generation run the workflow is still
-``generating``, so :meth:`repositories.workflow.SqlWorkflowRepository.mark_modified`
-is a no-op there and needs no special casing.
+Every write here also settles the parent workflow's status through
+:meth:`repositories.workflow.SqlWorkflowRepository.mark_design_edited`, exactly
+like the REST edit surfaces in :mod:`services.workflow_task_template`. A
+``published`` workflow moves to ``modified`` — task templates refined by chat
+have drifted from the snapshot taken at publish time just as much as ones
+edited through the admin UI, and runs keep using that snapshot until the
+workflow is published again. A ``failed`` one recovers to ``draft``: this chat
+is where a user repairs a design run that failed, and rebuilding the templates
+is what repairs it. During the initial background generation run the workflow
+is still ``generating``, so the call is a no-op there and needs no special
+casing.
 """
 
 import logging
@@ -109,18 +112,20 @@ class _Scope:
     template_repo: WorkflowTaskTemplateRepository
     workflow_repo: WorkflowRepository
 
-    async def mark_modified(self, tool_context: ToolContext) -> None:
-        """Move the templates' parent workflow to ``modified`` if it is ``published``.
+    async def mark_design_edited(self, tool_context: ToolContext) -> None:
+        """Settle the templates' parent workflow status after a write.
 
-        Called after every write so chat-refined templates record the same drift
-        from the published snapshot that a REST edit does. Any other status is
-        left alone by the repository.
+        Called after every write so chat-refined templates record the same
+        drift from the published snapshot that a REST edit does, and so a
+        workflow left ``failed`` by its design run recovers once the user has
+        rebuilt its templates through the chat. Any other status is left alone
+        by the repository.
 
         Args:
             tool_context: The ADK tool context for the current invocation, read
                 for the acting user id.
         """
-        await self.workflow_repo.mark_modified(
+        await self.workflow_repo.mark_design_edited(
             self.workflow_id, user_id=_user_id(tool_context)
         )
 
@@ -133,7 +138,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
     outside FastAPI's request scope), resolves the current run's workflow id
     and tenant id, and wires a DesignSession repository, a
     WorkflowTaskTemplate repository, and the Workflow repository backing
-    :meth:`_Scope.mark_modified` to it, all scoped to the resolved tenant.
+    :meth:`_Scope.mark_design_edited` to it, all scoped to the resolved tenant.
     The engine is referenced through the ``database`` module so tests can
     monkeypatch ``database.engine``.
 
@@ -311,7 +316,7 @@ async def register_design_tasks(
                     # it back for the agent to fix rather than letting it escape
                     # the tool and fail the whole run.
                     if created:
-                        await s.mark_modified(tool_context)
+                        await s.mark_design_edited(tool_context)
                     return {
                         "error": f"task {key!r} is invalid: {exc}",
                         "created": created,
@@ -320,7 +325,7 @@ async def register_design_tasks(
                     template = await s.template_repo.create(data, user_id=user_id)
                 except (ForeignKeyViolationError, DependencyCycleError) as exc:
                     if created:
-                        await s.mark_modified(tool_context)
+                        await s.mark_design_edited(tool_context)
                     return {
                         "error": f"failed to create task {key!r}: {exc}",
                         "created": created,
@@ -329,7 +334,7 @@ async def register_design_tasks(
                 created.append({"key": key, "id": template.id, "title": template.title})
             # Once, after the batch: the first call already flips the status, so
             # per-template calls would only add redundant reads.
-            await s.mark_modified(tool_context)
+            await s.mark_design_edited(tool_context)
             return {"created": created}
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
@@ -387,7 +392,7 @@ async def create_design_task(
             template = await s.template_repo.create(
                 data, user_id=_user_id(tool_context)
             )
-            await s.mark_modified(tool_context)
+            await s.mark_design_edited(tool_context)
             return _template_to_dict(template)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
@@ -513,7 +518,7 @@ async def update_design_task(
                 )
             except NotFoundError:
                 return _not_in_design_error(template_id)
-            await s.mark_modified(tool_context)
+            await s.mark_design_edited(tool_context)
             return _template_to_dict(template)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
@@ -544,7 +549,7 @@ async def delete_design_task(
             if existing is None or existing.workflow_id != s.workflow_id:
                 return _not_in_design_error(template_id)
             await s.template_repo.delete(template_id)
-            await s.mark_modified(tool_context)
+            await s.mark_design_edited(tool_context)
             return {"deleted": template_id}
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
