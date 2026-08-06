@@ -230,6 +230,15 @@ describe("useChat", () => {
     expect(mockAgent.addMessage).toHaveBeenCalledWith(
       expect.objectContaining({ role: "tool", toolCallId: "tc-a2ui-1" })
     );
+    // The tool result is preceded by the assistant message that re-declares the
+    // render_a2ui call, without which ag-ui-adk names the FunctionResponse
+    // "unknown" and the provider rejects the run.
+    const sent = mockAgent.addMessage.mock.calls.map(([m]) => m as { role: string });
+    expect(sent[0]).toMatchObject({
+      role: "assistant",
+      toolCalls: [{ id: "tc-a2ui-1", function: { name: "render_a2ui" } }],
+    });
+    expect(sent[1]).toMatchObject({ role: "tool" });
     // The submitted data model rides on the tool result, as valid JSON so
     // ag-ui-adk stores it verbatim and a reload can recover it.
     const toolMessage = mockAgent.addMessage.mock.calls

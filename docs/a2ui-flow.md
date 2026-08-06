@@ -195,6 +195,13 @@ Button click
             }
             └─ A2uiRenderer reads surface.dataModel.get("/") — the full data
                model — and calls onAction(action, values) → sendA2uiAction()
+                 └─ agent.addMessage({                       // the carrier
+                      role:      "assistant",
+                      toolCalls: [{ id: <render_a2ui tool call ID>,
+                                    type: "function",
+                                    function: { name: "render_a2ui",
+                                                arguments: "{}" } }]
+                    })
                  └─ agent.addMessage({
                       role:       "tool",
                       toolCallId: <render_a2ui tool call ID>,
@@ -220,8 +227,8 @@ Both properties are load-bearing. The codec lives in `src/lib/a2uiAction.ts`.
 result and, when that fails, wraps the string:
 `{"success": true, "result": "<the string>", "status": "completed"}`. That wrapper is what gets
 persisted, and `adk_events_to_messages` hands it back on resume. A prose tool result therefore
-comes back in a different shape than it went out, so the parser §6's restore depends on never
-matched and every reloaded surface fell back to the agent's defaults. A JSON **object**
+came back in a different shape than it went out, so the parser §6's restore depends on never
+matched it, and every reloaded surface fell back to the agent's defaults. A JSON **object**
 round-trips through ADK byte-for-byte. (This is also why `RENDER_ACK_CONTENT` —
 `{"status":"rendered"}` — always worked: it was already valid JSON.) `status: "action"` is
 deliberately distinct from `"rendered"` so `record_new_senders`
@@ -240,6 +247,26 @@ sessions recorded before this change recover whatever their `context` held.
 
 Input the user typed but never submitted is **not** persisted: nothing triggers an agent run until
 the surface is acted on, and AG-UI state only travels with a run.
+
+### Why the tool result is preceded by a carrier message
+
+`ADKAgent._extract_tool_results` resolves a tool result's **function name** by scanning
+`RunAgentInput.messages` for the assistant message that issued the call, and falls back to the
+literal string `"unknown"` when it finds none. Every send builds a fresh `HttpAgent`
+(`createChatAgent` / `createWorkflowSessionAgent` / `createDesignSessionAgent`), whose message
+list starts empty — so a request that carried only the tool results made ADK persist
+`FunctionResponse(name="unknown")`, and Gemini rejected the whole request with
+`400 INVALID_ARGUMENT`, because no function by that name had been declared. The failure is
+permanent for the session: the bad response stays in the ADK history and poisons every later
+model call in it.
+
+`buildToolCallCarrierMessage` (`src/lib/a2uiAction.ts`) fixes this by re-declaring the answered
+calls as an assistant message placed **before** the tool results — before, because `ag-ui-adk`
+decides a request is a tool-result submission by looking at the *last* unseen message. Its
+`arguments` are always `"{}"`: only `function.name` is read from the carrier, and real arguments
+would hand `@ag-ui/a2ui-middleware` a second, argument-bearing `render_a2ui` call to rebuild a
+surface from. `buildRenderAckMessages` emits the carrier itself; `sendApprovalResult` builds its
+own under the `render_approval` name.
 
 ---
 

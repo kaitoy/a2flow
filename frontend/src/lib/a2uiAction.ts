@@ -1,4 +1,5 @@
-import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
+import { type A2UIUserAction, RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
+import type { AssistantMessage, ToolMessage } from "@ag-ui/core";
 
 /**
  * No-op acknowledgement content sent as the tool result of a `render_a2ui` call
@@ -207,9 +208,50 @@ export function mergeRecoveredValuesIntoPayload(
     : [...ops, mergedOp];
 }
 
+/** A tool call a tool result is about to answer. */
+export interface AnsweredToolCall {
+  /** Id of the tool call being answered. */
+  toolCallId: string;
+  /** Name of the tool the agent called (e.g. `render_a2ui`). */
+  name: string;
+}
+
 /**
- * Build the tool-result messages that acknowledge every pending `render_a2ui`
- * call on the next agent run.
+ * Build the assistant message that re-declares the tool calls a batch of tool
+ * results answers.
+ *
+ * Load-bearing, not cosmetic. `ag-ui-adk` resolves a tool result's function name
+ * by scanning `RunAgentInput.messages` for the assistant message that issued the
+ * call (`ADKAgent._extract_tool_results`), falling back to the literal string
+ * `"unknown"` when it finds none. Every send builds a fresh `HttpAgent`, so
+ * without this carrier the request holds tool results and nothing else: ADK
+ * persists `FunctionResponse(name="unknown")` and Gemini rejects the entire
+ * request with `400 INVALID_ARGUMENT`, because no function by that name was
+ * ever declared.
+ *
+ * The carrier must be added *before* the tool messages — `ag-ui-adk` decides a
+ * request is a tool-result submission by looking at the last unseen message.
+ *
+ * `arguments` is deliberately `"{}"`: only `function.name` is ever read from it,
+ * and real arguments would hand `@ag-ui/a2ui-middleware` a second,
+ * argument-bearing `render_a2ui` call to rebuild a surface from.
+ */
+export function buildToolCallCarrierMessage(calls: AnsweredToolCall[]): AssistantMessage {
+  return {
+    id: crypto.randomUUID(),
+    role: "assistant",
+    toolCalls: calls.map(({ toolCallId, name }) => ({
+      id: toolCallId,
+      type: "function",
+      function: { name, arguments: "{}" },
+    })),
+  };
+}
+
+/**
+ * Build the messages that acknowledge every pending `render_a2ui` call on the
+ * next agent run: a {@link buildToolCallCarrierMessage} carrier followed by one
+ * tool result per pending call.
  *
  * Without an `action`, every pending call gets the no-op
  * {@link RENDER_ACK_CONTENT}. With an `action`, the last pending call whose
@@ -220,18 +262,24 @@ export function mergeRecoveredValuesIntoPayload(
  * still get the no-op acknowledgement. When no pending call matches the action's
  * surface (e.g. its arguments could not be parsed), the last pending call
  * carries the action so it is never silently dropped.
+ *
+ * Returns an empty array when nothing is pending — a carrier with no tool
+ * results would look like an unanswered tool call.
  */
 export function buildRenderAckMessages(
   pending: PendingRenderCall[],
   action?: A2UIUserAction,
   values?: Record<string, unknown>
-): Array<{ id: string; role: "tool"; toolCallId: string; content: string }> {
+): Array<AssistantMessage | ToolMessage> {
+  if (pending.length === 0) return [];
+
   let actionTargetIndex = -1;
-  if (action && pending.length > 0) {
+  if (action) {
     actionTargetIndex = pending.findLastIndex((call) => call.surfaceId === action.surfaceId);
     if (actionTargetIndex === -1) actionTargetIndex = pending.length - 1;
   }
-  return pending.map((call, index) => ({
+
+  const results: ToolMessage[] = pending.map((call, index) => ({
     id: crypto.randomUUID(),
     role: "tool",
     toolCallId: call.toolCallId,
@@ -240,4 +288,9 @@ export function buildRenderAckMessages(
         ? formatActionContent(action, values ?? {})
         : RENDER_ACK_CONTENT,
   }));
+
+  const carrier = buildToolCallCarrierMessage(
+    pending.map((call) => ({ toolCallId: call.toolCallId, name: RENDER_A2UI_TOOL_NAME }))
+  );
+  return [carrier, ...results];
 }

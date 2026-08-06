@@ -3,7 +3,11 @@
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "react-redux";
-import { buildRenderAckMessages, type PendingRenderCall } from "@/lib/a2uiAction";
+import {
+  buildRenderAckMessages,
+  buildToolCallCarrierMessage,
+  type PendingRenderCall,
+} from "@/lib/a2uiAction";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
   createDesignSessionAgent,
@@ -17,7 +21,11 @@ import {
   type User,
   type WorkflowTask,
 } from "@/lib/api";
-import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL } from "@/lib/approvalTool";
+import {
+  APPROVAL_ACTIVITY_TYPE,
+  RENDER_APPROVAL_TOOL,
+  RENDER_APPROVAL_TOOL_NAME,
+} from "@/lib/approvalTool";
 import logger from "@/lib/logger";
 import type { AppDispatch, RootState } from "@/store";
 import {
@@ -311,7 +319,13 @@ export function useWorkflowSessionChat(
       }
       if (pending.length > 0) dispatch(clearPendingRenderCalls());
 
-      // The approval tool's result resumes the agent run with the decision.
+      // The approval tool's result resumes the agent run with the decision. It
+      // needs its own carrier for the same reason the A2UI acks do: without the
+      // issuing tool call in `messages`, ag-ui-adk names the FunctionResponse
+      // "unknown" and the provider rejects the run.
+      agent.addMessage(
+        buildToolCallCarrierMessage([{ toolCallId, name: RENDER_APPROVAL_TOOL_NAME }])
+      );
       agent.addMessage({
         id: crypto.randomUUID(),
         role: "tool",

@@ -1,6 +1,8 @@
+import type { ToolMessage } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import {
   buildRenderAckMessages,
+  buildToolCallCarrierMessage,
   formatActionContent,
   mergeRecoveredValuesIntoPayload,
   parseActionContent,
@@ -100,21 +102,52 @@ describe("parseActionContent", () => {
   });
 });
 
+describe("buildToolCallCarrierMessage", () => {
+  it("re-declares every answered call so ag-ui-adk can resolve its function name", () => {
+    expect(
+      buildToolCallCarrierMessage([
+        { toolCallId: "call-a", name: "render_a2ui" },
+        { toolCallId: "call-b", name: "render_approval" },
+      ])
+    ).toMatchObject({
+      role: "assistant",
+      toolCalls: [
+        { id: "call-a", type: "function", function: { name: "render_a2ui", arguments: "{}" } },
+        { id: "call-b", type: "function", function: { name: "render_approval", arguments: "{}" } },
+      ],
+    });
+  });
+});
+
 describe("buildRenderAckMessages", () => {
   const pending = [
     { toolCallId: "call-a", surfaceId: "other" },
     { toolCallId: "call-b", surfaceId: "result" },
   ];
 
+  /** The tool results, dropping the leading tool-call carrier message. */
+  function toolResults(messages: ReturnType<typeof buildRenderAckMessages>) {
+    return messages.slice(1) as ToolMessage[];
+  }
+
+  it("leads with a carrier declaring every pending call as a render_a2ui call", () => {
+    const messages = buildRenderAckMessages(pending);
+    expect(messages[0]).toMatchObject({
+      role: "assistant",
+      toolCalls: [
+        { id: "call-a", function: { name: "render_a2ui" } },
+        { id: "call-b", function: { name: "render_a2ui" } },
+      ],
+    });
+  });
+
   it("puts the action and its values on the call that rendered the acted-on surface", () => {
-    const messages = buildRenderAckMessages(
-      pending,
-      { name: "confirm", surfaceId: "result" },
-      { email: "a@b.c" }
+    const results = toolResults(
+      buildRenderAckMessages(pending, { name: "confirm", surfaceId: "result" }, { email: "a@b.c" })
     );
-    expect(messages[0]).toMatchObject({ toolCallId: "call-a", content: RENDER_ACK_CONTENT });
-    expect(messages[1].toolCallId).toBe("call-b");
-    expect(JSON.parse(messages[1].content)).toMatchObject({
+    expect(results[0]).toMatchObject({ toolCallId: "call-a", content: RENDER_ACK_CONTENT });
+    expect(results[1].toolCallId).toBe("call-b");
+    expect(JSON.parse(results[1].content)).toMatchObject({
       status: "action",
       surfaceId: "result",
       values: { email: "a@b.c" },
@@ -122,10 +155,14 @@ describe("buildRenderAckMessages", () => {
   });
 
   it("acknowledges every pending call with the no-op ack when there is no action", () => {
-    expect(buildRenderAckMessages(pending).map((m) => m.content)).toEqual([
+    expect(toolResults(buildRenderAckMessages(pending)).map((m) => m.content)).toEqual([
       RENDER_ACK_CONTENT,
       RENDER_ACK_CONTENT,
     ]);
+  });
+
+  it("returns nothing when no render call is pending", () => {
+    expect(buildRenderAckMessages([])).toEqual([]);
   });
 });
 

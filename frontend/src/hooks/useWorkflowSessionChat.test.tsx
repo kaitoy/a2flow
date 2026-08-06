@@ -188,6 +188,15 @@ describe("useWorkflowSessionChat", () => {
         content: formatActionContent(action, values),
       })
     );
+    // The tool result is preceded by an assistant message re-declaring the
+    // render_a2ui call: ag-ui-adk resolves the FunctionResponse's function name
+    // from it, and names it "unknown" (which the provider rejects) without it.
+    const sent = mockAgent.addMessage.mock.calls.map(([m]) => m as { role: string });
+    expect(sent[0]).toMatchObject({
+      role: "assistant",
+      toolCalls: [{ id: "tc-a2ui-1", function: { name: RENDER_A2UI_TOOL_NAME } }],
+    });
+    expect(sent[1]).toMatchObject({ role: "tool" });
     expect(store.getState().chat.pendingRenderCalls).toEqual([]);
     expect(mockAgent.runAgent).toHaveBeenCalled();
     // The tool result is now persisted with its sender; the attribution map
@@ -352,6 +361,13 @@ describe("useWorkflowSessionChat", () => {
     expect(mockAgent.addMessage).toHaveBeenCalledWith(
       expect.objectContaining({ role: "tool", toolCallId: "tool-call-1", content: "approved" })
     );
+    // Same carrier requirement as the A2UI acks, under the approval tool's name.
+    const sent = mockAgent.addMessage.mock.calls.map(([m]) => m as { role: string });
+    expect(sent[0]).toMatchObject({
+      role: "assistant",
+      toolCalls: [{ id: "tool-call-1", function: { name: "render_approval" } }],
+    });
+    expect(sent[1]).toMatchObject({ role: "tool" });
     expect(mockAgent.runAgent).toHaveBeenCalled();
     // The decision is now persisted with its sender; the attribution map is
     // refreshed so the approval bubble shows the decider's avatar right away.
