@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AppHeader } from "@/components/AppHeader";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
@@ -162,13 +163,23 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
         />
       </SidebarDrawer>
       <div className="flex flex-col flex-1 min-w-0">
-        <AppHeader onMenuClick={() => setTimelineDrawerOpen(true)}>
-          <span className="h-6 w-px shrink-0 bg-glass-border" aria-hidden="true" />
-          <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-accent shadow-glow animate-pulse" />
-          <span className="font-display truncate text-[18px] leading-[28px] font-semibold tracking-tight text-gradient-accent">
-            {ws.workflowName}
-          </span>
-        </AppHeader>
+        <AppHeader onMenuClick={() => setTimelineDrawerOpen(true)} />
+
+        <div className="shrink-0 px-4 pt-3 sm:px-6">
+          <Breadcrumbs
+            items={[
+              { label: "Admin", href: "/admin" },
+              { label: "Workflows", href: "/admin/workflows" },
+              {
+                label: ws.workflowName,
+                href: ws.workflowId
+                  ? `/admin/workflows/${encodeURIComponent(ws.workflowId)}`
+                  : undefined,
+              },
+              { label: "Session" },
+            ]}
+          />
+        </div>
 
         {error && (
           <div className="shrink-0 mx-4 mt-3">

@@ -1,7 +1,7 @@
 /** @module WorkflowsPage — Admin list page for managing workflows. */
 "use client";
 
-import { Loader2, Play, Workflow as WorkflowIcon } from "lucide-react";
+import { Loader2, MessageSquareText, Play, Workflow as WorkflowIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -21,6 +21,7 @@ import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteWorkflow,
   executeWorkflow,
+  getWorkflowDesignSession,
   listAgentSkills,
   listWorkflows,
   type Workflow,
@@ -70,6 +71,7 @@ function buildColumns(
   onRun: (id: string) => void,
   runningId: string | null,
   onDelete: (id: string, name: string) => void,
+  onOpenDesign: (id: string) => void,
   permissions: WorkflowExecutePermissions
 ): ColumnDef<Workflow>[] {
   return [
@@ -134,6 +136,14 @@ function buildColumns(
       visibility: "always",
       cell: (w) => (
         <div className="flex justify-center gap-2">
+          {permissions.canEdit && (
+            <ActionIconButton
+              icon={MessageSquareText}
+              label="Open design session"
+              onClick={() => onOpenDesign(w.id)}
+              disabled={w.status === "generating"}
+            />
+          )}
           {permissions.canRun && (
             <ActionIconButton
               icon={runningId === w.id ? Loader2 : Play}
@@ -222,7 +232,19 @@ export default function WorkflowsPage() {
     }
   }
 
-  const columns = buildColumns(skillMap, handleRun, runningId, handleDelete, { canRun, canEdit });
+  async function handleOpenDesign(id: string) {
+    try {
+      const ds = await getWorkflowDesignSession(id);
+      router.push(`/design-sessions/${ds.id}`);
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
+    }
+  }
+
+  const columns = buildColumns(skillMap, handleRun, runningId, handleDelete, handleOpenDesign, {
+    canRun,
+    canEdit,
+  });
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflows",
     columns

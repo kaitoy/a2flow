@@ -1,7 +1,7 @@
 /** @module WorkflowSessionsPage — Admin list page for browsing executed WorkflowSessions. */
 "use client";
 
-import { ListChecks, MessageSquare } from "lucide-react";
+import { ListChecks, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
@@ -79,8 +79,8 @@ function buildColumns(
             href={`/admin/workflow-sessions/${s.id}/workflow-tasks`}
           />
           <ActionIconButton
-            icon={MessageSquare}
-            label="Open chat"
+            icon={MessageSquareText}
+            label="Open workflow session"
             href={`/workflow-sessions/${s.id}`}
           />
           <DeleteIconButton onClick={() => onDelete(s.id, s.workflowName)} />

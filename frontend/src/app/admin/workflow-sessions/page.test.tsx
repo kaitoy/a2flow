@@ -50,10 +50,10 @@ describe("WorkflowSessionsPage", () => {
     expect(link).toHaveAttribute("href", "/admin/workflow-sessions/ws-1/workflow-tasks");
   });
 
-  it("renders Open chat link to the chat page", async () => {
+  it("renders Open workflow session link to the chat page", async () => {
     render(<WorkflowSessionsPage />);
     await waitFor(() => screen.getByText("My Workflow"));
-    const link = screen.getByRole("link", { name: "Open chat" });
+    const link = screen.getByRole("link", { name: "Open workflow session" });
     expect(link).toHaveAttribute("href", "/workflow-sessions/ws-1");
   });
 
