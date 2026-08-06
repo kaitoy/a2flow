@@ -84,7 +84,8 @@ async def test_summarize_raises_on_empty_response(
 def test_build_llm_uses_litellm_for_prefixed_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The ``litellm:`` prefix selects LiteLlm with the prefix stripped."""
+    """The ``litellm:`` prefix selects LiteLlm with the prefix stripped and
+    pins reasoning_effort="none" + drop_params=True."""
     from google.adk.models.lite_llm import LiteLlm
 
     monkeypatch.setenv("LLM_MODEL", "litellm:openai/gpt-4o")
@@ -94,6 +95,8 @@ def test_build_llm_uses_litellm_for_prefixed_models(
     llm = build_llm()
     assert isinstance(llm, LiteLlm)
     assert llm.model == "openai/gpt-4o"
+    assert llm._additional_args["reasoning_effort"] == "none"
+    assert llm._additional_args["drop_params"] is True
 
 
 def test_build_llm_uses_registry_for_bare_models(
