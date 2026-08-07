@@ -133,6 +133,8 @@ export default function WorkflowDetailPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+  const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
+  const [confirmRunOpen, setConfirmRunOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
@@ -223,6 +225,7 @@ export default function WorkflowDetailPage() {
   }
 
   async function handlePublish() {
+    setConfirmPublishOpen(false);
     try {
       await publish.run(async () => {
         const published = await publishWorkflow(workflowId);
@@ -278,6 +281,7 @@ export default function WorkflowDetailPage() {
   }
 
   async function handleRun() {
+    setConfirmRunOpen(false);
     try {
       await run.run(async () => {
         const workflowExecution = await executeWorkflow(workflowId);
@@ -351,7 +355,7 @@ export default function WorkflowDetailPage() {
                 {canRun && (
                   <HeaderIconButton
                     label="Run workflow"
-                    onClick={handleRun}
+                    onClick={() => setConfirmRunOpen(true)}
                     disabled={
                       generating ||
                       run.inFlight ||
@@ -428,7 +432,7 @@ export default function WorkflowDetailPage() {
               <ActionIconButton
                 icon={Rocket}
                 label="Publish"
-                onClick={handlePublish}
+                onClick={() => setConfirmPublishOpen(true)}
                 disabled={generating || publish.inFlight}
                 spinning={publish.inFlight}
                 spinAnimation="rocket-launch"
@@ -576,6 +580,24 @@ export default function WorkflowDetailPage() {
         confirmLabel="Deactivate"
         onConfirm={handleDeactivate}
         onCancel={() => setConfirmDeactivateOpen(false)}
+      />
+      <ConfirmDialog
+        open={confirmPublishOpen}
+        title="Publish Workflow"
+        description="Publish this workflow? It becomes runnable by anyone with Run access."
+        confirmLabel="Publish"
+        confirmVariant="primary"
+        onConfirm={handlePublish}
+        onCancel={() => setConfirmPublishOpen(false)}
+      />
+      <ConfirmDialog
+        open={confirmRunOpen}
+        title="Run Workflow"
+        description={`Run "${workflow.name}"? This starts a new execution.`}
+        confirmLabel="Run"
+        confirmVariant="primary"
+        onConfirm={handleRun}
+        onCancel={() => setConfirmRunOpen(false)}
       />
       <DescriptionDiffDialog
         open={diffOpen}

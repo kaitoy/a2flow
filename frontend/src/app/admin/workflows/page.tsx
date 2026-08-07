@@ -67,7 +67,7 @@ function StatusCell({ workflow }: { workflow: Workflow }) {
 
 function buildColumns(
   skillMap: Map<string, string>,
-  onRun: (id: string) => void,
+  onRun: (id: string, name: string) => void,
   runningId: string | null,
   onDelete: (id: string, name: string) => void,
   onOpenDesign: (id: string) => void,
@@ -147,7 +147,7 @@ function buildColumns(
             <ActionIconButton
               icon={runningId === w.id ? Loader2 : Play}
               label="Run"
-              onClick={() => onRun(w.id)}
+              onClick={() => onRun(w.id, w.name)}
               // Published workflows are executable by anyone with Run access;
               // drafts are executable only by someone who can also edit
               // workflows (developer/super_admin), for pre-publish testing.
@@ -180,6 +180,7 @@ export default function WorkflowsPage() {
   } = useTableQuery<Workflow>(listWorkflows, { limit: LIMIT });
   const [skillMap, setSkillMap] = useState<Map<string, string>>(new Map());
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
+  const [runTarget, setRunTarget] = useState<{ id: string; name: string } | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
 
   // Load the agent-skill name map once, to label the Agent Skill column.
@@ -220,7 +221,14 @@ export default function WorkflowsPage() {
     }
   }
 
-  async function handleRun(id: string) {
+  function handleRun(id: string, name: string) {
+    setRunTarget({ id, name });
+  }
+
+  async function executeRun() {
+    if (!runTarget) return;
+    const id = runTarget.id;
+    setRunTarget(null);
     setRunningId(id);
     try {
       const workflowExecution = await executeWorkflow(id);
@@ -288,6 +296,15 @@ export default function WorkflowsPage() {
         description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
+      />
+      <ConfirmDialog
+        open={runTarget !== null}
+        title="Run Workflow"
+        description={runTarget ? `Run "${runTarget.name}"? This starts a new execution.` : ""}
+        confirmLabel="Run"
+        confirmVariant="primary"
+        onConfirm={executeRun}
+        onCancel={() => setRunTarget(null)}
       />
     </AdminPageContainer>
   );

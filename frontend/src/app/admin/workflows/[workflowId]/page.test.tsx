@@ -146,6 +146,8 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^publish$/i }));
 
     await waitFor(() =>
       expect(screen.getByRole("region", { name: "Workflow status" })).toHaveClass("live-edge")
@@ -243,6 +245,8 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^publish$/i }));
     await waitFor(() => expect(publishSpy).toHaveBeenCalled());
   });
 
@@ -275,6 +279,8 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^publish$/i }));
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "Workflow has no task templates",
@@ -322,6 +328,8 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /run workflow/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
     await waitFor(() =>
       expect(pushMock).toHaveBeenCalledWith("/workflow-executions/execution-1/session")
     );
@@ -338,6 +346,8 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /run workflow/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "Internal server error",

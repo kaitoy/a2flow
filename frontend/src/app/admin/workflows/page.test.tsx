@@ -56,6 +56,8 @@ describe("WorkflowsPage", () => {
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: "Run" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
     await waitFor(() =>
       expect(pushMock).toHaveBeenCalledWith("/workflow-executions/execution-1/session")
     );
@@ -86,6 +88,8 @@ describe("WorkflowsPage", () => {
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: "Run" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
     await waitFor(() =>
       expect(appStore.getState().toast.items.at(-1)).toMatchObject({
         message: "Internal server error",
