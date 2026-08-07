@@ -51,17 +51,30 @@ export interface DetailItemProps {
 
 /**
  * A single labelled cell of a {@link DetailList}. Labels use the shared
- * `text-label-caps` treatment so they read identically to form field labels.
- * The value is `font-medium`, the same weight the rest of the app uses for a
- * row's primary text, so it doesn't read as barely-there next to the caps
- * label above it. Values wrap mid-word so an unbroken fallback value (a raw
- * user UUID, say) cannot overflow a narrow column.
+ * `text-label-caps` treatment so they read identically to form field labels,
+ * and the value sits on a **recessed field surface** below it — the same
+ * `outline-variant` border + `surface-dim/40` fill + inset shadow the
+ * `SegmentedControl` track uses.
+ *
+ * Without a surface of its own the value loses to its own label: the caps label
+ * is the heavier mark, so a stack of bare label/value pairs reads as an
+ * undifferentiated column of text. Giving the value a field of its own restores
+ * the label/input rhythm of {@link import("../admin/form-field").FormField}, so
+ * a read-only page and an editable one share a skeleton. The surface is
+ * deliberately recessed rather than raised glass — per DESIGN.md that inversion
+ * is what keeps it from being mistaken for an input.
+ *
+ * `min-h-9` holds the field's height steady across value types (a mono `text-xs`
+ * commit SHA, an em-dash placeholder), and values wrap mid-word so an unbroken
+ * fallback value (a raw user UUID, say) cannot overflow a narrow column.
  */
 export function DetailItem({ label, value }: DetailItemProps) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <dt className="text-label-caps">{label}</dt>
-      <dd className="break-words text-sm font-medium text-on-surface">{value}</dd>
+      <dd className="min-h-9 break-words rounded-xl border border-outline-variant bg-surface-dim/40 px-3 py-2 text-sm font-medium text-on-surface shadow-[inset_0_1px_2px_var(--inner-track-shadow)]">
+        {value}
+      </dd>
     </div>
   );
 }

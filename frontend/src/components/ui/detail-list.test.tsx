@@ -74,4 +74,15 @@ describe("DetailItem", () => {
     expect(screen.getByText("Username")).toHaveClass("text-label-caps");
     expect(screen.getByText("alice")).toHaveClass("font-medium");
   });
+
+  it("renders the value on a recessed field surface so it reads apart from its label", () => {
+    render(<DetailItem label="Username" value="alice" />);
+
+    expect(screen.getByText("alice")).toHaveClass(
+      "rounded-xl",
+      "border",
+      "border-outline-variant",
+      "bg-surface-dim/40"
+    );
+  });
 });
