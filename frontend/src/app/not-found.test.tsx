@@ -9,8 +9,8 @@ describe("NotFound", () => {
     expect(screen.getByText("The page you're looking for doesn't exist.")).toBeInTheDocument();
   });
 
-  it("links to the dashboard", () => {
+  it("links to home", () => {
     render(<NotFound />);
-    expect(screen.getByRole("link", { name: "Go to dashboard" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Go to Home" })).toHaveAttribute("href", "/admin");
   });
 });

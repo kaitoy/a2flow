@@ -12,8 +12,8 @@ describe("RouteError", () => {
     expect(reset).toHaveBeenCalledOnce();
   });
 
-  it("links back to the dashboard", () => {
+  it("links to home", () => {
     render(<RouteError error={new Error("boom")} reset={vi.fn()} />);
-    expect(screen.getByRole("link", { name: "Go to dashboard" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Go to Home" })).toHaveAttribute("href", "/admin");
   });
 });

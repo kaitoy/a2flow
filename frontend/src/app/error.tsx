@@ -22,6 +22,6 @@ export default function RouteError({
   }, [error]);
 
   return (
-    <RouteErrorFallback reset={reset} fill="screen" homeHref="/admin" homeLabel="Go to dashboard" />
+    <RouteErrorFallback reset={reset} fill="screen" homeHref="/admin" homeLabel="Go to Home" />
   );
 }
