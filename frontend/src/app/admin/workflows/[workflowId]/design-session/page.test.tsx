@@ -119,14 +119,14 @@ beforeEach(() => {
 });
 
 describe("DesignSessionPage", () => {
-  it("renders a breadcrumb trail ending in Design, with the workflow name linking back to it", async () => {
+  it("renders a breadcrumb trail ending in Design Session, with the workflow name linking back to it", async () => {
     render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByRole("link", { name: "my-workflow" })).toHaveAttribute(
       "href",
       "/admin/workflows/wf-1"
     );
-    expect(within(nav).getByText("Design")).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByText("Design Session")).toHaveAttribute("aria-current", "page");
   });
 
   it("drives the chat hook in design mode with no kickoff prompt", async () => {

@@ -101,7 +101,7 @@ export default function ApprovalsPage() {
         cell: (a) =>
           a.workflowExecutionId ? (
             <Link
-              href={`/workflow-sessions/${a.workflowExecutionId}`}
+              href={`/workflow-executions/${a.workflowExecutionId}/session`}
               className="text-accent transition-colors hover:underline"
             >
               Open chat

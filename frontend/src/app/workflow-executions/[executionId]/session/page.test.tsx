@@ -8,7 +8,7 @@ import { server } from "@/test/msw/server";
 import { render, screen, within } from "@/test/test-utils";
 import WorkflowSessionPage from "./page";
 
-/** The default `/workflow-sessions/execution-1` handler's payload, for `server.use` overrides. */
+/** The default `/workflow-executions/execution-1/session` handler's payload, for `server.use` overrides. */
 const WORKFLOW_EXECUTION_1 = {
   id: "execution-1",
   tenantId: "tenant-1",

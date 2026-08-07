@@ -224,7 +224,7 @@ export default function WorkflowsPage() {
     setRunningId(id);
     try {
       const workflowExecution = await executeWorkflow(id);
-      router.push(`/workflow-sessions/${workflowExecution.id}`);
+      router.push(`/workflow-executions/${workflowExecution.id}/session`);
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
       setRunningId(null);
@@ -233,7 +233,7 @@ export default function WorkflowsPage() {
 
   function handleOpenDesign(id: string) {
     // A design session has no id of its own — it is addressed by its workflow.
-    router.push(`/design-sessions/${encodeURIComponent(id)}`);
+    router.push(`/admin/workflows/${encodeURIComponent(id)}/design-session`);
   }
 
   const columns = buildColumns(skillMap, handleRun, runningId, handleDelete, handleOpenDesign, {

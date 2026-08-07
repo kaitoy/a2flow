@@ -192,7 +192,7 @@ function DesignSessionView({
               { label: "Admin", href: "/admin" },
               { label: "Workflows", href: "/admin/workflows" },
               { label: workflow.name, href: `/admin/workflows/${encodeURIComponent(workflow.id)}` },
-              { label: "Design" },
+              { label: "Design Session" },
             ]}
           />
         </div>

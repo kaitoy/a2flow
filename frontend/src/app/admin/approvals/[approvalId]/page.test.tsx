@@ -56,7 +56,7 @@ describe("ApprovalDetailPage", () => {
     render(<ApprovalDetailPage />);
     await screen.findByRole("heading", { name: "Deploy to production" });
     await user.click(screen.getByRole("button", { name: "Open workflow session" }));
-    expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/execution-1");
+    expect(pushMock).toHaveBeenCalledWith("/workflow-executions/execution-1/session");
   });
 
   it("offers no delete or resolve controls", async () => {

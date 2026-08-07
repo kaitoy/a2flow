@@ -53,15 +53,17 @@ keeping straight:
 | **Workflow execution** | One run of a workflow: the workflow and skill metadata snapshotted at run time, and the parent of the run's `WorkflowTask`s, `Approval`s, and message metadata. | `workflow_executions` |
 | **Workflow session** | The chat that one workflow execution happens in — the run-time counterpart of a design session. | No table of its own: it is the ADK session named by `WorkflowExecution.session_id`, so its execution's id identifies it. |
 
-So a design session designs a workflow, and a workflow session runs one. The
-two are stored symmetrically: neither chat is an entity in its own right, so
-each is addressed by the record it belongs to — a design session by its
-workflow, a workflow session by its execution. That is why the chats live at
-`/design-sessions/{workflowId}` and `/workflow-sessions/{executionId}` while
-the records they belong to live at `/admin/workflows/{workflowId}` and
-`/admin/workflow-executions/{executionId}`. A design session's owner is its
-workflow's `createdBy` — the user who generated it — exactly as a workflow
-session's is its execution's `initiatorId`.
+So a design session designs a workflow, and a workflow session runs one.
+Neither chat is an entity in its own right, so each is addressed by the
+record it belongs to — a design session by its workflow, a workflow session
+by its execution — and each borrows that record's id as its own address. Their
+URLs diverge, though: a design session lives inside the admin UI, at
+`/admin/workflows/{workflowId}/design-session` alongside that workflow's other
+admin views, while a workflow session lives outside it, at a top-level
+`/workflow-executions/{executionId}/session` distinct from that execution's
+admin view at `/admin/workflow-executions/{executionId}`. A design session's
+owner is its workflow's `createdBy` — the user who generated it — exactly as a
+workflow session's is its execution's `initiatorId`.
 
 ## Quick start
 
@@ -365,7 +367,7 @@ A `published` workflow becomes `modified` when the summary is rewritten, since a
 
 A draft's task templates can be refined in two ways, in any mix:
 
-- **By chat** — the workflow detail page's **Open design session** button opens `/design-sessions/{workflowId}` (the chat has no id of its own, so it is addressed by its workflow): the same chat UI as a run, with the template list down the left edge, driven by an interactive *design* agent whose tools (`register_design_tasks`, `create_design_task`, `list_design_tasks`, `get_design_task`, `update_design_task`, `delete_design_task`) edit the workflow's templates directly. The design agent never executes anything. The design session is owner-only — its workflow's `createdBy`, plus Super Admins — and reuses the shared chat plumbing (history poll, A2UI surfaces).
+- **By chat** — the workflow detail page's **Open design session** button opens `/admin/workflows/{workflowId}/design-session` (the chat has no id of its own, so it is addressed by its workflow): the same chat UI as a run, with the template list down the left edge, driven by an interactive *design* agent whose tools (`register_design_tasks`, `create_design_task`, `list_design_tasks`, `get_design_task`, `update_design_task`, `delete_design_task`) edit the workflow's templates directly. The design agent never executes anything. The design session is owner-only — its workflow's `createdBy`, plus Super Admins — and reuses the shared chat plumbing (history poll, A2UI surfaces).
 - **By hand** — the **Task Templates** admin pages (`/admin/workflows/{id}/task-templates`) offer the familiar Table / Graph views (the Graph stacks the templates in one vertical column in dependency order, each branching rightward into the MCP servers it binds tools from and then into the individual tools) plus a create form and a per-template detail page with **Depends on** and **MCP Tools** pickers, backed by `GET /workflows/{id}/task-templates` and the `POST`/`PATCH`/`DELETE /workflow-task-templates` endpoints (developer-gated).
 
 Templates mirror session tasks structurally — title, description, `position`, DAG edges (`workflow_task_template_dependencies`), and MCP tool bindings (`workflow_task_template_tool_bindings`, server side `RESTRICT`) — but carry **no status**: the lifecycle belongs to a run, not the design. The same DAG rules apply (same-workflow targets, cycles rejected with HTTP 409 `DEPENDENCY_CYCLE`).
@@ -395,7 +397,7 @@ Clicking **Run** on a **published** or **modified** workflow — or, for a `deve
 
 1. The backend rejects any other status outright, and rejects a `draft` workflow for any caller who isn't `developer`/`super_admin`, with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`); it also re-checks the skill's published revision (`SKILL_NOT_READY` otherwise) — the repository was cloned when the skill was registered, so **nothing is cloned here**.
 2. A `WorkflowExecution` record is persisted, capturing the workflow name, its effective description (`description` if the user set one, else the AI-generated `generatedDescription`), skill details, the id of the **workflow session** it will run in, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). The workflow's task templates are **copied into the execution as `pending` WorkflowTasks** (dependency edges and tool bindings included, ids remapped), so later template edits never affect this run. For a `modified` workflow the name, description, and templates all come from its **last published version** rather than the edited rows. The ADK session itself is created lazily on the first agent call.
-3. The backend returns the `WorkflowExecution` (HTTP 201). The frontend redirects to `/workflow-sessions/{workflowExecution.id}` — the **workflow session**, the chat the run happens in. It has no record of its own, so it is addressed by its execution's id.
+3. The backend returns the `WorkflowExecution` (HTTP 201). The frontend redirects to `/workflow-executions/{workflowExecution.id}/session` — the **workflow session**, the chat the run happens in. It has no record of its own, so it is addressed by its execution's id.
 4. On mount, that page fetches the `WorkflowExecution`, and if no prior messages exist it auto-sends a fixed kickoff message via `POST /workflow-executions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](#welcome-page).
 5. The `/workflow-executions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id`, the pinned revision, **and the agent role**) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under an **execute-only** instruction — the tasks were approved by publishing, so it **begins immediately**, with the execution's effective description injected server-side as trusted run context.
 6. Subsequent user messages continue to flow through `POST /workflow-executions/{id}/agent`, so A2UI rendering, A2UI user actions (e.g. clicking a rendered button), and the full chat experience work normally.
@@ -446,7 +448,7 @@ The chat screen also shows a collapsible **task timeline** down the left edge: t
 
 ### Workflow Executions
 
-Navigate to [http://localhost:3000/admin/workflow-executions](http://localhost:3000/admin/workflow-executions) to browse every `WorkflowExecution`. Each row links to its workflow session (`/workflow-sessions/{id}`) and to the nested **Workflow Tasks** admin page (`/admin/workflow-executions/{id}/workflow-tasks`), a **read-only** view of the run's tasks — the task templates are edited on the workflow's [task templates](#adjusting-the-task-templates), and a run's statuses are advanced by the execution agent (and the approval flow), so a run's history stays faithful to what actually ran. A row's **Delete** action removes the `WorkflowExecution` after a confirmation prompt: the record, its tasks (cascade), and its workflow session are all deleted. The Workflow Tasks page offers a **Table / Graph** toggle: the Graph view renders the task DAG with [React Flow](https://reactflow.dev/), stacking the tasks in a single vertical column in dependency order so prerequisites sit above the tasks that depend on them, with each task branching rightward into the MCP servers it binds tools from and then into the individual tools (read-only; pan / zoom / fit).
+Navigate to [http://localhost:3000/admin/workflow-executions](http://localhost:3000/admin/workflow-executions) to browse every `WorkflowExecution`. Each row links to its workflow session (`/workflow-executions/{id}/session`) and to the nested **Workflow Tasks** admin page (`/admin/workflow-executions/{id}/workflow-tasks`), a **read-only** view of the run's tasks — the task templates are edited on the workflow's [task templates](#adjusting-the-task-templates), and a run's statuses are advanced by the execution agent (and the approval flow), so a run's history stays faithful to what actually ran. A row's **Delete** action removes the `WorkflowExecution` after a confirmation prompt: the record, its tasks (cascade), and its workflow session are all deleted. The Workflow Tasks page offers a **Table / Graph** toggle: the Graph view renders the task DAG with [React Flow](https://reactflow.dev/), stacking the tasks in a single vertical column in dependency order so prerequisites sit above the tasks that depend on them, with each task branching rightward into the MCP servers it binds tools from and then into the individual tools (read-only; pan / zoom / fit).
 
 | Operation | Path |
 |-----------|------|
@@ -456,7 +458,7 @@ Navigate to [http://localhost:3000/admin/workflow-executions](http://localhost:3
 
 ### Approvals
 
-Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/approvals) to browse every **Approval** request (see [Human approval](#human-approval)). The list shows the title, status (`pending` / `approved` / `rejected`), the designated approver, the approver's comment, a link to the originating `/workflow-sessions/{id}` workflow session, and the creation time, with sort and filter controls. Decisions are normally made from the in-chat Approve / Reject controls; this view is read-only browsing. The `GET`/`PATCH /api/v1/approvals` endpoints are documented in the [API reference](http://localhost:3000/api-doc).
+Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/approvals) to browse every **Approval** request (see [Human approval](#human-approval)). The list shows the title, status (`pending` / `approved` / `rejected`), the designated approver, the approver's comment, a link to the originating `/workflow-executions/{id}/session` workflow session, and the creation time, with sort and filter controls. Decisions are normally made from the in-chat Approve / Reject controls; this view is read-only browsing. The `GET`/`PATCH /api/v1/approvals` endpoints are documented in the [API reference](http://localhost:3000/api-doc).
 
 ## Notifications
 
@@ -473,7 +475,7 @@ Four workflow events generate a notification. The recipient depends on the event
 | `approval_request` | The agent requests a mid-execution decision (`request_approval`) and waits for the designated approver. |
 | `session_completed` | Every `WorkflowTask` in the session has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per session. |
 
-Clicking a notification marks it read and deep-links to the relevant place: run-scoped events to the `/workflow-sessions/{id}` chat, workflow-scoped ones (`workflow_draft_ready`, `workflow_generation_failed`) to the workflow's detail page. Each row also has a **"Mark as read" (✓)** button that clears it from the dropdown without navigating, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once. Nothing in the dropdown deletes a notification — marking it read only moves it out of the way.
+Clicking a notification marks it read and deep-links to the relevant place: run-scoped events to the `/workflow-executions/{id}/session` chat, workflow-scoped ones (`workflow_draft_ready`, `workflow_generation_failed`) to the workflow's detail page. Each row also has a **"Mark as read" (✓)** button that clears it from the dropdown without navigating, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once. Nothing in the dropdown deletes a notification — marking it read only moves it out of the way.
 
 ### Notification history page
 

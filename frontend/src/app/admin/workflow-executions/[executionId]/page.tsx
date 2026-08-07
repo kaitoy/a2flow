@@ -118,7 +118,7 @@ export default function WorkflowExecutionDetailPage() {
                 </HeaderIconButton>
                 <HeaderIconButton
                   label="Open workflow session"
-                  onClick={() => router.push(`/workflow-sessions/${executionId}`)}
+                  onClick={() => router.push(`/workflow-executions/${executionId}/session`)}
                 >
                   <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
                 </HeaderIconButton>

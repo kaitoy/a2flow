@@ -39,7 +39,7 @@ describe("ApprovalsPage", () => {
     render(<ApprovalsPage />);
     await waitFor(() => screen.getByText("Deploy to production"));
     const link = screen.getByRole("link", { name: "Open chat" });
-    expect(link).toHaveAttribute("href", "/workflow-sessions/execution-1");
+    expect(link).toHaveAttribute("href", "/workflow-executions/execution-1/session");
   });
 
   it("shows the empty-state message when no approvals exist", async () => {

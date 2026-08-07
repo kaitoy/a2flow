@@ -109,7 +109,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
       // Run-scoped notifications (approvals, completion) deep-link to the
       // session chat; workflow-scoped ones (a generated draft) to the workflow.
       if (workflowExecutionId) {
-        router.push(`/workflow-sessions/${encodeURIComponent(workflowExecutionId)}`);
+        router.push(`/workflow-executions/${encodeURIComponent(workflowExecutionId)}/session`);
       } else if (workflowId) {
         router.push(`/admin/workflows/${encodeURIComponent(workflowId)}`);
       }

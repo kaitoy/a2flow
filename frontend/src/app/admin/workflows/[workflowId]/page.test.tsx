@@ -280,7 +280,9 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /open design session/i }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/design-sessions/wf-1"));
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/admin/workflows/wf-1/design-session")
+    );
   });
 
   it("hides the Run action from a viewer without the requester or developer role", async () => {
@@ -304,7 +306,9 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /run workflow/i }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/execution-1"));
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/workflow-executions/execution-1/session")
+    );
   });
 
   it("shows an error toast when Run fails", async () => {

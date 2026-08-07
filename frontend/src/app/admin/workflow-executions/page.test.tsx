@@ -60,7 +60,7 @@ describe("WorkflowExecutionsPage", () => {
     render(<WorkflowExecutionsPage />);
     await waitFor(() => screen.getByText("My Workflow"));
     const link = screen.getByRole("link", { name: "Open workflow session" });
-    expect(link).toHaveAttribute("href", "/workflow-sessions/execution-1");
+    expect(link).toHaveAttribute("href", "/workflow-executions/execution-1/session");
   });
 
   it("shows empty-state message when no sessions exist", async () => {

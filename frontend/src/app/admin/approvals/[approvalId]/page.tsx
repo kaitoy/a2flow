@@ -100,7 +100,9 @@ export default function ApprovalDetailPage() {
             secondaryAction={
               <HeaderIconButton
                 label="Open workflow session"
-                onClick={() => router.push(`/workflow-sessions/${approval.workflowExecutionId}`)}
+                onClick={() =>
+                  router.push(`/workflow-executions/${approval.workflowExecutionId}/session`)
+                }
               >
                 <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
               </HeaderIconButton>

@@ -56,7 +56,9 @@ describe("WorkflowsPage", () => {
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: "Run" }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/execution-1"));
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/workflow-executions/execution-1/session")
+    );
   });
 
   it("opens the design session for a developer from the list row", async () => {
@@ -65,7 +67,9 @@ describe("WorkflowsPage", () => {
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: /open design session/i }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/design-sessions/wf-1"));
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/admin/workflows/wf-1/design-session")
+    );
   });
 
   it("hides the design session action from a user without the developer role", async () => {

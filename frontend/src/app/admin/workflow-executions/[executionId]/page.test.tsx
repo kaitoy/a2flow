@@ -87,7 +87,7 @@ describe("WorkflowExecutionDetailPage", () => {
     render(<WorkflowExecutionDetailPage />);
     await screen.findByRole("heading", { name: "My Workflow" });
     await user.click(screen.getByRole("button", { name: "Open workflow session" }));
-    expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/execution-1");
+    expect(pushMock).toHaveBeenCalledWith("/workflow-executions/execution-1/session");
   });
 
   it("deletes the session after confirmation and returns to the list", async () => {

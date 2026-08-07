@@ -88,7 +88,7 @@ function buildColumns(
           <ActionIconButton
             icon={MessageSquareText}
             label="Open workflow session"
-            href={`/workflow-sessions/${s.id}`}
+            href={`/workflow-executions/${s.id}/session`}
           />
           <DeleteIconButton onClick={() => onDelete(s.id, s.workflowName)} />
         </div>

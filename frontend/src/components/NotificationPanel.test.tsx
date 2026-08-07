@@ -112,7 +112,9 @@ describe("NotificationPanel", () => {
     await waitFor(() => screen.getByText("Plan ready for approval"));
     await screen.getByText("Plan ready for approval").click();
 
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/execution-1"));
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/workflow-executions/execution-1/session")
+    );
     expect(onClose).toHaveBeenCalled();
     expect(store.getState().notifications.unreadCount).toBe(0);
   });
