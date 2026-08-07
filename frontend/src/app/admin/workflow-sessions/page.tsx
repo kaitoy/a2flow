@@ -1,7 +1,7 @@
 /** @module WorkflowSessionsPage — Admin list page for browsing executed WorkflowSessions. */
 "use client";
 
-import { ListChecks, MessageSquareText } from "lucide-react";
+import { ClipboardList, ListChecks, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
@@ -39,7 +39,14 @@ function buildColumns(
       sortField: "workflowName",
       filterField: "workflowName",
       visibility: "always",
-      cell: (s) => <span className="font-medium">{s.workflowName}</span>,
+      cell: (s) => (
+        <Link
+          href={`/admin/workflow-sessions/${s.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {s.workflowName}
+        </Link>
+      ),
     },
     {
       header: "Agent Skill",
@@ -48,15 +55,15 @@ function buildColumns(
       cell: (s) => s.agentSkillName,
     },
     {
-      // Resolved from userId to a display name; not sorted/filtered by raw id.
-      header: "User",
+      // Resolved from initiatorId to a display name; not sorted/filtered by raw id.
+      header: "Initiator",
       cell: (s) =>
-        s.userId ? (
+        s.initiatorId ? (
           <Link
-            href={`/admin/users/${s.userId}`}
+            href={`/admin/users/${s.initiatorId}`}
             className="font-medium text-accent transition-colors hover:underline"
           >
-            {userMap.get(s.userId) ?? s.userId}
+            {userMap.get(s.initiatorId) ?? s.initiatorId}
           </Link>
         ) : (
           "—"
@@ -74,7 +81,7 @@ function buildColumns(
       cell: (s) => (
         <div className="flex justify-center gap-2">
           <ActionIconButton
-            icon={ListChecks}
+            icon={ClipboardList}
             label="View tasks"
             href={`/admin/workflow-sessions/${s.id}/workflow-tasks`}
           />
@@ -125,7 +132,7 @@ export default function WorkflowSessionsPage() {
 
   // Resolve user display names for the current page of sessions.
   useEffect(() => {
-    const ids = rows.map((s) => s.userId).filter((id): id is string => !!id);
+    const ids = rows.map((s) => s.initiatorId).filter((id): id is string => !!id);
     if (ids.length === 0) return;
     getUserNames(ids)
       .then(setUserMap)

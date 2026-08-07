@@ -120,7 +120,7 @@ class WorkflowSessionService:
                 designated approver of the session, nor a super admin.
         """
         ws = await self._get(ws_id)
-        await self._access.assert_access(ws_id, ws.user_id, caller)
+        await self._access.assert_access(ws_id, ws.initiator_id, caller)
         return ws
 
     async def list(
@@ -197,9 +197,9 @@ class WorkflowSessionService:
         never rewrite.
 
         The record is returned alongside the agent so the caller can key the ADK
-        run by the session's owner (``WorkflowSession.user_id``) rather than the
-        current user, letting every authorized viewer (for example a designated
-        approver) share the same ADK session.
+        run by the session's owner (``WorkflowSession.initiator_id``) rather than
+        the current user, letting every authorized viewer (for example a
+        designated approver) share the same ADK session.
 
         Args:
             ws_id: Identifier of the session whose agent to resolve.
@@ -265,9 +265,9 @@ class WorkflowSessionService:
         """Return the chat history of a WorkflowSession's ADK session.
 
         The ADK session is looked up by the WorkflowSession's owner
-        (``ws.user_id``), so the same history is returned regardless of which
-        authorized user requests it — a designated approver opening the chat
-        sees the owner's conversation instead of starting a fresh session.
+        (``ws.initiator_id``), so the same history is returned regardless of
+        which authorized user requests it — a designated approver opening the
+        chat sees the owner's conversation instead of starting a fresh session.
         Returns an empty list when the ADK session does not exist yet (before
         the first agent run).
 
@@ -287,7 +287,7 @@ class WorkflowSessionService:
         ws = await self.get(ws_id, caller=caller)
         session = await self._session_service.get_session(
             app_name=tenant_app_name(self._app_name, ws.tenant_id),
-            user_id=ws.user_id,
+            user_id=ws.initiator_id,
             session_id=ws.session_id,
         )
         if session is None:
@@ -333,7 +333,7 @@ class WorkflowSessionService:
         ws = await self._get(ws_id)
         session = await self._session_service.get_session(
             app_name=tenant_app_name(self._app_name, ws.tenant_id),
-            user_id=ws.user_id,
+            user_id=ws.initiator_id,
             session_id=ws.session_id,
         )
         if session is None:
@@ -376,7 +376,7 @@ class WorkflowSessionService:
         ws = await self._get(ws_id)
         session = await self._session_service.get_session(
             app_name=tenant_app_name(self._app_name, ws.tenant_id),
-            user_id=ws.user_id,
+            user_id=ws.initiator_id,
             session_id=ws.session_id,
         )
         if session is None:
@@ -421,7 +421,7 @@ class WorkflowSessionService:
         ws = await self._get(ws_id)
         session = await self._session_service.get_session(
             app_name=tenant_app_name(self._app_name, ws.tenant_id),
-            user_id=ws.user_id,
+            user_id=ws.initiator_id,
             session_id=ws.session_id,
         )
         if session is None:
@@ -471,17 +471,17 @@ class WorkflowSessionService:
                 super admin.
         """
         ws = await self._get(ws_id)
-        self._access.assert_owner(ws.user_id, caller)
+        self._access.assert_owner(ws.initiator_id, caller)
         scoped_app_name = tenant_app_name(self._app_name, ws.tenant_id)
         existing = await self._session_service.get_session(
             app_name=scoped_app_name,
-            user_id=ws.user_id,
+            user_id=ws.initiator_id,
             session_id=ws.session_id,
         )
         if existing is not None:
             await self._session_service.delete_session(
                 app_name=scoped_app_name,
-                user_id=ws.user_id,
+                user_id=ws.initiator_id,
                 session_id=ws.session_id,
             )
         await self._ws_repo.delete(ws_id)

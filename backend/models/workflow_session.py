@@ -30,7 +30,7 @@ class WorkflowSessionCreate(SQLModel):
     agent_skill_repo_url: str
     agent_skill_repo_path: str
     agent_skill_commit_sha: str | None = None
-    user_id: str
+    initiator_id: str
 
 
 class WorkflowSession(WorkflowSessionCreate, TenantScoped, BaseEntity, table=True):

@@ -298,7 +298,7 @@ class WorkflowService:
             agent_skill_repo_url=skill.repo_url,
             agent_skill_repo_path=skill.repo_path,
             agent_skill_commit_sha=skill.commit_sha,
-            user_id=user,
+            initiator_id=user,
         )
         ws = await self._ws_repo.create(
             ws_create, workflow_id=workflow.id, user_id=user

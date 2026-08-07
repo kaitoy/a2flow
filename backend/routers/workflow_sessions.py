@@ -167,7 +167,7 @@ async def workflow_session_agent(
     )
     # Key the ADK run by the WorkflowSession's owner rather than the current user
     # so every viewer (e.g. a designated approver) shares the same ADK session.
-    input_data = with_user_id(input_data, ws.user_id)
+    input_data = with_user_id(input_data, ws.initiator_id)
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
     async with AsyncExitStack() as stack:
@@ -180,7 +180,7 @@ async def workflow_session_agent(
                 advisory_lock(
                     agent_run_key(
                         tenant_app_name(APP_NAME, ws.tenant_id),
-                        ws.user_id,
+                        ws.initiator_id,
                         input_data.thread_id,
                     )
                 )

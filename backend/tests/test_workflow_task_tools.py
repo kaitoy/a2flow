@@ -70,7 +70,7 @@ async def _seed_session(
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
-            user_id=user_id,
+            initiator_id=user_id,
             tenant_id=tenant_id,
             created_by=user_id,
             updated_by=user_id,

@@ -561,7 +561,7 @@ async def test_delete_server_referenced_by_binding_returns_409(
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
             skill_dir="/tmp/skill",
-            user_id=SYSTEM_USER_ID,
+            initiator_id=SYSTEM_USER_ID,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,

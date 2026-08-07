@@ -46,7 +46,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
     locallySentMessageIds,
     messageTasks,
     tasks,
-  } = useWorkflowSessionChat(ws.id, ws.sessionId, EXECUTION_KICKOFF_PROMPT, ws.userId);
+  } = useWorkflowSessionChat(ws.id, ws.sessionId, EXECUTION_KICKOFF_PROMPT, ws.initiatorId);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [timelineDrawerOpen, setTimelineDrawerOpen] = useState(false);
   // Focus state shared by the timeline and chat: a hovered entry wins over the
@@ -110,7 +110,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
       } else if (locallySentMessageIds.has(message.id)) {
         user = currentUser;
       } else {
-        user = senderUsers.get(ws.userId) ?? null;
+        user = senderUsers.get(ws.initiatorId) ?? null;
       }
       return userAvatar(user);
     }

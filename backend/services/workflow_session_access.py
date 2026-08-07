@@ -34,7 +34,7 @@ class WorkflowSessionAccessPolicy:
 
         Args:
             ws_id: Identifier of the workflow session being operated on.
-            owner_id: The session owner's user ID (``WorkflowSession.user_id``).
+            owner_id: The session owner's user ID (``WorkflowSession.initiator_id``).
             caller: The authenticated user performing the operation.
 
         Raises:
@@ -61,7 +61,7 @@ class WorkflowSessionAccessPolicy:
         approver may participate in the chat but not delete it.
 
         Args:
-            owner_id: The session owner's user ID (``WorkflowSession.user_id``).
+            owner_id: The session owner's user ID (``WorkflowSession.initiator_id``).
             caller: The authenticated user performing the operation.
 
         Raises:

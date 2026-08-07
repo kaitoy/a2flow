@@ -384,8 +384,8 @@ async def test_workflow_session_agent_keys_run_by_session_owner(
         json=_make_run_agent_input(),
         headers={"X-User-Id": "alice"},
     )
-    assert received_inputs[0].forwarded_props["userId"] == ws["userId"]
-    assert ws["userId"] == SYSTEM_USER_ID
+    assert received_inputs[0].forwarded_props["userId"] == ws["initiatorId"]
+    assert ws["initiatorId"] == SYSTEM_USER_ID
 
 
 async def test_workflow_session_agent_records_sender_on_client_disconnect(
@@ -412,7 +412,7 @@ async def test_workflow_session_agent_records_sender_on_client_disconnect(
     async def _appending_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["userId"],
+            user_id=ws["initiatorId"],
             session_id=ws["sessionId"],
         )
         await real_session_service.append_event(
@@ -481,7 +481,7 @@ async def test_workflow_session_messages_shared_across_users(
     # Seed the owner's ADK session with one user message.
     session = await real_session_service.create_session(
         app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-        user_id=ws["userId"],
+        user_id=ws["initiatorId"],
         session_id=ws["sessionId"],
     )
     await real_session_service.append_event(
@@ -525,7 +525,7 @@ async def test_workflow_session_messages_record_sender_after_run(
         # owner-keyed ADK session during the run.
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["userId"],
+            user_id=ws["initiatorId"],
             session_id=ws["sessionId"],
         )
         await real_session_service.append_event(
@@ -577,7 +577,7 @@ async def test_workflow_session_messages_record_tool_sender_after_run(
         # session during the run.
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["userId"],
+            user_id=ws["initiatorId"],
             session_id=ws["sessionId"],
         )
         await real_session_service.append_event(
@@ -641,7 +641,7 @@ async def test_workflow_session_messages_skip_render_ack_sender(
         # render_a2ui call the user never acted on.
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["userId"],
+            user_id=ws["initiatorId"],
             session_id=ws["sessionId"],
         )
         await real_session_service.append_event(
@@ -708,7 +708,7 @@ async def test_workflow_session_messages_record_task_after_run(
     ) -> AsyncGenerator[Any, None]:
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["userId"],
+            user_id=ws["initiatorId"],
             session_id=ws["sessionId"],
         )
         # A user message before any task is started.

@@ -32,6 +32,12 @@ describe("WorkflowSessionsPage", () => {
     await waitFor(() => expect(screen.getByText("My Workflow")).toBeInTheDocument());
   });
 
+  it("links the Workflow cell to the session's detail page", async () => {
+    render(<WorkflowSessionsPage />);
+    const link = await screen.findByRole("link", { name: "My Workflow" });
+    expect(link).toHaveAttribute("href", "/admin/workflow-sessions/ws-1");
+  });
+
   it("resolves the session user ID to the user's name", async () => {
     render(<WorkflowSessionsPage />);
     await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());

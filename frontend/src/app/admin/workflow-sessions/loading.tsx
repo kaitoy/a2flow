@@ -10,7 +10,9 @@ export default function Loading() {
     <AdminPageContainer>
       <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Workflow Sessions" }]} />
       <AdminPageHeader title="Workflow Sessions" icon={ListChecks} />
-      <AdminListSkeleton columns={["Workflow", "Agent Skill", "User", "Created At", "Actions"]} />
+      <AdminListSkeleton
+        columns={["Workflow", "Agent Skill", "Initiator", "Created At", "Actions"]}
+      />
     </AdminPageContainer>
   );
 }

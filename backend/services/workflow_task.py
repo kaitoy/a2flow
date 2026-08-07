@@ -73,7 +73,7 @@ class WorkflowTaskService:
         ws = await self._ws_repo.get(ws_id)
         if ws is None:
             raise NotFoundError("WorkflowSession", ws_id)
-        await self._access.assert_access(ws_id, ws.user_id, caller)
+        await self._access.assert_access(ws_id, ws.initiator_id, caller)
 
     async def _assert_status_change_allowed(
         self, task: WorkflowTaskRead, caller: User
@@ -102,7 +102,7 @@ class WorkflowTaskService:
         if caller.id == approval.approver:
             return
         ws = await self._ws_repo.get(task.workflow_session_id)
-        if ws is not None and caller.id == ws.user_id:
+        if ws is not None and caller.id == ws.initiator_id:
             return
         raise ForbiddenError(
             "Only the session owner or the linked approval's designated "
@@ -153,7 +153,9 @@ class WorkflowTaskService:
         ws = await self._ws_repo.get(data.workflow_session_id)
         if ws is None:
             raise ForeignKeyViolationError("WorkflowSession", data.workflow_session_id)
-        await self._access.assert_access(data.workflow_session_id, ws.user_id, caller)
+        await self._access.assert_access(
+            data.workflow_session_id, ws.initiator_id, caller
+        )
         return await self._repo.create(data, user_id=caller.id)
 
     async def update(

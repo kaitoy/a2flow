@@ -130,7 +130,7 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
             agent_skill_name=skill.name,
             agent_skill_repo_url=str(skill.repo_url),
             agent_skill_repo_path=skill.repo_path,
-            user_id="owner",
+            initiator_id="owner",
         ),
         workflow_id=workflow.id,
         user_id="owner",

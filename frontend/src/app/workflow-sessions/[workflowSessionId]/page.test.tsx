@@ -21,7 +21,7 @@ const WORKFLOW_SESSION_1 = {
   agentSkillRepoUrl: "https://github.com/example/repo",
   agentSkillRepoPath: "",
   skillDir: "/tmp/skill",
-  userId: "user",
+  initiatorId: "user",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",

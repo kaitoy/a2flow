@@ -520,7 +520,7 @@ def upgrade() -> None:
         sa.Column(
             "agent_skill_commit_sha", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
-        sa.Column("user_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("initiator_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),

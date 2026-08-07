@@ -1066,7 +1066,7 @@ async def test_execute_workflow_uses_user_header(
         headers={"X-User-Id": "alice"},
     )
     body = assert_ok(response, status=201)
-    assert body["userId"] == "alice"
+    assert body["initiatorId"] == "alice"
 
 
 async def test_execute_workflow_copies_templates_into_session_tasks(
