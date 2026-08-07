@@ -24,6 +24,7 @@ import { zWorkflowTaskTemplateCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
   deleteWorkflowTaskTemplate,
+  getWorkflow,
   getWorkflowTaskTemplate,
   listWorkflowTaskTemplates,
   type ToolBinding,
@@ -70,6 +71,9 @@ export default function WorkflowTaskTemplateDetailPage() {
   // The persisted title, which names the page. Kept out of the form so the
   // heading names the saved record rather than following every keystroke.
   const [title, setTitle] = useState("");
+  // The parent workflow's name, shown as a breadcrumb crumb linking back to
+  // its detail page.
+  const [workflowName, setWorkflowName] = useState("");
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -124,6 +128,15 @@ export default function WorkflowTaskTemplateDetailPage() {
       });
   }, [workflowId]);
 
+  useEffect(() => {
+    getWorkflow(workflowId)
+      .then((wf) => setWorkflowName(wf.name))
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; the breadcrumb crumb
+        // simply stays as an ellipsis.
+      });
+  }, [workflowId]);
+
   async function onSubmit(values: FormValues) {
     try {
       await save.run(async () => {
@@ -155,6 +168,9 @@ export default function WorkflowTaskTemplateDetailPage() {
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Workflows", href: "/admin/workflows" },
+    // Links back to this template's parent workflow; an ellipsis stands in
+    // until its name has loaded.
+    { label: workflowName || "…", href: `/admin/workflows/${workflowId}` },
     { label: "Task Templates", href: `/admin/workflows/${workflowId}/task-templates` },
     // The template itself is the current page; an ellipsis stands in until its
     // title has loaded.

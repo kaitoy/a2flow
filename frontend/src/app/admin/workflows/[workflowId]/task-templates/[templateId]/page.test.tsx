@@ -26,7 +26,22 @@ const TEMPLATE = {
 function setup(template: unknown = TEMPLATE) {
   vi.mocked(useParams).mockReturnValue({ workflowId: "wf-1", templateId: "tmpl-1" });
   server.use(
-    http.get(`${BASE}/api/v1/workflow-task-templates/:templateId`, () => envelope(template))
+    http.get(`${BASE}/api/v1/workflow-task-templates/:templateId`, () => envelope(template)),
+    http.get(`${BASE}/api/v1/workflows/:id`, () =>
+      envelope({
+        id: "wf-1",
+        tenantId: "tenant-1",
+        name: "My Workflow",
+        description: null,
+        agentSkillId: "skill-1",
+        status: "draft",
+        generationError: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        createdBy: "",
+        updatedBy: "",
+      })
+    )
   );
 }
 
@@ -49,6 +64,14 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Template Step 1" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByText("Template Step 1")).toHaveAttribute("aria-current", "page");
+  });
+
+  it("adds a breadcrumb crumb linking back to the parent workflow", async () => {
+    setup();
+    render(<WorkflowTaskTemplateDetailPage />);
+    const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    const link = await within(nav).findByRole("link", { name: "My Workflow" });
+    expect(link).toHaveAttribute("href", "/admin/workflows/wf-1");
   });
 
   it("prefills the template's bound MCP tools", async () => {
