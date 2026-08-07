@@ -28,7 +28,7 @@ export default function Loading() {
         title="Task Templates"
         icon={ListTree}
         addHref={`/admin/workflows/${workflowId}/task-templates/new`}
-        addLabel="+ Add template"
+        addLabel="+ Add task"
       />
       <AdminListSkeleton
         columns={["#", "Title", "Description", "Depends on", "Tools", "Actions"]}

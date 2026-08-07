@@ -234,7 +234,7 @@ export default function WorkflowTaskTemplatesPage() {
         title="Task Templates"
         icon={ListTree}
         addHref={`/admin/workflows/${workflowId}/task-templates/new`}
-        addLabel="+ Add template"
+        addLabel="+ Add task"
         onRefresh={load}
         refreshing={loading}
         columnPicker={
