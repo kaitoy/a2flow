@@ -3,8 +3,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  ClipboardList,
   GitCompare,
-  ListTree,
   Loader2,
   MessageSquareText,
   Play,
@@ -538,7 +538,7 @@ export default function WorkflowDetailPage() {
 
         <div className="mt-4 flex items-center justify-between rounded-2xl glass-panel-strong p-4">
           <div className="flex items-center gap-2 text-sm text-on-surface">
-            <ListTree size={16} strokeWidth={1.8} aria-hidden="true" />
+            <ClipboardList size={16} strokeWidth={1.8} aria-hidden="true" />
             Task templates — the design copied into every run of this workflow.
           </div>
           <Link
