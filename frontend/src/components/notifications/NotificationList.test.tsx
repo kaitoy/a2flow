@@ -18,7 +18,7 @@ function makeNotification(overrides: Partial<Notification> = {}): Notification {
     type: "approval_request",
     title: "Plan ready for approval",
     body: null,
-    workflowSessionId: "ws-1",
+    workflowExecutionId: "execution-1",
     workflowId: null,
     read: false,
     createdAt: "2026-01-01T00:00:00Z",

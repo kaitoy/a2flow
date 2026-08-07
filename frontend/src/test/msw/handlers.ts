@@ -60,8 +60,8 @@ const WORKFLOW_1 = {
   updatedBy: "",
 };
 
-const WORKFLOW_SESSION_1 = {
-  id: "ws-1",
+const WORKFLOW_EXECUTION_1 = {
+  id: "execution-1",
   tenantId: "tenant-1",
   sessionId: "executed-session-id",
   workflowId: "wf-1",
@@ -109,7 +109,7 @@ const WORKFLOW_TASK_TEMPLATE_1 = {
 
 const WORKFLOW_TASK_1 = {
   id: "task-1",
-  workflowSessionId: "ws-1",
+  workflowExecutionId: "execution-1",
   title: "Step 1",
   description: null,
   status: "pending",
@@ -125,7 +125,7 @@ const WORKFLOW_TASK_1 = {
 const APPROVAL_1 = {
   id: "appr-1",
   tenantId: "tenant-1",
-  workflowSessionId: "ws-1",
+  workflowExecutionId: "execution-1",
   workflowTaskId: null,
   title: "Deploy to production",
   description: "The agent wants to deploy. Approve?",
@@ -320,15 +320,15 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/design-sessions/:dsId/messages`, () => envelope([])),
 
-  http.post(`${BASE}/api/v1/workflows/:id/execute`, () => envelope(WORKFLOW_SESSION_1, 201)),
+  http.post(`${BASE}/api/v1/workflows/:id/execute`, () => envelope(WORKFLOW_EXECUTION_1, 201)),
 
-  http.get(`${BASE}/api/v1/workflow-sessions`, () => envelope([WORKFLOW_SESSION_1])),
+  http.get(`${BASE}/api/v1/workflow-executions`, () => envelope([WORKFLOW_EXECUTION_1])),
 
-  http.get(`${BASE}/api/v1/workflow-sessions/:id`, () => envelope(WORKFLOW_SESSION_1)),
+  http.get(`${BASE}/api/v1/workflow-executions/:id`, () => envelope(WORKFLOW_EXECUTION_1)),
 
-  http.get(`${BASE}/api/v1/workflow-sessions/:wsId/messages`, () => envelope([])),
+  http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, () => envelope([])),
 
-  http.get(`${BASE}/api/v1/workflow-sessions/:wsId/workflow-tasks`, () =>
+  http.get(`${BASE}/api/v1/workflow-executions/:executionId/workflow-tasks`, () =>
     envelope([WORKFLOW_TASK_1])
   ),
 
@@ -402,7 +402,7 @@ export const handlers = [
       type: "approval_request",
       title: "Plan ready for approval",
       body: null,
-      workflowSessionId: "ws-1",
+      workflowExecutionId: "execution-1",
       read: body.read ?? true,
       createdAt: "2026-01-01T00:00:00Z",
       updatedAt: "2026-01-01T00:00:00Z",

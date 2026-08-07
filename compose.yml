@@ -61,7 +61,7 @@ services:
       DEMO_AWS_REGION: ${DEMO_AWS_REGION:-us-east-1}
       CORS_ORIGINS: http://localhost:3000
       # Store of cloned skill repositories, one directory per published
-      # revision. Durable state, not a cache: a workflow session pins the
+      # revision. Durable state, not a cache: a workflow execution pins the
       # revision it started with. Scaling the backend past one replica requires
       # every replica to mount this same volume (ReadWriteMany).
       SKILLS_DIR: /var/lib/a2flow/skills

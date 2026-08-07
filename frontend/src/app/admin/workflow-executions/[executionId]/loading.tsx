@@ -5,14 +5,14 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 
-/** Route-transition fallback for the workflow session detail page, matching its own post-mount `FormSkeleton`. */
+/** Route-transition fallback for the workflow execution detail page, matching its own post-mount `FormSkeleton`. */
 export default function Loading() {
   return (
     <AdminPageContainer>
       <Breadcrumbs
         items={[
           { label: "Admin", href: "/admin" },
-          { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
+          { label: "Workflow Executions", href: "/admin/workflow-executions" },
           { label: "…" },
         ]}
       />

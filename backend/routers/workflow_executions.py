@@ -1,4 +1,12 @@
-"""Endpoints for retrieving WorkflowSession details and streaming the workflow agent."""
+"""Endpoints for WorkflowExecution records and for their workflow sessions.
+
+A WorkflowExecution is one run of a published workflow: the snapshot of the
+workflow and skill it started against, plus the WorkflowTasks it works through.
+The *workflow session* is the LLM chat that run happens in — the ADK session
+named by ``WorkflowExecution.session_id``. It has no table of its own, so it is
+identified by its execution and served from this router's ``/messages`` and
+``/agent`` sub-resources, mirroring ``routers/design_sessions.py``.
+"""
 
 from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack
@@ -17,27 +25,27 @@ from dependencies import (
     FilterDep,
     PaginationDep,
     SortDep,
-    WorkflowSessionServiceDep,
+    WorkflowExecutionServiceDep,
 )
 from infrastructure.agent import keep_a2ui_context, tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
 from models.response import ApiResponse
-from models.workflow_session import WorkflowSession
+from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
 from repositories.exceptions import SessionRunInProgressError
 
-router = APIRouter(prefix="/workflow-sessions", tags=["workflow-sessions"])
+router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 
 
-@router.get("", response_model=ApiResponse[list[WorkflowSession]])
-async def list_workflow_sessions(
-    service: WorkflowSessionServiceDep,
+@router.get("", response_model=ApiResponse[list[WorkflowExecution]])
+async def list_workflow_executions(
+    service: WorkflowExecutionServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
     meta: ApiMetaDep,
-) -> ApiResponse[list[WorkflowSession]]:
-    """Return WorkflowSession records, defaulting to ``created_at`` descending."""
+) -> ApiResponse[list[WorkflowExecution]]:
+    """Return WorkflowExecution records, defaulting to ``created_at`` descending."""
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
@@ -47,43 +55,43 @@ async def list_workflow_sessions(
     return ApiResponse(meta=meta, data=items)
 
 
-@router.get("/{ws_id}", response_model=ApiResponse[WorkflowSession])
-async def get_workflow_session(
-    ws_id: str,
-    service: WorkflowSessionServiceDep,
+@router.get("/{execution_id}", response_model=ApiResponse[WorkflowExecution])
+async def get_workflow_execution(
+    execution_id: str,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     meta: ApiMetaDep,
-) -> ApiResponse[WorkflowSession]:
-    """Return the WorkflowSession record for the given ID.
+) -> ApiResponse[WorkflowExecution]:
+    """Return the WorkflowExecution record for the given ID.
 
-    Only the session owner, a designated approver of the session, or a super
-    admin may access it; anyone else receives HTTP 403 (``FORBIDDEN``).
+    Only the execution's initiator, a designated approver of the execution, or
+    a super admin may access it; anyone else receives HTTP 403 (``FORBIDDEN``).
     """
-    ws = await service.get(ws_id, caller=caller)
-    return ApiResponse(meta=meta, data=ws)
+    execution = await service.get(execution_id, caller=caller)
+    return ApiResponse(meta=meta, data=execution)
 
 
 @router.get(
-    "/{ws_id}/workflow-tasks", response_model=ApiResponse[list[WorkflowTaskRead]]
+    "/{execution_id}/workflow-tasks", response_model=ApiResponse[list[WorkflowTaskRead]]
 )
-async def list_workflow_session_tasks(
-    ws_id: str,
-    service: WorkflowSessionServiceDep,
+async def list_workflow_execution_tasks(
+    execution_id: str,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[WorkflowTaskRead]]:
-    """Return the WorkflowTasks belonging to the given WorkflowSession.
+    """Return the WorkflowTasks belonging to the given WorkflowExecution.
 
-    Restricted to the session owner, its designated approvers, and super
-    admins. Raises HTTP 404 (``NotFoundError``) if the parent session does not
-    exist, so callers can distinguish "no such session" from "session exists
-    but has no tasks".
+    Restricted to the execution's initiator, its designated approvers, and
+    super admins. Raises HTTP 404 (``NotFoundError``) if the parent execution
+    does not exist, so callers can distinguish "no such execution" from
+    "execution exists but has no tasks".
     """
     items = await service.list_tasks(
-        ws_id,
+        execution_id,
         caller=caller,
         limit=pagination.limit,
         offset=pagination.offset,
@@ -93,47 +101,47 @@ async def list_workflow_session_tasks(
     return ApiResponse(meta=meta, data=items)
 
 
-@router.delete("/{ws_id}", response_model=ApiResponse[None])
-async def delete_workflow_session(
-    ws_id: str,
-    service: WorkflowSessionServiceDep,
+@router.delete("/{execution_id}", response_model=ApiResponse[None])
+async def delete_workflow_execution(
+    execution_id: str,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
-    """Delete a WorkflowSession, its WorkflowTasks, and its ADK chat session.
+    """Delete a WorkflowExecution, its WorkflowTasks, and its workflow session.
 
-    Restricted to the session owner and super admins (stricter than the
+    Restricted to the execution's initiator and super admins (stricter than the
     shared-chat access rule). Raises HTTP 404 (``NotFoundError``) if no
-    session exists with the given ID.
+    execution exists with the given ID.
     """
-    await service.delete(ws_id, caller=caller)
+    await service.delete(execution_id, caller=caller)
     return ApiResponse(meta=meta, data=None)
 
 
-@router.post("/{ws_id}/agent", include_in_schema=False)
+@router.post("/{execution_id}/agent", include_in_schema=False)
 async def workflow_session_agent(
-    ws_id: str,
+    execution_id: str,
     input_data: RunAgentInput,
     request: Request,
-    service: WorkflowSessionServiceDep,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
 ) -> StreamingResponse:
-    """Stream AG-UI events from the agent bound to a specific workflow session.
+    """Stream AG-UI events from the agent driving an execution's workflow session.
 
-    Restricted to the session owner, its designated approvers, and super
-    admins. The skill and skill directory are resolved from the
-    WorkflowSession record so the correct ADK tools are loaded regardless of
+    Restricted to the execution's initiator, its designated approvers, and
+    super admins. The skill and skill directory are resolved from the
+    WorkflowExecution record so the correct ADK tools are loaded regardless of
     the global agent state. SystemMessages are stripped to prevent prompt
     injection.
 
-    Because the run is keyed by the session owner, the new messages are
+    Because the run is keyed by the execution's initiator, the new messages are
     attributed to the actual sender (the caller) once the run ends: the
     session's attributable keys present before the run are snapshotted
     (``"user"`` event ids and tool-response tool_call_ids -- the latter covers
     A2UI user-action acknowledgements), and any that appear afterwards are
     recorded as the current user's -- except no-op render acknowledgements,
     which merely unblock surfaces nobody acted on (see
-    ``WorkflowSessionService.record_new_senders``). "Ends" includes ending
+    ``WorkflowExecutionService.record_new_senders``). "Ends" includes ending
     badly: a run the client abandoned mid-stream has still appended its
     messages, so the attribution runs on the cancellation path too, shielded
     from it.
@@ -147,7 +155,7 @@ async def workflow_session_agent(
     """
     # Resolve (and authorize) before locking, so a caller with no business here
     # gets their 403/404 rather than queueing behind someone else's run.
-    adk_agent, ws = await service.resolve_agent(ws_id, caller=caller)
+    adk_agent, execution = await service.resolve_agent(execution_id, caller=caller)
     current_user_id = caller.id
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
@@ -157,17 +165,19 @@ async def workflow_session_agent(
     # render_a2ui argument format — and the workflow description is prepended
     # from the server-trusted record rather than taken from the client.
     context = keep_a2ui_context(input_data.context or [])
-    if ws.workflow_description:
+    if execution.workflow_description:
         context.insert(
             0,
-            Context(description="Workflow description", value=ws.workflow_description),
+            Context(
+                description="Workflow description", value=execution.workflow_description
+            ),
         )
     input_data = input_data.model_copy(
         update={"messages": filtered, "context": context}
     )
-    # Key the ADK run by the WorkflowSession's owner rather than the current user
+    # Key the ADK run by the WorkflowExecution's owner rather than the current user
     # so every viewer (e.g. a designated approver) shares the same ADK session.
-    input_data = with_user_id(input_data, ws.initiator_id)
+    input_data = with_user_id(input_data, execution.initiator_id)
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
     async with AsyncExitStack() as stack:
@@ -179,8 +189,8 @@ async def workflow_session_agent(
             await stack.enter_async_context(
                 advisory_lock(
                     agent_run_key(
-                        tenant_app_name(APP_NAME, ws.tenant_id),
-                        ws.initiator_id,
+                        tenant_app_name(APP_NAME, execution.tenant_id),
+                        execution.initiator_id,
                         input_data.thread_id,
                     )
                 )
@@ -191,7 +201,7 @@ async def workflow_session_agent(
         # Snapshot inside the lock: this is the "before" half of a read-then-diff
         # over session state, and a concurrent run appending between the two
         # halves would misattribute its messages to this caller.
-        prior_keys = await service.attributable_keys(ws_id)
+        prior_keys = await service.attributable_keys(execution_id)
 
         run_stack = stack.pop_all()
 
@@ -213,10 +223,12 @@ async def workflow_session_agent(
                     # Attribute the messages this run appended to the user who
                     # sent them. Still inside the run lock -- this is the "after"
                     # half of the read-then-diff the snapshot above opened.
-                    await service.record_new_senders(ws_id, prior_keys, current_user_id)
+                    await service.record_new_senders(
+                        execution_id, prior_keys, current_user_id
+                    )
                     # Associate each message with the workflow task in progress
                     # at the time.
-                    await service.record_message_tasks(ws_id)
+                    await service.record_message_tasks(execution_id)
 
     return StreamingResponse(
         event_generator(),
@@ -225,20 +237,22 @@ async def workflow_session_agent(
     )
 
 
-@router.get("/{ws_id}/messages", response_model=ApiResponse[list[dict[str, Any]]])
+@router.get(
+    "/{execution_id}/messages", response_model=ApiResponse[list[dict[str, Any]]]
+)
 async def get_workflow_session_messages(
-    ws_id: str,
-    service: WorkflowSessionServiceDep,
+    execution_id: str,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[dict[str, Any]]]:
-    """Return the chat history of a WorkflowSession's ADK session.
+    """Return the chat history of a WorkflowExecution's workflow session.
 
-    Restricted to the session owner, its designated approvers, and super
-    admins. The history is keyed by the session's owner, so a designated
-    approver opening the chat sees the owner's conversation rather than an
-    empty, separate session. Returns an empty list when the ADK session has not
-    been created yet. Raises HTTP 404 if the WorkflowSession does not exist.
+    Restricted to the execution's initiator, its designated approvers, and
+    super admins. The history is keyed by the initiator, so a designated
+    approver opening the chat sees their conversation rather than an empty,
+    separate session. Returns an empty list when the ADK session has not been
+    created yet. Raises HTTP 404 if the WorkflowExecution does not exist.
     """
-    messages = await service.get_messages(ws_id, caller=caller)
+    messages = await service.get_messages(execution_id, caller=caller)
     return ApiResponse(meta=meta, data=messages)

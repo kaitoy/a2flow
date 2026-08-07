@@ -5,7 +5,7 @@ paths:
 
 # List Query Parameters
 
-Every collection endpoint (`GET /agent-skills`, `GET /workflows`, `GET /workflows/{id}/task-templates`, `GET /workflow-sessions`, `GET /workflow-sessions/{id}/workflow-tasks`, `GET /notifications`) accepts the same set of optional query parameters. Field names are written in **camelCase** (matching the JSON response), and an unknown field, operator, or uncoercible value returns HTTP 400 with the `INVALID_QUERY` error code.
+Every collection endpoint (`GET /agent-skills`, `GET /workflows`, `GET /workflows/{id}/task-templates`, `GET /workflow-executions`, `GET /workflow-executions/{id}/workflow-tasks`, `GET /notifications`) accepts the same set of optional query parameters. Field names are written in **camelCase** (matching the JSON response), and an unknown field, operator, or uncoercible value returns HTTP 400 with the `INVALID_QUERY` error code.
 
 | Param | Purpose | Syntax | Example |
 |---|---|---|---|

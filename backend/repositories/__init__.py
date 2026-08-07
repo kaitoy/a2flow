@@ -23,11 +23,14 @@ from .tenant import SqlTenantRepository, TenantRepository
 from .user import SqlUserRepository, UserRepository
 from .user_avatar import SqlUserAvatarRepository, UserAvatarRepository
 from .workflow import SqlWorkflowRepository, WorkflowRepository
+from .workflow_execution import (
+    SqlWorkflowExecutionRepository,
+    WorkflowExecutionRepository,
+)
 from .workflow_published_version import (
     SqlWorkflowPublishedVersionRepository,
     WorkflowPublishedVersionRepository,
 )
-from .workflow_session import SqlWorkflowSessionRepository, WorkflowSessionRepository
 from .workflow_task import SqlWorkflowTaskRepository, WorkflowTaskRepository
 from .workflow_task_template import (
     MAX_TASK_TEMPLATES,
@@ -65,7 +68,7 @@ __all__ = [
     "SqlUserRepository",
     "SqlWorkflowPublishedVersionRepository",
     "SqlWorkflowRepository",
-    "SqlWorkflowSessionRepository",
+    "SqlWorkflowExecutionRepository",
     "SqlWorkflowTaskRepository",
     "SqlWorkflowTaskTemplateRepository",
     "TenantRepository",
@@ -75,7 +78,7 @@ __all__ = [
     "UserRepository",
     "WorkflowPublishedVersionRepository",
     "WorkflowRepository",
-    "WorkflowSessionRepository",
+    "WorkflowExecutionRepository",
     "WorkflowTaskRepository",
     "WorkflowTaskTemplateRepository",
 ]

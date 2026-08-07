@@ -35,11 +35,11 @@ describe("ApprovalsPage", () => {
     expect(screen.getByText("Looks good to me")).toBeInTheDocument();
   });
 
-  it("links to the workflow session chat", async () => {
+  it("links to the workflow execution chat", async () => {
     render(<ApprovalsPage />);
     await waitFor(() => screen.getByText("Deploy to production"));
     const link = screen.getByRole("link", { name: "Open chat" });
-    expect(link).toHaveAttribute("href", "/workflow-sessions/ws-1");
+    expect(link).toHaveAttribute("href", "/workflow-sessions/execution-1");
   });
 
   it("shows the empty-state message when no approvals exist", async () => {

@@ -25,7 +25,7 @@ function persistSelection(tenantId: string | null): void {
  * Tenant picker rendered in the app header for a signed-in Super Admin.
  *
  * A Super Admin has no tenant of their own, but nearly every resource
- * (agent skills, workflows, secrets, MCP servers, workflow sessions, chat)
+ * (agent skills, workflows, secrets, MCP servers, workflow executions, chat)
  * belongs to one — so this lets them pick which tenant to "act as." The
  * selection is sent as the `X-Tenant-Id` header on every API request (see
  * `lib/api.ts`), remembered across reloads, and auto-selects the first

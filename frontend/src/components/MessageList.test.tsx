@@ -8,7 +8,7 @@ import { MessageList } from "./MessageList";
 
 const makeTask = (id: string, title: string): WorkflowTask => ({
   id,
-  workflowSessionId: "ws",
+  workflowExecutionId: "execution",
   title,
   status: "in_progress",
   position: 0,

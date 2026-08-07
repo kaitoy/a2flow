@@ -545,14 +545,14 @@ async def test_delete_server_unknown_id_returns_404(mcp_client: AsyncClient) -> 
 async def test_delete_server_referenced_by_binding_returns_409(
     mcp_client: AsyncClient, mem_engine: AsyncEngine
 ) -> None:
-    from models.workflow_session import WorkflowSession
+    from models.workflow_execution import WorkflowExecution
     from models.workflow_task import WorkflowTask, WorkflowTaskToolBinding
 
     created = assert_ok(
         await mcp_client.post("/api/v1/mcp-servers", json=_CREATE_BODY), status=201
     )
     async with AsyncSession(mem_engine) as db:
-        ws = WorkflowSession(
+        execution = WorkflowExecution(
             session_id="sess-1",
             workflow_name="wf",
             workflow_prompt="p",
@@ -566,11 +566,11 @@ async def test_delete_server_referenced_by_binding_returns_409(
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )
-        db.add(ws)
+        db.add(execution)
         await db.commit()
-        await db.refresh(ws)
+        await db.refresh(execution)
         task = WorkflowTask(
-            workflow_session_id=ws.id,
+            workflow_execution_id=execution.id,
             title="Step",
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,

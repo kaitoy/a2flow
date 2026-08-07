@@ -5,7 +5,7 @@ templates are produced by the workflow's design session (the agent registers
 them via the design tools) and may also be edited manually through the admin
 API. When the workflow is executed, its templates are copied into status-ful
 :class:`models.workflow_task.WorkflowTask` rows belonging to the new
-WorkflowSession, so later template edits never affect runs already started.
+WorkflowExecution, so later template edits never affect runs already started.
 
 Like session tasks, templates form a directed acyclic graph (DAG): dependency
 edges live in :class:`WorkflowTaskTemplateDependency` and are surfaced on read

@@ -102,7 +102,7 @@ export function MessageList({
   isStreaming?: boolean;
   isRunning?: boolean;
   /**
-   * Optional sender-avatar renderer. When provided (workflow sessions) the
+   * Optional sender-avatar renderer. When provided (workflow executions) the
    * returned node is shown beside each conversational bubble; omitted for the
    * single-user chat, which renders no avatars.
    */

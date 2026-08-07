@@ -8,12 +8,13 @@ import {
 } from "@/components/WorkflowTaskTimeline";
 
 /**
- * Placeholder chat layout shown while a WorkflowSession record loads, so the
- * page presents the header shell and a few message-bubble skeletons instead of
- * flashing a blank screen. Shares its sidebar chrome classes with
- * {@link WorkflowTaskTimeline} so this loading state can't silently drift from
- * the real layout it stands in for. Used both by the workflow session page's
- * own post-mount loading branch and by that route's `loading.tsx`.
+ * Placeholder chat layout shown while a session page loads, so it presents the
+ * header shell and a few message-bubble skeletons instead of flashing a blank
+ * screen. Shares its sidebar chrome classes with {@link WorkflowTaskTimeline}
+ * so this loading state can't silently drift from the real layout it stands in
+ * for. Used by both session chats — the workflow session (which loads its
+ * WorkflowExecution first) and the design session — from their own post-mount
+ * loading branch and from their routes' `loading.tsx`.
  */
 export function WorkflowSessionSkeleton() {
   return (

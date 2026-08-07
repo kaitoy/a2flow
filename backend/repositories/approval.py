@@ -11,7 +11,7 @@ from models.user import User
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
-from repositories.workflow_session import WorkflowSessionRepository
+from repositories.workflow_execution import WorkflowExecutionRepository
 
 
 class ApprovalRepository(Protocol):
@@ -37,7 +37,7 @@ class ApprovalRepository(Protocol):
     async def exists(self, approval_id: str) -> bool: ...
 
     async def exists_for_approver(
-        self, workflow_session_id: str, user_id: str
+        self, workflow_execution_id: str, user_id: str
     ) -> bool: ...
 
     async def get_for_task(self, workflow_task_id: str) -> Approval | None: ...
@@ -49,18 +49,18 @@ class SqlApprovalRepository:
     def __init__(
         self,
         session: AsyncSession,
-        ws_repo: WorkflowSessionRepository,
+        execution_repo: WorkflowExecutionRepository,
         *,
         tenant_id: str,
     ) -> None:
-        """Store the async session and the WorkflowSession repository.
+        """Store the async session and the WorkflowExecution repository.
 
-        The WorkflowSession repository is used to validate that the parent
+        The WorkflowExecution repository is used to validate that the parent
         session exists before inserting an approval, producing a friendlier
         :class:`ForeignKeyViolationError` than the raw database constraint.
         """
         self._db = session
-        self._ws_repo = ws_repo
+        self._execution_repo = execution_repo
         self._tenant_id = tenant_id
 
     async def _get_scoped(self, approval_id: str) -> Approval | None:
@@ -107,7 +107,7 @@ class SqlApprovalRepository:
         return list(result.all())
 
     async def create(self, data: ApprovalCreate, *, user_id: str) -> Approval:
-        """Persist a new Approval, validating its workflow session exists.
+        """Persist a new Approval, validating its workflow execution exists.
 
         Args:
             data: The approval fields to insert.
@@ -117,12 +117,14 @@ class SqlApprovalRepository:
             The created approval.
 
         Raises:
-            ForeignKeyViolationError: If ``workflow_session_id`` does not match an
-                existing workflow session, or ``approver`` is set but does not
+            ForeignKeyViolationError: If ``workflow_execution_id`` does not match an
+                existing workflow execution, or ``approver`` is set but does not
                 match an existing user.
         """
-        if await self._ws_repo.get(data.workflow_session_id) is None:
-            raise ForeignKeyViolationError("WorkflowSession", data.workflow_session_id)
+        if await self._execution_repo.get(data.workflow_execution_id) is None:
+            raise ForeignKeyViolationError(
+                "WorkflowExecution", data.workflow_execution_id
+            )
         if (
             data.approver is not None
             and await self._db.get(User, data.approver) is None
@@ -165,15 +167,17 @@ class SqlApprovalRepository:
         result = await self._db.exec(stmt)
         return result.first() is not None
 
-    async def exists_for_approver(self, workflow_session_id: str, user_id: str) -> bool:
+    async def exists_for_approver(
+        self, workflow_execution_id: str, user_id: str
+    ) -> bool:
         """Return whether the session has any Approval addressed to the user.
 
-        Backs the workflow-session access check: a user designated as the
+        Backs the workflow-execution access check: a user designated as the
         approver of any approval in a session may view and participate in that
         session's shared chat.
 
         Args:
-            workflow_session_id: Identifier of the workflow session.
+            workflow_execution_id: Identifier of the workflow execution.
             user_id: The candidate approver's user ID.
 
         Returns:
@@ -183,7 +187,7 @@ class SqlApprovalRepository:
         stmt = (
             select(Approval.id)
             .where(
-                Approval.workflow_session_id == workflow_session_id,
+                Approval.workflow_execution_id == workflow_execution_id,
                 Approval.approver == user_id,
                 Approval.tenant_id == self._tenant_id,
             )

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { store as appStore } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import WorkflowSessionsPage from "./page";
+import WorkflowExecutionsPage from "./page";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -26,60 +26,60 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-describe("WorkflowSessionsPage", () => {
+describe("WorkflowExecutionsPage", () => {
   it("renders session row after load", async () => {
-    render(<WorkflowSessionsPage />);
+    render(<WorkflowExecutionsPage />);
     await waitFor(() => expect(screen.getByText("My Workflow")).toBeInTheDocument());
   });
 
   it("links the Workflow cell to the session's detail page", async () => {
-    render(<WorkflowSessionsPage />);
+    render(<WorkflowExecutionsPage />);
     const link = await screen.findByRole("link", { name: "My Workflow" });
-    expect(link).toHaveAttribute("href", "/admin/workflow-sessions/ws-1");
+    expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1");
   });
 
   it("resolves the session user ID to the user's name", async () => {
-    render(<WorkflowSessionsPage />);
+    render(<WorkflowExecutionsPage />);
     await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
   });
 
   it("links the user name to the user's edit page", async () => {
-    render(<WorkflowSessionsPage />);
+    render(<WorkflowExecutionsPage />);
     const link = await screen.findByRole("link", { name: "Alice Smith" });
     expect(link).toHaveAttribute("href", "/admin/users/user");
   });
 
   it("renders View tasks link to nested admin route", async () => {
-    render(<WorkflowSessionsPage />);
+    render(<WorkflowExecutionsPage />);
     await waitFor(() => screen.getByText("My Workflow"));
     const link = screen.getByRole("link", { name: "View tasks" });
-    expect(link).toHaveAttribute("href", "/admin/workflow-sessions/ws-1/workflow-tasks");
+    expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1/workflow-tasks");
   });
 
   it("renders Open workflow session link to the chat page", async () => {
-    render(<WorkflowSessionsPage />);
+    render(<WorkflowExecutionsPage />);
     await waitFor(() => screen.getByText("My Workflow"));
     const link = screen.getByRole("link", { name: "Open workflow session" });
-    expect(link).toHaveAttribute("href", "/workflow-sessions/ws-1");
+    expect(link).toHaveAttribute("href", "/workflow-sessions/execution-1");
   });
 
   it("shows empty-state message when no sessions exist", async () => {
-    server.use(http.get("http://localhost:8000/api/v1/workflow-sessions", () => envelope([])));
-    render(<WorkflowSessionsPage />);
+    server.use(http.get("http://localhost:8000/api/v1/workflow-executions", () => envelope([])));
+    render(<WorkflowExecutionsPage />);
     await waitFor(() =>
       expect(
-        screen.getByText("No workflow sessions yet. Run a workflow to create one.")
+        screen.getByText("No workflow executions yet. Run a workflow to create one.")
       ).toBeInTheDocument()
     );
   });
 
   it("shows an error toast when load fails", async () => {
     server.use(
-      http.get("http://localhost:8000/api/v1/workflow-sessions", () =>
+      http.get("http://localhost:8000/api/v1/workflow-executions", () =>
         envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
       )
     );
-    render(<WorkflowSessionsPage />);
+    render(<WorkflowExecutionsPage />);
     await waitFor(() =>
       expect(appStore.getState().toast.items.at(-1)).toMatchObject({
         message: "Internal server error",
@@ -91,9 +91,9 @@ describe("WorkflowSessionsPage", () => {
   it("calls delete api after confirm", async () => {
     const user = userEvent.setup();
     const deleteSpy = vi.fn(() => envelope(null));
-    server.use(http.delete("http://localhost:8000/api/v1/workflow-sessions/:id", deleteSpy));
+    server.use(http.delete("http://localhost:8000/api/v1/workflow-executions/:id", deleteSpy));
 
-    render(<WorkflowSessionsPage />);
+    render(<WorkflowExecutionsPage />);
     await waitFor(() => screen.getByText("My Workflow"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     const dialog = screen.getByRole("dialog");

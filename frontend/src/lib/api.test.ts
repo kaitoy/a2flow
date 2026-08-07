@@ -56,24 +56,24 @@ describe("getSessionMessages", () => {
 });
 
 describe("getWorkflowSessionMessages", () => {
-  it("fetches the workflow-session-scoped messages URL", async () => {
+  it("fetches the workflow-execution-scoped messages URL", async () => {
     let calledUrl = "";
     server.use(
-      http.get(`${BASE}/api/v1/workflow-sessions/:wsId/messages`, ({ request }) => {
+      http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, ({ request }) => {
         calledUrl = request.url;
         return envelope([]);
       })
     );
-    const result = await getWorkflowSessionMessages("ws-1");
+    const result = await getWorkflowSessionMessages("execution-1");
     expect(Array.isArray(result)).toBe(true);
-    expect(calledUrl).toContain("/workflow-sessions/ws-1/messages");
+    expect(calledUrl).toContain("/workflow-executions/execution-1/messages");
   });
 });
 
 describe("getWorkflowSessionMessageTasks", () => {
   it("maps message ids to their workflow task id, skipping null", async () => {
     server.use(
-      http.get(`${BASE}/api/v1/workflow-sessions/:wsId/messages`, () =>
+      http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, () =>
         envelope([
           { id: "m1", role: "user", content: "go", workflowTaskId: null },
           { id: "m2", role: "assistant", content: "a", workflowTaskId: "task-a" },
@@ -81,7 +81,7 @@ describe("getWorkflowSessionMessageTasks", () => {
         ])
       )
     );
-    const result = await getWorkflowSessionMessageTasks("ws-1");
+    const result = await getWorkflowSessionMessageTasks("execution-1");
     expect(result.get("m1")).toBeUndefined();
     expect(result.get("m2")).toBe("task-a");
     expect(result.get("m3")).toBe("task-b");
@@ -91,7 +91,7 @@ describe("getWorkflowSessionMessageTasks", () => {
 describe("getWorkflowSessionMessageSenders", () => {
   it("keys user messages by id and tool messages by toolCallId, skipping unattributed", async () => {
     server.use(
-      http.get(`${BASE}/api/v1/workflow-sessions/:wsId/messages`, () =>
+      http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, () =>
         envelope([
           { id: "m1", role: "user", content: "go", senderUserId: "alice" },
           { id: "m2", role: "assistant", content: "a", senderUserId: null },
@@ -106,7 +106,7 @@ describe("getWorkflowSessionMessageSenders", () => {
         ])
       )
     );
-    const result = await getWorkflowSessionMessageSenders("ws-1");
+    const result = await getWorkflowSessionMessageSenders("execution-1");
     expect(result.get("m1")).toBe("alice");
     // Tool messages are keyed by toolCallId, not their own (regenerated) id.
     expect(result.get("tc-1")).toBe("bob");

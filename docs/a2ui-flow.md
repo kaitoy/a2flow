@@ -232,7 +232,7 @@ matched it, and every reloaded surface fell back to the agent's defaults. A JSON
 round-trips through ADK byte-for-byte. (This is also why `RENDER_ACK_CONTENT` —
 `{"status":"rendered"}` — always worked: it was already valid JSON.) `status: "action"` is
 deliberately distinct from `"rendered"` so `record_new_senders`
-(`backend/services/workflow_session.py`) keeps telling a real action apart from a no-op ack.
+(`backend/services/workflow_execution.py`) keeps telling a real action apart from a no-op ack.
 
 **The whole data model, not just `context`.** `SurfaceModel.dispatchAction` populates `context`
 from the acted-on component's `action.event.context` — i.e. only the bindings *the agent chose to

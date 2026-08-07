@@ -14,7 +14,7 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  useParams: () => ({ wsId: "ws-1" }),
+  useParams: () => ({ executionId: "execution-1" }),
   useRouter: () => ({ push: vi.fn() }),
 }));
 
@@ -24,11 +24,11 @@ describe("WorkflowTasksPage", () => {
     await waitFor(() => expect(screen.getByText("Step 1")).toBeInTheDocument());
   });
 
-  it("adds a breadcrumb crumb linking back to the workflow session's admin record", async () => {
+  it("adds a breadcrumb crumb linking back to the workflow execution's admin record", async () => {
     render(<WorkflowTasksPage />);
     const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
     const link = await within(nav).findByRole("link", { name: "My Workflow" });
-    expect(link).toHaveAttribute("href", "/admin/workflow-sessions/ws-1");
+    expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1");
   });
 
   it("renders the task title as plain text (the run's task list is read-only)", async () => {
@@ -39,11 +39,11 @@ describe("WorkflowTasksPage", () => {
 
   it("renders a Depends on column resolving dependency ids to titles", async () => {
     server.use(
-      http.get("http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks", () =>
+      http.get("http://localhost:8000/api/v1/workflow-executions/:executionId/workflow-tasks", () =>
         envelope([
           {
             id: "task-1",
-            workflowSessionId: "ws-1",
+            workflowExecutionId: "execution-1",
             title: "Step 1",
             description: null,
             status: "pending",
@@ -56,7 +56,7 @@ describe("WorkflowTasksPage", () => {
           },
           {
             id: "task-2",
-            workflowSessionId: "ws-1",
+            workflowExecutionId: "execution-1",
             title: "Step 2",
             description: null,
             status: "pending",
@@ -82,11 +82,11 @@ describe("WorkflowTasksPage", () => {
   it("highlights the dependency's own row while its chip is hovered", async () => {
     const user = userEvent.setup();
     server.use(
-      http.get("http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks", () =>
+      http.get("http://localhost:8000/api/v1/workflow-executions/:executionId/workflow-tasks", () =>
         envelope([
           {
             id: "task-1",
-            workflowSessionId: "ws-1",
+            workflowExecutionId: "execution-1",
             title: "Step 1",
             description: null,
             status: "pending",
@@ -99,7 +99,7 @@ describe("WorkflowTasksPage", () => {
           },
           {
             id: "task-2",
-            workflowSessionId: "ws-1",
+            workflowExecutionId: "execution-1",
             title: "Step 2",
             description: null,
             status: "pending",
@@ -131,7 +131,7 @@ describe("WorkflowTasksPage", () => {
     const urls: string[] = [];
     server.use(
       http.get(
-        "http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks",
+        "http://localhost:8000/api/v1/workflow-executions/:executionId/workflow-tasks",
         ({ request }) => {
           urls.push(request.url);
           return envelope([]);
@@ -151,11 +151,11 @@ describe("WorkflowTasksPage", () => {
 
   it("renders a Tools column resolving server ids to names", async () => {
     server.use(
-      http.get("http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks", () =>
+      http.get("http://localhost:8000/api/v1/workflow-executions/:executionId/workflow-tasks", () =>
         envelope([
           {
             id: "task-1",
-            workflowSessionId: "ws-1",
+            workflowExecutionId: "execution-1",
             title: "Step 1",
             description: null,
             status: "pending",
@@ -201,7 +201,7 @@ describe("WorkflowTasksPage", () => {
 
   it("shows an error toast when load fails", async () => {
     server.use(
-      http.get("http://localhost:8000/api/v1/workflow-sessions/:wsId/workflow-tasks", () =>
+      http.get("http://localhost:8000/api/v1/workflow-executions/:executionId/workflow-tasks", () =>
         envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
       )
     );

@@ -113,7 +113,7 @@ class SkillNotReadyError(RepositoryError):
     directory and recorded the sha on ``AgentSkill.commit_sha``. Until then —
     while the registration clone is still running, or after it failed — running
     a workflow on it has nothing to load. Also raised when the revision a
-    WorkflowSession pinned is no longer on disk and the skill has no current
+    WorkflowExecution pinned is no longer on disk and the skill has no current
     revision to fall back on, which an admin fixes by pulling the skill again.
 
     Carries the ``skill_id`` so the HTTP layer can surface it in the error

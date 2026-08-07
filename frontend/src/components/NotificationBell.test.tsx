@@ -25,7 +25,7 @@ function row(id: string, read: boolean) {
     type: "approval_request",
     title: `Notification ${id}`,
     body: null,
-    workflowSessionId: "ws-1",
+    workflowExecutionId: "execution-1",
     read,
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",

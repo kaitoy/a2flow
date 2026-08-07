@@ -2,12 +2,12 @@
 
 Wraps the :class:`WorkflowTaskRepository` with the business rules the router
 needs: raising :class:`NotFoundError` when a task is missing and authorizing
-every operation against the task's parent workflow session — only the session
-owner, a designated approver of the session, or a super admin may read or
-modify a session's tasks. Changing a task's ``status`` is further restricted
+every operation against the task's parent workflow execution — only the
+execution's initiator, a designated approver of it, or a super admin may read
+or modify an execution's tasks. Changing a task's ``status`` is further restricted
 when the task has a linked ``Approval`` (``Approval.workflow_task_id``): only
-the session owner or that Approval's designated ``approver`` may do so — not
-merely any approver of the session — mirroring ``ApprovalService.resolve``'s
+the execution initiator or that Approval's designated ``approver`` may do so — not
+merely any approver of the execution — mirroring ``ApprovalService.resolve``'s
 no-bypass rule.
 """
 
@@ -19,7 +19,7 @@ from models.workflow_task import (
 )
 from repositories import (
     ApprovalRepository,
-    WorkflowSessionRepository,
+    WorkflowExecutionRepository,
     WorkflowTaskRepository,
 )
 from repositories.exceptions import (
@@ -27,7 +27,7 @@ from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
 )
-from services.workflow_session_access import WorkflowSessionAccessPolicy
+from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 
 
 class WorkflowTaskService:
@@ -36,44 +36,44 @@ class WorkflowTaskService:
     def __init__(
         self,
         repo: WorkflowTaskRepository,
-        ws_repo: WorkflowSessionRepository,
-        access: WorkflowSessionAccessPolicy,
+        execution_repo: WorkflowExecutionRepository,
+        access: WorkflowExecutionAccessPolicy,
         approvals: ApprovalRepository,
     ) -> None:
         """Initialize the service.
 
         Args:
             repo: Repository providing WorkflowTask persistence.
-            ws_repo: Repository used to resolve a task's parent session for
+            execution_repo: Repository used to resolve a task's parent execution for
                 the access check.
-            access: Policy restricting task operations to the session owner,
-                the session's designated approvers, and super admins.
+            access: Policy restricting task operations to the execution initiator,
+                the execution's designated approvers, and super admins.
             approvals: Repository used to look up whether a task being updated
                 has a linked Approval and, if so, its designated approver, to
                 restrict ``status`` changes on such tasks.
         """
         self._repo = repo
-        self._ws_repo = ws_repo
+        self._execution_repo = execution_repo
         self._access = access
         self._approvals = approvals
 
-    async def _assert_session_access(self, ws_id: str, caller: User) -> None:
-        """Authorize the caller against a task's parent workflow session.
+    async def _assert_execution_access(self, execution_id: str, caller: User) -> None:
+        """Authorize the caller against a task's parent workflow execution.
 
         Args:
-            ws_id: Identifier of the parent workflow session.
+            execution_id: Identifier of the parent workflow execution.
             caller: The authenticated user performing the task operation.
 
         Raises:
-            NotFoundError: If the parent session does not exist (so a missing
+            NotFoundError: If the parent execution does not exist (so a missing
                 parent surfaces as 404 before any 403).
-            ForbiddenError: If the caller is neither the session owner, a
-                designated approver of the session, nor a super admin.
+            ForbiddenError: If the caller is neither the execution initiator, a
+                designated approver of the execution, nor a super admin.
         """
-        ws = await self._ws_repo.get(ws_id)
-        if ws is None:
-            raise NotFoundError("WorkflowSession", ws_id)
-        await self._access.assert_access(ws_id, ws.initiator_id, caller)
+        execution = await self._execution_repo.get(execution_id)
+        if execution is None:
+            raise NotFoundError("WorkflowExecution", execution_id)
+        await self._access.assert_access(execution_id, execution.initiator_id, caller)
 
     async def _assert_status_change_allowed(
         self, task: WorkflowTaskRead, caller: User
@@ -82,7 +82,7 @@ class WorkflowTaskService:
 
         Only applies when the task has a linked Approval with a non-null
         ``approver``; tasks without one keep the broader rule already enforced
-        by :meth:`_assert_session_access`. No ``super_admin`` bypass, for
+        by :meth:`_assert_execution_access`. No ``super_admin`` bypass, for
         consistency with ``ApprovalService.resolve``'s no-bypass rule — this
         check protects the same "only the addressee decides" invariant,
         reachable here via the task's ``status`` field instead of the
@@ -93,7 +93,7 @@ class WorkflowTaskService:
             caller: The authenticated user performing the update.
 
         Raises:
-            ForbiddenError: If the caller is neither the session owner nor the
+            ForbiddenError: If the caller is neither the execution initiator nor the
                 linked Approval's designated approver.
         """
         approval = await self._approvals.get_for_task(task.id)
@@ -101,11 +101,11 @@ class WorkflowTaskService:
             return
         if caller.id == approval.approver:
             return
-        ws = await self._ws_repo.get(task.workflow_session_id)
-        if ws is not None and caller.id == ws.initiator_id:
+        execution = await self._execution_repo.get(task.workflow_execution_id)
+        if execution is not None and caller.id == execution.initiator_id:
             return
         raise ForbiddenError(
-            "Only the session owner or the linked approval's designated "
+            "Only the execution initiator or the linked approval's designated "
             "approver can change this task's status"
         )
 
@@ -121,12 +121,12 @@ class WorkflowTaskService:
 
         Raises:
             NotFoundError: If no task exists with the given ID.
-            ForbiddenError: If the caller may not access the task's session.
+            ForbiddenError: If the caller may not access the task's execution.
         """
         task = await self._repo.get(task_id)
         if task is None:
             raise NotFoundError("WorkflowTask", task_id)
-        await self._assert_session_access(task.workflow_session_id, caller)
+        await self._assert_execution_access(task.workflow_execution_id, caller)
         return task
 
     async def create(
@@ -134,27 +134,29 @@ class WorkflowTaskService:
     ) -> WorkflowTaskRead:
         """Create a new WorkflowTask.
 
-        A missing parent session surfaces as a foreign-key violation (HTTP
+        A missing parent execution surfaces as a foreign-key violation (HTTP
         422), matching the pre-authorization behavior of the repository's own
-        FK check, rather than the 404 used when the session appears in the
+        FK check, rather than the 404 used when the execution appears in the
         URL path.
 
         Args:
-            data: Fields for the new task, including its parent session.
+            data: Fields for the new task, including its parent execution.
             caller: The authenticated user creating the task.
 
         Returns:
             The created WorkflowTask.
 
         Raises:
-            ForeignKeyViolationError: If the parent session does not exist.
-            ForbiddenError: If the caller may not access the parent session.
+            ForeignKeyViolationError: If the parent execution does not exist.
+            ForbiddenError: If the caller may not access the parent execution.
         """
-        ws = await self._ws_repo.get(data.workflow_session_id)
-        if ws is None:
-            raise ForeignKeyViolationError("WorkflowSession", data.workflow_session_id)
+        execution = await self._execution_repo.get(data.workflow_execution_id)
+        if execution is None:
+            raise ForeignKeyViolationError(
+                "WorkflowExecution", data.workflow_execution_id
+            )
         await self._access.assert_access(
-            data.workflow_session_id, ws.initiator_id, caller
+            data.workflow_execution_id, execution.initiator_id, caller
         )
         return await self._repo.create(data, user_id=caller.id)
 
@@ -164,8 +166,8 @@ class WorkflowTaskService:
         """Apply a partial update to a WorkflowTask.
 
         Changing ``status`` on a task with a linked Approval is further
-        restricted to the session owner or that Approval's designated
-        approver, on top of the general session-access check — see
+        restricted to the execution initiator or that Approval's designated
+        approver, on top of the general execution-access check — see
         :meth:`_assert_status_change_allowed`.
 
         Args:
@@ -178,7 +180,7 @@ class WorkflowTaskService:
 
         Raises:
             NotFoundError: If no task exists with the given ID.
-            ForbiddenError: If the caller may not access the task's session,
+            ForbiddenError: If the caller may not access the task's execution,
                 or is changing ``status`` on a task whose linked Approval
                 designates someone else as approver.
         """
@@ -196,7 +198,7 @@ class WorkflowTaskService:
 
         Raises:
             NotFoundError: If no task exists with the given ID.
-            ForbiddenError: If the caller may not access the task's session.
+            ForbiddenError: If the caller may not access the task's execution.
         """
         await self.get(task_id, caller=caller)
         await self._repo.delete(task_id)

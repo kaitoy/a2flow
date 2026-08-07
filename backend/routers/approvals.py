@@ -5,7 +5,7 @@ and resolved here by the approver: ``PATCH /approvals/{id}`` moves a request to
 ``approved`` or ``rejected``. Only the designated approver (or a super admin)
 may resolve a request; the resolver's identity is recorded in the approval's
 audit fields. List and get are unscoped so the admin UI can browse every
-approval, mirroring the workflow-sessions router.
+approval, mirroring the workflow-executions router.
 """
 
 from fastapi import APIRouter

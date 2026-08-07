@@ -224,8 +224,8 @@ export default function WorkflowsPage() {
   async function handleRun(id: string) {
     setRunningId(id);
     try {
-      const workflowSession = await executeWorkflow(id);
-      router.push(`/workflow-sessions/${workflowSession.id}`);
+      const workflowExecution = await executeWorkflow(id);
+      router.push(`/workflow-sessions/${workflowExecution.id}`);
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
       setRunningId(null);

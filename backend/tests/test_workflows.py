@@ -687,12 +687,12 @@ async def test_modified_workflow_executes_its_published_version(
     )
     await add_template(workflow_client, wf["id"], title="Brand new step")
 
-    ws = assert_ok(
+    execution = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
     tasks = assert_ok(
         await workflow_client.get(
-            f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks"
+            f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
         )
     )
     assert [t["title"] for t in tasks] == ["Published step"]
@@ -709,11 +709,11 @@ async def test_modified_workflow_run_snapshots_the_published_name(
             json={"name": "Renamed", "description": "Edited description"},
         )
     )
-    ws = assert_ok(
+    execution = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
-    assert ws["workflowName"] == "my-workflow"
-    assert ws["workflowDescription"] != "Edited description"
+    assert execution["workflowName"] == "my-workflow"
+    assert execution["workflowDescription"] != "Edited description"
 
 
 async def test_republishing_promotes_the_edits_into_runs(
@@ -732,12 +732,12 @@ async def test_republishing_promotes_the_edits_into_runs(
     republished = await publish_workflow(workflow_client, wf["id"])
     assert republished["status"] == "published"
 
-    ws = assert_ok(
+    execution = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
     tasks = assert_ok(
         await workflow_client.get(
-            f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks"
+            f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
         )
     )
     assert [t["title"] for t in tasks] == ["Edited step"]
@@ -971,7 +971,7 @@ async def test_developer_can_still_execute_a_deactivated_workflow(
 # ---------- execute ----------
 
 
-async def test_execute_workflow_returns_201_with_workflow_session(
+async def test_execute_workflow_returns_201_with_workflow_execution(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await create_skill(workflow_client)
@@ -1081,12 +1081,12 @@ async def test_execute_workflow_copies_templates_into_session_tasks(
     )
     await publish_workflow(workflow_client, wf["id"])
 
-    ws = assert_ok(
+    execution = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
     tasks = assert_ok(
         await workflow_client.get(
-            f"/api/v1/workflow-sessions/{ws['id']}/workflow-tasks"
+            f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
         )
     )
 
@@ -1104,20 +1104,20 @@ async def test_execute_twice_creates_independent_task_copies(
 ) -> None:
     skill = await create_skill(workflow_client)
     wf = await create_published_workflow(workflow_client, skill["id"])
-    ws1 = assert_ok(
+    execution1 = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
-    ws2 = assert_ok(
+    execution2 = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
     tasks1 = assert_ok(
         await workflow_client.get(
-            f"/api/v1/workflow-sessions/{ws1['id']}/workflow-tasks"
+            f"/api/v1/workflow-executions/{execution1['id']}/workflow-tasks"
         )
     )
     tasks2 = assert_ok(
         await workflow_client.get(
-            f"/api/v1/workflow-sessions/{ws2['id']}/workflow-tasks"
+            f"/api/v1/workflow-executions/{execution2['id']}/workflow-tasks"
         )
     )
     assert len(tasks1) == len(tasks2) == 1

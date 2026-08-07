@@ -40,7 +40,7 @@ interface Coords {
 
 /**
  * Floating dropdown listing the current user's **unread** notifications, anchored
- * beneath the toolbar bell. Each row deep-links to the workflow session it
+ * beneath the toolbar bell. Each row deep-links to the workflow execution it
  * concerns and is marked read on click; a trailing action marks it read without
  * navigating. Marking read is the only way to clear a row here — deleting a
  * notification for good is done from the profile page, where the full history is
@@ -98,7 +98,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
   const onSelect = useCallback(
     (
       id: string,
-      workflowSessionId: string | null | undefined,
+      workflowExecutionId: string | null | undefined,
       workflowId: string | null | undefined
     ) => {
       dispatch(markReadLocal(id));
@@ -108,8 +108,8 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
       onClose();
       // Run-scoped notifications (approvals, completion) deep-link to the
       // session chat; workflow-scoped ones (a generated draft) to the workflow.
-      if (workflowSessionId) {
-        router.push(`/workflow-sessions/${encodeURIComponent(workflowSessionId)}`);
+      if (workflowExecutionId) {
+        router.push(`/workflow-sessions/${encodeURIComponent(workflowExecutionId)}`);
       } else if (workflowId) {
         router.push(`/admin/workflows/${encodeURIComponent(workflowId)}`);
       }
@@ -185,7 +185,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                   <li key={n.id} className="flex items-start gap-1">
                     <button
                       type="button"
-                      onClick={() => onSelect(n.id, n.workflowSessionId, n.workflowId)}
+                      onClick={() => onSelect(n.id, n.workflowExecutionId, n.workflowId)}
                       className="flex min-w-0 flex-1 items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                     >
                       <span

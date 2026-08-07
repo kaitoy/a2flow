@@ -1,4 +1,4 @@
-/** @module WorkflowSessionDetailPage — Read-only admin detail page for an executed WorkflowSession. */
+/** @module WorkflowExecutionDetailPage — Read-only admin detail page for an executed WorkflowExecution. */
 "use client";
 
 import { ClipboardList, ListChecks, MessageSquareText } from "lucide-react";
@@ -16,38 +16,38 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import {
-  deleteWorkflowSession,
+  deleteWorkflowExecution,
   getUserNames,
-  getWorkflowSession,
-  type WorkflowSession,
+  getWorkflowExecution,
+  type WorkflowExecution,
 } from "@/lib/api";
 
 /** Placeholder shown in place of an attribute that has no value. */
 const EMPTY = "—";
 
 /**
- * Read-only detail page for a single executed `WorkflowSession`: the workflow
+ * Read-only detail page for a single executed `WorkflowExecution`: the workflow
  * and agent skill it ran, who ran it, and when — followed by the same audit
  * footer every admin detail page shows.
  *
  * Nothing here is editable: a session is a record of a run, not an
  * author-managed entity. The header offers quick jumps to the session's task
  * list and its live chat, mirroring the icon actions already on the
- * `workflow-sessions` list page. Delete is offered for the same reason the
+ * `workflow-executions` list page. Delete is offered for the same reason the
  * list page offers it there.
  */
-export default function WorkflowSessionDetailPage() {
-  const { wsId } = useParams<{ wsId: string }>();
+export default function WorkflowExecutionDetailPage() {
+  const { executionId } = useParams<{ executionId: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<WorkflowSession | null>(null);
+  const [session, setSession] = useState<WorkflowExecution | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
-    getWorkflowSession(wsId)
+    getWorkflowExecution(executionId)
       .then(async (s) => {
         if (!active) return;
         setSession(s);
@@ -69,13 +69,13 @@ export default function WorkflowSessionDetailPage() {
     return () => {
       active = false;
     };
-  }, [wsId]);
+  }, [executionId]);
 
   async function executeDelete() {
     setConfirmOpen(false);
     try {
-      await deleteWorkflowSession(wsId);
-      router.push("/admin/workflow-sessions");
+      await deleteWorkflowExecution(executionId);
+      router.push("/admin/workflow-executions");
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
     }
@@ -83,7 +83,7 @@ export default function WorkflowSessionDetailPage() {
 
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
-    { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
+    { label: "Workflow Executions", href: "/admin/workflow-executions" },
     { label: session?.workflowName || "…" },
   ];
 
@@ -110,13 +110,15 @@ export default function WorkflowSessionDetailPage() {
               <>
                 <HeaderIconButton
                   label="View tasks"
-                  onClick={() => router.push(`/admin/workflow-sessions/${wsId}/workflow-tasks`)}
+                  onClick={() =>
+                    router.push(`/admin/workflow-executions/${executionId}/workflow-tasks`)
+                  }
                 >
                   <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" />
                 </HeaderIconButton>
                 <HeaderIconButton
                   label="Open workflow session"
-                  onClick={() => router.push(`/workflow-sessions/${wsId}`)}
+                  onClick={() => router.push(`/workflow-sessions/${executionId}`)}
                 >
                   <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
                 </HeaderIconButton>
@@ -196,7 +198,7 @@ export default function WorkflowSessionDetailPage() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => router.push("/admin/workflow-sessions")}
+              onClick={() => router.push("/admin/workflow-executions")}
             >
               Back
             </Button>
@@ -213,7 +215,7 @@ export default function WorkflowSessionDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Workflow Session"
+        title="Delete Workflow Execution"
         description={`Delete "${session.workflowName}"?`}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}

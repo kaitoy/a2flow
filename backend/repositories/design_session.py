@@ -116,7 +116,7 @@ class SqlDesignSessionRepository:
         """Return every skill revision that design sessions of this skill pin.
 
         These are revisions a prune of the skill store must keep alongside the
-        ones pinned by workflow sessions: each is the code some design
+        ones pinned by workflow executions: each is the code some design
         conversation started against and will keep loading on its next run.
 
         Args:

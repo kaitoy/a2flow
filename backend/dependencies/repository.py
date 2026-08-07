@@ -31,17 +31,17 @@ from repositories import (
     SqlTenantRepository,
     SqlUserAvatarRepository,
     SqlUserRepository,
+    SqlWorkflowExecutionRepository,
     SqlWorkflowPublishedVersionRepository,
     SqlWorkflowRepository,
-    SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
     SqlWorkflowTaskTemplateRepository,
     TenantRepository,
     UserAvatarRepository,
     UserRepository,
+    WorkflowExecutionRepository,
     WorkflowPublishedVersionRepository,
     WorkflowRepository,
-    WorkflowSessionRepository,
     WorkflowTaskRepository,
     WorkflowTaskTemplateRepository,
 )
@@ -162,15 +162,15 @@ WorkflowPublishedVersionRepositoryDep = Annotated[
 ]
 
 
-def get_workflow_session_repository(
+def get_workflow_execution_repository(
     db: DBSessionDep, tenant_id: CurrentTenantIdDep
-) -> WorkflowSessionRepository:
-    """Create a WorkflowSessionRepository backed by the current database session."""
-    return SqlWorkflowSessionRepository(db, tenant_id=tenant_id)
+) -> WorkflowExecutionRepository:
+    """Create a WorkflowExecutionRepository backed by the current database session."""
+    return SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
 
 
-WorkflowSessionRepositoryDep = Annotated[
-    WorkflowSessionRepository, Depends(get_workflow_session_repository)
+WorkflowExecutionRepositoryDep = Annotated[
+    WorkflowExecutionRepository, Depends(get_workflow_execution_repository)
 ]
 
 
@@ -188,17 +188,17 @@ MessageMetaRepositoryDep = Annotated[
 
 def get_workflow_task_repository(
     db: DBSessionDep,
-    ws_repo: WorkflowSessionRepositoryDep,
+    execution_repo: WorkflowExecutionRepositoryDep,
     mcp_repo: MCPServerRepositoryDep,
     tenant_id: CurrentTenantIdDep,
 ) -> WorkflowTaskRepository:
     """Create a WorkflowTaskRepository backed by the current database session.
 
-    The injected WorkflowSessionRepository is used to validate that the parent
+    The injected WorkflowExecutionRepository is used to validate that the parent
     session exists when creating tasks; the MCPServerRepository validates the
     servers referenced by tool bindings.
     """
-    return SqlWorkflowTaskRepository(db, ws_repo, mcp_repo, tenant_id=tenant_id)
+    return SqlWorkflowTaskRepository(db, execution_repo, mcp_repo, tenant_id=tenant_id)
 
 
 WorkflowTaskRepositoryDep = Annotated[
@@ -242,15 +242,15 @@ DesignSessionRepositoryDep = Annotated[
 
 def get_approval_repository(
     db: DBSessionDep,
-    ws_repo: WorkflowSessionRepositoryDep,
+    execution_repo: WorkflowExecutionRepositoryDep,
     tenant_id: CurrentTenantIdDep,
 ) -> ApprovalRepository:
     """Create an ApprovalRepository backed by the current database session.
 
-    The injected WorkflowSessionRepository is used to validate that the parent
+    The injected WorkflowExecutionRepository is used to validate that the parent
     session exists when creating an approval.
     """
-    return SqlApprovalRepository(db, ws_repo, tenant_id=tenant_id)
+    return SqlApprovalRepository(db, execution_repo, tenant_id=tenant_id)
 
 
 ApprovalRepositoryDep = Annotated[ApprovalRepository, Depends(get_approval_repository)]

@@ -1,6 +1,7 @@
-"""Per-message metadata model for the shared workflow session chat.
+"""Per-message metadata model for the shared workflow session.
 
-A workflow session chat is a single ADK session keyed by the session owner, yet
+A workflow session -- the chat a WorkflowExecution runs in -- is a single ADK
+session keyed by the execution's initiator, yet
 several people -- the applicant and one or more approvers -- post messages into
 it, and the agent works through a list of WorkflowTasks while it runs. ADK
 records every event with only an author role (``"user"`` or the agent) and no
@@ -25,8 +26,8 @@ from models.tenant_scoped import TenantScoped
 class MessageMeta(TenantScoped, BaseEntity, table=True):
     """Database-persisted side-channel metadata for one ADK chat event.
 
-    ``workflow_session_id`` references the owning workflow session
-    (``ON DELETE CASCADE``), so deleting the session removes its metadata.
+    ``workflow_execution_id`` references the owning WorkflowExecution
+    (``ON DELETE CASCADE``), so deleting the execution removes its metadata.
     ``adk_event_id`` is a correlation key, not always literally the ADK event
     id: for ``"user"`` events it is the event id, which is also the ``id`` of
     the message surfaced to the frontend. For tool-response events (including
@@ -42,7 +43,7 @@ class MessageMeta(TenantScoped, BaseEntity, table=True):
     recorded, so a row's presence on a tool response means a genuine action. ``workflow_task_id`` references the WorkflowTask
     that was in progress when the event was produced (``ON DELETE CASCADE``)
     and is null for messages produced outside any task (for example the
-    initial design exchange). ``(workflow_session_id, adk_event_id)`` is
+    initial design exchange). ``(workflow_execution_id, adk_event_id)`` is
     unique so each event has at most one metadata row and re-recording is
     idempotent.
     """
@@ -50,18 +51,18 @@ class MessageMeta(TenantScoped, BaseEntity, table=True):
     __tablename__ = "message_meta"
     __table_args__ = (
         UniqueConstraint(
-            "workflow_session_id",
+            "workflow_execution_id",
             "adk_event_id",
-            name="uq_message_meta_ws_event",
+            name="uq_message_meta_execution_event",
         ),
-        Index("ix_message_meta_workflow_session_id", "workflow_session_id"),
+        Index("ix_message_meta_workflow_execution_id", "workflow_execution_id"),
         Index("ix_message_meta_sender_user_id", "sender_user_id"),
         Index("ix_message_meta_workflow_task_id", "workflow_task_id"),
         ForeignKeyConstraint(
-            ["workflow_session_id"],
-            ["workflow_sessions.id"],
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
             ondelete="CASCADE",
-            name="fk_message_meta_workflow_session_id",
+            name="fk_message_meta_workflow_execution_id",
         ),
         ForeignKeyConstraint(
             ["sender_user_id"],
@@ -77,7 +78,7 @@ class MessageMeta(TenantScoped, BaseEntity, table=True):
         ),
     )
 
-    workflow_session_id: str
+    workflow_execution_id: str
     adk_event_id: str
     sender_user_id: str | None = None
     workflow_task_id: str | None = None

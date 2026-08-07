@@ -2,7 +2,7 @@
  * @module AdminLayout — Admin section shell with a collapsible sidebar
  * navigation and theme toggle. The sidebar can be toggled between a full-width
  * labelled list and a narrow icon-only rail (with hover tooltips), mirroring the
- * collapse behavior of the workflow session task timeline. On mobile the
+ * collapse behavior of the workflow execution task timeline. On mobile the
  * sidebar hides and opens instead as an off-canvas drawer from the header's
  * hamburger button.
  */

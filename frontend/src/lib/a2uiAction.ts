@@ -8,7 +8,7 @@ import type { AssistantMessage, ToolMessage } from "@ag-ui/core";
  * (`JSON.stringify({status:"rendered"})`), and doubles as a marker the backend
  * uses to skip sender attribution for these responses — only genuine user
  * actions are attributed (see `record_new_senders` in
- * `backend/services/workflow_session.py`).
+ * `backend/services/workflow_execution.py`).
  */
 export const RENDER_ACK_CONTENT = JSON.stringify({ status: "rendered" });
 

@@ -285,10 +285,10 @@ class SkillManager:
         """Delete a skill's revision directories that nothing references any more.
 
         A revision survives when it is named in ``keep`` — the skill's current
-        revision plus every revision a WorkflowSession pinned — or when it was
+        revision plus every revision a WorkflowExecution pinned — or when it was
         published within the grace window. The grace window covers the gap
         between a workflow run reading the skill's current ``commit_sha`` and
-        inserting the WorkflowSession row that names it: without it, a pull
+        inserting the WorkflowExecution row that names it: without it, a pull
         landing inside that gap could delete the revision the run just picked.
 
         Best effort: a directory that cannot be removed (e.g. still open on

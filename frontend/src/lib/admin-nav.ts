@@ -37,7 +37,7 @@ export interface AdminNavItem {
  * (`app/admin/page.tsx`) so the two stay in sync.
  *
  * Entries carrying `roles` are filtered per user by {@link useVisibleAdminNavItems}.
- * Workflow Sessions and Approvals stay visible to everyone: they are read views
+ * Workflow Executions and Approvals stay visible to everyone: they are read views
  * whose per-record access is enforced by the backend (session owners and
  * designated approvers).
  */
@@ -85,8 +85,8 @@ export const adminNavItems: AdminNavItem[] = [
     roles: [Role.DEVELOPER, Role.REQUESTER],
   },
   {
-    href: "/admin/workflow-sessions",
-    label: "Workflow Sessions",
+    href: "/admin/workflow-executions",
+    label: "Workflow Executions",
     icon: ListChecks,
     description: "Track workflow runs",
   },

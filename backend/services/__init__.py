@@ -13,8 +13,8 @@ from .user import UserService
 from .user_avatar import UserAvatarService
 from .workflow import WorkflowService
 from .workflow_design import WorkflowDesignService, generate_workflow_design
-from .workflow_session import WorkflowSessionService
-from .workflow_session_access import WorkflowSessionAccessPolicy
+from .workflow_execution import WorkflowExecutionService
+from .workflow_execution_access import WorkflowExecutionAccessPolicy
 from .workflow_task import WorkflowTaskService
 from .workflow_task_template import WorkflowTaskTemplateService
 
@@ -34,8 +34,8 @@ __all__ = [
     "UserService",
     "WorkflowDesignService",
     "WorkflowService",
-    "WorkflowSessionAccessPolicy",
-    "WorkflowSessionService",
+    "WorkflowExecutionAccessPolicy",
+    "WorkflowExecutionService",
     "WorkflowTaskService",
     "WorkflowTaskTemplateService",
     "generate_workflow_design",

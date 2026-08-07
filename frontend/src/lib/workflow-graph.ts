@@ -274,7 +274,7 @@ function orderTasksForColumn(tasks: GraphTask[]): GraphTask[] {
  * Returned nodes are positioned at the origin; call {@link layoutWorkflowGraph}
  * to assign real coordinates.
  *
- * @param tasks - The tasks of a single workflow session or workflow design.
+ * @param tasks - The tasks of a single workflow execution or workflow design.
  * @param serverNameById - Registered MCP server names by id, used to label
  *   server nodes. Ids missing from the map fall back to a truncated id.
  * @returns The unpositioned nodes, the edges between them, and the task rows in
@@ -439,7 +439,7 @@ export function layoutWorkflowGraph(graph: WorkflowGraph): WorkflowGraphNode[] {
 /**
  * Convenience wrapper that builds the graph and lays it out in one call.
  *
- * @param tasks - The tasks of a single workflow session or workflow design.
+ * @param tasks - The tasks of a single workflow execution or workflow design.
  * @param serverNameById - Registered MCP server names by id, used to label
  *   server nodes.
  * @returns Positioned nodes and edges ready for `<ReactFlow>`.

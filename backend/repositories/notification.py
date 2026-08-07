@@ -50,7 +50,7 @@ class NotificationRepository(Protocol):
     async def mark_all_read(self, *, user_id: str) -> int: ...
 
     async def exists_for_session(
-        self, workflow_session_id: str, notification_type: NotificationType
+        self, workflow_execution_id: str, notification_type: NotificationType
     ) -> bool: ...
 
 
@@ -184,16 +184,16 @@ class SqlNotificationRepository:
         return len(notifications)
 
     async def exists_for_session(
-        self, workflow_session_id: str, notification_type: NotificationType
+        self, workflow_execution_id: str, notification_type: NotificationType
     ) -> bool:
         """Return whether a notification of the given type already exists for a session.
 
-        Used to keep one-shot events (such as ``session_completed``) idempotent so
+        Used to keep one-shot events (such as ``execution_completed``) idempotent so
         repeated triggers do not produce duplicate notifications.
         """
         stmt = (
             select(Notification.id)
-            .where(Notification.workflow_session_id == workflow_session_id)
+            .where(Notification.workflow_execution_id == workflow_execution_id)
             .where(Notification.type == notification_type)
             .where(Notification.tenant_id == self._tenant_id)
             .limit(1)

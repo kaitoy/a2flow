@@ -20,7 +20,7 @@ function makeNotification(overrides: Partial<Notification> = {}): Notification {
     type: "approval_request",
     title: "Plan ready for approval",
     body: "Waiting for your approval.",
-    workflowSessionId: "ws-1",
+    workflowExecutionId: "execution-1",
     read: false,
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
@@ -97,7 +97,7 @@ describe("NotificationPanel", () => {
     expect(screen.queryByText("Already handled")).not.toBeInTheDocument();
   });
 
-  it("marks the item read, closes, and navigates to its workflow session", async () => {
+  it("marks the item read, closes, and navigates to its workflow execution", async () => {
     const onClose = vi.fn();
     pushMock.mockClear();
     const { store } = render(<Harness onClose={onClose} />, {
@@ -112,7 +112,7 @@ describe("NotificationPanel", () => {
     await waitFor(() => screen.getByText("Plan ready for approval"));
     await screen.getByText("Plan ready for approval").click();
 
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/ws-1"));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/execution-1"));
     expect(onClose).toHaveBeenCalled();
     expect(store.getState().notifications.unreadCount).toBe(0);
   });
@@ -127,7 +127,7 @@ describe("NotificationPanel", () => {
             makeNotification({
               type: "workflow_draft_ready",
               title: "Workflow draft ready",
-              workflowSessionId: null,
+              workflowExecutionId: null,
               workflowId: "wf-1",
             }),
           ],

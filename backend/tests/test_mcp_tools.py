@@ -28,7 +28,7 @@ from models.mcp_server import MCPServer, McpTransport
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
 from models.workflow import Workflow
-from models.workflow_session import WorkflowSession
+from models.workflow_execution import WorkflowExecution
 from models.workflow_task import (
     WorkflowTask,
     WorkflowTaskStatus,
@@ -47,7 +47,7 @@ async def _seed_design_session(
     """Insert a skill + workflow + DesignSession chain; return the workflow PK.
 
     Workflow generation and the design chat run against a
-    DesignSession rather than a WorkflowSession, so this is what the tools see
+    DesignSession rather than a WorkflowExecution, so this is what the tools see
     during the whole design phase.
     """
     async with AsyncSession(eng) as db:
@@ -170,9 +170,9 @@ async def _seed_stdio_server(
 
 
 async def _seed_session(eng: AsyncEngine, *, session_id: str = "sess-abc") -> str:
-    """Insert a WorkflowSession with the given ADK session id and return its PK."""
+    """Insert a WorkflowExecution with the given ADK session id and return its PK."""
     async with AsyncSession(eng) as db:
-        ws = WorkflowSession(
+        execution = WorkflowExecution(
             session_id=session_id,
             workflow_name="wf",
             workflow_prompt="do it",
@@ -186,15 +186,15 @@ async def _seed_session(eng: AsyncEngine, *, session_id: str = "sess-abc") -> st
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         )
-        db.add(ws)
+        db.add(execution)
         await db.commit()
-        await db.refresh(ws)
-        return ws.id
+        await db.refresh(execution)
+        return execution.id
 
 
 async def _seed_task(
     eng: AsyncEngine,
-    ws_id: str,
+    execution_id: str,
     *,
     status: WorkflowTaskStatus = WorkflowTaskStatus.in_progress,
     bindings: list[tuple[str, str]] = (),  # type: ignore[assignment]
@@ -202,7 +202,7 @@ async def _seed_task(
     """Insert a WorkflowTask with optional (server_id, tool_name) bindings."""
     async with AsyncSession(eng) as db:
         task = WorkflowTask(
-            workflow_session_id=ws_id,
+            workflow_execution_id=execution_id,
             title="Step",
             status=status,
             tenant_id=DEFAULT_TEST_TENANT_ID,
@@ -247,10 +247,10 @@ async def test_call_without_session_errors(engine: AsyncEngine) -> None:
 
 async def test_call_without_in_progress_task_errors(engine: AsyncEngine) -> None:
     server_id = await _seed_server(engine)
-    ws_id = await _seed_session(engine)
+    execution_id = await _seed_session(engine)
     await _seed_task(
         engine,
-        ws_id,
+        execution_id,
         status=WorkflowTaskStatus.pending,
         bindings=[(server_id, "search")],
     )
@@ -260,8 +260,8 @@ async def test_call_without_in_progress_task_errors(engine: AsyncEngine) -> None
 
 async def test_call_unbound_tool_rejected_with_bound_list(engine: AsyncEngine) -> None:
     server_id = await _seed_server(engine)
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
     result = await call_mcp_tool(server_id, "delete_everything", {}, _ctx())
     assert "not bound" in result["error"]
     assert "search" in result["error"]
@@ -271,8 +271,8 @@ async def test_call_bound_tool_forwards_to_server(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     server_id = await _seed_server(engine, headers={"Authorization": "Bearer t"})
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
     seen: dict[str, Any] = {}
 
     async def fake_call_server_tool(
@@ -299,8 +299,8 @@ async def test_call_accepts_json_string_arguments(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     server_id = await _seed_server(engine)
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
     seen: dict[str, Any] = {}
 
     async def fake_call_server_tool(
@@ -321,8 +321,8 @@ async def test_call_accepts_json_string_arguments(
 
 async def test_call_invalid_arguments_rejected(engine: AsyncEngine) -> None:
     server_id = await _seed_server(engine)
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
     result = await call_mcp_tool(server_id, "search", "not json", _ctx())  # type: ignore[arg-type]
     assert "error" in result
 
@@ -331,8 +331,8 @@ async def test_call_unreachable_server_errors(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     server_id = await _seed_server(engine)
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
 
     async def fake_call_server_tool(
         connection: McpConnection,
@@ -352,8 +352,8 @@ async def test_call_tool_error_result_becomes_error_dict(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     server_id = await _seed_server(engine)
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
 
     async def fake_call_server_tool(
         connection: McpConnection,
@@ -373,9 +373,9 @@ async def test_call_validates_against_union_of_in_progress_tasks(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     server_id = await _seed_server(engine)
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "alpha")])
-    await _seed_task(engine, ws_id, bindings=[(server_id, "beta")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "alpha")])
+    await _seed_task(engine, execution_id, bindings=[(server_id, "beta")])
 
     async def fake_call_server_tool(
         connection: McpConnection,
@@ -402,8 +402,8 @@ async def test_call_forwards_a_stdio_server_as_a_stdio_connection(
         args=["-y", "files-mcp@0.3.0"],
         env={"API_KEY": "${secret:files-key/k}"},
     )
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "read_file")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "read_file")])
     seen: dict[str, Any] = {}
 
     async def fake_call_server_tool(
@@ -445,8 +445,8 @@ async def test_list_mcp_tools_works_in_a_design_session(
 ) -> None:
     """The design agents must see the registry: that is where tools get bound.
 
-    Their ADK session is keyed on a DesignSession, not a WorkflowSession, so
-    resolving the run through WorkflowSession alone silently left every
+    Their ADK session is keyed on a DesignSession, not a WorkflowExecution, so
+    resolving the run through WorkflowExecution alone silently left every
     generated task templates without tool bindings.
     """
     await _seed_design_session(engine)
@@ -558,8 +558,8 @@ async def test_call_resolves_secret_placeholder_in_headers(
     server_id = await _seed_server(
         engine, headers={"Authorization": "Bearer ${secret:api-token/k}"}
     )
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
     seen: dict[str, Any] = {}
 
     async def fake_call_server_tool(
@@ -586,8 +586,8 @@ async def test_call_with_missing_secret_returns_error(
     server_id = await _seed_server(
         engine, headers={"Authorization": "Bearer ${secret:nope/k}"}
     )
-    ws_id = await _seed_session(engine)
-    await _seed_task(engine, ws_id, bindings=[(server_id, "search")])
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
     called: list[str] = []
 
     async def fake_call_server_tool(

@@ -139,7 +139,7 @@ async def test_list_filters_by_type(
         eng,
         user_id="alice",
         title="All done",
-        notification_type=NotificationType.session_completed,
+        notification_type=NotificationType.execution_completed,
     )
 
     res = await client.get(

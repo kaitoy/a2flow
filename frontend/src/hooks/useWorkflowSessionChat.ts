@@ -46,7 +46,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 const POLL_INTERVAL_MS = 10_000;
 
 /**
- * Build the workflow-session AG-UI subscriber: the shared subscriber plus an
+ * Build the workflow-execution AG-UI subscriber: the shared subscriber plus an
  * approval-rendering handler that turns `render_approval` tool calls into
  * approval-control activity messages.
  *
@@ -86,14 +86,14 @@ function makeEventHandlers(
 }
 
 /**
- * Which session-scoped chat backend the hook talks to: a workflow session
- * (execution run, shared with approvers) or a design session (the owner-only
- * chat that refines a workflow's task templates).
+ * Which session-scoped chat backend the hook talks to: a workflow session (the
+ * chat a workflow execution runs in, shared with its approvers) or a design
+ * session (the owner-only chat that refines a workflow's task templates).
  */
 export type SessionChatVariant = "workflow" | "design";
 
 /**
- * Manage the agent interaction for a workflow or design session.
+ * Manage the agent interaction for a workflow session or a design session.
  *
  * On mount, loads prior message history and — when `kickoffPrompt` is non-null
  * and the session is new — auto-sends it to start the run; design sessions
@@ -102,8 +102,9 @@ export type SessionChatVariant = "workflow" | "design";
  * user actions (e.g. a button click inside a rendered surface) are routed to
  * the session's dedicated agent endpoint, selected by `variant`.
  *
- * Because the workflow chat is shared (owner, approvers, and the agent all
- * post into it), the history is also re-fetched every {@link POLL_INTERVAL_MS}
+ * Because a workflow session is shared (its execution's initiator, the
+ * approvers, and the agent all post into it), the history is also re-fetched
+ * every {@link POLL_INTERVAL_MS}
  * so messages from other participants appear without a reload. Polling pauses
  * while the current viewer's own run is in flight and skips re-applying an
  * unchanged history. Design sessions keep the same polling (the background
@@ -111,7 +112,7 @@ export type SessionChatVariant = "workflow" | "design";
  * attribution or task association — the chat belongs to its owner alone.
  */
 export function useWorkflowSessionChat(
-  workflowSessionId: string,
+  workflowExecutionId: string,
   sessionId: string,
   kickoffPrompt: string | null,
   ownerUserId: string,
@@ -163,14 +164,14 @@ export function useWorkflowSessionChat(
       // human in the chat); resolve just the owner for the avatar fallback.
       const senders = isDesign
         ? new Map<string, string>()
-        : await getWorkflowSessionMessageSenders(workflowSessionId);
+        : await getWorkflowSessionMessageSenders(workflowExecutionId);
       const users = await getUsersByIds([ownerUserId, ...senders.values()]);
       setMessageSenders(senders);
       setSenderUsers(users);
     } catch (err) {
       logger.error(err, "failed to load message senders");
     }
-  }, [workflowSessionId, ownerUserId, isDesign]);
+  }, [workflowExecutionId, ownerUserId, isDesign]);
 
   const refreshTasks = useCallback(async () => {
     // Design sessions edit the workflow's task templates, which the page
@@ -178,15 +179,15 @@ export function useWorkflowSessionChat(
     if (isDesign) return;
     try {
       const [taskList, taskMap] = await Promise.all([
-        listWorkflowTasks(workflowSessionId),
-        getWorkflowSessionMessageTasks(workflowSessionId),
+        listWorkflowTasks(workflowExecutionId),
+        getWorkflowSessionMessageTasks(workflowExecutionId),
       ]);
       setTasks(taskList);
       setMessageTasks(taskMap);
     } catch (err) {
       logger.error(err, "failed to load workflow tasks");
     }
-  }, [workflowSessionId, isDesign]);
+  }, [workflowExecutionId, isDesign]);
 
   const refreshMessages = useCallback(async () => {
     // Never merge mid-run: syncPolledMessages rebuilds the message array from the
@@ -194,7 +195,7 @@ export function useWorkflowSessionChat(
     // stream, so polling is only safe between runs.
     if (isRunningRef.current || isStreamingRef.current) return;
     try {
-      const loaded = await fetchMessages(workflowSessionId);
+      const loaded = await fetchMessages(workflowExecutionId);
       // A run may have started while the fetch was in flight; re-check the guard.
       if (isRunningRef.current || isStreamingRef.current) return;
       // The shared chat is append-only, so length + last id uniquely identify the
@@ -212,7 +213,7 @@ export function useWorkflowSessionChat(
     } catch (err) {
       logger.error(err, "failed to poll session messages");
     }
-  }, [workflowSessionId, sessionId, dispatch, refreshSenders, refreshTasks, fetchMessages]);
+  }, [workflowExecutionId, sessionId, dispatch, refreshSenders, refreshTasks, fetchMessages]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
@@ -223,7 +224,7 @@ export function useWorkflowSessionChat(
       dispatch(addUserMessage({ id: msgId, content: prompt }));
       locallySentIds.current.add(msgId);
 
-      const agent = buildAgent(workflowSessionId, sessionId);
+      const agent = buildAgent(workflowExecutionId, sessionId);
 
       const pending = store.getState().chat.pendingRenderCalls;
       for (const ack of buildRenderAckMessages(pending)) {
@@ -253,7 +254,7 @@ export function useWorkflowSessionChat(
       // Refresh task state and the per-message task association the run produced.
       void refreshTasks();
     },
-    [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks, buildAgent]
+    [workflowExecutionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks, buildAgent]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -263,7 +264,7 @@ export function useWorkflowSessionChat(
 
       dispatch(startRun());
 
-      const agent = buildAgent(workflowSessionId, sessionId);
+      const agent = buildAgent(workflowExecutionId, sessionId);
 
       // The action rides as the tool result of the render call that produced
       // the acted-on surface, carrying `values` (the surface's data model) so
@@ -301,7 +302,7 @@ export function useWorkflowSessionChat(
       // the same resumed-history path keeps it consistent with the sender map.
       void refreshMessages();
     },
-    [workflowSessionId, sessionId, isRunning, dispatch, refreshMessages, buildAgent]
+    [workflowExecutionId, sessionId, isRunning, dispatch, refreshMessages, buildAgent]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -311,7 +312,7 @@ export function useWorkflowSessionChat(
 
       dispatch(startRun());
 
-      const agent = createWorkflowSessionAgent(workflowSessionId, sessionId);
+      const agent = createWorkflowSessionAgent(workflowExecutionId, sessionId);
 
       const pending = store.getState().chat.pendingRenderCalls;
       for (const ack of buildRenderAckMessages(pending)) {
@@ -355,7 +356,7 @@ export function useWorkflowSessionChat(
       // refresh task state and the per-message task association.
       void refreshTasks();
     },
-    [workflowSessionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
+    [workflowExecutionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and the init guard below prevents double-sends
@@ -370,7 +371,7 @@ export function useWorkflowSessionChat(
     dispatch(setSession(sessionId));
     void refreshSenders();
     void refreshTasks();
-    fetchMessages(workflowSessionId)
+    fetchMessages(workflowExecutionId)
       .then((loadedMessages) => {
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
         // Record the loaded history so the first poll doesn't re-apply it.

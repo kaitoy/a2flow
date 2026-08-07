@@ -11,7 +11,7 @@ import { UserMessageBubble } from "./UserMessageBubble";
  * Dispatch a message to the appropriate role-specific bubble component.
  *
  * `avatar` is an optional sender avatar shown beside conversational (`user` /
- * `assistant`) bubbles in workflow sessions. It is also forwarded to
+ * `assistant`) bubbles in workflow executions. It is also forwarded to
  * `ActivityMessageBubble`, which shows it only next to a resolved A2UI
  * surface (the user who acted on it); other activity types ignore it.
  * `isThinking` is likewise forwarded to `ActivityMessageBubble`, which uses it

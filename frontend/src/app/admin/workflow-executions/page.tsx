@@ -1,4 +1,4 @@
-/** @module WorkflowSessionsPage — Admin list page for browsing executed WorkflowSessions. */
+/** @module WorkflowExecutionsPage — Admin list page for browsing executed WorkflowExecutions. */
 "use client";
 
 import { ClipboardList, ListChecks, MessageSquareText } from "lucide-react";
@@ -17,10 +17,10 @@ import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import {
-  deleteWorkflowSession,
+  deleteWorkflowExecution,
   getUserNames,
-  listWorkflowSessions,
-  type WorkflowSession,
+  listWorkflowExecutions,
+  type WorkflowExecution,
 } from "@/lib/api";
 
 const LIMIT = 20;
@@ -32,7 +32,7 @@ const LIMIT = 20;
 function buildColumns(
   userMap: Map<string, string>,
   onDelete: (id: string, name: string) => void
-): ColumnDef<WorkflowSession>[] {
+): ColumnDef<WorkflowExecution>[] {
   return [
     {
       header: "Workflow",
@@ -41,7 +41,7 @@ function buildColumns(
       visibility: "always",
       cell: (s) => (
         <Link
-          href={`/admin/workflow-sessions/${s.id}`}
+          href={`/admin/workflow-executions/${s.id}`}
           className="font-medium text-accent transition-colors hover:underline"
         >
           {s.workflowName}
@@ -83,7 +83,7 @@ function buildColumns(
           <ActionIconButton
             icon={ClipboardList}
             label="View tasks"
-            href={`/admin/workflow-sessions/${s.id}/workflow-tasks`}
+            href={`/admin/workflow-executions/${s.id}/workflow-tasks`}
           />
           <ActionIconButton
             icon={MessageSquareText}
@@ -97,8 +97,8 @@ function buildColumns(
   ];
 }
 
-/** Admin list of WorkflowSessions ordered by most recent first. */
-export default function WorkflowSessionsPage() {
+/** Admin list of WorkflowExecutions ordered by most recent first. */
+export default function WorkflowExecutionsPage() {
   const {
     rows,
     loading,
@@ -110,7 +110,7 @@ export default function WorkflowSessionsPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<WorkflowSession>(listWorkflowSessions, { limit: LIMIT });
+  } = useTableQuery<WorkflowExecution>(listWorkflowExecutions, { limit: LIMIT });
   const [userMap, setUserMap] = useState<Map<string, string>>(new Map());
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -121,7 +121,7 @@ export default function WorkflowSessionsPage() {
   async function executeDelete() {
     if (!confirmTarget) return;
     try {
-      await deleteWorkflowSession(confirmTarget.id);
+      await deleteWorkflowExecution(confirmTarget.id);
       setConfirmTarget(null);
       await reload();
     } catch {
@@ -142,15 +142,15 @@ export default function WorkflowSessionsPage() {
   }, [rows]);
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
-    "workflowSessions",
+    "workflowExecutions",
     buildColumns(userMap, handleDelete)
   );
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Workflow Sessions" }]} />
+      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Workflow Executions" }]} />
       <AdminPageHeader
-        title="Workflow Sessions"
+        title="Workflow Executions"
         icon={ListChecks}
         onRefresh={reload}
         refreshing={loading || refreshing}
@@ -168,7 +168,7 @@ export default function WorkflowSessionsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No workflow sessions yet. Run a workflow to create one."
+        emptyMessage="No workflow executions yet. Run a workflow to create one."
         emptyIcon={ListChecks}
         getRowKey={(s) => s.id}
         sort={sort}
@@ -185,7 +185,7 @@ export default function WorkflowSessionsPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Workflow Session"
+        title="Delete Workflow Execution"
         description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}

@@ -28,7 +28,7 @@ from models.design_session import DesignSession
 from models.response import ApiResponse
 from models.user import Role
 from models.workflow import Workflow, WorkflowUpdate
-from models.workflow_session import WorkflowSession
+from models.workflow_execution import WorkflowExecution
 from models.workflow_task_template import WorkflowTaskTemplateRead
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
@@ -240,7 +240,7 @@ async def deactivate_workflow(
 
 @router.post(
     "/{workflow_id}/execute",
-    response_model=ApiResponse[WorkflowSession],
+    response_model=ApiResponse[WorkflowExecution],
     status_code=201,
     dependencies=_requires_execute,
 )
@@ -249,8 +249,8 @@ async def execute_workflow(
     service: WorkflowServiceDep,
     caller: CurrentUserDep,
     meta: ApiMetaDep,
-) -> ApiResponse[WorkflowSession]:
-    """Create a WorkflowSession pre-filled with the workflow's task templates.
+) -> ApiResponse[WorkflowExecution]:
+    """Create a WorkflowExecution pre-filled with the workflow's task templates.
 
     ``published`` workflows can be executed by any caller who reaches this
     route. ``draft`` workflows can additionally be executed, but only by a
@@ -259,5 +259,5 @@ async def execute_workflow(
     session is created lazily on the first agent call, which starts executing
     immediately.
     """
-    ws = await service.execute(workflow_id, caller=caller)
-    return ApiResponse(meta=meta, data=ws)
+    execution = await service.execute(workflow_id, caller=caller)
+    return ApiResponse(meta=meta, data=execution)

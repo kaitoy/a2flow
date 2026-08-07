@@ -12,7 +12,7 @@ const makeTask = (
   toolBindings: ToolBinding[] = []
 ): WorkflowTask => ({
   id,
-  workflowSessionId: "ws",
+  workflowExecutionId: "execution",
   title,
   status,
   position,

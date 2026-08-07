@@ -4,9 +4,14 @@ A DesignSession is the chat in which a Workflow's task templates are
 produced and refined. Exactly one exists per workflow: it is created together
 with the draft workflow by the generation flow, its first exchange is driven
 by a background agent run, and the user can reopen it later to adjust the
-templates conversationally. It is deliberately a separate entity from
-:class:`models.workflow_session.WorkflowSession`, which represents a run of a
-published workflow.
+templates conversationally.
+
+A design session is the design-time counterpart of a *workflow session*, the
+chat a run of a published workflow happens in. The two are deliberately
+asymmetric in storage: a design session is its own entity because it exists
+before any run does, whereas a workflow session is identified by the
+:class:`models.workflow_execution.WorkflowExecution` it belongs to and carries
+no row of its own.
 """
 
 from sqlalchemy import ForeignKeyConstraint, Index, UniqueConstraint
@@ -22,7 +27,7 @@ class DesignSessionCreate(SQLModel):
     ``agent_skill_commit_sha`` pins the session to the skill revision that was
     published when generation started, so a later ``pull`` of the skill cannot
     swap the design agent's code mid-conversation. Generation requires a
-    published revision, so unlike WorkflowSession the pin is always present.
+    published revision, so unlike WorkflowExecution the pin is always present.
     """
 
     session_id: str

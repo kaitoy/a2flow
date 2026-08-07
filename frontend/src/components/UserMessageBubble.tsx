@@ -16,7 +16,7 @@ function getUserTextContent(content: UserMessage["content"]): string {
 /**
  * Render a user message as a right-aligned gradient bubble.
  *
- * When `avatar` is provided (workflow sessions, where several people share the
+ * When `avatar` is provided (workflow executions, where several people share the
  * chat) it is shown on the outer (right) edge so the sender is identifiable;
  * without it the layout is unchanged for the single-user chat.
  */

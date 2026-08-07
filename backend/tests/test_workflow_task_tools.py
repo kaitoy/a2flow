@@ -27,8 +27,8 @@ from infrastructure.workflow_task_tools import (
     update_workflow_task,
 )
 from models.notification import Notification, NotificationType
-from models.workflow_session import WorkflowSession
-from repositories import SqlNotificationRepository, SqlWorkflowSessionRepository
+from models.workflow_execution import WorkflowExecution
+from repositories import SqlNotificationRepository, SqlWorkflowExecutionRepository
 from repositories.tenant_bootstrap import NoTenantSessionError
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
@@ -61,9 +61,9 @@ async def _seed_session(
     user_id: str = "owner",
     tenant_id: str = DEFAULT_TEST_TENANT_ID,
 ) -> str:
-    """Insert a WorkflowSession with the given ADK session id and return its PK."""
+    """Insert a WorkflowExecution with the given ADK session id and return its PK."""
     async with AsyncSession(eng) as db:
-        ws = WorkflowSession(
+        execution = WorkflowExecution(
             session_id=session_id,
             workflow_name="wf",
             agent_skill_id="skill-1",
@@ -75,10 +75,10 @@ async def _seed_session(
             created_by=user_id,
             updated_by=user_id,
         )
-        db.add(ws)
+        db.add(execution)
         await db.commit()
-        await db.refresh(ws)
-        return ws.id
+        await db.refresh(execution)
+        return execution.id
 
 
 def _ctx(session_id: str = "sess-abc", user_id: str = "tester") -> Any:
@@ -179,10 +179,10 @@ async def test_delete_cross_session_guard(engine: AsyncEngine) -> None:
 
 
 async def test_resolve_scope(engine: AsyncEngine) -> None:
-    ws_id = await _seed_session(engine, session_id="sess-x")
+    execution_id = await _seed_session(engine, session_id="sess-x")
     async with AsyncSession(engine) as db:
         assert await _resolve_scope(_ctx("sess-x"), db) == (
-            ws_id,
+            execution_id,
             DEFAULT_TEST_TENANT_ID,
         )
         with pytest.raises(NoTenantSessionError):
@@ -190,12 +190,12 @@ async def test_resolve_scope(engine: AsyncEngine) -> None:
 
 
 async def test_get_by_session_id(engine: AsyncEngine) -> None:
-    ws_id = await _seed_session(engine, session_id="sess-find")
+    execution_id = await _seed_session(engine, session_id="sess-find")
     async with AsyncSession(engine) as db:
-        repo = SqlWorkflowSessionRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
+        repo = SqlWorkflowExecutionRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
         found = await repo.get_by_session_id("sess-find")
         assert found is not None
-        assert found.id == ws_id
+        assert found.id == execution_id
         assert await repo.get_by_session_id("absent") is None
 
 
@@ -206,7 +206,7 @@ async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notificatio
         return await repo.list(user_id=user_id, limit=100, offset=0)
 
 
-async def test_session_completed_notification_emitted_once(
+async def test_execution_completed_notification_emitted_once(
     engine: AsyncEngine,
 ) -> None:
     await _seed_session(engine, user_id="owner")
@@ -218,7 +218,7 @@ async def test_session_completed_notification_emitted_once(
     completed = [
         n
         for n in await _notifications_for(engine, "owner")
-        if n.type is NotificationType.session_completed
+        if n.type is NotificationType.execution_completed
     ]
     assert completed == []
 
@@ -227,7 +227,7 @@ async def test_session_completed_notification_emitted_once(
     completed = [
         n
         for n in await _notifications_for(engine, "owner")
-        if n.type is NotificationType.session_completed
+        if n.type is NotificationType.execution_completed
     ]
     assert len(completed) == 1
 
@@ -236,7 +236,7 @@ async def test_session_completed_notification_emitted_once(
     completed = [
         n
         for n in await _notifications_for(engine, "owner")
-        if n.type is NotificationType.session_completed
+        if n.type is NotificationType.execution_completed
     ]
     assert len(completed) == 1
 

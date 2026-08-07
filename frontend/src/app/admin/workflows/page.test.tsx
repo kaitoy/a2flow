@@ -56,7 +56,7 @@ describe("WorkflowsPage", () => {
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: "Run" }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/ws-1"));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/execution-1"));
   });
 
   it("opens the design session for a developer from the list row", async () => {

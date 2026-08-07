@@ -1,4 +1,11 @@
-/** @module WorkflowSessionPage — Loads a WorkflowSession record and renders the workflow chat view. */
+/**
+ * @module WorkflowSessionPage — the workflow session: the LLM chat a workflow
+ * execution runs in, the run-time counterpart of the design session.
+ *
+ * A workflow session has no record of its own; it exists one-to-one with its
+ * WorkflowExecution, so the `[executionId]` route segment identifies it and the
+ * page loads that execution to render the chat.
+ */
 "use client";
 
 import { A2UIActivityType } from "@ag-ui/a2ui-middleware";
@@ -22,15 +29,15 @@ import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import { A2UI_SOURCE_TOOL_CALL_ID_KEY } from "@/lib/agentActivity";
-import { formatUserName, getWorkflowSession, type User, type WorkflowSession } from "@/lib/api";
+import { formatUserName, getWorkflowExecution, type User, type WorkflowExecution } from "@/lib/api";
 import { APPROVAL_ACTIVITY_TYPE } from "@/lib/approvalTool";
 import logger from "@/lib/logger";
 import { EXECUTION_KICKOFF_PROMPT } from "@/lib/workflowKickoff";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
-/** Renders the chat UI for an already-loaded WorkflowSession, including the task timeline and message list. */
-function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
+/** Renders the chat UI for an already-loaded WorkflowExecution, including the task timeline and message list. */
+function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((s) => s.auth.user);
   const {
@@ -47,7 +54,12 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
     locallySentMessageIds,
     messageTasks,
     tasks,
-  } = useWorkflowSessionChat(ws.id, ws.sessionId, EXECUTION_KICKOFF_PROMPT, ws.initiatorId);
+  } = useWorkflowSessionChat(
+    execution.id,
+    execution.sessionId,
+    EXECUTION_KICKOFF_PROMPT,
+    execution.initiatorId
+  );
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [timelineDrawerOpen, setTimelineDrawerOpen] = useState(false);
   // Focus state shared by the timeline and chat: a hovered entry wins over the
@@ -96,7 +108,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
   const renderAvatar = (message: Message): ReactNode => {
     if (message.role === "assistant") {
       return (
-        <Tooltip label={ws.workflowName}>
+        <Tooltip label={execution.workflowName}>
           <span className="inline-flex">
             <AgentAvatar size={28} />
           </span>
@@ -111,7 +123,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
       } else if (locallySentMessageIds.has(message.id)) {
         user = currentUser;
       } else {
-        user = senderUsers.get(ws.initiatorId) ?? null;
+        user = senderUsers.get(execution.initiatorId) ?? null;
       }
       return userAvatar(user);
     }
@@ -170,11 +182,11 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           <Breadcrumbs
             items={[
               { label: "Admin", href: "/admin" },
-              { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
-              // Links to this session's own admin record. Unlike the (nullable)
-              // design-time workflow id, the session's own id always exists — even
-              // after its parent workflow design has been deleted.
-              { label: ws.workflowName, href: `/admin/workflow-sessions/${ws.id}` },
+              { label: "Workflow Executions", href: "/admin/workflow-executions" },
+              // Links to this session's own execution record. Unlike the
+              // (nullable) design-time workflow id, the execution id always
+              // exists — even after its parent workflow design has been deleted.
+              { label: execution.workflowName, href: `/admin/workflow-executions/${execution.id}` },
               { label: "Session" },
             ]}
           />
@@ -207,7 +219,7 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
   );
 }
 
-/** Full-screen error state shown when the WorkflowSession record fails to load, with a retry action. */
+/** Full-screen error state shown when the WorkflowExecution record fails to load, with a retry action. */
 function WorkflowSessionLoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex h-dvh flex-col items-center justify-center gap-4">
@@ -215,7 +227,7 @@ function WorkflowSessionLoadError({ onRetry }: { onRetry: () => void }) {
         icon={AlertTriangle}
         animation="wiggle"
         title="Couldn't load this workflow"
-        description="Something went wrong while loading this workflow session."
+        description="Something went wrong while loading this workflow execution."
       />
       <Button variant="secondary" onClick={onRetry}>
         Retry
@@ -225,29 +237,29 @@ function WorkflowSessionLoadError({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function WorkflowSessionPage() {
-  const params = useParams<{ workflowSessionId: string }>();
-  const workflowSessionId = params.workflowSessionId;
-  const [workflowSession, setWorkflowSession] = useState<WorkflowSession | null>(null);
+  const params = useParams<{ executionId: string }>();
+  const executionId = params.executionId;
+  const [workflowExecution, setWorkflowExecution] = useState<WorkflowExecution | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: retryCount is a bump counter that re-triggers the fetch, not a data dependency
   useEffect(() => {
     setLoadFailed(false);
-    getWorkflowSession(workflowSessionId)
-      .then(setWorkflowSession)
+    getWorkflowExecution(executionId)
+      .then(setWorkflowExecution)
       .catch((err: unknown) => {
-        logger.error(err, "failed to load workflow session");
+        logger.error(err, "failed to load workflow execution");
         setLoadFailed(true);
       });
-  }, [workflowSessionId, retryCount]);
+  }, [executionId, retryCount]);
 
   const retry = useCallback(() => setRetryCount((c) => c + 1), []);
 
   return (
     <AuthProvider>
-      {workflowSession ? (
-        <WorkflowSessionView ws={workflowSession} />
+      {workflowExecution ? (
+        <WorkflowSessionView execution={workflowExecution} />
       ) : loadFailed ? (
         <WorkflowSessionLoadError onRetry={retry} />
       ) : (

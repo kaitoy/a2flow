@@ -13,7 +13,7 @@ export default function Loading() {
       <Breadcrumbs
         items={[
           { label: "Admin", href: "/admin" },
-          { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
+          { label: "Workflow Executions", href: "/admin/workflow-executions" },
           { label: "Workflow Tasks" },
         ]}
       />

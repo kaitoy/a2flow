@@ -3,13 +3,13 @@
 A Notification is a per-user message surfaced in the GUI's notification center
 (the toolbar bell). Notifications are generated as a side effect of workflow
 activity — for example when the agent registers task templates and waits for human
-approval (``approval_request``) or when every task in a workflow session reaches
-a terminal state (``session_completed``).
+approval (``approval_request``) or when every task in a workflow execution reaches
+a terminal state (``execution_completed``).
 
 The ``user_id`` column is the **recipient** of the notification and is distinct
 from the inherited ``created_by`` / ``updated_by`` audit fields (which record the
-actor that produced the record). ``workflow_session_id`` links the notification
-to the workflow session it concerns so the UI can deep-link to it.
+actor that produced the record). ``workflow_execution_id`` links the notification
+to the workflow execution it concerns so the UI can deep-link to it.
 """
 
 from enum import StrEnum
@@ -30,7 +30,7 @@ class NotificationType(StrEnum):
     """Kinds of events that produce a notification."""
 
     approval_request = "approval_request"
-    session_completed = "session_completed"
+    execution_completed = "execution_completed"
     workflow_draft_ready = "workflow_draft_ready"
     workflow_generation_failed = "workflow_generation_failed"
 
@@ -50,9 +50,9 @@ class NotificationCreate(NotificationUpdate):
     """Creation payload for a Notification.
 
     Adds the required recipient ``user_id``, the event ``type``, the ``title``,
-    and the optional ``body`` / ``workflow_session_id`` / ``workflow_id``
+    and the optional ``body`` / ``workflow_execution_id`` / ``workflow_id``
     links, and defaults ``read`` to ``False`` so new notifications start
-    unread. ``workflow_session_id`` deep-links run-scoped notifications
+    unread. ``workflow_execution_id`` deep-links run-scoped notifications
     (approvals, completion) while ``workflow_id`` deep-links workflow-scoped
     ones (``workflow_draft_ready``).
     """
@@ -61,7 +61,7 @@ class NotificationCreate(NotificationUpdate):
     type: NotificationType
     title: ShortText
     body: BodyText | None = None
-    workflow_session_id: str | None = None
+    workflow_execution_id: str | None = None
     workflow_id: str | None = None
     read: bool = False
 
@@ -70,7 +70,7 @@ class Notification(NotificationCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted Notification addressed to a single recipient user.
 
     ``user_id`` references the recipient (``ON DELETE CASCADE``); the optional
-    ``workflow_session_id`` / ``workflow_id`` reference the workflow session or
+    ``workflow_execution_id`` / ``workflow_id`` reference the workflow execution or
     workflow the notification is about (``ON DELETE CASCADE``), so deleting any
     of them removes the notification.
     """
@@ -78,7 +78,7 @@ class Notification(NotificationCreate, TenantScoped, BaseEntity, table=True):
     __tablename__ = "notifications"
     __table_args__ = (
         Index("ix_notifications_user_id", "user_id"),
-        Index("ix_notifications_workflow_session_id", "workflow_session_id"),
+        Index("ix_notifications_workflow_execution_id", "workflow_execution_id"),
         Index("ix_notifications_workflow_id", "workflow_id"),
         ForeignKeyConstraint(
             ["user_id"],
@@ -87,10 +87,10 @@ class Notification(NotificationCreate, TenantScoped, BaseEntity, table=True):
             name="fk_notifications_user_id",
         ),
         ForeignKeyConstraint(
-            ["workflow_session_id"],
-            ["workflow_sessions.id"],
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
             ondelete="CASCADE",
-            name="fk_notifications_workflow_session_id",
+            name="fk_notifications_workflow_execution_id",
         ),
         ForeignKeyConstraint(
             ["workflow_id"],

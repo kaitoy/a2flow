@@ -42,8 +42,8 @@ import type {
   UserCreate,
   UserRead as UserReadModel,
   UserUpdate,
+  WorkflowExecution as WorkflowExecutionModel,
   Workflow as WorkflowModel,
-  WorkflowSession as WorkflowSessionModel,
   WorkflowStatus,
   WorkflowTaskCreate,
   WorkflowTaskRead as WorkflowTaskModel,
@@ -72,7 +72,7 @@ import {
   zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse,
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
-  zDeleteWorkflowSessionApiV1WorkflowSessionsWsIdDeleteResponse,
+  zDeleteWorkflowExecutionApiV1WorkflowExecutionsExecutionIdDeleteResponse,
   zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
   zDeleteWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdDeleteResponse,
   zDiscardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPostResponse,
@@ -91,8 +91,8 @@ import {
   zGetUserApiV1UsersUserIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
   zGetWorkflowDesignSessionApiV1WorkflowsWorkflowIdDesignSessionGetResponse,
-  zGetWorkflowSessionApiV1WorkflowSessionsWsIdGetResponse,
-  zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse,
+  zGetWorkflowExecutionApiV1WorkflowExecutionsExecutionIdGetResponse,
+  zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse,
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
@@ -105,8 +105,8 @@ import {
   zListSessionsApiV1SessionsGetResponse,
   zListTenantsApiV1TenantsGetResponse,
   zListUsersApiV1UsersGetResponse,
-  zListWorkflowSessionsApiV1WorkflowSessionsGetResponse,
-  zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse,
+  zListWorkflowExecutionsApiV1WorkflowExecutionsGetResponse,
+  zListWorkflowExecutionTasksApiV1WorkflowExecutionsExecutionIdWorkflowTasksGetResponse,
   zListWorkflowsApiV1WorkflowsGetResponse,
   zListWorkflowTaskTemplatesApiV1WorkflowsWorkflowIdTaskTemplatesGetResponse,
   zLoginApiV1AuthLoginPostResponse,
@@ -323,7 +323,7 @@ export type Tenant = WithAudit<TenantModel>;
 export type User = WithAudit<UserReadModel>;
 export type DesignSession = WithAudit<DesignSessionModel>;
 export type Workflow = WithAudit<WorkflowModel>;
-export type WorkflowSession = WithAudit<WorkflowSessionModel>;
+export type WorkflowExecution = WithAudit<WorkflowExecutionModel>;
 export type WorkflowTask = WithAudit<WorkflowTaskModel>;
 export type WorkflowTaskTemplate = WithAudit<WorkflowTaskTemplateModel>;
 export type Session = SessionModel;
@@ -940,13 +940,13 @@ export async function deleteWorkflow(id: string): Promise<void> {
   );
 }
 
-/** Execute a workflow, creating a WorkflowSession that links the ADK session to the workflow. */
-export async function executeWorkflow(id: string): Promise<WorkflowSession> {
+/** Execute a workflow, creating a WorkflowExecution that links the ADK session to the workflow. */
+export async function executeWorkflow(id: string): Promise<WorkflowExecution> {
   const session = (await fetchEnvelope(
     apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/execute`),
     zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse
-  )) as WorkflowSession;
-  logger.info({ workflowSessionId: session.id, workflowId: id }, "workflow executed");
+  )) as WorkflowExecution;
+  logger.info({ workflowExecutionId: session.id, workflowId: id }, "workflow executed");
   return session;
 }
 
@@ -1035,30 +1035,30 @@ export async function getDesignSessionMessages(dsId: string): Promise<Message[]>
   ) as Promise<Message[]>;
 }
 
-/** Fetch a WorkflowSession record by ID. */
-export async function getWorkflowSession(id: string): Promise<WorkflowSession> {
+/** Fetch a WorkflowExecution record by ID. */
+export async function getWorkflowExecution(id: string): Promise<WorkflowExecution> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(id)}`),
-    zGetWorkflowSessionApiV1WorkflowSessionsWsIdGetResponse
-  ) as Promise<WorkflowSession>;
+    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(id)}`),
+    zGetWorkflowExecutionApiV1WorkflowExecutionsExecutionIdGetResponse
+  ) as Promise<WorkflowExecution>;
 }
 
 /**
- * Fetch the chat history of a WorkflowSession's ADK session.
+ * Fetch the chat history of a WorkflowExecution's workflow session.
  *
- * Unlike {@link getSessionMessages}, the history is keyed by the workflow
- * session's owner on the backend, so any viewer (for example a designated
- * approver) sees the same conversation instead of a separate, empty session.
+ * Unlike {@link getSessionMessages}, the history is keyed by the execution's
+ * initiator on the backend, so any viewer (for example a designated approver)
+ * sees the same conversation instead of a separate, empty session.
  */
-export async function getWorkflowSessionMessages(wsId: string): Promise<Message[]> {
+export async function getWorkflowSessionMessages(executionId: string): Promise<Message[]> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(wsId)}/messages`),
-    zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse
+    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`),
+    zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
   ) as Promise<Message[]>;
 }
 
 /**
- * Fetch the per-message sender attribution for a WorkflowSession's chat.
+ * Fetch the per-message sender attribution for a WorkflowExecution's chat.
  *
  * Returns a map keyed by whichever id identifies the message to the rest of
  * the UI: the message id (the ADK event id) for attributed human (`user`)
@@ -1067,14 +1067,16 @@ export async function getWorkflowSessionMessages(wsId: string): Promise<Message[
  * `toolCallId` since a tool message's own `id` is regenerated on every fetch
  * and cannot be used to correlate it back to its sender. Agent messages and
  * legacy history sent before attribution existed are absent, so callers fall
- * back to the session owner. Hits the same `/messages` endpoint as
+ * back to the execution's initiator. Hits the same `/messages` endpoint as
  * {@link getWorkflowSessionMessages}, reading the `senderUserId` each record
  * carries.
  */
-export async function getWorkflowSessionMessageSenders(wsId: string): Promise<Map<string, string>> {
+export async function getWorkflowSessionMessageSenders(
+  executionId: string
+): Promise<Map<string, string>> {
   const records = (await fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(wsId)}/messages`),
-    zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse
+    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`),
+    zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
   )) as Array<{ id?: string; role?: string; toolCallId?: string; senderUserId?: string | null }>;
   const senders = new Map<string, string>();
   for (const record of records) {
@@ -1086,7 +1088,7 @@ export async function getWorkflowSessionMessageSenders(wsId: string): Promise<Ma
 }
 
 /**
- * Fetch the per-message WorkflowTask association for a WorkflowSession's chat.
+ * Fetch the per-message WorkflowTask association for a WorkflowExecution's chat.
  *
  * Returns a map from message id (the ADK event id) to the id of the WorkflowTask
  * that was in progress when the message was produced. Messages produced outside
@@ -1094,10 +1096,12 @@ export async function getWorkflowSessionMessageSenders(wsId: string): Promise<Ma
  * `/messages` endpoint as {@link getWorkflowSessionMessages}, reading the
  * `workflowTaskId` each record carries alongside its `id`.
  */
-export async function getWorkflowSessionMessageTasks(wsId: string): Promise<Map<string, string>> {
+export async function getWorkflowSessionMessageTasks(
+  executionId: string
+): Promise<Map<string, string>> {
   const records = (await fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-sessions/${encodeURIComponent(wsId)}/messages`),
-    zGetWorkflowSessionMessagesApiV1WorkflowSessionsWsIdMessagesGetResponse
+    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`),
+    zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
   )) as Array<{ id?: string; workflowTaskId?: string | null }>;
   const tasks = new Map<string, string>();
   for (const record of records) {
@@ -1108,36 +1112,36 @@ export async function getWorkflowSessionMessageTasks(wsId: string): Promise<Map<
   return tasks;
 }
 
-/** List WorkflowSession records (newest first) with optional pagination, sort, and filters. */
-export async function listWorkflowSessions(query: ListQuery = {}): Promise<WorkflowSession[]> {
+/** List WorkflowExecution records (newest first) with optional pagination, sort, and filters. */
+export async function listWorkflowExecutions(query: ListQuery = {}): Promise<WorkflowExecution[]> {
   return fetchEnvelope(
-    apiClient.get("/api/v1/workflow-sessions", listConfig(query)),
-    zListWorkflowSessionsApiV1WorkflowSessionsGetResponse
-  ) as Promise<WorkflowSession[]>;
+    apiClient.get("/api/v1/workflow-executions", listConfig(query)),
+    zListWorkflowExecutionsApiV1WorkflowExecutionsGetResponse
+  ) as Promise<WorkflowExecution[]>;
 }
 
-/** Delete a WorkflowSession by ID, along with its tasks and ADK chat session. */
-export async function deleteWorkflowSession(id: string): Promise<void> {
+/** Delete a WorkflowExecution by ID, along with its tasks and workflow session. */
+export async function deleteWorkflowExecution(id: string): Promise<void> {
   await fetchEnvelope(
-    apiClient.delete(`/api/v1/workflow-sessions/${encodeURIComponent(id)}`),
-    zDeleteWorkflowSessionApiV1WorkflowSessionsWsIdDeleteResponse
+    apiClient.delete(`/api/v1/workflow-executions/${encodeURIComponent(id)}`),
+    zDeleteWorkflowExecutionApiV1WorkflowExecutionsExecutionIdDeleteResponse
   );
 }
 
 /**
- * List the WorkflowTasks belonging to the given WorkflowSession (position ASC by
+ * List the WorkflowTasks belonging to the given WorkflowExecution (position ASC by
  * default) with optional pagination, sort, and filters.
  */
 export async function listWorkflowTasks(
-  workflowSessionId: string,
+  workflowExecutionId: string,
   query: ListQuery = {}
 ): Promise<WorkflowTask[]> {
   return fetchEnvelope(
     apiClient.get(
-      `/api/v1/workflow-sessions/${encodeURIComponent(workflowSessionId)}/workflow-tasks`,
+      `/api/v1/workflow-executions/${encodeURIComponent(workflowExecutionId)}/workflow-tasks`,
       listConfig(query)
     ),
-    zListWorkflowSessionTasksApiV1WorkflowSessionsWsIdWorkflowTasksGetResponse
+    zListWorkflowExecutionTasksApiV1WorkflowExecutionsExecutionIdWorkflowTasksGetResponse
   ) as Promise<WorkflowTask[]>;
 }
 
@@ -1149,7 +1153,7 @@ export async function getWorkflowTask(taskId: string): Promise<WorkflowTask> {
   ) as Promise<WorkflowTask>;
 }
 
-/** Create a new WorkflowTask under the workflow session given in ``body.workflowSessionId``. */
+/** Create a new WorkflowTask under the workflow execution given in ``body.workflowExecutionId``. */
 export async function createWorkflowTask(body: WorkflowTaskCreate): Promise<WorkflowTask> {
   return fetchEnvelope(
     apiClient.post("/api/v1/workflow-tasks", body),
@@ -1157,7 +1161,7 @@ export async function createWorkflowTask(body: WorkflowTaskCreate): Promise<Work
   ) as Promise<WorkflowTask>;
 }
 
-/** Apply a partial update to a WorkflowTask. ``workflowSessionId`` is not updatable. */
+/** Apply a partial update to a WorkflowTask. ``workflowExecutionId`` is not updatable. */
 export async function updateWorkflowTask(
   taskId: string,
   body: WorkflowTaskUpdate
@@ -1305,15 +1309,16 @@ export function createChatAgent(sessionId: string): HttpAgent {
 }
 
 /**
- * Create an HttpAgent scoped to a specific workflow session endpoint, pre-configured
- * with the A2UI middleware so the agent can render interactive surfaces.
+ * Create an HttpAgent scoped to one execution's workflow session endpoint,
+ * pre-configured with the A2UI middleware so the agent can render interactive
+ * surfaces.
  */
 export function createWorkflowSessionAgent(
-  workflowSessionId: string,
+  workflowExecutionId: string,
   sessionId: string
 ): HttpAgent {
   const agent = new CredentialedHttpAgent({
-    url: `${API_BASE}/api/v1/workflow-sessions/${encodeURIComponent(workflowSessionId)}/agent`,
+    url: `${API_BASE}/api/v1/workflow-executions/${encodeURIComponent(workflowExecutionId)}/agent`,
     threadId: sessionId,
   });
   agent.use(

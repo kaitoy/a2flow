@@ -18,9 +18,9 @@ generic tools:
 
 Because of that difference the two tools resolve the current run differently.
 ``list_mcp_tools`` only needs the tenant, so it accepts both an execution run
-(keyed on a WorkflowSession) and a design run (keyed on a DesignSession).
+(keyed on a WorkflowExecution) and a design run (keyed on a DesignSession).
 ``call_mcp_tool`` has to check the run's in-progress tasks, so it still requires
-a WorkflowSession and is unavailable while merely designing — a task template
+a WorkflowExecution and is unavailable while merely designing — a task template
 may bind tools, but only a run may invoke them.
 
 Like :mod:`infrastructure.workflow_task_tools`, these callables run during the
@@ -51,7 +51,7 @@ from models.workflow_task import WorkflowTaskRead, WorkflowTaskStatus
 from repositories import (
     SqlMCPServerRepository,
     SqlSecretRepository,
-    SqlWorkflowSessionRepository,
+    SqlWorkflowExecutionRepository,
     SqlWorkflowTaskRepository,
 )
 from repositories.exceptions import McpConnectionError, SecretResolutionError
@@ -89,8 +89,8 @@ async def _resolve_tenant(tool_context: ToolContext, db: AsyncSession) -> str:
 
     ``list_mcp_tools`` only needs to know which tenant's registry to read, so
     unlike :func:`infrastructure.workflow_task_tools._resolve_scope` it accepts
-    a run keyed on either a WorkflowSession or a DesignSession. Resolving
-    through WorkflowSession alone would make the tool fail for the whole
+    a run keyed on either a WorkflowExecution or a DesignSession. Resolving
+    through WorkflowExecution alone would make the tool fail for the whole
     design phase — exactly where the templates' tool bindings are decided.
 
     Args:
@@ -102,7 +102,7 @@ async def _resolve_tenant(tool_context: ToolContext, db: AsyncSession) -> str:
 
     Raises:
         NoTenantSessionError: If the session id is missing or matches neither a
-            WorkflowSession nor a DesignSession.
+            WorkflowExecution nor a DesignSession.
     """
     session = getattr(tool_context, "session", None)
     session_id = getattr(session, "id", None)
@@ -112,7 +112,7 @@ async def _resolve_tenant(tool_context: ToolContext, db: AsyncSession) -> str:
     return tenant_id
 
 
-_NO_SESSION = "no workflow session is bound to the current run; cannot use MCP tools"
+_NO_SESSION = "no workflow execution is bound to the current run; cannot use MCP tools"
 _NO_TENANT = (
     "the current run is not bound to a workflow or design session; "
     "cannot list MCP tools"
@@ -138,17 +138,19 @@ async def _db_session() -> AsyncIterator[AsyncSession]:
 
 
 async def _in_progress_tasks(
-    db: AsyncSession, ws_id: str, tenant_id: str
+    db: AsyncSession, execution_id: str, tenant_id: str
 ) -> list[WorkflowTaskRead]:
     """Return the session's tasks currently in the ``in_progress`` status."""
-    ws_repo = SqlWorkflowSessionRepository(db, tenant_id=tenant_id)
+    execution_repo = SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
     task_repo = SqlWorkflowTaskRepository(
         db,
-        ws_repo,
+        execution_repo,
         SqlMCPServerRepository(db, tenant_id=tenant_id),
         tenant_id=tenant_id,
     )
-    tasks = await task_repo.list(limit=1000, offset=0, workflow_session_id=ws_id)
+    tasks = await task_repo.list(
+        limit=1000, offset=0, workflow_execution_id=execution_id
+    )
     return [t for t in tasks if t.status == WorkflowTaskStatus.in_progress]
 
 
@@ -320,10 +322,10 @@ async def call_mcp_tool(
         return {"error": "arguments must be an object matching the tool's input schema"}
     async with _db_session() as db:
         try:
-            ws_id, tenant_id = await _resolve_scope(tool_context, db)
+            execution_id, tenant_id = await _resolve_scope(tool_context, db)
         except NoTenantSessionError:
             return {"error": _NO_SESSION}
-        tasks = await _in_progress_tasks(db, ws_id, tenant_id)
+        tasks = await _in_progress_tasks(db, execution_id, tenant_id)
         if not tasks:
             return {"error": _NO_TASK_IN_PROGRESS}
         allowed = {

@@ -1,4 +1,4 @@
-/** @module WorkflowTasksPage — Read-only admin view of a WorkflowSession's tasks. */
+/** @module WorkflowTasksPage — Read-only admin view of a WorkflowExecution's tasks. */
 "use client";
 
 import { ListTree } from "lucide-react";
@@ -15,7 +15,7 @@ import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import {
   type FilterSpec,
-  getWorkflowSession,
+  getWorkflowExecution,
   listMcpServers,
   listWorkflowTasks,
   type SortSpec,
@@ -146,13 +146,13 @@ function buildColumns(
 }
 
 /**
- * Read-only admin list of a WorkflowSession's tasks. The tasks are copies of
+ * Read-only admin list of a WorkflowExecution's tasks. The tasks are copies of
  * the workflow's published templates, advanced by the execution agent (and
  * the approval flow) — the task templates themselves are edited on the workflow's task
  * templates, not here, so a run's history stays faithful to what actually ran.
  */
 export default function WorkflowTasksPage() {
-  const { wsId } = useParams<{ wsId: string }>();
+  const { executionId } = useParams<{ executionId: string }>();
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState<SortSpec | null>(null);
@@ -161,7 +161,7 @@ export default function WorkflowTasksPage() {
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
   // The task a hovered "Depends on" chip points at, called out in the table.
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  // The parent WorkflowSession's workflow name, shown as a breadcrumb crumb
+  // The parent WorkflowExecution's workflow name, shown as a breadcrumb crumb
   // linking back to the session's own admin record.
   const [workflowName, setWorkflowName] = useState("");
 
@@ -172,15 +172,15 @@ export default function WorkflowTasksPage() {
       // filter at all; the table takes both but is likewise unpaginated.
       const data =
         view === "graph"
-          ? await listWorkflowTasks(wsId, { limit: ALL_LIMIT })
-          : await listWorkflowTasks(wsId, { limit: ALL_LIMIT, sort, filters });
+          ? await listWorkflowTasks(executionId, { limit: ALL_LIMIT })
+          : await listWorkflowTasks(executionId, { limit: ALL_LIMIT, sort, filters });
       setTasks(data);
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
     } finally {
       setLoading(false);
     }
-  }, [wsId, view, sort, filters]);
+  }, [executionId, view, sort, filters]);
 
   useEffect(() => {
     load();
@@ -195,13 +195,13 @@ export default function WorkflowTasksPage() {
   }, []);
 
   useEffect(() => {
-    getWorkflowSession(wsId)
+    getWorkflowExecution(executionId)
       .then((s) => setWorkflowName(s.workflowName))
       .catch(() => {
         // Failure toast is shown globally by api.ts; the breadcrumb crumb
         // simply stays as an ellipsis.
       });
-  }, [wsId]);
+  }, [executionId]);
 
   const columns = buildColumns(
     // Unpaginated, so every dependency resolves to a real title.
@@ -219,10 +219,10 @@ export default function WorkflowTasksPage() {
       <Breadcrumbs
         items={[
           { label: "Admin", href: "/admin" },
-          { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
+          { label: "Workflow Executions", href: "/admin/workflow-executions" },
           // Links back to this run's own admin record; an ellipsis stands in
           // until its workflow name has loaded.
-          { label: workflowName || "…", href: `/admin/workflow-sessions/${wsId}` },
+          { label: workflowName || "…", href: `/admin/workflow-executions/${executionId}` },
           { label: "Workflow Tasks" },
         ]}
       />

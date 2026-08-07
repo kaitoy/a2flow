@@ -23,7 +23,7 @@ from infrastructure.workflow_task_tools import create_workflow_task
 from models.approval import ApprovalStatus
 from models.notification import Notification, NotificationType
 from models.user import Role
-from models.workflow_session import WorkflowSession
+from models.workflow_execution import WorkflowExecution
 from repositories import SqlApprovalRepository, SqlNotificationRepository
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
@@ -53,9 +53,9 @@ async def engine(
 async def _seed_session(
     eng: AsyncEngine, *, session_id: str = "sess-abc", user_id: str = "owner"
 ) -> str:
-    """Insert a WorkflowSession with the given ADK session id and return its PK."""
+    """Insert a WorkflowExecution with the given ADK session id and return its PK."""
     async with AsyncSession(eng) as db:
-        ws = WorkflowSession(
+        execution = WorkflowExecution(
             session_id=session_id,
             workflow_name="wf",
             workflow_prompt="do it",
@@ -69,10 +69,10 @@ async def _seed_session(
             created_by=user_id,
             updated_by=user_id,
         )
-        db.add(ws)
+        db.add(execution)
         await db.commit()
-        await db.refresh(ws)
-        return ws.id
+        await db.refresh(execution)
+        return execution.id
 
 
 def _ctx(session_id: str = "sess-abc", user_id: str = "owner") -> Any:
@@ -177,7 +177,9 @@ async def test_get_approval_reflects_resolution(engine: AsyncEngine) -> None:
     created = await request_approval("Decide", _ctx(), approver="alice")
     # Resolve directly through the repository (the frontend's PATCH path).
     async with AsyncSession(engine) as db:
-        repo = SqlApprovalRepository(db, _ws_repo(db), tenant_id=DEFAULT_TEST_TENANT_ID)
+        repo = SqlApprovalRepository(
+            db, _execution_repo(db), tenant_id=DEFAULT_TEST_TENANT_ID
+        )
         from models.approval import ApprovalUpdate
 
         await repo.update(
@@ -235,11 +237,11 @@ async def test_list_users_id_usable_as_approver(engine: AsyncEngine) -> None:
     assert fetched["approver"] == approver_id
 
 
-def _ws_repo(db: AsyncSession) -> Any:
-    """Build a WorkflowSession repository for the approval repository's FK check."""
-    from repositories import SqlWorkflowSessionRepository
+def _execution_repo(db: AsyncSession) -> Any:
+    """Build a WorkflowExecution repository for the approval repository's FK check."""
+    from repositories import SqlWorkflowExecutionRepository
 
-    return SqlWorkflowSessionRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
+    return SqlWorkflowExecutionRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
 
 
 # ---------- approver eligibility (roles) ----------

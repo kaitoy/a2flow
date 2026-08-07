@@ -1,13 +1,13 @@
 """CRUD endpoints for WorkflowTask resources.
 
-A WorkflowTask is a single actionable item belonging to a WorkflowSession.
-Listing the tasks of a particular session is exposed on the WorkflowSession
-router as ``GET /workflow-sessions/{session_id}/workflow-tasks``; this router
+A WorkflowTask is a single actionable item belonging to a WorkflowExecution.
+Listing the tasks of a particular execution is exposed on the WorkflowExecution
+router as ``GET /workflow-executions/{session_id}/workflow-tasks``; this router
 focuses on the create-and-act-on-a-single-task operations. Every operation is
-restricted to the parent session's owner, its designated approvers, and super
+restricted to the parent execution's initiator, its designated approvers, and super
 admins (enforced by :class:`~services.workflow_task.WorkflowTaskService`).
 Changing a task's ``status`` is further restricted when the task has a linked
-Approval: only the session owner or that Approval's designated approver may
+Approval: only the execution initiator or that Approval's designated approver may
 do so.
 """
 
@@ -31,7 +31,7 @@ async def create_workflow_task(
     caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowTaskRead]:
-    """Create a new WorkflowTask belonging to the session named in ``body``."""
+    """Create a new WorkflowTask belonging to the execution named in ``body``."""
     task = await service.create(body, caller=caller)
     return ApiResponse(meta=meta, data=task)
 

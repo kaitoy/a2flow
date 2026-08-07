@@ -231,7 +231,7 @@ def mock_agent_registry(mock_adk_agent: MagicMock) -> MagicMock:
 
 
 #: Commit sha the fake skill store reports for every clone, and that tests
-#: expect a WorkflowSession to be pinned to.
+#: expect a WorkflowExecution to be pinned to.
 FAKE_COMMIT_SHA = "a" * 40
 
 
@@ -335,8 +335,8 @@ async def _workflow_client_env(
         DesignSession as _DesignSession,  # noqa: F401 — registers model
     )
     from models.workflow import Workflow as _Workflow  # noqa: F401 — registers model
-    from models.workflow_session import (
-        WorkflowSession as _WorkflowSession,  # noqa: F401 — registers model
+    from models.workflow_execution import (
+        WorkflowExecution as _WorkflowExecution,  # noqa: F401 — registers model
     )
     from models.workflow_task import (
         WorkflowTask as _WorkflowTask,  # noqa: F401 — registers model

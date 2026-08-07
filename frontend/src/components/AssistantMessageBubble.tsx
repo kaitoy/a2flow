@@ -13,7 +13,7 @@ import { type ReactNode, useEffect, useState } from "react";
  * as untrusted), re-parsed on every streaming delta so formatting appears as
  * tokens arrive.
  *
- * When `avatar` is provided (workflow sessions) it is shown on the outer (left)
+ * When `avatar` is provided (workflow executions) it is shown on the outer (left)
  * edge to mark the message as the agent's; without it the layout is unchanged
  * for the single-user chat.
  */

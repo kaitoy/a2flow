@@ -1,6 +1,6 @@
 """WorkflowTask data models for create, update, read, and database persistence.
 
-A WorkflowTask represents a single actionable item belonging to a WorkflowSession.
+A WorkflowTask represents a single actionable item belonging to a WorkflowExecution.
 Tasks are intended to capture the steps produced by the agent under the workflow
 instruction "use the provided skill to produce an actionable task list".
 
@@ -53,7 +53,7 @@ class ToolBinding(SQLModel):
 class WorkflowTaskUpdate(SQLModel):
     """Partial update payload for a WorkflowTask — every field is optional.
 
-    Does not include ``workflow_session_id``: tasks cannot be re-parented to a
+    Does not include ``workflow_execution_id``: tasks cannot be re-parented to a
     different session after creation. When ``depends_on_ids`` is ``None`` the
     task's dependency edges are left unchanged; when it is an explicit list the
     full set of edges is replaced with that list. ``tool_bindings`` follows the
@@ -74,11 +74,11 @@ class WorkflowTaskCreate(WorkflowTaskUpdate):
 
     Inherits the optional fields from :class:`WorkflowTaskUpdate` and tightens
     ``title`` to required, supplies defaults for ``status`` and ``position``,
-    adds the required parent ``workflow_session_id`` foreign key, and defaults
+    adds the required parent ``workflow_execution_id`` foreign key, and defaults
     ``depends_on_ids`` and ``tool_bindings`` to empty lists.
     """
 
-    workflow_session_id: str
+    workflow_execution_id: str
     title: ShortText
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
     position: Position = 0
@@ -87,7 +87,7 @@ class WorkflowTaskCreate(WorkflowTaskUpdate):
 
 
 class WorkflowTask(TenantScoped, BaseEntity, table=True):
-    """Database-persisted WorkflowTask record belonging to a WorkflowSession.
+    """Database-persisted WorkflowTask record belonging to a WorkflowExecution.
 
     This table holds only the scalar fields of a task. Dependency edges between
     tasks live in :class:`WorkflowTaskDependency`; they are not columns here.
@@ -95,15 +95,15 @@ class WorkflowTask(TenantScoped, BaseEntity, table=True):
 
     __tablename__ = "workflow_tasks"
     __table_args__ = (
-        Index("ix_workflow_tasks_session_id", "workflow_session_id"),
+        Index("ix_workflow_tasks_workflow_execution_id", "workflow_execution_id"),
         ForeignKeyConstraint(
-            ["workflow_session_id"],
-            ["workflow_sessions.id"],
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
             ondelete="CASCADE",
         ),
     )
 
-    workflow_session_id: str
+    workflow_execution_id: str
     title: str
     description: str | None = None
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
@@ -119,7 +119,7 @@ class WorkflowTaskRead(BaseEntity):
     bound to this task.
     """
 
-    workflow_session_id: str
+    workflow_execution_id: str
     title: str
     description: str | None = None
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending

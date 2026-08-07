@@ -27,7 +27,7 @@ const STATUS_STYLES: Record<ApprovalStatus, string> = {
 
 /**
  * Read-only detail page for a single `Approval` request: its status, the
- * approver's decision and comment, and the workflow session it belongs to.
+ * approver's decision and comment, and the workflow execution it belongs to.
  *
  * Approve/reject is deliberately not offered here — resolving an approval
  * stays in the in-chat flow (`ApprovalControls`), the only place the backend
@@ -100,7 +100,7 @@ export default function ApprovalDetailPage() {
             secondaryAction={
               <HeaderIconButton
                 label="Open workflow session"
-                onClick={() => router.push(`/workflow-sessions/${approval.workflowSessionId}`)}
+                onClick={() => router.push(`/workflow-sessions/${approval.workflowExecutionId}`)}
               >
                 <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
               </HeaderIconButton>
@@ -135,10 +135,10 @@ export default function ApprovalDetailPage() {
             />
             <DetailItem label="Comment" value={approval.response ?? EMPTY} />
             <DetailItem
-              label="Workflow Session"
+              label="Workflow Execution"
               value={
                 <Link
-                  href={`/admin/workflow-sessions/${approval.workflowSessionId}`}
+                  href={`/admin/workflow-executions/${approval.workflowExecutionId}`}
                   className="font-medium text-accent transition-colors hover:underline"
                 >
                   Open session

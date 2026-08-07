@@ -1,7 +1,7 @@
 """Tests for the approvals API (``GET``/``PATCH /api/v1/approvals``).
 
 The list and get endpoints are unscoped (admin browsing), while ``PATCH`` records
-the requesting user as the approver. Approvals reference a workflow session via a
+the requesting user as the approver. Approvals reference a workflow execution via a
 foreign key, so each test seeds a session before inserting approvals.
 """
 
@@ -16,7 +16,7 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalStatus
-from models.workflow_session import WorkflowSession
+from models.workflow_execution import WorkflowExecution
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
@@ -56,9 +56,9 @@ async def approval_env() -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None
 
 
 async def _seed_session(eng: AsyncEngine, *, user_id: str = "owner") -> str:
-    """Insert a WorkflowSession and return its primary key."""
+    """Insert a WorkflowExecution and return its primary key."""
     async with AsyncSession(eng) as db:
-        ws = WorkflowSession(
+        execution = WorkflowExecution(
             session_id="sess-1",
             workflow_name="wf",
             workflow_prompt="do it",
@@ -72,16 +72,16 @@ async def _seed_session(eng: AsyncEngine, *, user_id: str = "owner") -> str:
             created_by=user_id,
             updated_by=user_id,
         )
-        db.add(ws)
+        db.add(execution)
         await db.commit()
-        await db.refresh(ws)
-        return ws.id
+        await db.refresh(execution)
+        return execution.id
 
 
 async def _insert_approval(
     eng: AsyncEngine,
     *,
-    workflow_session_id: str,
+    workflow_execution_id: str,
     title: str = "Approve me",
     status: ApprovalStatus = ApprovalStatus.pending,
     user_id: str = "owner",
@@ -90,7 +90,7 @@ async def _insert_approval(
     """Insert an Approval for the given session and return its id."""
     async with AsyncSession(eng) as db:
         approval = Approval(
-            workflow_session_id=workflow_session_id,
+            workflow_execution_id=workflow_execution_id,
             title=title,
             status=status,
             approver=approver,
@@ -108,9 +108,9 @@ async def test_list_returns_approvals(
     approval_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = approval_env
-    ws_id = await _seed_session(eng)
-    await _insert_approval(eng, workflow_session_id=ws_id, title="First")
-    await _insert_approval(eng, workflow_session_id=ws_id, title="Second")
+    execution_id = await _seed_session(eng)
+    await _insert_approval(eng, workflow_execution_id=execution_id, title="First")
+    await _insert_approval(eng, workflow_execution_id=execution_id, title="Second")
 
     res = await client.get("/api/v1/approvals", headers={"X-User-Id": "owner"})
     data = assert_ok(res)
@@ -121,8 +121,8 @@ async def test_get_approval(
     approval_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = approval_env
-    ws_id = await _seed_session(eng)
-    approval_id = await _insert_approval(eng, workflow_session_id=ws_id)
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(eng, workflow_execution_id=execution_id)
 
     res = await client.get(
         f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}
@@ -146,9 +146,9 @@ async def test_resolve_approval_approves(
     approval_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = approval_env
-    ws_id = await _seed_session(eng)
+    execution_id = await _seed_session(eng)
     approval_id = await _insert_approval(
-        eng, workflow_session_id=ws_id, approver="alice"
+        eng, workflow_execution_id=execution_id, approver="alice"
     )
 
     res = await client.patch(
@@ -167,8 +167,10 @@ async def test_resolve_by_non_approver_is_forbidden(
     approval_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = approval_env
-    ws_id = await _seed_session(eng)
-    approval_id = await _insert_approval(eng, workflow_session_id=ws_id, approver="bob")
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
 
     # alice is not the designated approver, so she cannot resolve it — even
     # while holding the approver role (the test auth stub defaults to
@@ -192,8 +194,10 @@ async def test_resolve_by_super_admin_who_is_not_approver_is_forbidden(
 ) -> None:
     """A super admin who is not the designated approver still cannot resolve it."""
     client, eng = approval_env
-    ws_id = await _seed_session(eng)
-    approval_id = await _insert_approval(eng, workflow_session_id=ws_id, approver="bob")
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
 
     res = await client.patch(
         f"/api/v1/approvals/{approval_id}",
@@ -213,8 +217,10 @@ async def test_resolve_keeps_designated_approver(
     approval_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = approval_env
-    ws_id = await _seed_session(eng)
-    approval_id = await _insert_approval(eng, workflow_session_id=ws_id, approver="bob")
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
 
     res = await client.get(
         f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}

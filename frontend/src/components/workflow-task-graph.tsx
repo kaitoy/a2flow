@@ -23,7 +23,7 @@ const EMPTY_SERVER_NAMES: Map<string, string> = new Map();
 
 /** Props for {@link WorkflowTaskGraph}. */
 export interface WorkflowTaskGraphProps {
-  /** Tasks of a single workflow session (or a workflow's task templates) to visualize as a DAG. */
+  /** Tasks of a single workflow execution (or a workflow's task templates) to visualize as a DAG. */
   tasks: GraphTask[];
   /** Registered MCP server names by id, used to label the server nodes. Ids
    * missing from the map fall back to a truncated id. */

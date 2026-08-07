@@ -63,7 +63,7 @@ export interface WorkflowTaskTimelineProps {
 }
 
 /**
- * Collapsible left-hand timeline of a workflow session's tasks. Each entry shows
+ * Collapsible left-hand timeline of a workflow execution's tasks. Each entry shows
  * a numbered status badge and the task's title, highlights the in-progress task,
  * follows the chat's scroll position / hover, and scrolls the chat to the
  * matching {@link WorkflowTaskGroup} when clicked. The badge number matches the

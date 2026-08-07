@@ -292,7 +292,7 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /run workflow/i }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/ws-1"));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/execution-1"));
   });
 
   it("shows an error toast when Run fails", async () => {

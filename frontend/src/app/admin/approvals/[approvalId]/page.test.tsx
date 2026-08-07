@@ -35,10 +35,10 @@ describe("ApprovalDetailPage", () => {
     );
   });
 
-  it("links to the workflow session", async () => {
+  it("links to the workflow execution", async () => {
     render(<ApprovalDetailPage />);
     const link = await screen.findByRole("link", { name: "Open session" });
-    expect(link).toHaveAttribute("href", "/admin/workflow-sessions/ws-1");
+    expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1");
   });
 
   it("navigates to the chat page from the header action", async () => {
@@ -56,7 +56,7 @@ describe("ApprovalDetailPage", () => {
     render(<ApprovalDetailPage />);
     await screen.findByRole("heading", { name: "Deploy to production" });
     await user.click(screen.getByRole("button", { name: "Open workflow session" }));
-    expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/ws-1");
+    expect(pushMock).toHaveBeenCalledWith("/workflow-sessions/execution-1");
   });
 
   it("offers no delete or resolve controls", async () => {

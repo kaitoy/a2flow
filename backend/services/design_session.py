@@ -2,7 +2,7 @@
 
 Exposes DesignSession reads and resolution of the design agent bound to a
 session. A design session is the chat in which a workflow's task templates
-are produced and refined; unlike workflow sessions it has no approver sharing —
+are produced and refined; unlike workflow executions it has no approver sharing —
 only the owner (and super admins) may use it — so no separate access policy is
 needed.
 """
@@ -161,7 +161,7 @@ class DesignSessionService:
     ) -> tuple[ADKAgent, DesignSession]:
         """Resolve the design agent bound to a DesignSession and the record.
 
-        Mirrors ``WorkflowSessionService.resolve_agent``: the skill revision
+        Mirrors ``WorkflowExecutionService.resolve_agent``: the skill revision
         pinned on the record is loaded from the shared store, falling back to
         the skill's current revision (loudly) when the pinned directory is
         gone, and the agent is resolved with :attr:`AgentKind.design` so the
@@ -220,7 +220,7 @@ class DesignSessionService:
         The history is keyed by the session's owner. Returns an empty list when
         the ADK session does not exist yet (the background generation run has
         not started). ``senderUserId`` and ``workflowTaskId`` are included as
-        ``None`` so the payload shape matches the workflow-session messages
+        ``None`` so the payload shape matches the workflow-execution messages
         endpoint and the frontend chat components can be reused unchanged.
 
         Args:

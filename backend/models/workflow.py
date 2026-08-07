@@ -144,7 +144,7 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
 
     @property
     def effective_description(self) -> str | None:
-        """Return the description a workflow session should use.
+        """Return the description a workflow execution should use.
 
         ``description`` wins whenever a user has set it; otherwise falls back
         to the AI-generated ``generated_description``.

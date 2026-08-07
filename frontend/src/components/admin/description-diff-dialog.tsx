@@ -131,7 +131,7 @@ export function DescriptionDiffDialog({
   if (typeof document === "undefined") return null;
 
   // An empty description is not an edit of the generated text — it means the
-  // workflow session falls back to it verbatim, so a diff would be misleading.
+  // workflow execution falls back to it verbatim, so a diff would be misleading.
   const emptyDescription = description.trim() === "";
 
   return createPortal(

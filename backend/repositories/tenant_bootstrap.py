@@ -20,20 +20,20 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.agent_skill import AgentSkill
 from models.design_session import DesignSession
 from models.workflow import Workflow
-from models.workflow_session import WorkflowSession
+from models.workflow_execution import WorkflowExecution
 
 
 class NoTenantSessionError(Exception):
     """Raised when an agent tool's ADK session id maps to no known tenant."""
 
 
-async def resolve_workflow_session_tenant(
+async def resolve_workflow_execution_tenant(
     db: AsyncSession, session_id: str
 ) -> tuple[str, str] | None:
-    """Return ``(workflow_session_id, tenant_id)`` for an ADK session id, or ``None``."""
+    """Return ``(workflow_execution_id, tenant_id)`` for an ADK session id, or ``None``."""
     stmt = (
-        select(WorkflowSession.id, WorkflowSession.tenant_id)
-        .where(col(WorkflowSession.session_id) == session_id)
+        select(WorkflowExecution.id, WorkflowExecution.tenant_id)
+        .where(col(WorkflowExecution.session_id) == session_id)
         .limit(1)
     )
     row = (await db.exec(stmt)).first()
@@ -56,9 +56,9 @@ async def resolve_design_session_tenant(
 async def resolve_agent_run_tenant(db: AsyncSession, session_id: str) -> str | None:
     """Return the tenant_id owning an ADK session id, run or design alike.
 
-    Agent tools that only need the tenant -- not the WorkflowSession primary key
+    Agent tools that only need the tenant -- not the WorkflowExecution primary key
     -- must accept both kinds of run: an execution run keys its ADK session on a
-    :class:`models.workflow_session.WorkflowSession`, while workflow generation
+    :class:`models.workflow_execution.WorkflowExecution`, while workflow generation
     and the design chat keys theirs on a
     :class:`models.design_session.DesignSession`. Resolving through only one
     of the two makes the tool fail outright in the other phase.
@@ -66,8 +66,8 @@ async def resolve_agent_run_tenant(db: AsyncSession, session_id: str) -> str | N
     Use this for tenant-only tools such as
     :func:`infrastructure.mcp_tools.list_mcp_tools`. Tools that enforce
     something against the run's tasks (``call_mcp_tool``) still need the
-    WorkflowSession id and must keep using
-    :func:`resolve_workflow_session_tenant`.
+    WorkflowExecution id and must keep using
+    :func:`resolve_workflow_execution_tenant`.
 
     Args:
         db: The database session to resolve against.
@@ -75,9 +75,9 @@ async def resolve_agent_run_tenant(db: AsyncSession, session_id: str) -> str | N
 
     Returns:
         The owning tenant_id, or ``None`` when the id matches neither a
-        WorkflowSession nor a DesignSession.
+        WorkflowExecution nor a DesignSession.
     """
-    resolved = await resolve_workflow_session_tenant(db, session_id)
+    resolved = await resolve_workflow_execution_tenant(db, session_id)
     if resolved is not None:
         return resolved[1]
     design = await resolve_design_session_tenant(db, session_id)

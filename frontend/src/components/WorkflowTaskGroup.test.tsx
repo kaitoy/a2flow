@@ -6,7 +6,7 @@ import { WorkflowTaskGroup } from "./WorkflowTaskGroup";
 
 const task: WorkflowTask = {
   id: "t1",
-  workflowSessionId: "ws",
+  workflowExecutionId: "execution",
   title: "Draft the report",
   status: "in_progress",
   position: 0,

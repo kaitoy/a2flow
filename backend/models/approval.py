@@ -1,12 +1,12 @@
 """Approval data models for create, update, read, and database persistence.
 
 An Approval is a human-in-the-loop decision the workflow agent asks for while
-executing a workflow session. The agent creates an Approval (in the ``pending``
+executing a workflow execution. The agent creates an Approval (in the ``pending``
 state) via the ``request_approval`` tool, the GUI surfaces it to the approver,
 and the approver resolves it to ``approved`` or ``rejected``. The agent then
 continues or aborts the task based on the recorded decision.
 
-``workflow_session_id`` links the approval to the workflow session it belongs to
+``workflow_execution_id`` links the approval to the workflow execution it belongs to
 (so the GUI can deep-link to the session chat); the optional ``workflow_task_id``
 ties it to the specific task that needs approval. The optional ``approver`` is
 the user the agent addresses the request to (the request's destination), set when
@@ -52,13 +52,13 @@ class ApprovalUpdate(SQLModel):
 class ApprovalCreate(ApprovalUpdate):
     """Creation payload for an Approval.
 
-    Adds the required ``workflow_session_id`` and ``title``, the optional
+    Adds the required ``workflow_execution_id`` and ``title``, the optional
     ``description``, ``workflow_task_id`` link, and ``approver`` (the user the
     request is addressed to), and defaults ``status`` to ``pending`` so a freshly
     requested approval starts unresolved.
     """
 
-    workflow_session_id: str
+    workflow_execution_id: str
     title: ShortText
     description: BodyText | None = None
     workflow_task_id: str | None = None
@@ -69,7 +69,7 @@ class ApprovalCreate(ApprovalUpdate):
 class Approval(ApprovalCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted approval request.
 
-    ``workflow_session_id`` references the owning workflow session
+    ``workflow_execution_id`` references the owning workflow execution
     (``ON DELETE CASCADE``), so deleting the session removes its approvals. The
     optional ``workflow_task_id`` references the task the approval concerns
     (``ON DELETE SET NULL``), so deleting the task leaves the approval record
@@ -79,14 +79,14 @@ class Approval(ApprovalCreate, TenantScoped, BaseEntity, table=True):
 
     __tablename__ = "approvals"
     __table_args__ = (
-        Index("ix_approvals_workflow_session_id", "workflow_session_id"),
+        Index("ix_approvals_workflow_execution_id", "workflow_execution_id"),
         Index("ix_approvals_workflow_task_id", "workflow_task_id"),
         Index("ix_approvals_approver", "approver"),
         ForeignKeyConstraint(
-            ["workflow_session_id"],
-            ["workflow_sessions.id"],
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
             ondelete="CASCADE",
-            name="fk_approvals_workflow_session_id",
+            name="fk_approvals_workflow_execution_id",
         ),
         ForeignKeyConstraint(
             ["workflow_task_id"],

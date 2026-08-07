@@ -26,8 +26,8 @@ from models.mcp_server import MCPServerCreate
 from models.notification import NotificationCreate, NotificationType
 from models.secret import SecretCreate, SecretType
 from models.workflow import WorkflowCreate
+from models.workflow_execution import WorkflowExecutionCreate
 from models.workflow_published_version import dump_templates, snapshot_template
-from models.workflow_session import WorkflowSessionCreate
 from models.workflow_task import WorkflowTaskCreate
 from models.workflow_task_template import WorkflowTaskTemplateCreate
 from repositories import (
@@ -38,9 +38,9 @@ from repositories import (
     SqlMessageMetaRepository,
     SqlNotificationRepository,
     SqlSecretRepository,
+    SqlWorkflowExecutionRepository,
     SqlWorkflowPublishedVersionRepository,
     SqlWorkflowRepository,
-    SqlWorkflowSessionRepository,
     SqlWorkflowTaskRepository,
     SqlWorkflowTaskTemplateRepository,
 )
@@ -77,7 +77,7 @@ class _Rows:
         self.mcp_server = ""
         self.secret = ""
         self.workflow = ""
-        self.workflow_session = ""
+        self.workflow_execution = ""
         self.workflow_task = ""
         self.approval = ""
         self.notification = ""
@@ -121,9 +121,9 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
     )
     rows.workflow = workflow.id
 
-    ws_repo = SqlWorkflowSessionRepository(db, tenant_id=tenant_id)
-    ws = await ws_repo.create(
-        WorkflowSessionCreate(
+    execution_repo = SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
+    execution = await execution_repo.create(
+        WorkflowExecutionCreate(
             session_id=f"sess-{suffix}",
             workflow_name=workflow.name,
             agent_skill_id=skill.id,
@@ -135,18 +135,18 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
         workflow_id=workflow.id,
         user_id="owner",
     )
-    rows.workflow_session = ws.id
+    rows.workflow_execution = execution.id
 
-    tasks = SqlWorkflowTaskRepository(db, ws_repo, mcp, tenant_id=tenant_id)
+    tasks = SqlWorkflowTaskRepository(db, execution_repo, mcp, tenant_id=tenant_id)
     task = await tasks.create(
-        WorkflowTaskCreate(workflow_session_id=ws.id, title=f"task-{suffix}"),
+        WorkflowTaskCreate(workflow_execution_id=execution.id, title=f"task-{suffix}"),
         user_id="owner",
     )
     rows.workflow_task = task.id
 
-    approvals = SqlApprovalRepository(db, ws_repo, tenant_id=tenant_id)
+    approvals = SqlApprovalRepository(db, execution_repo, tenant_id=tenant_id)
     approval = await approvals.create(
-        ApprovalCreate(workflow_session_id=ws.id, title=f"approve-{suffix}"),
+        ApprovalCreate(workflow_execution_id=execution.id, title=f"approve-{suffix}"),
         user_id="owner",
     )
     rows.approval = approval.id
@@ -196,7 +196,7 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
     meta = SqlMessageMetaRepository(db, tenant_id=tenant_id)
     rows.message_meta_event_id = f"event-{suffix}"
     await meta.set_sender(
-        workflow_session_id=ws.id,
+        workflow_execution_id=execution.id,
         adk_event_id=rows.message_meta_event_id,
         sender_user_id="owner",
     )
@@ -271,19 +271,19 @@ async def test_workflow_isolation(
             await repo_a.delete(b.workflow)
 
 
-async def test_workflow_session_isolation(
+async def test_workflow_execution_isolation(
     engine: AsyncEngine, seeded: tuple[_Rows, _Rows]
 ) -> None:
     a, b = seeded
     async with AsyncSession(engine, expire_on_commit=False) as db:
-        repo_a = SqlWorkflowSessionRepository(db, tenant_id=TENANT_A)
-        assert await repo_a.get(b.workflow_session) is None
+        repo_a = SqlWorkflowExecutionRepository(db, tenant_id=TENANT_A)
+        assert await repo_a.get(b.workflow_execution) is None
         # get_by_session_id must not resolve another tenant's ADK session id.
         assert await repo_a.get_by_session_id("sess-b") is None
         listed = await repo_a.list(limit=100, offset=0)
-        assert b.workflow_session not in {r.id for r in listed}
+        assert b.workflow_execution not in {r.id for r in listed}
         with pytest.raises(NotFoundError):
-            await repo_a.delete(b.workflow_session)
+            await repo_a.delete(b.workflow_execution)
 
 
 async def test_workflow_task_isolation(
@@ -291,9 +291,11 @@ async def test_workflow_task_isolation(
 ) -> None:
     a, b = seeded
     async with AsyncSession(engine, expire_on_commit=False) as db:
-        ws_repo_a = SqlWorkflowSessionRepository(db, tenant_id=TENANT_A)
+        execution_repo_a = SqlWorkflowExecutionRepository(db, tenant_id=TENANT_A)
         mcp_a = SqlMCPServerRepository(db, tenant_id=TENANT_A)
-        repo_a = SqlWorkflowTaskRepository(db, ws_repo_a, mcp_a, tenant_id=TENANT_A)
+        repo_a = SqlWorkflowTaskRepository(
+            db, execution_repo_a, mcp_a, tenant_id=TENANT_A
+        )
         assert await repo_a.get(b.workflow_task) is None
         listed = await repo_a.list(limit=100, offset=0)
         assert b.workflow_task not in {t.id for t in listed}
@@ -306,8 +308,8 @@ async def test_approval_isolation(
 ) -> None:
     a, b = seeded
     async with AsyncSession(engine, expire_on_commit=False) as db:
-        ws_repo_a = SqlWorkflowSessionRepository(db, tenant_id=TENANT_A)
-        repo_a = SqlApprovalRepository(db, ws_repo_a, tenant_id=TENANT_A)
+        execution_repo_a = SqlWorkflowExecutionRepository(db, tenant_id=TENANT_A)
+        repo_a = SqlApprovalRepository(db, execution_repo_a, tenant_id=TENANT_A)
         assert await repo_a.get(b.approval) is None
         assert await repo_a.exists(b.approval) is False
         listed = await repo_a.list(limit=100, offset=0)
@@ -376,8 +378,8 @@ async def test_message_meta_isolation(
     a, b = seeded
     async with AsyncSession(engine, expire_on_commit=False) as db:
         repo_a = SqlMessageMetaRepository(db, tenant_id=TENANT_A)
-        # Tenant A's repo, queried against tenant B's workflow_session_id, must
+        # Tenant A's repo, queried against tenant B's workflow_execution_id, must
         # see no metadata rows even though the row itself exists in tenant B.
-        assert await repo_a.meta_for_session(b.workflow_session) == {}
-        own = await repo_a.meta_for_session(a.workflow_session)
+        assert await repo_a.meta_for_session(b.workflow_execution) == {}
+        own = await repo_a.meta_for_session(a.workflow_execution)
         assert a.message_meta_event_id in own

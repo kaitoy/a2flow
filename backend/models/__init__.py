@@ -27,6 +27,7 @@ from .workflow import (
     WorkflowStatus,
     WorkflowUpdate,
 )
+from .workflow_execution import WorkflowExecution, WorkflowExecutionCreate
 from .workflow_published_version import (
     WorkflowPublishedVersion,
     WorkflowPublishedVersionTemplate,
@@ -34,7 +35,6 @@ from .workflow_published_version import (
     parse_templates,
     snapshot_template,
 )
-from .workflow_session import WorkflowSession, WorkflowSessionCreate
 from .workflow_task import (
     ToolBinding,
     WorkflowTask,
@@ -89,8 +89,8 @@ __all__ = [
     "WorkflowPublishedVersionTemplate",
     "WorkflowStatus",
     "WorkflowUpdate",
-    "WorkflowSession",
-    "WorkflowSessionCreate",
+    "WorkflowExecution",
+    "WorkflowExecutionCreate",
     "WorkflowTask",
     "WorkflowTaskCreate",
     "WorkflowTaskDependency",

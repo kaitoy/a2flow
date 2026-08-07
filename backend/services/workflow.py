@@ -2,7 +2,7 @@
 
 Holds the Workflow read/update/delete operations plus the multi-collaborator
 ``execute`` orchestration (resolve workflow → resolve skill → create a
-WorkflowSession and copy the published task templates into it). Workflows are
+WorkflowExecution and copy the published task templates into it). Workflows are
 not created here: they are born from the generation flow in
 ``services/workflow_design.py``.
 
@@ -18,19 +18,19 @@ from collections.abc import Sequence
 
 from models.user import Role, User, has_role
 from models.workflow import Workflow, WorkflowStatus, WorkflowUpdate
+from models.workflow_execution import WorkflowExecution, WorkflowExecutionCreate
 from models.workflow_published_version import (
     WorkflowPublishedVersionTemplate,
     parse_templates,
     snapshot_template,
 )
-from models.workflow_session import WorkflowSession, WorkflowSessionCreate
 from models.workflow_task import WorkflowTaskCreate, WorkflowTaskStatus
 from repositories import (
     MAX_TASK_TEMPLATES,
     AgentSkillRepository,
+    WorkflowExecutionRepository,
     WorkflowPublishedVersionRepository,
     WorkflowRepository,
-    WorkflowSessionRepository,
     WorkflowTaskRepository,
     WorkflowTaskTemplateRepository,
 )
@@ -100,7 +100,7 @@ class WorkflowService:
         self,
         workflows: WorkflowRepository,
         skills: AgentSkillRepository,
-        ws_repo: WorkflowSessionRepository,
+        execution_repo: WorkflowExecutionRepository,
         templates: WorkflowTaskTemplateRepository,
         tasks: WorkflowTaskRepository,
         versions: WorkflowPublishedVersionRepository,
@@ -110,7 +110,7 @@ class WorkflowService:
         Args:
             workflows: Repository providing Workflow persistence.
             skills: Repository providing AgentSkill persistence.
-            ws_repo: Repository providing WorkflowSession persistence.
+            execution_repo: Repository providing WorkflowExecution persistence.
             templates: Repository providing WorkflowTaskTemplate persistence,
                 read at execute time to copy the task templates into the new session.
             tasks: Repository providing WorkflowTask persistence, written at
@@ -121,7 +121,7 @@ class WorkflowService:
         """
         self._workflows = workflows
         self._skills = skills
-        self._ws_repo = ws_repo
+        self._execution_repo = execution_repo
         self._templates = templates
         self._tasks = tasks
         self._versions = versions
@@ -224,10 +224,10 @@ class WorkflowService:
         """
         await self._workflows.delete(workflow_id)
 
-    async def execute(self, workflow_id: str, *, caller: User) -> WorkflowSession:
-        """Start a workflow run by creating a WorkflowSession with its tasks.
+    async def execute(self, workflow_id: str, *, caller: User) -> WorkflowExecution:
+        """Start a workflow run by creating a WorkflowExecution with its tasks.
 
-        Resolves the workflow and its skill, records a new WorkflowSession
+        Resolves the workflow and its skill, records a new WorkflowExecution
         pinned to the skill's currently published revision, and copies the
         workflow's task templates into the session as ``pending``
         WorkflowTasks (dependency edges and tool bindings included), so later
@@ -257,7 +257,7 @@ class WorkflowService:
                 (role-gated to ``requester``/``developer`` at the router).
 
         Returns:
-            The created WorkflowSession.
+            The created WorkflowExecution.
 
         Raises:
             NotFoundError: If the workflow or its skill does not exist.
@@ -289,7 +289,7 @@ class WorkflowService:
         user = caller.id or "user"
         session_id = str(uuid.uuid4())
 
-        ws_create = WorkflowSessionCreate(
+        execution_create = WorkflowExecutionCreate(
             session_id=session_id,
             workflow_name=name,
             workflow_description=description,
@@ -300,10 +300,10 @@ class WorkflowService:
             agent_skill_commit_sha=skill.commit_sha,
             initiator_id=user,
         )
-        ws = await self._ws_repo.create(
-            ws_create, workflow_id=workflow.id, user_id=user
+        execution = await self._execution_repo.create(
+            execution_create, workflow_id=workflow.id, user_id=user
         )
-        ws_id = ws.id
+        execution_id = execution.id
 
         # Copy the task templates in dependency order, remapping template ids to the
         # freshly created task ids so the edges land on the copies.
@@ -311,7 +311,7 @@ class WorkflowService:
         for template in _topo_order(templates):
             task = await self._tasks.create(
                 WorkflowTaskCreate(
-                    workflow_session_id=ws_id,
+                    workflow_execution_id=execution_id,
                     title=template.title,
                     description=template.description,
                     status=WorkflowTaskStatus.pending,
@@ -327,11 +327,11 @@ class WorkflowService:
             )
             template_to_task[template.id] = task.id
         # Re-read after the last commit: each task commit on the shared request
-        # session expires the ``ws`` instance, and serializing an expired one
+        # session expires the ``execution`` instance, and serializing an expired one
         # outside the request's greenlet context would fail.
-        created = await self._ws_repo.get(ws_id)
+        created = await self._execution_repo.get(execution_id)
         if created is None:  # pragma: no cover - just created above
-            raise NotFoundError("WorkflowSession", ws_id)
+            raise NotFoundError("WorkflowExecution", execution_id)
         return created
 
     async def _resolve_design(

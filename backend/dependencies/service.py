@@ -23,9 +23,9 @@ from services import (
     UserAvatarService,
     UserService,
     WorkflowDesignService,
+    WorkflowExecutionAccessPolicy,
+    WorkflowExecutionService,
     WorkflowService,
-    WorkflowSessionAccessPolicy,
-    WorkflowSessionService,
     WorkflowTaskService,
     WorkflowTaskTemplateService,
     generate_workflow_design,
@@ -44,9 +44,9 @@ from .repository import (
     TenantRepositoryDep,
     UserAvatarRepositoryDep,
     UserRepositoryDep,
+    WorkflowExecutionRepositoryDep,
     WorkflowPublishedVersionRepositoryDep,
     WorkflowRepositoryDep,
-    WorkflowSessionRepositoryDep,
     WorkflowTaskRepositoryDep,
     WorkflowTaskTemplateRepositoryDep,
 )
@@ -169,13 +169,15 @@ UserAvatarServiceDep = Annotated[UserAvatarService, Depends(get_user_avatar_serv
 def get_workflow_service(
     workflows: WorkflowRepositoryDep,
     skills: AgentSkillRepositoryDep,
-    ws_repo: WorkflowSessionRepositoryDep,
+    execution_repo: WorkflowExecutionRepositoryDep,
     templates: WorkflowTaskTemplateRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     versions: WorkflowPublishedVersionRepositoryDep,
 ) -> WorkflowService:
     """Create a WorkflowService wiring the repositories it orchestrates."""
-    return WorkflowService(workflows, skills, ws_repo, templates, tasks, versions)
+    return WorkflowService(
+        workflows, skills, execution_repo, templates, tasks, versions
+    )
 
 
 WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
@@ -255,31 +257,31 @@ DesignSessionServiceDep = Annotated[
 ]
 
 
-def get_workflow_session_access_policy(
+def get_workflow_execution_access_policy(
     approvals: ApprovalRepositoryDep,
-) -> WorkflowSessionAccessPolicy:
-    """Create the access policy for workflow-session-scoped operations."""
-    return WorkflowSessionAccessPolicy(approvals)
+) -> WorkflowExecutionAccessPolicy:
+    """Create the access policy for workflow-execution-scoped operations."""
+    return WorkflowExecutionAccessPolicy(approvals)
 
 
-WorkflowSessionAccessPolicyDep = Annotated[
-    WorkflowSessionAccessPolicy, Depends(get_workflow_session_access_policy)
+WorkflowExecutionAccessPolicyDep = Annotated[
+    WorkflowExecutionAccessPolicy, Depends(get_workflow_execution_access_policy)
 ]
 
 
-def get_workflow_session_service(
-    ws_repo: WorkflowSessionRepositoryDep,
+def get_workflow_execution_service(
+    execution_repo: WorkflowExecutionRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     meta: MessageMetaRepositoryDep,
     skills: AgentSkillRepositoryDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
-    access: WorkflowSessionAccessPolicyDep,
-) -> WorkflowSessionService:
-    """Create a WorkflowSessionService wiring the repositories, skill store, agent registry, session store, and access policy."""
-    return WorkflowSessionService(
-        ws_repo,
+    access: WorkflowExecutionAccessPolicyDep,
+) -> WorkflowExecutionService:
+    """Create a WorkflowExecutionService wiring the repositories, skill store, agent registry, session store, and access policy."""
+    return WorkflowExecutionService(
+        execution_repo,
         tasks,
         meta,
         skills,
@@ -291,19 +293,19 @@ def get_workflow_session_service(
     )
 
 
-WorkflowSessionServiceDep = Annotated[
-    WorkflowSessionService, Depends(get_workflow_session_service)
+WorkflowExecutionServiceDep = Annotated[
+    WorkflowExecutionService, Depends(get_workflow_execution_service)
 ]
 
 
 def get_workflow_task_service(
     repo: WorkflowTaskRepositoryDep,
-    ws_repo: WorkflowSessionRepositoryDep,
-    access: WorkflowSessionAccessPolicyDep,
+    execution_repo: WorkflowExecutionRepositoryDep,
+    access: WorkflowExecutionAccessPolicyDep,
     approvals: ApprovalRepositoryDep,
 ) -> WorkflowTaskService:
     """Create a WorkflowTaskService wiring the task, session, and approval repositories and the access policy."""
-    return WorkflowTaskService(repo, ws_repo, access, approvals)
+    return WorkflowTaskService(repo, execution_repo, access, approvals)
 
 
 WorkflowTaskServiceDep = Annotated[

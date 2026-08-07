@@ -98,7 +98,7 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * workflows list — hidden for viewers who can't execute workflows at all, and
  * disabled for a `draft` workflow unless the viewer can also edit workflows
  * (pre-publish testing) — and, on success, navigates to the new run's
- * `WorkflowSession` page just like the list's Run action.
+ * `WorkflowExecution` page just like the list's Run action.
  *
  * `description` is a free-form field any developer can set; the workflow
  * session falls back to the AI-generated `generatedDescription` whenever it's
@@ -282,8 +282,8 @@ export default function WorkflowDetailPage() {
   async function handleRun() {
     try {
       await run.run(async () => {
-        const workflowSession = await executeWorkflow(workflowId);
-        router.push(`/workflow-sessions/${workflowSession.id}`);
+        const workflowExecution = await executeWorkflow(workflowId);
+        router.push(`/workflow-sessions/${workflowExecution.id}`);
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -468,7 +468,7 @@ export default function WorkflowDetailPage() {
             <Textarea
               id="description"
               rows={4}
-              placeholder="Overrides the generated description below for the workflow session"
+              placeholder="Overrides the generated description below for the workflow execution"
               {...register("description")}
             />
           </FormField>
@@ -514,7 +514,7 @@ export default function WorkflowDetailPage() {
               {isSuperAdmin
                 ? "AI-generated summary. Only a super admin can edit it directly."
                 : "AI-generated summary, read-only."}{" "}
-              Used for the workflow session whenever Description above is empty.
+              Used for the workflow execution whenever Description above is empty.
             </p>
           </FormField>
 

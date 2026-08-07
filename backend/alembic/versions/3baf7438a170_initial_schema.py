@@ -496,7 +496,7 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
-        "workflow_sessions",
+        "workflow_executions",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
@@ -530,14 +530,14 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        "ix_workflow_sessions_session_id",
-        "workflow_sessions",
+        "ix_workflow_executions_session_id",
+        "workflow_executions",
         ["session_id"],
         unique=False,
     )
     op.create_index(
-        "ix_workflow_sessions_tenant_id",
-        "workflow_sessions",
+        "ix_workflow_executions_tenant_id",
+        "workflow_executions",
         ["tenant_id"],
         unique=False,
     )
@@ -554,7 +554,7 @@ def upgrade() -> None:
             "type",
             sa.Enum(
                 "approval_request",
-                "session_completed",
+                "execution_completed",
                 "workflow_draft_ready",
                 "workflow_generation_failed",
                 name="notificationtype",
@@ -564,7 +564,7 @@ def upgrade() -> None:
         sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("body", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
-            "workflow_session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+            "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
@@ -577,9 +577,9 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["workflow_session_id"],
-            ["workflow_sessions.id"],
-            name="fk_notifications_workflow_session_id",
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
+            name="fk_notifications_workflow_execution_id",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
@@ -595,9 +595,9 @@ def upgrade() -> None:
         "ix_notifications_user_id", "notifications", ["user_id"], unique=False
     )
     op.create_index(
-        "ix_notifications_workflow_session_id",
+        "ix_notifications_workflow_execution_id",
         "notifications",
-        ["workflow_session_id"],
+        ["workflow_execution_id"],
         unique=False,
     )
     op.create_index(
@@ -620,7 +620,7 @@ def upgrade() -> None:
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column(
-            "workflow_session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+            "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
         ),
         sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
@@ -641,15 +641,15 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
-            ["workflow_session_id"], ["workflow_sessions.id"], ondelete="CASCADE"
+            ["workflow_execution_id"], ["workflow_executions.id"], ondelete="CASCADE"
         ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        "ix_workflow_tasks_session_id",
+        "ix_workflow_tasks_workflow_execution_id",
         "workflow_tasks",
-        ["workflow_session_id"],
+        ["workflow_execution_id"],
         unique=False,
     )
     op.create_index(
@@ -672,7 +672,7 @@ def upgrade() -> None:
         ),
         sa.Column("response", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
-            "workflow_session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+            "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
         ),
         sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
@@ -690,9 +690,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
-            ["workflow_session_id"],
-            ["workflow_sessions.id"],
-            name="fk_approvals_workflow_session_id",
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
+            name="fk_approvals_workflow_execution_id",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
@@ -706,9 +706,9 @@ def upgrade() -> None:
     )
     op.create_index("ix_approvals_approver", "approvals", ["approver"], unique=False)
     op.create_index(
-        "ix_approvals_workflow_session_id",
+        "ix_approvals_workflow_execution_id",
         "approvals",
-        ["workflow_session_id"],
+        ["workflow_execution_id"],
         unique=False,
     )
     op.create_index(
@@ -723,7 +723,7 @@ def upgrade() -> None:
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column(
-            "workflow_session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+            "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
         ),
         sa.Column("adk_event_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("sender_user_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
@@ -740,9 +740,9 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
-            ["workflow_session_id"],
-            ["workflow_sessions.id"],
-            name="fk_message_meta_workflow_session_id",
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
+            name="fk_message_meta_workflow_execution_id",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
@@ -754,7 +754,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "workflow_session_id", "adk_event_id", name="uq_message_meta_ws_event"
+            "workflow_execution_id",
+            "adk_event_id",
+            name="uq_message_meta_execution_event",
         ),
     )
     op.create_index(
@@ -764,9 +766,9 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_index(
-        "ix_message_meta_workflow_session_id",
+        "ix_message_meta_workflow_execution_id",
         "message_meta",
-        ["workflow_session_id"],
+        ["workflow_execution_id"],
         unique=False,
     )
     op.create_index(
@@ -861,26 +863,28 @@ def downgrade() -> None:
     )
     op.drop_table("workflow_task_dependencies")
     op.drop_index("ix_message_meta_workflow_task_id", table_name="message_meta")
-    op.drop_index("ix_message_meta_workflow_session_id", table_name="message_meta")
+    op.drop_index("ix_message_meta_workflow_execution_id", table_name="message_meta")
     op.drop_index("ix_message_meta_sender_user_id", table_name="message_meta")
     op.drop_index("ix_message_meta_tenant_id", table_name="message_meta")
     op.drop_table("message_meta")
     op.drop_index("ix_approvals_workflow_task_id", table_name="approvals")
-    op.drop_index("ix_approvals_workflow_session_id", table_name="approvals")
+    op.drop_index("ix_approvals_workflow_execution_id", table_name="approvals")
     op.drop_index("ix_approvals_approver", table_name="approvals")
     op.drop_index("ix_approvals_tenant_id", table_name="approvals")
     op.drop_table("approvals")
-    op.drop_index("ix_workflow_tasks_session_id", table_name="workflow_tasks")
+    op.drop_index(
+        "ix_workflow_tasks_workflow_execution_id", table_name="workflow_tasks"
+    )
     op.drop_index("ix_workflow_tasks_tenant_id", table_name="workflow_tasks")
     op.drop_table("workflow_tasks")
     op.drop_index("ix_notifications_workflow_id", table_name="notifications")
-    op.drop_index("ix_notifications_workflow_session_id", table_name="notifications")
+    op.drop_index("ix_notifications_workflow_execution_id", table_name="notifications")
     op.drop_index("ix_notifications_user_id", table_name="notifications")
     op.drop_index("ix_notifications_tenant_id", table_name="notifications")
     op.drop_table("notifications")
-    op.drop_index("ix_workflow_sessions_session_id", table_name="workflow_sessions")
-    op.drop_index("ix_workflow_sessions_tenant_id", table_name="workflow_sessions")
-    op.drop_table("workflow_sessions")
+    op.drop_index("ix_workflow_executions_session_id", table_name="workflow_executions")
+    op.drop_index("ix_workflow_executions_tenant_id", table_name="workflow_executions")
+    op.drop_table("workflow_executions")
     op.drop_index("ix_workflows_tenant_id_name", table_name="workflows")
     op.drop_table("workflows")
     op.drop_table("user_avatars")

@@ -14,20 +14,20 @@ class MessageMetaRepository(Protocol):
     """Interface for per-message side-channel metadata persistence."""
 
     async def set_sender(
-        self, *, workflow_session_id: str, adk_event_id: str, sender_user_id: str
+        self, *, workflow_execution_id: str, adk_event_id: str, sender_user_id: str
     ) -> None: ...
 
     async def set_task(
         self,
         *,
-        workflow_session_id: str,
+        workflow_execution_id: str,
         adk_event_id: str,
         workflow_task_id: str,
         user_id: str,
     ) -> None: ...
 
     async def meta_for_session(
-        self, workflow_session_id: str
+        self, workflow_execution_id: str
     ) -> dict[str, MessageMeta]: ...
 
 
@@ -47,13 +47,13 @@ class SqlMessageMetaRepository:
         self._tenant_id = tenant_id
 
     async def _get(
-        self, workflow_session_id: str, adk_event_id: str
+        self, workflow_execution_id: str, adk_event_id: str
     ) -> MessageMeta | None:
         """Return the metadata row for one event, or ``None`` if not yet recorded."""
         result = await self._db.exec(
             select(MessageMeta)
             .where(
-                col(MessageMeta.workflow_session_id) == workflow_session_id,
+                col(MessageMeta.workflow_execution_id) == workflow_execution_id,
                 col(MessageMeta.adk_event_id) == adk_event_id,
                 MessageMeta.tenant_id == self._tenant_id,
             )
@@ -62,7 +62,7 @@ class SqlMessageMetaRepository:
         return result.first()
 
     async def set_sender(
-        self, *, workflow_session_id: str, adk_event_id: str, sender_user_id: str
+        self, *, workflow_execution_id: str, adk_event_id: str, sender_user_id: str
     ) -> None:
         """Attribute one ADK user event to its sender, upserting its metadata row.
 
@@ -72,7 +72,7 @@ class SqlMessageMetaRepository:
         does not churn the row.
 
         Args:
-            workflow_session_id: The owning workflow session id.
+            workflow_execution_id: The owning workflow execution id.
             adk_event_id: The id of the ADK ``"user"`` event being attributed.
             sender_user_id: The user who actually sent the message; also recorded
                 in the audit fields.
@@ -81,12 +81,12 @@ class SqlMessageMetaRepository:
             ForeignKeyViolationError: If ``sender_user_id`` does not match an
                 existing user.
         """
-        row = await self._get(workflow_session_id, adk_event_id)
+        row = await self._get(workflow_execution_id, adk_event_id)
         if row is not None and row.sender_user_id == sender_user_id:
             return
         if row is None:
             row = MessageMeta(
-                workflow_session_id=workflow_session_id,
+                workflow_execution_id=workflow_execution_id,
                 adk_event_id=adk_event_id,
                 sender_user_id=sender_user_id,
                 tenant_id=self._tenant_id,
@@ -102,7 +102,7 @@ class SqlMessageMetaRepository:
     async def set_task(
         self,
         *,
-        workflow_session_id: str,
+        workflow_execution_id: str,
         adk_event_id: str,
         workflow_task_id: str,
         user_id: str,
@@ -116,7 +116,7 @@ class SqlMessageMetaRepository:
         and the association skipped.
 
         Args:
-            workflow_session_id: The owning workflow session id.
+            workflow_execution_id: The owning workflow execution id.
             adk_event_id: The id of the ADK event being associated.
             workflow_task_id: The id of the in-progress WorkflowTask.
             user_id: The acting user recorded in the audit fields (the session
@@ -126,12 +126,12 @@ class SqlMessageMetaRepository:
             ForeignKeyViolationError: If ``user_id`` does not match an existing
                 user (the audit FK); a missing task is swallowed instead.
         """
-        row = await self._get(workflow_session_id, adk_event_id)
+        row = await self._get(workflow_execution_id, adk_event_id)
         if row is not None and row.workflow_task_id == workflow_task_id:
             return
         if row is None:
             row = MessageMeta(
-                workflow_session_id=workflow_session_id,
+                workflow_execution_id=workflow_execution_id,
                 adk_event_id=adk_event_id,
                 workflow_task_id=workflow_task_id,
                 tenant_id=self._tenant_id,
@@ -151,12 +151,12 @@ class SqlMessageMetaRepository:
             return
 
     async def meta_for_session(
-        self, workflow_session_id: str
+        self, workflow_execution_id: str
     ) -> dict[str, MessageMeta]:
         """Return the ``adk_event_id -> MessageMeta`` map for a session.
 
         Args:
-            workflow_session_id: The workflow session whose metadata to load.
+            workflow_execution_id: The workflow execution whose metadata to load.
 
         Returns:
             A mapping from ADK event id to its metadata row. Events without a
@@ -164,7 +164,7 @@ class SqlMessageMetaRepository:
         """
         result = await self._db.exec(
             select(MessageMeta).where(
-                col(MessageMeta.workflow_session_id) == workflow_session_id,
+                col(MessageMeta.workflow_execution_id) == workflow_execution_id,
                 MessageMeta.tenant_id == self._tenant_id,
             )
         )

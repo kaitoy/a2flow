@@ -390,7 +390,7 @@ async def test_reads_are_open_to_users_without_roles(
         "/api/v1/mcp-servers",
         "/api/v1/agent-skills",
         "/api/v1/workflows",
-        "/api/v1/workflow-sessions",
+        "/api/v1/workflow-executions",
         "/api/v1/approvals",
     ):
         res = await workflow_client.get(path, headers=_roles(""))

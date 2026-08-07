@@ -99,9 +99,9 @@ export default function ApprovalsPage() {
         header: "Session",
         noTruncate: true,
         cell: (a) =>
-          a.workflowSessionId ? (
+          a.workflowExecutionId ? (
             <Link
-              href={`/workflow-sessions/${a.workflowSessionId}`}
+              href={`/workflow-sessions/${a.workflowExecutionId}`}
               className="text-accent transition-colors hover:underline"
             >
               Open chat

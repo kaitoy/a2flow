@@ -40,7 +40,7 @@ function task(
 ): WorkflowTask {
   return {
     id,
-    workflowSessionId: "ws-1",
+    workflowExecutionId: "execution-1",
     title: `Task ${id}`,
     status: "pending",
     position: 0,

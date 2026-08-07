@@ -37,7 +37,7 @@ from repositories.exceptions import (
 )
 from repositories.mcp_server import MCPServerRepository
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
-from repositories.workflow_session import WorkflowSessionRepository
+from repositories.workflow_execution import WorkflowExecutionRepository
 
 # Module-level aliases for ``list[...]`` types. The repository defines a method
 # named ``list``, which causes mypy to resolve a bare ``list[...]`` annotation in
@@ -57,7 +57,7 @@ class WorkflowTaskRepository(Protocol):
         *,
         limit: int,
         offset: int,
-        workflow_session_id: str | None = None,
+        workflow_execution_id: str | None = None,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> list[WorkflowTaskRead]: ...
@@ -76,7 +76,7 @@ class WorkflowTaskRepository(Protocol):
 class SqlWorkflowTaskRepository:
     """SQLModel-backed implementation of WorkflowTaskRepository.
 
-    Validates that the referenced ``workflow_session_id`` exists before creating
+    Validates that the referenced ``workflow_execution_id`` exists before creating
     a task, raising ForeignKeyViolationError if it does not. Dependency edges are
     validated for existence, same-session membership, self-loops, and acyclicity
     before being written; reads resolve a task's outgoing edges into
@@ -87,14 +87,14 @@ class SqlWorkflowTaskRepository:
     def __init__(
         self,
         session: AsyncSession,
-        ws_repo: WorkflowSessionRepository,
+        execution_repo: WorkflowExecutionRepository,
         mcp_repo: MCPServerRepository,
         *,
         tenant_id: str,
     ) -> None:
-        """Store the session and the WorkflowSession/MCPServer repos for FK checks."""
+        """Store the session and the WorkflowExecution/MCPServer repos for FK checks."""
         self._db = session
-        self._ws = ws_repo
+        self._execution = execution_repo
         self._mcp = mcp_repo
         self._tenant_id = tenant_id
 
@@ -120,19 +120,21 @@ class SqlWorkflowTaskRepository:
         *,
         limit: int,
         offset: int,
-        workflow_session_id: str | None = None,
+        workflow_execution_id: str | None = None,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> list[WorkflowTaskRead]:
         """Return WorkflowTasks, defaulting to ``position`` then ``created_at`` order.
 
-        When ``workflow_session_id`` is supplied, only tasks belonging to that
+        When ``workflow_execution_id`` is supplied, only tasks belonging to that
         session are returned. Each task's outgoing dependency edges are resolved
         into ``depends_on_ids`` with a single batched query.
         """
         stmt = select(WorkflowTask).where(WorkflowTask.tenant_id == self._tenant_id)
-        if workflow_session_id is not None:
-            stmt = stmt.where(WorkflowTask.workflow_session_id == workflow_session_id)
+        if workflow_execution_id is not None:
+            stmt = stmt.where(
+                WorkflowTask.workflow_execution_id == workflow_execution_id
+            )
         stmt = apply_filters(stmt, WorkflowTask, filters, readable=WorkflowTaskRead)
         stmt = apply_sort(
             stmt,
@@ -156,8 +158,10 @@ class SqlWorkflowTaskRepository:
         self, data: WorkflowTaskCreate, *, user_id: str
     ) -> WorkflowTaskRead:
         """Create a new WorkflowTask after validating the parent session, dependencies, and tool bindings."""
-        if await self._ws.get(data.workflow_session_id) is None:
-            raise ForeignKeyViolationError("WorkflowSession", data.workflow_session_id)
+        if await self._execution.get(data.workflow_execution_id) is None:
+            raise ForeignKeyViolationError(
+                "WorkflowExecution", data.workflow_execution_id
+            )
         task = WorkflowTask.model_validate(
             {
                 **data.model_dump(exclude={"depends_on_ids", "tool_bindings"}),
@@ -167,7 +171,7 @@ class SqlWorkflowTaskRepository:
             }
         )
         dep_ids = _dedupe(data.depends_on_ids or [])
-        await self._validate_dependencies(task.id, data.workflow_session_id, dep_ids)
+        await self._validate_dependencies(task.id, data.workflow_execution_id, dep_ids)
         bindings = _dedupe_bindings(data.tool_bindings or [])
         await self._validate_bindings(bindings)
         self._db.add(task)
@@ -193,7 +197,7 @@ class SqlWorkflowTaskRepository:
         When ``data.depends_on_ids`` is ``None`` the task's edges are left
         unchanged; when it is a list the full set of outgoing edges is replaced
         after validation. ``data.tool_bindings`` follows the same semantics for
-        the task's bound MCP tools. ``workflow_session_id`` is not part of
+        the task's bound MCP tools. ``workflow_execution_id`` is not part of
         ``WorkflowTaskUpdate`` so no parent re-validation is needed here.
         """
         task = await self._get_scoped(task_id)
@@ -209,7 +213,7 @@ class SqlWorkflowTaskRepository:
         if data.depends_on_ids is not None:
             dep_ids = _dedupe(data.depends_on_ids)
             await self._validate_dependencies(
-                task_id, task.workflow_session_id, dep_ids
+                task_id, task.workflow_execution_id, dep_ids
             )
             await self._replace_edges(task_id, dep_ids)
         if data.tool_bindings is not None:
@@ -358,7 +362,7 @@ class SqlWorkflowTaskRepository:
             if dep_id == task_id:
                 raise DependencyCycleError(task_id, dep_id)
             dep = await self._get_scoped(dep_id)
-            if dep is None or dep.workflow_session_id != session_id:
+            if dep is None or dep.workflow_execution_id != session_id:
                 raise ForeignKeyViolationError("WorkflowTask", dep_id)
         adjacency = await self._session_adjacency(session_id)
         for dep_id in dep_ids:
@@ -373,7 +377,7 @@ class SqlWorkflowTaskRepository:
                 WorkflowTask,
                 col(WorkflowTaskDependency.task_id) == col(WorkflowTask.id),
             )
-            .where(WorkflowTask.workflow_session_id == session_id)
+            .where(WorkflowTask.workflow_execution_id == session_id)
         )
         result = await self._db.exec(stmt)
         adjacency: dict[str, set[str]] = {}

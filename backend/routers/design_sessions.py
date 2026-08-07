@@ -84,7 +84,7 @@ async def design_session_agent(
     continuing the chat shares the same ADK session.
 
     The run is serialized per ADK session by the same cross-process lock the
-    workflow-session endpoint uses; it also excludes the background generation
+    workflow-execution endpoint uses; it also excludes the background generation
     run, so reopening the chat while generation is still in flight surfaces as
     HTTP 409 instead of corrupting the session.
     """

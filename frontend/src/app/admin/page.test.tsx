@@ -56,7 +56,7 @@ describe("AdminPage (welcome)", () => {
     expect(screen.queryByRole("link", { name: /Agent Skills/ })).not.toBeInTheDocument();
     // Ungated sections stay visible to everyone.
     expect(screen.getByRole("link", { name: /Approvals/ })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Workflow Sessions/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Workflow Executions/ })).toBeInTheDocument();
   });
 
   it("shows only the sections a developer may act on", () => {

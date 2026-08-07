@@ -47,7 +47,7 @@ class AgentKind(StrEnum):
     "Generate workflow" prompt into the workflow's first task templates; it
     carries no A2UI toolset because no client is connected to execute frontend
     tools. ``design`` is the interactive design-session chat used to refine
-    the templates. ``execution`` drives a WorkflowSession created from a
+    the templates. ``execution`` drives a WorkflowExecution created from a
     published workflow.
     """
 

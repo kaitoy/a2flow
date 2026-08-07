@@ -31,7 +31,7 @@ function task(
 ): WorkflowTask {
   return {
     id,
-    workflowSessionId: "ws-1",
+    workflowExecutionId: "execution-1",
     title: `Task ${id}`,
     status: "pending",
     position,
@@ -130,7 +130,7 @@ describe("buildWorkflowGraph", () => {
   });
 
   it("handles tasks with no dependsOnIds field", () => {
-    const bare = { id: "x", workflowSessionId: "ws-1", title: "x" } as WorkflowTask;
+    const bare = { id: "x", workflowExecutionId: "execution-1", title: "x" } as WorkflowTask;
     const { nodes, edges } = buildWorkflowGraph([bare]);
     expect(nodes).toHaveLength(1);
     expect(edges).toHaveLength(0);

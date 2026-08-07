@@ -36,7 +36,7 @@ _DEFAULT_IDLE_TIMEOUT_SECONDS = 28800
 
 #: How long (1 hour) a published skill revision directory is kept from pruning
 #: regardless of whether anything references it. A workflow run reads the
-#: skill's current ``commit_sha`` and inserts its WorkflowSession row a moment
+#: skill's current ``commit_sha`` and inserts its WorkflowExecution row a moment
 #: later; the grace window covers that gap, so a concurrent pull cannot delete
 #: the revision the run just picked before the row naming it exists.
 _DEFAULT_PRUNE_GRACE_SECONDS = 3600
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
         db_url: Database URL selecting SQLite (default) or PostgreSQL.
         skills_dir: Root of the Agent Skill store, laid out as
             ``<skill_id>/<commit_sha>/``. This is durable state, not a cache:
-            a WorkflowSession pins the revision it started with, so wiping the
+            a WorkflowExecution pins the revision it started with, so wiping the
             directory leaves existing sessions unable to load their skill until
             an admin pulls again. In a horizontally scaled deployment it must
             be a volume shared by every replica.

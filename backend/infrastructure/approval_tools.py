@@ -1,4 +1,4 @@
-"""ADK agent tools for requesting human approval during a workflow session.
+"""ADK agent tools for requesting human approval during a workflow execution.
 
 These callables are attached to the skill-driven workflow agent (see
 :func:`infrastructure.agent.create_agent`) so it can pause for a human decision
@@ -12,7 +12,7 @@ and can re-check it with :func:`get_approval`.
 
 Like the WorkflowTask tools, these run *during* the AG-UI SSE stream outside
 FastAPI's request scope, so each call opens its own ``AsyncSession`` on the
-module-level engine and resolves the current WorkflowSession from the ADK
+module-level engine and resolves the current WorkflowExecution from the ADK
 session id. They reuse the WorkflowTask tools' session-resolution, audit-user,
 and notification helpers. Every tool returns plain JSON-serializable values,
 mapping errors to an ``{"error": ...}`` payload instead of raising.
@@ -44,10 +44,10 @@ from repositories import (
     SqlMCPServerRepository,
     SqlNotificationRepository,
     SqlUserRepository,
-    SqlWorkflowSessionRepository,
+    SqlWorkflowExecutionRepository,
     SqlWorkflowTaskRepository,
     UserRepository,
-    WorkflowSessionRepository,
+    WorkflowExecutionRepository,
     WorkflowTaskRepository,
 )
 from repositories.exceptions import ForeignKeyViolationError
@@ -59,11 +59,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class _Scope:
-    """Per-tool-call resolved WorkflowSession id, tenant id, and scoped repos."""
+    """Per-tool-call resolved WorkflowExecution id, tenant id, and scoped repos."""
 
-    ws_id: str
+    execution_id: str
     tenant_id: str
-    ws_repo: WorkflowSessionRepository
+    execution_repo: WorkflowExecutionRepository
     approval_repo: ApprovalRepository
     task_repo: WorkflowTaskRepository
     notif_repo: NotificationRepository
@@ -76,8 +76,8 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
 
     Opens a fresh ``AsyncSession`` on the module-level engine (referenced through
     the ``database`` module so tests can monkeypatch ``database.engine``),
-    resolves the current run's WorkflowSession id and tenant id, and wires the
-    WorkflowSession, Approval, WorkflowTask, and Notification repositories to
+    resolves the current run's WorkflowExecution id and tenant id, and wires the
+    WorkflowExecution, Approval, WorkflowTask, and Notification repositories to
     it, all scoped to the resolved tenant. The User repository is not tenant
     scoped -- ``User`` is not a ``TenantScoped`` entity.
 
@@ -88,19 +88,21 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
         The resolved :class:`_Scope`.
 
     Raises:
-        NoTenantSessionError: If no WorkflowSession is bound to the current run.
+        NoTenantSessionError: If no WorkflowExecution is bound to the current run.
     """
     async with AsyncSession(database.engine) as db:
-        ws_id, tenant_id = await _resolve_scope(tool_context, db)
-        ws_repo = SqlWorkflowSessionRepository(db, tenant_id=tenant_id)
+        execution_id, tenant_id = await _resolve_scope(tool_context, db)
+        execution_repo = SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
         yield _Scope(
-            ws_id=ws_id,
+            execution_id=execution_id,
             tenant_id=tenant_id,
-            ws_repo=ws_repo,
-            approval_repo=SqlApprovalRepository(db, ws_repo, tenant_id=tenant_id),
+            execution_repo=execution_repo,
+            approval_repo=SqlApprovalRepository(
+                db, execution_repo, tenant_id=tenant_id
+            ),
             task_repo=SqlWorkflowTaskRepository(
                 db,
-                ws_repo,
+                execution_repo,
                 SqlMCPServerRepository(db, tenant_id=tenant_id),
                 tenant_id=tenant_id,
             ),
@@ -148,7 +150,7 @@ async def request_approval(
     """Create a pending approval request and notify the designated approver.
 
     Call this before performing an action that needs a human go-ahead. It records
-    a ``pending`` Approval for the current workflow session and creates an
+    a ``pending`` Approval for the current workflow execution and creates an
     ``approval_request`` notification addressed to ``approver`` so only they are
     alerted. After it returns, explain the request to the user and call the
     client-side ``render_approval`` frontend tool with the returned ``approval_id``
@@ -179,7 +181,7 @@ async def request_approval(
         async with _repos(tool_context) as s:
             if workflow_task_id is not None:
                 task = await s.task_repo.get(workflow_task_id)
-                if task is None or task.workflow_session_id != s.ws_id:
+                if task is None or task.workflow_execution_id != s.execution_id:
                     return {
                         "error": f"WorkflowTask {workflow_task_id!r} "
                         "not found in the current session"
@@ -193,7 +195,7 @@ async def request_approval(
                     "Use list_users to discover eligible approvers."
                 }
             data = ApprovalCreate(
-                workflow_session_id=s.ws_id,
+                workflow_execution_id=s.execution_id,
                 title=title,
                 description=description,
                 workflow_task_id=workflow_task_id,
@@ -209,9 +211,9 @@ async def request_approval(
             # these attributes and trigger a lazy reload outside the greenlet context.
             result = {"approval_id": approval.id, "status": approval.status.value}
             await _notify(
-                s.ws_repo,
+                s.execution_repo,
                 s.notif_repo,
-                s.ws_id,
+                s.execution_id,
                 NotificationType.approval_request,
                 title,
                 body=description,
@@ -289,7 +291,7 @@ async def get_approval(approval_id: str, tool_context: ToolContext) -> dict[str,
     try:
         async with _repos(tool_context) as s:
             approval = await s.approval_repo.get(approval_id)
-            if approval is None or approval.workflow_session_id != s.ws_id:
+            if approval is None or approval.workflow_execution_id != s.execution_id:
                 return {
                     "error": f"Approval {approval_id!r} not found in the current session"
                 }

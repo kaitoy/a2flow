@@ -28,7 +28,7 @@ const LIMIT = 20;
 /** Filter dropdown choices for the Type column, matching `NotificationType`. */
 const TYPE_OPTIONS = [
   { value: "approval_request", label: "approval_request" },
-  { value: "session_completed", label: "session_completed" },
+  { value: "execution_completed", label: "execution_completed" },
   { value: "workflow_draft_ready", label: "workflow_draft_ready" },
   { value: "workflow_generation_failed", label: "workflow_generation_failed" },
 ];

@@ -101,26 +101,26 @@ async def _post_agent_and_disconnect(path: str, user_id: str) -> None:
     await app(scope, receive, send)
 
 
-# ---------- GET /workflow-sessions (list) ----------
+# ---------- GET /workflow-executions (list) ----------
 
 
-async def test_list_workflow_sessions_empty_initially(
+async def test_list_workflow_executions_empty_initially(
     workflow_client: AsyncClient,
 ) -> None:
-    response = await workflow_client.get("/api/v1/workflow-sessions")
+    response = await workflow_client.get("/api/v1/workflow-executions")
     assert assert_ok(response) == []
 
 
-async def test_list_workflow_sessions_returns_executed_sessions(
+async def test_list_workflow_executions_returns_executed_sessions(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
     await _execute_workflow(workflow_client, skill["id"])
-    response = await workflow_client.get("/api/v1/workflow-sessions")
+    response = await workflow_client.get("/api/v1/workflow-executions")
     assert len(assert_ok(response)) == 1
 
 
-async def test_list_workflow_sessions_respects_limit_param(
+async def test_list_workflow_executions_respects_limit_param(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
@@ -131,42 +131,46 @@ async def test_list_workflow_sessions_respects_limit_param(
             status=201,
         )
     response = await workflow_client.get(
-        "/api/v1/workflow-sessions", params={"limit": 2}
+        "/api/v1/workflow-executions", params={"limit": 2}
     )
     assert len(assert_ok(response)) == 2
 
 
-# ---------- GET /workflow-sessions/{id} ----------
+# ---------- GET /workflow-executions/{id} ----------
 
 
-async def test_get_workflow_session_returns_200(workflow_client: AsyncClient) -> None:
+async def test_get_workflow_execution_returns_200(workflow_client: AsyncClient) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
-    response = await workflow_client.get(f"/api/v1/workflow-sessions/{ws['id']}")
+    execution = await _execute_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        f"/api/v1/workflow-executions/{execution['id']}"
+    )
     assert response.status_code == 200
 
 
-async def test_get_workflow_session_returns_correct_data(
+async def test_get_workflow_execution_returns_correct_data(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
-    body = assert_ok(await workflow_client.get(f"/api/v1/workflow-sessions/{ws['id']}"))
-    assert body["id"] == ws["id"]
+    execution = await _execute_workflow(workflow_client, skill["id"])
+    body = assert_ok(
+        await workflow_client.get(f"/api/v1/workflow-executions/{execution['id']}")
+    )
+    assert body["id"] == execution["id"]
     assert body["workflowName"] == GENERATE_BODY["name"]
     assert "workflowPrompt" not in body
     assert body["agentSkillId"] == skill["id"]
-    assert body["sessionId"] == ws["sessionId"]
+    assert body["sessionId"] == execution["sessionId"]
 
 
-async def test_get_workflow_session_unknown_id_returns_404(
+async def test_get_workflow_execution_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
-    response = await workflow_client.get("/api/v1/workflow-sessions/nonexistent")
+    response = await workflow_client.get("/api/v1/workflow-executions/nonexistent")
     assert_err(response, code="NOT_FOUND", status=404)
 
 
-# ---------- POST /workflow-sessions/{id}/agent ----------
+# ---------- POST /workflow-executions/{id}/agent ----------
 
 
 async def test_workflow_session_agent_returns_200(
@@ -174,9 +178,9 @@ async def test_workflow_session_agent_returns_200(
     mock_agent_registry: MagicMock,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
     response = await workflow_client.post(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
         json=_make_run_agent_input(),
     )
     assert response.status_code == 200
@@ -201,8 +205,8 @@ async def test_workflow_session_agent_rejects_a_concurrent_run(
     monkeypatch.setattr(locks, "_DEFAULT_WAIT_SECONDS", 0.05)
 
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
-    url = f"/api/v1/workflow-sessions/{ws['id']}/agent"
+    execution = await _execute_workflow(workflow_client, skill["id"])
+    url = f"/api/v1/workflow-executions/{execution['id']}/agent"
 
     streaming = asyncio.Event()
 
@@ -234,8 +238,8 @@ async def test_workflow_session_agent_allows_a_later_run(
 ) -> None:
     """The run lock is released with the stream, so the next turn is not refused."""
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
-    url = f"/api/v1/workflow-sessions/{ws['id']}/agent"
+    execution = await _execute_workflow(workflow_client, skill["id"])
+    url = f"/api/v1/workflow-executions/{execution['id']}/agent"
 
     first = await workflow_client.post(url, json=_make_run_agent_input())
     second = await workflow_client.post(url, json=_make_run_agent_input())
@@ -246,7 +250,7 @@ async def test_workflow_session_agent_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
     response = await workflow_client.post(
-        "/api/v1/workflow-sessions/nonexistent/agent",
+        "/api/v1/workflow-executions/nonexistent/agent",
         json=_make_run_agent_input(),
     )
     assert response.status_code == 404
@@ -258,7 +262,7 @@ async def test_workflow_session_agent_delegates_to_agent_registry(
     mock_adk_agent: MagicMock,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
 
     async def _capturing_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
         return
@@ -266,7 +270,7 @@ async def test_workflow_session_agent_delegates_to_agent_registry(
 
     mock_adk_agent.run = _capturing_run
     await workflow_client.post(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
         json=_make_run_agent_input(),
     )
     # The agent is keyed by the revision the session pinned, so a later pull of
@@ -286,7 +290,7 @@ async def test_workflow_session_agent_strips_system_messages(
     mock_adk_agent: MagicMock,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
 
     received_inputs: list[Any] = []
 
@@ -307,7 +311,7 @@ async def test_workflow_session_agent_strips_system_messages(
         ],
     }
     await workflow_client.post(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
         json=input_with_system,
     )
     assert len(received_inputs) == 1
@@ -324,7 +328,7 @@ async def test_workflow_session_agent_keeps_only_a2ui_context(
     these entries, so dropping them leaves it inventing an unrenderable dialect.
     """
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
 
     received_inputs: list[Any] = []
 
@@ -349,7 +353,7 @@ async def test_workflow_session_agent_keeps_only_a2ui_context(
         ],
     }
     await workflow_client.post(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
         json=input_with_context,
     )
     descriptions = [c.description for c in received_inputs[0].context]
@@ -358,13 +362,13 @@ async def test_workflow_session_agent_keeps_only_a2ui_context(
     assert "Injected by a client" not in descriptions
 
 
-async def test_workflow_session_agent_keys_run_by_session_owner(
+async def test_workflow_session_agent_keys_run_by_execution_initiator(
     workflow_client: AsyncClient,
     mock_adk_agent: MagicMock,
 ) -> None:
     skill = await _create_skill(workflow_client)
     # The session is executed (owned) by the default workflow_client user.
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
 
     received_inputs: list[Any] = []
 
@@ -380,12 +384,12 @@ async def test_workflow_session_agent_keys_run_by_session_owner(
     # A different user (alice) drives the agent, but the ADK run must be keyed by
     # the session's owner so everyone shares the same ADK session.
     await workflow_client.post(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
         json=_make_run_agent_input(),
         headers={"X-User-Id": "alice"},
     )
-    assert received_inputs[0].forwarded_props["userId"] == ws["initiatorId"]
-    assert ws["initiatorId"] == SYSTEM_USER_ID
+    assert received_inputs[0].forwarded_props["userId"] == execution["initiatorId"]
+    assert execution["initiatorId"] == SYSTEM_USER_ID
 
 
 async def test_workflow_session_agent_records_sender_on_client_disconnect(
@@ -398,22 +402,22 @@ async def test_workflow_session_agent_records_sender_on_client_disconnect(
     Starlette cancels the SSE generator the moment the client goes away, so the
     attribution has to survive that cancellation. Without it, the messages the
     abandoned run already wrote to the shared ADK session belong to nobody, and
-    every viewer sees them as the session owner's.
+    every viewer sees them as the execution initiator's.
     """
     from ag_ui.core import EventType, RunStartedEvent
     from google.adk.events.event import Event
     from google.genai import types
 
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
 
     cancelled = asyncio.Event()
 
     async def _appending_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["initiatorId"],
-            session_id=ws["sessionId"],
+            user_id=execution["initiatorId"],
+            session_id=execution["sessionId"],
         )
         await real_session_service.append_event(
             session,
@@ -440,35 +444,35 @@ async def test_workflow_session_agent_records_sender_on_client_disconnect(
     mock_adk_agent.run = _appending_run
 
     await _post_agent_and_disconnect(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent", user_id="alice"
+        f"/api/v1/workflow-executions/{execution['id']}/agent", user_id="alice"
     )
 
     # Guard against a false pass: the run must really have been cut short.
     assert cancelled.is_set()
 
     response = await workflow_client.get(
-        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+        f"/api/v1/workflow-executions/{execution['id']}/messages"
     )
     messages = assert_ok(response)
     assert [m["content"] for m in messages] == ["hi from alice"]
     assert messages[0]["senderUserId"] == "alice"
 
 
-# ---------- GET /workflow-sessions/{id}/messages ----------
+# ---------- GET /workflow-executions/{id}/messages ----------
 
 
-async def test_workflow_session_messages_empty_before_first_run(
+async def test_workflow_execution_messages_empty_before_first_run(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
     response = await workflow_client.get(
-        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+        f"/api/v1/workflow-executions/{execution['id']}/messages"
     )
     assert assert_ok(response) == []
 
 
-async def test_workflow_session_messages_shared_across_users(
+async def test_workflow_execution_messages_shared_across_users(
     workflow_client: AsyncClient,
     real_session_service: InMemorySessionService,
 ) -> None:
@@ -476,13 +480,13 @@ async def test_workflow_session_messages_shared_across_users(
     from google.genai import types
 
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
 
     # Seed the owner's ADK session with one user message.
     session = await real_session_service.create_session(
         app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-        user_id=ws["initiatorId"],
-        session_id=ws["sessionId"],
+        user_id=execution["initiatorId"],
+        session_id=execution["sessionId"],
     )
     await real_session_service.append_event(
         session,
@@ -496,17 +500,17 @@ async def test_workflow_session_messages_shared_across_users(
 
     # A different user (alice) fetches the history and sees the owner's messages.
     response = await workflow_client.get(
-        f"/api/v1/workflow-sessions/{ws['id']}/messages",
+        f"/api/v1/workflow-executions/{execution['id']}/messages",
         headers={"X-User-Id": "alice"},
     )
     messages = assert_ok(response)
     assert [m["content"] for m in messages] == ["hello from owner"]
     # A message with no attribution row (legacy history) reports no sender, so
-    # the UI can fall back to the session owner.
+    # the UI can fall back to the execution initiator.
     assert messages[0]["senderUserId"] is None
 
 
-async def test_workflow_session_messages_record_sender_after_run(
+async def test_workflow_execution_messages_record_sender_after_run(
     workflow_client: AsyncClient,
     mock_adk_agent: MagicMock,
     real_session_service: InMemorySessionService,
@@ -516,7 +520,7 @@ async def test_workflow_session_messages_record_sender_after_run(
 
     skill = await _create_skill(workflow_client)
     # Session is owned by the default workflow_client user (SYSTEM_USER_ID).
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
 
     async def _appending_run(
         input_data: Any, *args: Any, **kwargs: Any
@@ -525,8 +529,8 @@ async def test_workflow_session_messages_record_sender_after_run(
         # owner-keyed ADK session during the run.
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["initiatorId"],
-            session_id=ws["sessionId"],
+            user_id=execution["initiatorId"],
+            session_id=execution["sessionId"],
         )
         await real_session_service.append_event(
             session,
@@ -544,21 +548,21 @@ async def test_workflow_session_messages_record_sender_after_run(
 
     # Alice (a designated approver, not the owner) drives the run.
     await workflow_client.post(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
         json=_make_run_agent_input(),
         headers={"X-User-Id": "alice"},
     )
 
     response = await workflow_client.get(
-        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+        f"/api/v1/workflow-executions/{execution['id']}/messages"
     )
     messages = assert_ok(response)
     assert [m["content"] for m in messages] == ["hi from alice"]
-    # The message is attributed to the actual sender, not the session owner.
+    # The message is attributed to the actual sender, not the execution initiator.
     assert messages[0]["senderUserId"] == "alice"
 
 
-async def test_workflow_session_messages_record_tool_sender_after_run(
+async def test_workflow_execution_messages_record_tool_sender_after_run(
     workflow_client: AsyncClient,
     mock_adk_agent: MagicMock,
     real_session_service: InMemorySessionService,
@@ -567,7 +571,7 @@ async def test_workflow_session_messages_record_tool_sender_after_run(
     from google.genai import types
 
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
 
     async def _appending_run(
         input_data: Any, *args: Any, **kwargs: Any
@@ -577,8 +581,8 @@ async def test_workflow_session_messages_record_tool_sender_after_run(
         # session during the run.
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["initiatorId"],
-            session_id=ws["sessionId"],
+            user_id=execution["initiatorId"],
+            session_id=execution["sessionId"],
         )
         await real_session_service.append_event(
             session,
@@ -605,13 +609,13 @@ async def test_workflow_session_messages_record_tool_sender_after_run(
 
     # Alice (a designated approver, not the owner) resolves the A2UI action.
     await workflow_client.post(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
         json=_make_run_agent_input(),
         headers={"X-User-Id": "alice"},
     )
 
     response = await workflow_client.get(
-        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+        f"/api/v1/workflow-executions/{execution['id']}/messages"
     )
     messages = assert_ok(response)
     assert len(messages) == 1
@@ -622,7 +626,7 @@ async def test_workflow_session_messages_record_tool_sender_after_run(
     assert messages[0]["senderUserId"] == "alice"
 
 
-async def test_workflow_session_messages_skip_render_ack_sender(
+async def test_workflow_execution_messages_skip_render_ack_sender(
     workflow_client: AsyncClient,
     mock_adk_agent: MagicMock,
     real_session_service: InMemorySessionService,
@@ -631,7 +635,7 @@ async def test_workflow_session_messages_skip_render_ack_sender(
     from google.genai import types
 
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
 
     async def _appending_run(
         input_data: Any, *args: Any, **kwargs: Any
@@ -641,8 +645,8 @@ async def test_workflow_session_messages_skip_render_ack_sender(
         # render_a2ui call the user never acted on.
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["initiatorId"],
-            session_id=ws["sessionId"],
+            user_id=execution["initiatorId"],
+            session_id=execution["sessionId"],
         )
         await real_session_service.append_event(
             session,
@@ -670,13 +674,13 @@ async def test_workflow_session_messages_skip_render_ack_sender(
     # Alice's run flushes the no-op acknowledgement, but she did not act on
     # the surface, so the response must stay unattributed.
     await workflow_client.post(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
         json=_make_run_agent_input(),
         headers={"X-User-Id": "alice"},
     )
 
     response = await workflow_client.get(
-        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+        f"/api/v1/workflow-executions/{execution['id']}/messages"
     )
     messages = assert_ok(response)
     assert len(messages) == 1
@@ -685,7 +689,7 @@ async def test_workflow_session_messages_skip_render_ack_sender(
     assert messages[0]["senderUserId"] is None
 
 
-async def test_workflow_session_messages_record_task_after_run(
+async def test_workflow_execution_messages_record_task_after_run(
     workflow_client: AsyncClient,
     mock_adk_agent: MagicMock,
     real_session_service: InMemorySessionService,
@@ -694,11 +698,11 @@ async def test_workflow_session_messages_record_task_after_run(
     from google.genai import types
 
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
     task = assert_ok(
         await workflow_client.post(
             "/api/v1/workflow-tasks",
-            json={"workflowSessionId": ws["id"], "title": "Step one"},
+            json={"workflowExecutionId": execution["id"], "title": "Step one"},
         ),
         status=201,
     )
@@ -708,8 +712,8 @@ async def test_workflow_session_messages_record_task_after_run(
     ) -> AsyncGenerator[Any, None]:
         session = await real_session_service.create_session(
             app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
-            user_id=ws["initiatorId"],
-            session_id=ws["sessionId"],
+            user_id=execution["initiatorId"],
+            session_id=execution["sessionId"],
         )
         # A user message before any task is started.
         await real_session_service.append_event(
@@ -753,12 +757,12 @@ async def test_workflow_session_messages_record_task_after_run(
     mock_adk_agent.run = _appending_run
 
     await workflow_client.post(
-        f"/api/v1/workflow-sessions/{ws['id']}/agent",
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
         json=_make_run_agent_input(),
     )
 
     response = await workflow_client.get(
-        f"/api/v1/workflow-sessions/{ws['id']}/messages"
+        f"/api/v1/workflow-executions/{execution['id']}/messages"
     )
     messages = assert_ok(response)
     # The leading user message precedes the in_progress transition, so it is not
@@ -769,87 +773,91 @@ async def test_workflow_session_messages_record_task_after_run(
     assert any(m["workflowTaskId"] == task["id"] for m in messages)
 
 
-async def test_workflow_session_messages_unknown_id_returns_404(
+async def test_workflow_execution_messages_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
     response = await workflow_client.get(
-        "/api/v1/workflow-sessions/nonexistent/messages"
+        "/api/v1/workflow-executions/nonexistent/messages"
     )
     assert_err(response, code="NOT_FOUND", status=404)
 
 
-# ---------- DELETE /workflow-sessions/{id} ----------
+# ---------- DELETE /workflow-executions/{id} ----------
 
 
-async def test_delete_workflow_session_returns_200(
+async def test_delete_workflow_execution_returns_200(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
-    response = await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
+    execution = await _execute_workflow(workflow_client, skill["id"])
+    response = await workflow_client.delete(
+        f"/api/v1/workflow-executions/{execution['id']}"
+    )
     assert assert_ok(response, status=200) is None
 
 
-async def test_delete_workflow_session_removes_from_list(
+async def test_delete_workflow_execution_removes_from_list(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
-    await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
-    response = await workflow_client.get("/api/v1/workflow-sessions")
+    execution = await _execute_workflow(workflow_client, skill["id"])
+    await workflow_client.delete(f"/api/v1/workflow-executions/{execution['id']}")
+    response = await workflow_client.get("/api/v1/workflow-executions")
     assert assert_ok(response) == []
 
 
-async def test_delete_workflow_session_cascades_tasks(
+async def test_delete_workflow_execution_cascades_tasks(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
     task = assert_ok(
         await workflow_client.post(
             "/api/v1/workflow-tasks",
-            json={"workflowSessionId": ws["id"], "title": "Step one"},
+            json={"workflowExecutionId": execution["id"], "title": "Step one"},
         ),
         status=201,
     )
-    await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
+    await workflow_client.delete(f"/api/v1/workflow-executions/{execution['id']}")
     response = await workflow_client.get(f"/api/v1/workflow-tasks/{task['id']}")
     assert_err(response, code="NOT_FOUND", status=404)
 
 
-async def test_delete_workflow_session_deletes_adk_session(
+async def test_delete_workflow_execution_deletes_adk_session(
     workflow_client: AsyncClient,
     real_session_service: InMemorySessionService,
 ) -> None:
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
+    execution = await _execute_workflow(workflow_client, skill["id"])
     await real_session_service.create_session(
         app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
         user_id=SYSTEM_USER_ID,
-        session_id=ws["sessionId"],
+        session_id=execution["sessionId"],
     )
-    await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
+    await workflow_client.delete(f"/api/v1/workflow-executions/{execution['id']}")
     remaining = await real_session_service.get_session(
         app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
         user_id=SYSTEM_USER_ID,
-        session_id=ws["sessionId"],
+        session_id=execution["sessionId"],
     )
     assert remaining is None
 
 
-async def test_delete_workflow_session_succeeds_without_adk_session(
+async def test_delete_workflow_execution_succeeds_without_adk_session(
     workflow_client: AsyncClient,
 ) -> None:
     # The ADK session is created lazily on the first agent call, so a freshly
     # executed session has none. Deletion must still succeed.
     skill = await _create_skill(workflow_client)
-    ws = await _execute_workflow(workflow_client, skill["id"])
-    response = await workflow_client.delete(f"/api/v1/workflow-sessions/{ws['id']}")
+    execution = await _execute_workflow(workflow_client, skill["id"])
+    response = await workflow_client.delete(
+        f"/api/v1/workflow-executions/{execution['id']}"
+    )
     assert assert_ok(response, status=200) is None
 
 
-async def test_delete_workflow_session_unknown_id_returns_404(
+async def test_delete_workflow_execution_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
-    response = await workflow_client.delete("/api/v1/workflow-sessions/nonexistent")
+    response = await workflow_client.delete("/api/v1/workflow-executions/nonexistent")
     assert_err(response, code="NOT_FOUND", status=404)

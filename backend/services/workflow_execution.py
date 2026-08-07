@@ -1,7 +1,7 @@
-"""Use case service for WorkflowSession resources.
+"""Use case service for WorkflowExecution resources.
 
-Exposes WorkflowSession reads, the parent-checked task listing, and resolution
-of the ADK agent bound to a session. HTTP concerns (SSE encoding, streaming,
+Exposes WorkflowExecution reads, the parent-checked task listing, and resolution
+of the ADK agent driving an execution's workflow session. HTTP concerns (SSE encoding, streaming,
 message filtering) remain in the router; this service only owns the data access
 and agent-resolution business rules.
 """
@@ -17,17 +17,17 @@ from google.adk.sessions import BaseSessionService
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
 from models.user import User
-from models.workflow_session import WorkflowSession
+from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
 from repositories import (
     AgentSkillRepository,
     MessageMetaRepository,
-    WorkflowSessionRepository,
+    WorkflowExecutionRepository,
     WorkflowTaskRepository,
 )
 from repositories.exceptions import NotFoundError, SkillNotReadyError
 from repositories.query import FilterSpec, SortSpec
-from services.workflow_session_access import WorkflowSessionAccessPolicy
+from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +39,12 @@ logger = logging.getLogger(__name__)
 _RENDER_ACK_RESPONSE = {"status": "rendered"}
 
 
-class WorkflowSessionService:
-    """Application service orchestrating WorkflowSession operations."""
+class WorkflowExecutionService:
+    """Application service orchestrating WorkflowExecution operations."""
 
     def __init__(
         self,
-        ws_repo: WorkflowSessionRepository,
+        execution_repo: WorkflowExecutionRepository,
         tasks: WorkflowTaskRepository,
         meta: MessageMetaRepository,
         skills: AgentSkillRepository,
@@ -52,27 +52,28 @@ class WorkflowSessionService:
         registry: AgentRegistry,
         session_service: BaseSessionService,
         app_name: str,
-        access: WorkflowSessionAccessPolicy,
+        access: WorkflowExecutionAccessPolicy,
     ) -> None:
         """Initialize the service.
 
         Args:
-            ws_repo: Repository providing WorkflowSession persistence.
+            execution_repo: Repository providing WorkflowExecution persistence.
             tasks: Repository providing WorkflowTask persistence.
             meta: Repository recording and reading per-message side-channel
                 metadata (sender attribution and task association) for the
-                shared workflow chat.
+                shared workflow session.
             skills: Repository providing AgentSkill persistence, read to resolve
-                the ``repo_path`` and fallback revision of a session's skill.
+                the ``repo_path`` and fallback revision of an execution's skill.
             skills_store: Store locating a skill revision's directory on disk.
             registry: Registry resolving ADK agents per skill revision.
-            session_service: ADK session store, used to delete the underlying
-                chat session when a WorkflowSession is removed.
+            session_service: ADK session store, used to delete the workflow
+                session when a WorkflowExecution is removed.
             app_name: ADK application name keying sessions in the store.
-            access: Policy restricting session-scoped operations to the owner,
-                the session's designated approvers, and super admins.
+            access: Policy restricting execution-scoped operations to the
+                initiator, the execution's designated approvers, and super
+                admins.
         """
-        self._ws_repo = ws_repo
+        self._execution_repo = execution_repo
         self._tasks = tasks
         self._meta = meta
         self._skills = skills
@@ -82,46 +83,46 @@ class WorkflowSessionService:
         self._app_name = app_name
         self._access = access
 
-    async def _get(self, ws_id: str) -> WorkflowSession:
-        """Return the WorkflowSession with the given ID, without authorization.
+    async def _get(self, execution_id: str) -> WorkflowExecution:
+        """Return the WorkflowExecution with the given ID, without authorization.
 
         Used internally by run-completion bookkeeping (which executes after
         the caller was already authorized by :meth:`resolve_agent`) and as the
-        fetch step of the authorized public methods — the missing-session case
+        fetch step of the authorized public methods — the missing-execution case
         must surface as 404 before any 403.
 
         Args:
-            ws_id: Identifier of the session to fetch.
+            execution_id: Identifier of the execution to fetch.
 
         Returns:
-            The matching WorkflowSession.
+            The matching WorkflowExecution.
 
         Raises:
-            NotFoundError: If no session exists with the given ID.
+            NotFoundError: If no execution exists with the given ID.
         """
-        ws = await self._ws_repo.get(ws_id)
-        if ws is None:
-            raise NotFoundError("WorkflowSession", ws_id)
-        return ws
+        execution = await self._execution_repo.get(execution_id)
+        if execution is None:
+            raise NotFoundError("WorkflowExecution", execution_id)
+        return execution
 
-    async def get(self, ws_id: str, *, caller: User) -> WorkflowSession:
-        """Return the WorkflowSession with the given ID, authorizing the caller.
+    async def get(self, execution_id: str, *, caller: User) -> WorkflowExecution:
+        """Return the WorkflowExecution with the given ID, authorizing the caller.
 
         Args:
-            ws_id: Identifier of the session to fetch.
-            caller: The authenticated user requesting the session.
+            execution_id: Identifier of the execution to fetch.
+            caller: The authenticated user requesting the execution.
 
         Returns:
-            The matching WorkflowSession.
+            The matching WorkflowExecution.
 
         Raises:
-            NotFoundError: If no session exists with the given ID.
-            ForbiddenError: If the caller is neither the session owner, a
-                designated approver of the session, nor a super admin.
+            NotFoundError: If no execution exists with the given ID.
+            ForbiddenError: If the caller is neither the execution initiator, a
+                designated approver of the execution, nor a super admin.
         """
-        ws = await self._get(ws_id)
-        await self._access.assert_access(ws_id, ws.initiator_id, caller)
-        return ws
+        execution = await self._get(execution_id)
+        await self._access.assert_access(execution_id, execution.initiator_id, caller)
+        return execution
 
     async def list(
         self,
@@ -130,8 +131,8 @@ class WorkflowSessionService:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
-    ) -> builtins.list[WorkflowSession]:
-        """Return a page of WorkflowSession records.
+    ) -> builtins.list[WorkflowExecution]:
+        """Return a page of WorkflowExecution records.
 
         Args:
             limit: Maximum number of records to return.
@@ -140,15 +141,15 @@ class WorkflowSessionService:
             filters: Field filters applied to the query.
 
         Returns:
-            The requested page of sessions, newest first by default.
+            The requested page of executions, newest first by default.
         """
-        return await self._ws_repo.list(
+        return await self._execution_repo.list(
             limit=limit, offset=offset, sort=sort, filters=filters
         )
 
     async def list_tasks(
         self,
-        ws_id: str,
+        execution_id: str,
         *,
         caller: User,
         limit: int,
@@ -156,10 +157,10 @@ class WorkflowSessionService:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> builtins.list[WorkflowTaskRead]:
-        """Return the WorkflowTasks belonging to a session.
+        """Return the WorkflowTasks belonging to an execution.
 
         Args:
-            ws_id: Identifier of the parent session.
+            execution_id: Identifier of the parent execution.
             caller: The authenticated user requesting the tasks.
             limit: Maximum number of records to return.
             offset: Number of records to skip.
@@ -167,29 +168,30 @@ class WorkflowSessionService:
             filters: Field filters applied to the query.
 
         Returns:
-            The requested page of tasks for the session.
+            The requested page of tasks for the execution.
 
         Raises:
-            NotFoundError: If the parent session does not exist, so callers can
-                distinguish "no such session" from "session has no tasks".
-            ForbiddenError: If the caller is neither the session owner, a
-                designated approver of the session, nor a super admin.
+            NotFoundError: If the parent execution does not exist, so callers
+                can distinguish "no such execution" from "execution has no
+                tasks".
+            ForbiddenError: If the caller is neither the execution initiator, a
+                designated approver of the execution, nor a super admin.
         """
-        await self.get(ws_id, caller=caller)
+        await self.get(execution_id, caller=caller)
         return await self._tasks.list(
             limit=limit,
             offset=offset,
-            workflow_session_id=ws_id,
+            workflow_execution_id=execution_id,
             sort=sort,
             filters=filters,
         )
 
     async def resolve_agent(
-        self, ws_id: str, *, caller: User
-    ) -> tuple[ADKAgent, WorkflowSession]:
-        """Resolve the ADK agent bound to a WorkflowSession and the session record.
+        self, execution_id: str, *, caller: User
+    ) -> tuple[ADKAgent, WorkflowExecution]:
+        """Resolve the ADK agent driving an execution and the execution record.
 
-        The skill revision comes from the session record, so the run loads the
+        The skill revision comes from the execution record, so the run loads the
         code it started against no matter which replica serves it and no matter
         how many times the skill has been pulled since. Revision directories are
         immutable and live in the shared skill store, so this needs no lock and
@@ -197,45 +199,46 @@ class WorkflowSessionService:
         never rewrite.
 
         The record is returned alongside the agent so the caller can key the ADK
-        run by the session's owner (``WorkflowSession.initiator_id``) rather than
-        the current user, letting every authorized viewer (for example a
-        designated approver) share the same ADK session.
+        run by the execution's initiator (``WorkflowExecution.initiator_id``)
+        rather than the current user, letting every authorized viewer (for
+        example a designated approver) share the one workflow session.
 
         Args:
-            ws_id: Identifier of the session whose agent to resolve.
+            execution_id: Identifier of the execution whose agent to resolve.
             caller: The authenticated user driving the agent run.
 
         Returns:
-            A ``(agent, workflow_session)`` tuple: the ADK agent configured for
-            the session's skill revision, and the WorkflowSession record itself.
+            A ``(agent, workflow_execution)`` tuple: the ADK agent configured
+            for the execution's skill revision, and the WorkflowExecution record
+            itself.
 
         Raises:
-            NotFoundError: If no session exists with the given ID.
-            ForbiddenError: If the caller is neither the session owner, a
-                designated approver of the session, nor a super admin.
-            SkillNotReadyError: If neither the revision the session pinned nor
+            NotFoundError: If no execution exists with the given ID.
+            ForbiddenError: If the caller is neither the execution initiator, a
+                designated approver of the execution, nor a super admin.
+            SkillNotReadyError: If neither the revision the execution pinned nor
                 the skill's current revision is present in the store — the skill
                 has never been cloned, or its store was wiped. An admin fixes it
                 by pulling the skill.
         """
-        ws = await self.get(ws_id, caller=caller)
-        skill = await self._skills.get(ws.agent_skill_id)
+        execution = await self.get(execution_id, caller=caller)
+        skill = await self._skills.get(execution.agent_skill_id)
         if skill is None:
-            raise SkillNotReadyError(ws.agent_skill_id)
+            raise SkillNotReadyError(execution.agent_skill_id)
 
-        # Sessions created before the store was revisioned pinned no revision;
+        # Executions created before the store was revisioned pinned no revision;
         # they get the skill's current one.
-        commit_sha = ws.agent_skill_commit_sha or skill.commit_sha
+        commit_sha = execution.agent_skill_commit_sha or skill.commit_sha
         if commit_sha is None:
             raise SkillNotReadyError(skill.id)
 
         skill_dir = self._skills_store.skill_dir(skill, commit_sha)
         if not skill_dir.exists():
             # The pinned revision is gone (a wiped volume, or a prune that
-            # outran a session's insert). The skill's current revision is the
-            # only code left to run, so fall back to it rather than stranding
-            # the conversation -- loudly, because it is not the code the session
-            # started with.
+            # outran an execution's insert). The skill's current revision is
+            # the only code left to run, so fall back to it rather than
+            # stranding the conversation -- loudly, because it is not the code
+            # the execution started with.
             logger.warning(
                 "Skill revision %s of skill %s is missing from the store; "
                 "falling back to its current revision %s.",
@@ -251,49 +254,50 @@ class WorkflowSessionService:
                 raise SkillNotReadyError(skill.id)
 
         agent = self._registry.get(
-            ws.agent_skill_id,
+            execution.agent_skill_id,
             commit_sha,
             skill_dir,
-            tenant_id=ws.tenant_id,
+            tenant_id=execution.tenant_id,
             kind=AgentKind.execution,
         )
-        return agent, ws
+        return agent, execution
 
     async def get_messages(
-        self, ws_id: str, *, caller: User
+        self, execution_id: str, *, caller: User
     ) -> builtins.list[dict[str, Any]]:
-        """Return the chat history of a WorkflowSession's ADK session.
+        """Return the chat history of a WorkflowExecution's workflow session.
 
-        The ADK session is looked up by the WorkflowSession's owner
-        (``ws.initiator_id``), so the same history is returned regardless of
-        which authorized user requests it — a designated approver opening the
-        chat sees the owner's conversation instead of starting a fresh session.
+        The ADK session is looked up by the WorkflowExecution's initiator
+        (``execution.initiator_id``), so the same history is returned
+        regardless of which authorized user requests it — a designated
+        approver opening the chat sees the initiator's conversation instead
+        of starting a fresh one.
         Returns an empty list when the ADK session does not exist yet (before
         the first agent run).
 
         Args:
-            ws_id: Identifier of the WorkflowSession whose messages to fetch.
+            execution_id: Identifier of the WorkflowExecution whose messages to fetch.
             caller: The authenticated user requesting the history.
 
         Returns:
-            The session's messages as plain JSON-serializable dicts (the same
-            shape as ``GET /sessions/{id}/messages``).
+            The workflow session's messages as plain JSON-serializable dicts
+            (the same shape as ``GET /sessions/{id}/messages``).
 
         Raises:
-            NotFoundError: If no WorkflowSession exists with the given ID.
-            ForbiddenError: If the caller is neither the session owner, a
-                designated approver of the session, nor a super admin.
+            NotFoundError: If no WorkflowExecution exists with the given ID.
+            ForbiddenError: If the caller is neither the execution initiator, a
+                designated approver of the execution, nor a super admin.
         """
-        ws = await self.get(ws_id, caller=caller)
+        execution = await self.get(execution_id, caller=caller)
         session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, ws.tenant_id),
-            user_id=ws.initiator_id,
-            session_id=ws.session_id,
+            app_name=tenant_app_name(self._app_name, execution.tenant_id),
+            user_id=execution.initiator_id,
+            session_id=execution.session_id,
         )
         if session is None:
             return []
         messages = adk_events_to_messages(session.events)
-        meta = await self._meta.meta_for_session(ws_id)
+        meta = await self._meta.meta_for_session(execution_id)
         result: builtins.list[dict[str, Any]] = []
         for message in messages:
             data = message.model_dump(mode="json", by_alias=True)
@@ -308,8 +312,8 @@ class WorkflowSessionService:
             result.append(data)
         return result
 
-    async def attributable_keys(self, ws_id: str) -> set[str]:
-        """Return the correlation keys of the session's attributable events.
+    async def attributable_keys(self, execution_id: str) -> set[str]:
+        """Return the correlation keys of the workflow session's attributable events.
 
         Two kinds of events can be attributed to a sender: ADK ``"user"``
         events (keyed by their own event id) and tool-response
@@ -321,20 +325,21 @@ class WorkflowSessionService:
         not exist yet (before the first run).
 
         Args:
-            ws_id: Identifier of the WorkflowSession whose events to read.
+            execution_id: Identifier of the WorkflowExecution whose events to read.
 
         Returns:
             The set of correlation keys (event ids and tool_call_ids)
-            representing attributable events already present in the session.
+            representing attributable events already present in the workflow
+            session.
 
         Raises:
-            NotFoundError: If no WorkflowSession exists with the given ID.
+            NotFoundError: If no WorkflowExecution exists with the given ID.
         """
-        ws = await self._get(ws_id)
+        execution = await self._get(execution_id)
         session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, ws.tenant_id),
-            user_id=ws.initiator_id,
-            session_id=ws.session_id,
+            app_name=tenant_app_name(self._app_name, execution.tenant_id),
+            user_id=execution.initiator_id,
+            session_id=execution.session_id,
         )
         if session is None:
             return set()
@@ -348,11 +353,11 @@ class WorkflowSessionService:
         return keys
 
     async def record_new_senders(
-        self, ws_id: str, prior_keys: set[str], sender_user_id: str
+        self, execution_id: str, prior_keys: set[str], sender_user_id: str
     ) -> None:
-        """Attribute the session's new attributable events to ``sender_user_id``.
+        """Attribute the workflow session's new events to ``sender_user_id``.
 
-        Compares the session's current attributable keys (see
+        Compares the workflow session's current attributable keys (see
         :meth:`attributable_keys`) against the snapshot taken before the run;
         every key not in ``prior_keys`` was produced by the current user, so it
         is recorded (idempotently) -- new ``"user"`` events by their event id,
@@ -365,26 +370,26 @@ class WorkflowSessionService:
         touched. Does nothing when the ADK session does not exist.
 
         Args:
-            ws_id: Identifier of the WorkflowSession that was run.
+            execution_id: Identifier of the WorkflowExecution that was run.
             prior_keys: The attributable keys present before the run.
             sender_user_id: The user who sent the new messages.
 
         Raises:
-            NotFoundError: If no WorkflowSession exists with the given ID.
+            NotFoundError: If no WorkflowExecution exists with the given ID.
             ForeignKeyViolationError: If ``sender_user_id`` does not match a user.
         """
-        ws = await self._get(ws_id)
+        execution = await self._get(execution_id)
         session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, ws.tenant_id),
-            user_id=ws.initiator_id,
-            session_id=ws.session_id,
+            app_name=tenant_app_name(self._app_name, execution.tenant_id),
+            user_id=execution.initiator_id,
+            session_id=execution.session_id,
         )
         if session is None:
             return
         for event in session.events:
             if event.author == "user" and event.id not in prior_keys:
                 await self._meta.set_sender(
-                    workflow_session_id=ws_id,
+                    workflow_execution_id=execution_id,
                     adk_event_id=event.id,
                     sender_user_id=sender_user_id,
                 )
@@ -393,18 +398,18 @@ class WorkflowSessionService:
                     continue
                 if fr.id and fr.id not in prior_keys:
                     await self._meta.set_sender(
-                        workflow_session_id=ws_id,
+                        workflow_execution_id=execution_id,
                         adk_event_id=fr.id,
                         sender_user_id=sender_user_id,
                     )
 
-    async def record_message_tasks(self, ws_id: str) -> None:
+    async def record_message_tasks(self, execution_id: str) -> None:
         """Associate each ADK event with the WorkflowTask in progress at the time.
 
         The agent drives the task lifecycle by calling ``update_workflow_task``
         with ``status="in_progress"`` before working on a task. Walking the
-        session's events in order and tracking the most recent such transition
-        therefore yields, for every event, the task that was in progress when it
+        workflow session's events in order and tracking the most recent such
+        transition therefore yields, for every event, the task that was in progress when it
         was produced. Each event from the first ``in_progress`` transition onward
         is recorded against its task (idempotently); events before any
         transition (the initial design exchange) are left unassociated.
@@ -413,23 +418,23 @@ class WorkflowSessionService:
         nothing when the ADK session does not exist.
 
         Args:
-            ws_id: Identifier of the WorkflowSession that was run.
+            execution_id: Identifier of the WorkflowExecution that was run.
 
         Raises:
-            NotFoundError: If no WorkflowSession exists with the given ID.
+            NotFoundError: If no WorkflowExecution exists with the given ID.
         """
-        ws = await self._get(ws_id)
+        execution = await self._get(execution_id)
         session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, ws.tenant_id),
-            user_id=ws.initiator_id,
-            session_id=ws.session_id,
+            app_name=tenant_app_name(self._app_name, execution.tenant_id),
+            user_id=execution.initiator_id,
+            session_id=execution.session_id,
         )
         if session is None:
             return
         # Capture the audit user before the loop: each set_task commit expires
-        # the ``ws`` instance, and re-reading ``ws.created_by`` afterwards would
+        # the ``execution`` instance, and re-reading ``execution.created_by`` afterwards would
         # trigger a lazy load outside the async greenlet context.
-        owner_id = ws.created_by
+        owner_id = execution.created_by
         current_task_id: str | None = None
         for event in session.events:
             for call in event.get_function_calls():
@@ -442,46 +447,46 @@ class WorkflowSessionService:
                         current_task_id = task_id
             if current_task_id is not None:
                 await self._meta.set_task(
-                    workflow_session_id=ws_id,
+                    workflow_execution_id=execution_id,
                     adk_event_id=event.id,
                     workflow_task_id=current_task_id,
                     user_id=owner_id,
                 )
 
-    async def delete(self, ws_id: str, *, caller: User) -> None:
-        """Delete a WorkflowSession and its underlying ADK chat session.
+    async def delete(self, execution_id: str, *, caller: User) -> None:
+        """Delete a WorkflowExecution and its workflow session.
 
-        Deletion is stricter than the shared-chat access rule: only the
-        session owner or a super admin may delete a session — a designated
-        approver may participate in the chat but not destroy it.
+        Deletion is stricter than the shared-session access rule: only the
+        execution initiator or a super admin may delete an execution — a
+        designated approver may participate in the chat but not destroy it.
 
-        Removes, in order: the ADK chat session keyed by the record's
+        Removes, in order: the ADK session keyed by the record's
         ``session_id`` (best effort — skipped if it no longer exists), then the
-        WorkflowSession row itself. Deleting the row cascades to its
+        WorkflowExecution row itself. Deleting the row cascades to its
         WorkflowTasks (and their dependency edges and tool bindings) via the
         ``ON DELETE CASCADE`` foreign keys.
 
         Args:
-            ws_id: Identifier of the session to delete.
+            execution_id: Identifier of the execution to delete.
             caller: The authenticated user requesting the deletion.
 
         Raises:
-            NotFoundError: If no WorkflowSession exists with the given ID.
-            ForbiddenError: If the caller is neither the session owner nor a
+            NotFoundError: If no WorkflowExecution exists with the given ID.
+            ForbiddenError: If the caller is neither the execution initiator nor a
                 super admin.
         """
-        ws = await self._get(ws_id)
-        self._access.assert_owner(ws.initiator_id, caller)
-        scoped_app_name = tenant_app_name(self._app_name, ws.tenant_id)
+        execution = await self._get(execution_id)
+        self._access.assert_owner(execution.initiator_id, caller)
+        scoped_app_name = tenant_app_name(self._app_name, execution.tenant_id)
         existing = await self._session_service.get_session(
             app_name=scoped_app_name,
-            user_id=ws.initiator_id,
-            session_id=ws.session_id,
+            user_id=execution.initiator_id,
+            session_id=execution.session_id,
         )
         if existing is not None:
             await self._session_service.delete_session(
                 app_name=scoped_app_name,
-                user_id=ws.initiator_id,
-                session_id=ws.session_id,
+                user_id=execution.initiator_id,
+                session_id=execution.session_id,
             )
-        await self._ws_repo.delete(ws_id)
+        await self._execution_repo.delete(execution_id)

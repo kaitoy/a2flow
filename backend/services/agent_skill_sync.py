@@ -29,8 +29,8 @@ from repositories import (
     SqlAgentSkillRepository,
     SqlDesignSessionRepository,
     SqlSecretRepository,
-    SqlWorkflowSessionRepository,
-    WorkflowSessionRepository,
+    SqlWorkflowExecutionRepository,
+    WorkflowExecutionRepository,
 )
 from repositories.exceptions import (
     NotFoundError,
@@ -56,7 +56,7 @@ class AgentSkillSyncService:
     def __init__(
         self,
         skills: AgentSkillRepository,
-        sessions: WorkflowSessionRepository,
+        sessions: WorkflowExecutionRepository,
         design_sessions: DesignSessionRepository,
         resolver: SecretResolver,
         skill_manager: SkillManager,
@@ -65,7 +65,7 @@ class AgentSkillSyncService:
 
         Args:
             skills: Repository providing AgentSkill persistence.
-            sessions: Repository used to find which revisions workflow sessions
+            sessions: Repository used to find which revisions workflow executions
                 still pin, so a prune does not delete code a session needs.
             design_sessions: Repository used to find which revisions design
                 sessions still pin, for the same reason.
@@ -170,7 +170,7 @@ async def sync_agent_skill(skill_id: str, *, user_id: str) -> None:
             secrets = SqlSecretRepository(db, tenant_id=tenant_id)
             service = AgentSkillSyncService(
                 skills=SqlAgentSkillRepository(db, tenant_id=tenant_id),
-                sessions=SqlWorkflowSessionRepository(db, tenant_id=tenant_id),
+                sessions=SqlWorkflowExecutionRepository(db, tenant_id=tenant_id),
                 design_sessions=SqlDesignSessionRepository(db, tenant_id=tenant_id),
                 resolver=SecretResolver(
                     secrets, get_secret_cipher(), get_vault_client()

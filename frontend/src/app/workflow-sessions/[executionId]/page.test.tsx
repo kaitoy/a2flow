@@ -8,9 +8,9 @@ import { server } from "@/test/msw/server";
 import { render, screen, within } from "@/test/test-utils";
 import WorkflowSessionPage from "./page";
 
-/** The default `/workflow-sessions/ws-1` handler's payload, for `server.use` overrides. */
-const WORKFLOW_SESSION_1 = {
-  id: "ws-1",
+/** The default `/workflow-sessions/execution-1` handler's payload, for `server.use` overrides. */
+const WORKFLOW_EXECUTION_1 = {
+  id: "execution-1",
   tenantId: "tenant-1",
   sessionId: "executed-session-id",
   workflowId: "wf-1",
@@ -64,7 +64,7 @@ function authState(roles: string[]): Partial<RootState> {
 const AUTH_STATE = authState(["developer"]);
 
 beforeEach(() => {
-  vi.mocked(useParams).mockReturnValue({ workflowSessionId: "ws-1" });
+  vi.mocked(useParams).mockReturnValue({ workflowExecutionId: "execution-1" });
   useWorkflowSessionChatMock.mockReturnValue({
     messages: [],
     isRunning: false,
@@ -88,22 +88,22 @@ describe("WorkflowSessionPage", () => {
     const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByRole("link", { name: "My Workflow" })).toHaveAttribute(
       "href",
-      "/admin/workflow-sessions/ws-1"
+      "/admin/workflow-executions/execution-1"
     );
     expect(within(nav).getByText("Session")).toHaveAttribute("aria-current", "page");
   });
 
-  it("keeps the workflow-session crumb linked even when the parent workflow design has been deleted", async () => {
+  it("keeps the workflow-execution crumb linked even when the parent workflow design has been deleted", async () => {
     server.use(
-      http.get("http://localhost:8000/api/v1/workflow-sessions/:id", () =>
-        envelope({ ...WORKFLOW_SESSION_1, workflowId: null })
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id", () =>
+        envelope({ ...WORKFLOW_EXECUTION_1, workflowId: null })
       )
     );
     render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
     const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByRole("link", { name: "My Workflow" })).toHaveAttribute(
       "href",
-      "/admin/workflow-sessions/ws-1"
+      "/admin/workflow-executions/execution-1"
     );
   });
 });
