@@ -233,7 +233,7 @@ export default function WorkflowsPage() {
 
   function handleOpenDesign(id: string) {
     // A design session has no id of its own — it is addressed by its workflow.
-    router.push(`/admin/workflows/${encodeURIComponent(id)}/design-session`);
+    router.push(`/workflows/${encodeURIComponent(id)}/design-session`);
   }
 
   const columns = buildColumns(skillMap, handleRun, runningId, handleDelete, handleOpenDesign, {
