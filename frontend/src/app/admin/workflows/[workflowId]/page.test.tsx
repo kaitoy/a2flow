@@ -156,12 +156,23 @@ describe("WorkflowDetailPage", () => {
     );
   });
 
-  it("links to the task template management page", async () => {
+  it("navigates to the task template management page", async () => {
+    const user = userEvent.setup();
+    const pushMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+      forward: vi.fn(),
+    });
+
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
-    expect(screen.getByRole("link", { name: /manage templates/i })).toHaveAttribute(
-      "href",
-      "/admin/workflows/wf-1/task-templates"
+    await user.click(screen.getByRole("button", { name: /manage task templates/i }));
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/admin/workflows/wf-1/task-templates")
     );
   });
 

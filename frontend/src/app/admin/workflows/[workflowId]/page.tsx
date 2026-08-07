@@ -360,6 +360,12 @@ export default function WorkflowDetailPage() {
                     )}
                   </HeaderIconButton>
                 )}
+                <HeaderIconButton
+                  label="Manage task templates"
+                  onClick={() => router.push(`/admin/workflows/${workflowId}/task-templates`)}
+                >
+                  <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" />
+                </HeaderIconButton>
               </>
             }
           />
@@ -535,19 +541,6 @@ export default function WorkflowDetailPage() {
             </Button>
           </div>
         </form>
-
-        <div className="mt-4 flex items-center justify-between rounded-2xl glass-panel-strong p-4">
-          <div className="flex items-center gap-2 text-sm text-on-surface">
-            <ClipboardList size={16} strokeWidth={1.8} aria-hidden="true" />
-            Task templates — the design copied into every run of this workflow.
-          </div>
-          <Link
-            href={`/admin/workflows/${workflowId}/task-templates`}
-            className="text-sm font-medium text-accent transition-colors hover:underline"
-          >
-            Manage templates
-          </Link>
-        </div>
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
