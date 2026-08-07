@@ -22,6 +22,12 @@ describe("ApprovalsPage", () => {
     await waitFor(() => expect(screen.getByText("Deploy to production")).toBeInTheDocument());
   });
 
+  it("links the Title cell to the approval's detail page", async () => {
+    render(<ApprovalsPage />);
+    const link = await screen.findByRole("link", { name: "Deploy to production" });
+    expect(link).toHaveAttribute("href", "/admin/approvals/appr-1");
+  });
+
   it("shows the resolved approver name and comment", async () => {
     render(<ApprovalsPage />);
     await waitFor(() => screen.getByText("Deploy to production"));

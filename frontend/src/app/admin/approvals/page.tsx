@@ -68,7 +68,14 @@ export default function ApprovalsPage() {
         sortField: "title",
         filterField: "title",
         visibility: "always",
-        cell: (a) => <span className="font-medium">{a.title}</span>,
+        cell: (a) => (
+          <Link
+            href={`/admin/approvals/${a.id}`}
+            className="font-medium text-accent transition-colors hover:underline"
+          >
+            {a.title}
+          </Link>
+        ),
       },
       {
         header: "Status",
