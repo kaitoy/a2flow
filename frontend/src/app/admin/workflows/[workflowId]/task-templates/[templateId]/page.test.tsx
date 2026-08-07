@@ -19,7 +19,7 @@ const TEMPLATE = {
   toolBindings: [{ mcpServerId: "mcp-1", toolName: "search" }],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
-  createdBy: "",
+  createdBy: "user",
   updatedBy: "",
 };
 
@@ -34,11 +34,13 @@ function setup(template: unknown = TEMPLATE) {
         name: "My Workflow",
         description: null,
         agentSkillId: "skill-1",
+        sessionId: "design-session-id",
+        agentSkillCommitSha: "a".repeat(40),
         status: "draft",
         generationError: null,
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
-        createdBy: "",
+        createdBy: "user",
         updatedBy: "",
       })
     )

@@ -65,7 +65,7 @@ describe("WorkflowsPage", () => {
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-workflow"));
     await user.click(screen.getByRole("button", { name: /open design session/i }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/design-sessions/ds-1"));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/design-sessions/wf-1"));
   });
 
   it("hides the design session action from a user without the developer role", async () => {
@@ -131,11 +131,13 @@ describe("WorkflowsPage", () => {
             description: null,
             generatedDescription: "AI summary of the design",
             agentSkillId: "skill-1",
+            sessionId: "design-session-id",
+            agentSkillCommitSha: "a".repeat(40),
             status: "published",
             generationError: null,
             createdAt: "2026-01-01T00:00:00Z",
             updatedAt: "2026-01-01T00:00:00Z",
-            createdBy: "",
+            createdBy: "user",
             updatedBy: "",
           },
         ])
@@ -156,11 +158,13 @@ describe("WorkflowsPage", () => {
             description: "User's own summary",
             generatedDescription: "AI summary of the design",
             agentSkillId: "skill-1",
+            sessionId: "design-session-id",
+            agentSkillCommitSha: "a".repeat(40),
             status: "published",
             generationError: null,
             createdAt: "2026-01-01T00:00:00Z",
             updatedAt: "2026-01-01T00:00:00Z",
-            createdBy: "",
+            createdBy: "user",
             updatedBy: "",
           },
         ])
@@ -182,11 +186,13 @@ describe("WorkflowsPage", () => {
             name: "my-workflow",
             description: null,
             agentSkillId: "skill-1",
+            sessionId: "design-session-id",
+            agentSkillCommitSha: "a".repeat(40),
             status: "draft",
             generationError: null,
             createdAt: "2026-01-01T00:00:00Z",
             updatedAt: "2026-01-01T00:00:00Z",
-            createdBy: "",
+            createdBy: "user",
             updatedBy: "",
           },
         ])
@@ -218,11 +224,13 @@ describe("WorkflowsPage", () => {
             name: "my-workflow",
             description: null,
             agentSkillId: "skill-1",
+            sessionId: "design-session-id",
+            agentSkillCommitSha: "a".repeat(40),
             status: "modified",
             generationError: null,
             createdAt: "2026-01-01T00:00:00Z",
             updatedAt: "2026-01-01T00:00:00Z",
-            createdBy: "",
+            createdBy: "user",
             updatedBy: "",
           },
         ])

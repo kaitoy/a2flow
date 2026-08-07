@@ -1,7 +1,6 @@
 from .agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
 from .approval import Approval, ApprovalCreate, ApprovalStatus, ApprovalUpdate
 from .auth_session import AuthSession
-from .design_session import DesignSession, DesignSessionCreate
 from .impersonation_event import ImpersonationEvent
 from .mcp_server import (
     MCPServer,
@@ -75,8 +74,6 @@ __all__ = [
     "NotificationCreate",
     "NotificationType",
     "NotificationUpdate",
-    "DesignSession",
-    "DesignSessionCreate",
     "Session",
     "Tenant",
     "TenantCreate",

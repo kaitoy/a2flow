@@ -95,6 +95,10 @@ export type SessionChatVariant = "workflow" | "design";
 /**
  * Manage the agent interaction for a workflow session or a design session.
  *
+ * Neither chat has a record of its own, so both are addressed by their parent:
+ * `parentId` is a WorkflowExecution id for the `"workflow"` variant and a
+ * Workflow id for the `"design"` one.
+ *
  * On mount, loads prior message history and — when `kickoffPrompt` is non-null
  * and the session is new — auto-sends it to start the run; design sessions
  * pass `null` because their first exchange happened in the background
@@ -112,7 +116,7 @@ export type SessionChatVariant = "workflow" | "design";
  * attribution or task association — the chat belongs to its owner alone.
  */
 export function useWorkflowSessionChat(
-  workflowExecutionId: string,
+  parentId: string,
   sessionId: string,
   kickoffPrompt: string | null,
   ownerUserId: string,
@@ -164,14 +168,14 @@ export function useWorkflowSessionChat(
       // human in the chat); resolve just the owner for the avatar fallback.
       const senders = isDesign
         ? new Map<string, string>()
-        : await getWorkflowSessionMessageSenders(workflowExecutionId);
+        : await getWorkflowSessionMessageSenders(parentId);
       const users = await getUsersByIds([ownerUserId, ...senders.values()]);
       setMessageSenders(senders);
       setSenderUsers(users);
     } catch (err) {
       logger.error(err, "failed to load message senders");
     }
-  }, [workflowExecutionId, ownerUserId, isDesign]);
+  }, [parentId, ownerUserId, isDesign]);
 
   const refreshTasks = useCallback(async () => {
     // Design sessions edit the workflow's task templates, which the page
@@ -179,15 +183,15 @@ export function useWorkflowSessionChat(
     if (isDesign) return;
     try {
       const [taskList, taskMap] = await Promise.all([
-        listWorkflowTasks(workflowExecutionId),
-        getWorkflowSessionMessageTasks(workflowExecutionId),
+        listWorkflowTasks(parentId),
+        getWorkflowSessionMessageTasks(parentId),
       ]);
       setTasks(taskList);
       setMessageTasks(taskMap);
     } catch (err) {
       logger.error(err, "failed to load workflow tasks");
     }
-  }, [workflowExecutionId, isDesign]);
+  }, [parentId, isDesign]);
 
   const refreshMessages = useCallback(async () => {
     // Never merge mid-run: syncPolledMessages rebuilds the message array from the
@@ -195,7 +199,7 @@ export function useWorkflowSessionChat(
     // stream, so polling is only safe between runs.
     if (isRunningRef.current || isStreamingRef.current) return;
     try {
-      const loaded = await fetchMessages(workflowExecutionId);
+      const loaded = await fetchMessages(parentId);
       // A run may have started while the fetch was in flight; re-check the guard.
       if (isRunningRef.current || isStreamingRef.current) return;
       // The shared chat is append-only, so length + last id uniquely identify the
@@ -213,7 +217,7 @@ export function useWorkflowSessionChat(
     } catch (err) {
       logger.error(err, "failed to poll session messages");
     }
-  }, [workflowExecutionId, sessionId, dispatch, refreshSenders, refreshTasks, fetchMessages]);
+  }, [parentId, sessionId, dispatch, refreshSenders, refreshTasks, fetchMessages]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
@@ -224,7 +228,7 @@ export function useWorkflowSessionChat(
       dispatch(addUserMessage({ id: msgId, content: prompt }));
       locallySentIds.current.add(msgId);
 
-      const agent = buildAgent(workflowExecutionId, sessionId);
+      const agent = buildAgent(parentId, sessionId);
 
       const pending = store.getState().chat.pendingRenderCalls;
       for (const ack of buildRenderAckMessages(pending)) {
@@ -254,7 +258,7 @@ export function useWorkflowSessionChat(
       // Refresh task state and the per-message task association the run produced.
       void refreshTasks();
     },
-    [workflowExecutionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks, buildAgent]
+    [parentId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks, buildAgent]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -264,7 +268,7 @@ export function useWorkflowSessionChat(
 
       dispatch(startRun());
 
-      const agent = buildAgent(workflowExecutionId, sessionId);
+      const agent = buildAgent(parentId, sessionId);
 
       // The action rides as the tool result of the render call that produced
       // the acted-on surface, carrying `values` (the surface's data model) so
@@ -302,7 +306,7 @@ export function useWorkflowSessionChat(
       // the same resumed-history path keeps it consistent with the sender map.
       void refreshMessages();
     },
-    [workflowExecutionId, sessionId, isRunning, dispatch, refreshMessages, buildAgent]
+    [parentId, sessionId, isRunning, dispatch, refreshMessages, buildAgent]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -312,7 +316,7 @@ export function useWorkflowSessionChat(
 
       dispatch(startRun());
 
-      const agent = createWorkflowSessionAgent(workflowExecutionId, sessionId);
+      const agent = createWorkflowSessionAgent(parentId, sessionId);
 
       const pending = store.getState().chat.pendingRenderCalls;
       for (const ack of buildRenderAckMessages(pending)) {
@@ -356,7 +360,7 @@ export function useWorkflowSessionChat(
       // refresh task state and the per-message task association.
       void refreshTasks();
     },
-    [workflowExecutionId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
+    [parentId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and the init guard below prevents double-sends
@@ -371,7 +375,7 @@ export function useWorkflowSessionChat(
     dispatch(setSession(sessionId));
     void refreshSenders();
     void refreshTasks();
-    fetchMessages(workflowExecutionId)
+    fetchMessages(parentId)
       .then((loadedMessages) => {
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
         // Record the loaded history so the first poll doesn't re-apply it.

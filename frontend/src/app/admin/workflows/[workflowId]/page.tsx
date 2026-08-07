@@ -43,7 +43,6 @@ import {
   generateWorkflowDescription,
   getAgentSkill,
   getWorkflow,
-  getWorkflowDesignSession,
   publishWorkflow,
   updateWorkflow,
   type Workflow,
@@ -270,13 +269,9 @@ export default function WorkflowDetailPage() {
     }
   }
 
-  async function handleOpenDesign() {
-    try {
-      const ds = await getWorkflowDesignSession(workflowId);
-      router.push(`/design-sessions/${ds.id}`);
-    } catch {
-      // Failure toast is shown globally by api.ts; nothing else to do here.
-    }
+  function handleOpenDesign() {
+    // A design session has no id of its own — it is addressed by its workflow.
+    router.push(`/design-sessions/${encodeURIComponent(workflowId)}`);
   }
 
   async function handleRun() {

@@ -21,7 +21,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkillCreate
 from models.approval import ApprovalCreate
-from models.design_session import DesignSessionCreate
 from models.mcp_server import MCPServerCreate
 from models.notification import NotificationCreate, NotificationType
 from models.secret import SecretCreate, SecretType
@@ -33,7 +32,6 @@ from models.workflow_task_template import WorkflowTaskTemplateCreate
 from repositories import (
     SqlAgentSkillRepository,
     SqlApprovalRepository,
-    SqlDesignSessionRepository,
     SqlMCPServerRepository,
     SqlMessageMetaRepository,
     SqlNotificationRepository,
@@ -81,7 +79,6 @@ class _Rows:
         self.workflow_task = ""
         self.approval = ""
         self.notification = ""
-        self.design_session = ""
         self.workflow_task_template = ""
         self.message_meta_event_id = ""
 
@@ -117,7 +114,13 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
 
     workflows = SqlWorkflowRepository(db, skills, tenant_id=tenant_id)
     workflow = await workflows.create(
-        WorkflowCreate(name=f"wf-{suffix}", agent_skill_id=skill.id), user_id="owner"
+        WorkflowCreate(
+            name=f"wf-{suffix}",
+            agent_skill_id=skill.id,
+            session_id=f"design-{suffix}",
+            agent_skill_commit_sha="a" * 40,
+        ),
+        user_id="owner",
     )
     rows.workflow = workflow.id
 
@@ -161,19 +164,6 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
         user_id="owner",
     )
     rows.notification = notification.id
-
-    design_sessions = SqlDesignSessionRepository(db, tenant_id=tenant_id)
-    ds = await design_sessions.create(
-        DesignSessionCreate(
-            session_id=f"design-{suffix}",
-            workflow_id=workflow.id,
-            agent_skill_id=skill.id,
-            agent_skill_commit_sha="a" * 40,
-            user_id="owner",
-        ),
-        user_id="owner",
-    )
-    rows.design_session = ds.id
 
     templates = SqlWorkflowTaskTemplateRepository(
         db, workflows, mcp, tenant_id=tenant_id
@@ -334,14 +324,14 @@ async def test_notification_isolation(
 async def test_design_session_isolation(
     engine: AsyncEngine, seeded: tuple[_Rows, _Rows]
 ) -> None:
+    """A design session is reachable only through its own tenant's workflow."""
     a, b = seeded
     async with AsyncSession(engine, expire_on_commit=False) as db:
-        repo_a = SqlDesignSessionRepository(db, tenant_id=TENANT_A)
-        assert await repo_a.get(b.design_session) is None
+        skills_a = SqlAgentSkillRepository(db, tenant_id=TENANT_A)
+        repo_a = SqlWorkflowRepository(db, skills_a, tenant_id=TENANT_A)
         assert await repo_a.get_by_session_id("design-b") is None
-        assert await repo_a.get_by_workflow_id(b.workflow) is None
-        with pytest.raises(NotFoundError):
-            await repo_a.delete(b.design_session)
+        assert await repo_a.get_by_session_id("design-a") is not None
+        assert await repo_a.commit_shas_for_skill(b.agent_skill) == set()
 
 
 async def test_workflow_published_version_isolation(

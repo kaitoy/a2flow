@@ -21,11 +21,13 @@ const WORKFLOW_1 = {
   description: null,
   generatedDescription: null,
   agentSkillId: "skill-1",
+  sessionId: "design-session-id",
+  agentSkillCommitSha: "a".repeat(40),
   status: "published",
   generationError: null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
-  createdBy: "",
+  createdBy: "user",
   updatedBy: "",
 };
 
@@ -88,7 +90,7 @@ function mockMe(roles: string[]) {
           roles,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         },
         impersonatedBy: null,
@@ -98,7 +100,7 @@ function mockMe(roles: string[]) {
 }
 
 beforeEach(() => {
-  vi.mocked(useParams).mockReturnValue({ designSessionId: "ds-1" });
+  vi.mocked(useParams).mockReturnValue({ workflowId: "wf-1" });
   useWorkflowSessionChatMock.mockReturnValue({
     messages: [],
     isRunning: false,
@@ -131,7 +133,7 @@ describe("DesignSessionPage", () => {
     render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     await screen.findByRole("link", { name: "my-workflow" });
     expect(useWorkflowSessionChatMock).toHaveBeenCalledWith(
-      "ds-1",
+      "wf-1",
       "design-session-id",
       null,
       "user",
@@ -159,7 +161,7 @@ describe("DesignSessionPage", () => {
             toolBindings: [{ mcpServerId: "mcp-1", toolName: "search" }],
             createdAt: "2026-01-01T00:00:00Z",
             updatedAt: "2026-01-01T00:00:00Z",
-            createdBy: "",
+            createdBy: "user",
             updatedBy: "",
           },
         ])
@@ -281,11 +283,13 @@ describe("DesignSessionPage", () => {
           description: null,
           generatedDescription: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "generating",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )

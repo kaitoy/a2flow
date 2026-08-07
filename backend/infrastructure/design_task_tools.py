@@ -5,8 +5,8 @@ These callables are attached to the design agents (see
 register the designed steps as WorkflowTaskTemplates and the interactive
 design chat can refine it. They mirror
 :mod:`infrastructure.workflow_task_tools`, with two differences: the tools
-resolve the current run's :class:`models.design_session.DesignSession` (by
-the ADK session id) and operate on the linked workflow's *templates*, and
+resolve the current run's :class:`models.workflow.Workflow` (by the ADK session
+id of its design session) and operate on that workflow's *templates*, and
 templates carry no ``status`` — the lifecycle belongs to a run, not the design.
 
 Like the session-task tools, every call opens its own ``AsyncSession`` on the
@@ -52,9 +52,7 @@ from models.workflow_task_template import (
     WorkflowTaskTemplateUpdate,
 )
 from repositories import (
-    DesignSessionRepository,
     SqlAgentSkillRepository,
-    SqlDesignSessionRepository,
     SqlMCPServerRepository,
     SqlWorkflowRepository,
     SqlWorkflowTaskTemplateRepository,
@@ -68,7 +66,7 @@ from repositories.exceptions import (
 )
 from repositories.tenant_bootstrap import (
     NoTenantSessionError,
-    resolve_design_session_tenant,
+    resolve_workflow_design_tenant,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,7 +106,6 @@ class _Scope:
 
     workflow_id: str
     tenant_id: str
-    ds_repo: DesignSessionRepository
     template_repo: WorkflowTaskTemplateRepository
     workflow_repo: WorkflowRepository
 
@@ -136,11 +133,10 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
 
     Opens a fresh ``AsyncSession`` on the module-level engine (the tools run
     outside FastAPI's request scope), resolves the current run's workflow id
-    and tenant id, and wires a DesignSession repository, a
-    WorkflowTaskTemplate repository, and the Workflow repository backing
-    :meth:`_Scope.mark_design_edited` to it, all scoped to the resolved tenant.
-    The engine is referenced through the ``database`` module so tests can
-    monkeypatch ``database.engine``.
+    and tenant id, and wires a WorkflowTaskTemplate repository plus the
+    Workflow repository backing :meth:`_Scope.mark_design_edited` to it, both
+    scoped to the resolved tenant. The engine is referenced through the
+    ``database`` module so tests can monkeypatch ``database.engine``.
 
     Args:
         tool_context: The ADK tool context for the current invocation.
@@ -149,13 +145,14 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
         The resolved :class:`_Scope`.
 
     Raises:
-        NoTenantSessionError: If no DesignSession is bound to the current run.
+        NoTenantSessionError: If the current run's ADK session is not a
+            workflow's design session.
     """
     async with AsyncSession(database.engine) as db:
         session = getattr(tool_context, "session", None)
         session_id = getattr(session, "id", None)
         resolved = (
-            await resolve_design_session_tenant(db, session_id) if session_id else None
+            await resolve_workflow_design_tenant(db, session_id) if session_id else None
         )
         if resolved is None:
             raise NoTenantSessionError()
@@ -168,7 +165,6 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
         yield _Scope(
             workflow_id=workflow_id,
             tenant_id=tenant_id,
-            ds_repo=SqlDesignSessionRepository(db, tenant_id=tenant_id),
             template_repo=SqlWorkflowTaskTemplateRepository(
                 db,
                 workflow_repo,

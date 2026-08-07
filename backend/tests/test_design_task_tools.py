@@ -4,7 +4,8 @@ The tools open their own ``AsyncSession`` on ``infrastructure.database.engine``;
 each test monkeypatches that engine to an isolated in-memory SQLite database and
 drives the tools with a lightweight fake ToolContext exposing only ``session.id``
 and ``user_id`` (the attributes the tools read). Unlike the session-task tools,
-these resolve a DesignSession and edit the linked workflow's task templates.
+these resolve the Workflow whose design session the run is in, and edit that
+workflow's task templates.
 """
 
 from collections.abc import AsyncGenerator
@@ -28,9 +29,8 @@ from infrastructure.design_task_tools import (
     update_design_task,
 )
 from models.agent_skill import AgentSkill
-from models.design_session import DesignSession
 from models.workflow import Workflow, WorkflowStatus
-from repositories.tenant_bootstrap import resolve_design_session_tenant
+from repositories.tenant_bootstrap import resolve_workflow_design_tenant
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
@@ -102,10 +102,13 @@ async def _seed_design_session(
     user_id: str = "owner",
     status: WorkflowStatus = WorkflowStatus.draft,
 ) -> str:
-    """Insert a skill + workflow + DesignSession chain; return the workflow PK.
+    """Insert a skill + workflow whose design session is ``session_id``.
 
     ``status`` seeds the workflow's lifecycle state so tests can exercise the
     ``published`` → ``modified`` transition the write tools trigger.
+
+    Returns:
+        The workflow's primary key.
     """
     async with AsyncSession(eng) as db:
         skill = AgentSkill(
@@ -124,6 +127,8 @@ async def _seed_design_session(
         workflow = Workflow(
             name=f"wf-{session_id}",
             agent_skill_id=skill_id,
+            session_id=session_id,
+            agent_skill_commit_sha="a" * 40,
             status=status,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
@@ -132,21 +137,7 @@ async def _seed_design_session(
         db.add(workflow)
         await db.commit()
         await db.refresh(workflow)
-        workflow_id = workflow.id
-
-        ds = DesignSession(
-            session_id=session_id,
-            workflow_id=workflow_id,
-            agent_skill_id=skill_id,
-            agent_skill_commit_sha="a" * 40,
-            user_id=user_id,
-            tenant_id=DEFAULT_TEST_TENANT_ID,
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        db.add(ds)
-        await db.commit()
-        return workflow_id
+        return workflow.id
 
 
 def _ctx(session_id: str = "design-abc", user_id: str = "tester") -> Any:
@@ -349,14 +340,14 @@ async def test_delete_cross_workflow_guard(engine: AsyncEngine) -> None:
 # ---------- session resolution ----------
 
 
-async def test_resolve_design_session_tenant(engine: AsyncEngine) -> None:
+async def test_resolve_workflow_design_tenant(engine: AsyncEngine) -> None:
     workflow_id = await _seed_design_session(engine, session_id="design-x")
     async with AsyncSession(engine) as db:
-        assert await resolve_design_session_tenant(db, "design-x") == (
+        assert await resolve_workflow_design_tenant(db, "design-x") == (
             workflow_id,
             DEFAULT_TEST_TENANT_ID,
         )
-        assert await resolve_design_session_tenant(db, "absent") is None
+        assert await resolve_workflow_design_tenant(db, "absent") is None
 
 
 # ---------- tool bindings ----------

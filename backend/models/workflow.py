@@ -1,13 +1,22 @@
 """Workflow data models for update, generation, and database persistence.
 
 A Workflow is a reusable, pre-designed unit of work: an agent skill plus the
-task templates generated for it by a design session. Workflows are never
+task templates generated for it by its design session. Workflows are never
 created directly through a plain POST — they are born from
 ``POST /agent-skills/{skill_id}/workflows`` ("Generate workflow"), which
 registers a draft row and schedules a background design run that fills in
 the task templates and the first conversation summary
 (``generated_description``); later summaries are produced on demand by
 ``POST /workflows/{id}/generate-description``.
+
+The chat those templates are produced and refined in is the workflow's
+**design session** — the ADK session named by :attr:`WorkflowCreate.session_id`
+and keyed by the workflow's ``created_by``. It is the design-time counterpart
+of a *workflow session*, the chat a run happens in
+(:class:`models.workflow_execution.WorkflowExecution`). Neither has a table of
+its own: a design session exists one-to-one with its workflow, so the
+workflow's id identifies it, exactly as an execution's id identifies its
+workflow session.
 """
 
 from enum import StrEnum
@@ -99,11 +108,23 @@ class WorkflowCreate(WorkflowUpdate):
     """Creation payload for a Workflow with required fields.
 
     Not exposed as a POST body — workflows are created internally by the
-    generation flow (``WorkflowGenerationService``), which supplies the skill.
+    generation flow (``WorkflowDesignService.generate``), which supplies the
+    skill, mints the design session's id, and pins the skill revision.
+
+    ``agent_skill_commit_sha`` pins the design to the skill revision that was
+    published when generation started, so a later ``pull`` of the skill cannot
+    swap the design agent's code mid-conversation. Generation requires a
+    published revision, so — unlike WorkflowExecution — the pin is always
+    present.
     """
 
     name: EntityName
     agent_skill_id: str
+
+    session_id: str
+    """ADK/AG-UI id of this workflow's design session — the chat it is designed in."""
+
+    agent_skill_commit_sha: str
 
 
 class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
@@ -126,6 +147,13 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     by a ``super_admin`` through ``PATCH``); ``description`` is the free-form
     field any ``developer`` can set to override it. See
     :attr:`effective_description`.
+
+    ``session_id`` is the workflow's design session and is indexed so the
+    design agent's tools can map the session they run in back to the workflow
+    whose templates they edit. ``created_by`` doubles as that chat's owner: it
+    keys the ADK session and gates ``/messages`` and ``/agent``, so only the
+    user who generated the workflow (or a super admin) can drive the design
+    conversation.
     """
 
     __tablename__ = "workflows"
@@ -137,6 +165,7 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_workflows_tenant_id_name"),
         Index("ix_workflows_tenant_id_name", "tenant_id", "name"),
+        Index("ix_workflows_session_id", "session_id"),
         ForeignKeyConstraint(
             ["agent_skill_id"], ["agent_skills.id"], ondelete="RESTRICT"
         ),

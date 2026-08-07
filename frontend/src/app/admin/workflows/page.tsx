@@ -21,7 +21,6 @@ import { useTableQuery } from "@/hooks/useTableQuery";
 import {
   deleteWorkflow,
   executeWorkflow,
-  getWorkflowDesignSession,
   listAgentSkills,
   listWorkflows,
   type Workflow,
@@ -232,13 +231,9 @@ export default function WorkflowsPage() {
     }
   }
 
-  async function handleOpenDesign(id: string) {
-    try {
-      const ds = await getWorkflowDesignSession(id);
-      router.push(`/design-sessions/${ds.id}`);
-    } catch {
-      // Failure toast is shown globally by api.ts; nothing else to do here.
-    }
+  function handleOpenDesign(id: string) {
+    // A design session has no id of its own — it is addressed by its workflow.
+    router.push(`/design-sessions/${encodeURIComponent(id)}`);
   }
 
   const columns = buildColumns(skillMap, handleRun, runningId, handleDelete, handleOpenDesign, {

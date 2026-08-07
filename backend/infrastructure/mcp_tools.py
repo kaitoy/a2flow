@@ -18,7 +18,8 @@ generic tools:
 
 Because of that difference the two tools resolve the current run differently.
 ``list_mcp_tools`` only needs the tenant, so it accepts both an execution run
-(keyed on a WorkflowExecution) and a design run (keyed on a DesignSession).
+(keyed on a WorkflowExecution) and a design run (keyed on a Workflow's design
+session).
 ``call_mcp_tool`` has to check the run's in-progress tasks, so it still requires
 a WorkflowExecution and is unavailable while merely designing — a task template
 may bind tools, but only a run may invoke them.
@@ -89,7 +90,8 @@ async def _resolve_tenant(tool_context: ToolContext, db: AsyncSession) -> str:
 
     ``list_mcp_tools`` only needs to know which tenant's registry to read, so
     unlike :func:`infrastructure.workflow_task_tools._resolve_scope` it accepts
-    a run keyed on either a WorkflowExecution or a DesignSession. Resolving
+    a run keyed on either a WorkflowExecution or a Workflow's design session.
+    Resolving
     through WorkflowExecution alone would make the tool fail for the whole
     design phase — exactly where the templates' tool bindings are decided.
 
@@ -102,7 +104,7 @@ async def _resolve_tenant(tool_context: ToolContext, db: AsyncSession) -> str:
 
     Raises:
         NoTenantSessionError: If the session id is missing or matches neither a
-            WorkflowExecution nor a DesignSession.
+            WorkflowExecution nor a Workflow.
     """
     session = getattr(tool_context, "session", None)
     session_id = getattr(session, "id", None)

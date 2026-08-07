@@ -166,10 +166,10 @@ resulting task templates are on `GET /api/v1/workflows/{id}/task-templates`.
 
 ### Driving the design chat
 
-`POST /api/v1/design-sessions/{ds_id}/agent` is an AG-UI SSE stream, not an
-envelope route. Find the session with
-`GET /api/v1/workflows/{id}/design-session`, then post a `RunAgentInput` whose
-`threadId` is that record's `sessionId`:
+`POST /api/v1/workflows/{id}/agent` is an AG-UI SSE stream, not an envelope
+route. A design session has no id of its own — read the workflow with
+`GET /api/v1/workflows/{id}`, then post a `RunAgentInput` whose `threadId` is
+that record's `sessionId`:
 
 ```json
 {"threadId":"<sessionId>","runId":"r1","state":{},

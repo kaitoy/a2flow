@@ -13,7 +13,6 @@ import type {
   ApprovalStatus,
   ApprovalUpdate,
   AvatarConfig,
-  DesignSession as DesignSessionModel,
   GenerateWorkflowRequest,
   LoginRequest,
   McpCommand,
@@ -81,8 +80,7 @@ import {
   zGenerateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
-  zGetDesignSessionApiV1DesignSessionsDsIdGetResponse,
-  zGetDesignSessionMessagesApiV1DesignSessionsDsIdMessagesGetResponse,
+  zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
   zGetSecretApiV1SecretsSecretIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
@@ -90,7 +88,6 @@ import {
   zGetTenantApiV1TenantsTenantIdGetResponse,
   zGetUserApiV1UsersUserIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
-  zGetWorkflowDesignSessionApiV1WorkflowsWorkflowIdDesignSessionGetResponse,
   zGetWorkflowExecutionApiV1WorkflowExecutionsExecutionIdGetResponse,
   zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse,
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
@@ -321,7 +318,6 @@ export type Notification = WithAudit<NotificationModel>;
 export type Secret = WithAudit<SecretModel>;
 export type Tenant = WithAudit<TenantModel>;
 export type User = WithAudit<UserReadModel>;
-export type DesignSession = WithAudit<DesignSessionModel>;
 export type Workflow = WithAudit<WorkflowModel>;
 export type WorkflowExecution = WithAudit<WorkflowExecutionModel>;
 export type WorkflowTask = WithAudit<WorkflowTaskModel>;
@@ -1004,34 +1000,19 @@ export async function deleteWorkflowTaskTemplate(templateId: string): Promise<vo
   );
 }
 
-/** Fetch the design session belonging to a workflow (every generated workflow has one). */
-export async function getWorkflowDesignSession(workflowId: string): Promise<DesignSession> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/design-session`),
-    zGetWorkflowDesignSessionApiV1WorkflowsWorkflowIdDesignSessionGetResponse
-  ) as Promise<DesignSession>;
-}
-
-/** Fetch a DesignSession record by ID. */
-export async function getDesignSession(id: string): Promise<DesignSession> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/design-sessions/${encodeURIComponent(id)}`),
-    zGetDesignSessionApiV1DesignSessionsDsIdGetResponse
-  ) as Promise<DesignSession>;
-}
-
 /**
- * Fetch the chat history of a DesignSession's ADK session.
+ * Fetch the chat history of a workflow's design session.
  *
- * Returns an empty list while the background generation run has not started
- * yet. The records carry ``senderUserId``/``workflowTaskId`` as ``null`` so
- * the payload shape matches {@link getWorkflowSessionMessages} and the chat
+ * A design session has no record of its own, so it is addressed by its
+ * workflow's id. Returns an empty list while the background generation run has
+ * not started yet. The records carry `senderUserId`/`workflowTaskId` as `null`
+ * so the payload shape matches {@link getWorkflowSessionMessages} and the chat
  * components can be reused unchanged.
  */
-export async function getDesignSessionMessages(dsId: string): Promise<Message[]> {
+export async function getDesignSessionMessages(workflowId: string): Promise<Message[]> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/design-sessions/${encodeURIComponent(dsId)}/messages`),
-    zGetDesignSessionMessagesApiV1DesignSessionsDsIdMessagesGetResponse
+    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/messages`),
+    zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse
   ) as Promise<Message[]>;
 }
 
@@ -1332,13 +1313,13 @@ export function createWorkflowSessionAgent(
 }
 
 /**
- * Create an HttpAgent scoped to a specific design session endpoint, pre-configured
+ * Create an HttpAgent scoped to a workflow's design session endpoint, pre-configured
  * with the A2UI middleware so the design agent can render interactive surfaces
  * while the user refines the workflow's task templates.
  */
-export function createDesignSessionAgent(designSessionId: string, sessionId: string): HttpAgent {
+export function createDesignSessionAgent(workflowId: string, sessionId: string): HttpAgent {
   const agent = new CredentialedHttpAgent({
-    url: `${API_BASE}/api/v1/design-sessions/${encodeURIComponent(designSessionId)}/agent`,
+    url: `${API_BASE}/api/v1/workflows/${encodeURIComponent(workflowId)}/agent`,
     threadId: sessionId,
   });
   agent.use(

@@ -79,17 +79,15 @@ async def test_generate_workflow_becomes_draft_after_job(
     assert body["status"] == "draft"
 
 
-async def test_generate_workflow_creates_design_session(
+async def test_generate_workflow_opens_a_design_session(
     workflow_client: AsyncClient,
 ) -> None:
+    """Generation mints the design session's id and pins the skill revision."""
     skill = await create_skill(workflow_client)
     wf = await generate_workflow(workflow_client, skill["id"])
-    ds = assert_ok(
-        await workflow_client.get(f"/api/v1/workflows/{wf['id']}/design-session")
-    )
-    assert ds["workflowId"] == wf["id"]
-    assert ds["agentSkillId"] == skill["id"]
-    assert ds["agentSkillCommitSha"] == FAKE_COMMIT_SHA
+    assert wf["agentSkillId"] == skill["id"]
+    assert wf["agentSkillCommitSha"] == FAKE_COMMIT_SHA
+    assert wf["sessionId"]
 
 
 async def test_generate_workflow_missing_name_returns_422(

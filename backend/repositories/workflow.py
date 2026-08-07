@@ -23,6 +23,8 @@ class WorkflowRepository(Protocol):
 
     async def get(self, workflow_id: str) -> Workflow | None: ...
 
+    async def get_by_session_id(self, session_id: str) -> Workflow | None: ...
+
     async def list(
         self,
         *,
@@ -31,6 +33,8 @@ class WorkflowRepository(Protocol):
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> list[Workflow]: ...
+
+    async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]: ...
 
     async def create(self, data: WorkflowCreate, *, user_id: str) -> Workflow: ...
 
@@ -79,6 +83,33 @@ class SqlWorkflowRepository:
     async def get(self, workflow_id: str) -> Workflow | None:
         return await self._get_scoped(workflow_id)
 
+    async def get_by_session_id(self, session_id: str) -> Workflow | None:
+        """Return the Workflow for the given ADK session id, or ``None``.
+
+        The ADK session id (the AG-UI thread id) is stored on
+        :attr:`Workflow.session_id` — the workflow's design session — which is
+        distinct from the primary key. The design agent's tools use this lookup
+        to map the session they run in back to the workflow whose task
+        templates they edit.
+
+        Args:
+            session_id: The ADK session id to look up.
+
+        Returns:
+            The matching Workflow, or ``None`` if no workflow has that session
+            id.
+        """
+        stmt = (
+            select(Workflow)
+            .where(
+                col(Workflow.session_id) == session_id,
+                Workflow.tenant_id == self._tenant_id,
+            )
+            .limit(1)
+        )
+        result = await self._db.exec(stmt)
+        return result.first()
+
     async def list(
         self,
         *,
@@ -98,6 +129,26 @@ class SqlWorkflowRepository:
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
+
+    async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]:
+        """Return every skill revision that workflows of this skill pin.
+
+        These are revisions a prune of the skill store must keep alongside the
+        ones pinned by workflow executions: each is the code some design
+        conversation started against and will keep loading on its next run.
+
+        Args:
+            agent_skill_id: Identifier of the skill whose workflows to scan.
+
+        Returns:
+            The set of pinned commit shas.
+        """
+        stmt = select(Workflow.agent_skill_commit_sha).where(
+            col(Workflow.agent_skill_id) == agent_skill_id,
+            Workflow.tenant_id == self._tenant_id,
+        )
+        result = await self._db.exec(stmt)
+        return set(result.all())
 
     async def create(self, data: WorkflowCreate, *, user_id: str) -> Workflow:
         """Create a new Workflow, raising UniqueViolationError on duplicate name."""

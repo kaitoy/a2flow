@@ -81,11 +81,11 @@ async def seed_design_transcript(
     through these helpers has an empty transcript. Tests that need one — the
     description summarizer reads it — seed it here.
     """
-    ds = assert_ok(await client.get(f"/api/v1/workflows/{workflow_id}/design-session"))
+    workflow = assert_ok(await client.get(f"/api/v1/workflows/{workflow_id}"))
     session = await session_service.create_session(
-        app_name=tenant_app_name(APP_NAME, ds["tenantId"]),
-        user_id=ds["userId"],
-        session_id=ds["sessionId"],
+        app_name=tenant_app_name(APP_NAME, workflow["tenantId"]),
+        user_id=workflow["createdBy"],
+        session_id=workflow["sessionId"],
     )
     await session_service.append_event(
         session,

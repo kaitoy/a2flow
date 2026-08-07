@@ -1,9 +1,9 @@
 """Workflow generation ("Generate workflow") and publication use cases.
 
-``WorkflowDesignService.generate`` registers a draft Workflow plus its
-DesignSession synchronously; the actual design run —
-:func:`generate_workflow_design` — runs as a background job because it is a full
-agent run against an LLM and must not hold the HTTP request open. The job
+``WorkflowDesignService.generate`` registers a draft Workflow synchronously,
+minting the id of the design session it will be designed in; the actual design
+run — :func:`generate_workflow_design` — runs as a background job because it is
+a full agent run against an LLM and must not hold the HTTP request open. The job
 drives the ``initial_design`` agent through the same ``ADKAgent`` machinery
 the chat endpoints use, so the prompt and the agent's reply land in the same
 ADK session the design chat later reopens.
@@ -31,15 +31,16 @@ from infrastructure.agent import (
 )
 from infrastructure.locks import advisory_lock, agent_run_key
 from infrastructure.skill_manager import SkillManager
-from infrastructure.summarizer import summarize_design_transcript
-from models.design_session import DesignSessionCreate
+from infrastructure.summarizer import (
+    build_design_transcript,
+    summarize_design_transcript,
+)
 from models.notification import NotificationCreate, NotificationType
 from models.workflow import Workflow, WorkflowCreate, WorkflowStatus, WorkflowUpdate
 from models.workflow_published_version import dump_templates, snapshot_template
 from repositories import (
     MAX_TASK_TEMPLATES,
     AgentSkillRepository,
-    DesignSessionRepository,
     WorkflowPublishedVersionRepository,
     WorkflowRepository,
     WorkflowTaskTemplateRepository,
@@ -51,7 +52,6 @@ from repositories.exceptions import (
     WorkflowDescriptionNotGeneratableError,
     WorkflowNotRunnableError,
 )
-from services.design_session import build_design_transcript
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +68,8 @@ NO_TASK_TEMPLATES_REASON = "The design run registered no task templates."
 #: Failure reason recorded when no runnable revision of the skill is on disk.
 SKILL_NOT_READY_REASON = "The agent skill has no usable published revision."
 
-#: Failure reason recorded when the design session or its skill has vanished.
-MISSING_RECORD_REASON = "The workflow's design session or agent skill no longer exists."
+#: Failure reason recorded when the workflow or its skill has vanished.
+MISSING_RECORD_REASON = "The workflow or its agent skill no longer exists."
 
 #: Failure reason recorded for a crash with no more specific classification.
 UNEXPECTED_FAILURE_REASON = (
@@ -121,7 +121,6 @@ class WorkflowDesignService:
         self,
         workflows: WorkflowRepository,
         skills: AgentSkillRepository,
-        ds_repo: DesignSessionRepository,
         templates: WorkflowTaskTemplateRepository,
         versions: WorkflowPublishedVersionRepository,
         session_service: BaseSessionService,
@@ -133,7 +132,6 @@ class WorkflowDesignService:
         Args:
             workflows: Repository providing Workflow persistence.
             skills: Repository providing AgentSkill persistence.
-            ds_repo: Repository providing DesignSession persistence.
             templates: Repository providing WorkflowTaskTemplate persistence.
             versions: Repository storing the published-design snapshot written by
                 :meth:`publish`.
@@ -149,7 +147,6 @@ class WorkflowDesignService:
         """
         self._workflows = workflows
         self._skills = skills
-        self._ds_repo = ds_repo
         self._templates = templates
         self._versions = versions
         self._session_service = session_service
@@ -157,13 +154,14 @@ class WorkflowDesignService:
         self._summarize = summarize or summarize_design_transcript
 
     async def generate(self, skill_id: str, name: str, *, user_id: str) -> Workflow:
-        """Register a draft Workflow and its DesignSession for a skill.
+        """Register a draft Workflow, with its design session, for a skill.
 
-        Creates the workflow in ``generating`` status and a design session
-        pinned to the skill's current published revision, then returns; the
-        caller schedules :func:`generate_workflow_design` as a background job to
-        fill in the task templates. The prompt itself is not stored — it
-        becomes the design session's first chat message.
+        Creates the workflow in ``generating`` status, minting the id of the
+        design session it will be designed in and pinning it to the skill's
+        current published revision, then returns; the caller schedules
+        :func:`generate_workflow_design` as a background job to fill in the
+        task templates. The prompt itself is not stored — it becomes the design
+        session's first chat message.
 
         Args:
             skill_id: Identifier of the skill to generate a workflow from.
@@ -189,21 +187,17 @@ class WorkflowDesignService:
         commit_sha = skill.commit_sha
 
         workflow = await self._workflows.create(
-            WorkflowCreate(name=name, agent_skill_id=skill_id), user_id=user_id
+            WorkflowCreate(
+                name=name,
+                agent_skill_id=skill_id,
+                session_id=str(uuid.uuid4()),
+                agent_skill_commit_sha=commit_sha,
+            ),
+            user_id=user_id,
         )
         workflow_id = workflow.id
         await self._workflows.set_status(
             workflow_id, WorkflowStatus.generating, user_id=user_id
-        )
-        await self._ds_repo.create(
-            DesignSessionCreate(
-                session_id=str(uuid.uuid4()),
-                workflow_id=workflow_id,
-                agent_skill_id=skill_id,
-                agent_skill_commit_sha=commit_sha,
-                user_id=user_id or "user",
-            ),
-            user_id=user_id,
         )
         # Re-read after the last commit: each commit on the shared request
         # session expires loaded instances, and serializing an expired one
@@ -350,16 +344,16 @@ class WorkflowDesignService:
             workflow_id: Identifier of the workflow whose conversation to read.
 
         Returns:
-            The transcript, or an empty string when the workflow has no
-            design session or the ADK session does not exist.
+            The transcript, or an empty string when the workflow does not exist
+            or its design session's ADK session has not been created yet.
         """
-        ds = await self._ds_repo.get_by_workflow_id(workflow_id)
-        if ds is None:
+        workflow = await self._workflows.get(workflow_id)
+        if workflow is None:
             return ""
         session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, ds.tenant_id),
-            user_id=ds.user_id,
-            session_id=ds.session_id,
+            app_name=tenant_app_name(self._app_name, workflow.tenant_id),
+            user_id=workflow.created_by,
+            session_id=workflow.session_id,
         )
         if session is None:
             return ""
@@ -418,7 +412,6 @@ async def generate_workflow_design(
     from infrastructure import database
     from repositories import (
         SqlAgentSkillRepository,
-        SqlDesignSessionRepository,
         SqlMCPServerRepository,
         SqlNotificationRepository,
         SqlWorkflowRepository,
@@ -440,8 +433,8 @@ async def generate_workflow_design(
 
         Every failure path funnels through here, so the row and the bell stay
         in step. The notification is addressed to ``user_id`` rather than the
-        design session's owner because the session may be exactly what could
-        not be loaded; the two are the same person in practice.
+        workflow's ``created_by`` because the workflow row may be exactly what
+        could not be loaded; the two are the same person in practice.
 
         Args:
             reason: Summarized failure reason to store and show. Raw failure
@@ -480,40 +473,43 @@ async def generate_workflow_design(
     try:
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
             skills = SqlAgentSkillRepository(db, tenant_id=tenant_id)
-            ds = await SqlDesignSessionRepository(
-                db, tenant_id=tenant_id
-            ).get_by_workflow_id(workflow_id)
-            if ds is None:
-                raise NotFoundError("DesignSession", workflow_id)
-            skill = await skills.get(ds.agent_skill_id)
+            workflow = await SqlWorkflowRepository(db, skills, tenant_id=tenant_id).get(
+                workflow_id
+            )
+            if workflow is None:
+                raise NotFoundError("Workflow", workflow_id)
+            skill = await skills.get(workflow.agent_skill_id)
             if skill is None:
-                raise NotFoundError("AgentSkill", ds.agent_skill_id)
+                raise NotFoundError("AgentSkill", workflow.agent_skill_id)
+            # Capture before the session closes: the design session's ADK
+            # coordinates are read again after every commit below.
+            session_id = workflow.session_id
+            owner_id = workflow.created_by
+            commit_sha = workflow.agent_skill_commit_sha
 
-        skill_dir = skills_store.skill_dir(skill, ds.agent_skill_commit_sha)
+        skill_dir = skills_store.skill_dir(skill, commit_sha)
         if not skill_dir.exists():
             raise SkillNotReadyError(skill.id)
         scoped_app_name = tenant_app_name(app_name, tenant_id)
         agent = registry.get(
             skill.id,
-            ds.agent_skill_commit_sha,
+            commit_sha,
             skill_dir,
             tenant_id=tenant_id,
             kind=AgentKind.initial_design,
         )
 
         input_data = RunAgentInput(
-            thread_id=ds.session_id,
+            thread_id=session_id,
             run_id=str(uuid.uuid4()),
             state=None,
             messages=[UserMessage(id=str(uuid.uuid4()), role="user", content=prompt)],
             tools=[],
             context=[],
-            forwarded_props={USER_ID_PROP_KEY: ds.user_id},
+            forwarded_props={USER_ID_PROP_KEY: owner_id},
         )
         run_error: RunErrorEvent | None = None
-        async with advisory_lock(
-            agent_run_key(scoped_app_name, ds.user_id, ds.session_id)
-        ):
+        async with advisory_lock(agent_run_key(scoped_app_name, owner_id, session_id)):
             async for event in agent.run(input_data):
                 # ``ADKAgent`` never raises an LLM failure — it yields it as a
                 # ``RunErrorEvent`` and ends the stream normally. Keeping the
@@ -552,7 +548,7 @@ async def generate_workflow_design(
             return
 
         session = await session_service.get_session(
-            app_name=scoped_app_name, user_id=ds.user_id, session_id=ds.session_id
+            app_name=scoped_app_name, user_id=owner_id, session_id=session_id
         )
         transcript = build_design_transcript(session.events) if session else ""
         generated_description: str | None
@@ -582,7 +578,7 @@ async def generate_workflow_design(
             try:
                 await SqlNotificationRepository(db, tenant_id=tenant_id).create(
                     NotificationCreate(
-                        user_id=ds.user_id,
+                        user_id=owner_id,
                         type=NotificationType.workflow_draft_ready,
                         title="Workflow draft ready",
                         body="The initial task list has been generated. "

@@ -571,6 +571,8 @@ async def test_removal_keeps_a_referenced_demo_skill(
                 tenant_id=TENANT_ID,
                 name="Launch EC2",
                 agent_skill_id=DEMO_AGENT_SKILL_ID,
+                session_id="operator-workflow-design",
+                agent_skill_commit_sha="a" * 40,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )

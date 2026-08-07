@@ -16,11 +16,13 @@ const NEW_WORKFLOW = {
   name: "my-flow",
   description: null,
   agentSkillId: "skill-1",
+  sessionId: "design-session-id",
+  agentSkillCommitSha: "a".repeat(40),
   status: "generating",
   generationError: null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
-  createdBy: "",
+  createdBy: "user",
   updatedBy: "",
 };
 

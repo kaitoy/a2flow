@@ -49,16 +49,19 @@ keeping straight:
 | Term | What it is | Stored as |
 |---|---|---|
 | **Workflow** | A reusable, pre-designed unit of work: an agent skill plus the task templates generated for it. | `workflows` |
-| **Design session** | The chat in which a workflow's task templates are produced and refined. Exactly one per workflow, and it exists before any run does. | `design_sessions` |
+| **Design session** | The chat in which a workflow's task templates are produced and refined. Exactly one per workflow, and it exists before any run does. | No table of its own: it is the ADK session named by `Workflow.sessionId`, so its workflow's id identifies it. |
 | **Workflow execution** | One run of a workflow: the workflow and skill metadata snapshotted at run time, and the parent of the run's `WorkflowTask`s, `Approval`s, and message metadata. | `workflow_executions` |
 | **Workflow session** | The chat that one workflow execution happens in — the run-time counterpart of a design session. | No table of its own: it is the ADK session named by `WorkflowExecution.session_id`, so its execution's id identifies it. |
 
 So a design session designs a workflow, and a workflow session runs one. The
-asymmetry in storage is deliberate: a design session needs its own row because
-it outlives no run and precedes every one, while a workflow session exists
-one-to-one with its execution and needs no identity beyond it. That is why the
-chat lives at `/workflow-sessions/{executionId}` while the record it belongs to
-lives at `/admin/workflow-executions/{executionId}`.
+two are stored symmetrically: neither chat is an entity in its own right, so
+each is addressed by the record it belongs to — a design session by its
+workflow, a workflow session by its execution. That is why the chats live at
+`/design-sessions/{workflowId}` and `/workflow-sessions/{executionId}` while
+the records they belong to live at `/admin/workflows/{workflowId}` and
+`/admin/workflow-executions/{executionId}`. A design session's owner is its
+workflow's `createdBy` — the user who generated it — exactly as a workflow
+session's is its execution's `initiatorId`.
 
 ## Quick start
 
@@ -344,7 +347,7 @@ Each workflow record stores a name, a reference to an Agent Skill, a lifecycle *
 
 Submitting the dialog:
 
-1. Checks that the skill has a published revision (`commitSha`); otherwise HTTP 409 (`SKILL_NOT_READY`). The new workflow (`status: "generating"`) and its **DesignSession** — pinned to that revision — are registered immediately (HTTP 201), and the frontend navigates to the workflow's detail page, which polls while generation runs.
+1. Checks that the skill has a published revision (`commitSha`); otherwise HTTP 409 (`SKILL_NOT_READY`). The new workflow (`status: "generating"`) is registered immediately (HTTP 201), carrying the id of the **design session** it will be designed in and pinned to that revision, and the frontend navigates to the workflow's detail page, which polls while generation runs.
 2. A **background design run** sends the prompt as the design session's first chat message and drives an *initial-design* agent: following the skill, it breaks the request into steps and registers them as the workflow's **task templates** in one `register_design_tasks` call (a DAG — each step declares a `key` and its `depends_on` predecessors, plus optional MCP `tools` bindings).
 3. When the run finishes, the design conversation is summarized (one LLM call) into the workflow's `generatedDescription`, the status becomes **`draft`**, and a **workflow-draft-ready notification** deep-links back to the workflow. Any failure — an LLM error, or a run that registered no templates — lands on the row as **`failed`** with the reason and raises a **workflow-generation-failed notification**. The reason is shown on the workflow's detail page and as a banner in its design chat, which stays usable: writing the task templates from there (or from the admin template editor) recovers the workflow to **`draft`** and clears the failure, since rebuilding the design is what repairs it.
 
@@ -362,7 +365,7 @@ A `published` workflow becomes `modified` when the summary is rewritten, since a
 
 A draft's task templates can be refined in two ways, in any mix:
 
-- **By chat** — the workflow detail page's **Open design session** button opens `/design-sessions/{id}`: the same chat UI as a run, with the template list down the left edge, driven by an interactive *design* agent whose tools (`register_design_tasks`, `create_design_task`, `list_design_tasks`, `get_design_task`, `update_design_task`, `delete_design_task`) edit the workflow's templates directly. The design agent never executes anything. The design session is owner-only (plus Super Admins) and reuses the shared chat plumbing (history poll, A2UI surfaces).
+- **By chat** — the workflow detail page's **Open design session** button opens `/design-sessions/{workflowId}` (the chat has no id of its own, so it is addressed by its workflow): the same chat UI as a run, with the template list down the left edge, driven by an interactive *design* agent whose tools (`register_design_tasks`, `create_design_task`, `list_design_tasks`, `get_design_task`, `update_design_task`, `delete_design_task`) edit the workflow's templates directly. The design agent never executes anything. The design session is owner-only — its workflow's `createdBy`, plus Super Admins — and reuses the shared chat plumbing (history poll, A2UI surfaces).
 - **By hand** — the **Task Templates** admin pages (`/admin/workflows/{id}/task-templates`) offer the familiar Table / Graph views (the Graph stacks the templates in one vertical column in dependency order, each branching rightward into the MCP servers it binds tools from and then into the individual tools) plus a create form and a per-template detail page with **Depends on** and **MCP Tools** pickers, backed by `GET /workflows/{id}/task-templates` and the `POST`/`PATCH`/`DELETE /workflow-task-templates` endpoints (developer-gated).
 
 Templates mirror session tasks structurally — title, description, `position`, DAG edges (`workflow_task_template_dependencies`), and MCP tool bindings (`workflow_task_template_tool_bindings`, server side `RESTRICT`) — but carry **no status**: the lifecycle belongs to a run, not the design. The same DAG rules apply (same-workflow targets, cycles rejected with HTTP 409 `DEPENDENCY_CYCLE`).
@@ -412,7 +415,7 @@ Bound tools appear as chips in the **Tools** column of the Task Templates and Wo
 
 Both of those lists show **every** record instead of paginating, which lets the **Depends on** column work as a cross-reference: each dependency is named by its title, and hovering that chip highlights the depended-on task's own row. The design agent is held to terse imperative task titles — 2–4 words, 30 characters — so they read cleanly as chips; its task tools reject a longer one with a message telling it to move the detail into the description. (The limit binds the agent, not people: a title edited through the admin form is still allowed the full 200 characters.) A title that still overflows its chip is clipped and revealed in full on hover.
 
-Workflow executions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowExecution` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains). Deleting a workflow **does** delete its design session, task templates, and published version (cascade).
+Workflow executions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowExecution` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains). Deleting a workflow **does** delete its task templates and published version (cascade), and with the row goes the design session it named.
 
 The individual tasks of a run are persisted as `WorkflowTask` records. Each task carries a status (`pending` / `in_progress` / `completed` / `failed` / `skipped`) and an integer `position` for stable layout ordering. See [backend/README.md](backend/README.md#workflow-tasks) for the API reference. Deleting a `WorkflowExecution` cascades to its tasks.
 

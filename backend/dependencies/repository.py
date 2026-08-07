@@ -15,7 +15,6 @@ from repositories import (
     AgentSkillRepository,
     ApprovalRepository,
     AuthSessionRepository,
-    DesignSessionRepository,
     MCPServerRepository,
     MessageMetaRepository,
     NotificationRepository,
@@ -23,7 +22,6 @@ from repositories import (
     SqlAgentSkillRepository,
     SqlApprovalRepository,
     SqlAuthSessionRepository,
-    SqlDesignSessionRepository,
     SqlMCPServerRepository,
     SqlMessageMetaRepository,
     SqlNotificationRepository,
@@ -225,18 +223,6 @@ def get_workflow_task_template_repository(
 
 WorkflowTaskTemplateRepositoryDep = Annotated[
     WorkflowTaskTemplateRepository, Depends(get_workflow_task_template_repository)
-]
-
-
-def get_design_session_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
-) -> DesignSessionRepository:
-    """Create a DesignSessionRepository backed by the current database session."""
-    return SqlDesignSessionRepository(db, tenant_id=tenant_id)
-
-
-DesignSessionRepositoryDep = Annotated[
-    DesignSessionRepository, Depends(get_design_session_repository)
 ]
 
 

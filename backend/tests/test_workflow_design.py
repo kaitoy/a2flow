@@ -23,7 +23,6 @@ from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
-from models.design_session import DesignSession
 from models.notification import Notification, NotificationType
 from models.workflow import Workflow, WorkflowStatus
 from models.workflow_task_template import WorkflowTaskTemplate
@@ -60,7 +59,11 @@ async def engine(
 
 
 async def _seed(eng: AsyncEngine) -> tuple[str, str]:
-    """Insert a skill + generating workflow + design session; return (wf_id, session_id)."""
+    """Insert a skill + a generating workflow; return ``(wf_id, session_id)``.
+
+    The workflow's ``session_id`` is its design session — the chat the
+    background run posts the prompt into.
+    """
     async with AsyncSession(eng, expire_on_commit=False) as db:
         skill = AgentSkill(
             name="skill-a",
@@ -76,6 +79,8 @@ async def _seed(eng: AsyncEngine) -> tuple[str, str]:
         workflow = Workflow(
             name="wf-a",
             agent_skill_id=skill.id,
+            session_id="design-sess-1",
+            agent_skill_commit_sha=_SHA,
             status=WorkflowStatus.generating,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by="owner",
@@ -83,19 +88,7 @@ async def _seed(eng: AsyncEngine) -> tuple[str, str]:
         )
         db.add(workflow)
         await db.commit()
-        ds = DesignSession(
-            session_id="design-sess-1",
-            workflow_id=workflow.id,
-            agent_skill_id=skill.id,
-            agent_skill_commit_sha=_SHA,
-            user_id="owner",
-            tenant_id=DEFAULT_TEST_TENANT_ID,
-            created_by="owner",
-            updated_by="owner",
-        )
-        db.add(ds)
-        await db.commit()
-        return workflow.id, ds.session_id
+        return workflow.id, workflow.session_id
 
 
 async def _add_template(eng: AsyncEngine, workflow_id: str) -> None:
@@ -138,17 +131,17 @@ def _fakes(
         if run_registers:
             assert eng is not None
             async with AsyncSession(eng) as db:
-                ds = (
+                designed = (
                     await db.exec(
-                        select(DesignSession).where(
-                            DesignSession.session_id == input_data.thread_id
+                        select(Workflow).where(
+                            Workflow.session_id == input_data.thread_id
                         )
                     )
                 ).first()
-                assert ds is not None
+                assert designed is not None
                 db.add(
                     WorkflowTaskTemplate(
-                        workflow_id=ds.workflow_id,
+                        workflow_id=designed.id,
                         title="Generated step",
                         tenant_id=DEFAULT_TEST_TENANT_ID,
                         created_by="owner",

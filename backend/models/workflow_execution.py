@@ -6,9 +6,10 @@ and MessageMeta rows the run produces.
 
 The chat the run happens in is its **workflow session** — the ADK session named
 by :attr:`WorkflowExecutionCreate.session_id`. It is the run-time counterpart of
-:class:`models.design_session.DesignSession`, the chat a workflow is designed
-in. Unlike a design session it has no table of its own: it exists one-to-one
-with its execution, so the execution's id identifies it.
+a *design session*, the chat a workflow is designed in
+(:class:`models.workflow.Workflow`). Neither has a table of its own: a workflow
+session exists one-to-one with its execution, so the execution's id identifies
+it, exactly as a workflow's id identifies its design session.
 """
 
 from sqlalchemy import ForeignKeyConstraint, Index

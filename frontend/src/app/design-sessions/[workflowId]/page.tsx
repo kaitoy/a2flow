@@ -1,4 +1,12 @@
-/** @module DesignSessionPage — Loads a DesignSession and renders the design chat. */
+/**
+ * @module DesignSessionPage — the design session: the LLM chat a workflow's task
+ * templates are produced and refined in, the design-time counterpart of the
+ * workflow session.
+ *
+ * A design session has no record of its own; it exists one-to-one with its
+ * Workflow, so the `[workflowId]` route segment identifies it and the page
+ * loads that workflow to render the chat.
+ */
 "use client";
 
 import { AlertTriangle } from "lucide-react";
@@ -20,9 +28,7 @@ import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import {
-  type DesignSession,
   generateWorkflowDescription,
-  getDesignSession,
   getWorkflow,
   listWorkflowTaskTemplates,
   type Workflow,
@@ -55,11 +61,9 @@ const WORKFLOW_POLL_INTERVAL_MS = 2_000;
  * recorded on the workflow itself, polled while generation is in flight.
  */
 function DesignSessionView({
-  ds,
   workflow,
   onWorkflowUpdate,
 }: {
-  ds: DesignSession;
   workflow: Workflow;
   onWorkflowUpdate: (wf: Workflow) => void;
 }) {
@@ -76,26 +80,28 @@ function DesignSessionView({
     sendMessage,
     sendA2uiAction,
     sendApprovalResult,
-  } = useWorkflowSessionChat(ds.id, ds.sessionId, null, ds.userId, "design");
+  } = useWorkflowSessionChat(workflow.id, workflow.sessionId, null, workflow.createdBy, "design");
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [timelineDrawerOpen, setTimelineDrawerOpen] = useState(false);
   const [templates, setTemplates] = useState<WorkflowTaskTemplate[]>([]);
 
+  const workflowId = workflow.id;
+
   const refreshTemplates = useCallback(async () => {
     try {
-      setTemplates(await listWorkflowTaskTemplates(ds.workflowId));
+      setTemplates(await listWorkflowTaskTemplates(workflowId));
     } catch (err) {
       logger.error(err, "failed to load task templates");
     }
-  }, [ds.workflowId]);
+  }, [workflowId]);
 
   const refreshWorkflow = useCallback(async () => {
     try {
-      onWorkflowUpdate(await getWorkflow(ds.workflowId));
+      onWorkflowUpdate(await getWorkflow(workflowId));
     } catch (err) {
       logger.error(err, "failed to load workflow");
     }
-  }, [ds.workflowId, onWorkflowUpdate]);
+  }, [workflowId, onWorkflowUpdate]);
 
   // Load on mount and re-fetch whenever an agent turn finishes (the design
   // agent edits the templates through its tools), plus a slow interval so
@@ -247,7 +253,7 @@ function DesignSessionView({
   );
 }
 
-/** Full-screen error state shown when the DesignSession record fails to load, with a retry action. */
+/** Full-screen error state shown when the workflow fails to load, with a retry action. */
 function DesignSessionLoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex h-dvh flex-col items-center justify-center gap-4">
@@ -265,13 +271,12 @@ function DesignSessionLoadError({ onRetry }: { onRetry: () => void }) {
 }
 
 /**
- * Page shell: loads the DesignSession record and its workflow, then renders
+ * Page shell: loads the workflow the design session belongs to, then renders
  * the design chat (or a skeleton / retryable error state).
  */
 export default function DesignSessionPage() {
-  const params = useParams<{ designSessionId: string }>();
-  const designSessionId = params.designSessionId;
-  const [designSession, setDesignSession] = useState<DesignSession | null>(null);
+  const params = useParams<{ workflowId: string }>();
+  const workflowId = params.workflowId;
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -279,24 +284,20 @@ export default function DesignSessionPage() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: retryCount is a bump counter that re-triggers the fetch, not a data dependency
   useEffect(() => {
     setLoadFailed(false);
-    getDesignSession(designSessionId)
-      .then(async (ds) => {
-        const wf = await getWorkflow(ds.workflowId);
-        setDesignSession(ds);
-        setWorkflow(wf);
-      })
+    getWorkflow(workflowId)
+      .then(setWorkflow)
       .catch((err: unknown) => {
         logger.error(err, "failed to load design session");
         setLoadFailed(true);
       });
-  }, [designSessionId, retryCount]);
+  }, [workflowId, retryCount]);
 
   const retry = useCallback(() => setRetryCount((c) => c + 1), []);
 
   return (
     <AuthProvider>
-      {designSession && workflow ? (
-        <DesignSessionView ds={designSession} workflow={workflow} onWorkflowUpdate={setWorkflow} />
+      {workflow ? (
+        <DesignSessionView workflow={workflow} onWorkflowUpdate={setWorkflow} />
       ) : loadFailed ? (
         <DesignSessionLoadError onRetry={retry} />
       ) : (

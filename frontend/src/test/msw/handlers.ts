@@ -52,12 +52,14 @@ const WORKFLOW_1 = {
   description: null,
   generatedDescription: null,
   agentSkillId: "skill-1",
+  sessionId: "design-session-id",
+  agentSkillCommitSha: "a".repeat(40),
   status: "published",
   generationError: null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
-  createdBy: "",
-  updatedBy: "",
+  createdBy: "user",
+  updatedBy: "user",
 };
 
 const WORKFLOW_EXECUTION_1 = {
@@ -73,20 +75,6 @@ const WORKFLOW_EXECUTION_1 = {
   agentSkillRepoPath: "",
   skillDir: "/tmp/skill",
   initiatorId: "user",
-  createdAt: "2026-01-01T00:00:00Z",
-  updatedAt: "2026-01-01T00:00:00Z",
-  createdBy: "",
-  updatedBy: "",
-};
-
-const DESIGN_SESSION_1 = {
-  id: "ds-1",
-  tenantId: "tenant-1",
-  sessionId: "design-session-id",
-  workflowId: "wf-1",
-  agentSkillId: "skill-1",
-  agentSkillCommitSha: "a".repeat(40),
-  userId: "user",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -296,8 +284,6 @@ export const handlers = [
     envelope({ ...WORKFLOW_1, status: "draft" })
   ),
 
-  http.get(`${BASE}/api/v1/workflows/:id/design-session`, () => envelope(DESIGN_SESSION_1)),
-
   http.get(`${BASE}/api/v1/workflows/:id/task-templates`, () =>
     envelope([WORKFLOW_TASK_TEMPLATE_1])
   ),
@@ -316,9 +302,7 @@ export const handlers = [
 
   http.delete(`${BASE}/api/v1/workflow-task-templates/:templateId`, () => envelope(null)),
 
-  http.get(`${BASE}/api/v1/design-sessions/:dsId`, () => envelope(DESIGN_SESSION_1)),
-
-  http.get(`${BASE}/api/v1/design-sessions/:dsId/messages`, () => envelope([])),
+  http.get(`${BASE}/api/v1/workflows/:id/messages`, () => envelope([])),
 
   http.post(`${BASE}/api/v1/workflows/:id/execute`, () => envelope(WORKFLOW_EXECUTION_1, 201)),
 

@@ -81,11 +81,13 @@ describe("WorkflowDetailPage", () => {
           name: "my-workflow",
           description: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "generating",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -108,11 +110,13 @@ describe("WorkflowDetailPage", () => {
           name: "my-workflow",
           description: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "draft",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       ),
@@ -125,11 +129,13 @@ describe("WorkflowDetailPage", () => {
           name: "my-workflow",
           description: "Summarized",
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "published",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         });
       })
@@ -184,11 +190,13 @@ describe("WorkflowDetailPage", () => {
         name: "my-workflow",
         description: "Summarized",
         agentSkillId: "skill-1",
+        sessionId: "design-session-id",
+        agentSkillCommitSha: "a".repeat(40),
         status: "published",
         generationError: null,
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
-        createdBy: "",
+        createdBy: "user",
         updatedBy: "",
       })
     );
@@ -201,11 +209,13 @@ describe("WorkflowDetailPage", () => {
           name: "my-workflow",
           description: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "draft",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       ),
@@ -229,11 +239,13 @@ describe("WorkflowDetailPage", () => {
           name: "my-workflow",
           description: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "draft",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       ),
@@ -268,7 +280,7 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />);
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /open design session/i }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/design-sessions/ds-1"));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/design-sessions/wf-1"));
   });
 
   it("hides the Run action from a viewer without the requester or developer role", async () => {
@@ -323,11 +335,13 @@ describe("WorkflowDetailPage", () => {
           name: "my-workflow",
           description: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "draft",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -347,11 +361,13 @@ describe("WorkflowDetailPage", () => {
           name: "my-workflow",
           description: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "draft",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -373,11 +389,13 @@ describe("WorkflowDetailPage", () => {
           name: "Renamed",
           description: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "published",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         });
       })
@@ -403,11 +421,13 @@ describe("WorkflowDetailPage", () => {
           description: null,
           generatedDescription: "AI summary of the design",
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "published",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -430,11 +450,13 @@ describe("WorkflowDetailPage", () => {
           description: null,
           generatedDescription: "AI summary of the design",
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "published",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -457,11 +479,13 @@ describe("WorkflowDetailPage", () => {
           description: null,
           generatedDescription: "AI summary",
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "published",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       ),
@@ -473,11 +497,13 @@ describe("WorkflowDetailPage", () => {
           description: null,
           generatedDescription: "Edited by admin",
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "published",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         });
       })
@@ -509,11 +535,13 @@ describe("WorkflowDetailPage", () => {
         description: null,
         generatedDescription: "A freshly generated summary",
         agentSkillId: "skill-1",
+        sessionId: "design-session-id",
+        agentSkillCommitSha: "a".repeat(40),
         status: "modified",
         generationError: null,
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
-        createdBy: "",
+        createdBy: "user",
         updatedBy: "",
       })
     );
@@ -551,11 +579,13 @@ describe("WorkflowDetailPage", () => {
           description: null,
           generatedDescription: "A freshly generated summary",
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "modified",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         });
       })
@@ -615,11 +645,13 @@ describe("WorkflowDetailPage", () => {
           description: null,
           generatedDescription: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "generating",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -648,11 +680,13 @@ describe("WorkflowDetailPage", () => {
           description: "Collects the weekly sales report.",
           generatedDescription: "Collects the monthly sales report.",
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "published",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -682,11 +716,13 @@ describe("WorkflowDetailPage", () => {
           description: null,
           generatedDescription: "Runs monthly.",
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "published",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -725,11 +761,13 @@ describe("WorkflowDetailPage", () => {
           name: "my-workflow",
           description: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "modified",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -741,11 +779,13 @@ describe("WorkflowDetailPage", () => {
         name: "my-workflow",
         description: null,
         agentSkillId: "skill-1",
+        sessionId: "design-session-id",
+        agentSkillCommitSha: "a".repeat(40),
         status: "published",
         generationError: null,
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
-        createdBy: "",
+        createdBy: "user",
         updatedBy: "",
       })
     );
@@ -793,11 +833,13 @@ describe("WorkflowDetailPage", () => {
           name: "my-workflow",
           description: null,
           agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
           status: "draft",
           generationError: null,
           createdAt: "2026-01-01T00:00:00Z",
           updatedAt: "2026-01-01T00:00:00Z",
-          createdBy: "",
+          createdBy: "user",
           updatedBy: "",
         })
       )
@@ -817,11 +859,13 @@ describe("WorkflowDetailPage", () => {
         name: "my-workflow",
         description: null,
         agentSkillId: "skill-1",
+        sessionId: "design-session-id",
+        agentSkillCommitSha: "a".repeat(40),
         status: "draft",
         generationError: null,
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
-        createdBy: "",
+        createdBy: "user",
         updatedBy: "",
       })
     );

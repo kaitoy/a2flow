@@ -5,7 +5,8 @@ workflow and skill it started against, plus the WorkflowTasks it works through.
 The *workflow session* is the LLM chat that run happens in — the ADK session
 named by ``WorkflowExecution.session_id``. It has no table of its own, so it is
 identified by its execution and served from this router's ``/messages`` and
-``/agent`` sub-resources, mirroring ``routers/design_sessions.py``.
+``/agent`` sub-resources — the same pair ``routers/workflows.py`` uses to serve
+a workflow's design session, the design-time counterpart.
 """
 
 from collections.abc import AsyncGenerator

@@ -1,7 +1,6 @@
 from .agent_skill import AgentSkillRepository, SqlAgentSkillRepository
 from .approval import ApprovalRepository, SqlApprovalRepository
 from .auth_session import AuthSessionRepository, SqlAuthSessionRepository
-from .design_session import DesignSessionRepository, SqlDesignSessionRepository
 from .exceptions import (
     CsrfError,
     ForeignKeyViolationError,
@@ -50,7 +49,6 @@ __all__ = [
     "MessageMetaRepository",
     "NotFoundError",
     "NotificationRepository",
-    "DesignSessionRepository",
     "ReferencedError",
     "RepositoryError",
     "SecretRepository",
@@ -61,7 +59,6 @@ __all__ = [
     "SqlMCPServerRepository",
     "SqlMessageMetaRepository",
     "SqlNotificationRepository",
-    "SqlDesignSessionRepository",
     "SqlSecretRepository",
     "SqlTenantRepository",
     "SqlUserAvatarRepository",

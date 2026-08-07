@@ -1,16 +1,20 @@
-"""One-shot LLM summarization of a workflow's design conversation.
+"""Rendering and one-shot LLM summarization of a workflow's design conversation.
 
 Used by the workflow generation job and by ``POST
 /workflows/{id}/generate-description`` to distill a design session's
 transcript into the workflow's ``generated_description``, which is later handed
-to the execution agent as context. Reuses the application's model
-selection (``config.Settings.llm_model`` via
+to the execution agent as context. :func:`build_design_transcript` turns the
+ADK session's raw events into that transcript;
+:func:`summarize_design_transcript` summarizes it. The latter reuses the
+application's model selection (``config.Settings.llm_model`` via
 :func:`infrastructure.agent.resolve_model`) so the summarizer always runs on
 the same LLM as the agents.
 """
 
 import logging
 
+from ag_ui_adk import adk_events_to_messages
+from google.adk.events import Event
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.models.llm_request import LlmRequest
@@ -20,6 +24,33 @@ from google.genai import types
 from infrastructure.agent import resolve_model
 
 logger = logging.getLogger(__name__)
+
+
+def build_design_transcript(events: list[Event]) -> str:
+    """Render a design session's ADK events as a plain-text transcript.
+
+    Keeps only plain-text ``user`` and ``assistant`` turns (tool calls and
+    their results are noise for summarization) and prefixes each line with its
+    speaker.
+
+    Args:
+        events: The ADK session's events, oldest first.
+
+    Returns:
+        The transcript, one ``Speaker: text`` paragraph per message.
+    """
+    lines: list[str] = []
+    for message in adk_events_to_messages(events):
+        data = message.model_dump(mode="json", by_alias=True)
+        role = data.get("role")
+        content = data.get("content")
+        if role not in ("user", "assistant") or not isinstance(content, str):
+            continue
+        text = content.strip()
+        if text:
+            lines.append(f"{role.capitalize()}: {text}")
+    return "\n\n".join(lines)
+
 
 #: Hard cap on the transcript text handed to the LLM, so an arbitrarily long
 #: design conversation cannot blow the request up; the head carries the

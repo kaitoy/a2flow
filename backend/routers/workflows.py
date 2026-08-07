@@ -1,21 +1,35 @@
-"""Endpoints for Workflow resources: reads, updates, publication, deactivation, and execution.
+"""Endpoints for Workflow resources and for their design sessions.
 
 Workflows are not created here — they are born from
 ``POST /agent-skills/{skill_id}/workflows`` ("Generate workflow", see
 ``routers/agent_skills.py``), which registers a draft and generates its task
 templates in the background. This router covers everything after that:
-inspecting a workflow and its templates, editing name/description, opening its
-design session, publishing it, deactivating it back to draft, and executing
-it.
+inspecting a workflow and its templates, editing name/description, publishing
+it, deactivating it back to draft, and executing it.
+
+The *design session* is the LLM chat a workflow's task templates are produced
+and refined in — the ADK session named by ``Workflow.session_id``. It has no
+table of its own, so it is identified by its workflow and served from this
+router's ``/messages`` and ``/agent`` sub-resources, mirroring
+``routers/workflow_executions.py``. Only the session owner
+(``Workflow.created_by``) and super admins may use it — design has no approver
+sharing, so there is no sender-attribution bookkeeping either.
 """
 
-from fastapi import APIRouter, Depends
+from collections.abc import AsyncGenerator
+from contextlib import AsyncExitStack
+from typing import Any
+
+from ag_ui.core import RunAgentInput, SystemMessage
+from ag_ui.encoder import EventEncoder
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 
 from dependencies import (
+    APP_NAME,
     ApiMetaDep,
     CurrentUserDep,
     CurrentUserIdDep,
-    DesignSessionServiceDep,
     FilterDep,
     PaginationDep,
     SortDep,
@@ -24,12 +38,14 @@ from dependencies import (
     WorkflowTaskTemplateServiceDep,
     require_roles,
 )
-from models.design_session import DesignSession
+from infrastructure.agent import tenant_app_name, with_user_id
+from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
 from models.response import ApiResponse
 from models.user import Role
 from models.workflow import Workflow, WorkflowUpdate
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task_template import WorkflowTaskTemplateRead
+from repositories.exceptions import SessionRunInProgressError
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -98,22 +114,78 @@ async def list_workflow_task_templates(
     return ApiResponse(meta=meta, data=items)
 
 
-@router.get(
-    "/{workflow_id}/design-session",
-    response_model=ApiResponse[DesignSession],
-)
-async def get_workflow_design_session(
+@router.get("/{workflow_id}/messages", response_model=ApiResponse[list[dict[str, Any]]])
+async def get_design_session_messages(
     workflow_id: str,
-    service: DesignSessionServiceDep,
+    service: WorkflowServiceDep,
+    caller: CurrentUserDep,
     meta: ApiMetaDep,
-) -> ApiResponse[DesignSession]:
-    """Return the design session of the given Workflow.
+) -> ApiResponse[list[dict[str, Any]]]:
+    """Return the chat history of a Workflow's design session.
 
-    Every generated workflow has exactly one; raises HTTP 404 when the
-    workflow (or its session) does not exist.
+    Restricted to the session owner (the workflow's ``createdBy``) and super
+    admins. Returns an empty list when the ADK session has not been created yet
+    (the background generation run has not started). Raises HTTP 404 if the
+    workflow does not exist.
     """
-    ds = await service.get_for_workflow(workflow_id)
-    return ApiResponse(meta=meta, data=ds)
+    messages = await service.get_messages(workflow_id, caller=caller)
+    return ApiResponse(meta=meta, data=messages)
+
+
+@router.post("/{workflow_id}/agent", include_in_schema=False)
+async def design_session_agent(
+    workflow_id: str,
+    input_data: RunAgentInput,
+    request: Request,
+    service: WorkflowServiceDep,
+    caller: CurrentUserDep,
+) -> StreamingResponse:
+    """Stream AG-UI events from the agent driving a Workflow's design session.
+
+    Restricted to the session owner and super admins. The skill directory is
+    resolved from the Workflow record (pinned revision) and the agent runs with
+    the interactive design instruction and toolset, editing the workflow's task
+    templates. SystemMessages are stripped to prevent prompt injection, and the
+    run is keyed by the session owner so a super admin continuing the chat
+    shares the same ADK session.
+
+    The run is serialized per ADK session by the same cross-process lock the
+    workflow-execution endpoint uses; it also excludes the background generation
+    run, so reopening the chat while generation is still in flight surfaces as
+    HTTP 409 instead of corrupting the session.
+    """
+    adk_agent, workflow = await service.resolve_agent(workflow_id, caller=caller)
+
+    filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
+    input_data = input_data.model_copy(update={"messages": filtered})
+    input_data = with_user_id(input_data, workflow.created_by)
+    encoder = EventEncoder(accept=request.headers.get("accept") or "")
+
+    async with AsyncExitStack() as stack:
+        try:
+            await stack.enter_async_context(
+                advisory_lock(
+                    agent_run_key(
+                        tenant_app_name(APP_NAME, workflow.tenant_id),
+                        workflow.created_by,
+                        input_data.thread_id,
+                    )
+                )
+            )
+        except LockNotAcquiredError as exc:
+            raise SessionRunInProgressError(input_data.thread_id) from exc
+        run_stack = stack.pop_all()
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        async with run_stack:
+            async for event in adk_agent.run(input_data):
+                yield encoder.encode(event)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type=encoder.get_content_type(),
+        headers={"X-Accel-Buffering": "no"},
+    )
 
 
 @router.patch(

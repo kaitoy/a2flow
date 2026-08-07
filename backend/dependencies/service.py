@@ -14,7 +14,6 @@ from infrastructure.secret_resolver import SecretResolver
 from services import (
     AgentSkillService,
     ApprovalService,
-    DesignSessionService,
     MCPRegistryService,
     MCPServerService,
     NotificationService,
@@ -36,7 +35,6 @@ from .context import APP_NAME
 from .repository import (
     AgentSkillRepositoryDep,
     ApprovalRepositoryDep,
-    DesignSessionRepositoryDep,
     MCPServerRepositoryDep,
     MessageMetaRepositoryDep,
     NotificationRepositoryDep,
@@ -173,10 +171,27 @@ def get_workflow_service(
     templates: WorkflowTaskTemplateRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     versions: WorkflowPublishedVersionRepositoryDep,
+    skills_store: SkillManagerDep,
+    registry: AgentRegistryDep,
+    session_service: SessionServiceDep,
 ) -> WorkflowService:
-    """Create a WorkflowService wiring the repositories it orchestrates."""
+    """Create a WorkflowService wiring its repositories, skill store, agent registry, and session store.
+
+    The last four collaborators serve the workflow's design session: the store
+    and registry resolve the design agent, and the session store holds its chat
+    history.
+    """
     return WorkflowService(
-        workflows, skills, execution_repo, templates, tasks, versions
+        workflows,
+        skills,
+        execution_repo,
+        templates,
+        tasks,
+        versions,
+        skills_store,
+        registry,
+        session_service,
+        APP_NAME,
     )
 
 
@@ -186,14 +201,13 @@ WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
 def get_workflow_design_service(
     workflows: WorkflowRepositoryDep,
     skills: AgentSkillRepositoryDep,
-    ds_repo: DesignSessionRepositoryDep,
     templates: WorkflowTaskTemplateRepositoryDep,
     versions: WorkflowPublishedVersionRepositoryDep,
     session_service: SessionServiceDep,
 ) -> WorkflowDesignService:
     """Create a WorkflowDesignService wiring the repositories and the session store."""
     return WorkflowDesignService(
-        workflows, skills, ds_repo, templates, versions, session_service, APP_NAME
+        workflows, skills, templates, versions, session_service, APP_NAME
     )
 
 
@@ -236,24 +250,6 @@ def get_workflow_generation_job(
 
 WorkflowGenerationJobDep = Annotated[
     WorkflowGenerationJob, Depends(get_workflow_generation_job)
-]
-
-
-def get_design_session_service(
-    ds_repo: DesignSessionRepositoryDep,
-    skills: AgentSkillRepositoryDep,
-    skills_store: SkillManagerDep,
-    registry: AgentRegistryDep,
-    session_service: SessionServiceDep,
-) -> DesignSessionService:
-    """Create a DesignSessionService wiring the repositories, skill store, agent registry, and session store."""
-    return DesignSessionService(
-        ds_repo, skills, skills_store, registry, session_service, APP_NAME
-    )
-
-
-DesignSessionServiceDep = Annotated[
-    DesignSessionService, Depends(get_design_session_service)
 ]
 
 

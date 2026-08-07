@@ -23,7 +23,6 @@ from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnec
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
-from models.design_session import DesignSession
 from models.mcp_server import MCPServer, McpTransport
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
@@ -44,11 +43,14 @@ async def _seed_design_session(
     session_id: str = "design-abc",
     tenant_id: str = DEFAULT_TEST_TENANT_ID,
 ) -> str:
-    """Insert a skill + workflow + DesignSession chain; return the workflow PK.
+    """Insert a skill + workflow whose design session is ``session_id``.
 
-    Workflow generation and the design chat run against a
-    DesignSession rather than a WorkflowExecution, so this is what the tools see
+    Workflow generation and the design chat run against a Workflow's design
+    session rather than a WorkflowExecution, so this is what the tools see
     during the whole design phase.
+
+    Returns:
+        The workflow's primary key.
     """
     async with AsyncSession(eng) as db:
         skill = AgentSkill(
@@ -67,6 +69,8 @@ async def _seed_design_session(
         workflow = Workflow(
             name=f"wf-{session_id}",
             agent_skill_id=skill_id,
+            session_id=session_id,
+            agent_skill_commit_sha="a" * 40,
             tenant_id=tenant_id,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
@@ -74,22 +78,7 @@ async def _seed_design_session(
         db.add(workflow)
         await db.commit()
         await db.refresh(workflow)
-        workflow_id = workflow.id
-
-        db.add(
-            DesignSession(
-                session_id=session_id,
-                workflow_id=workflow_id,
-                agent_skill_id=skill_id,
-                agent_skill_commit_sha="a" * 40,
-                user_id=SYSTEM_USER_ID,
-                tenant_id=tenant_id,
-                created_by=SYSTEM_USER_ID,
-                updated_by=SYSTEM_USER_ID,
-            )
-        )
-        await db.commit()
-        return workflow_id
+        return workflow.id
 
 
 @pytest_asyncio.fixture()
@@ -445,7 +434,7 @@ async def test_list_mcp_tools_works_in_a_design_session(
 ) -> None:
     """The design agents must see the registry: that is where tools get bound.
 
-    Their ADK session is keyed on a DesignSession, not a WorkflowExecution, so
+    Their ADK session is keyed on a Workflow, not a WorkflowExecution, so
     resolving the run through WorkflowExecution alone silently left every
     generated task templates without tool bindings.
     """

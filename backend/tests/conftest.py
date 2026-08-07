@@ -331,9 +331,6 @@ async def _workflow_client_env(
     from models.agent_skill import (
         AgentSkill as _AgentSkill,  # noqa: F401 — registers model
     )
-    from models.design_session import (
-        DesignSession as _DesignSession,  # noqa: F401 — registers model
-    )
     from models.workflow import Workflow as _Workflow  # noqa: F401 — registers model
     from models.workflow_execution import (
         WorkflowExecution as _WorkflowExecution,  # noqa: F401 — registers model

@@ -52,10 +52,8 @@ def _service(
     sessions = MagicMock()
     sessions.commit_shas_for_skill = AsyncMock(return_value=pinned or set())
 
-    design_sessions = MagicMock()
-    design_sessions.commit_shas_for_skill = AsyncMock(
-        return_value=design_pinned or set()
-    )
+    workflows = MagicMock()
+    workflows.commit_shas_for_skill = AsyncMock(return_value=design_pinned or set())
 
     resolver = MagicMock()
     resolver.resolve_ref = resolve or AsyncMock(return_value="tok-123")
@@ -64,7 +62,7 @@ def _service(
     store.clone = clone or AsyncMock(return_value=_SHA)
     store.prune = AsyncMock()
 
-    service = AgentSkillSyncService(skills, sessions, design_sessions, resolver, store)
+    service = AgentSkillSyncService(skills, sessions, workflows, resolver, store)
     return service, skills, store
 
 
@@ -92,7 +90,7 @@ async def test_successful_clone_prunes_revisions_no_session_still_needs() -> Non
 
 
 async def test_successful_clone_prunes_spare_design_session_pins() -> None:
-    """Pruning must also spare the revisions design sessions are pinned to."""
+    """Pruning must also spare the revisions workflows' design sessions pin."""
     design_sha = "c" * 40
     service, _skills, store = _service(
         _skill(), pinned={_OLD_SHA}, design_pinned={design_sha}

@@ -18,7 +18,6 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
-from models.design_session import DesignSession
 from models.workflow import Workflow
 from models.workflow_execution import WorkflowExecution
 
@@ -40,13 +39,13 @@ async def resolve_workflow_execution_tenant(
     return (row[0], row[1]) if row is not None else None
 
 
-async def resolve_design_session_tenant(
+async def resolve_workflow_design_tenant(
     db: AsyncSession, session_id: str
 ) -> tuple[str, str] | None:
-    """Return ``(workflow_id, tenant_id)`` for an ADK session id, or ``None``."""
+    """Return ``(workflow_id, tenant_id)`` for a design session's ADK id, or ``None``."""
     stmt = (
-        select(DesignSession.workflow_id, DesignSession.tenant_id)
-        .where(col(DesignSession.session_id) == session_id)
+        select(Workflow.id, Workflow.tenant_id)
+        .where(col(Workflow.session_id) == session_id)
         .limit(1)
     )
     row = (await db.exec(stmt)).first()
@@ -59,9 +58,9 @@ async def resolve_agent_run_tenant(db: AsyncSession, session_id: str) -> str | N
     Agent tools that only need the tenant -- not the WorkflowExecution primary key
     -- must accept both kinds of run: an execution run keys its ADK session on a
     :class:`models.workflow_execution.WorkflowExecution`, while workflow generation
-    and the design chat keys theirs on a
-    :class:`models.design_session.DesignSession`. Resolving through only one
-    of the two makes the tool fail outright in the other phase.
+    and the design chat key theirs on the design session of a
+    :class:`models.workflow.Workflow`. Resolving through only one of the two
+    makes the tool fail outright in the other phase.
 
     Use this for tenant-only tools such as
     :func:`infrastructure.mcp_tools.list_mcp_tools`. Tools that enforce
@@ -75,12 +74,12 @@ async def resolve_agent_run_tenant(db: AsyncSession, session_id: str) -> str | N
 
     Returns:
         The owning tenant_id, or ``None`` when the id matches neither a
-        WorkflowExecution nor a DesignSession.
+        WorkflowExecution nor a Workflow.
     """
     resolved = await resolve_workflow_execution_tenant(db, session_id)
     if resolved is not None:
         return resolved[1]
-    design = await resolve_design_session_tenant(db, session_id)
+    design = await resolve_workflow_design_tenant(db, session_id)
     return design[1] if design is not None else None
 
 
