@@ -88,12 +88,12 @@ describe("WorkflowSessionPage", () => {
     const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByRole("link", { name: "My Workflow" })).toHaveAttribute(
       "href",
-      "/admin/workflows/wf-1"
+      "/admin/workflow-sessions/ws-1"
     );
     expect(within(nav).getByText("Session")).toHaveAttribute("aria-current", "page");
   });
 
-  it("falls back to a plain-text crumb when the session has no linked workflow", async () => {
+  it("keeps the workflow-session crumb linked even when the parent workflow design has been deleted", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflow-sessions/:id", () =>
         envelope({ ...WORKFLOW_SESSION_1, workflowId: null })
@@ -101,7 +101,9 @@ describe("WorkflowSessionPage", () => {
     );
     render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
     const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
-    expect(within(nav).getByText("My Workflow")).toBeInTheDocument();
-    expect(within(nav).queryByRole("link", { name: "My Workflow" })).not.toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "My Workflow" })).toHaveAttribute(
+      "href",
+      "/admin/workflow-sessions/ws-1"
+    );
   });
 });

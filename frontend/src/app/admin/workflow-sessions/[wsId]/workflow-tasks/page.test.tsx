@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -22,6 +22,13 @@ describe("WorkflowTasksPage", () => {
   it("renders task row after load", async () => {
     render(<WorkflowTasksPage />);
     await waitFor(() => expect(screen.getByText("Step 1")).toBeInTheDocument());
+  });
+
+  it("adds a breadcrumb crumb linking back to the workflow session's admin record", async () => {
+    render(<WorkflowTasksPage />);
+    const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    const link = await within(nav).findByRole("link", { name: "My Workflow" });
+    expect(link).toHaveAttribute("href", "/admin/workflow-sessions/ws-1");
   });
 
   it("renders the task title as plain text (the run's task list is read-only)", async () => {

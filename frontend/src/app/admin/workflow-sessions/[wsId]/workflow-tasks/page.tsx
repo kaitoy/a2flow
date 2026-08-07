@@ -15,6 +15,7 @@ import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import {
   type FilterSpec,
+  getWorkflowSession,
   listMcpServers,
   listWorkflowTasks,
   type SortSpec,
@@ -160,6 +161,9 @@ export default function WorkflowTasksPage() {
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
   // The task a hovered "Depends on" chip points at, called out in the table.
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  // The parent WorkflowSession's workflow name, shown as a breadcrumb crumb
+  // linking back to the session's own admin record.
+  const [workflowName, setWorkflowName] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -190,6 +194,15 @@ export default function WorkflowTasksPage() {
       });
   }, []);
 
+  useEffect(() => {
+    getWorkflowSession(wsId)
+      .then((s) => setWorkflowName(s.workflowName))
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; the breadcrumb crumb
+        // simply stays as an ellipsis.
+      });
+  }, [wsId]);
+
   const columns = buildColumns(
     // Unpaginated, so every dependency resolves to a real title.
     new Map(tasks.map((t) => [t.id, t.title])),
@@ -207,6 +220,9 @@ export default function WorkflowTasksPage() {
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
+          // Links back to this run's own admin record; an ellipsis stands in
+          // until its workflow name has loaded.
+          { label: workflowName || "…", href: `/admin/workflow-sessions/${wsId}` },
           { label: "Workflow Tasks" },
         ]}
       />

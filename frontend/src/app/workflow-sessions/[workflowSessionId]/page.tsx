@@ -29,6 +29,7 @@ import { EXECUTION_KICKOFF_PROMPT } from "@/lib/workflowKickoff";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
+/** Renders the chat UI for an already-loaded WorkflowSession, including the task timeline and message list. */
 function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((s) => s.auth.user);
@@ -169,13 +170,11 @@ function WorkflowSessionView({ ws }: { ws: WorkflowSession }) {
           <Breadcrumbs
             items={[
               { label: "Admin", href: "/admin" },
-              { label: "Workflows", href: "/admin/workflows" },
-              {
-                label: ws.workflowName,
-                href: ws.workflowId
-                  ? `/admin/workflows/${encodeURIComponent(ws.workflowId)}`
-                  : undefined,
-              },
+              { label: "Workflow Sessions", href: "/admin/workflow-sessions" },
+              // Links to this session's own admin record. Unlike the (nullable)
+              // design-time workflow id, the session's own id always exists — even
+              // after its parent workflow design has been deleted.
+              { label: ws.workflowName, href: `/admin/workflow-sessions/${ws.id}` },
               { label: "Session" },
             ]}
           />
