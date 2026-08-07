@@ -554,7 +554,7 @@ async def test_delete_server_referenced_by_binding_returns_409(
     async with AsyncSession(mem_engine) as db:
         execution = WorkflowExecution(
             session_id="sess-1",
-            workflow_name="wf",
+            name="wf",
             workflow_prompt="p",
             agent_skill_id="skill-1",
             agent_skill_name="skill",

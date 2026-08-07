@@ -37,8 +37,8 @@ class WorkflowExecutionCreate(SQLModel):
     session_id: str
     """ADK/AG-UI id of this execution's workflow session — the chat it runs in."""
 
-    workflow_name: str
-    workflow_description: str | None = None
+    name: str
+    description: str | None = None
     agent_skill_id: str
     agent_skill_name: str
     agent_skill_repo_url: str

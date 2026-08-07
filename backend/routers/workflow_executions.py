@@ -166,12 +166,10 @@ async def workflow_session_agent(
     # render_a2ui argument format — and the workflow description is prepended
     # from the server-trusted record rather than taken from the client.
     context = keep_a2ui_context(input_data.context or [])
-    if execution.workflow_description:
+    if execution.description:
         context.insert(
             0,
-            Context(
-                description="Workflow description", value=execution.workflow_description
-            ),
+            Context(description="Workflow description", value=execution.description),
         )
     input_data = input_data.model_copy(
         update={"messages": filtered, "context": context}

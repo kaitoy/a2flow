@@ -196,7 +196,7 @@ export default function WorkflowTasksPage() {
 
   useEffect(() => {
     getWorkflowExecution(executionId)
-      .then((s) => setWorkflowName(s.workflowName))
+      .then((s) => setWorkflowName(s.name))
       .catch(() => {
         // Failure toast is shown globally by api.ts; the breadcrumb crumb
         // simply stays as an ellipsis.

@@ -128,7 +128,7 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
     execution = await execution_repo.create(
         WorkflowExecutionCreate(
             session_id=f"sess-{suffix}",
-            workflow_name=workflow.name,
+            name=workflow.name,
             agent_skill_id=skill.id,
             agent_skill_name=skill.name,
             agent_skill_repo_url=str(skill.repo_url),

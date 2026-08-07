@@ -108,7 +108,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
   const renderAvatar = (message: Message): ReactNode => {
     if (message.role === "assistant") {
       return (
-        <Tooltip label={execution.workflowName}>
+        <Tooltip label={execution.name}>
           <span className="inline-flex">
             <AgentAvatar size={28} />
           </span>
@@ -186,7 +186,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
               // Links to this session's own execution record. Unlike the
               // (nullable) design-time workflow id, the execution id always
               // exists — even after its parent workflow design has been deleted.
-              { label: execution.workflowName, href: `/admin/workflow-executions/${execution.id}` },
+              { label: execution.name, href: `/admin/workflow-executions/${execution.id}` },
               { label: "Session" },
             ]}
           />

@@ -473,10 +473,8 @@ def upgrade() -> None:
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("workflow_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column(
-            "workflow_description", sqlmodel.sql.sqltypes.AutoString(), nullable=True
-        ),
+        sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("agent_skill_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column(
             "agent_skill_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False

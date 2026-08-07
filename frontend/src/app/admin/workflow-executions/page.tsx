@@ -36,15 +36,15 @@ function buildColumns(
   return [
     {
       header: "Workflow",
-      sortField: "workflowName",
-      filterField: "workflowName",
+      sortField: "name",
+      filterField: "name",
       visibility: "always",
       cell: (s) => (
         <Link
           href={`/admin/workflow-executions/${s.id}`}
           className="font-medium text-accent transition-colors hover:underline"
         >
-          {s.workflowName}
+          {s.name}
         </Link>
       ),
     },
@@ -90,7 +90,7 @@ function buildColumns(
             label="Open workflow session"
             href={`/workflow-executions/${s.id}/session`}
           />
-          <DeleteIconButton onClick={() => onDelete(s.id, s.workflowName)} />
+          <DeleteIconButton onClick={() => onDelete(s.id, s.name)} />
         </div>
       ),
     },

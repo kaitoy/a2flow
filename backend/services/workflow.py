@@ -454,8 +454,8 @@ class WorkflowService:
 
         execution_create = WorkflowExecutionCreate(
             session_id=session_id,
-            workflow_name=name,
-            workflow_description=description,
+            name=name,
+            description=description,
             agent_skill_id=skill.id,
             agent_skill_name=skill.name,
             agent_skill_repo_url=skill.repo_url,

@@ -65,7 +65,7 @@ async def _seed_session(
     async with AsyncSession(eng) as db:
         execution = WorkflowExecution(
             session_id=session_id,
-            workflow_name="wf",
+            name="wf",
             agent_skill_id="skill-1",
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",

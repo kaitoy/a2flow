@@ -60,7 +60,7 @@ async def _seed_session(eng: AsyncEngine, *, user_id: str = "owner") -> str:
     async with AsyncSession(eng) as db:
         execution = WorkflowExecution(
             session_id="sess-1",
-            workflow_name="wf",
+            name="wf",
             workflow_prompt="do it",
             agent_skill_id="skill-1",
             agent_skill_name="skill",

@@ -157,7 +157,7 @@ async def test_get_workflow_execution_returns_correct_data(
         await workflow_client.get(f"/api/v1/workflow-executions/{execution['id']}")
     )
     assert body["id"] == execution["id"]
-    assert body["workflowName"] == GENERATE_BODY["name"]
+    assert body["name"] == GENERATE_BODY["name"]
     assert "workflowPrompt" not in body
     assert body["agentSkillId"] == skill["id"]
     assert body["sessionId"] == execution["sessionId"]

@@ -84,7 +84,7 @@ export default function WorkflowExecutionDetailPage() {
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Workflow Executions", href: "/admin/workflow-executions" },
-    { label: session?.workflowName || "…" },
+    { label: session?.name || "…" },
   ];
 
   if (loading || !session) {
@@ -104,7 +104,7 @@ export default function WorkflowExecutionDetailPage() {
       <FormLayout
         header={
           <AdminPageHeader
-            title={session.workflowName}
+            title={session.name}
             icon={ListChecks}
             secondaryAction={
               <>
@@ -138,14 +138,14 @@ export default function WorkflowExecutionDetailPage() {
                     href={`/admin/workflows/${session.workflowId}`}
                     className="font-medium text-accent transition-colors hover:underline"
                   >
-                    {session.workflowName}
+                    {session.name}
                   </Link>
                 ) : (
-                  session.workflowName
+                  session.name
                 )
               }
             />
-            <DetailItem label="Description" value={session.workflowDescription || EMPTY} />
+            <DetailItem label="Description" value={session.description || EMPTY} />
             <DetailItem
               label="Agent Skill"
               value={
@@ -216,7 +216,7 @@ export default function WorkflowExecutionDetailPage() {
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Workflow Execution"
-        description={`Delete "${session.workflowName}"?`}
+        description={`Delete "${session.name}"?`}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

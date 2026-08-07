@@ -710,8 +710,8 @@ async def test_modified_workflow_run_snapshots_the_published_name(
     execution = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
-    assert execution["workflowName"] == "my-workflow"
-    assert execution["workflowDescription"] != "Edited description"
+    assert execution["name"] == "my-workflow"
+    assert execution["description"] != "Edited description"
 
 
 async def test_republishing_promotes_the_edits_into_runs(
@@ -978,7 +978,7 @@ async def test_execute_workflow_returns_201_with_workflow_execution(
     body = assert_ok(response, status=201)
     assert "id" in body
     assert "sessionId" in body
-    assert body["workflowName"] == "my-workflow"
+    assert body["name"] == "my-workflow"
 
 
 async def test_execute_workflow_unknown_id_returns_404(
