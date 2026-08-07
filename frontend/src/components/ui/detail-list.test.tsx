@@ -39,6 +39,16 @@ describe("DetailList", () => {
     expect(container.querySelector("dl")?.className).toBe("grid grid-cols-1 @xl:grid-cols-2 gap-4");
   });
 
+  it("drops the two-column breakpoint when singleColumn is set", () => {
+    const { container } = render(
+      <DetailList singleColumn>
+        <DetailItem label="Username" value="alice" />
+      </DetailList>
+    );
+
+    expect(container.querySelector("dl")?.className).toBe("grid grid-cols-1 gap-4");
+  });
+
   it("wraps the list in a query container so the column count follows its own width", () => {
     const { container } = render(
       <DetailList className="glass-panel p-4">
@@ -54,5 +64,14 @@ describe("DetailList", () => {
     render(<DetailList>{<DetailItem label="Roles" value={<span>Admin</span>} />}</DetailList>);
 
     expect(screen.getByText("Admin").tagName).toBe("SPAN");
+  });
+});
+
+describe("DetailItem", () => {
+  it("renders the value in a heavier weight than the label", () => {
+    render(<DetailItem label="Username" value="alice" />);
+
+    expect(screen.getByText("Username")).toHaveClass("text-label-caps");
+    expect(screen.getByText("alice")).toHaveClass("font-medium");
   });
 });

@@ -127,7 +127,7 @@ export default function WorkflowSessionDetailPage() {
         aside={audit && <AuditMeta {...audit} />}
       >
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
-          <DetailList>
+          <DetailList singleColumn>
             <DetailItem
               label="Workflow"
               value={

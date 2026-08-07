@@ -7,11 +7,18 @@ export interface DetailListProps {
   children: ReactNode;
   /** Extra classes merged onto the `<dl>`, e.g. the surrounding panel styling. */
   className?: string;
+  /**
+   * Force a single column even when the container has room for two. Use for
+   * pages that must match a sibling single-column admin form, or whose values
+   * run long enough (URLs, descriptions) that two columns would look cramped.
+   */
+  singleColumn?: boolean;
 }
 
 /**
- * Responsive definition list for read-only attribute display: one column when
- * cramped, two once it has `@xl` (36rem) of room.
+ * Definition list for read-only attribute display, one column when cramped
+ * and — unless `singleColumn` opts out — two once it has `@xl` (36rem) of
+ * room.
  *
  * The breakpoint is a container query against the list's own wrapper, not the
  * viewport, because the same list is used both full-width under a form and
@@ -24,8 +31,9 @@ export interface DetailListProps {
  * is left to the call site via `className`, so the same list can sit inside a
  * form card or stand alone as an audit footer.
  */
-export function DetailList({ children, className }: DetailListProps) {
-  const cls = ["grid grid-cols-1 @xl:grid-cols-2 gap-4", className].filter(Boolean).join(" ");
+export function DetailList({ children, className, singleColumn }: DetailListProps) {
+  const gridCols = singleColumn ? "grid-cols-1" : "grid-cols-1 @xl:grid-cols-2";
+  const cls = ["grid", gridCols, "gap-4", className].filter(Boolean).join(" ");
   return (
     <div className="@container">
       <dl className={cls}>{children}</dl>
@@ -44,14 +52,16 @@ export interface DetailItemProps {
 /**
  * A single labelled cell of a {@link DetailList}. Labels use the shared
  * `text-label-caps` treatment so they read identically to form field labels.
- * Values wrap mid-word so an unbroken fallback value (a raw user UUID, say)
- * cannot overflow a narrow column.
+ * The value is `font-medium`, the same weight the rest of the app uses for a
+ * row's primary text, so it doesn't read as barely-there next to the caps
+ * label above it. Values wrap mid-word so an unbroken fallback value (a raw
+ * user UUID, say) cannot overflow a narrow column.
  */
 export function DetailItem({ label, value }: DetailItemProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <dt className="text-label-caps">{label}</dt>
-      <dd className="break-words text-sm text-on-surface">{value}</dd>
+      <dd className="break-words text-sm font-medium text-on-surface">{value}</dd>
     </div>
   );
 }
