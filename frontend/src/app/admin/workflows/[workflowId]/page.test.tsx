@@ -10,8 +10,10 @@ import { render, screen, waitFor, within } from "@/test/test-utils";
 import WorkflowDetailPage from "./page";
 
 vi.mock("next/link", () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
+  default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
   ),
 }));
 
@@ -160,6 +162,22 @@ describe("WorkflowDetailPage", () => {
       "href",
       "/admin/agent-skills/skill-1"
     );
+  });
+
+  it("shows the skill's repo URL, ref, path, and pinned commit in a tooltip on hover", async () => {
+    const user = userEvent.setup();
+    render(<WorkflowDetailPage />);
+    await waitFor(() => screen.getByLabelText(/^name/i));
+
+    await user.hover(screen.getByRole("link", { name: "my-skill" }));
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Repo URL: https://github.com/example/repo");
+    expect(tooltip).toHaveTextContent("Ref: default branch");
+    expect(tooltip).toHaveTextContent("Path: repo root");
+    // Pinned to the workflow's own agentSkillCommitSha ("a" x40), not the
+    // skill's own commitSha, which differs in the mock data.
+    expect(tooltip).toHaveTextContent("Commit: aaaaaaa");
   });
 
   it("navigates to the task template management page", async () => {

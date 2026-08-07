@@ -33,9 +33,12 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip } from "@/components/ui/tooltip";
 import { zGenerateWorkflowRequest } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { formatRevision } from "@/lib/agent-skill-sync-status";
 import {
+  type AgentSkill,
   deactivateWorkflow,
   deleteWorkflow,
   discardWorkflowChanges,
@@ -126,7 +129,7 @@ export default function WorkflowDetailPage() {
   const canEdit = useHasRole(Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [skillName, setSkillName] = useState<string | null>(null);
+  const [skill, setSkill] = useState<AgentSkill | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
@@ -180,7 +183,7 @@ export default function WorkflowDetailPage() {
     getWorkflow(workflowId)
       .then(async (wf) => {
         applyWorkflow(wf);
-        setSkillName((await getAgentSkill(wf.agentSkillId)).name);
+        setSkill(await getAgentSkill(wf.agentSkillId));
       })
       .catch(() => {
         // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -316,6 +319,18 @@ export default function WorkflowDetailPage() {
 
   const canDeactivate = workflow.status === "published" || workflow.status === "modified";
 
+  // The commit shown is the workflow's own pinned revision, not the skill's
+  // current one — that's the code the workflow actually runs, even after the
+  // skill has been re-pulled to a newer commit.
+  const skillTooltip = skill
+    ? [
+        `Repo URL: ${skill.repoUrl}`,
+        `Ref: ${skill.repoRef || "default branch"}`,
+        `Path: ${skill.repoPath || "repo root"}`,
+        `Commit: ${formatRevision(workflow.agentSkillCommitSha)}`,
+      ].join("\n")
+    : "";
+
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
@@ -433,12 +448,14 @@ export default function WorkflowDetailPage() {
         >
           <FormField htmlFor="agentSkill" label="Agent Skill">
             <div className="py-1.5">
-              <Link
-                href={`/admin/agent-skills/${workflow.agentSkillId}`}
-                className="text-sm font-medium text-accent transition-colors hover:underline"
-              >
-                {skillName ?? workflow.agentSkillId}
-              </Link>
+              <Tooltip label={skillTooltip} disabled={!skill}>
+                <Link
+                  href={`/admin/agent-skills/${workflow.agentSkillId}`}
+                  className="text-sm font-medium text-accent transition-colors hover:underline"
+                >
+                  {skill?.name ?? workflow.agentSkillId}
+                </Link>
+              </Tooltip>
             </div>
           </FormField>
 
