@@ -7,6 +7,9 @@ from unittest.mock import MagicMock
 import pytest
 from google.adk.sessions import InMemorySessionService
 from httpx import AsyncClient, Response
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from dependencies import APP_NAME
 from infrastructure.agent import (
@@ -16,6 +19,7 @@ from infrastructure.agent import (
     tenant_app_name,
 )
 from models.user import SYSTEM_USER_ID
+from models.workflow_execution import WorkflowExecution
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID
 from tests._workflow import GENERATE_BODY, create_published_workflow, create_skill
@@ -861,3 +865,33 @@ async def test_delete_workflow_execution_unknown_id_returns_404(
 ) -> None:
     response = await workflow_client.delete("/api/v1/workflow-executions/nonexistent")
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_initiator_id_must_reference_an_existing_user(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """``initiator_id`` is a real FK, not just a documented convention.
+
+    Written directly against the database because every API path that creates
+    a WorkflowExecution takes the initiator from the authenticated caller, who
+    also becomes ``created_by`` -- so a bad id would trip that FK first and
+    this one would never be exercised.
+    """
+    _, engine = workflow_client_with_engine
+    async with AsyncSession(engine) as db:
+        db.add(
+            WorkflowExecution(
+                session_id="sess-orphan",
+                name="wf",
+                agent_skill_id="skill-1",
+                agent_skill_name="skill",
+                agent_skill_repo_url="https://example.com/repo",
+                agent_skill_repo_path=".",
+                initiator_id="ghost-user",
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            await db.commit()

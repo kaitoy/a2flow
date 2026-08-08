@@ -20,7 +20,14 @@ from dependencies import (
     require_roles,
 )
 from models.response import ApiResponse
-from models.user import Role, UserCreate, UserRead, UserUpdate
+from models.user import (
+    ResolvedUserName,
+    Role,
+    UserCreate,
+    UserNameResolveRequest,
+    UserRead,
+    UserUpdate,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -77,6 +84,31 @@ async def list_users(
         acting_tenant_id=acting_tenant_id,
     )
     return ApiResponse(meta=meta, data=[UserRead.model_validate(u) for u in items])
+
+
+@router.post("/resolve-names", response_model=ApiResponse[list[ResolvedUserName]])
+async def resolve_user_names(
+    body: UserNameResolveRequest,
+    service: UserServiceDep,
+    acting_user: CurrentUserDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[ResolvedUserName]]:
+    """Resolve a batch of user ids to the display names the caller may see.
+
+    Lets a client render many user references (audit footers, initiator and
+    approver columns) with one request instead of one ``GET /users/{id}`` per
+    id. Applies the same tenant boundary as that endpoint: a user outside the
+    caller's tenant is not named, except that the seeded system user and any
+    ``super_admin`` come back under a fixed placeholder. Ids that resolve to
+    nothing the caller may see are omitted rather than erroring, so the client
+    falls back to displaying the raw id for those.
+
+    ``POST`` rather than ``GET`` because the id list runs to
+    ``MAX_RESOLVE_NAME_IDS`` entries, which does not fit a URL; the request is
+    a read and requires no role beyond a valid session.
+    """
+    names = await service.resolve_names(body.ids, acting_user=acting_user)
+    return ApiResponse(meta=meta, data=names)
 
 
 @router.get("/{user_id}", response_model=ApiResponse[UserRead])

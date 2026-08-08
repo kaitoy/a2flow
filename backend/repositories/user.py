@@ -33,6 +33,8 @@ class UserRepository(Protocol):
 
     async def get(self, user_id: str) -> User | None: ...
 
+    async def get_many(self, user_ids: Sequence[str]) -> list[User]: ...
+
     async def get_by_username(
         self, username: str, *, tenant_id: str | None
     ) -> User | None: ...
@@ -71,6 +73,27 @@ class SqlUserRepository:
 
     async def get(self, user_id: str) -> User | None:
         return await self._db.get(User, user_id)
+
+    async def get_many(self, user_ids: Sequence[str]) -> list[User]:
+        """Return every User whose id is in ``user_ids``, in unspecified order.
+
+        Mirrors :meth:`get` rather than :meth:`list`: no ``deleted_at`` filter
+        and no ``SYSTEM_USER_ID`` exclusion, because the display names of
+        soft-deleted users and of the seeded system user must stay resolvable
+        for the records they own. Ids with no matching row are simply absent
+        from the result.
+
+        Args:
+            user_ids: Identifiers to look up. An empty sequence short-circuits
+                without touching the database.
+
+        Returns:
+            The matching users.
+        """
+        if not user_ids:
+            return []
+        stmt = select(User).where(col(User.id).in_(user_ids))
+        return list((await self._db.exec(stmt)).all())
 
     async def get_by_username(
         self, username: str, *, tenant_id: str | None

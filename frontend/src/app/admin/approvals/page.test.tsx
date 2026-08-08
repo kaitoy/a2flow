@@ -35,6 +35,41 @@ describe("ApprovalsPage", () => {
     expect(screen.getByText("Looks good to me")).toBeInTheDocument();
   });
 
+  it("resolves every row's approver in a single request", async () => {
+    const requests: string[][] = [];
+    server.use(
+      http.get("http://localhost:8000/api/v1/approvals", () =>
+        envelope(
+          ["ann", "bob", "cal"].map((approver, i) => ({
+            id: `appr-${i}`,
+            tenantId: "tenant-1",
+            workflowExecutionId: "execution-1",
+            workflowTaskId: null,
+            title: `Approve ${i}`,
+            description: null,
+            status: "pending",
+            response: null,
+            approver,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "owner",
+            updatedBy: "owner",
+          }))
+        )
+      ),
+      http.post("http://localhost:8000/api/v1/users/resolve-names", async ({ request }) => {
+        const { ids } = (await request.json()) as { ids: string[] };
+        requests.push(ids);
+        return envelope(ids.map((id) => ({ id, displayName: id.toUpperCase() })));
+      })
+    );
+
+    render(<ApprovalsPage />);
+
+    await waitFor(() => expect(screen.getByText("ANN")).toBeInTheDocument());
+    expect(requests).toEqual([["ann", "bob", "cal"]]);
+  });
+
   it("links to the workflow execution chat", async () => {
     render(<ApprovalsPage />);
     await waitFor(() => screen.getByText("Deploy to production"));

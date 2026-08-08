@@ -1268,3 +1268,140 @@ async def test_delete_super_admin_returns_404_for_tenant_scoped_admin(
     # The target survives -- a super admin can still fetch it afterwards.
     fetched = assert_ok(await user_client.get(f"/api/v1/users/{created['id']}"))
     assert fetched["id"] == created["id"]
+
+
+# ---------- resolve-names ----------
+
+
+async def _resolve_names(
+    user_client: AsyncClient, ids: list[str], headers: dict[str, str] | None = None
+) -> dict[str, str]:
+    """Resolve ``ids`` and return the response as an ``{id: displayName}`` map."""
+    entries = assert_ok(
+        await user_client.post(
+            "/api/v1/users/resolve-names", json={"ids": ids}, headers=headers or {}
+        )
+    )
+    return {entry["id"]: entry["displayName"] for entry in entries}
+
+
+async def test_resolve_names_returns_display_name_for_same_tenant_user(
+    user_client: AsyncClient,
+) -> None:
+    created = await _create_user(user_client)
+    resolved = await _resolve_names(
+        user_client, [created["id"]], headers={"X-User-Roles": "admin"}
+    )
+    assert resolved == {created["id"]: "Alice Smith"}
+
+
+async def test_resolve_names_deduplicates_repeated_ids(
+    user_client: AsyncClient,
+) -> None:
+    created = await _create_user(user_client)
+    entries = assert_ok(
+        await user_client.post(
+            "/api/v1/users/resolve-names",
+            json={"ids": [created["id"], created["id"], created["id"]]},
+        )
+    )
+    assert len(entries) == 1
+
+
+async def test_resolve_names_with_no_ids_returns_empty_list(
+    user_client: AsyncClient,
+) -> None:
+    assert (
+        assert_ok(
+            await user_client.post("/api/v1/users/resolve-names", json={"ids": []})
+        )
+        == []
+    )
+
+
+async def test_resolve_names_omits_unknown_id(user_client: AsyncClient) -> None:
+    """An id with no matching user is dropped rather than failing the batch."""
+    created = await _create_user(user_client)
+    resolved = await _resolve_names(user_client, ["ghost", created["id"]])
+    assert resolved == {created["id"]: "Alice Smith"}
+
+
+async def test_resolve_names_resolves_soft_deleted_user(
+    user_client: AsyncClient,
+) -> None:
+    """A soft-deleted user still resolves, so the records they own keep a name.
+
+    Unlike ``list``, which hides them -- see ``SqlUserRepository.get_many``.
+    """
+    owner = await _create_user(user_client)
+    # Referencing the owner from another row forces DELETE down the
+    # soft-delete path (the created_by FK is RESTRICT).
+    await _create_user(
+        user_client,
+        headers={"X-User-Id": owner["id"]},
+        username="referencing-user",
+        email="referencing@x.com",
+    )
+    assert_ok(await user_client.delete(f"/api/v1/users/{owner['id']}"))
+
+    resolved = await _resolve_names(user_client, [owner["id"]])
+    assert resolved == {owner["id"]: "Alice Smith"}
+
+
+async def test_resolve_names_omits_user_from_another_tenant(
+    user_client: AsyncClient,
+) -> None:
+    """The tenant boundary of ``GET /users/{id}`` applies here too."""
+    other_tenant = await _create_tenant(user_client, name="tenant-isolation-resolve")
+    created = await _create_user(
+        user_client,
+        tenantId=other_tenant["id"],
+        username="other-tenant-user-resolve",
+        email="other-resolve@x.com",
+    )
+    resolved = await _resolve_names(
+        user_client, [created["id"]], headers={"X-User-Roles": "admin"}
+    )
+    assert resolved == {}
+
+
+async def test_resolve_names_masks_super_admin_for_tenant_scoped_caller(
+    user_client: AsyncClient,
+) -> None:
+    """A super_admin is invisible to a plain admin, but not anonymous either."""
+    super_admin = await _create_user(user_client, roles=["super_admin"])
+    resolved = await _resolve_names(
+        user_client, [super_admin["id"]], headers={"X-User-Roles": "admin"}
+    )
+    assert resolved == {super_admin["id"]: "Super Admin"}
+
+
+async def test_resolve_names_masks_system_user_for_tenant_scoped_caller(
+    user_client: AsyncClient,
+) -> None:
+    """The seeded system user owns bootstrap records, so it needs a label."""
+    resolved = await _resolve_names(
+        user_client, [SYSTEM_USER_ID], headers={"X-User-Roles": "admin"}
+    )
+    assert resolved == {SYSTEM_USER_ID: "System User"}
+
+
+async def test_resolve_names_gives_super_admin_caller_the_real_names(
+    user_client: AsyncClient,
+) -> None:
+    """A super admin is exempt from the boundary, so nothing is masked for them."""
+    super_admin = await _create_user(user_client, roles=["super_admin"])
+    resolved = await _resolve_names(user_client, [super_admin["id"], SYSTEM_USER_ID])
+    assert resolved == {super_admin["id"]: "Alice Smith", SYSTEM_USER_ID: "System User"}
+
+
+async def test_resolve_names_rejects_more_ids_than_the_limit(
+    user_client: AsyncClient,
+) -> None:
+    from models.user import MAX_RESOLVE_NAME_IDS
+
+    response = await user_client.post(
+        "/api/v1/users/resolve-names",
+        json={"ids": [f"id-{i}" for i in range(MAX_RESOLVE_NAME_IDS + 1)]},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)

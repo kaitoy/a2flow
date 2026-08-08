@@ -53,7 +53,10 @@ class WorkflowExecution(WorkflowExecutionCreate, TenantScoped, BaseEntity, table
     ``workflow_id`` is nullable and ``SET NULL`` on delete: the snapshot columns
     keep the run readable after its workflow design is gone. ``session_id`` is
     indexed so agent tools can map the workflow session they run in back to this
-    record.
+    record. ``initiator_id`` is ``RESTRICT`` on delete, matching the audit user
+    FKs on :class:`~models.base.BaseEntity` -- a user who started a run cannot
+    be hard-deleted out from under it, and is soft-deleted instead so the run's
+    initiator still resolves to a name.
     """
 
     __tablename__ = "workflow_executions"
@@ -61,4 +64,5 @@ class WorkflowExecution(WorkflowExecutionCreate, TenantScoped, BaseEntity, table
     __table_args__ = (
         Index("ix_workflow_executions_session_id", "session_id"),
         ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="SET NULL"),
+        ForeignKeyConstraint(["initiator_id"], ["users.id"], ondelete="RESTRICT"),
     )

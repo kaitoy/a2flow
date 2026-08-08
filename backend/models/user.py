@@ -274,6 +274,34 @@ class User(UserCreate, BaseEntity, table=True):
         return _serialize_deleted_at(dt)
 
 
+#: Upper bound on the ids one ``POST /users/resolve-names`` call may carry.
+#: Matches ``PaginationParams.limit``'s ceiling, so resolving the names on a
+#: full page of records always fits in a single request.
+MAX_RESOLVE_NAME_IDS = 1000
+
+
+class UserNameResolveRequest(SQLModel):
+    """Request body for ``POST /users/resolve-names``: the ids to resolve."""
+
+    model_config = _alias_config
+    ids: list[str] = Field(max_length=MAX_RESOLVE_NAME_IDS)
+
+
+class ResolvedUserName(SQLModel):
+    """A user id paired with the display name the caller is allowed to see.
+
+    Carries a single ``display_name`` rather than ``first_name`` /
+    ``last_name`` because the name is not always a real person's: a user the
+    caller may not see individually is reported under a fixed placeholder
+    (see :meth:`services.user.UserService.resolve_names`), which has no
+    meaningful split into given and family names.
+    """
+
+    model_config = _alias_config
+    id: str
+    display_name: str
+
+
 class UserRead(BaseEntity):
     """Read view of a User returned by the API, excluding the password hash."""
 

@@ -345,10 +345,21 @@ Authentication (a valid session) is applied router-wide; **authorization** has t
 1. **Role gates — router layer.** `dependencies/authz.py::require_roles(*roles)` builds a route dependency; attach it per route (`@router.post(..., dependencies=[Depends(require_roles(Role.developer))])`), never router-wide, because every router mixes open `GET`s with gated writes. Reads are deliberately open to all authenticated users. `Role` and the shared `has_role(user, *roles)` helper (with its `super_admin` bypass) live in `models/user.py` — always go through `has_role`, never compare `user.roles` directly.
 2. **Ownership rules — service layer.** Anything a role cannot express belongs in the service, alongside the business rules: `UserService.update` (self-service fields + the `super_admin` grant/revoke guard), `UserAvatarService` (self-only writes), `ApprovalService.resolve` (designated approver — no `super_admin` bypass), `WorkflowTaskService.update`'s status-change guard (`services/workflow_task.py`: changing a task's `status` is restricted to the execution's initiator or, when the task has a linked `Approval`, that Approval's designated approver — also no `super_admin` bypass, for consistency with `ApprovalService.resolve`), and `WorkflowExecutionAccessPolicy` (`services/workflow_execution_access.py`), which `WorkflowExecutionService` and `WorkflowTaskService` call with the `caller: User` their routers pass in. Fetch the entity first so a missing record still surfaces as 404, not 403. `UserService`'s tenant-visibility check (`_assert_tenant_visible`, restricting `get`/`list`/`update`/`delete` to the caller's own tenant unless they're a super admin — see "Tenant Isolation" above) follows the same fetch-first rule but raises `NotFoundError`, not `ForbiddenError`, for a cross-tenant reference, so existence in another tenant is never confirmed to the caller.
 
+#### Masked reads
+
+`UserService.resolve_names` (`POST /users/resolve-names`) is the one read that neither returns a record nor pretends it is missing. It exists because the UI shows user *names* everywhere records are listed, and fetching them one id at a time is an N+1. It runs each candidate through the same `_assert_tenant_visible` as `get`, then:
+
+- **visible** → the real `"First Last"`,
+- **invisible, but the seeded system user or a `super_admin`** → a fixed placeholder (`"System User"` / `"Super Admin"`), identical for every such account,
+- **anything else invisible or missing** → omitted from the response entirely, so the client falls back to rendering the raw id.
+
+Reach for this shape only when a name has to render for a record the caller legitimately sees but whose *owner* they cannot fetch — which here is unavoidable, since the system user and platform-scoped super admins own records inside every tenant. The placeholder is deliberately per-*kind*, not per-user: it discloses that the owner is a super admin (already inferable from the record) without disclosing which one. Never extend this to a per-user label, and never widen it to entities whose visibility rules are the caller's actual authorization boundary.
+
 ### Path and Tag Naming
 
 - Router prefix: kebab-case plural (`/agent-skills`, `/workflows`)
 - OpenAPI tag: same as the prefix (`"agent-skills"`, `"workflows"`)
+- Sub-resource action paths: kebab-case too (`/users/resolve-names`), declared **before** any `/{id}` route in the same router so the literal segment is matched first
 
 ---
 

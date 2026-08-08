@@ -113,6 +113,7 @@ import {
   zPublishWorkflowApiV1WorkflowsWorkflowIdPublishPostResponse,
   zPullAgentSkillApiV1AgentSkillsSkillIdPullPostResponse,
   zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
+  zResolveUserNamesApiV1UsersResolveNamesPostResponse,
   zSearchMcpRegistryApiV1McpRegistryGetResponse,
   zStartImpersonationApiV1AuthImpersonatePostResponse,
   zStopImpersonationApiV1AuthImpersonateDeleteResponse,
@@ -797,25 +798,27 @@ export async function deleteUserAvatar(id: string): Promise<User> {
 }
 
 /**
- * Resolve a set of user IDs to their display names ("First Last").
+ * Resolve a set of user IDs to their display names, in a single request.
  *
- * Each unique ID is fetched individually via {@link getUser} (which resolves
- * soft-deleted users too), so names still render for users that have been
- * soft-deleted. IDs that cannot be fetched are omitted, letting callers fall
- * back to the raw ID.
+ * De-duplicates the IDs and resolves them all through
+ * `POST /api/v1/users/resolve-names`, so a screen showing many user
+ * references (an audit footer, a table of initiators) costs one round trip
+ * rather than one per ID. Soft-deleted users still resolve, so names keep
+ * rendering for the records they own.
+ *
+ * The server omits IDs the caller may not see, so those are simply missing
+ * from the returned map and callers fall back to the raw ID. Users the caller
+ * cannot see individually but whose *kind* of account is not a secret come
+ * back under a fixed placeholder instead ("System User", "Super Admin").
  */
 export async function getUserNames(ids: Iterable<string>): Promise<Map<string, string>> {
   const unique = [...new Set([...ids].filter(Boolean))];
-  const entries = await Promise.all(
-    unique.map(async (id): Promise<[string, string] | null> => {
-      try {
-        return [id, formatUserName(await getUser(id))];
-      } catch {
-        return null;
-      }
-    })
+  if (unique.length === 0) return new Map();
+  const resolved = await fetchEnvelope(
+    apiClient.post("/api/v1/users/resolve-names", { ids: unique }),
+    zResolveUserNamesApiV1UsersResolveNamesPostResponse
   );
-  return new Map(entries.filter((e): e is [string, string] => e !== null));
+  return new Map((resolved ?? []).map((entry) => [entry.id, entry.displayName]));
 }
 
 /**

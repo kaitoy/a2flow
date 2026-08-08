@@ -43,6 +43,43 @@ describe("WorkflowExecutionsPage", () => {
     await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
   });
 
+  it("resolves every row's initiator in a single request", async () => {
+    const requests: string[][] = [];
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions", () =>
+        envelope(
+          ["ann", "bob", "cal"].map((initiatorId, i) => ({
+            id: `execution-${i}`,
+            tenantId: "tenant-1",
+            sessionId: `session-${i}`,
+            workflowId: "wf-1",
+            name: `Workflow ${i}`,
+            description: null,
+            agentSkillId: "skill-1",
+            agentSkillName: "My Skill",
+            agentSkillRepoUrl: "https://github.com/example/repo",
+            agentSkillRepoPath: "",
+            initiatorId,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          }))
+        )
+      ),
+      http.post("http://localhost:8000/api/v1/users/resolve-names", async ({ request }) => {
+        const { ids } = (await request.json()) as { ids: string[] };
+        requests.push(ids);
+        return envelope(ids.map((id) => ({ id, displayName: id.toUpperCase() })));
+      })
+    );
+
+    render(<WorkflowExecutionsPage />);
+
+    await waitFor(() => expect(screen.getByText("ANN")).toBeInTheDocument());
+    expect(requests).toEqual([["ann", "bob", "cal"]]);
+  });
+
   it("links the user name to the user's edit page", async () => {
     render(<WorkflowExecutionsPage />);
     const link = await screen.findByRole("link", { name: "Alice Smith" });

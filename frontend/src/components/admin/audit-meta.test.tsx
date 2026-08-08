@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { AuditMeta } from "./audit-meta";
 
@@ -51,7 +52,7 @@ describe("AuditMeta", () => {
 
   it("falls back to the raw ID when the user cannot be resolved", async () => {
     server.use(
-      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+      http.post("http://localhost:8000/api/v1/users/resolve-names", () =>
         HttpResponse.json({ detail: "boom" }, { status: 500 })
       )
     );
@@ -59,5 +60,21 @@ describe("AuditMeta", () => {
     render(<AuditMeta createdBy="ghost-user" updatedBy="ghost-user" />);
 
     await waitFor(() => expect(screen.getAllByText("ghost-user").length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("resolves both audit IDs in one request, de-duplicating a shared ID", async () => {
+    const requests: string[][] = [];
+    server.use(
+      http.post("http://localhost:8000/api/v1/users/resolve-names", async ({ request }) => {
+        const { ids } = (await request.json()) as { ids: string[] };
+        requests.push(ids);
+        return envelope(ids.map((id) => ({ id, displayName: "Alice Smith" })));
+      })
+    );
+
+    render(<AuditMeta createdBy="user-1" updatedBy="user-1" />);
+
+    await waitFor(() => expect(screen.getAllByText("Alice Smith").length).toBe(2));
+    expect(requests).toEqual([["user-1"]]);
   });
 });

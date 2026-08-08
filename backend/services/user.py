@@ -29,7 +29,15 @@ no separate exemption, so a plain ``admin`` can never view, edit, or delete a
 from collections.abc import Sequence
 
 from infrastructure.password import hash_password
-from models.user import Role, User, UserCreate, UserUpdate, has_role
+from models.user import (
+    SYSTEM_USER_ID,
+    ResolvedUserName,
+    Role,
+    User,
+    UserCreate,
+    UserUpdate,
+    has_role,
+)
 from repositories import UserRepository
 from repositories.exceptions import ForbiddenError, NotFoundError, UserValidationError
 from repositories.query import FilterSpec, SortSpec
@@ -141,6 +149,51 @@ def _assert_tenant_visible(acting_user: User, target: User) -> None:
         raise NotFoundError("User", target.id)
 
 
+#: Display name reported for a ``super_admin`` the caller may not see
+#: individually. Every super admin collapses to this one string, so a record
+#: they own reads as something other than a bare UUID without disclosing which
+#: of them it was.
+_MASKED_SUPER_ADMIN_NAME = "Super Admin"
+
+#: Display name reported for the seeded system user, which is platform-scoped
+#: and therefore invisible to every non-super-admin caller (see
+#: :func:`_assert_tenant_visible`). It matches the seeded record's own name, so
+#: a super admin and a tenant user read the same label.
+_MASKED_SYSTEM_USER_NAME = "System User"
+
+
+def _visible_display_name(acting_user: User, target: User) -> str | None:
+    """Return the display name ``acting_user`` may see for ``target``.
+
+    Applies the same tenant boundary as :meth:`UserService.get`. A target the
+    acting user cannot see individually still gets a name when it is the
+    seeded system user or a ``super_admin`` -- a fixed placeholder that
+    identifies the *kind* of account without naming the individual.
+
+    Args:
+        acting_user: The authenticated user making the request.
+        target: The user record whose name is being resolved.
+
+    Returns:
+        ``"First Last"`` when the target is visible, a placeholder when it is
+        an invisible system user or super admin, or ``None`` when the caller
+        may not learn anything about it (the client then falls back to
+        displaying the raw id).
+    """
+    try:
+        _assert_tenant_visible(acting_user, target)
+    except NotFoundError:
+        if target.id == SYSTEM_USER_ID:
+            return _MASKED_SYSTEM_USER_NAME
+        # An empty ``allowed`` makes has_role a plain "is a super admin?" test.
+        if has_role(
+            target,
+        ):
+            return _MASKED_SUPER_ADMIN_NAME
+        return None
+    return f"{target.first_name} {target.last_name}".strip()
+
+
 class UserService:
     """Application service orchestrating User operations."""
 
@@ -173,6 +226,40 @@ class UserService:
             raise NotFoundError("User", user_id)
         _assert_tenant_visible(acting_user, user)
         return user
+
+    async def resolve_names(
+        self, ids: Sequence[str], *, acting_user: User
+    ) -> list[ResolvedUserName]:
+        """Resolve user ids to the display names ``acting_user`` may see.
+
+        The batch counterpart of :meth:`get` for the single purpose of
+        rendering a name: it exists so a client showing many user references
+        at once (an audit footer, a list of workflow initiators) resolves them
+        in one request instead of one per id. Soft-deleted users and the
+        seeded system user resolve here, unlike in :meth:`list`, because the
+        records they own outlive them.
+
+        The tenant boundary is the same as :meth:`get`'s -- see
+        :func:`_visible_display_name` for how an invisible target is masked or
+        dropped. Ids are de-duplicated, and unknown ones are simply absent
+        from the result rather than raising, so one stale reference does not
+        cost the caller every other name in the batch.
+
+        Args:
+            ids: User identifiers to resolve; duplicates and empty strings are
+                ignored.
+            acting_user: The authenticated user making the request.
+
+        Returns:
+            One entry per resolvable id, in unspecified order.
+        """
+        unique = list(dict.fromkeys(user_id for user_id in ids if user_id))
+        resolved: list[ResolvedUserName] = []
+        for user in await self._repo.get_many(unique):
+            name = _visible_display_name(acting_user, user)
+            if name is not None:
+                resolved.append(ResolvedUserName(id=user.id, display_name=name))
+        return resolved
 
     async def list(
         self,

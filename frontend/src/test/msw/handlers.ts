@@ -248,6 +248,15 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/users`, () => envelope([USER_1])),
 
+  // Batch name resolution: every requested ID resolves to USER_1's display
+  // name, mirroring the single-user handler below.
+  http.post(`${BASE}/api/v1/users/resolve-names`, async ({ request }) => {
+    const { ids } = (await request.json()) as { ids: string[] };
+    return envelope(
+      ids.map((id) => ({ id, displayName: `${USER_1.firstName} ${USER_1.lastName}` }))
+    );
+  }),
+
   http.get(`${BASE}/api/v1/users/:userId`, () => envelope(USER_1)),
 
   http.post(`${BASE}/api/v1/users`, () => envelope({ ...USER_1, id: "new-user-id" }, 201)),
