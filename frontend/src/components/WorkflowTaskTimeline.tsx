@@ -3,6 +3,7 @@
 import { ChevronLeft, ListTree, Wrench } from "lucide-react";
 import { useRef, useState } from "react";
 import { TaskToolsDialog } from "@/components/TaskToolsDialog";
+import { Tooltip } from "@/components/ui/tooltip";
 import { listMcpServers, type ToolBinding, type WorkflowTaskStatus } from "@/lib/api";
 import { formatStatusLabel, STATUS_RAIL_CLASS } from "@/lib/workflow-task-status";
 
@@ -21,6 +22,8 @@ export interface TimelineTask {
   title: string;
   /** Lifecycle status, or absent for status-less entries (task templates). */
   status?: WorkflowTaskStatus | null;
+  /** Longer explanation of the task, shown in a hover tooltip when present. */
+  description?: string | null;
   /** MCP tools bound to this task/template, shown as a small count indicator when non-empty. */
   toolBindings?: ToolBinding[];
 }
@@ -67,10 +70,11 @@ export interface WorkflowTaskTimelineProps {
  * a numbered status badge and the task's title, highlights the in-progress task,
  * follows the chat's scroll position / hover, and scrolls the chat to the
  * matching {@link WorkflowTaskGroup} when clicked. The badge number matches the
- * chat group's heading so the two views can be paired at a glance. When a task
- * or template has bound MCP tools, a small tool icon and count appear below
- * the title/status; clicking it opens a dialog listing each tool and its
- * owning MCP server.
+ * chat group's heading so the two views can be paired at a glance. Hovering a
+ * title with a description reveals it in a tooltip. When a task or template
+ * has bound MCP tools, a small tool icon and count appear below the
+ * title/status; clicking it opens a dialog listing each tool and its owning
+ * MCP server.
  */
 export function WorkflowTaskTimeline({
   tasks,
@@ -178,9 +182,11 @@ export function WorkflowTaskTimeline({
                       {index}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium leading-snug">
-                        {task.title}
-                      </span>
+                      <Tooltip label={task.description ?? ""} disabled={!task.description}>
+                        <span className="block truncate text-sm font-medium leading-snug">
+                          {task.title}
+                        </span>
+                      </Tooltip>
                       {status !== null && (
                         <span className="block text-xs text-on-surface-variant">
                           {formatStatusLabel(status)}

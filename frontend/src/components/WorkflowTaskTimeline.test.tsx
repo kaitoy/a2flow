@@ -9,7 +9,8 @@ const makeTask = (
   title: string,
   status: WorkflowTask["status"] = "pending",
   position = 0,
-  toolBindings: ToolBinding[] = []
+  toolBindings: ToolBinding[] = [],
+  description: string | null = null
 ): WorkflowTask => ({
   id,
   workflowExecutionId: "execution",
@@ -18,6 +19,7 @@ const makeTask = (
   position,
   dependsOnIds: [],
   toolBindings,
+  description,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -44,6 +46,39 @@ describe("WorkflowTaskTimeline", () => {
     expect(screen.getByText("Gather sources")).toBeInTheDocument();
     expect(screen.getByText("Draft")).toBeInTheDocument();
     expect(screen.getByText("Review")).toBeInTheDocument();
+  });
+
+  it("shows a task's description in a tooltip on hover", async () => {
+    const user = userEvent.setup();
+    const withDescription = [
+      makeTask("t1", "Gather sources", "completed", 0, [], "Collect all reference material."),
+    ];
+    render(
+      <WorkflowTaskTimeline
+        tasks={withDescription}
+        activeTaskId={null}
+        onSelectTask={vi.fn()}
+        collapsed={false}
+        onToggle={vi.fn()}
+      />
+    );
+    await user.hover(screen.getByText("Gather sources"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Collect all reference material.");
+  });
+
+  it("shows no tooltip for a task with no description", async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkflowTaskTimeline
+        tasks={tasks}
+        activeTaskId={null}
+        onSelectTask={vi.fn()}
+        collapsed={false}
+        onToggle={vi.fn()}
+      />
+    );
+    await user.hover(screen.getByText("Gather sources"));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("marks the active task with aria-current", () => {
