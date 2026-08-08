@@ -224,6 +224,37 @@ apiClient.interceptors.response.use(
   }
 );
 
+/**
+ * In-flight GET requests keyed by URL + query params, so two callers racing
+ * for the exact same data collapse into one network request instead of the
+ * backend seeing it twice. The main case this guards against is a list
+ * page's mount effect firing twice with identical params -- e.g. under React
+ * StrictMode's dev-only mount/cleanup/remount cycle -- but it also covers two
+ * independent components (e.g. the tenant switcher and the tenants admin
+ * page) requesting the same resource at once. Entries are removed as soon as
+ * the request settles, so this shares only concurrent requests -- it is not
+ * a cache and never serves stale data to a later call.
+ */
+const inFlightGets = new Map<string, Promise<AxiosResponse>>();
+
+function dedupeKey(url: string, config?: AxiosRequestConfig): string {
+  return `${url}?${JSON.stringify(config?.params ?? {})}`;
+}
+
+const rawGet = apiClient.get.bind(apiClient) as (
+  url: string,
+  config?: AxiosRequestConfig
+) => Promise<AxiosResponse>;
+
+apiClient.get = ((url: string, config?: AxiosRequestConfig) => {
+  const key = dedupeKey(url, config);
+  const existing = inFlightGets.get(key);
+  if (existing) return existing;
+  const request = rawGet(url, config).finally(() => inFlightGets.delete(key));
+  inFlightGets.set(key, request);
+  return request;
+}) as typeof apiClient.get;
+
 /** Re-export the generated envelope types so call sites do not import from ``@/generated``. */
 export type { ApiError, ApiMeta };
 

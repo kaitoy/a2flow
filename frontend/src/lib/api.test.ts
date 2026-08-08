@@ -1,5 +1,5 @@
 import { HttpAgent } from "@ag-ui/client";
-import { HttpResponse, http } from "msw";
+import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
@@ -28,6 +28,39 @@ describe("listSessions", () => {
   it("throws on server error", async () => {
     server.use(http.get(`${BASE}/api/v1/sessions`, () => HttpResponse.json(null, { status: 500 })));
     await expect(listSessions()).rejects.toThrow("500");
+  });
+});
+
+describe("GET request deduplication", () => {
+  it("shares one network request between concurrent identical GETs", async () => {
+    let callCount = 0;
+    server.use(
+      http.get(`${BASE}/api/v1/sessions`, async () => {
+        callCount++;
+        await delay(10);
+        return envelope([]);
+      })
+    );
+
+    const [first, second] = await Promise.all([listSessions(), listSessions()]);
+
+    expect(callCount).toBe(1);
+    expect(first).toEqual(second);
+  });
+
+  it("issues a separate request for a GET that starts after the previous one settles", async () => {
+    let callCount = 0;
+    server.use(
+      http.get(`${BASE}/api/v1/sessions`, async () => {
+        callCount++;
+        return envelope([]);
+      })
+    );
+
+    await listSessions();
+    await listSessions();
+
+    expect(callCount).toBe(2);
   });
 });
 
