@@ -19,6 +19,7 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.workflow_task_tools import (
+    ACTING_USER_STATE_KEY,
     _resolve_scope,
     create_workflow_task,
     delete_workflow_task,
@@ -28,6 +29,7 @@ from infrastructure.workflow_task_tools import (
 )
 from models.notification import Notification, NotificationType
 from models.workflow_execution import WorkflowExecution
+from models.workflow_task import WorkflowTask
 from repositories import SqlNotificationRepository, SqlWorkflowExecutionRepository
 from repositories.tenant_bootstrap import NoTenantSessionError
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
@@ -81,9 +83,16 @@ async def _seed_session(
         return execution.id
 
 
-def _ctx(session_id: str = "sess-abc", user_id: str = "tester") -> Any:
-    """Build a fake ToolContext exposing ``session.id`` and ``user_id``."""
-    return SimpleNamespace(session=SimpleNamespace(id=session_id), user_id=user_id)
+def _ctx(
+    session_id: str = "sess-abc",
+    user_id: str = "tester",
+    *,
+    state: dict[str, Any] | None = None,
+) -> Any:
+    """Build a fake ToolContext exposing ``session.id``, ``user_id``, and ``state``."""
+    return SimpleNamespace(
+        session=SimpleNamespace(id=session_id), user_id=user_id, state=state
+    )
 
 
 async def test_create_workflow_task(engine: AsyncEngine) -> None:
@@ -91,6 +100,57 @@ async def test_create_workflow_task(engine: AsyncEngine) -> None:
     result = await create_workflow_task("Solo", _ctx())
     assert result["title"] == "Solo"
     assert result["status"] == "pending"
+
+
+async def test_create_workflow_task_attributes_to_acting_user(
+    engine: AsyncEngine,
+) -> None:
+    """The router-stamped acting user, not the session's fixed owner, is recorded.
+
+    ``owner`` is the ADK session's ``tool_context.user_id`` (the execution's
+    initiator), but ``alice`` is the per-turn acting user impersonation would
+    stamp into state -- ``created_by``/``updated_by`` must follow ``alice``.
+    """
+    await _seed_session(engine, user_id="owner")
+    result = await create_workflow_task(
+        "Solo", _ctx(user_id="owner", state={ACTING_USER_STATE_KEY: "alice"})
+    )
+    async with AsyncSession(engine) as db:
+        task = await db.get(WorkflowTask, result["id"])
+    assert task is not None
+    assert task.created_by == "alice"
+    assert task.updated_by == "alice"
+
+
+async def test_create_workflow_task_falls_back_to_session_owner(
+    engine: AsyncEngine,
+) -> None:
+    """With no acting-user state (e.g. the unattended initial-design run), the
+    session's fixed owner (``tool_context.user_id``) is used, as before."""
+    await _seed_session(engine, user_id="owner")
+    result = await create_workflow_task("Solo", _ctx(user_id="owner"))
+    async with AsyncSession(engine) as db:
+        task = await db.get(WorkflowTask, result["id"])
+    assert task is not None
+    assert task.created_by == "owner"
+    assert task.updated_by == "owner"
+
+
+async def test_update_workflow_task_attributes_to_acting_user(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine, user_id="owner")
+    created = await create_workflow_task("Solo", _ctx(user_id="owner"))
+    await update_workflow_task(
+        created["id"],
+        _ctx(user_id="owner", state={ACTING_USER_STATE_KEY: "bob"}),
+        title="Renamed",
+    )
+    async with AsyncSession(engine) as db:
+        task = await db.get(WorkflowTask, created["id"])
+    assert task is not None
+    assert task.created_by == "owner"
+    assert task.updated_by == "bob"
 
 
 async def test_create_with_invalid_status(engine: AsyncEngine) -> None:

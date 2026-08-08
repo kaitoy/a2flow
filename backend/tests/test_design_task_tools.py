@@ -140,9 +140,16 @@ async def _seed_design_session(
         return workflow.id
 
 
-def _ctx(session_id: str = "design-abc", user_id: str = "tester") -> Any:
-    """Build a fake ToolContext exposing ``session.id`` and ``user_id``."""
-    return SimpleNamespace(session=SimpleNamespace(id=session_id), user_id=user_id)
+def _ctx(
+    session_id: str = "design-abc",
+    user_id: str = "tester",
+    *,
+    state: dict[str, Any] | None = None,
+) -> Any:
+    """Build a fake ToolContext exposing ``session.id``, ``user_id``, and ``state``."""
+    return SimpleNamespace(
+        session=SimpleNamespace(id=session_id), user_id=user_id, state=state
+    )
 
 
 # ---------- register ----------
@@ -272,6 +279,29 @@ async def test_create_design_task(engine: AsyncEngine) -> None:
     result = await create_design_task("Solo", _ctx())
     assert result["title"] == "Solo"
     assert "status" not in result
+
+
+async def test_create_design_task_attributes_to_acting_user(
+    engine: AsyncEngine,
+) -> None:
+    """The router-stamped acting user, not the session's fixed owner, is recorded.
+
+    ``owner`` is the ADK session's ``tool_context.user_id`` (the workflow's
+    creator), but ``alice`` is the per-turn acting user impersonation would
+    stamp into state -- ``created_by``/``updated_by`` must follow ``alice``.
+    """
+    from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
+    from models.workflow_task_template import WorkflowTaskTemplate
+
+    await _seed_design_session(engine, user_id="owner")
+    result = await create_design_task(
+        "Solo", _ctx(user_id="owner", state={ACTING_USER_STATE_KEY: "alice"})
+    )
+    async with AsyncSession(engine) as db:
+        template = await db.get(WorkflowTaskTemplate, result["id"])
+    assert template is not None
+    assert template.created_by == "alice"
+    assert template.updated_by == "alice"
 
 
 async def test_list_isolates_workflows(engine: AsyncEngine) -> None:

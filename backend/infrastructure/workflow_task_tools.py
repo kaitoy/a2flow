@@ -68,6 +68,19 @@ logger = logging.getLogger(__name__)
 
 _NO_SESSION = "no workflow execution is bound to the current run; cannot manage tasks"
 
+#: ``RunAgentInput.state`` key carrying the effective (impersonation-aware)
+#: caller actually driving the current turn, stamped in by
+#: ``infrastructure.agent.with_user_id`` -- as opposed to the ADK session's
+#: ``user_id``, which stays pinned to a shared session's fixed owner (an
+#: execution's initiator, or a workflow's design-session creator) for the
+#: session's whole life. The ``temp:`` prefix
+#: (``google.adk.sessions.state.State.TEMP_PREFIX``) makes ag-ui-adk keep it
+#: out of the session's persisted state, so it never leaks into another
+#: participant's later turn on the same shared session. Read by :func:`_user_id`
+#: below, and (via that helper) by every write tool in this module and in
+#: ``approval_tools.py``/``design_task_tools.py``.
+ACTING_USER_STATE_KEY = "temp:actingUserId"
+
 
 @dataclass
 class _Scope:
@@ -149,7 +162,19 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
 
 
 def _user_id(tool_context: ToolContext) -> str:
-    """Return the caller's user id for audit fields, defaulting to ``"user"``."""
+    """Return the acting caller's user id for audit fields.
+
+    Prefers the per-turn acting user stamped into session state by the router
+    (see :data:`ACTING_USER_STATE_KEY`) -- impersonation-aware, since it comes
+    from ``CurrentUserDep`` -- falling back to the ADK session's fixed owner id
+    (``tool_context.user_id``) when absent, e.g. the unattended initial-design
+    background run, which never goes through ``with_user_id``'s
+    ``acting_user_id`` parameter. Defaults to ``"user"`` if neither is set.
+    """
+    state = getattr(tool_context, "state", None)
+    acting = state.get(ACTING_USER_STATE_KEY) if state is not None else None
+    if acting:
+        return str(acting)
     return getattr(tool_context, "user_id", None) or "user"
 
 

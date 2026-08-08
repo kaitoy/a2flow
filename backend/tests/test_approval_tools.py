@@ -19,8 +19,11 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.approval_tools import get_approval, list_users, request_approval
-from infrastructure.workflow_task_tools import create_workflow_task
-from models.approval import ApprovalStatus
+from infrastructure.workflow_task_tools import (
+    ACTING_USER_STATE_KEY,
+    create_workflow_task,
+)
+from models.approval import Approval, ApprovalStatus
 from models.notification import Notification, NotificationType
 from models.user import Role
 from models.workflow_execution import WorkflowExecution
@@ -75,9 +78,16 @@ async def _seed_session(
         return execution.id
 
 
-def _ctx(session_id: str = "sess-abc", user_id: str = "owner") -> Any:
-    """Build a fake ToolContext exposing ``session.id`` and ``user_id``."""
-    return SimpleNamespace(session=SimpleNamespace(id=session_id), user_id=user_id)
+def _ctx(
+    session_id: str = "sess-abc",
+    user_id: str = "owner",
+    *,
+    state: dict[str, Any] | None = None,
+) -> Any:
+    """Build a fake ToolContext exposing ``session.id``, ``user_id``, and ``state``."""
+    return SimpleNamespace(
+        session=SimpleNamespace(id=session_id), user_id=user_id, state=state
+    )
 
 
 async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notification]:
@@ -85,6 +95,28 @@ async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notificatio
     async with AsyncSession(eng) as db:
         repo = SqlNotificationRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
         return await repo.list(user_id=user_id, limit=100, offset=0)
+
+
+async def test_request_approval_attributes_to_acting_user(engine: AsyncEngine) -> None:
+    """The router-stamped acting user, not the session's fixed owner, is recorded.
+
+    ``owner`` is the ADK session's ``tool_context.user_id`` (the execution's
+    initiator), but ``alice`` is the per-turn acting user impersonation would
+    stamp into state -- ``created_by``/``updated_by`` on the Approval must
+    follow ``alice``.
+    """
+    await _seed_session(engine, user_id="owner")
+    result = await request_approval(
+        "Deploy to prod",
+        _ctx(user_id="owner", state={ACTING_USER_STATE_KEY: "alice"}),
+        approver="bob",
+    )
+    assert "error" not in result
+    async with AsyncSession(engine) as db:
+        approval = await db.get(Approval, result["approval_id"])
+    assert approval is not None
+    assert approval.created_by == "alice"
+    assert approval.updated_by == "alice"
 
 
 async def test_request_approval_creates_pending_record(engine: AsyncEngine) -> None:

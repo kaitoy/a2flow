@@ -18,6 +18,7 @@ from infrastructure.agent import (
     AgentKind,
     tenant_app_name,
 )
+from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
 from models.user import SYSTEM_USER_ID
 from models.workflow_execution import WorkflowExecution
 from tests._envelope import assert_err, assert_ok
@@ -394,6 +395,42 @@ async def test_workflow_session_agent_keys_run_by_execution_initiator(
     )
     assert received_inputs[0].forwarded_props["userId"] == execution["initiatorId"]
     assert execution["initiatorId"] == SYSTEM_USER_ID
+
+
+async def test_workflow_session_agent_stamps_acting_user_in_state(
+    workflow_client: AsyncClient,
+    mock_adk_agent: MagicMock,
+) -> None:
+    """The actual driver of this turn (impersonation-aware) reaches the tools.
+
+    Unlike ``forwarded_props['userId']`` (pinned to the session owner, see
+    ``test_workflow_session_agent_keys_run_by_execution_initiator``), the
+    ``ACTING_USER_STATE_KEY`` state entry must carry whoever is really driving
+    this turn, so tool-call writes (``created_by``/``updated_by``) attribute to
+    them rather than always to the session's owner.
+    """
+    skill = await _create_skill(workflow_client)
+    execution = await _execute_workflow(workflow_client, skill["id"])
+
+    received_inputs: list[Any] = []
+
+    async def _capturing_run(
+        input_data: Any, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        received_inputs.append(input_data)
+        return
+        yield
+
+    mock_adk_agent.run = _capturing_run
+
+    await workflow_client.post(
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Id": "alice"},
+    )
+    assert received_inputs[0].state[ACTING_USER_STATE_KEY] == "alice"
+    assert received_inputs[0].forwarded_props["userId"] == execution["initiatorId"]
+    assert execution["initiatorId"] != "alice"
 
 
 async def test_workflow_session_agent_records_sender_on_client_disconnect(

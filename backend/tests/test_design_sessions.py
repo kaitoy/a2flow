@@ -171,6 +171,43 @@ async def test_design_session_agent_uses_design_kind(
     )
 
 
+async def test_design_session_agent_stamps_acting_user_in_state(
+    workflow_client: AsyncClient,
+    mock_adk_agent: MagicMock,
+) -> None:
+    """The actual driver of this turn (impersonation-aware) reaches the tools.
+
+    ``forwarded_props['userId']`` stays pinned to the workflow's ``created_by``
+    (the design session's owner, shared by every developer), but the
+    ``ACTING_USER_STATE_KEY`` state entry must carry whoever is really driving
+    this turn, so tool-call writes attribute to them instead of always to the
+    session's owner.
+    """
+    from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
+
+    _skill, wf = await _design_session(workflow_client)
+
+    received_inputs: list[Any] = []
+
+    async def _capturing_run(
+        input_data: Any, *args: Any, **kwargs: Any
+    ) -> AsyncGenerator[Any, None]:
+        received_inputs.append(input_data)
+        return
+        yield
+
+    mock_adk_agent.run = _capturing_run
+
+    await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Id": "alice", "X-User-Roles": "developer"},
+    )
+    assert received_inputs[0].state[ACTING_USER_STATE_KEY] == "alice"
+    assert received_inputs[0].forwarded_props["userId"] == wf["createdBy"]
+    assert wf["createdBy"] != "alice"
+
+
 async def test_design_session_agent_allowed_for_other_developer(
     workflow_client: AsyncClient,
     mock_agent_registry: MagicMock,

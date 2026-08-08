@@ -179,7 +179,7 @@ async def design_session_agent(
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
-    input_data = with_user_id(input_data, workflow.created_by)
+    input_data = with_user_id(input_data, workflow.created_by, acting_user_id=caller.id)
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
     async with AsyncExitStack() as stack:

@@ -28,6 +28,7 @@ from infrastructure.design_task_tools import (
 )
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.workflow_task_tools import (
+    ACTING_USER_STATE_KEY,
     create_workflow_task,
     delete_workflow_task,
     get_workflow_task,
@@ -159,31 +160,48 @@ def extract_user_id(input_data: RunAgentInput) -> str:
     return str(props.get(USER_ID_PROP_KEY, DEFAULT_USER_ID))
 
 
-def with_user_id(input_data: RunAgentInput, user_id: str) -> RunAgentInput:
-    """Return a copy of ``input_data`` with ``forwarded_props`` sanitized.
+def with_user_id(
+    input_data: RunAgentInput, user_id: str, *, acting_user_id: str | None = None
+) -> RunAgentInput:
+    """Return a copy of ``input_data`` with ``forwarded_props``/``state`` sanitized.
 
-    ``forwarded_props`` is client-controlled, so both run endpoints funnel their
-    input through this before handing it to :class:`~ag_ui_adk.ADKAgent`:
+    ``forwarded_props`` and ``state`` are both client-controlled, so both run
+    endpoints funnel their input through this before handing it to
+    :class:`~ag_ui_adk.ADKAgent`:
 
     - ``userId`` is overridden so the agent's session is keyed by the
-      server-validated identity rather than an untrusted client prop.
-    - :data:`A2UI_INJECT_PROP_KEY` is dropped so ``ag-ui-adk`` leaves the
-      frontend-injected ``render_a2ui`` tool alone instead of swapping in its own
-      server-side A2UI sub-agent.
+      server-validated identity rather than an untrusted client prop. On a
+      route that shares one ADK session across several authorized
+      participants (an execution's initiator and its approvers, or a
+      workflow's design session), this stays pinned to the session's owner
+      for the session's whole life -- it is an addressing key, not "who is
+      driving this turn".
+    - :data:`ACTING_USER_STATE_KEY` is stamped with ``acting_user_id`` -- the
+      *actual* effective caller for this turn (impersonation-aware), which
+      can differ from ``user_id`` on a shared session. The agent tools
+      (``infrastructure/*_tools.py``) read it via ``tool_context.state`` to
+      attribute their writes (``created_by``/``updated_by``) to whoever is
+      really driving the turn instead of always the session's fixed owner.
 
     Args:
         input_data: The incoming AG-UI run input.
-        user_id: The user id derived from the ``X-User-Id`` header; falls back to
+        user_id: The user id the ADK session is keyed by; falls back to
             :data:`DEFAULT_USER_ID` when empty.
+        acting_user_id: The effective (impersonation-aware) caller actually
+            driving this turn. Defaults to ``user_id`` for single-user routes
+            where the two are always the same.
 
     Returns:
-        A copy of ``input_data`` whose ``forwarded_props['userId']`` is set and
-        whose A2UI injection flag is removed.
+        A copy of ``input_data`` whose ``forwarded_props['userId']`` and
+        ``state[ACTING_USER_STATE_KEY]`` are set and whose A2UI injection flag
+        is removed.
     """
     props = dict(input_data.forwarded_props or {})
     props[USER_ID_PROP_KEY] = user_id or DEFAULT_USER_ID
     props.pop(A2UI_INJECT_PROP_KEY, None)
-    return input_data.model_copy(update={"forwarded_props": props})
+    state = dict(input_data.state or {})
+    state[ACTING_USER_STATE_KEY] = acting_user_id or user_id or DEFAULT_USER_ID
+    return input_data.model_copy(update={"forwarded_props": props, "state": state})
 
 
 def keep_a2ui_context(context: Sequence[Context]) -> list[Context]:
