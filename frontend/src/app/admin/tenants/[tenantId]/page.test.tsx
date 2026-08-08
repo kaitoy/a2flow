@@ -161,4 +161,19 @@ describe("TenantDetailPage", () => {
       })
     );
   });
+
+  it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {
+    setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/tenants/:tenantId", () =>
+        envelopeErr("FORBIDDEN", "Requires developer", 403)
+      )
+    );
+    const beforeCount = store.getState().toast.items.length;
+
+    render(<TenantDetailPage />);
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
 });

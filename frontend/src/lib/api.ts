@@ -169,6 +169,18 @@ function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
 }
 
+declare module "axios" {
+  interface AxiosRequestConfig {
+    /**
+     * When true, skip the global error toast for a FORBIDDEN (403) failure on
+     * this specific request -- the caller renders its own access-denied state
+     * instead. Any other failure, including a different 403, still toasts
+     * normally. See {@link isForbiddenError}.
+     */
+    suppressForbiddenToast?: boolean;
+  }
+}
+
 const apiClient = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
@@ -203,6 +215,8 @@ apiClient.interceptors.response.use(
     if (isSessionExpiry) {
       // A toast would just flash and vanish mid-navigation, so skip it here.
       window.location.assign("/login");
+    } else if (error?.config?.suppressForbiddenToast && isForbiddenError(error)) {
+      // Caller renders its own access-denied state; skip the generic toast.
     } else {
       reportApiError(error);
     }
@@ -270,6 +284,38 @@ function reportApiError(error: unknown): void {
   store.dispatch(showToast({ message: getApiErrorMessage(error), variant: "error" }));
 }
 
+/** Backend error code for `ForbiddenError` -- see `backend/repositories/exceptions.py`. */
+const FORBIDDEN_CODE = "FORBIDDEN";
+
+/**
+ * True when `error` is the backend's `ForbiddenError` (HTTP 403, envelope
+ * `error.code === "FORBIDDEN"`) -- an authenticated caller who lacks the
+ * specific role/ownership grant for an otherwise-existing record. Distinct
+ * from a 404 (the record doesn't exist, or isn't visible to this tenant),
+ * which this deliberately does not match. Handles both shapes a call can
+ * fail with, same as {@link getApiErrorMessage}: a raw Axios error
+ * (HTTP-level 403) and an {@link ApiClientError} (a 2xx envelope that still
+ * carries the error, thrown by {@link fetchEnvelope}).
+ */
+export function isForbiddenError(error: unknown): boolean {
+  if (error instanceof ApiClientError) {
+    return error.code === FORBIDDEN_CODE;
+  }
+  if (axios.isAxiosError(error) && error.response?.status === 403) {
+    const envelopeCode = (error.response.data as { error?: ApiError } | null | undefined)?.error
+      ?.code;
+    return envelopeCode === undefined || envelopeCode === FORBIDDEN_CODE;
+  }
+  return false;
+}
+
+/**
+ * Axios request config for a page's initial-load GET that renders its own
+ * {@link isForbiddenError}-driven access-denied state, so the generic error
+ * toast should stay silent for a FORBIDDEN failure on that specific request.
+ */
+export const SUPPRESS_FORBIDDEN_TOAST: AxiosRequestConfig = { suppressForbiddenToast: true };
+
 /**
  * Zod schema shape produced for every wrapped response by ``@hey-api/openapi-ts``.
  * Constrains the helper below so only generated envelope schemas can be passed in.
@@ -302,7 +348,9 @@ async function fetchEnvelope<S extends EnvelopeSchema>(
       env.error.details,
       env.meta.requestId
     );
-    reportApiError(err);
+    if (!(res.config?.suppressForbiddenToast && isForbiddenError(err))) {
+      reportApiError(err);
+    }
     throw err;
   }
   return env.data;
@@ -510,9 +558,9 @@ export async function listAgentSkills(query: ListQuery = {}): Promise<AgentSkill
 }
 
 /** Fetch a single agent skill by ID. */
-export async function getAgentSkill(id: string): Promise<AgentSkill> {
+export async function getAgentSkill(id: string, config?: AxiosRequestConfig): Promise<AgentSkill> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/agent-skills/${encodeURIComponent(id)}`),
+    apiClient.get(`/api/v1/agent-skills/${encodeURIComponent(id)}`, config),
     zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse
   ) as Promise<AgentSkill>;
 }
@@ -565,9 +613,9 @@ export async function listMcpServers(query: ListQuery = {}): Promise<McpServer[]
 }
 
 /** Fetch a single registered MCP server by ID. */
-export async function getMcpServer(id: string): Promise<McpServer> {
+export async function getMcpServer(id: string, config?: AxiosRequestConfig): Promise<McpServer> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/mcp-servers/${encodeURIComponent(id)}`),
+    apiClient.get(`/api/v1/mcp-servers/${encodeURIComponent(id)}`, config),
     zGetMcpServerApiV1McpServersServerIdGetResponse
   ) as Promise<McpServer>;
 }
@@ -629,9 +677,9 @@ export async function listSecrets(query: ListQuery = {}): Promise<Secret[]> {
 }
 
 /** Fetch a single secret by ID. The stored value is never returned. */
-export async function getSecret(id: string): Promise<Secret> {
+export async function getSecret(id: string, config?: AxiosRequestConfig): Promise<Secret> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/secrets/${encodeURIComponent(id)}`),
+    apiClient.get(`/api/v1/secrets/${encodeURIComponent(id)}`, config),
     zGetSecretApiV1SecretsSecretIdGetResponse
   ) as Promise<Secret>;
 }
@@ -683,9 +731,9 @@ export async function listTenants(query: ListQuery = {}): Promise<Tenant[]> {
 }
 
 /** Fetch a single tenant by ID. */
-export async function getTenant(id: string): Promise<Tenant> {
+export async function getTenant(id: string, config?: AxiosRequestConfig): Promise<Tenant> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/tenants/${encodeURIComponent(id)}`),
+    apiClient.get(`/api/v1/tenants/${encodeURIComponent(id)}`, config),
     zGetTenantApiV1TenantsTenantIdGetResponse
   ) as Promise<Tenant>;
 }
@@ -723,9 +771,9 @@ export async function listUsers(query: ListQuery = {}): Promise<User[]> {
 }
 
 /** Fetch a single user by ID. */
-export async function getUser(id: string): Promise<User> {
+export async function getUser(id: string, config?: AxiosRequestConfig): Promise<User> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/users/${encodeURIComponent(id)}`),
+    apiClient.get(`/api/v1/users/${encodeURIComponent(id)}`, config),
     zGetUserApiV1UsersUserIdGetResponse
   ) as Promise<User>;
 }
@@ -852,9 +900,9 @@ export async function listWorkflows(query: ListQuery = {}): Promise<Workflow[]> 
 }
 
 /** Fetch a single workflow by ID. */
-export async function getWorkflow(id: string): Promise<Workflow> {
+export async function getWorkflow(id: string, config?: AxiosRequestConfig): Promise<Workflow> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/workflows/${encodeURIComponent(id)}`),
+    apiClient.get(`/api/v1/workflows/${encodeURIComponent(id)}`, config),
     zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse
   ) as Promise<Workflow>;
 }
@@ -967,9 +1015,12 @@ export async function listWorkflowTaskTemplates(
 }
 
 /** Fetch a single WorkflowTaskTemplate by ID. */
-export async function getWorkflowTaskTemplate(templateId: string): Promise<WorkflowTaskTemplate> {
+export async function getWorkflowTaskTemplate(
+  templateId: string,
+  config?: AxiosRequestConfig
+): Promise<WorkflowTaskTemplate> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-task-templates/${encodeURIComponent(templateId)}`),
+    apiClient.get(`/api/v1/workflow-task-templates/${encodeURIComponent(templateId)}`, config),
     zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse
   ) as Promise<WorkflowTaskTemplate>;
 }
@@ -1042,9 +1093,12 @@ function sendersFrom(records: MessageSenderRecord[]): Map<string, string> {
  * shape matches {@link getWorkflowSessionMessages} and the chat components can
  * be reused unchanged.
  */
-export async function getDesignSessionMessages(workflowId: string): Promise<Message[]> {
+export async function getDesignSessionMessages(
+  workflowId: string,
+  config?: AxiosRequestConfig
+): Promise<Message[]> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/messages`),
+    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/messages`, config),
     zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse
   ) as Promise<Message[]>;
 }
@@ -1070,9 +1124,12 @@ export async function getDesignSessionMessageSenders(
 }
 
 /** Fetch a WorkflowExecution record by ID. */
-export async function getWorkflowExecution(id: string): Promise<WorkflowExecution> {
+export async function getWorkflowExecution(
+  id: string,
+  config?: AxiosRequestConfig
+): Promise<WorkflowExecution> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(id)}`),
+    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(id)}`, config),
     zGetWorkflowExecutionApiV1WorkflowExecutionsExecutionIdGetResponse
   ) as Promise<WorkflowExecution>;
 }
@@ -1084,9 +1141,15 @@ export async function getWorkflowExecution(id: string): Promise<WorkflowExecutio
  * initiator on the backend, so any viewer (for example a designated approver)
  * sees the same conversation instead of a separate, empty session.
  */
-export async function getWorkflowSessionMessages(executionId: string): Promise<Message[]> {
+export async function getWorkflowSessionMessages(
+  executionId: string,
+  config?: AxiosRequestConfig
+): Promise<Message[]> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`),
+    apiClient.get(
+      `/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`,
+      config
+    ),
     zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
   ) as Promise<Message[]>;
 }
@@ -1259,9 +1322,9 @@ export async function listApprovals(query: ListQuery = {}): Promise<Approval[]> 
 }
 
 /** Fetch a single approval request by ID. */
-export async function getApproval(id: string): Promise<Approval> {
+export async function getApproval(id: string, config?: AxiosRequestConfig): Promise<Approval> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}`),
+    apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}`, config),
     zGetApprovalApiV1ApprovalsApprovalIdGetResponse
   ) as Promise<Approval>;
 }

@@ -19,6 +19,7 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
 import { ChatInputMenu } from "@/components/ChatInputMenu";
 import { MessageList } from "@/components/MessageList";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
@@ -31,7 +32,9 @@ import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import {
   generateWorkflowDescription,
   getWorkflow,
+  isForbiddenError,
   listWorkflowTaskTemplates,
+  SUPPRESS_FORBIDDEN_TOAST,
   type Workflow,
   type WorkflowTaskTemplate,
 } from "@/lib/api";
@@ -87,6 +90,7 @@ function DesignSessionView({
     messageSenders,
     senderUsers,
     locallySentMessageIds,
+    forbidden: chatForbidden,
   } = useWorkflowSessionChat(workflow.id, workflow.sessionId, null, workflow.createdBy, "design");
 
   // The design chat is shared by the tenant's developers, so each message shows
@@ -176,6 +180,10 @@ function DesignSessionView({
       // than leaving it stuck on the loading skeleton.
       setDiffOpen(false);
     }
+  }
+
+  if (chatForbidden) {
+    return <AccessDeniedState fill="screen" />;
   }
 
   return (
@@ -300,14 +308,20 @@ export default function DesignSessionPage() {
   const workflowId = params.workflowId;
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: retryCount is a bump counter that re-triggers the fetch, not a data dependency
   useEffect(() => {
     setLoadFailed(false);
-    getWorkflow(workflowId)
+    setForbidden(false);
+    getWorkflow(workflowId, SUPPRESS_FORBIDDEN_TOAST)
       .then(setWorkflow)
       .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         logger.error(err, "failed to load design session");
         setLoadFailed(true);
       });
@@ -319,6 +333,8 @@ export default function DesignSessionPage() {
     <AuthProvider>
       {workflow ? (
         <DesignSessionView workflow={workflow} onWorkflowUpdate={setWorkflow} />
+      ) : forbidden ? (
+        <AccessDeniedState fill="screen" />
       ) : loadFailed ? (
         <DesignSessionLoadError onRetry={retry} />
       ) : (

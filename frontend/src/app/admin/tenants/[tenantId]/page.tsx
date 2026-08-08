@@ -14,13 +14,21 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { deleteTenant, getTenant, type TenantUpdate, updateTenant } from "@/lib/api";
+import {
+  deleteTenant,
+  getTenant,
+  isForbiddenError,
+  SUPPRESS_FORBIDDEN_TOAST,
+  type TenantUpdate,
+  updateTenant,
+} from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { tenantsChanged } from "@/store/tenantsSlice";
 import { showToast } from "@/store/toastSlice";
@@ -41,6 +49,7 @@ export default function TenantDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   // The persisted display name, which titles the page. Kept out of the form so
@@ -66,7 +75,7 @@ export default function TenantDetailPage() {
   });
 
   useEffect(() => {
-    getTenant(tenantId)
+    getTenant(tenantId, SUPPRESS_FORBIDDEN_TOAST)
       .then((tenant) => {
         setDisplayName(tenant.displayName);
         setName(tenant.name);
@@ -81,7 +90,11 @@ export default function TenantDetailPage() {
           updatedAt: tenant.updatedAt,
         });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
@@ -126,6 +139,15 @@ export default function TenantDetailPage() {
     // display name has loaded.
     { label: displayName || "…" },
   ];
+
+  if (forbidden) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
 
   if (loading) {
     return (

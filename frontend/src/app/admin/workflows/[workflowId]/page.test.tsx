@@ -910,4 +910,18 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(deactivateSpy).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByText("draft")).toBeInTheDocument());
   });
+
+  it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelopeErr("FORBIDDEN", "Requires developer", 403)
+      )
+    );
+    const beforeCount = store.getState().toast.items.length;
+
+    render(<WorkflowDetailPage />);
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
 });

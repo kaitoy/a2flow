@@ -22,6 +22,7 @@ import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { GenerateWorkflowDialog } from "@/components/admin/generate-workflow-dialog";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -34,8 +35,10 @@ import {
   type AgentSkill,
   deleteAgentSkill,
   getAgentSkill,
+  isForbiddenError,
   pullAgentSkill,
   type SkillSyncStatus,
+  SUPPRESS_FORBIDDEN_TOAST,
   updateAgentSkill,
 } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
@@ -63,6 +66,7 @@ export default function AgentSkillDetailPage() {
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saveBeforeGenerateOpen, setSaveBeforeGenerateOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -96,7 +100,7 @@ export default function AgentSkillDetailPage() {
   }, []);
 
   useEffect(() => {
-    getAgentSkill(skillId)
+    getAgentSkill(skillId, SUPPRESS_FORBIDDEN_TOAST)
       .then((skill) => {
         setName(skill.name);
         reset({
@@ -116,7 +120,11 @@ export default function AgentSkillDetailPage() {
           updatedAt: skill.updatedAt,
         });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
@@ -215,6 +223,15 @@ export default function AgentSkillDetailPage() {
     // name has loaded.
     { label: name || "…" },
   ];
+
+  if (forbidden) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
 
   if (loading) {
     return (

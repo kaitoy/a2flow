@@ -21,10 +21,17 @@ import {
   toMcpServerBody,
 } from "@/components/admin/mcp-server-fields";
 import { McpServerToolsPanel } from "@/components/admin/mcp-server-tools-panel";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { deleteMcpServer, getMcpServer, updateMcpServer } from "@/lib/api";
+import {
+  deleteMcpServer,
+  getMcpServer,
+  isForbiddenError,
+  SUPPRESS_FORBIDDEN_TOAST,
+  updateMcpServer,
+} from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -37,6 +44,7 @@ export default function McpServerDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   // The persisted name, which titles the page. Kept out of the form so the
@@ -60,7 +68,7 @@ export default function McpServerDetailPage() {
   const transport = watch("transport");
 
   useEffect(() => {
-    getMcpServer(serverId)
+    getMcpServer(serverId, SUPPRESS_FORBIDDEN_TOAST)
       .then((server) => {
         setName(server.name);
         reset({
@@ -80,7 +88,11 @@ export default function McpServerDetailPage() {
           updatedAt: server.updatedAt,
         });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
@@ -119,6 +131,15 @@ export default function McpServerDetailPage() {
     // name has loaded.
     { label: name || "…" },
   ];
+
+  if (forbidden) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
 
   if (loading) {
     return (

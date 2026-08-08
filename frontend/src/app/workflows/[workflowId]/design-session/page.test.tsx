@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { RootState } from "@/store";
+import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { act, render, screen, waitFor, within } from "@/test/test-utils";
@@ -457,5 +458,43 @@ describe("DesignSessionPage", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("shows the access-denied state and no toast when loading the workflow is FORBIDDEN", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelopeErr("FORBIDDEN", "Requires developer", 403)
+      )
+    );
+    const beforeCount = store.getState().toast.items.length;
+
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
+
+  it("shows the access-denied state when the design chat history load is FORBIDDEN", async () => {
+    useWorkflowSessionChatMock.mockReturnValue({
+      messages: [],
+      isRunning: false,
+      isStreaming: false,
+      error: null,
+      pendingRenderCalls: [],
+      sendMessage: vi.fn(),
+      sendA2uiAction: vi.fn(),
+      sendApprovalResult: vi.fn(),
+      messageSenders: new Map(),
+      senderUsers: new Map(),
+      locallySentMessageIds: new Set(),
+      messageTasks: new Map(),
+      tasks: [],
+      forbidden: true,
+    });
+
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("message-list-mock")).not.toBeInTheDocument());
   });
 });

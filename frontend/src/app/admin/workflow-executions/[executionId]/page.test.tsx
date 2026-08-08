@@ -2,7 +2,8 @@ import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import WorkflowExecutionDetailPage from "./page";
@@ -112,5 +113,19 @@ describe("WorkflowExecutionDetailPage", () => {
 
     await waitFor(() => expect(deleteSpy).toHaveBeenCalled());
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflow-executions"));
+  });
+
+  it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id", () =>
+        envelopeErr("FORBIDDEN", "Only the execution initiator or a designated approver", 403)
+      )
+    );
+    const beforeCount = store.getState().toast.items.length;
+
+    render(<WorkflowExecutionDetailPage />);
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(store.getState().toast.items.length).toBe(beforeCount);
   });
 });

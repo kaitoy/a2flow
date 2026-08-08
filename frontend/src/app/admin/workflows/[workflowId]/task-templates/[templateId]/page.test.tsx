@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { useParams } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
+import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -135,5 +136,20 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(captured.body).toMatchObject({ toolBindings: [] }));
+  });
+
+  it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {
+    vi.mocked(useParams).mockReturnValue({ workflowId: "wf-1", templateId: "tmpl-1" });
+    server.use(
+      http.get(`${BASE}/api/v1/workflow-task-templates/:templateId`, () =>
+        envelopeErr("FORBIDDEN", "Requires developer", 403)
+      )
+    );
+    const beforeCount = store.getState().toast.items.length;
+
+    render(<WorkflowTaskTemplateDetailPage />);
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(store.getState().toast.items.length).toBe(beforeCount);
   });
 });

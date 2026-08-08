@@ -3,9 +3,10 @@ import { useParams } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { RootState } from "@/store";
-import { envelope } from "@/test/msw/envelope";
+import { store } from "@/store";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { render, screen, within } from "@/test/test-utils";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import WorkflowSessionPage from "./page";
 
 /** The default `/workflow-executions/execution-1/session` handler's payload, for `server.use` overrides. */
@@ -105,5 +106,47 @@ describe("WorkflowSessionPage", () => {
       "href",
       "/admin/workflow-executions/execution-1"
     );
+  });
+
+  it("shows the access-denied state and no toast when loading the execution is FORBIDDEN", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id", () =>
+        envelopeErr(
+          "FORBIDDEN",
+          "Only the execution initiator or a designated approver can access this workflow execution",
+          403
+        )
+      )
+    );
+    const beforeCount = store.getState().toast.items.length;
+
+    render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
+
+  it("shows the access-denied state when the chat history load is FORBIDDEN", async () => {
+    useWorkflowSessionChatMock.mockReturnValue({
+      messages: [],
+      isRunning: false,
+      isStreaming: false,
+      error: null,
+      pendingRenderCalls: [],
+      sendMessage: vi.fn(),
+      sendA2uiAction: vi.fn(),
+      sendApprovalResult: vi.fn(),
+      messageSenders: new Map(),
+      senderUsers: new Map(),
+      locallySentMessageIds: new Set(),
+      messageTasks: new Map(),
+      tasks: [],
+      forbidden: true,
+    });
+
+    render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("message-list-mock")).not.toBeInTheDocument());
   });
 });

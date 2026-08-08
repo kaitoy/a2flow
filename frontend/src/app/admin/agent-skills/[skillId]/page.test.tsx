@@ -341,4 +341,15 @@ describe("AgentSkillDetailPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(patchSpy).not.toHaveBeenCalled();
   });
+
+  it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {
+    setup();
+    server.use(http.get(SKILL_URL, () => envelopeErr("FORBIDDEN", "Requires developer", 403)));
+    const beforeCount = store.getState().toast.items.length;
+
+    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
 });

@@ -12,9 +12,17 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
-import { type Approval, type ApprovalStatus, getApproval, getUserNames } from "@/lib/api";
+import {
+  type Approval,
+  type ApprovalStatus,
+  getApproval,
+  getUserNames,
+  isForbiddenError,
+  SUPPRESS_FORBIDDEN_TOAST,
+} from "@/lib/api";
 
 /** Placeholder shown in place of an attribute that has no value. */
 const EMPTY = "—";
@@ -39,13 +47,14 @@ export default function ApprovalDetailPage() {
   const { approvalId } = useParams<{ approvalId: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
   const [approverName, setApproverName] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
   useEffect(() => {
     let active = true;
-    getApproval(approvalId)
+    getApproval(approvalId, SUPPRESS_FORBIDDEN_TOAST)
       .then(async (a) => {
         if (!active) return;
         setApproval(a);
@@ -59,7 +68,12 @@ export default function ApprovalDetailPage() {
         const names = await getUserNames([a.approver]);
         if (active) setApproverName(names.get(a.approver) ?? null);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (!active) return;
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => {
@@ -75,6 +89,15 @@ export default function ApprovalDetailPage() {
     { label: "Approvals", href: "/admin/approvals" },
     { label: approval?.title || "…" },
   ];
+
+  if (forbidden) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
 
   if (loading || !approval) {
     return (

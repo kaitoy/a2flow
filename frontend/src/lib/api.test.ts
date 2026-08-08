@@ -1,15 +1,18 @@
 import { HttpAgent } from "@ag-ui/client";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
-import { envelope } from "@/test/msw/envelope";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import {
+  ApiClientError,
   createChatAgent,
+  getAgentSkill,
   getDesignSessionMessageSenders,
   getSessionMessages,
   getWorkflowSessionMessageSenders,
   getWorkflowSessionMessages,
   getWorkflowSessionMessageTasks,
+  isForbiddenError,
   listSessions,
 } from "./api";
 
@@ -133,6 +136,41 @@ describe("getDesignSessionMessageSenders", () => {
     expect(result.get("m2")).toBe("dev-2");
     expect(result.has("m1")).toBe(false);
     expect(result.has("m3")).toBe(false);
+  });
+});
+
+describe("isForbiddenError", () => {
+  it("returns true for an ApiClientError with code FORBIDDEN", () => {
+    expect(isForbiddenError(new ApiClientError("FORBIDDEN", "nope"))).toBe(true);
+  });
+
+  it("returns false for an ApiClientError with a different code", () => {
+    expect(isForbiddenError(new ApiClientError("NOT_FOUND", "nope"))).toBe(false);
+  });
+
+  it("returns true for a raw HTTP 403 with a FORBIDDEN envelope", async () => {
+    server.use(
+      http.get(`${BASE}/api/v1/agent-skills/:id`, () =>
+        envelopeErr("FORBIDDEN", "Requires developer", 403)
+      )
+    );
+    const error = await getAgentSkill("skill-1").catch((err: unknown) => err);
+    expect(isForbiddenError(error)).toBe(true);
+  });
+
+  it("returns false for a non-403 error", async () => {
+    server.use(
+      http.get(`${BASE}/api/v1/agent-skills/:id`, () =>
+        envelopeErr("NOT_FOUND", "AgentSkill not found", 404)
+      )
+    );
+    const error = await getAgentSkill("skill-1").catch((err: unknown) => err);
+    expect(isForbiddenError(error)).toBe(false);
+  });
+
+  it("returns false for a plain Error and other non-error values", () => {
+    expect(isForbiddenError(new Error("boom"))).toBe(false);
+    expect(isForbiddenError(undefined)).toBe(false);
   });
 });
 

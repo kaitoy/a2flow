@@ -3,10 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { listAgentSkills } from "./api";
+import { getAgentSkill, listAgentSkills, SUPPRESS_FORBIDDEN_TOAST } from "./api";
 
 const BASE = "http://localhost:8000";
 const URL = `${BASE}/api/v1/agent-skills`;
+const SKILL_ID = "skill-1";
+const SKILL_URL = `${URL}/${SKILL_ID}`;
 
 const assignMock = vi.fn();
 
@@ -76,5 +78,30 @@ describe("global API error toast", () => {
     await listAgentSkills();
 
     expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
+
+  it("does not show a toast for a FORBIDDEN 403 when suppressForbiddenToast is set", async () => {
+    server.use(http.get(SKILL_URL, () => envelopeErr("FORBIDDEN", "Requires developer", 403)));
+    const beforeCount = store.getState().toast.items.length;
+
+    await expect(getAgentSkill(SKILL_ID, SUPPRESS_FORBIDDEN_TOAST)).rejects.toThrow();
+
+    expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
+
+  it("still shows a toast for a FORBIDDEN 403 without the suppress flag", async () => {
+    server.use(http.get(SKILL_URL, () => envelopeErr("FORBIDDEN", "Requires developer", 403)));
+
+    await expect(getAgentSkill(SKILL_ID)).rejects.toThrow();
+
+    expect(lastToast()).toMatchObject({ message: "Requires developer", variant: "error" });
+  });
+
+  it("still shows a toast for a non-FORBIDDEN error even with suppressForbiddenToast set", async () => {
+    server.use(http.get(SKILL_URL, () => envelopeErr("NOT_FOUND", "AgentSkill not found", 404)));
+
+    await expect(getAgentSkill(SKILL_ID, SUPPRESS_FORBIDDEN_TOAST)).rejects.toThrow();
+
+    expect(lastToast()).toMatchObject({ message: "AgentSkill not found", variant: "error" });
   });
 });

@@ -29,6 +29,7 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,9 @@ import {
   generateWorkflowDescription,
   getAgentSkill,
   getWorkflow,
+  isForbiddenError,
   publishWorkflow,
+  SUPPRESS_FORBIDDEN_TOAST,
   updateWorkflow,
   type Workflow,
   type WorkflowStatus,
@@ -128,6 +131,7 @@ export default function WorkflowDetailPage() {
   const canRun = useHasRole(Role.REQUESTER, Role.DEVELOPER);
   const canEdit = useHasRole(Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [skill, setSkill] = useState<AgentSkill | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -182,12 +186,16 @@ export default function WorkflowDetailPage() {
   );
 
   useEffect(() => {
-    getWorkflow(workflowId)
+    getWorkflow(workflowId, SUPPRESS_FORBIDDEN_TOAST)
       .then(async (wf) => {
         applyWorkflow(wf);
-        setSkill(await getAgentSkill(wf.agentSkillId));
+        setSkill(await getAgentSkill(wf.agentSkillId, SUPPRESS_FORBIDDEN_TOAST));
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
@@ -309,6 +317,15 @@ export default function WorkflowDetailPage() {
     // name has loaded.
     { label: workflow?.name || "…" },
   ];
+
+  if (forbidden) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
 
   if (loading || !workflow) {
     return (

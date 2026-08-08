@@ -17,8 +17,10 @@ vi.mock("@/lib/api", () => ({
   getWorkflowSessionMessages: vi.fn(),
   getWorkflowSessionMessageSenders: vi.fn(),
   getWorkflowSessionMessageTasks: vi.fn(),
+  isForbiddenError: vi.fn(),
   listWorkflowTasks: vi.fn(),
   getUsersByIds: vi.fn(),
+  SUPPRESS_FORBIDDEN_TOAST: { suppressForbiddenToast: true },
   formatUserName: (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`,
 }));
 
@@ -48,6 +50,7 @@ beforeEach(() => {
   vi.mocked(api.getWorkflowSessionMessageTasks).mockResolvedValue(new Map());
   vi.mocked(api.listWorkflowTasks).mockResolvedValue([]);
   vi.mocked(api.getUsersByIds).mockResolvedValue(new Map());
+  vi.mocked(api.isForbiddenError).mockReset().mockReturnValue(false);
   mockAgent.addMessage.mockClear();
   mockAgent.runAgent.mockClear();
 });
@@ -58,7 +61,12 @@ describe("useWorkflowSessionChat", () => {
     renderHook(() => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"), {
       wrapper: makeWrapper(store),
     });
-    await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalledWith("execution-1"));
+    await waitFor(() =>
+      expect(api.getWorkflowSessionMessages).toHaveBeenCalledWith(
+        "execution-1",
+        api.SUPPRESS_FORBIDDEN_TOAST
+      )
+    );
   });
 
   it("returns pendingRenderCalls mirroring the store", async () => {
@@ -106,7 +114,12 @@ describe("useWorkflowSessionChat", () => {
       () => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"),
       { wrapper: makeWrapper(store) }
     );
-    await waitFor(() => expect(api.getDesignSessionMessages).toHaveBeenCalledWith("ds-1"));
+    await waitFor(() =>
+      expect(api.getDesignSessionMessages).toHaveBeenCalledWith(
+        "ds-1",
+        api.SUPPRESS_FORBIDDEN_TOAST
+      )
+    );
     expect(api.getWorkflowSessionMessages).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -170,6 +183,32 @@ describe("useWorkflowSessionChat", () => {
     await waitFor(() => expect(api.getWorkflowSessionMessages).toHaveBeenCalled());
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
     expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
+  });
+
+  it("sets forbidden and does not auto-send when the initial fetch is FORBIDDEN", async () => {
+    vi.mocked(api.getWorkflowSessionMessages).mockRejectedValue(new Error("forbidden"));
+    vi.mocked(api.isForbiddenError).mockReturnValue(true);
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(result.current.forbidden).toBe(true));
+    // A FORBIDDEN failure must not be treated as "no session yet" -- it must
+    // not auto-send the kickoff prompt and start an unauthorized run.
+    expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
+  });
+
+  it("sets forbidden for the design variant without treating it as a new session", async () => {
+    vi.mocked(api.getDesignSessionMessages).mockRejectedValue(new Error("forbidden"));
+    vi.mocked(api.isForbiddenError).mockReturnValue(true);
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(result.current.forbidden).toBe(true));
+    expect(api.createDesignSessionAgent).not.toHaveBeenCalled();
   });
 
   it("sendMessage uses createWorkflowSessionAgent with the correct ids", async () => {

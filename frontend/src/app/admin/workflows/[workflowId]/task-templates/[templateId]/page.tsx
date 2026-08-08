@@ -15,6 +15,7 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { McpToolPicker } from "@/components/admin/mcp-tool-picker";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -26,7 +27,9 @@ import {
   deleteWorkflowTaskTemplate,
   getWorkflow,
   getWorkflowTaskTemplate,
+  isForbiddenError,
   listWorkflowTaskTemplates,
+  SUPPRESS_FORBIDDEN_TOAST,
   type ToolBinding,
   updateWorkflowTaskTemplate,
   type WorkflowTaskTemplate,
@@ -64,6 +67,7 @@ export default function WorkflowTaskTemplateDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [candidates, setCandidates] = useState<WorkflowTaskTemplate[]>([]);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
@@ -96,7 +100,7 @@ export default function WorkflowTaskTemplateDetailPage() {
   });
 
   useEffect(() => {
-    getWorkflowTaskTemplate(templateId)
+    getWorkflowTaskTemplate(templateId, SUPPRESS_FORBIDDEN_TOAST)
       .then((template) => {
         setTitle(template.title);
         reset({
@@ -114,7 +118,11 @@ export default function WorkflowTaskTemplateDetailPage() {
           updatedAt: template.updatedAt,
         });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
@@ -176,6 +184,15 @@ export default function WorkflowTaskTemplateDetailPage() {
     // title has loaded.
     { label: title || "…" },
   ];
+
+  if (forbidden) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
 
   if (loading) {
     return (

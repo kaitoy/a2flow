@@ -19,10 +19,17 @@ import {
   type SecretFormValues,
   toSecretBody,
 } from "@/components/admin/secret-fields";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { deleteSecret, getSecret, updateSecret } from "@/lib/api";
+import {
+  deleteSecret,
+  getSecret,
+  isForbiddenError,
+  SUPPRESS_FORBIDDEN_TOAST,
+  updateSecret,
+} from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -41,6 +48,7 @@ export default function SecretDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   // The persisted name, which titles the page. Kept out of the form so the
@@ -64,7 +72,7 @@ export default function SecretDetailPage() {
   const type = watch("type");
 
   useEffect(() => {
-    getSecret(secretId)
+    getSecret(secretId, SUPPRESS_FORBIDDEN_TOAST)
       .then((secret) => {
         setName(secret.name);
         reset({
@@ -83,7 +91,11 @@ export default function SecretDetailPage() {
           updatedAt: secret.updatedAt,
         });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
@@ -122,6 +134,15 @@ export default function SecretDetailPage() {
     // name has loaded.
     { label: name || "…" },
   ];
+
+  if (forbidden) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
 
   if (loading) {
     return (

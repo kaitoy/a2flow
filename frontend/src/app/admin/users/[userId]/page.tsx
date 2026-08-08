@@ -23,6 +23,7 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { RolesField } from "@/components/admin/roles-field";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,15 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { type AvatarConfig, deleteUser, getUser, type UserUpdate, updateUser } from "@/lib/api";
+import {
+  type AvatarConfig,
+  deleteUser,
+  getUser,
+  isForbiddenError,
+  SUPPRESS_FORBIDDEN_TOAST,
+  type UserUpdate,
+  updateUser,
+} from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -61,6 +70,7 @@ export default function UserDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   // Username is immutable after creation, so it lives outside the form state and
@@ -117,7 +127,7 @@ export default function UserDetailPage() {
   });
 
   useEffect(() => {
-    getUser(userId)
+    getUser(userId, SUPPRESS_FORBIDDEN_TOAST)
       .then((user) => {
         setUsername(user.username);
         setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
@@ -139,7 +149,11 @@ export default function UserDetailPage() {
           updatedAt: user.updatedAt,
         });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
@@ -190,6 +204,15 @@ export default function UserDetailPage() {
     // username has loaded.
     { label: username || "…" },
   ];
+
+  if (forbidden) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
 
   if (loading) {
     return (

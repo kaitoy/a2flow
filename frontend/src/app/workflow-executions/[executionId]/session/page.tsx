@@ -16,6 +16,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
@@ -24,7 +25,12 @@ import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useSessionAvatarRenderer } from "@/hooks/useSessionAvatarRenderer";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
-import { getWorkflowExecution, type WorkflowExecution } from "@/lib/api";
+import {
+  getWorkflowExecution,
+  isForbiddenError,
+  SUPPRESS_FORBIDDEN_TOAST,
+  type WorkflowExecution,
+} from "@/lib/api";
 import logger from "@/lib/logger";
 import { EXECUTION_KICKOFF_PROMPT } from "@/lib/workflowKickoff";
 import { clearError } from "@/store/chatSlice";
@@ -48,6 +54,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
     locallySentMessageIds,
     messageTasks,
     tasks,
+    forbidden: chatForbidden,
   } = useWorkflowSessionChat(
     execution.id,
     execution.sessionId,
@@ -91,6 +98,10 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
     locallySentMessageIds,
     currentUser,
   });
+
+  if (chatForbidden) {
+    return <AccessDeniedState fill="screen" />;
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -189,14 +200,20 @@ export default function WorkflowSessionPage() {
   const executionId = params.executionId;
   const [workflowExecution, setWorkflowExecution] = useState<WorkflowExecution | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: retryCount is a bump counter that re-triggers the fetch, not a data dependency
   useEffect(() => {
     setLoadFailed(false);
-    getWorkflowExecution(executionId)
+    setForbidden(false);
+    getWorkflowExecution(executionId, SUPPRESS_FORBIDDEN_TOAST)
       .then(setWorkflowExecution)
       .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         logger.error(err, "failed to load workflow execution");
         setLoadFailed(true);
       });
@@ -208,6 +225,8 @@ export default function WorkflowSessionPage() {
     <AuthProvider>
       {workflowExecution ? (
         <WorkflowSessionView execution={workflowExecution} />
+      ) : forbidden ? (
+        <AccessDeniedState fill="screen" />
       ) : loadFailed ? (
         <WorkflowSessionLoadError onRetry={retry} />
       ) : (

@@ -12,6 +12,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
@@ -19,6 +20,8 @@ import {
   deleteWorkflowExecution,
   getUserNames,
   getWorkflowExecution,
+  isForbiddenError,
+  SUPPRESS_FORBIDDEN_TOAST,
   type WorkflowExecution,
 } from "@/lib/api";
 
@@ -40,6 +43,7 @@ export default function WorkflowExecutionDetailPage() {
   const { executionId } = useParams<{ executionId: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [session, setSession] = useState<WorkflowExecution | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
@@ -47,7 +51,7 @@ export default function WorkflowExecutionDetailPage() {
 
   useEffect(() => {
     let active = true;
-    getWorkflowExecution(executionId)
+    getWorkflowExecution(executionId, SUPPRESS_FORBIDDEN_TOAST)
       .then(async (s) => {
         if (!active) return;
         setSession(s);
@@ -60,7 +64,12 @@ export default function WorkflowExecutionDetailPage() {
         const names = await getUserNames([s.initiatorId]);
         if (active) setUserName(names.get(s.initiatorId) ?? null);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (!active) return;
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => {
@@ -86,6 +95,15 @@ export default function WorkflowExecutionDetailPage() {
     { label: "Workflow Executions", href: "/admin/workflow-executions" },
     { label: session?.name || "…" },
   ];
+
+  if (forbidden) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
 
   if (loading || !session) {
     return (

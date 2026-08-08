@@ -1,6 +1,10 @@
 import userEvent from "@testing-library/user-event";
+import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { store } from "@/store";
+import { envelopeErr } from "@/test/msw/envelope";
+import { server } from "@/test/msw/server";
 import { render, screen, within } from "@/test/test-utils";
 import ApprovalDetailPage from "./page";
 
@@ -83,5 +87,19 @@ describe("ApprovalDetailPage", () => {
     await screen.findByRole("heading", { name: "Deploy to production" });
     await user.click(screen.getByRole("button", { name: /^back$/i }));
     expect(pushMock).toHaveBeenCalledWith("/admin/approvals");
+  });
+
+  it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/approvals/:approvalId", () =>
+        envelopeErr("FORBIDDEN", "Requires developer", 403)
+      )
+    );
+    const beforeCount = store.getState().toast.items.length;
+
+    render(<ApprovalDetailPage />);
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(store.getState().toast.items.length).toBe(beforeCount);
   });
 });

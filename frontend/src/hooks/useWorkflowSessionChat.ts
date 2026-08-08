@@ -18,7 +18,9 @@ import {
   getWorkflowSessionMessageSenders,
   getWorkflowSessionMessages,
   getWorkflowSessionMessageTasks,
+  isForbiddenError,
   listWorkflowTasks,
+  SUPPRESS_FORBIDDEN_TOAST,
   type User,
   type WorkflowTask,
 } from "@/lib/api";
@@ -106,7 +108,9 @@ export type SessionChatVariant = "workflow" | "design";
  * pass `null` because their first exchange happened in the background
  * generation run (or the user types it). Subsequent user messages and A2UI
  * user actions (e.g. a button click inside a rendered surface) are routed to
- * the session's dedicated agent endpoint, selected by `variant`.
+ * the session's dedicated agent endpoint, selected by `variant`. A FORBIDDEN
+ * (403) failure on that initial load surfaces as the returned `forbidden`
+ * flag instead of retrying or auto-sending the kickoff prompt.
  *
  * Both chats are shared, so the history is re-fetched every
  * {@link POLL_INTERVAL_MS} and messages from other participants appear without
@@ -153,6 +157,9 @@ export function useWorkflowSessionChat(
   // WorkflowTasks, used to render the task timeline and the in-chat task dividers.
   const [messageTasks, setMessageTasks] = useState<Map<string, string>>(new Map());
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
+  // Set when the initial history load is rejected with a FORBIDDEN (403) --
+  // the caller renders AccessDeniedState instead of the chat UI.
+  const [forbidden, setForbidden] = useState(false);
   // Ids of user messages the current viewer sent this session. Their optimistic
   // client ids differ from the persisted ADK event ids, so they are absent from
   // `messageSenders`; the UI attributes them to the current user until a reload
@@ -376,10 +383,11 @@ export function useWorkflowSessionChat(
     initializedSessionRef.current = sessionId;
     autoSentRef.current = false;
     appliedSignatureRef.current = null;
+    setForbidden(false);
     dispatch(setSession(sessionId));
     void refreshSenders();
     void refreshTasks();
-    fetchMessages(parentId)
+    fetchMessages(parentId, SUPPRESS_FORBIDDEN_TOAST)
       .then((loadedMessages) => {
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
         // Record the loaded history so the first poll doesn't re-apply it.
@@ -389,7 +397,11 @@ export function useWorkflowSessionChat(
           sendMessage(kickoffPrompt);
         }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (isForbiddenError(err)) {
+          setForbidden(true);
+          return;
+        }
         // ADK session not yet created (first run) — auto-send to kick off the workflow
         if (kickoffPrompt !== null && !autoSentRef.current) {
           autoSentRef.current = true;
@@ -429,5 +441,6 @@ export function useWorkflowSessionChat(
     locallySentMessageIds: locallySentIds.current,
     messageTasks,
     tasks,
+    forbidden,
   };
 }
