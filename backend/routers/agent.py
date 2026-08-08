@@ -5,7 +5,7 @@ from contextlib import AsyncExitStack
 
 from ag_ui.core import RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from dependencies import (
@@ -14,6 +14,7 @@ from dependencies import (
     CurrentTenantIdDep,
     CurrentUserIdDep,
     SessionServiceDep,
+    require_roles,
 )
 from infrastructure.agent import (
     SESSION_TITLE_KEY,
@@ -23,12 +24,16 @@ from infrastructure.agent import (
     with_user_id,
 )
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from models.user import Role
 from repositories.exceptions import SessionRunInProgressError
 
 router = APIRouter()
 
+#: Route dependency gating the general-purpose chat endpoint behind the ``super_admin`` role.
+_requires_super_admin = [Depends(require_roles(Role.super_admin))]
 
-@router.post("/agent", include_in_schema=False)
+
+@router.post("/agent", include_in_schema=False, dependencies=_requires_super_admin)
 async def agent_endpoint(
     input_data: RunAgentInput,
     request: Request,
@@ -38,6 +43,8 @@ async def agent_endpoint(
     tenant_id: CurrentTenantIdDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the ADK agent for the given thread.
+
+    Restricted to ``super_admin`` callers.
 
     SystemMessages are stripped from the input to prevent prompt injection
     (ag_ui_adk appends their content directly to agent instructions).

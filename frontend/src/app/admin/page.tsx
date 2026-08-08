@@ -4,8 +4,9 @@
 import { type LucideIcon, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { type AdminNavItem, useVisibleAdminNavItems } from "@/lib/admin-nav";
+import { Role, useHasRole } from "@/lib/roles";
 
-/** The chat card, always shown first; the admin destinations follow it. */
+/** The chat card, shown first and only to `super_admin`; the admin destinations follow it. */
 const CHAT_CARD: AdminNavItem = {
   href: "/sessions/new",
   label: "Start chat",
@@ -20,7 +21,11 @@ const CHAT_CARD: AdminNavItem = {
  * reached from `/`, after login, and by clicking the A2Flow logo.
  */
 export default function AdminPage() {
-  const cards: AdminNavItem[] = [CHAT_CARD, ...useVisibleAdminNavItems()];
+  const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
+  const cards: AdminNavItem[] = [
+    ...(isSuperAdmin ? [CHAT_CARD] : []),
+    ...useVisibleAdminNavItems(),
+  ];
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">

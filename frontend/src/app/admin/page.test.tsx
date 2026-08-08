@@ -32,12 +32,17 @@ describe("AdminPage (welcome)", () => {
     expect(screen.getByRole("heading", { name: "Welcome to A2Flow" })).toBeInTheDocument();
   });
 
-  it("renders a chat card linking to /sessions/new", () => {
-    render(<AdminPage />, { preloadedState: authState([]) });
+  it("renders a chat card linking to /sessions/new for a super admin", () => {
+    render(<AdminPage />, { preloadedState: authState(["super_admin"]) });
     expect(screen.getByRole("link", { name: /Start chat/ })).toHaveAttribute(
       "href",
       "/sessions/new"
     );
+  });
+
+  it("hides the chat card from a non-super-admin", () => {
+    render(<AdminPage />, { preloadedState: authState([]) });
+    expect(screen.queryByRole("link", { name: /Start chat/ })).not.toBeInTheDocument();
   });
 
   it("renders cards linking to admin sections for a super admin", () => {

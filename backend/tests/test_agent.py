@@ -590,6 +590,20 @@ async def test_agent_endpoint_succeeds_for_platform_scoped_caller_with_tenant_he
     assert response.status_code == 200
 
 
+async def test_agent_endpoint_forbidden_for_non_super_admin(
+    agent_client: tuple[AsyncClient, MagicMock],
+) -> None:
+    from tests._envelope import assert_err
+
+    client, _ = agent_client
+    response = await client.post(
+        "/api/v1/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Roles": "developer"},
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
+
+
 def _write_skill_md(tmp_path: Any, name: str = "test-skill") -> Any:
     """Create a minimal skill directory with a SKILL.md and return its path."""
     skill_dir = tmp_path / name

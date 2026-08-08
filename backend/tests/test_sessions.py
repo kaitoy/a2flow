@@ -192,3 +192,46 @@ async def test_list_sessions_does_not_mix_tenants(
     )
     assert len(tenant_a_sessions) == 1
     assert len(tenant_b_sessions) == 1
+
+
+async def test_list_sessions_forbidden_for_non_super_admin(
+    client_with_real_sessions: AsyncClient,
+) -> None:
+    response = await client_with_real_sessions.get(
+        "/api/v1/sessions", headers={"X-User-Roles": "developer"}
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
+
+
+async def test_get_session_forbidden_for_non_super_admin(
+    client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    session_id = await _create_session(real_session_service, "mallory")
+    response = await client_with_real_sessions.get(
+        f"/api/v1/sessions/{session_id}", headers={"X-User-Roles": "developer"}
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
+
+
+async def test_get_messages_forbidden_for_non_super_admin(
+    client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    session_id = await _create_session(real_session_service, "mallory")
+    response = await client_with_real_sessions.get(
+        f"/api/v1/sessions/{session_id}/messages",
+        headers={"X-User-Roles": "developer"},
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
+
+
+async def test_delete_session_forbidden_for_non_super_admin(
+    client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    session_id = await _create_session(real_session_service, "mallory")
+    response = await client_with_real_sessions.delete(
+        f"/api/v1/sessions/{session_id}", headers={"X-User-Roles": "developer"}
+    )
+    assert_err(response, code="FORBIDDEN", status=403)

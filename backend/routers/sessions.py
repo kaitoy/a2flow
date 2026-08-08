@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ag_ui_adk import adk_events_to_messages
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from dependencies import (
     APP_NAME,
@@ -10,16 +10,23 @@ from dependencies import (
     CurrentTenantIdDep,
     CurrentUserIdDep,
     SessionServiceDep,
+    require_roles,
 )
 from infrastructure.agent import SESSION_TITLE_KEY, tenant_app_name
 from models.response import ApiResponse
 from models.session import Session
+from models.user import Role
 from repositories.exceptions import NotFoundError
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
+#: Route dependency gating every session route behind the ``super_admin`` role.
+_requires_super_admin = [Depends(require_roles(Role.super_admin))]
 
-@router.get("", response_model=ApiResponse[list[Session]])
+
+@router.get(
+    "", response_model=ApiResponse[list[Session]], dependencies=_requires_super_admin
+)
 async def list_sessions(
     user_id: CurrentUserIdDep,
     tenant_id: CurrentTenantIdDep,
@@ -43,7 +50,11 @@ async def list_sessions(
     return ApiResponse(meta=meta, data=items)
 
 
-@router.get("/{session_id}", response_model=ApiResponse[Session])
+@router.get(
+    "/{session_id}",
+    response_model=ApiResponse[Session],
+    dependencies=_requires_super_admin,
+)
 async def get_session(
     session_id: str,
     user_id: CurrentUserIdDep,
@@ -68,7 +79,11 @@ async def get_session(
     return ApiResponse(meta=meta, data=item)
 
 
-@router.get("/{session_id}/messages", response_model=ApiResponse[list[dict[str, Any]]])
+@router.get(
+    "/{session_id}/messages",
+    response_model=ApiResponse[list[dict[str, Any]]],
+    dependencies=_requires_super_admin,
+)
 async def get_session_messages(
     session_id: str,
     user_id: CurrentUserIdDep,
@@ -97,7 +112,11 @@ async def get_session_messages(
     )
 
 
-@router.delete("/{session_id}", response_model=ApiResponse[None])
+@router.delete(
+    "/{session_id}",
+    response_model=ApiResponse[None],
+    dependencies=_requires_super_admin,
+)
 async def delete_session(
     session_id: str,
     user_id: CurrentUserIdDep,
