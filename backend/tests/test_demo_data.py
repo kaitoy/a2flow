@@ -27,6 +27,7 @@ from infrastructure.demo_data import (
     DEMO_APPROVER_USER_ID,
     DEMO_AWS_SECRET_ID,
     DEMO_AWS_SECRET_NAME,
+    DEMO_DEVELOPER_USER_ID,
     DEMO_MCP_SERVER_ID,
     DEMO_MCP_SERVER_NAME,
     DEMO_REQUESTER_USER_ID,
@@ -182,7 +183,7 @@ async def test_sync_demo_data_seeds_the_full_dataset(
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 2
+    assert len(await _demo_users(engine)) == 3
     assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
     assert len(await _rows(engine, AgentSkill)) == 1
@@ -211,25 +212,28 @@ async def test_sync_demo_data_is_idempotent(
     _enable(monkeypatch)
     await _sync(engine)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 2
+    assert len(await _demo_users(engine)) == 3
     assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
     assert len(await _rows(engine, AgentSkill)) == 1
 
 
-async def test_demo_users_hold_the_approver_and_requester_roles(
+async def test_demo_users_hold_the_approver_requester_and_developer_roles(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
-    approver, requester = await _demo_users(engine)
+    approver, developer, requester = await _demo_users(engine)
     assert approver.id == DEMO_APPROVER_USER_ID
     assert approver.username == "demo-approver"
     assert approver.roles == [Role.approver.value]
+    assert developer.id == DEMO_DEVELOPER_USER_ID
+    assert developer.username == "demo-developer"
+    assert developer.roles == [Role.developer.value]
     assert requester.id == DEMO_REQUESTER_USER_ID
     assert requester.username == "demo-requester"
     assert requester.roles == [Role.requester.value]
-    for user in (approver, requester):
+    for user in (approver, developer, requester):
         assert user.tenant_id == TENANT_ID
         assert user.enabled is True
         assert user.created_by == SYSTEM_USER_ID

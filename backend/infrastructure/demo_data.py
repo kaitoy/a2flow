@@ -12,8 +12,10 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
   entries from its ``env`` via ``${secret:NAME/KEY}``,
 * one AgentSkill pointing at ``sample_skills/aws-ec2-launch`` in this
   repository,
-* two Users: a ``demo-approver`` (the manager the skill asks for approval)
-  and a ``demo-requester`` (who runs the workflow).
+* three Users: a ``demo-approver`` (the manager the skill asks for approval),
+  a ``demo-requester`` (who runs the workflow), and a ``demo-developer`` (who
+  may build and register the workflow, MCP server, and agent skill in the
+  first place).
 
 The Workflow itself is deliberately *not* seeded — these records are the
 ingredients an operator assembles one into.
@@ -58,6 +60,10 @@ DEMO_APPROVER_USER_ID = "00000000-0000-0000-0000-00000000d001"
 
 #: Fixed identifier of the demo ``requester`` user (who executes the workflow).
 DEMO_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d002"
+
+#: Fixed identifier of the demo ``developer`` user (who builds and registers
+#: the workflow, MCP server, and agent skill).
+DEMO_DEVELOPER_USER_ID = "00000000-0000-0000-0000-00000000d003"
 
 #: Fixed identifier of the demo Secret holding the AWS credentials.
 DEMO_AWS_SECRET_ID = "00000000-0000-0000-0000-00000000d101"
@@ -134,7 +140,8 @@ class _DemoUserSpec:
 
 #: The demo accounts, in creation order. The sample skill looks for a user
 #: holding ``approver`` to route its approval request to; ``requester`` is the
-#: role that may execute a workflow.
+#: role that may execute a workflow; ``developer`` is the role that may build
+#: and register a workflow, MCP server, or agent skill.
 _DEMO_USERS = (
     _DemoUserSpec(
         id=DEMO_APPROVER_USER_ID,
@@ -149,6 +156,13 @@ _DEMO_USERS = (
         first_name="Demo",
         last_name="Requester",
         role=Role.requester,
+    ),
+    _DemoUserSpec(
+        id=DEMO_DEVELOPER_USER_ID,
+        username="demo-developer",
+        first_name="Demo",
+        last_name="Developer",
+        role=Role.developer,
     ),
 )
 

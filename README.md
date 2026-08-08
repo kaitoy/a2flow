@@ -172,7 +172,7 @@ Setting `DEMO_DATA=true` on the backend registers a ready-made example of the ap
 - two [secrets](#secrets) holding an AWS access key id and secret access key,
 - an [MCP server](#mcp-servers) (`AWS MCP Server`) that reaches AWS's managed AWS MCP Server over `stdio`, through the `mcp-proxy-for-aws` bridge launched with `uvx`, reading those secrets through `${secret:…}` references,
 - an [agent skill](#agent-skills) pointing at `sample_skills/aws-ec2-launch` in this repository,
-- a `demo-approver` and a `demo-requester` [user](#users), holding the roles the sample skill's approval step needs.
+- a `demo-approver`, a `demo-requester`, and a `demo-developer` [user](#users), holding the roles the sample skill's approval step needs and the role that may build and register a workflow, MCP server, or agent skill.
 
 The [workflow](#workflows) itself is not seeded — these are the ingredients you generate one from. Turning the flag off and restarting **removes** the same records again, so it is a genuine on/off switch. Records that other data has come to depend on are kept (and logged) rather than deleted, and a demo user who has created records is soft-deleted so their name still resolves.
 

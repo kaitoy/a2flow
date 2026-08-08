@@ -207,6 +207,7 @@ If either is unset (or empty), a random password is generated instead and logged
 | Agent skill | `Demo AWS EC2 Launch` | `sample_skills/aws-ec2-launch` in this repository (see [Agent skills](#agent-skills)) |
 | User | `demo-approver` | holds `approver` — the manager the sample skill routes its approval request to |
 | User | `demo-requester` | holds `requester` — may execute the workflow |
+| User | `demo-developer` | holds `developer` — may build and register the workflow, MCP server, and agent skill |
 
 The Workflow itself is deliberately not seeded: these records are the ingredients you assemble one from.
 
@@ -218,7 +219,7 @@ DEMO_AWS_SECRET_ACCESS_KEY=...
 DEMO_AWS_REGION=us-east-1
 ```
 
-- `DEMO_PASSWORD` is shared by both demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
+- `DEMO_PASSWORD` is shared by all three demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
 - **AWS MCP Server** is a managed remote server AWS hosts, not something this project runs, so the registered `stdio` server actually launches [`mcp-proxy-for-aws`](https://github.com/aws/mcp-proxy-for-aws) — a thin bridge that SigV4-signs each request with the credentials it finds in its environment and forwards it to the endpoint. It supersedes the deprecated self-hosted `awslabs.aws-api-mcp-server`; see the upstream [migration guide](https://github.com/awslabs/mcp/blob/main/src/aws-api-mcp-server/MIGRATION.md).
 
   The two regions in the arguments are not the same knob. `--region us-east-1` is the region the *signature* is computed for and is fixed to wherever the endpoint lives, while `--metadata AWS_REGION=${env:AWS_REGION}` (which expands to `DEMO_AWS_REGION`, carried in the row's own `env` — see [`${env:NAME}`](#mcp-servers)) is the region the server's *tools* act on. The proxy does not infer the signing region from the endpoint URL, so it stays explicit.
