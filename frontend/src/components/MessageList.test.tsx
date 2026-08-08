@@ -82,6 +82,24 @@ class FakeIntersectionObserver {
   }
 }
 
+/**
+ * Records the constructed observer's callback so a test can fire it by hand.
+ * happy-dom ships a real ResizeObserver, but with no layout engine behind it
+ * nothing ever actually resizes, so the content-growth follow has to be
+ * driven explicitly, same as {@link FakeIntersectionObserver}.
+ */
+class FakeResizeObserver {
+  static instances: FakeResizeObserver[] = [];
+  callback: ResizeObserverCallback;
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback;
+    FakeResizeObserver.instances.push(this);
+  }
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 describe("MessageList", () => {
   it("shows empty state when messages is empty", () => {
     render(<MessageList messages={[]} />);
@@ -154,6 +172,47 @@ describe("MessageList", () => {
     vi.mocked(Element.prototype.scrollIntoView).mockClear();
     rerender(<MessageList messages={[...initial, { id: "m2", role: "user", content: "yo" }]} />);
     expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("follows to the bottom when content resizes without a messages change (e.g. an A2UI surface finishing its async mount)", () => {
+    const realResizeObserver = window.ResizeObserver;
+    FakeResizeObserver.instances = [];
+    window.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+    try {
+      const messages: Message[] = [{ id: "m1", role: "user", content: "hi" }];
+      render(<MessageList messages={messages} />);
+
+      vi.mocked(Element.prototype.scrollIntoView).mockClear();
+      const observer = FakeResizeObserver.instances[0];
+      observer.callback([] as ResizeObserverEntry[], observer as unknown as ResizeObserver);
+
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    } finally {
+      window.ResizeObserver = realResizeObserver;
+    }
+  });
+
+  it("does not follow a content resize once the viewer has scrolled up", () => {
+    const realResizeObserver = window.ResizeObserver;
+    FakeResizeObserver.instances = [];
+    window.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+    try {
+      const messages: Message[] = [{ id: "m1", role: "user", content: "hi" }];
+      const { container } = render(<MessageList messages={messages} />);
+      const scrollEl = container.querySelector(".overflow-y-auto") as HTMLElement;
+      // Scrolled up: 1000 - 0 - 200 = 800px from the bottom, well past the 120 threshold.
+      Object.defineProperty(scrollEl, "scrollHeight", { value: 1000, configurable: true });
+      Object.defineProperty(scrollEl, "clientHeight", { value: 200, configurable: true });
+      fireEvent.scroll(scrollEl);
+
+      vi.mocked(Element.prototype.scrollIntoView).mockClear();
+      const observer = FakeResizeObserver.instances[0];
+      observer.callback([] as ResizeObserverEntry[], observer as unknown as ResizeObserver);
+
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      window.ResizeObserver = realResizeObserver;
+    }
   });
 
   it("shows the working indicator with the live edge while running and not streaming", () => {

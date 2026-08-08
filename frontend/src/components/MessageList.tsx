@@ -4,7 +4,15 @@ import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { animated, useSpring } from "@react-spring/web";
 import { Sparkles } from "lucide-react";
-import { Fragment, type ReactNode, type UIEvent, useEffect, useMemo, useRef } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  type UIEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import type { PendingRenderCall } from "@/lib/a2uiAction";
 import {
   REASONING_ACTIVITY_TYPE,
@@ -81,7 +89,12 @@ function WorkingIndicator() {
  * Scrollable list of chat messages. New messages follow to the bottom only when
  * the viewer is already near the bottom, so an incoming message (for example one
  * polled in from another workflow participant) never yanks a reader away from
- * earlier history they're scrolled up to read.
+ * earlier history they're scrolled up to read. The same following also covers
+ * content that grows *after* `messages` itself last changed — an A2UI surface
+ * that finishes mounting a beat after its activity bubble appears, or an
+ * approval control that swaps in its resolved state once its fetch lands —
+ * tracked via a `ResizeObserver` on the message column rather than the
+ * `messages` prop alone.
  */
 export function MessageList({
   messages,
@@ -134,6 +147,10 @@ export function MessageList({
   pendingRenderCalls?: PendingRenderCall[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Wraps the message column itself (unlike scrollRef, which is clipped by
+  // overflow-y-auto and never resizes) so the ResizeObserver below sees the
+  // column's real height, including content that grows after mount.
+  const contentRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Whether the viewer is parked near the bottom. Updated on scroll *before* the
   // next content append, so the scroll effect can decide whether to follow.
@@ -198,10 +215,27 @@ export function MessageList({
 
   const lastMessageId = messages[messages.length - 1]?.id;
 
+  /** Follow to the bottom, but only while the viewer is already parked there. */
+  const scrollToBottomIfStuck = useCallback(() => {
+    if (stickToBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to bottom whenever messages change
   useEffect(() => {
-    if (stickToBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottomIfStuck();
   }, [messages]);
+
+  // Content can grow after `messages` last changed — an A2UI surface finishes
+  // mounting a beat after its activity bubble appears, an approval control
+  // swaps in its resolved state once its fetch lands — so watch the actual
+  // layout height rather than relying on `messages` alone to know when to follow.
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    const observer = new ResizeObserver(scrollToBottomIfStuck);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [scrollToBottomIfStuck]);
 
   /** Track whether the viewer is near the bottom so new messages only follow then. */
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
@@ -294,7 +328,7 @@ export function MessageList({
 
   return (
     <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-6">
-      <div className="mx-auto flex max-w-3xl flex-col">
+      <div ref={contentRef} className="mx-auto flex max-w-3xl flex-col">
         {messages.length === 0 && (
           <animated.div style={emptyStateSpring}>
             <EmptyState
