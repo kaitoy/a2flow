@@ -65,27 +65,27 @@ function userMessage(id: string): Message {
 describe("useSessionAvatarRenderer", () => {
   it("labels the agent's own messages with the agent label", () => {
     const renderAvatar = renderer();
-    render(<>{renderAvatar({ id: "m1", role: "assistant", content: "hello" } as Message)}</>);
+    render(renderAvatar({ id: "m1", role: "assistant", content: "hello" } as Message));
     expect(screen.getByTestId("agent-avatar")).toBeInTheDocument();
     expect(screen.getByTestId("tooltip")).toHaveAttribute("data-label", "my-workflow");
   });
 
   it("resolves an attributed user message to its recorded sender", () => {
     const renderAvatar = renderer({ messageSenders: new Map([["m1", OTHER.id]]) });
-    render(<>{renderAvatar(userMessage("m1"))}</>);
+    render(renderAvatar(userMessage("m1")));
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", OTHER.id);
     expect(screen.getByTestId("tooltip")).toHaveAttribute("data-label", "Dana Developer");
   });
 
   it("attributes a message this viewer just sent to the current user", () => {
     const renderAvatar = renderer({ locallySentMessageIds: new Set(["m1"]) });
-    render(<>{renderAvatar(userMessage("m1"))}</>);
+    render(renderAvatar(userMessage("m1")));
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", VIEWER.id);
   });
 
   it("falls back to the session owner for unattributed history", () => {
     const renderAvatar = renderer();
-    render(<>{renderAvatar(userMessage("m1"))}</>);
+    render(renderAvatar(userMessage("m1")));
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", OWNER.id);
   });
 
@@ -93,7 +93,7 @@ describe("useSessionAvatarRenderer", () => {
     const renderAvatar = renderer({
       messageSenders: new Map([["m1", "deleted-user"]]),
     });
-    render(<>{renderAvatar(userMessage("m1"))}</>);
+    render(renderAvatar(userMessage("m1")));
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", "unresolved");
     expect(screen.getByTestId("tooltip")).toHaveAttribute("data-label", "Unknown sender");
   });
@@ -101,14 +101,12 @@ describe("useSessionAvatarRenderer", () => {
   it("resolves an A2UI surface by the tool call that produced it", () => {
     const renderAvatar = renderer({ messageSenders: new Map([["tc-1", OTHER.id]]) });
     render(
-      <>
-        {renderAvatar({
-          id: "m1",
-          role: "activity",
-          activityType: A2UIActivityType,
-          content: { [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
-        } as unknown as Message)}
-      </>
+      renderAvatar({
+        id: "m1",
+        role: "activity",
+        activityType: A2UIActivityType,
+        content: { [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
+      } as unknown as Message)
     );
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", OTHER.id);
   });
@@ -116,14 +114,12 @@ describe("useSessionAvatarRenderer", () => {
   it("shows no avatar on a surface nobody has acted on", () => {
     const renderAvatar = renderer();
     const { container } = render(
-      <>
-        {renderAvatar({
-          id: "m1",
-          role: "activity",
-          activityType: A2UIActivityType,
-          content: { [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
-        } as unknown as Message)}
-      </>
+      renderAvatar({
+        id: "m1",
+        role: "activity",
+        activityType: A2UIActivityType,
+        content: { [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
+      } as unknown as Message)
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -131,14 +127,12 @@ describe("useSessionAvatarRenderer", () => {
   it("resolves an approval control to whoever decided it", () => {
     const renderAvatar = renderer({ messageSenders: new Map([["tc-approve", OTHER.id]]) });
     render(
-      <>
-        {renderAvatar({
-          id: "tc-approve",
-          role: "activity",
-          activityType: APPROVAL_ACTIVITY_TYPE,
-          content: { approvalId: "ap-1" },
-        } as unknown as Message)}
-      </>
+      renderAvatar({
+        id: "tc-approve",
+        role: "activity",
+        activityType: APPROVAL_ACTIVITY_TYPE,
+        content: { approvalId: "ap-1" },
+      } as unknown as Message)
     );
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", OTHER.id);
   });
