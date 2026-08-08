@@ -12,6 +12,7 @@ import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
   createDesignSessionAgent,
   createWorkflowSessionAgent,
+  getDesignSessionMessageSenders,
   getDesignSessionMessages,
   getUsersByIds,
   getWorkflowSessionMessageSenders,
@@ -88,7 +89,8 @@ function makeEventHandlers(
 /**
  * Which session-scoped chat backend the hook talks to: a workflow session (the
  * chat a workflow execution runs in, shared with its approvers) or a design
- * session (the owner-only chat that refines a workflow's task templates).
+ * session (the chat that refines a workflow's task templates, shared with the
+ * tenant's other developers).
  */
 export type SessionChatVariant = "workflow" | "design";
 
@@ -106,14 +108,17 @@ export type SessionChatVariant = "workflow" | "design";
  * user actions (e.g. a button click inside a rendered surface) are routed to
  * the session's dedicated agent endpoint, selected by `variant`.
  *
- * Because a workflow session is shared (its execution's initiator, the
- * approvers, and the agent all post into it), the history is also re-fetched
- * every {@link POLL_INTERVAL_MS}
- * so messages from other participants appear without a reload. Polling pauses
- * while the current viewer's own run is in flight and skips re-applying an
- * unchanged history. Design sessions keep the same polling (the background
- * generation run's messages appear the same way) but have no sender
- * attribution or task association — the chat belongs to its owner alone.
+ * Both chats are shared, so the history is re-fetched every
+ * {@link POLL_INTERVAL_MS} and messages from other participants appear without
+ * a reload: a workflow session's execution initiator, its approvers, and the
+ * agent all post into it; a design session's is every developer in the tenant,
+ * plus the background generation run. Polling pauses while the current viewer's
+ * own run is in flight and skips re-applying an unchanged history.
+ *
+ * Sender attribution is loaded for both variants so each message can show who
+ * sent it. Task association is workflow-session-only — a design session edits
+ * task *templates*, which the page fetches itself, rather than working through
+ * the status-ful tasks a run produces.
  */
 export function useWorkflowSessionChat(
   parentId: string,
@@ -124,6 +129,7 @@ export function useWorkflowSessionChat(
 ) {
   const isDesign = variant === "design";
   const fetchMessages = isDesign ? getDesignSessionMessages : getWorkflowSessionMessages;
+  const fetchSenders = isDesign ? getDesignSessionMessageSenders : getWorkflowSessionMessageSenders;
   const buildAgent = isDesign ? createDesignSessionAgent : createWorkflowSessionAgent;
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
@@ -138,9 +144,9 @@ export function useWorkflowSessionChat(
   // while autoSentRef (already set) suppressed re-sending it, so the workflow
   // prompt vanished moments after appearing (before the first poll).
   const initializedSessionRef = useRef<string | null>(null);
-  // Per-message sender attribution for the shared workflow chat: a map from
-  // message id to the sender's user id, and the resolved sender User records
-  // (always including the owner, for the fallback below).
+  // Per-message sender attribution for the shared chat: a map from message id
+  // to the sender's user id, and the resolved sender User records (always
+  // including the owner, for the fallback below).
   const [messageSenders, setMessageSenders] = useState<Map<string, string>>(new Map());
   const [senderUsers, setSenderUsers] = useState<Map<string, User>>(new Map());
   // Per-message task association (message id -> WorkflowTask id) and the session's
@@ -164,18 +170,16 @@ export function useWorkflowSessionChat(
 
   const refreshSenders = useCallback(async () => {
     try {
-      // Design sessions have no sender attribution (the owner is the only
-      // human in the chat); resolve just the owner for the avatar fallback.
-      const senders = isDesign
-        ? new Map<string, string>()
-        : await getWorkflowSessionMessageSenders(parentId);
+      const senders = await fetchSenders(parentId);
+      // The owner is resolved too, even when they sent nothing: unattributed
+      // messages fall back to them.
       const users = await getUsersByIds([ownerUserId, ...senders.values()]);
       setMessageSenders(senders);
       setSenderUsers(users);
     } catch (err) {
       logger.error(err, "failed to load message senders");
     }
-  }, [parentId, ownerUserId, isDesign]);
+  }, [parentId, ownerUserId, fetchSenders]);
 
   const refreshTasks = useCallback(async () => {
     // Design sessions edit the workflow's task templates, which the page

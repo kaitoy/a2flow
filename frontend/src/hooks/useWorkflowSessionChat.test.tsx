@@ -13,6 +13,7 @@ vi.mock("@/lib/api", () => ({
   createDesignSessionAgent: vi.fn(),
   createWorkflowSessionAgent: vi.fn(),
   getDesignSessionMessages: vi.fn(),
+  getDesignSessionMessageSenders: vi.fn(),
   getWorkflowSessionMessages: vi.fn(),
   getWorkflowSessionMessageSenders: vi.fn(),
   getWorkflowSessionMessageTasks: vi.fn(),
@@ -41,6 +42,8 @@ beforeEach(() => {
   vi.mocked(api.getWorkflowSessionMessages).mockResolvedValue([]);
   vi.mocked(api.getDesignSessionMessages).mockClear();
   vi.mocked(api.getDesignSessionMessages).mockResolvedValue([]);
+  vi.mocked(api.getDesignSessionMessageSenders).mockClear();
+  vi.mocked(api.getDesignSessionMessageSenders).mockResolvedValue(new Map());
   vi.mocked(api.getWorkflowSessionMessageSenders).mockResolvedValue(new Map());
   vi.mocked(api.getWorkflowSessionMessageTasks).mockResolvedValue(new Map());
   vi.mocked(api.listWorkflowTasks).mockResolvedValue([]);
@@ -113,11 +116,16 @@ describe("useWorkflowSessionChat", () => {
     expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
   });
 
-  it("design variant skips task and sender-attribution fetches", async () => {
+  it("design variant skips task fetches but still loads sender attribution", async () => {
     vi.mocked(api.listWorkflowTasks).mockClear();
     vi.mocked(api.getWorkflowSessionMessageTasks).mockClear();
     vi.mocked(api.getWorkflowSessionMessageSenders).mockClear();
     vi.mocked(api.getUsersByIds).mockClear();
+    // The design chat is shared by the tenant's developers, so it is attributed
+    // through its own endpoint — but it has no status-ful tasks to associate.
+    vi.mocked(api.getDesignSessionMessageSenders).mockResolvedValue(
+      new Map([["m1", "developer-2"]])
+    );
     const store = makeStore();
     renderHook(() => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"), {
       wrapper: makeWrapper(store),
@@ -126,8 +134,29 @@ describe("useWorkflowSessionChat", () => {
     expect(api.listWorkflowTasks).not.toHaveBeenCalled();
     expect(api.getWorkflowSessionMessageTasks).not.toHaveBeenCalled();
     expect(api.getWorkflowSessionMessageSenders).not.toHaveBeenCalled();
-    // The owner is still resolved, for the avatar fallback.
-    await waitFor(() => expect(api.getUsersByIds).toHaveBeenCalledWith(["owner-1"]));
+    await waitFor(() => expect(api.getDesignSessionMessageSenders).toHaveBeenCalledWith("ds-1"));
+    // The owner is resolved alongside the senders, for the avatar fallback.
+    await waitFor(() => expect(api.getUsersByIds).toHaveBeenCalledWith(["owner-1", "developer-2"]));
+  });
+
+  it("design variant exposes the resolved senders for avatar rendering", async () => {
+    const sender = {
+      id: "developer-2",
+      username: "dev2",
+      firstName: "Dev",
+      lastName: "Two",
+    } as never;
+    vi.mocked(api.getDesignSessionMessageSenders).mockResolvedValue(
+      new Map([["m1", "developer-2"]])
+    );
+    vi.mocked(api.getUsersByIds).mockResolvedValue(new Map([["developer-2", sender]]));
+    const store = makeStore();
+    const { result } = renderHook(
+      () => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"),
+      { wrapper: makeWrapper(store) }
+    );
+    await waitFor(() => expect(result.current.messageSenders.get("m1")).toBe("developer-2"));
+    expect(result.current.senderUsers.get("developer-2")).toBe(sender);
   });
 
   it("does NOT auto-send when messages already exist", async () => {

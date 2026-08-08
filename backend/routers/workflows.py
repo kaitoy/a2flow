@@ -11,15 +11,16 @@ The *design session* is the LLM chat a workflow's task templates are produced
 and refined in — the ADK session named by ``Workflow.session_id``. It has no
 table of its own, so it is identified by its workflow and served from this
 router's ``/messages`` and ``/agent`` sub-resources, mirroring
-``routers/workflow_executions.py``. Only the session owner
-(``Workflow.created_by``) and super admins may use it — design has no approver
-sharing, so there is no sender-attribution bookkeeping either.
+``routers/workflow_executions.py``. It is shared by every ``developer`` in the
+tenant (plus super admins and the workflow's creator), so — like a workflow
+session — each message is attributed to the user who actually sent it.
 """
 
 from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack
 from typing import Any
 
+import anyio
 from ag_ui.core import RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Depends, Request
@@ -123,10 +124,13 @@ async def get_design_session_messages(
 ) -> ApiResponse[list[dict[str, Any]]]:
     """Return the chat history of a Workflow's design session.
 
-    Restricted to the session owner (the workflow's ``createdBy``) and super
-    admins. Returns an empty list when the ADK session has not been created yet
-    (the background generation run has not started). Raises HTTP 404 if the
-    workflow does not exist.
+    Restricted to the tenant's developers (plus super admins and the workflow's
+    creator). The history is keyed by the session owner (the workflow's
+    ``createdBy``), so every developer opening the chat sees the one shared
+    conversation rather than an empty, separate session, and each message
+    carries the ``senderUserId`` recorded for it. Returns an empty list when the
+    ADK session has not been created yet (the background generation run has not
+    started). Raises HTTP 404 if the workflow does not exist.
     """
     messages = await service.get_messages(workflow_id, caller=caller)
     return ApiResponse(meta=meta, data=messages)
@@ -142,19 +146,36 @@ async def design_session_agent(
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent driving a Workflow's design session.
 
-    Restricted to the session owner and super admins. The skill directory is
-    resolved from the Workflow record (pinned revision) and the agent runs with
-    the interactive design instruction and toolset, editing the workflow's task
-    templates. SystemMessages are stripped to prevent prompt injection, and the
-    run is keyed by the session owner so a super admin continuing the chat
-    shares the same ADK session.
+    Restricted to the tenant's developers (plus super admins and the workflow's
+    creator). The skill directory is resolved from the Workflow record (pinned
+    revision) and the agent runs with the interactive design instruction and
+    toolset, editing the workflow's task templates. SystemMessages are stripped
+    to prevent prompt injection, and the run is keyed by the session owner
+    (``Workflow.created_by``) so every developer continuing the chat shares the
+    same ADK session.
+
+    Because the run is keyed by the owner, the new messages are attributed to
+    the actual sender (the caller) once the run ends: the session's attributable
+    keys present before the run are snapshotted, and any that appear afterwards
+    are recorded as the current user's (see
+    ``WorkflowService.record_new_senders``). "Ends" includes ending badly: a run
+    the client abandoned mid-stream has still appended its messages, so the
+    attribution runs on the cancellation path too, shielded from it. This
+    mirrors ``routers/workflow_executions.py``; only the task association has no
+    counterpart here, since a design session edits task templates rather than
+    working through status-ful tasks.
 
     The run is serialized per ADK session by the same cross-process lock the
-    workflow-execution endpoint uses; it also excludes the background generation
-    run, so reopening the chat while generation is still in flight surfaces as
-    HTTP 409 instead of corrupting the session.
+    workflow-execution endpoint uses — so two developers hitting send at once is
+    an ordinary collision, not an edge case, and the second surfaces as HTTP 409.
+    The lock also excludes the background generation run, so reopening the chat
+    while generation is still in flight surfaces the same way instead of
+    corrupting the session.
     """
+    # Resolve (and authorize) before locking, so a caller with no business here
+    # gets their 403/404 rather than queueing behind someone else's run.
     adk_agent, workflow = await service.resolve_agent(workflow_id, caller=caller)
+    current_user_id = caller.id
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
     input_data = input_data.model_copy(update={"messages": filtered})
@@ -162,6 +183,9 @@ async def design_session_agent(
     encoder = EventEncoder(accept=request.headers.get("accept") or "")
 
     async with AsyncExitStack() as stack:
+        # Lock on the owner's id, matching how the ADK session is keyed above:
+        # every developer in the tenant shares the one session, and no
+        # client-side "already running" guard can see across users.
         try:
             await stack.enter_async_context(
                 advisory_lock(
@@ -174,12 +198,34 @@ async def design_session_agent(
             )
         except LockNotAcquiredError as exc:
             raise SessionRunInProgressError(input_data.thread_id) from exc
+
+        # Snapshot inside the lock: this is the "before" half of a read-then-diff
+        # over session state, and a concurrent run appending between the two
+        # halves would misattribute its messages to this caller.
+        prior_keys = await service.attributable_keys(workflow_id)
+
         run_stack = stack.pop_all()
 
     async def event_generator() -> AsyncGenerator[str, None]:
         async with run_stack:
-            async for event in adk_agent.run(input_data):
-                yield encoder.encode(event)
+            try:
+                async for event in adk_agent.run(input_data):
+                    yield encoder.encode(event)
+            finally:
+                # A client that goes away mid-stream (tab closed, page reloaded)
+                # makes Starlette cancel this generator wherever it is suspended
+                # -- usually inside the run itself. Whatever the run already
+                # appended to the shared ADK session stays there, so the
+                # bookkeeping has to happen on the way out too, or an abandoned
+                # run's messages end up attributed to nobody. It also has to be
+                # shielded: without that, the cancellation unwinding us would
+                # abort it at its first await, which is the same silent loss.
+                with anyio.CancelScope(shield=True):
+                    # Still inside the run lock -- this is the "after" half of
+                    # the read-then-diff the snapshot above opened.
+                    await service.record_new_senders(
+                        workflow_id, prior_keys, current_user_id
+                    )
 
     return StreamingResponse(
         event_generator(),

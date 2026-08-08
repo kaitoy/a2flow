@@ -1000,20 +1000,70 @@ export async function deleteWorkflowTaskTemplate(templateId: string): Promise<vo
   );
 }
 
+/** One `/messages` record, as far as the attribution helpers below care. */
+interface MessageSenderRecord {
+  id?: string;
+  role?: string;
+  toolCallId?: string;
+  senderUserId?: string | null;
+}
+
+/**
+ * Reduce raw `/messages` records to a message-id → sender-user-id map.
+ *
+ * Keyed by whichever id identifies the message to the rest of the UI: the
+ * message id (the ADK event id) for human (`user`) messages, and the
+ * `toolCallId` for tool-result messages (for example an A2UI user-action
+ * acknowledgement) — the backend keys those by `toolCallId` since a tool
+ * message's own `id` is regenerated on every fetch and cannot be used to
+ * correlate it back to its sender. Unattributed records are omitted, so callers
+ * fall back to the session's owner.
+ */
+function sendersFrom(records: MessageSenderRecord[]): Map<string, string> {
+  const senders = new Map<string, string>();
+  for (const record of records) {
+    if (!record.senderUserId) continue;
+    const key = record.role === "tool" ? record.toolCallId : record.id;
+    if (key) senders.set(key, record.senderUserId);
+  }
+  return senders;
+}
+
 /**
  * Fetch the chat history of a workflow's design session.
  *
  * A design session has no record of its own, so it is addressed by its
  * workflow's id. Returns an empty list while the background generation run has
- * not started yet. The records carry `senderUserId`/`workflowTaskId` as `null`
- * so the payload shape matches {@link getWorkflowSessionMessages} and the chat
- * components can be reused unchanged.
+ * not started yet. The records carry `senderUserId` (and `workflowTaskId`,
+ * always `null` here — a design session has no status-ful tasks) so the payload
+ * shape matches {@link getWorkflowSessionMessages} and the chat components can
+ * be reused unchanged.
  */
 export async function getDesignSessionMessages(workflowId: string): Promise<Message[]> {
   return fetchEnvelope(
     apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/messages`),
     zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse
   ) as Promise<Message[]>;
+}
+
+/**
+ * Fetch the per-message sender attribution for a workflow's design session.
+ *
+ * The design chat is shared by every developer in the tenant, so its messages
+ * carry the same attribution a workflow session's do. Hits the same `/messages`
+ * endpoint as {@link getDesignSessionMessages}, reading the `senderUserId` each
+ * record carries; see {@link sendersFrom} for how the map is keyed. Messages
+ * from the unattended background generation run have no sender, so callers fall
+ * back to the workflow's `createdBy`.
+ */
+export async function getDesignSessionMessageSenders(
+  workflowId: string
+): Promise<Map<string, string>> {
+  const records = (await fetchEnvelope(
+    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/messages`),
+    zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse
+  )) as MessageSenderRecord[];
+  return sendersFrom(records);
 }
 
 /** Fetch a WorkflowExecution record by ID. */
@@ -1041,16 +1091,11 @@ export async function getWorkflowSessionMessages(executionId: string): Promise<M
 /**
  * Fetch the per-message sender attribution for a WorkflowExecution's chat.
  *
- * Returns a map keyed by whichever id identifies the message to the rest of
- * the UI: the message id (the ADK event id) for attributed human (`user`)
- * messages, and the `toolCallId` for attributed tool-result messages (for
- * example an A2UI user-action acknowledgement) — the backend keys those by
- * `toolCallId` since a tool message's own `id` is regenerated on every fetch
- * and cannot be used to correlate it back to its sender. Agent messages and
- * legacy history sent before attribution existed are absent, so callers fall
- * back to the execution's initiator. Hits the same `/messages` endpoint as
- * {@link getWorkflowSessionMessages}, reading the `senderUserId` each record
- * carries.
+ * Hits the same `/messages` endpoint as {@link getWorkflowSessionMessages},
+ * reading the `senderUserId` each record carries; see {@link sendersFrom} for
+ * how the map is keyed. Agent messages and legacy history sent before
+ * attribution existed are absent, so callers fall back to the execution's
+ * initiator.
  */
 export async function getWorkflowSessionMessageSenders(
   executionId: string
@@ -1058,14 +1103,8 @@ export async function getWorkflowSessionMessageSenders(
   const records = (await fetchEnvelope(
     apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`),
     zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
-  )) as Array<{ id?: string; role?: string; toolCallId?: string; senderUserId?: string | null }>;
-  const senders = new Map<string, string>();
-  for (const record of records) {
-    if (!record.senderUserId) continue;
-    const key = record.role === "tool" ? record.toolCallId : record.id;
-    if (key) senders.set(key, record.senderUserId);
-  }
-  return senders;
+  )) as MessageSenderRecord[];
+  return sendersFrom(records);
 }
 
 /**

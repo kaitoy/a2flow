@@ -16,7 +16,9 @@ of a *workflow session*, the chat a run happens in
 (:class:`models.workflow_execution.WorkflowExecution`). Neither has a table of
 its own: a design session exists one-to-one with its workflow, so the
 workflow's id identifies it, exactly as an execution's id identifies its
-workflow session.
+workflow session. Both are shared chats — a design session by the tenant's
+developers, a workflow session by its initiator and approvers — so both record
+per-message sender attribution in :class:`models.message_meta.MessageMeta`.
 """
 
 from enum import StrEnum
@@ -151,9 +153,12 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     ``session_id`` is the workflow's design session and is indexed so the
     design agent's tools can map the session they run in back to the workflow
     whose templates they edit. ``created_by`` doubles as that chat's owner: it
-    keys the ADK session and gates ``/messages`` and ``/agent``, so only the
-    user who generated the workflow (or a super admin) can drive the design
-    conversation.
+    keys the ADK session, so every developer driving the conversation through
+    ``/messages`` and ``/agent`` shares one history instead of forking a private
+    session. Access itself is not tied to it — the chat is open to every
+    ``developer`` in the tenant (see
+    ``services.workflow.WorkflowService._assert_design_access``), and each
+    message is attributed to its real sender through ``models.message_meta``.
     """
 
     __tablename__ = "workflows"

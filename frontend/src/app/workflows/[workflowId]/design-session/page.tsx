@@ -26,6 +26,7 @@ import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useSessionAvatarRenderer } from "@/hooks/useSessionAvatarRenderer";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import {
   generateWorkflowDescription,
@@ -37,7 +38,7 @@ import {
 import logger from "@/lib/logger";
 import { Role, useHasRole } from "@/lib/roles";
 import { clearError } from "@/store/chatSlice";
-import { useAppDispatch } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
 /** How often (ms) to re-fetch the workflow's task templates while designing. */
@@ -49,6 +50,8 @@ const WORKFLOW_POLL_INTERVAL_MS = 2_000;
 /**
  * The design chat of a workflow's design session: the template
  * timeline on the left, the conversation with the design agent on the right.
+ * The chat is shared by every developer in the tenant, so each message carries
+ * its sender's avatar and the history is polled for their messages.
  * Templates are re-fetched after every agent turn (and on an interval) so the
  * timeline follows the task templates the agent is editing. A developer can also open
  * the chat input's action menu to re-summarize the conversation into the
@@ -69,6 +72,7 @@ function DesignSessionView({
 }) {
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
+  const currentUser = useAppSelector((s) => s.auth.user);
   const generateDescription = useAsyncAction({ showDone: false });
   const [diffOpen, setDiffOpen] = useState(false);
   const {
@@ -80,7 +84,23 @@ function DesignSessionView({
     sendMessage,
     sendA2uiAction,
     sendApprovalResult,
+    messageSenders,
+    senderUsers,
+    locallySentMessageIds,
   } = useWorkflowSessionChat(workflow.id, workflow.sessionId, null, workflow.createdBy, "design");
+
+  // The design chat is shared by the tenant's developers, so each message shows
+  // who sent it — the same resolution the workflow session uses. Messages with
+  // no attribution (the background generation run's) fall back to the
+  // workflow's creator, who the ADK session is keyed by.
+  const renderAvatar = useSessionAvatarRenderer({
+    agentLabel: workflow.name,
+    ownerUserId: workflow.createdBy,
+    messageSenders,
+    senderUsers,
+    locallySentMessageIds,
+    currentUser,
+  });
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [timelineDrawerOpen, setTimelineDrawerOpen] = useState(false);
   const [templates, setTemplates] = useState<WorkflowTaskTemplate[]>([]);
@@ -217,6 +237,7 @@ function DesignSessionView({
           messages={messages}
           isStreaming={isStreaming}
           isRunning={isRunning}
+          renderAvatar={renderAvatar}
           onAction={sendA2uiAction}
           onApprovalResolved={sendApprovalResult}
           pendingRenderCalls={pendingRenderCalls}

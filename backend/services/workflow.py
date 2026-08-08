@@ -8,9 +8,11 @@ refined in. That chat has no record of its own, so it is identified by its
 workflow and served here through :meth:`WorkflowService.get_messages` and
 :meth:`WorkflowService.resolve_agent`, mirroring how
 ``services/workflow_execution.py`` serves an execution's workflow session.
-Unlike a workflow session, a design session has no approver sharing — only its
-owner (``Workflow.created_by``) and super admins may use it — so no separate
-access policy is needed.
+Like a workflow session, a design session is shared: every ``developer`` in the
+tenant may read and drive it, and each message is attributed to the user who
+actually sent it. Sharing follows from the role rather than from a per-record
+list of participants, so no separate access policy object is needed — see
+:meth:`WorkflowService._assert_design_access`.
 
 Workflows are not created here: they are born from the generation flow in
 ``services/workflow_design.py``.
@@ -28,10 +30,11 @@ from collections.abc import Sequence
 from typing import Any
 
 from ag_ui_adk import ADKAgent, adk_events_to_messages
-from google.adk.sessions import BaseSessionService
+from google.adk.sessions import BaseSessionService, Session
 
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
+from models.message_meta import MessageScope
 from models.user import Role, User, has_role
 from models.workflow import Workflow, WorkflowStatus, WorkflowUpdate
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionCreate
@@ -44,6 +47,7 @@ from models.workflow_task import WorkflowTaskCreate, WorkflowTaskStatus
 from repositories import (
     MAX_TASK_TEMPLATES,
     AgentSkillRepository,
+    MessageMetaRepository,
     WorkflowExecutionRepository,
     WorkflowPublishedVersionRepository,
     WorkflowRepository,
@@ -59,6 +63,7 @@ from repositories.exceptions import (
     WorkflowNotRunnableError,
 )
 from repositories.query import FilterSpec, SortSpec
+from services import session_attribution
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +125,7 @@ class WorkflowService:
         templates: WorkflowTaskTemplateRepository,
         tasks: WorkflowTaskRepository,
         versions: WorkflowPublishedVersionRepository,
+        meta: MessageMetaRepository,
         skills_store: SkillManager,
         registry: AgentRegistry,
         session_service: BaseSessionService,
@@ -138,6 +144,8 @@ class WorkflowService:
             versions: Repository holding the snapshot taken at publish time,
                 which a ``modified`` workflow runs against and
                 :meth:`discard_changes` restores from.
+            meta: Repository recording and reading per-message sender
+                attribution for the shared design session.
             skills_store: Store locating a skill revision's directory on disk.
             registry: Registry resolving ADK agents per skill revision and kind.
             session_service: ADK session store holding the design chat history.
@@ -149,6 +157,7 @@ class WorkflowService:
         self._templates = templates
         self._tasks = tasks
         self._versions = versions
+        self._meta = meta
         self._skills_store = skills_store
         self._registry = registry
         self._session_service = session_service
@@ -172,24 +181,32 @@ class WorkflowService:
         return workflow
 
     @staticmethod
-    def _assert_design_owner(workflow: Workflow, caller: User) -> None:
-        """Reject callers who own neither the design session nor the platform.
+    def _assert_design_access(workflow: Workflow, caller: User) -> None:
+        """Reject callers with no business in this workflow's design session.
 
-        The design session's owner is the workflow's ``created_by`` — the user
-        who generated it. Unlike a workflow session there is no approver
-        sharing, so nobody else may read or drive the chat.
+        Designing a workflow is developer work — the same role that gates
+        editing and publishing it — so every ``developer`` in the tenant may
+        read and drive the chat, just as an execution's approvers share its
+        workflow session. ``has_role`` lets a ``super_admin`` through. The
+        workflow's ``created_by`` is admitted explicitly as well, so the user
+        who generated it is not locked out of their own conversation if their
+        ``developer`` role is later revoked.
+
+        The tenant boundary is enforced a layer below: the workflow was fetched
+        through the tenant-scoped repository, so another tenant's id surfaced as
+        404 before ever reaching here.
 
         Args:
             workflow: The workflow whose design session is being operated on.
             caller: The authenticated user performing the operation.
 
         Raises:
-            ForbiddenError: If the caller neither owns the design session nor
-                is a super admin.
+            ForbiddenError: If the caller is neither a developer, a super admin,
+                nor the workflow's creator.
         """
-        if caller.id == workflow.created_by or has_role(caller, Role.super_admin):
+        if caller.id == workflow.created_by or has_role(caller, Role.developer):
             return
-        raise ForbiddenError("Only the session owner can access this design session")
+        raise ForbiddenError("Only developers can access this design session")
 
     async def get_for_design(self, workflow_id: str, *, caller: User) -> Workflow:
         """Return a Workflow, authorizing the caller against its design session.
@@ -203,11 +220,11 @@ class WorkflowService:
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
-            ForbiddenError: If the caller neither owns the design session nor
-                is a super admin.
+            ForbiddenError: If the caller is neither a developer, a super admin,
+                nor the workflow's creator.
         """
         workflow = await self.get(workflow_id)
-        self._assert_design_owner(workflow, caller)
+        self._assert_design_access(workflow, caller)
         return workflow
 
     async def resolve_agent(
@@ -230,8 +247,8 @@ class WorkflowService:
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
-            ForbiddenError: If the caller neither owns the design session nor
-                is a super admin.
+            ForbiddenError: If the caller is neither a developer, a super admin,
+                nor the workflow's creator.
             SkillNotReadyError: If neither the pinned revision nor the skill's
                 current revision is present in the store.
         """
@@ -266,17 +283,41 @@ class WorkflowService:
         )
         return agent, workflow
 
+    async def _adk_session(self, workflow: Workflow) -> Session | None:
+        """Return the ADK session holding a workflow's design session chat.
+
+        Keyed by the workflow's ``created_by``, not the current user, so every
+        developer in the tenant reads and writes the one shared conversation
+        rather than forking a private session of their own.
+
+        Args:
+            workflow: The workflow whose design chat to look up.
+
+        Returns:
+            The ADK session, or ``None`` when it does not exist yet (the
+            background generation run has not started).
+        """
+        return await self._session_service.get_session(
+            app_name=tenant_app_name(self._app_name, workflow.tenant_id),
+            user_id=workflow.created_by,
+            session_id=workflow.session_id,
+        )
+
     async def get_messages(
         self, workflow_id: str, *, caller: User
     ) -> builtins.list[dict[str, Any]]:
         """Return the chat history of a workflow's design session.
 
-        The history is keyed by the session's owner (``created_by``). Returns
-        an empty list when the ADK session does not exist yet (the background
-        generation run has not started). ``senderUserId`` and
-        ``workflowTaskId`` are included as ``None`` so the payload shape
-        matches the workflow-execution messages endpoint and the frontend chat
-        components can be reused unchanged.
+        The history is keyed by the session's owner (``created_by``), so every
+        developer sees the one shared conversation. Each message carries the
+        ``senderUserId`` recorded for it, letting the UI show who said what;
+        agent messages and the unattended background generation run's messages
+        have none and fall back in the UI. ``workflowTaskId`` is always ``None``
+        here — a design session edits task *templates*, not the status-ful tasks
+        a run works through — but is still emitted so the payload shape matches
+        the workflow-execution messages endpoint and the frontend chat
+        components can be reused unchanged. Returns an empty list when the ADK
+        session does not exist yet.
 
         Args:
             workflow_id: Identifier of the workflow whose messages to fetch.
@@ -287,24 +328,75 @@ class WorkflowService:
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
-            ForbiddenError: If the caller neither owns the design session nor
-                is a super admin.
+            ForbiddenError: If the caller is neither a developer, a super admin,
+                nor the workflow's creator.
         """
         workflow = await self.get_for_design(workflow_id, caller=caller)
-        session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, workflow.tenant_id),
-            user_id=workflow.created_by,
-            session_id=workflow.session_id,
-        )
+        session = await self._adk_session(workflow)
         if session is None:
             return []
-        result: builtins.list[dict[str, Any]] = []
-        for message in adk_events_to_messages(session.events):
-            data = message.model_dump(mode="json", by_alias=True)
-            data["senderUserId"] = None
-            data["workflowTaskId"] = None
-            result.append(data)
-        return result
+        meta = await self._meta.meta_for_session(
+            MessageScope.design_session(workflow_id)
+        )
+        return session_attribution.merge_message_meta(
+            adk_events_to_messages(session.events), meta
+        )
+
+    async def attributable_keys(self, workflow_id: str) -> set[str]:
+        """Return the correlation keys of the design session's attributable events.
+
+        Snapshotting this set before an agent run lets the router attribute
+        whatever appears afterwards to the user who drove the run — see
+        :func:`services.session_attribution.attributable_keys`. Returns an empty
+        set when the ADK session does not exist yet (before the first run).
+
+        Called only after :meth:`resolve_agent` has already authorized the
+        caller, so it deliberately skips the design-access check.
+
+        Args:
+            workflow_id: Identifier of the workflow whose events to read.
+
+        Returns:
+            The set of correlation keys (event ids and tool_call_ids)
+            representing attributable events already present in the design
+            session.
+
+        Raises:
+            NotFoundError: If no workflow exists with the given ID.
+        """
+        workflow = await self.get(workflow_id)
+        return session_attribution.attributable_keys(await self._adk_session(workflow))
+
+    async def record_new_senders(
+        self, workflow_id: str, prior_keys: set[str], sender_user_id: str
+    ) -> None:
+        """Attribute the design session's new events to ``sender_user_id``.
+
+        Everything the session gained since ``prior_keys`` was snapshotted was
+        produced by the current user, so it is recorded against them — see
+        :func:`services.session_attribution.record_new_senders` for the
+        read-then-diff rules. Does nothing when the ADK session does not exist.
+
+        Like :meth:`attributable_keys`, this runs after the caller was
+        authorized by :meth:`resolve_agent`, so it skips the access check.
+
+        Args:
+            workflow_id: Identifier of the workflow that was run.
+            prior_keys: The attributable keys present before the run.
+            sender_user_id: The user who sent the new messages.
+
+        Raises:
+            NotFoundError: If no workflow exists with the given ID.
+            ForeignKeyViolationError: If ``sender_user_id`` does not match a user.
+        """
+        workflow = await self.get(workflow_id)
+        await session_attribution.record_new_senders(
+            self._meta,
+            MessageScope.design_session(workflow_id),
+            await self._adk_session(workflow),
+            prior_keys,
+            sender_user_id,
+        )
 
     async def list(
         self,

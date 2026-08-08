@@ -691,14 +691,19 @@ def upgrade() -> None:
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column(
-            "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+            "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
+        sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("adk_event_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("sender_user_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
             "workflow_task_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.CheckConstraint(
+            "(workflow_execution_id IS NULL) <> (workflow_id IS NULL)",
+            name="ck_message_meta_single_parent",
+        ),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["sender_user_id"],
@@ -714,6 +719,12 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
+            ["workflow_id"],
+            ["workflows.id"],
+            name="fk_message_meta_workflow_id",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
             ["workflow_task_id"],
             ["workflow_tasks.id"],
             name="fk_message_meta_workflow_task_id",
@@ -726,6 +737,11 @@ def upgrade() -> None:
             "adk_event_id",
             name="uq_message_meta_execution_event",
         ),
+        sa.UniqueConstraint(
+            "workflow_id",
+            "adk_event_id",
+            name="uq_message_meta_workflow_event",
+        ),
     )
     op.create_index(
         "ix_message_meta_sender_user_id",
@@ -737,6 +753,12 @@ def upgrade() -> None:
         "ix_message_meta_workflow_execution_id",
         "message_meta",
         ["workflow_execution_id"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_message_meta_workflow_id",
+        "message_meta",
+        ["workflow_id"],
         unique=False,
     )
     op.create_index(
@@ -828,6 +850,7 @@ def downgrade() -> None:
     )
     op.drop_table("workflow_task_dependencies")
     op.drop_index("ix_message_meta_workflow_task_id", table_name="message_meta")
+    op.drop_index("ix_message_meta_workflow_id", table_name="message_meta")
     op.drop_index("ix_message_meta_workflow_execution_id", table_name="message_meta")
     op.drop_index("ix_message_meta_sender_user_id", table_name="message_meta")
     op.drop_index("ix_message_meta_tenant_id", table_name="message_meta")

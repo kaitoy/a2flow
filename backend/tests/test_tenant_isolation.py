@@ -22,6 +22,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.agent_skill import AgentSkillCreate
 from models.approval import ApprovalCreate
 from models.mcp_server import MCPServerCreate
+from models.message_meta import MessageScope
 from models.notification import NotificationCreate, NotificationType
 from models.secret import SecretCreate, SecretType
 from models.workflow import WorkflowCreate
@@ -81,6 +82,7 @@ class _Rows:
         self.notification = ""
         self.workflow_task_template = ""
         self.message_meta_event_id = ""
+        self.design_message_meta_event_id = ""
 
 
 async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) -> _Rows:
@@ -186,8 +188,14 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
     meta = SqlMessageMetaRepository(db, tenant_id=tenant_id)
     rows.message_meta_event_id = f"event-{suffix}"
     await meta.set_sender(
-        workflow_execution_id=execution.id,
+        scope=MessageScope.workflow_session(execution.id),
         adk_event_id=rows.message_meta_event_id,
+        sender_user_id="owner",
+    )
+    rows.design_message_meta_event_id = f"design-event-{suffix}"
+    await meta.set_sender(
+        scope=MessageScope.design_session(workflow.id),
+        adk_event_id=rows.design_message_meta_event_id,
         sender_user_id="owner",
     )
 
@@ -370,6 +378,22 @@ async def test_message_meta_isolation(
         repo_a = SqlMessageMetaRepository(db, tenant_id=TENANT_A)
         # Tenant A's repo, queried against tenant B's workflow_execution_id, must
         # see no metadata rows even though the row itself exists in tenant B.
-        assert await repo_a.meta_for_session(b.workflow_execution) == {}
-        own = await repo_a.meta_for_session(a.workflow_execution)
+        assert (
+            await repo_a.meta_for_session(
+                MessageScope.workflow_session(b.workflow_execution)
+            )
+            == {}
+        )
+        own = await repo_a.meta_for_session(
+            MessageScope.workflow_session(a.workflow_execution)
+        )
         assert a.message_meta_event_id in own
+        # The same holds for the design-session half of the table, addressed by
+        # workflow id rather than execution id.
+        assert (
+            await repo_a.meta_for_session(MessageScope.design_session(b.workflow)) == {}
+        )
+        own_design = await repo_a.meta_for_session(
+            MessageScope.design_session(a.workflow)
+        )
+        assert a.design_message_meta_event_id in own_design

@@ -12,10 +12,11 @@ from collections.abc import Sequence
 from typing import Any
 
 from ag_ui_adk import ADKAgent, adk_events_to_messages
-from google.adk.sessions import BaseSessionService
+from google.adk.sessions import BaseSessionService, Session
 
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
+from models.message_meta import MessageScope
 from models.user import User
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
@@ -27,16 +28,10 @@ from repositories import (
 )
 from repositories.exceptions import NotFoundError, SkillNotReadyError
 from repositories.query import FilterSpec, SortSpec
+from services import session_attribution
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 
 logger = logging.getLogger(__name__)
-
-#: Tool-response payload of the frontend's no-op ``render_a2ui``
-#: acknowledgement (``RENDER_ACK_CONTENT`` in ``frontend/src/lib/a2uiAction.ts``,
-#: mirroring the ``@ag-ui/a2ui-middleware`` convention). Such a response merely
-#: unblocks the long-running render call for a surface nobody acted on, so it
-#: must not be attributed to the user whose run happened to flush it.
-_RENDER_ACK_RESPONSE = {"status": "rendered"}
 
 
 class WorkflowExecutionService:
@@ -289,40 +284,43 @@ class WorkflowExecutionService:
                 designated approver of the execution, nor a super admin.
         """
         execution = await self.get(execution_id, caller=caller)
-        session = await self._session_service.get_session(
+        session = await self._adk_session(execution)
+        if session is None:
+            return []
+        meta = await self._meta.meta_for_session(
+            MessageScope.workflow_session(execution_id)
+        )
+        return session_attribution.merge_message_meta(
+            adk_events_to_messages(session.events), meta
+        )
+
+    async def _adk_session(self, execution: WorkflowExecution) -> Session | None:
+        """Return the ADK session holding an execution's workflow session chat.
+
+        Keyed by the execution's initiator, not the current user, so every
+        authorized viewer (for example a designated approver) reads and writes
+        the one shared conversation.
+
+        Args:
+            execution: The WorkflowExecution whose chat to look up.
+
+        Returns:
+            The ADK session, or ``None`` when it does not exist yet (before the
+            first agent run).
+        """
+        return await self._session_service.get_session(
             app_name=tenant_app_name(self._app_name, execution.tenant_id),
             user_id=execution.initiator_id,
             session_id=execution.session_id,
         )
-        if session is None:
-            return []
-        messages = adk_events_to_messages(session.events)
-        meta = await self._meta.meta_for_session(execution_id)
-        result: builtins.list[dict[str, Any]] = []
-        for message in messages:
-            data = message.model_dump(mode="json", by_alias=True)
-            # "user" and "assistant" messages keep the ADK event id as their
-            # own id, but `adk_events_to_messages` regenerates a fresh random
-            # id for every "tool" message on each call -- their only stable,
-            # round-trip-safe correlation key is the tool_call_id they resolve.
-            key = data.get("toolCallId") if data.get("role") == "tool" else data["id"]
-            row = meta.get(key) if key is not None else None
-            data["senderUserId"] = row.sender_user_id if row is not None else None
-            data["workflowTaskId"] = row.workflow_task_id if row is not None else None
-            result.append(data)
-        return result
 
     async def attributable_keys(self, execution_id: str) -> set[str]:
         """Return the correlation keys of the workflow session's attributable events.
 
-        Two kinds of events can be attributed to a sender: ADK ``"user"``
-        events (keyed by their own event id) and tool-response
-        (function-response) events -- including A2UI user-action
-        acknowledgements -- keyed by their function response id (the
-        ``tool_call_id`` the frontend sent). Snapshotting this set before an
-        agent run lets the router attribute whatever appears afterwards to the
-        user who drove the run. Returns an empty set when the ADK session does
-        not exist yet (before the first run).
+        Snapshotting this set before an agent run lets the router attribute
+        whatever appears afterwards to the user who drove the run — see
+        :func:`services.session_attribution.attributable_keys`. Returns an empty
+        set when the ADK session does not exist yet (before the first run).
 
         Args:
             execution_id: Identifier of the WorkflowExecution whose events to read.
@@ -336,38 +334,17 @@ class WorkflowExecutionService:
             NotFoundError: If no WorkflowExecution exists with the given ID.
         """
         execution = await self._get(execution_id)
-        session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, execution.tenant_id),
-            user_id=execution.initiator_id,
-            session_id=execution.session_id,
-        )
-        if session is None:
-            return set()
-        keys: set[str] = set()
-        for event in session.events:
-            if event.author == "user":
-                keys.add(event.id)
-            for fr in event.get_function_responses():
-                if fr.id:
-                    keys.add(fr.id)
-        return keys
+        return session_attribution.attributable_keys(await self._adk_session(execution))
 
     async def record_new_senders(
         self, execution_id: str, prior_keys: set[str], sender_user_id: str
     ) -> None:
         """Attribute the workflow session's new events to ``sender_user_id``.
 
-        Compares the workflow session's current attributable keys (see
-        :meth:`attributable_keys`) against the snapshot taken before the run;
-        every key not in ``prior_keys`` was produced by the current user, so it
-        is recorded (idempotently) -- new ``"user"`` events by their event id,
-        and new tool-response events (including A2UI action acknowledgements)
-        by their tool_call_id. Tool responses matching
-        :data:`_RENDER_ACK_RESPONSE` are skipped: they are the no-op
-        acknowledgements the frontend flushes for every still-pending render
-        call on the user's next run, not actions the user performed, and
-        attributing them would paint the user's avatar onto surfaces they never
-        touched. Does nothing when the ADK session does not exist.
+        Everything the session gained since ``prior_keys`` was snapshotted was
+        produced by the current user, so it is recorded against them — see
+        :func:`services.session_attribution.record_new_senders` for the
+        read-then-diff rules. Does nothing when the ADK session does not exist.
 
         Args:
             execution_id: Identifier of the WorkflowExecution that was run.
@@ -379,29 +356,13 @@ class WorkflowExecutionService:
             ForeignKeyViolationError: If ``sender_user_id`` does not match a user.
         """
         execution = await self._get(execution_id)
-        session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, execution.tenant_id),
-            user_id=execution.initiator_id,
-            session_id=execution.session_id,
+        await session_attribution.record_new_senders(
+            self._meta,
+            MessageScope.workflow_session(execution_id),
+            await self._adk_session(execution),
+            prior_keys,
+            sender_user_id,
         )
-        if session is None:
-            return
-        for event in session.events:
-            if event.author == "user" and event.id not in prior_keys:
-                await self._meta.set_sender(
-                    workflow_execution_id=execution_id,
-                    adk_event_id=event.id,
-                    sender_user_id=sender_user_id,
-                )
-            for fr in event.get_function_responses():
-                if fr.response == _RENDER_ACK_RESPONSE:
-                    continue
-                if fr.id and fr.id not in prior_keys:
-                    await self._meta.set_sender(
-                        workflow_execution_id=execution_id,
-                        adk_event_id=fr.id,
-                        sender_user_id=sender_user_id,
-                    )
 
     async def record_message_tasks(self, execution_id: str) -> None:
         """Associate each ADK event with the WorkflowTask in progress at the time.
@@ -424,11 +385,7 @@ class WorkflowExecutionService:
             NotFoundError: If no WorkflowExecution exists with the given ID.
         """
         execution = await self._get(execution_id)
-        session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, execution.tenant_id),
-            user_id=execution.initiator_id,
-            session_id=execution.session_id,
-        )
+        session = await self._adk_session(execution)
         if session is None:
             return
         # Capture the audit user before the loop: each set_task commit expires

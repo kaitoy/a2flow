@@ -171,15 +171,17 @@ def get_workflow_service(
     templates: WorkflowTaskTemplateRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     versions: WorkflowPublishedVersionRepositoryDep,
+    meta: MessageMetaRepositoryDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
 ) -> WorkflowService:
     """Create a WorkflowService wiring its repositories, skill store, agent registry, and session store.
 
-    The last four collaborators serve the workflow's design session: the store
-    and registry resolve the design agent, and the session store holds its chat
-    history.
+    The last five collaborators serve the workflow's design session: the store
+    and registry resolve the design agent, the session store holds its chat
+    history, and the metadata repository records which developer sent each
+    message in that shared chat.
     """
     return WorkflowService(
         workflows,
@@ -188,6 +190,7 @@ def get_workflow_service(
         templates,
         tasks,
         versions,
+        meta,
         skills_store,
         registry,
         session_service,

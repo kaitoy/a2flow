@@ -5,6 +5,7 @@ import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import {
   createChatAgent,
+  getDesignSessionMessageSenders,
   getSessionMessages,
   getWorkflowSessionMessageSenders,
   getWorkflowSessionMessages,
@@ -113,6 +114,25 @@ describe("getWorkflowSessionMessageSenders", () => {
     expect(result.has("m3-random")).toBe(false);
     expect(result.has("m2")).toBe(false);
     expect(result.has("m4")).toBe(false);
+  });
+});
+
+describe("getDesignSessionMessageSenders", () => {
+  it("reads attribution off the design session's own messages endpoint", async () => {
+    server.use(
+      http.get(`${BASE}/api/v1/workflows/:workflowId/messages`, () =>
+        envelope([
+          // The unattended background generation run records no sender.
+          { id: "m1", role: "user", content: "Build me a report", senderUserId: null },
+          { id: "m2", role: "user", content: "add a step", senderUserId: "dev-2" },
+          { id: "m3", role: "assistant", content: "done", senderUserId: null },
+        ])
+      )
+    );
+    const result = await getDesignSessionMessageSenders("wf-1");
+    expect(result.get("m2")).toBe("dev-2");
+    expect(result.has("m1")).toBe(false);
+    expect(result.has("m3")).toBe(false);
   });
 });
 

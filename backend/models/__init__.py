@@ -9,7 +9,7 @@ from .mcp_server import (
     McpToolInfo,
     McpTransport,
 )
-from .message_meta import MessageMeta
+from .message_meta import MessageMeta, MessageScope
 from .notification import (
     Notification,
     NotificationCreate,
@@ -69,6 +69,7 @@ __all__ = [
     "McpToolInfo",
     "McpTransport",
     "MessageMeta",
+    "MessageScope",
     "GenerateWorkflowRequest",
     "Notification",
     "NotificationCreate",

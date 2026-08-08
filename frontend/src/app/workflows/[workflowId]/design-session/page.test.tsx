@@ -44,7 +44,11 @@ vi.mock("@/hooks/useWorkflowSessionChat", () => ({
 }));
 
 vi.mock("@/components/MessageList", () => ({
-  MessageList: () => <div data-testid="message-list-mock" />,
+  MessageList: ({ renderAvatar }: { renderAvatar?: (m: unknown) => ReactNode }) => (
+    <div data-testid="message-list-mock">
+      {renderAvatar?.({ id: "m1", role: "user", content: "hi" })}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/ChatInput", () => ({
@@ -139,6 +143,64 @@ describe("DesignSessionPage", () => {
       "user",
       "design"
     );
+  });
+
+  it("shows the recorded sender's avatar beside a message", async () => {
+    // `avatarUpdatedAt` makes Avatar render an <img alt="… avatar">; without an
+    // uploaded avatar it falls back to a decorative, unnamed generated SVG.
+    const sender = {
+      id: "dev-2",
+      username: "dana",
+      firstName: "Dana",
+      lastName: "Developer",
+      avatarUpdatedAt: "2026-01-01T00:00:00Z",
+    } as User;
+    useWorkflowSessionChatMock.mockReturnValue({
+      messages: [],
+      isRunning: false,
+      isStreaming: false,
+      error: null,
+      pendingRenderCalls: [],
+      sendMessage: vi.fn(),
+      sendA2uiAction: vi.fn(),
+      sendApprovalResult: vi.fn(),
+      messageSenders: new Map([["m1", "dev-2"]]),
+      senderUsers: new Map([["dev-2", sender]]),
+      locallySentMessageIds: new Set(),
+      messageTasks: new Map(),
+      tasks: [],
+    });
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
+    const list = await screen.findByTestId("message-list-mock");
+    expect(within(list).getByRole("img", { name: "dana avatar" })).toBeInTheDocument();
+  });
+
+  it("falls back to the workflow's creator for an unattributed message", async () => {
+    const owner = {
+      id: "user",
+      username: "olivia",
+      firstName: "Olivia",
+      lastName: "Owner",
+      avatarUpdatedAt: "2026-01-01T00:00:00Z",
+    } as User;
+    useWorkflowSessionChatMock.mockReturnValue({
+      messages: [],
+      isRunning: false,
+      isStreaming: false,
+      error: null,
+      pendingRenderCalls: [],
+      sendMessage: vi.fn(),
+      sendA2uiAction: vi.fn(),
+      sendApprovalResult: vi.fn(),
+      messageSenders: new Map(),
+      senderUsers: new Map([["user", owner]]),
+      locallySentMessageIds: new Set(),
+      messageTasks: new Map(),
+      tasks: [],
+    });
+    render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
+    const list = await screen.findByTestId("message-list-mock");
+    expect(within(list).getByRole("img", { name: "olivia avatar" })).toBeInTheDocument();
   });
 
   it("renders the template timeline entries", async () => {

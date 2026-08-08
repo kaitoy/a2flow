@@ -8,29 +8,23 @@
  */
 "use client";
 
-import { A2UIActivityType } from "@ag-ui/a2ui-middleware";
-import type { Message } from "@ag-ui/core";
 import { AlertTriangle } from "lucide-react";
 import { useParams } from "next/navigation";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageList } from "@/components/MessageList";
-import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
-import { Tooltip } from "@/components/ui/tooltip";
 import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
+import { useSessionAvatarRenderer } from "@/hooks/useSessionAvatarRenderer";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
-import { A2UI_SOURCE_TOOL_CALL_ID_KEY } from "@/lib/agentActivity";
-import { formatUserName, getWorkflowExecution, type User, type WorkflowExecution } from "@/lib/api";
-import { APPROVAL_ACTIVITY_TYPE } from "@/lib/approvalTool";
+import { getWorkflowExecution, type WorkflowExecution } from "@/lib/api";
 import logger from "@/lib/logger";
 import { EXECUTION_KICKOFF_PROMPT } from "@/lib/workflowKickoff";
 import { clearError } from "@/store/chatSlice";
@@ -86,63 +80,17 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  /** Render a tooltip-wrapped avatar for the given (possibly unresolved) user. */
-  const userAvatar = (user: User | null): ReactNode => (
-    <Tooltip label={user ? formatUserName(user) : "Unknown sender"}>
-      <span className="inline-flex">
-        <Avatar user={user} size={28} />
-      </span>
-    </Tooltip>
-  );
-
-  /**
-   * Render the sender avatar shown beside a message: the workflow agent for its
-   * own (`assistant`) messages, the resolved human (applicant or approver) for
-   * `user` messages, and — once resolved — the human who acted on a rendered
-   * A2UI surface or decided an approval request. Messages whose sender is
-   * unknown fall back to the session owner; messages the current viewer just
-   * sent are attributed to them until the persisted, attributed history
-   * reloads. A2UI surfaces and approval controls show no avatar until someone
-   * has actually resolved them.
-   */
-  const renderAvatar = (message: Message): ReactNode => {
-    if (message.role === "assistant") {
-      return (
-        <Tooltip label={execution.name}>
-          <span className="inline-flex">
-            <AgentAvatar size={28} />
-          </span>
-        </Tooltip>
-      );
-    }
-    if (message.role === "user") {
-      const senderId = messageSenders.get(message.id);
-      let user: User | null;
-      if (senderId) {
-        user = senderUsers.get(senderId) ?? null;
-      } else if (locallySentMessageIds.has(message.id)) {
-        user = currentUser;
-      } else {
-        user = senderUsers.get(execution.initiatorId) ?? null;
-      }
-      return userAvatar(user);
-    }
-    if (message.role === "activity" && message.activityType === A2UIActivityType) {
-      const toolCallId = message.content[A2UI_SOURCE_TOOL_CALL_ID_KEY];
-      const senderId = typeof toolCallId === "string" ? messageSenders.get(toolCallId) : undefined;
-      if (!senderId) return null;
-      return userAvatar(senderUsers.get(senderId) ?? null);
-    }
-    if (message.role === "activity" && message.activityType === APPROVAL_ACTIVITY_TYPE) {
-      // An approval activity's id is the render_approval tool call id, which is
-      // also the key the decision's tool result is attributed under — so the
-      // sender lookup resolves to the user who approved or rejected.
-      const senderId = messageSenders.get(message.id);
-      if (!senderId) return null;
-      return userAvatar(senderUsers.get(senderId) ?? null);
-    }
-    return null;
-  };
+  // The sender avatar shown beside each message: the workflow agent for its own
+  // messages, and the resolved human (applicant or approver) for everything a
+  // person said or acted on. Shared with the design session — see the hook.
+  const renderAvatar = useSessionAvatarRenderer({
+    agentLabel: execution.name,
+    ownerUserId: execution.initiatorId,
+    messageSenders,
+    senderUsers,
+    locallySentMessageIds,
+    currentUser,
+  });
 
   return (
     <div className="flex h-dvh overflow-hidden">
