@@ -32,17 +32,25 @@ import {
   SUPPRESS_FORBIDDEN_TOAST,
   updateMcpServer,
 } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
 /**
  * Detail page of a registered MCP server: its connection fields and the tools
  * it advertises. The page is titled with the server's own name.
+ *
+ * A viewer without the developer role gets a read-only rendering — reads are
+ * open to every authenticated user, but writes are developer-only — so the
+ * connection fields show as plain values (see {@link McpServerFields}'s
+ * `readOnly` mode) and Save/Delete are hidden rather than left to fail with a
+ * 403 on click. The tools panel stays: listing a server's tools is a read.
  */
 export default function McpServerDetailPage() {
   const { serverId } = useParams<{ serverId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const canEdit = useHasRole(Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -163,29 +171,37 @@ export default function McpServerDetailPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <McpServerFields
-            register={register}
-            control={control}
-            errors={errors}
-            transport={transport}
-          />
+          {canEdit ? (
+            <McpServerFields
+              register={register}
+              control={control}
+              errors={errors}
+              transport={transport}
+            />
+          ) : (
+            <McpServerFields readOnly values={getValues()} />
+          )}
 
           <div className="flex gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={save.inFlight}
-              status={save.status}
-              pendingLabel="Saving…"
-            >
-              Save
-            </Button>
+            {canEdit && (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={save.inFlight}
+                status={save.status}
+                pendingLabel="Saving…"
+              >
+                Save
+              </Button>
+            )}
             <Button type="button" variant="ghost" onClick={() => router.push("/admin/mcp-servers")}>
-              Cancel
+              {canEdit ? "Cancel" : "Back"}
             </Button>
-            <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-              Delete
-            </Button>
+            {canEdit && (
+              <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
+                Delete
+              </Button>
+            )}
           </div>
         </form>
         <McpServerToolsPanel serverId={serverId} />

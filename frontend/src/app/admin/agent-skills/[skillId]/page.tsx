@@ -59,6 +59,14 @@ interface SyncState {
  * Detail page of a registered agent skill: its repository fields, the clone /
  * pull state of the skill store, and the entry point to generating a workflow
  * from it. The page is titled with the skill's own name.
+ *
+ * A viewer without the developer role gets a read-only rendering — reads are
+ * open to every authenticated user, and a `requester` reaches this page from
+ * the Agent Skill link on a workflow's detail page. The fields then show as
+ * plain values (see {@link AgentSkillFields}'s `readOnly` mode) and every action
+ * that would hit a developer-only endpoint — Generate Workflow, Pull, Save,
+ * Delete — is hidden rather than left to fail with a 403 on click, the same
+ * convention `WorkflowDetailPage` follows.
  */
 export default function AgentSkillDetailPage() {
   const { skillId } = useParams<{ skillId: string }>();
@@ -306,7 +314,11 @@ export default function AgentSkillDetailPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <AgentSkillFields register={register} control={control} errors={errors} />
+          {canEdit ? (
+            <AgentSkillFields register={register} control={control} errors={errors} />
+          ) : (
+            <AgentSkillFields readOnly values={getValues()} />
+          )}
 
           <div className="flex gap-2">
             {canEdit && (
@@ -325,7 +337,7 @@ export default function AgentSkillDetailPage() {
               variant="ghost"
               onClick={() => router.push("/admin/agent-skills")}
             >
-              Cancel
+              {canEdit ? "Cancel" : "Back"}
             </Button>
             {canEdit && (
               <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">

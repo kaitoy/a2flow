@@ -3,10 +3,16 @@ import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
+import { ADMIN, SUPER_ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewTenantPage from "./page";
+
+/** Render the form as a super admin — the role creating a tenant requires. */
+function renderPage() {
+  return render(<NewTenantPage />, { preloadedState: SUPER_ADMIN });
+}
 
 const CREATED_TENANT = {
   id: "new-tenant-id",
@@ -27,12 +33,12 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
 
 describe("NewTenantPage", () => {
   it("renders display name input", () => {
-    render(<NewTenantPage />);
+    renderPage();
     expect(screen.getByRole("textbox", { name: /^display name/i })).toBeInTheDocument();
   });
 
   it("renders enabled checkbox checked by default", () => {
-    render(<NewTenantPage />);
+    renderPage();
     expect(screen.getByRole("checkbox", { name: "Enabled" })).toBeChecked();
   });
 
@@ -41,7 +47,7 @@ describe("NewTenantPage", () => {
     const createSpy = vi.fn(() => envelope(CREATED_TENANT, 201));
     server.use(http.post("http://localhost:8000/api/v1/tenants", createSpy));
 
-    render(<NewTenantPage />);
+    renderPage();
     await fillRequiredFields(user);
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -60,7 +66,7 @@ describe("NewTenantPage", () => {
       forward: vi.fn(),
     });
 
-    render(<NewTenantPage />);
+    renderPage();
     await fillRequiredFields(user);
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -69,7 +75,7 @@ describe("NewTenantPage", () => {
 
   it("signals tenantsChanged on success so pickers elsewhere refetch", async () => {
     const user = userEvent.setup();
-    const { store } = render(<NewTenantPage />);
+    const { store } = renderPage();
     await fillRequiredFields(user);
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -78,7 +84,7 @@ describe("NewTenantPage", () => {
 
   it("shows validation error on blur when display name is empty", async () => {
     const user = userEvent.setup();
-    render(<NewTenantPage />);
+    renderPage();
     await user.click(screen.getByRole("textbox", { name: /^display name/i }));
     await user.tab();
     await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
@@ -86,7 +92,7 @@ describe("NewTenantPage", () => {
 
   it("shows validation error on blur when name has uppercase characters", async () => {
     const user = userEvent.setup();
-    render(<NewTenantPage />);
+    renderPage();
     await user.type(screen.getByRole("textbox", { name: /^name/i }), "Acme-Corp");
     await user.tab();
     await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
@@ -100,7 +106,7 @@ describe("NewTenantPage", () => {
       )
     );
 
-    render(<NewTenantPage />);
+    renderPage();
     await fillRequiredFields(user);
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -110,5 +116,13 @@ describe("NewTenantPage", () => {
         variant: "error",
       })
     );
+  });
+
+  it("refuses the form for a viewer without the super admin role", () => {
+    render(<NewTenantPage />, { preloadedState: ADMIN });
+
+    expect(screen.getByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
   });
 });

@@ -23,9 +23,7 @@ import {
   isForbiddenError,
   SUPPRESS_FORBIDDEN_TOAST,
 } from "@/lib/api";
-
-/** Placeholder shown in place of an attribute that has no value. */
-const EMPTY = "—";
+import { EMPTY_VALUE } from "@/lib/read-only-display";
 
 const STATUS_STYLES: Record<ApprovalStatus, string> = {
   pending: "text-on-surface-variant",
@@ -142,7 +140,7 @@ export default function ApprovalDetailPage() {
                 <span className={`font-medium capitalize ${STATUS_STYLES[status]}`}>{status}</span>
               }
             />
-            <DetailItem label="Description" value={approval.description || EMPTY} />
+            <DetailItem label="Description" value={approval.description || EMPTY_VALUE} />
             <DetailItem
               label="Approver"
               value={
@@ -154,11 +152,11 @@ export default function ApprovalDetailPage() {
                     {approverName ?? approval.approver}
                   </Link>
                 ) : (
-                  EMPTY
+                  EMPTY_VALUE
                 )
               }
             />
-            <DetailItem label="Comment" value={approval.response ?? EMPTY} />
+            <DetailItem label="Comment" value={approval.response ?? EMPTY_VALUE} />
             <DetailItem
               label="Workflow Execution"
               value={
@@ -172,7 +170,9 @@ export default function ApprovalDetailPage() {
             />
             <DetailItem
               label="Related Task"
-              value={<span className="font-mono text-xs">{approval.workflowTaskId ?? EMPTY}</span>}
+              value={
+                <span className="font-mono text-xs">{approval.workflowTaskId ?? EMPTY_VALUE}</span>
+              }
             />
           </DetailList>
 

@@ -139,4 +139,29 @@ describe("AgentSkillFields", () => {
     render(<Harness showPlaceholders />);
     expect(screen.getByLabelText(/^name/i)).toHaveAttribute("placeholder", "e.g. code-review");
   });
+
+  describe("readOnly", () => {
+    it("renders every field as a value instead of a control", () => {
+      render(<AgentSkillFields readOnly values={FILLED} />);
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.getByText("code-review")).toBeInTheDocument();
+      expect(screen.getByText("https://github.com/owner/repo")).toBeInTheDocument();
+      expect(screen.getByText("skills/review")).toBeInTheDocument();
+      expect(screen.getByText("release/v2")).toBeInTheDocument();
+      expect(screen.getByText("Reviews code")).toBeInTheDocument();
+      expect(screen.getByText("octocat")).toBeInTheDocument();
+    });
+
+    it("shows the stored secret reference without mounting the picker", () => {
+      render(<AgentSkillFields readOnly values={FILLED} />);
+      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+      expect(screen.getByText("github-token/token")).toBeInTheDocument();
+      expect(screen.queryByText(/one entry of a registered secret/i)).not.toBeInTheDocument();
+    });
+
+    it("falls back to a placeholder for every blank field", () => {
+      render(<AgentSkillFields readOnly values={emptyAgentSkillFormValues()} />);
+      expect(screen.getAllByText("—")).toHaveLength(7);
+    });
+  });
 });

@@ -17,10 +17,12 @@ import {
   mcpServerFormSchema,
   toMcpServerBody,
 } from "@/components/admin/mcp-server-fields";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createMcpServer } from "@/lib/api";
 import { parsePrefill } from "@/lib/mcp-registry-prefill";
+import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -29,6 +31,7 @@ function NewMcpServerForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
+  const canEdit = useHasRole(Role.DEVELOPER);
 
   // Seed the form from registry prefill query params (set by the registry search
   // dialog); falls back to empty values for a manual entry.
@@ -63,15 +66,27 @@ function NewMcpServerForm() {
     }
   }
 
+  const breadcrumbItems = [
+    { label: "Admin", href: "/admin" },
+    { label: "MCP Servers", href: "/admin/mcp-servers" },
+    { label: "New" },
+  ];
+
+  // The list page hides Add and Browse registry for this viewer, so reaching the
+  // form at all means a deep link (or a hand-built prefill URL); refuse it here
+  // rather than let the submit 403.
+  if (!canEdit) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
+
   return (
     <AdminPageContainer>
-      <Breadcrumbs
-        items={[
-          { label: "Admin", href: "/admin" },
-          { label: "MCP Servers", href: "/admin/mcp-servers" },
-          { label: "New" },
-        ]}
-      />
+      <Breadcrumbs items={breadcrumbItems} />
       <AdminPageHeader title="New MCP Server" icon={Server} />
 
       <FormColumn>

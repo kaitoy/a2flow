@@ -24,9 +24,7 @@ import {
   SUPPRESS_FORBIDDEN_TOAST,
   type WorkflowExecution,
 } from "@/lib/api";
-
-/** Placeholder shown in place of an attribute that has no value. */
-const EMPTY = "—";
+import { EMPTY_VALUE } from "@/lib/read-only-display";
 
 /**
  * Read-only detail page for a single executed `WorkflowExecution`: the workflow
@@ -163,7 +161,7 @@ export default function WorkflowExecutionDetailPage() {
                 )
               }
             />
-            <DetailItem label="Description" value={session.description || EMPTY} />
+            <DetailItem label="Description" value={session.description || EMPTY_VALUE} />
             <DetailItem
               label="Agent Skill"
               value={
@@ -188,11 +186,13 @@ export default function WorkflowExecutionDetailPage() {
                 </a>
               }
             />
-            <DetailItem label="Repository Path" value={session.agentSkillRepoPath || EMPTY} />
+            <DetailItem label="Repository Path" value={session.agentSkillRepoPath || EMPTY_VALUE} />
             <DetailItem
               label="Commit"
               value={
-                <span className="font-mono text-xs">{session.agentSkillCommitSha ?? EMPTY}</span>
+                <span className="font-mono text-xs">
+                  {session.agentSkillCommitSha ?? EMPTY_VALUE}
+                </span>
               }
             />
             <DetailItem

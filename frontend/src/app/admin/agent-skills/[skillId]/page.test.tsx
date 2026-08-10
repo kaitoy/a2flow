@@ -2,10 +2,8 @@ import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
-import type { User } from "@/lib/api";
-import type { Role } from "@/lib/roles";
-import type { RootState } from "@/store";
 import { store } from "@/store";
+import { DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -28,24 +26,6 @@ const FULL_SKILL = {
   updatedBy: "",
 };
 
-/** Build a preloaded auth slice for a signed-in user holding the given roles. */
-function authState(roles: Role[]): Partial<RootState> {
-  return {
-    auth: {
-      user: { id: "u1", roles } as User,
-      status: "authenticated",
-      selectedTenantId: null,
-      impersonatedUserId: null,
-      impersonatedBy: null,
-    },
-  };
-}
-
-/** Roles granting every agent-skill action (edit, delete, pull). */
-const FULL_ACCESS = authState(["developer"]);
-/** A signed-in user with no role granting agent-skill writes. */
-const READ_ONLY = authState(["requester"]);
-
 const SKILL_URL = "http://localhost:8000/api/v1/agent-skills/:skillId";
 
 function setup() {
@@ -55,7 +35,7 @@ function setup() {
 describe("AgentSkillDetailPage", () => {
   it("titles the page and ends the breadcrumb trail with the skill's name", async () => {
     setup();
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     expect(await screen.findByRole("heading", { name: "my-skill" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByText("my-skill")).toHaveAttribute("aria-current", "page");
@@ -63,7 +43,7 @@ describe("AgentSkillDetailPage", () => {
 
   it("prefills form with skill data", async () => {
     setup();
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => expect(screen.getByDisplayValue("my-skill")).toBeInTheDocument());
     expect(screen.getByDisplayValue("https://github.com/example/repo")).toBeInTheDocument();
   });
@@ -73,7 +53,7 @@ describe("AgentSkillDetailPage", () => {
     const patchSpy = vi.fn(() => envelope(FULL_SKILL));
     server.use(http.patch("http://localhost:8000/api/v1/agent-skills/:skillId", patchSpy));
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -99,7 +79,7 @@ describe("AgentSkillDetailPage", () => {
       })
     );
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() =>
       expect(screen.getByRole("combobox", { name: "Auth Password" })).toHaveTextContent(
         "github-token"
@@ -139,7 +119,7 @@ describe("AgentSkillDetailPage", () => {
       })
     );
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     expect(await screen.findByText(/no secret named "gone" is registered/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -158,7 +138,7 @@ describe("AgentSkillDetailPage", () => {
       forward: vi.fn(),
     });
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -179,7 +159,7 @@ describe("AgentSkillDetailPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/agent-skills/:skillId", deleteSpy));
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     const dialog = screen.getByRole("dialog");
@@ -192,7 +172,7 @@ describe("AgentSkillDetailPage", () => {
   it("shows validation error on blur when required field is cleared", async () => {
     setup();
     const user = userEvent.setup();
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     const nameInput = screen.getByLabelText(/^name/i);
     await user.clear(nameInput);
@@ -208,7 +188,7 @@ describe("AgentSkillDetailPage", () => {
       )
     );
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "AgentSkill not found",
@@ -219,7 +199,7 @@ describe("AgentSkillDetailPage", () => {
 
   it("shows the sync status and short revision", async () => {
     setup();
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     const panel = screen.getByRole("region", { name: /repository sync/i });
     expect(within(panel).getByText("ready")).toBeInTheDocument();
@@ -238,7 +218,7 @@ describe("AgentSkillDetailPage", () => {
       )
     );
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     expect(screen.getByText(/clone of .* failed: not found/)).toBeInTheDocument();
     // The old revision is still published, so the skill still runs on it.
@@ -251,7 +231,7 @@ describe("AgentSkillDetailPage", () => {
     const pullSpy = vi.fn(() => envelope({ ...FULL_SKILL, syncStatus: "pending" }, 202));
     server.use(http.post(`${SKILL_URL}/pull`, pullSpy));
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await user.click(screen.getByRole("button", { name: /pull/i }));
 
@@ -260,15 +240,45 @@ describe("AgentSkillDetailPage", () => {
 
   it("hides write actions from a user without the developer role", async () => {
     setup();
-    render(<AgentSkillDetailPage />, { preloadedState: READ_ONLY });
-    await waitFor(() => screen.getByDisplayValue("my-skill"));
+    render(<AgentSkillDetailPage />, { preloadedState: REQUESTER });
+    expect(await screen.findByRole("heading", { name: "my-skill" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /pull/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /generate workflow/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: /^workflow$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
     // The sync state is still readable — only the actions are gated.
     expect(screen.getByRole("region", { name: /repository sync/i })).toBeInTheDocument();
+  });
+
+  it("renders the fields as values for a user without the developer role", async () => {
+    setup();
+    server.use(
+      http.get(SKILL_URL, () =>
+        envelope({
+          ...FULL_SKILL,
+          repoRef: "main",
+          description: "Reviews pull requests",
+          repoAuthPassword: "github-token/token",
+          repoAuthUsername: "oauth2",
+        })
+      )
+    );
+
+    render(<AgentSkillDetailPage />, { preloadedState: REQUESTER });
+
+    expect(await screen.findByRole("heading", { name: "my-skill" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getByText("https://github.com/example/repo")).toBeInTheDocument();
+    expect(screen.getByText("main")).toBeInTheDocument();
+    expect(screen.getByText("Reviews pull requests")).toBeInTheDocument();
+    expect(screen.getByText("oauth2")).toBeInTheDocument();
+    // The stored reference is shown as-is rather than through the secret
+    // picker, so no secret list is fetched for a viewer who cannot edit it.
+    expect(screen.getByText("github-token/token")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
   it("opens the generate dialog without asking when nothing was edited", async () => {
@@ -277,7 +287,7 @@ describe("AgentSkillDetailPage", () => {
     const patchSpy = vi.fn(() => envelope(FULL_SKILL));
     server.use(http.patch(SKILL_URL, patchSpy));
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await user.click(screen.getByRole("button", { name: /generate workflow/i }));
 
@@ -294,7 +304,7 @@ describe("AgentSkillDetailPage", () => {
       http.get(SKILL_URL, () => envelope({ ...FULL_SKILL, syncStatus: "pending", commitSha: null }))
     );
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     expect(screen.getByRole("button", { name: /generate workflow/i })).toBeDisabled();
   });
@@ -305,7 +315,7 @@ describe("AgentSkillDetailPage", () => {
     const patchSpy = vi.fn(() => envelope({ ...FULL_SKILL, name: "renamed-skill" }));
     server.use(http.patch(SKILL_URL, patchSpy));
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     const nameInput = screen.getByDisplayValue("my-skill");
     await user.clear(nameInput);
@@ -330,7 +340,7 @@ describe("AgentSkillDetailPage", () => {
     const patchSpy = vi.fn(() => envelope(FULL_SKILL));
     server.use(http.patch(SKILL_URL, patchSpy));
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("my-skill"));
     await user.type(screen.getByDisplayValue("my-skill"), "-edited");
     await user.click(screen.getByRole("button", { name: /generate workflow/i }));
@@ -347,7 +357,7 @@ describe("AgentSkillDetailPage", () => {
     server.use(http.get(SKILL_URL, () => envelopeErr("FORBIDDEN", "Requires developer", 403)));
     const beforeCount = store.getState().toast.items.length;
 
-    render(<AgentSkillDetailPage />, { preloadedState: FULL_ACCESS });
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
 
     expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     expect(store.getState().toast.items.length).toBe(beforeCount);

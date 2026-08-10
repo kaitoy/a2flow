@@ -5,10 +5,21 @@ import { describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { RootState } from "@/store";
 import { store } from "@/store";
+import { ADMIN, DEVELOPER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import UserDetailPage from "./page";
+
+/** Render the page as an admin — the role updating or deleting a user requires. */
+function renderPage() {
+  return render(<UserDetailPage />, { preloadedState: ADMIN });
+}
+
+/** Render the page as a developer, who may read a user but never write one. */
+function renderPageReadOnly() {
+  return render(<UserDetailPage />, { preloadedState: DEVELOPER });
+}
 
 /** Build a preloaded auth slice for a signed-in super admin acting as a given tenant. */
 function superAdminState(selectedTenantId: string | null): Partial<RootState> {
@@ -57,7 +68,7 @@ function setup() {
 describe("UserDetailPage", () => {
   it("titles the page and ends the breadcrumb trail with the username", async () => {
     setup();
-    render(<UserDetailPage />);
+    renderPage();
     expect(await screen.findByRole("heading", { name: "alice" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByText("alice")).toHaveAttribute("aria-current", "page");
@@ -65,9 +76,9 @@ describe("UserDetailPage", () => {
 
   it("prefills form with user data", async () => {
     setup();
-    render(<UserDetailPage />);
-    await waitFor(() => expect(screen.getByDisplayValue("alice")).toBeInTheDocument());
-    expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
+    renderPage();
+    await waitFor(() => expect(screen.getByDisplayValue("Alice")).toBeInTheDocument());
+    expect(screen.getByDisplayValue("Smith")).toBeInTheDocument();
     expect(screen.getByDisplayValue("alice@example.com")).toBeInTheDocument();
   });
 
@@ -76,8 +87,8 @@ describe("UserDetailPage", () => {
     const patchSpy = vi.fn(() => envelope(FULL_USER));
     server.use(http.patch("http://localhost:8000/api/v1/users/:userId", patchSpy));
 
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(patchSpy).toHaveBeenCalled());
@@ -93,8 +104,8 @@ describe("UserDetailPage", () => {
       })
     );
 
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(capturedBody).not.toBeNull());
@@ -111,8 +122,8 @@ describe("UserDetailPage", () => {
       })
     );
 
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.type(screen.getByLabelText(/password/i), "newsecret456");
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -132,8 +143,8 @@ describe("UserDetailPage", () => {
       forward: vi.fn(),
     });
 
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/users"));
@@ -153,8 +164,8 @@ describe("UserDetailPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/users/:userId", deleteSpy));
 
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     const dialog = screen.getByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: /delete/i }));
@@ -163,11 +174,14 @@ describe("UserDetailPage", () => {
     expect(pushMock).toHaveBeenCalledWith("/admin/users");
   });
 
-  it("renders username as a read-only field", async () => {
+  it("renders the immutable username as a value, not an input", async () => {
     setup();
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
-    expect(screen.getByRole("textbox", { name: /username/i })).toBeDisabled();
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
+    expect(screen.queryByRole("textbox", { name: /username/i })).not.toBeInTheDocument();
+    // The heading and the breadcrumb carry the username too; the field value is
+    // the only one rendered on a ReadOnlyField's <p>.
+    expect(screen.getByText("alice", { selector: "p" })).toHaveClass("bg-surface-dim/40");
   });
 
   it("omits username from the request body", async () => {
@@ -180,8 +194,8 @@ describe("UserDetailPage", () => {
       })
     );
 
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(capturedBody).not.toBeNull());
@@ -191,8 +205,8 @@ describe("UserDetailPage", () => {
   it("shows validation error on blur when required field is cleared", async () => {
     setup();
     const user = userEvent.setup();
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     const firstNameInput = screen.getByRole("textbox", { name: /first name/i });
     await user.clear(firstNameInput);
     await user.tab();
@@ -208,8 +222,8 @@ describe("UserDetailPage", () => {
       )
     );
 
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
 
     expect(screen.getByTestId("avatar")).toHaveAttribute(
       "data-config",
@@ -225,23 +239,23 @@ describe("UserDetailPage", () => {
       )
     );
 
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
 
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-tenant", JSON.stringify("tenant-7"));
   });
 
   it("does not render a tenant field for a non-super-admin viewer", async () => {
     setup();
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     expect(screen.queryByLabelText("Tenant")).not.toBeInTheDocument();
   });
 
   it("does not render a tenant field for a super-admin viewer either", async () => {
     setup();
     render(<UserDetailPage />, { preloadedState: superAdminState("tenant-1") });
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     expect(screen.queryByLabelText("Tenant")).not.toBeInTheDocument();
   });
 
@@ -259,7 +273,7 @@ describe("UserDetailPage", () => {
     );
 
     render(<UserDetailPage />, { preloadedState: superAdminState("tenant-1") });
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.click(screen.getByRole("checkbox", { name: "Super Admin" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -281,7 +295,7 @@ describe("UserDetailPage", () => {
     );
 
     render(<UserDetailPage />, { preloadedState: superAdminState("tenant-1") });
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(capturedBody?.tenantId).toBeNull());
@@ -301,7 +315,7 @@ describe("UserDetailPage", () => {
     );
 
     render(<UserDetailPage />, { preloadedState: superAdminState("tenant-2") });
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(capturedBody?.tenantId).toBe("tenant-1"));
@@ -319,7 +333,7 @@ describe("UserDetailPage", () => {
     );
 
     render(<UserDetailPage />, { preloadedState: superAdminState("tenant-1") });
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    await waitFor(() => screen.getByDisplayValue("Alice"));
     await userEvent.click(screen.getByRole("checkbox", { name: "Super Admin" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -340,7 +354,7 @@ describe("UserDetailPage", () => {
     );
 
     render(<UserDetailPage />, { preloadedState: superAdminState(null) });
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    await waitFor(() => screen.getByDisplayValue("Alice"));
 
     await userEvent.click(screen.getByRole("checkbox", { name: "Super Admin" }));
 
@@ -360,16 +374,16 @@ describe("UserDetailPage", () => {
       )
     );
 
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
 
     expect(screen.getByText("Super Admin")).toBeInTheDocument();
   });
 
   it("does not show a Super Admin badge for a non-super-admin target", async () => {
     setup();
-    render(<UserDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("alice"));
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Alice"));
 
     expect(screen.queryByText("Super Admin")).not.toBeInTheDocument();
   });
@@ -382,7 +396,7 @@ describe("UserDetailPage", () => {
       )
     );
 
-    render(<UserDetailPage />);
+    renderPage();
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "User not found",
@@ -400,17 +414,58 @@ describe("UserDetailPage", () => {
     );
     const beforeCount = store.getState().toast.items.length;
 
-    render(<UserDetailPage />);
+    renderPage();
 
     expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
+
+  describe("without the admin role", () => {
+    it("renders the profile fields, roles, and flags as values", async () => {
+      setup();
+      server.use(
+        http.get("http://localhost:8000/api/v1/users/:userId", () =>
+          envelope({ ...FULL_USER, roles: ["developer", "approver"] })
+        )
+      );
+      renderPageReadOnly();
+
+      expect(await screen.findByRole("heading", { name: "alice" })).toBeInTheDocument();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+      expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+      expect(screen.getByText("Developer, Approver")).toBeInTheDocument();
+      expect(screen.getByText("Yes")).toBeInTheDocument();
+      expect(screen.getByText("No")).toBeInTheDocument();
+    });
+
+    it("omits the password field entirely", async () => {
+      setup();
+      renderPageReadOnly();
+
+      expect(await screen.findByRole("heading", { name: "alice" })).toBeInTheDocument();
+      expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
+      expect(screen.queryByText("Password")).not.toBeInTheDocument();
+    });
+
+    it("hides Save and Delete and offers Back instead of Cancel", async () => {
+      setup();
+      renderPageReadOnly();
+
+      expect(await screen.findByRole("heading", { name: "alice" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
+    });
   });
 
   describe("impersonate action", () => {
     it("shows the Impersonate button for an eligible target", async () => {
       setup();
       render(<UserDetailPage />, { preloadedState: superAdminState(null) });
-      await waitFor(() => screen.getByDisplayValue("alice"));
+      await waitFor(() => screen.getByDisplayValue("Alice"));
       expect(screen.getByRole("button", { name: "Impersonate" })).toBeInTheDocument();
     });
 
@@ -422,7 +477,7 @@ describe("UserDetailPage", () => {
         )
       );
       render(<UserDetailPage />, { preloadedState: superAdminState(null) });
-      await waitFor(() => screen.getByDisplayValue("alice"));
+      await waitFor(() => screen.getByDisplayValue("Alice"));
       expect(screen.queryByRole("button", { name: "Impersonate" })).not.toBeInTheDocument();
     });
 
@@ -439,7 +494,7 @@ describe("UserDetailPage", () => {
           },
         },
       });
-      await waitFor(() => screen.getByDisplayValue("alice"));
+      await waitFor(() => screen.getByDisplayValue("Alice"));
       expect(screen.queryByRole("button", { name: "Impersonate" })).not.toBeInTheDocument();
     });
 
@@ -475,7 +530,7 @@ describe("UserDetailPage", () => {
       server.use(http.post("http://localhost:8000/api/v1/auth/impersonate", impersonateSpy));
 
       render(<UserDetailPage />, { preloadedState: superAdminState(null) });
-      await waitFor(() => screen.getByDisplayValue("alice"));
+      await waitFor(() => screen.getByDisplayValue("Alice"));
       await userEvent.click(screen.getByRole("button", { name: "Impersonate" }));
       const dialog = screen.getByRole("dialog");
       await userEvent.click(within(dialog).getByRole("button", { name: /impersonate/i }));

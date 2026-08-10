@@ -98,4 +98,43 @@ describe("RolesField", () => {
     });
     expect(screen.queryByText(/can't be combined with other roles/i)).not.toBeInTheDocument();
   });
+
+  describe("readOnly", () => {
+    it("lists the held roles as a value instead of checkboxes", () => {
+      render(<RolesField value={["developer", "approver"]} onChange={vi.fn()} readOnly />, {
+        preloadedState: authState(["admin"]),
+      });
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+      expect(screen.getByText("Developer, Approver")).toBeInTheDocument();
+    });
+
+    it("shows a placeholder when no role is held", () => {
+      render(<RolesField value={[]} onChange={vi.fn()} readOnly />, {
+        preloadedState: authState(["admin"]),
+      });
+      expect(screen.getByText("—")).toBeInTheDocument();
+    });
+
+    it("keeps super_admin out of the list for a non-super-admin viewer", () => {
+      render(<RolesField value={["super_admin"]} onChange={vi.fn()} readOnly />, {
+        preloadedState: authState(["admin"]),
+      });
+      expect(screen.queryByText(/super admin/i)).not.toBeInTheDocument();
+      expect(screen.getByText("—")).toBeInTheDocument();
+    });
+
+    it("names super_admin for a super-admin viewer", () => {
+      render(<RolesField value={["super_admin"]} onChange={vi.fn()} readOnly />, {
+        preloadedState: authState(["super_admin"]),
+      });
+      expect(screen.getByText("Super Admin")).toBeInTheDocument();
+    });
+
+    it("drops the exclusivity hint", () => {
+      render(<RolesField value={[]} onChange={vi.fn()} readOnly />, {
+        preloadedState: authState(["super_admin"]),
+      });
+      expect(screen.queryByText(/can't be combined with other roles/i)).not.toBeInTheDocument();
+    });
+  });
 });

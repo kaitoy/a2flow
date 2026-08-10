@@ -19,6 +19,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { RolesField } from "@/components/admin/roles-field";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ export default function NewUserPage() {
   // rather than a registered input.
   const [roles, setRoles] = useState<Role[]>([]);
   const isSuperAdminViewer = useHasRole(Role.SUPER_ADMIN);
+  const canEdit = useHasRole(Role.ADMIN);
   const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
   const targetIsSuperAdmin = roles.includes(Role.SUPER_ADMIN);
   // A plain admin's own tenant is applied server-side regardless of what's
@@ -93,15 +95,26 @@ export default function NewUserPage() {
     }
   }
 
+  const breadcrumbItems = [
+    { label: "Admin", href: "/admin" },
+    { label: "Users", href: "/admin/users" },
+    { label: "New" },
+  ];
+
+  // The list page hides the Add button for this viewer, so reaching the form at
+  // all means a deep link; refuse it here rather than let the submit 403.
+  if (!canEdit) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
+
   return (
     <AdminPageContainer>
-      <Breadcrumbs
-        items={[
-          { label: "Admin", href: "/admin" },
-          { label: "Users", href: "/admin/users" },
-          { label: "New" },
-        ]}
-      />
+      <Breadcrumbs items={breadcrumbItems} />
       <AdminPageHeader title="New User" icon={UsersIcon} />
 
       <FormColumn>

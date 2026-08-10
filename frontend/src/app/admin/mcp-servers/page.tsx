@@ -1,4 +1,11 @@
-/** @module McpServersPage — Admin list page for managing registered MCP servers. */
+/**
+ * @module McpServersPage — Admin list page for managing registered MCP servers.
+ *
+ * Reads are open to every authenticated user, so a viewer without the developer
+ * role sees the list but none of the write entry points — Add, Browse registry,
+ * and the per-row Delete — the same convention the detail page follows by
+ * rendering read-only.
+ */
 "use client";
 
 import { PackageSearch, Server } from "lucide-react";
@@ -26,6 +33,7 @@ import {
   type McpServer,
 } from "@/lib/api";
 import { buildPrefillHref } from "@/lib/mcp-registry-prefill";
+import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
 
@@ -77,6 +85,7 @@ const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
 ];
 
 export default function McpServersPage() {
+  const canEdit = useHasRole(Role.DEVELOPER);
   const {
     rows,
     loading,
@@ -117,16 +126,20 @@ export default function McpServersPage() {
 
   const columns: ColumnDef<McpServer>[] = [
     ...STATIC_COLUMNS,
-    {
-      header: "Actions",
-      noTruncate: true,
-      visibility: "always",
-      cell: (server) => (
-        <div className="flex justify-center gap-2">
-          <DeleteIconButton onClick={() => handleDelete(server.id, server.name)} />
-        </div>
-      ),
-    },
+    ...(canEdit
+      ? [
+          {
+            header: "Actions",
+            noTruncate: true,
+            visibility: "always" as const,
+            cell: (server: McpServer) => (
+              <div className="flex justify-center gap-2">
+                <DeleteIconButton onClick={() => handleDelete(server.id, server.name)} />
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
@@ -140,17 +153,21 @@ export default function McpServersPage() {
       <AdminPageHeader
         title="MCP Servers"
         icon={Server}
-        addHref="/admin/mcp-servers/new"
+        addHref={canEdit ? "/admin/mcp-servers/new" : undefined}
         addLabel="+ Add server"
         secondaryAction={
-          <Button
-            variant="secondary"
-            className="inline-flex items-center gap-1.5"
-            onClick={() => setRegistryOpen(true)}
-          >
-            <PackageSearch size={16} />
-            Browse registry
-          </Button>
+          // Browsing the registry only leads to the create form, so it is a
+          // write entry point like Add.
+          canEdit ? (
+            <Button
+              variant="secondary"
+              className="inline-flex items-center gap-1.5"
+              onClick={() => setRegistryOpen(true)}
+            >
+              <PackageSearch size={16} />
+              Browse registry
+            </Button>
+          ) : undefined
         }
         columnPicker={
           <ColumnPicker

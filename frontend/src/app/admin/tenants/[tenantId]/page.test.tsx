@@ -3,6 +3,7 @@ import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
+import { ADMIN, SUPER_ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -23,10 +24,15 @@ function setup() {
   vi.mocked(useParams).mockReturnValue({ tenantId: "tenant-1" });
 }
 
+/** Render the page as a super admin — the role every tenant write requires. */
+function renderPage() {
+  return render(<TenantDetailPage />, { preloadedState: SUPER_ADMIN });
+}
+
 describe("TenantDetailPage", () => {
   it("titles the page and ends the breadcrumb trail with the tenant's display name", async () => {
     setup();
-    render(<TenantDetailPage />);
+    renderPage();
     expect(await screen.findByRole("heading", { name: "Acme Corp" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByText("Acme Corp")).toHaveAttribute("aria-current", "page");
@@ -34,9 +40,9 @@ describe("TenantDetailPage", () => {
 
   it("prefills form with tenant data", async () => {
     setup();
-    render(<TenantDetailPage />);
+    renderPage();
     await waitFor(() => expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument());
-    expect(screen.getByDisplayValue("acme-corp")).toBeInTheDocument();
+    expect(screen.getByText("acme-corp")).toBeInTheDocument();
   });
 
   it("submits update api on form submit", async () => {
@@ -44,7 +50,7 @@ describe("TenantDetailPage", () => {
     const patchSpy = vi.fn(() => envelope(FULL_TENANT));
     server.use(http.patch("http://localhost:8000/api/v1/tenants/:tenantId", patchSpy));
 
-    render(<TenantDetailPage />);
+    renderPage();
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -63,7 +69,7 @@ describe("TenantDetailPage", () => {
       forward: vi.fn(),
     });
 
-    render(<TenantDetailPage />);
+    renderPage();
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -76,7 +82,7 @@ describe("TenantDetailPage", () => {
       http.patch("http://localhost:8000/api/v1/tenants/:tenantId", () => envelope(FULL_TENANT))
     );
 
-    const { store } = render(<TenantDetailPage />);
+    const { store } = renderPage();
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -87,7 +93,7 @@ describe("TenantDetailPage", () => {
     setup();
     server.use(http.delete("http://localhost:8000/api/v1/tenants/:tenantId", () => envelope(null)));
 
-    const { store } = render(<TenantDetailPage />);
+    const { store } = renderPage();
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     const dialog = screen.getByRole("dialog");
@@ -110,7 +116,7 @@ describe("TenantDetailPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/tenants/:tenantId", deleteSpy));
 
-    render(<TenantDetailPage />);
+    renderPage();
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /delete/i }));
     const dialog = screen.getByRole("dialog");
@@ -120,11 +126,12 @@ describe("TenantDetailPage", () => {
     expect(pushMock).toHaveBeenCalledWith("/admin/tenants");
   });
 
-  it("renders name as a read-only field", async () => {
+  it("renders the immutable name as a value, not an input, even for a super admin", async () => {
     setup();
-    render(<TenantDetailPage />);
-    await waitFor(() => screen.getByDisplayValue("acme-corp"));
-    expect(screen.getByRole("textbox", { name: /^name/i })).toBeDisabled();
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Acme Corp"));
+    expect(screen.queryByRole("textbox", { name: /^name/i })).not.toBeInTheDocument();
+    expect(screen.getByText("acme-corp")).toHaveClass("bg-surface-dim/40");
   });
 
   it("omits name from the request body", async () => {
@@ -137,7 +144,7 @@ describe("TenantDetailPage", () => {
       })
     );
 
-    render(<TenantDetailPage />);
+    renderPage();
     await waitFor(() => screen.getByDisplayValue("Acme Corp"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -153,7 +160,7 @@ describe("TenantDetailPage", () => {
       )
     );
 
-    render(<TenantDetailPage />);
+    renderPage();
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "Tenant not found",
@@ -171,9 +178,33 @@ describe("TenantDetailPage", () => {
     );
     const beforeCount = store.getState().toast.items.length;
 
-    render(<TenantDetailPage />);
+    renderPage();
 
     expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
+
+  describe("without the super admin role", () => {
+    it("renders every field as a value instead of a control", async () => {
+      setup();
+      render(<TenantDetailPage />, { preloadedState: ADMIN });
+
+      expect(await screen.findByRole("heading", { name: "Acme Corp" })).toBeInTheDocument();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+      expect(screen.getByText("acme-corp")).toBeInTheDocument();
+      expect(screen.getByText("Yes")).toBeInTheDocument();
+    });
+
+    it("hides Save and Delete and offers Back instead of Cancel", async () => {
+      setup();
+      render(<TenantDetailPage />, { preloadedState: ADMIN });
+
+      expect(await screen.findByRole("heading", { name: "Acme Corp" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
+    });
   });
 });

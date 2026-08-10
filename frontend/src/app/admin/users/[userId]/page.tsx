@@ -23,6 +23,7 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { RolesField } from "@/components/admin/roles-field";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Avatar } from "@/components/ui/avatar";
@@ -45,6 +46,7 @@ import {
   updateUser,
 } from "@/lib/api";
 import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
+import { EMPTY_VALUE, formatFlag } from "@/lib/read-only-display";
 import { Role, useHasRole } from "@/lib/roles";
 import { setMe } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -68,6 +70,15 @@ type FormValues = z.infer<typeof schema>;
  * Detail page of a user account: avatar, profile fields, roles, and flags. The
  * page is titled with the user's username — the identifier its row carries in
  * the list, and the one attribute that cannot change.
+ *
+ * A viewer without the admin role gets a read-only rendering — reads are open
+ * to every authenticated user within the tenant, but updating anyone else (or
+ * any field beyond the avatar this form does not touch) is admin-only. The
+ * profile fields, roles, and flags then show as plain values, Password is
+ * omitted entirely (there is no stored value to show, and setting one is
+ * exactly what this viewer may not do), and Save/Delete are hidden rather than
+ * left to fail with a 403 on click. Impersonate follows its own eligibility
+ * rules ({@link canImpersonate}) and is unaffected.
  */
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
@@ -99,6 +110,10 @@ export default function UserDetailPage() {
   const [originalTenantId, setOriginalTenantId] = useState<string | null>(null);
   const isSuperAdminViewer = useHasRole(Role.SUPER_ADMIN);
   const isAdmin = useHasRole(Role.ADMIN);
+  // Admin is exactly what `UserService.update`/`delete` require to act on
+  // another user; its self-service exemption covers only `avatarConfig`, which
+  // this form never sends.
+  const canEdit = isAdmin;
   const viewer = useAppSelector((s) => s.auth.user);
   const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
   const tenantLocked = originalTenantId !== null;
@@ -124,6 +139,7 @@ export default function UserDetailPage() {
     register,
     handleSubmit,
     reset,
+    getValues,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -298,7 +314,7 @@ export default function UserDetailPage() {
           </div>
 
           <FormField htmlFor="username" label="Username">
-            <Input id="username" value={username} readOnly disabled />
+            <ReadOnlyField>{username || EMPTY_VALUE}</ReadOnlyField>
           </FormField>
 
           <FormField
@@ -307,52 +323,83 @@ export default function UserDetailPage() {
             required
             error={errors.firstName?.message}
           >
-            <Input id="firstName" {...register("firstName")} />
+            {canEdit ? (
+              <Input id="firstName" {...register("firstName")} />
+            ) : (
+              <ReadOnlyField>{getValues("firstName") || EMPTY_VALUE}</ReadOnlyField>
+            )}
           </FormField>
 
           <FormField htmlFor="lastName" label="Last Name" required error={errors.lastName?.message}>
-            <Input id="lastName" {...register("lastName")} />
+            {canEdit ? (
+              <Input id="lastName" {...register("lastName")} />
+            ) : (
+              <ReadOnlyField>{getValues("lastName") || EMPTY_VALUE}</ReadOnlyField>
+            )}
           </FormField>
 
           <FormField htmlFor="email" label="Email" required error={errors.email?.message}>
-            <Input id="email" type="email" {...register("email")} />
+            {canEdit ? (
+              <Input id="email" type="email" {...register("email")} />
+            ) : (
+              <ReadOnlyField>{getValues("email") || EMPTY_VALUE}</ReadOnlyField>
+            )}
           </FormField>
 
-          <FormField htmlFor="password" label="Password" error={errors.password?.message}>
-            <PasswordInput
-              id="password"
-              placeholder="Leave blank to keep unchanged"
-              {...register("password")}
-            />
-          </FormField>
+          {canEdit && (
+            <FormField htmlFor="password" label="Password" error={errors.password?.message}>
+              <PasswordInput
+                id="password"
+                placeholder="Leave blank to keep unchanged"
+                {...register("password")}
+              />
+            </FormField>
+          )}
 
-          <RolesField value={roles} onChange={setRoles} />
+          <RolesField value={roles} onChange={setRoles} readOnly={!canEdit} />
 
-          <Checkbox label="Enabled" {...register("enabled")} />
-          <Checkbox label="Email verified" {...register("emailVerified")} />
+          {canEdit ? (
+            <>
+              <Checkbox label="Enabled" {...register("enabled")} />
+              <Checkbox label="Email verified" {...register("emailVerified")} />
+            </>
+          ) : (
+            <>
+              <FormField htmlFor="enabled" label="Enabled">
+                <ReadOnlyField>{formatFlag(getValues("enabled") ?? false)}</ReadOnlyField>
+              </FormField>
+              <FormField htmlFor="emailVerified" label="Email verified">
+                <ReadOnlyField>{formatFlag(getValues("emailVerified") ?? false)}</ReadOnlyField>
+              </FormField>
+            </>
+          )}
 
-          {tenantMissing && (
+          {canEdit && tenantMissing && (
             <p className="text-xs text-error">
               Select a tenant in the header before removing this user's Super Admin role.
             </p>
           )}
 
           <div className="flex gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={save.inFlight || tenantMissing}
-              status={save.status}
-              pendingLabel="Saving…"
-            >
-              Save
-            </Button>
+            {canEdit && (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={save.inFlight || tenantMissing}
+                status={save.status}
+                pendingLabel="Saving…"
+              >
+                Save
+              </Button>
+            )}
             <Button type="button" variant="ghost" onClick={() => router.push("/admin/users")}>
-              Cancel
+              {canEdit ? "Cancel" : "Back"}
             </Button>
-            <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-              Delete
-            </Button>
+            {canEdit && (
+              <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
+                Delete
+              </Button>
+            )}
           </div>
         </form>
       </FormLayout>

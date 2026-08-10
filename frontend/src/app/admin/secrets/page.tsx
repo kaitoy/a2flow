@@ -1,4 +1,10 @@
-/** @module SecretsPage — Admin list page for managing registered secrets. */
+/**
+ * @module SecretsPage — Admin list page for managing registered secrets.
+ *
+ * Reads are open to every authenticated user, so a viewer without the admin
+ * role sees the list but neither the Add button nor the per-row Delete — the
+ * same convention the detail page follows by rendering read-only.
+ */
 "use client";
 
 import { KeyRound } from "lucide-react";
@@ -16,6 +22,7 @@ import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteSecret, listSecrets, type Secret } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
 
@@ -60,6 +67,7 @@ const STATIC_COLUMNS: ColumnDef<Secret>[] = [
 ];
 
 export default function SecretsPage() {
+  const canEdit = useHasRole(Role.ADMIN);
   const {
     rows,
     loading,
@@ -92,16 +100,20 @@ export default function SecretsPage() {
 
   const columns: ColumnDef<Secret>[] = [
     ...STATIC_COLUMNS,
-    {
-      header: "Actions",
-      noTruncate: true,
-      visibility: "always",
-      cell: (secret) => (
-        <div className="flex justify-center gap-2">
-          <DeleteIconButton onClick={() => handleDelete(secret.id, secret.name)} />
-        </div>
-      ),
-    },
+    ...(canEdit
+      ? [
+          {
+            header: "Actions",
+            noTruncate: true,
+            visibility: "always" as const,
+            cell: (secret: Secret) => (
+              <div className="flex justify-center gap-2">
+                <DeleteIconButton onClick={() => handleDelete(secret.id, secret.name)} />
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
@@ -115,7 +127,7 @@ export default function SecretsPage() {
       <AdminPageHeader
         title="Secrets"
         icon={KeyRound}
-        addHref="/admin/secrets/new"
+        addHref={canEdit ? "/admin/secrets/new" : undefined}
         addLabel="+ Add secret"
         onRefresh={reload}
         refreshing={loading || refreshing}

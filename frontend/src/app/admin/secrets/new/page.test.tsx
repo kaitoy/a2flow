@@ -3,11 +3,17 @@ import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
+import { ADMIN, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { SECRET_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewSecretPage from "./page";
+
+/** Render the form as an admin — the role creating a secret requires. */
+function renderPage() {
+  return render(<NewSecretPage />, { preloadedState: ADMIN });
+}
 
 /** Fill the first entry row, which the form starts with. */
 async function typeEntry(user: ReturnType<typeof userEvent.setup>, key: string, value: string) {
@@ -17,7 +23,7 @@ async function typeEntry(user: ReturnType<typeof userEvent.setup>, key: string, 
 
 describe("NewSecretPage", () => {
   it("renders name input, type toggle, and one entry row by default", () => {
-    render(<NewSecretPage />);
+    renderPage();
     expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: /secret type/i })).toBeInTheDocument();
     expect(screen.getByLabelText("entries key 1")).toBeInTheDocument();
@@ -26,13 +32,13 @@ describe("NewSecretPage", () => {
   });
 
   it("masks entry values so they are not shoulder-readable", () => {
-    render(<NewSecretPage />);
+    renderPage();
     expect(screen.getByLabelText("entries value 1")).toHaveAttribute("type", "password");
   });
 
   it("switching to vault shows the reference inputs and hides the entries", async () => {
     const user = userEvent.setup();
-    render(<NewSecretPage />);
+    renderPage();
     await user.click(screen.getByRole("tab", { name: /hashicorp vault/i }));
     expect(screen.getByLabelText(/vault mount/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/vault path/i)).toBeInTheDocument();
@@ -50,7 +56,7 @@ describe("NewSecretPage", () => {
       })
     );
 
-    render(<NewSecretPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "api-token");
     await typeEntry(user, "token", "tok-123");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -74,7 +80,7 @@ describe("NewSecretPage", () => {
       })
     );
 
-    render(<NewSecretPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "aws-credentials");
     await typeEntry(user, "AWS_ACCESS_KEY_ID", "AKIA1");
     await user.click(screen.getByRole("button", { name: /add row/i }));
@@ -101,7 +107,7 @@ describe("NewSecretPage", () => {
       })
     );
 
-    render(<NewSecretPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "vault-token");
     await user.click(screen.getByRole("tab", { name: /hashicorp vault/i }));
     await user.type(screen.getByLabelText(/vault mount/i), "secret");
@@ -130,7 +136,7 @@ describe("NewSecretPage", () => {
       forward: vi.fn(),
     });
 
-    render(<NewSecretPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "api-token");
     await typeEntry(user, "token", "tok-123");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -148,7 +154,7 @@ describe("NewSecretPage", () => {
       })
     );
 
-    render(<NewSecretPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "api-token");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
@@ -168,7 +174,7 @@ describe("NewSecretPage", () => {
       })
     );
 
-    render(<NewSecretPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "api-token");
     await user.type(screen.getByLabelText("entries key 1"), "token");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -187,7 +193,7 @@ describe("NewSecretPage", () => {
       )
     );
 
-    render(<NewSecretPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "api-token");
     await typeEntry(user, "token", "tok-123");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -198,5 +204,13 @@ describe("NewSecretPage", () => {
         variant: "error",
       })
     );
+  });
+
+  it("refuses the form for a viewer without the admin role", () => {
+    render(<NewSecretPage />, { preloadedState: REQUESTER });
+
+    expect(screen.getByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
   });
 });

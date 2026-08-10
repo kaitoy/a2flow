@@ -18,11 +18,13 @@ import {
   type KeyValuePair,
   pairsToRecord,
 } from "@/components/admin/key-value-editor";
+import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { StringListEditor } from "@/components/admin/string-list-editor";
 import { Input } from "@/components/ui/input";
-import { SegmentedControl } from "@/components/ui/segmented-control";
+import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
 import { zMcpCommand, zMcpServerCreate, zMcpTransport } from "@/generated/api/zod.gen";
 import type { McpServerCreate } from "@/lib/api";
+import { EMPTY_VALUE, formatChoice, formatLines, formatPairs } from "@/lib/read-only-display";
 
 /**
  * Run a generated field schema against a value that the form keeps as a plain
@@ -75,6 +77,22 @@ export const mcpServerFormSchema = z
 /** Form values for the MCP server create and edit forms. */
 export type McpServerFormValues = z.infer<typeof mcpServerFormSchema>;
 
+/**
+ * The selectable transports. Module-level so the editable control and the
+ * read-only label resolution share one list, and so the control is not handed a
+ * fresh array literal on every render.
+ */
+const TRANSPORT_OPTIONS: ReadonlyArray<SegmentedOption<McpServerFormValues["transport"]>> = [
+  { value: "streamable_http", label: "Streamable HTTP", icon: Globe },
+  { value: "stdio", label: "stdio", icon: Terminal },
+];
+
+/** The launchers a stdio server may be started with. See {@link TRANSPORT_OPTIONS}. */
+const COMMAND_OPTIONS: ReadonlyArray<SegmentedOption<McpServerFormValues["command"]>> = [
+  { value: "npx", label: "npx" },
+  { value: "uvx", label: "uvx" },
+];
+
 /** Blank form values, used as the create form's fallback and the edit form's reset base. */
 export function emptyMcpServerFormValues(): McpServerFormValues {
   return {
@@ -114,8 +132,8 @@ export function toMcpServerBody(values: McpServerFormValues): McpServerCreate {
   };
 }
 
-/** Props for {@link McpServerFields}. */
-export interface McpServerFieldsProps {
+/** Props for the editable rendering of {@link McpServerFields}. */
+export interface McpServerEditableFieldsProps {
   /** `register` from the page's `useForm`. */
   register: UseFormRegister<McpServerFormValues>;
   /** `control` from the page's `useForm`, for the pair/list editors. */
@@ -127,6 +145,24 @@ export interface McpServerFieldsProps {
   /** Whether to show input placeholders (the create form does, the edit form does not). */
   showPlaceholders?: boolean;
 }
+
+/** Props for the read-only rendering of {@link McpServerFields}. */
+export interface McpServerReadOnlyFieldsProps {
+  /** Renders every field as a value instead of a control. */
+  readOnly: true;
+  /** The values to display, e.g. the edit form's `getValues()`. */
+  values: McpServerFormValues;
+}
+
+/**
+ * Props for {@link McpServerFields}: either the form handles to edit with, or
+ * the values to display. A read-only rendering has no control to register
+ * against and no errors to report, so the two shapes are kept apart rather than
+ * left as optional props that only make sense in one mode.
+ */
+export type McpServerFieldsProps =
+  | ({ readOnly?: false } & McpServerEditableFieldsProps)
+  | McpServerReadOnlyFieldsProps;
 
 /** Note shown under the header and environment editors about secret references. */
 function SecretReferenceHint() {
@@ -151,17 +187,74 @@ function EnvArgReferenceHint() {
 }
 
 /**
+ * The same fields as values on a recessed surface, for a viewer who may see the
+ * server but not edit it.
+ *
+ * The hints the editable fields carry are all about *how to type a value in*
+ * (secret and env-var reference syntax, how `args` is passed to the process), so
+ * they are dropped here — the stored values already show whatever references
+ * they use.
+ */
+function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
+  return (
+    <>
+      <FormField htmlFor="name" label="Name" required>
+        <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
+      </FormField>
+
+      <FormField htmlFor="transport" label="Transport" required>
+        <ReadOnlyField>{formatChoice(TRANSPORT_OPTIONS, values.transport)}</ReadOnlyField>
+      </FormField>
+
+      {values.transport === "streamable_http" ? (
+        <>
+          <FormField htmlFor="url" label="URL" required>
+            <ReadOnlyField>{values.url || EMPTY_VALUE}</ReadOnlyField>
+          </FormField>
+
+          <FormField htmlFor="headers" label="HTTP Headers">
+            <ReadOnlyField className="whitespace-pre-wrap">
+              {formatLines(formatPairs(values.headers))}
+            </ReadOnlyField>
+          </FormField>
+        </>
+      ) : (
+        <>
+          <FormField htmlFor="command" label="Command" required>
+            <ReadOnlyField>{formatChoice(COMMAND_OPTIONS, values.command)}</ReadOnlyField>
+          </FormField>
+
+          <FormField htmlFor="args" label="Arguments">
+            <ReadOnlyField className="whitespace-pre-wrap">
+              {formatLines(values.args.filter((arg) => arg !== ""))}
+            </ReadOnlyField>
+          </FormField>
+
+          <FormField htmlFor="env" label="Environment Variables">
+            <ReadOnlyField className="whitespace-pre-wrap">
+              {formatLines(formatPairs(values.env))}
+            </ReadOnlyField>
+          </FormField>
+        </>
+      )}
+    </>
+  );
+}
+
+/**
  * Name, transport switch, and the transport-specific fields of a registered
  * MCP server: URL plus HTTP headers for a remote server, or command, arguments,
  * and environment variables for one launched over stdio.
+ *
+ * Pass `readOnly` with the current `values` to render the same fields as plain
+ * values instead, for a viewer whose role cannot write MCP servers.
  */
-export function McpServerFields({
-  register,
-  control,
-  errors,
-  transport,
-  showPlaceholders = false,
-}: McpServerFieldsProps) {
+export function McpServerFields(props: McpServerFieldsProps) {
+  if (props.readOnly) {
+    return <McpServerFieldValues values={props.values} />;
+  }
+  const { register, control, errors, transport, showPlaceholders = false } = props;
+
   return (
     <>
       <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
@@ -179,10 +272,7 @@ export function McpServerFields({
           render={({ field }) => (
             <SegmentedControl
               aria-label="Transport"
-              options={[
-                { value: "streamable_http", label: "Streamable HTTP", icon: Globe },
-                { value: "stdio", label: "stdio", icon: Terminal },
-              ]}
+              options={TRANSPORT_OPTIONS}
               value={field.value}
               onChange={field.onChange}
             />
@@ -226,10 +316,7 @@ export function McpServerFields({
               render={({ field }) => (
                 <SegmentedControl
                   aria-label="Command"
-                  options={[
-                    { value: "npx", label: "npx" },
-                    { value: "uvx", label: "uvx" },
-                  ]}
+                  options={COMMAND_OPTIONS}
                   value={field.value}
                   onChange={field.onChange}
                 />

@@ -1,4 +1,12 @@
-/** @module TenantsPage — Admin list page for managing tenant organizations. */
+/**
+ * @module TenantsPage — Admin list page for managing tenant organizations.
+ *
+ * Reads are open to every authenticated user, so a viewer without the super
+ * admin role sees the list but neither the Add button nor the per-row Delete —
+ * the same convention the detail page follows by rendering read-only. The
+ * section is already hidden from the sidebar for such a viewer; this covers the
+ * deep link.
+ */
 "use client";
 
 import { Building2 } from "lucide-react";
@@ -16,6 +24,7 @@ import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteTenant, listTenants, type Tenant } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { tenantsChanged } from "@/store/tenantsSlice";
 
@@ -65,6 +74,7 @@ const STATIC_COLUMNS: ColumnDef<Tenant>[] = [
 ];
 
 export default function TenantsPage() {
+  const canEdit = useHasRole(Role.SUPER_ADMIN);
   const dispatch = useAppDispatch();
   const {
     rows,
@@ -99,16 +109,20 @@ export default function TenantsPage() {
 
   const columns: ColumnDef<Tenant>[] = [
     ...STATIC_COLUMNS,
-    {
-      header: "Actions",
-      noTruncate: true,
-      visibility: "always",
-      cell: (tenant) => (
-        <div className="flex justify-center gap-2">
-          <DeleteIconButton onClick={() => handleDelete(tenant.id, tenant.displayName)} />
-        </div>
-      ),
-    },
+    ...(canEdit
+      ? [
+          {
+            header: "Actions",
+            noTruncate: true,
+            visibility: "always" as const,
+            cell: (tenant: Tenant) => (
+              <div className="flex justify-center gap-2">
+                <DeleteIconButton onClick={() => handleDelete(tenant.id, tenant.displayName)} />
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
@@ -122,7 +136,7 @@ export default function TenantsPage() {
       <AdminPageHeader
         title="Tenants"
         icon={Building2}
-        addHref="/admin/tenants/new"
+        addHref={canEdit ? "/admin/tenants/new" : undefined}
         addLabel="+ Add tenant"
         onRefresh={reload}
         refreshing={loading || refreshing}

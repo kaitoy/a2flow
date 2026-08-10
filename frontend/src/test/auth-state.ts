@@ -17,6 +17,8 @@ export function authState(roles: string[]): Partial<RootState> {
 
 /** Preloaded state for a signed-in `super_admin`. */
 export const SUPER_ADMIN = authState(["super_admin"]);
+/** Preloaded state for a signed-in `admin`. */
+export const ADMIN = authState(["admin"]);
 /** Preloaded state for a signed-in `requester`. */
 export const REQUESTER = authState(["requester"]);
 /** Preloaded state for a signed-in `developer`. */

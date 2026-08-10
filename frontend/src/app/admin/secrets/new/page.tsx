@@ -16,9 +16,11 @@ import {
   type SecretFormValues,
   toSecretBody,
 } from "@/components/admin/secret-fields";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createSecret } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -28,6 +30,7 @@ const schema = buildSecretFormSchema(true);
 export default function NewSecretPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const canEdit = useHasRole(Role.ADMIN);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -55,15 +58,26 @@ export default function NewSecretPage() {
     }
   }
 
+  const breadcrumbItems = [
+    { label: "Admin", href: "/admin" },
+    { label: "Secrets", href: "/admin/secrets" },
+    { label: "New" },
+  ];
+
+  // The list page hides the Add button for this viewer, so reaching the form at
+  // all means a deep link; refuse it here rather than let the submit 403.
+  if (!canEdit) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
+
   return (
     <AdminPageContainer>
-      <Breadcrumbs
-        items={[
-          { label: "Admin", href: "/admin" },
-          { label: "Secrets", href: "/admin/secrets" },
-          { label: "New" },
-        ]}
-      />
+      <Breadcrumbs items={breadcrumbItems} />
       <AdminPageHeader title="New Secret" icon={KeyRound} />
 
       <FormColumn>

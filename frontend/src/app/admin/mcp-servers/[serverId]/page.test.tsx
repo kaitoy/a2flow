@@ -3,6 +3,7 @@ import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
+import { DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { MCP_SERVER_1, MCP_STDIO_SERVER, MCP_TOOL_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
@@ -13,10 +14,15 @@ function setup() {
   vi.mocked(useParams).mockReturnValue({ serverId: "mcp-1" });
 }
 
+/** Render the page as a developer — the role every MCP server write requires. */
+function renderPage() {
+  return render(<McpServerDetailPage />, { preloadedState: DEVELOPER });
+}
+
 describe("McpServerDetailPage", () => {
   it("titles the page and ends the breadcrumb trail with the server's name", async () => {
     setup();
-    render(<McpServerDetailPage />);
+    renderPage();
     expect(await screen.findByRole("heading", { name: "my-mcp-server" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByText("my-mcp-server")).toHaveAttribute("aria-current", "page");
@@ -24,7 +30,7 @@ describe("McpServerDetailPage", () => {
 
   it("prefills form with server data including headers", async () => {
     setup();
-    render(<McpServerDetailPage />);
+    renderPage();
     await waitFor(() => expect(screen.getByDisplayValue("my-mcp-server")).toBeInTheDocument());
     expect(screen.getByDisplayValue("https://mcp.example.com/mcp")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Authorization")).toBeInTheDocument();
@@ -41,7 +47,7 @@ describe("McpServerDetailPage", () => {
       })
     );
 
-    render(<McpServerDetailPage />);
+    renderPage();
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("button", { name: "Remove headers row 1" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -64,7 +70,7 @@ describe("McpServerDetailPage", () => {
       )
     );
 
-    render(<McpServerDetailPage />);
+    renderPage();
     await waitFor(() => expect(screen.getByDisplayValue("local-files")).toBeInTheDocument());
     expect(screen.getByRole("tab", { name: "npx" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByDisplayValue("-y")).toBeInTheDocument();
@@ -83,7 +89,7 @@ describe("McpServerDetailPage", () => {
       })
     );
 
-    render(<McpServerDetailPage />);
+    renderPage();
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("tab", { name: "stdio" }));
     await userEvent.click(screen.getByRole("tab", { name: "uvx" }));
@@ -112,7 +118,7 @@ describe("McpServerDetailPage", () => {
       forward: vi.fn(),
     });
 
-    render(<McpServerDetailPage />);
+    renderPage();
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -133,7 +139,7 @@ describe("McpServerDetailPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/mcp-servers/:serverId", deleteSpy));
 
-    render(<McpServerDetailPage />);
+    renderPage();
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
     await userEvent.click(screen.getByRole("button", { name: /^delete$/i }));
     const dialog = screen.getByRole("dialog");
@@ -145,7 +151,7 @@ describe("McpServerDetailPage", () => {
 
   it("fetches and renders the server's tools on demand", async () => {
     setup();
-    render(<McpServerDetailPage />);
+    renderPage();
     await waitFor(() => screen.getByDisplayValue("my-mcp-server"));
 
     await userEvent.click(screen.getByRole("button", { name: /fetch tools/i }));
@@ -161,7 +167,7 @@ describe("McpServerDetailPage", () => {
       )
     );
 
-    render(<McpServerDetailPage />);
+    renderPage();
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
         message: "McpServer not found",
@@ -179,9 +185,53 @@ describe("McpServerDetailPage", () => {
     );
     const beforeCount = store.getState().toast.items.length;
 
-    render(<McpServerDetailPage />);
+    renderPage();
 
     expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
+
+  describe("without the developer role", () => {
+    it("renders the connection fields as values instead of controls", async () => {
+      setup();
+      render(<McpServerDetailPage />, { preloadedState: REQUESTER });
+
+      expect(await screen.findByRole("heading", { name: "my-mcp-server" })).toBeInTheDocument();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+      expect(screen.getByText("Streamable HTTP")).toBeInTheDocument();
+      expect(screen.getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
+      expect(screen.getByText("Authorization: Bearer secret")).toBeInTheDocument();
+    });
+
+    it("renders a stdio server's command, arguments, and environment as values", async () => {
+      vi.mocked(useParams).mockReturnValue({ serverId: "mcp-2" });
+      server.use(
+        http.get("http://localhost:8000/api/v1/mcp-servers/:serverId", () =>
+          envelope(MCP_STDIO_SERVER)
+        )
+      );
+
+      render(<McpServerDetailPage />, { preloadedState: REQUESTER });
+
+      expect(await screen.findByRole("heading", { name: "local-files" })).toBeInTheDocument();
+      expect(screen.getByText("stdio")).toBeInTheDocument();
+      expect(screen.getByText("npx")).toBeInTheDocument();
+      // One argument per line; getByText's normalizer collapses the newline.
+      expect(screen.getByText("-y files-mcp@0.3.0")).toBeInTheDocument();
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: literal secret-reference syntax stored by the API
+      expect(screen.getByText("API_KEY: ${secret:files-key}")).toBeInTheDocument();
+    });
+
+    it("hides Save and Delete and offers Back instead of Cancel", async () => {
+      setup();
+      render(<McpServerDetailPage />, { preloadedState: REQUESTER });
+
+      expect(await screen.findByRole("heading", { name: "my-mcp-server" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
+    });
   });
 });

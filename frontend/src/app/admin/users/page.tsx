@@ -1,4 +1,11 @@
-/** @module UsersPage — Admin list page for managing application users. */
+/**
+ * @module UsersPage — Admin list page for managing application users.
+ *
+ * Reads are open to every authenticated user within the tenant, so a viewer
+ * without the admin role sees the list but neither the Add button nor the
+ * Actions column — the same convention the detail page follows by rendering
+ * read-only.
+ */
 "use client";
 
 import { UserCog, Users as UsersIcon } from "lucide-react";
@@ -178,23 +185,30 @@ export default function UsersPage() {
 
   const columns: ColumnDef<User>[] = [
     ...STATIC_COLUMNS,
-    {
-      header: "Actions",
-      noTruncate: true,
-      visibility: "always",
-      cell: (user) => (
-        <div className="flex justify-center gap-2">
-          {canImpersonate(viewer, isSuperAdmin, isAdmin, user) && (
-            <ActionIconButton
-              icon={UserCog}
-              label="Impersonate"
-              onClick={() => handleImpersonate(user.id, user.username)}
-            />
-          )}
-          <DeleteIconButton onClick={() => handleDelete(user.id, user.username)} />
-        </div>
-      ),
-    },
+    // Both actions in this column need the admin role — deleting a user
+    // outright, and `canImpersonate`, which already answers false without it —
+    // so the whole column goes for a viewer who only holds a read role.
+    ...(isAdmin
+      ? [
+          {
+            header: "Actions",
+            noTruncate: true,
+            visibility: "always" as const,
+            cell: (user: User) => (
+              <div className="flex justify-center gap-2">
+                {canImpersonate(viewer, isSuperAdmin, isAdmin, user) && (
+                  <ActionIconButton
+                    icon={UserCog}
+                    label="Impersonate"
+                    onClick={() => handleImpersonate(user.id, user.username)}
+                  />
+                )}
+                <DeleteIconButton onClick={() => handleDelete(user.id, user.username)} />
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
@@ -208,7 +222,7 @@ export default function UsersPage() {
       <AdminPageHeader
         title="Users"
         icon={UsersIcon}
-        addHref="/admin/users/new"
+        addHref={isAdmin ? "/admin/users/new" : undefined}
         addLabel="+ Add user"
         onRefresh={reload}
         refreshing={loading || refreshing}

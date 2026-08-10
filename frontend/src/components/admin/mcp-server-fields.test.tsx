@@ -66,6 +66,66 @@ describe("McpServerFields", () => {
     render(<Host defaults={{ transport: "stdio" }} />);
     expect(screen.getByText(/\$\{env:NAME\}/)).toBeInTheDocument();
   });
+
+  describe("readOnly", () => {
+    it("renders a remote server's url and headers as values", () => {
+      render(
+        <McpServerFields
+          readOnly
+          values={{
+            ...emptyMcpServerFormValues(),
+            name: "web-search",
+            url: "https://mcp.example.com/mcp",
+            headers: [{ key: "Authorization", value: "Bearer x" }],
+          }}
+        />
+      );
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+      expect(screen.getByText("web-search")).toBeInTheDocument();
+      expect(screen.getByText("Streamable HTTP")).toBeInTheDocument();
+      expect(screen.getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
+      expect(screen.getByText("Authorization: Bearer x")).toBeInTheDocument();
+    });
+
+    it("renders a stdio server's command, arguments, and environment as values", () => {
+      render(
+        <McpServerFields
+          readOnly
+          values={{
+            ...emptyMcpServerFormValues(),
+            name: "local-files",
+            transport: "stdio",
+            command: "uvx",
+            args: ["-y", "", "files-mcp"],
+            env: [{ key: "API_KEY", value: "x" }],
+          }}
+        />
+      );
+      expect(screen.getByText("stdio")).toBeInTheDocument();
+      expect(screen.getByText("uvx")).toBeInTheDocument();
+      // One argument per line; getByText's normalizer collapses the newline,
+      // and the blank row is dropped.
+      expect(screen.getByText("-y files-mcp")).toBeInTheDocument();
+      expect(screen.getByText("API_KEY: x")).toBeInTheDocument();
+      expect(screen.queryByText("HTTP Headers")).not.toBeInTheDocument();
+    });
+
+    it("drops the authoring hints", () => {
+      render(
+        <McpServerFields readOnly values={{ ...emptyMcpServerFormValues(), transport: "stdio" }} />
+      );
+      expect(screen.queryByText(/\$\{env:NAME\}/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/\$\{secret:name\/key\}/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/child process of the backend/i)).not.toBeInTheDocument();
+    });
+
+    it("falls back to a placeholder for empty pair and list fields", () => {
+      render(<McpServerFields readOnly values={{ ...emptyMcpServerFormValues(), name: "srv" }} />);
+      // URL and HTTP Headers are both empty for a freshly blank remote server.
+      expect(screen.getAllByText("—")).toHaveLength(2);
+    });
+  });
 });
 
 describe("mcpServerFormSchema", () => {

@@ -3,15 +3,21 @@ import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
+import { DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { MCP_SERVER_1, MCP_STDIO_SERVER } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewMcpServerPage from "./page";
 
+/** Render the form as a developer — the role registering an MCP server requires. */
+function renderPage() {
+  return render(<NewMcpServerPage />, { preloadedState: DEVELOPER });
+}
+
 describe("NewMcpServerPage", () => {
   it("renders name and url inputs", () => {
-    render(<NewMcpServerPage />);
+    renderPage();
     expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/url/i)).toBeInTheDocument();
   });
@@ -26,7 +32,7 @@ describe("NewMcpServerPage", () => {
       })
     );
 
-    render(<NewMcpServerPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/name/i), "test-server");
     await user.type(screen.getByLabelText(/url/i), "https://mcp.test/mcp");
     await user.click(screen.getByRole("button", { name: /add row/i }));
@@ -54,7 +60,7 @@ describe("NewMcpServerPage", () => {
       })
     );
 
-    render(<NewMcpServerPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/name/i), "local-files");
     await user.click(screen.getByRole("tab", { name: "stdio" }));
     await user.click(screen.getByRole("tab", { name: "npx" }));
@@ -88,7 +94,7 @@ describe("NewMcpServerPage", () => {
       forward: vi.fn(),
     });
 
-    render(<NewMcpServerPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/name/i), "test-server");
     await user.type(screen.getByLabelText(/url/i), "https://mcp.test/mcp");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -98,7 +104,7 @@ describe("NewMcpServerPage", () => {
 
   it("shows validation error on blur when url is invalid", async () => {
     const user = userEvent.setup();
-    render(<NewMcpServerPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/url/i), "not-a-url");
     await user.tab();
     await waitFor(() => expect(screen.getByText(/invalid/i)).toBeInTheDocument());
@@ -112,7 +118,7 @@ describe("NewMcpServerPage", () => {
       )
     );
 
-    render(<NewMcpServerPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/name/i), "test-server");
     await user.type(screen.getByLabelText(/url/i), "https://mcp.test/mcp");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -123,5 +129,13 @@ describe("NewMcpServerPage", () => {
         variant: "error",
       })
     );
+  });
+
+  it("refuses the form for a viewer without the developer role", () => {
+    render(<NewMcpServerPage />, { preloadedState: REQUESTER });
+
+    expect(screen.getByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
   });
 });

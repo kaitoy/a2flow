@@ -3,19 +3,25 @@ import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
+import { DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewAgentSkillPage from "./page";
 
+/** Render the form as a developer — the role creating an agent skill requires. */
+function renderPage() {
+  return render(<NewAgentSkillPage />, { preloadedState: DEVELOPER });
+}
+
 describe("NewAgentSkillPage", () => {
   it("renders name input", () => {
-    render(<NewAgentSkillPage />);
+    renderPage();
     expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
   });
 
   it("renders repo url input", () => {
-    render(<NewAgentSkillPage />);
+    renderPage();
     expect(screen.getByLabelText(/repo url/i)).toBeInTheDocument();
   });
 
@@ -39,7 +45,7 @@ describe("NewAgentSkillPage", () => {
     );
     server.use(http.post("http://localhost:8000/api/v1/agent-skills", createSpy));
 
-    render(<NewAgentSkillPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -70,7 +76,7 @@ describe("NewAgentSkillPage", () => {
       })
     );
 
-    render(<NewAgentSkillPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     // github-token holds a single entry, so choosing it completes the reference.
@@ -114,7 +120,7 @@ describe("NewAgentSkillPage", () => {
       })
     );
 
-    render(<NewAgentSkillPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -141,7 +147,7 @@ describe("NewAgentSkillPage", () => {
       forward: vi.fn(),
     });
 
-    render(<NewAgentSkillPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -151,7 +157,7 @@ describe("NewAgentSkillPage", () => {
 
   it("shows validation error on blur when required field is empty", async () => {
     const user = userEvent.setup();
-    render(<NewAgentSkillPage />);
+    renderPage();
     const nameInput = screen.getByLabelText(/^name/i);
     await user.click(nameInput);
     await user.tab();
@@ -160,7 +166,7 @@ describe("NewAgentSkillPage", () => {
 
   it("shows validation error on blur when name has a non-printable character", async () => {
     const user = userEvent.setup();
-    render(<NewAgentSkillPage />);
+    renderPage();
     // A no-break space (U+00A0) is non-printable and rejected; an ordinary
     // space would be accepted.
     await user.type(screen.getByLabelText(/^name/i), "bad\u00a0name");
@@ -170,7 +176,7 @@ describe("NewAgentSkillPage", () => {
 
   it("shows validation error on blur when repo url is invalid", async () => {
     const user = userEvent.setup();
-    render(<NewAgentSkillPage />);
+    renderPage();
     const repoUrlInput = screen.getByLabelText(/repo url/i);
     await user.type(repoUrlInput, "not-a-url");
     await user.tab();
@@ -185,7 +191,7 @@ describe("NewAgentSkillPage", () => {
       )
     );
 
-    render(<NewAgentSkillPage />);
+    renderPage();
     await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     await user.click(screen.getByRole("button", { name: /save/i }));
@@ -196,5 +202,13 @@ describe("NewAgentSkillPage", () => {
         variant: "error",
       })
     );
+  });
+
+  it("refuses the form for a viewer without the developer role", () => {
+    render(<NewAgentSkillPage />, { preloadedState: REQUESTER });
+
+    expect(screen.getByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
   });
 });

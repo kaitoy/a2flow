@@ -312,6 +312,21 @@ describe("UsersPage", () => {
       expect(push).toHaveBeenCalledWith("/admin");
     });
   });
+
+  describe("without the admin role", () => {
+    it("hides the add link and the whole Actions column", async () => {
+      routerMock();
+      render(<UsersPage />, { preloadedState: authState(["developer" as Role]) });
+      await waitFor(() => screen.getByText("alice"));
+
+      expect(screen.queryByRole("link", { name: /add user/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Impersonate" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("columnheader", { name: "Actions" })).not.toBeInTheDocument();
+      // The list itself stays readable — only the write actions are gated.
+      expect(screen.getByRole("link", { name: "alice" })).toBeInTheDocument();
+    });
+  });
 });
 
 /** A user row with a `tenantId`, for the admin-viewer eligibility tests. */

@@ -11,12 +11,14 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
+import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { createTenant } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { tenantsChanged } from "@/store/tenantsSlice";
 import { showToast } from "@/store/toastSlice";
@@ -28,6 +30,7 @@ type FormValues = z.infer<typeof schema>;
 export default function NewTenantPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const canEdit = useHasRole(Role.SUPER_ADMIN);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -61,15 +64,26 @@ export default function NewTenantPage() {
     }
   }
 
+  const breadcrumbItems = [
+    { label: "Admin", href: "/admin" },
+    { label: "Tenants", href: "/admin/tenants" },
+    { label: "New" },
+  ];
+
+  // The list page hides the Add button for this viewer, so reaching the form at
+  // all means a deep link; refuse it here rather than let the submit 403.
+  if (!canEdit) {
+    return (
+      <AdminPageContainer>
+        <Breadcrumbs items={breadcrumbItems} />
+        <AccessDeniedState fill="full" />
+      </AdminPageContainer>
+    );
+  }
+
   return (
     <AdminPageContainer>
-      <Breadcrumbs
-        items={[
-          { label: "Admin", href: "/admin" },
-          { label: "Tenants", href: "/admin/tenants" },
-          { label: "New" },
-        ]}
-      />
+      <Breadcrumbs items={breadcrumbItems} />
       <AdminPageHeader title="New Tenant" icon={Building2} />
 
       <FormColumn>

@@ -22,10 +22,12 @@ import {
   type KeyValuePair,
   pairsToRecord,
 } from "@/components/admin/key-value-editor";
+import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { Input } from "@/components/ui/input";
-import { SegmentedControl } from "@/components/ui/segmented-control";
+import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
 import { zSecretCreate } from "@/generated/api/zod.gen";
 import type { SecretCreate } from "@/lib/api";
+import { EMPTY_VALUE, formatChoice, formatLines } from "@/lib/read-only-display";
 
 /** Charset a secret entry key must use, mirroring the backend's slug rule. */
 const ENTRY_KEY_PATTERN = /^[a-zA-Z0-9._-]+$/;
@@ -115,6 +117,16 @@ function validateEntries(
 /** Form values for the secret create and edit forms. */
 export type SecretFormValues = z.infer<ReturnType<typeof buildSecretFormSchema>>;
 
+/**
+ * The storage backings a secret may use. Module-level so the editable control
+ * and the read-only label resolution share one list, and so the control is not
+ * handed a fresh array literal on every render.
+ */
+const SECRET_TYPE_OPTIONS: ReadonlyArray<SegmentedOption<SecretFormValues["type"]>> = [
+  { value: "local", label: "Local (encrypted)" },
+  { value: "vault", label: "HashiCorp Vault" },
+];
+
 /** Blank form values, used as the create form's fallback and the edit form's reset base. */
 export function emptySecretFormValues(): SecretFormValues {
   return {
@@ -149,8 +161,8 @@ export function toSecretBody(values: SecretFormValues): SecretCreate {
   };
 }
 
-/** Props for {@link SecretFields}. */
-export interface SecretFieldsProps {
+/** Props for the editable rendering of {@link SecretFields}. */
+export interface SecretEditableFieldsProps {
   /** `register` from the page's `useForm`. */
   register: UseFormRegister<SecretFormValues>;
   /** `control` from the page's `useForm`, for the entry editor. */
@@ -163,18 +175,79 @@ export interface SecretFieldsProps {
   showPlaceholders?: boolean;
 }
 
+/** Props for the read-only rendering of {@link SecretFields}. */
+export interface SecretReadOnlyFieldsProps {
+  /** Renders every field as a value instead of a control. */
+  readOnly: true;
+  /** The values to display, e.g. the edit form's `getValues()`. */
+  values: SecretFormValues;
+}
+
+/**
+ * Props for {@link SecretFields}: either the form handles to edit with, or the
+ * values to display. A read-only rendering has no control to register against
+ * and no errors to report, so the two shapes are kept apart rather than left as
+ * optional props that only make sense in one mode.
+ */
+export type SecretFieldsProps =
+  | ({ readOnly?: false } & SecretEditableFieldsProps)
+  | SecretReadOnlyFieldsProps;
+
+/**
+ * The same fields as values on a recessed surface, for a viewer who may see the
+ * secret but not edit it.
+ *
+ * Entries list their **keys only**: the API never returns a stored value, so
+ * there is nothing else to show — the edit form's blank value column exists to
+ * *set* a new one, which is exactly what this viewer may not do.
+ */
+function SecretFieldValues({ values }: { values: SecretFormValues }) {
+  return (
+    <>
+      <FormField htmlFor="name" label="Name" required>
+        <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
+      </FormField>
+
+      <FormField htmlFor="type" label="Type" required>
+        <ReadOnlyField>{formatChoice(SECRET_TYPE_OPTIONS, values.type)}</ReadOnlyField>
+      </FormField>
+
+      {values.type === "local" ? (
+        <FormField htmlFor="entries" label="Entries" required>
+          <ReadOnlyField className="whitespace-pre-wrap">
+            {formatLines(
+              values.entries.map((entry) => entry.key.trim()).filter((key) => key !== "")
+            )}
+          </ReadOnlyField>
+        </FormField>
+      ) : (
+        <>
+          <FormField htmlFor="vaultMount" label="Vault Mount" required>
+            <ReadOnlyField>{values.vaultMount || EMPTY_VALUE}</ReadOnlyField>
+          </FormField>
+          <FormField htmlFor="vaultPath" label="Vault Path" required>
+            <ReadOnlyField>{values.vaultPath || EMPTY_VALUE}</ReadOnlyField>
+          </FormField>
+        </>
+      )}
+    </>
+  );
+}
+
 /**
  * Name, type switch, and the type-specific fields of a secret: the key/value
  * entries of a locally encrypted secret, or the mount and path of a Vault KV
  * reference whose keys are read live from Vault.
+ *
+ * Pass `readOnly` with the current `values` to render the same fields as plain
+ * values instead, for a viewer whose role cannot write secrets.
  */
-export function SecretFields({
-  register,
-  control,
-  errors,
-  type,
-  showPlaceholders = false,
-}: SecretFieldsProps) {
+export function SecretFields(props: SecretFieldsProps) {
+  if (props.readOnly) {
+    return <SecretFieldValues values={props.values} />;
+  }
+  const { register, control, errors, type, showPlaceholders = false } = props;
+
   return (
     <>
       <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
@@ -198,10 +271,7 @@ export function SecretFields({
           render={({ field }) => (
             <SegmentedControl
               aria-label="Secret type"
-              options={[
-                { value: "local", label: "Local (encrypted)" },
-                { value: "vault", label: "HashiCorp Vault" },
-              ]}
+              options={SECRET_TYPE_OPTIONS}
               value={field.value}
               onChange={field.onChange}
             />

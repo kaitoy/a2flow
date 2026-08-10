@@ -30,6 +30,7 @@ import {
   SUPPRESS_FORBIDDEN_TOAST,
   updateSecret,
 } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -42,11 +43,18 @@ const schema = buildSecretFormSchema(false);
 /**
  * Detail page of a registered secret: its type and the entry keys it holds
  * (values are write-only). The page is titled with the secret's own name.
+ *
+ * A viewer without the admin role gets a read-only rendering — reads are open
+ * to every authenticated user, but writes are admin-only — so the fields show
+ * as plain values, with a `local` secret's entries listed by key alone (see
+ * {@link SecretFields}'s `readOnly` mode), and Save/Delete are hidden rather
+ * than left to fail with a 403 on click.
  */
 export default function SecretDetailPage() {
   const { secretId } = useParams<{ secretId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const canEdit = useHasRole(Role.ADMIN);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -166,24 +174,32 @@ export default function SecretDetailPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <SecretFields register={register} control={control} errors={errors} type={type} />
+          {canEdit ? (
+            <SecretFields register={register} control={control} errors={errors} type={type} />
+          ) : (
+            <SecretFields readOnly values={getValues()} />
+          )}
 
           <div className="flex gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={save.inFlight}
-              status={save.status}
-              pendingLabel="Saving…"
-            >
-              Save
-            </Button>
+            {canEdit && (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={save.inFlight}
+                status={save.status}
+                pendingLabel="Saving…"
+              >
+                Save
+              </Button>
+            )}
             <Button type="button" variant="ghost" onClick={() => router.push("/admin/secrets")}>
-              Cancel
+              {canEdit ? "Cancel" : "Back"}
             </Button>
-            <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-              Delete
-            </Button>
+            {canEdit && (
+              <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
+                Delete
+              </Button>
+            )}
           </div>
         </form>
       </FormLayout>

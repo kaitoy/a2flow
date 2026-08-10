@@ -14,6 +14,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,6 +30,8 @@ import {
   type TenantUpdate,
   updateTenant,
 } from "@/lib/api";
+import { EMPTY_VALUE, formatFlag } from "@/lib/read-only-display";
+import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { tenantsChanged } from "@/store/tenantsSlice";
 import { showToast } from "@/store/toastSlice";
@@ -43,11 +46,18 @@ type FormValues = z.infer<typeof schema>;
  * Detail page of a tenant: its display name, its immutable URL-safe name, and
  * whether it is enabled. The page is titled with the tenant's display name —
  * the same label its row carries in the list.
+ *
+ * A viewer without the super admin role gets a read-only rendering — reads are
+ * open to every authenticated user, but every tenant write is super-admin-only
+ * — so Display Name and Enabled show as plain values and Save/Delete are hidden
+ * rather than left to fail with a 403 on click. Name is read-only for everyone,
+ * super admins included: it is immutable once the tenant exists.
  */
 export default function TenantDetailPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const canEdit = useHasRole(Role.SUPER_ADMIN);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -64,6 +74,7 @@ export default function TenantDetailPage() {
     register,
     handleSubmit,
     reset,
+    getValues,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -177,31 +188,45 @@ export default function TenantDetailPage() {
             required
             error={errors.displayName?.message}
           >
-            <Input id="displayName" {...register("displayName")} />
+            {canEdit ? (
+              <Input id="displayName" {...register("displayName")} />
+            ) : (
+              <ReadOnlyField>{displayName || EMPTY_VALUE}</ReadOnlyField>
+            )}
           </FormField>
 
           <FormField htmlFor="name" label="Name">
-            <Input id="name" value={name} readOnly disabled />
+            <ReadOnlyField>{name || EMPTY_VALUE}</ReadOnlyField>
           </FormField>
 
-          <Checkbox label="Enabled" {...register("enabled")} />
+          {canEdit ? (
+            <Checkbox label="Enabled" {...register("enabled")} />
+          ) : (
+            <FormField htmlFor="enabled" label="Enabled">
+              <ReadOnlyField>{formatFlag(getValues("enabled") ?? false)}</ReadOnlyField>
+            </FormField>
+          )}
 
           <div className="flex gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={save.inFlight}
-              status={save.status}
-              pendingLabel="Saving…"
-            >
-              Save
-            </Button>
+            {canEdit && (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={save.inFlight}
+                status={save.status}
+                pendingLabel="Saving…"
+              >
+                Save
+              </Button>
+            )}
             <Button type="button" variant="ghost" onClick={() => router.push("/admin/tenants")}>
-              Cancel
+              {canEdit ? "Cancel" : "Back"}
             </Button>
-            <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-              Delete
-            </Button>
+            {canEdit && (
+              <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
+                Delete
+              </Button>
+            )}
           </div>
         </form>
       </FormLayout>

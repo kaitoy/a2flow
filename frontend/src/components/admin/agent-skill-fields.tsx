@@ -17,11 +17,13 @@ import type { Control, FieldErrors, UseFormRegister } from "react-hook-form";
 import { Controller } from "react-hook-form";
 import { z } from "zod";
 import { FormField } from "@/components/admin/form-field";
+import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { SecretRefField } from "@/components/admin/secret-ref-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zAgentSkillCreate } from "@/generated/api/zod.gen";
 import type { AgentSkillCreate, AgentSkillUpdate } from "@/lib/api";
+import { EMPTY_VALUE } from "@/lib/read-only-display";
 
 /**
  * Validation schema shared by the create and edit forms.
@@ -98,8 +100,8 @@ export function toAgentSkillUpdateBody(values: AgentSkillFormValues): AgentSkill
   };
 }
 
-/** Props for {@link AgentSkillFields}. */
-export interface AgentSkillFieldsProps {
+/** Props for the editable rendering of {@link AgentSkillFields}. */
+export interface AgentSkillEditableFieldsProps {
   /** `register` from the page's `useForm`. */
   register: UseFormRegister<AgentSkillFormValues>;
   /** `control` from the page's `useForm`, for the secret reference picker. */
@@ -110,17 +112,83 @@ export interface AgentSkillFieldsProps {
   showPlaceholders?: boolean;
 }
 
+/** Props for the read-only rendering of {@link AgentSkillFields}. */
+export interface AgentSkillReadOnlyFieldsProps {
+  /** Renders every field as a value instead of a control. */
+  readOnly: true;
+  /** The values to display, e.g. the edit form's `getValues()`. */
+  values: AgentSkillFormValues;
+}
+
+/**
+ * Props for {@link AgentSkillFields}: either the form handles to edit with, or
+ * the values to display. A read-only rendering has no control to register
+ * against and no errors to report, so the two shapes are kept apart rather than
+ * left as optional props that only make sense in one mode.
+ */
+export type AgentSkillFieldsProps =
+  | ({ readOnly?: false } & AgentSkillEditableFieldsProps)
+  | AgentSkillReadOnlyFieldsProps;
+
+/**
+ * The same fields as values on a recessed surface, for a viewer who may see the
+ * skill but not edit it.
+ *
+ * The auth password is shown as its stored `name/key` reference rather than
+ * through {@link SecretRefField}: the picker exists to *choose* a reference, and
+ * mounting it would list every registered secret to a viewer who has no business
+ * editing this record.
+ */
+function AgentSkillFieldValues({ values }: { values: AgentSkillFormValues }) {
+  return (
+    <>
+      <FormField htmlFor="name" label="Name" required>
+        <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
+      </FormField>
+
+      <FormField htmlFor="repoUrl" label="Repo URL" required>
+        <ReadOnlyField>{values.repoUrl || EMPTY_VALUE}</ReadOnlyField>
+      </FormField>
+
+      <FormField htmlFor="repoPath" label="Repo Path">
+        <ReadOnlyField>{values.repoPath || EMPTY_VALUE}</ReadOnlyField>
+      </FormField>
+
+      <FormField htmlFor="repoRef" label="Ref">
+        <ReadOnlyField>{values.repoRef || EMPTY_VALUE}</ReadOnlyField>
+      </FormField>
+
+      <FormField htmlFor="description" label="Description">
+        <ReadOnlyField className="whitespace-pre-wrap">
+          {values.description || EMPTY_VALUE}
+        </ReadOnlyField>
+      </FormField>
+
+      <FormField htmlFor="repoAuthUsername" label="Auth Username">
+        <ReadOnlyField>{values.repoAuthUsername || EMPTY_VALUE}</ReadOnlyField>
+      </FormField>
+
+      <FormField htmlFor="repoAuthPassword" label="Auth Password">
+        <ReadOnlyField>{values.repoAuthPassword || EMPTY_VALUE}</ReadOnlyField>
+      </FormField>
+    </>
+  );
+}
+
 /**
  * Name, repository location, description, and repository credentials of an
  * agent skill. The clone token is not typed in — it is picked as one entry of a
  * registered secret, which is the only form the backend accepts.
+ *
+ * Pass `readOnly` with the current `values` to render the same fields as plain
+ * values instead, for a viewer whose role cannot write agent skills.
  */
-export function AgentSkillFields({
-  register,
-  control,
-  errors,
-  showPlaceholders = false,
-}: AgentSkillFieldsProps) {
+export function AgentSkillFields(props: AgentSkillFieldsProps) {
+  if (props.readOnly) {
+    return <AgentSkillFieldValues values={props.values} />;
+  }
+  const { register, control, errors, showPlaceholders = false } = props;
+
   return (
     <>
       <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
