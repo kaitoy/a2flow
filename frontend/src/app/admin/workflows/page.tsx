@@ -105,18 +105,25 @@ function buildColumns(
         </Link>
       ),
     },
-    {
-      header: "Status",
-      sortField: "status",
-      filterField: "status",
-      filterOp: "eq",
-      filterOptions: WORKFLOW_STATUSES.map((s) => ({
-        label: formatWorkflowStatusLabel(s),
-        value: s,
-      })),
-      noTruncate: true,
-      cell: (w) => <StatusCell workflow={w} />,
-    },
+    // A requester only ever deals with published workflows, so the status
+    // column carries no information for them; shown only to viewers who can
+    // also edit workflows (developer/super_admin).
+    ...(permissions.canEdit
+      ? [
+          {
+            header: "Status",
+            sortField: "status",
+            filterField: "status",
+            filterOp: "eq",
+            filterOptions: WORKFLOW_STATUSES.map((s) => ({
+              label: formatWorkflowStatusLabel(s),
+              value: s,
+            })),
+            noTruncate: true,
+            cell: (w: Workflow) => <StatusCell workflow={w} />,
+          },
+        ]
+      : []),
     {
       header: "Description",
       sortField: "description",

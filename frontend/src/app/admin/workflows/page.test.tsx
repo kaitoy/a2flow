@@ -117,6 +117,12 @@ describe("WorkflowsPage", () => {
     expect(screen.getByText("published")).toBeInTheDocument();
   });
 
+  it("hides the workflow status from a user without the developer role", async () => {
+    render(<WorkflowsPage />, { preloadedState: authState(["requester"]) });
+    await waitFor(() => screen.getByText("my-workflow"));
+    expect(screen.queryByText("published")).not.toBeInTheDocument();
+  });
+
   it("links the workflow Name cell to its detail page for a requester", async () => {
     render(<WorkflowsPage />, { preloadedState: authState(["requester"]) });
     await waitFor(() => screen.getByText("my-workflow"));

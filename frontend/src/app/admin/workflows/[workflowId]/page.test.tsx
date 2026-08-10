@@ -47,8 +47,14 @@ describe("WorkflowDetailPage", () => {
   });
 
   it("shows the workflow status", async () => {
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+  });
+
+  it("hides the workflow status from a requester", async () => {
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await screen.findByRole("heading", { name: "my-workflow" });
+    expect(screen.queryByText("published")).not.toBeInTheDocument();
   });
 
   it("leaves the status bar unlit while nothing is generating", async () => {
@@ -198,7 +204,7 @@ describe("WorkflowDetailPage", () => {
     });
 
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(
       screen.queryByRole("button", { name: /manage task templates/i })
     ).not.toBeInTheDocument();
@@ -315,7 +321,7 @@ describe("WorkflowDetailPage", () => {
 
   it("hides the Run action from a viewer without the requester or developer role", async () => {
     render(<WorkflowDetailPage />);
-    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.queryByRole("button", { name: /run workflow/i })).not.toBeInTheDocument();
   });
 
@@ -332,7 +338,7 @@ describe("WorkflowDetailPage", () => {
     });
 
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     await user.click(screen.getByRole("button", { name: /run workflow/i }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
@@ -350,7 +356,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     await user.click(screen.getByRole("button", { name: /run workflow/i }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
@@ -384,7 +390,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => expect(screen.getByText("draft")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.getByRole("button", { name: /run workflow/i })).toBeDisabled();
   });
 
@@ -667,7 +673,7 @@ describe("WorkflowDetailPage", () => {
 
   it("hides the generate action from a viewer who cannot edit workflows", async () => {
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.queryByRole("button", { name: GENERATE_BUTTON })).not.toBeInTheDocument();
   });
 
@@ -702,7 +708,7 @@ describe("WorkflowDetailPage", () => {
 
   it("hides Save, Delete, and Open design session from a requester, but keeps templates viewable", async () => {
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /open design session/i })).not.toBeInTheDocument();
@@ -739,7 +745,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => expect(screen.getByText("modified")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.queryByRole("button", { name: /discard changes/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /deactivate/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
@@ -775,7 +781,7 @@ describe("WorkflowDetailPage", () => {
 
   it("disables the diff action while there is no generated description to compare against", async () => {
     render(<WorkflowDetailPage />);
-    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.getByRole("button", { name: DIFF_BUTTON })).toBeDisabled();
   });
 
@@ -803,7 +809,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />);
-    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     await user.click(screen.getByRole("button", { name: DIFF_BUTTON }));
 
     const dialog = await screen.findByRole("dialog");
@@ -956,7 +962,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />);
-    await waitFor(() => expect(screen.getByText("draft")).toBeInTheDocument());
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.queryByRole("button", { name: /deactivate/i })).not.toBeInTheDocument();
   });
 

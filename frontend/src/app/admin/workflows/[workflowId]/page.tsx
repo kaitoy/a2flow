@@ -132,7 +132,10 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * click. Task templates stay reachable read-only for such a viewer too — the
  * header button is labeled "View task templates" instead of "Manage task
  * templates" and the templates screens it opens hide their own write actions
- * the same way.
+ * the same way. The whole "Workflow status" bar is hidden for such a viewer
+ * too — a `requester` only ever deals with `published` workflows, so the
+ * status would carry no information, and the bar's only other content is
+ * those same developer-only actions.
  */
 export default function WorkflowDetailPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -419,65 +422,67 @@ export default function WorkflowDetailPage() {
         }
         aside={audit && <AuditMeta {...audit} />}
       >
-        <section
-          aria-label="Workflow status"
-          className={[
-            "mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4",
-            // Signature "live edge": a lifecycle transition is being written
-            // server-side, or `generating` means the background design run is
-            // still going, so the card carries the same travelling light the
-            // chat bubbles do. Gated on the 200ms `pending` stage rather than
-            // `inFlight` so a fast rejection (409 with no task templates) never
-            // flashes it. Generating the description is deliberately absent:
-            // it belongs to the field below, which spins its own button and
-            // lights its own live edge.
-            publish.status === "pending" ||
-            discard.status === "pending" ||
-            deactivate.status === "pending" ||
-            generating
-              ? "live-edge"
-              : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <StatusLine workflow={workflow} />
-          <div className="ml-auto flex items-center gap-2">
-            {canEdit && workflow.status === "modified" && (
-              <ActionIconButton
-                icon={Undo2}
-                label="Discard changes"
-                onClick={() => setConfirmDiscardOpen(true)}
-                disabled={discard.inFlight}
-                spinning={discard.inFlight}
-              />
+        {canEdit && (
+          <section
+            aria-label="Workflow status"
+            className={[
+              "mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4",
+              // Signature "live edge": a lifecycle transition is being written
+              // server-side, or `generating` means the background design run is
+              // still going, so the card carries the same travelling light the
+              // chat bubbles do. Gated on the 200ms `pending` stage rather than
+              // `inFlight` so a fast rejection (409 with no task templates) never
+              // flashes it. Generating the description is deliberately absent:
+              // it belongs to the field below, which spins its own button and
+              // lights its own live edge.
+              publish.status === "pending" ||
+              discard.status === "pending" ||
+              deactivate.status === "pending" ||
+              generating
+                ? "live-edge"
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <StatusLine workflow={workflow} />
+            <div className="ml-auto flex items-center gap-2">
+              {workflow.status === "modified" && (
+                <ActionIconButton
+                  icon={Undo2}
+                  label="Discard changes"
+                  onClick={() => setConfirmDiscardOpen(true)}
+                  disabled={discard.inFlight}
+                  spinning={discard.inFlight}
+                />
+              )}
+              {canDeactivate && (
+                <ActionIconButton
+                  icon={PowerOff}
+                  label="Deactivate"
+                  onClick={() => setConfirmDeactivateOpen(true)}
+                  disabled={deactivate.inFlight}
+                  spinning={deactivate.inFlight}
+                />
+              )}
+              {workflow.status !== "published" && (
+                <ActionIconButton
+                  icon={Rocket}
+                  label="Publish"
+                  onClick={() => setConfirmPublishOpen(true)}
+                  disabled={generating || publish.inFlight}
+                  spinning={publish.inFlight}
+                  spinAnimation="rocket-launch"
+                />
+              )}
+            </div>
+            {workflow.status === "failed" && workflow.generationError && (
+              <p className="w-full break-words font-mono text-error text-xs">
+                {workflow.generationError}
+              </p>
             )}
-            {canEdit && canDeactivate && (
-              <ActionIconButton
-                icon={PowerOff}
-                label="Deactivate"
-                onClick={() => setConfirmDeactivateOpen(true)}
-                disabled={deactivate.inFlight}
-                spinning={deactivate.inFlight}
-              />
-            )}
-            {canEdit && workflow.status !== "published" && (
-              <ActionIconButton
-                icon={Rocket}
-                label="Publish"
-                onClick={() => setConfirmPublishOpen(true)}
-                disabled={generating || publish.inFlight}
-                spinning={publish.inFlight}
-                spinAnimation="rocket-launch"
-              />
-            )}
-          </div>
-          {workflow.status === "failed" && workflow.generationError && (
-            <p className="w-full break-words font-mono text-error text-xs">
-              {workflow.generationError}
-            </p>
-          )}
-        </section>
+          </section>
+        )}
 
         <form
           onSubmit={handleSubmit(onSubmit)}
