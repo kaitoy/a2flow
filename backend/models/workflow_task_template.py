@@ -9,8 +9,8 @@ WorkflowExecution, so later template edits never affect runs already started.
 
 Like session tasks, templates form a directed acyclic graph (DAG): dependency
 edges live in :class:`WorkflowTaskTemplateDependency` and are surfaced on read
-models as ``depends_on_ids``. ``position`` is retained purely for layout and
-implies no execution order. MCP tool bindings live in
+models as ``depends_on_ids``. Templates are listed in ``created_at`` order;
+there is no separate layout/ordering field. MCP tool bindings live in
 :class:`WorkflowTaskTemplateToolBinding` and are surfaced as ``tool_bindings``;
 they are copied onto the run's tasks at execute time. Templates carry no
 ``status`` — status is a property of a run, not of the design.
@@ -22,7 +22,7 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
-from models.constraints import DescText, Position, ShortText
+from models.constraints import DescText, ShortText
 from models.tenant_scoped import TenantScoped
 from models.workflow_task import ToolBinding
 
@@ -42,7 +42,6 @@ class WorkflowTaskTemplateUpdate(SQLModel):
     model_config = _alias_config
     title: ShortText | None = None
     description: DescText | None = None
-    position: Position | None = None
     depends_on_ids: list[str] | None = None
     tool_bindings: list[ToolBinding] | None = None
 
@@ -51,14 +50,13 @@ class WorkflowTaskTemplateCreate(WorkflowTaskTemplateUpdate):
     """Creation payload for a WorkflowTaskTemplate.
 
     Inherits the optional fields from :class:`WorkflowTaskTemplateUpdate`,
-    tightens ``title`` to required, supplies a default ``position``, adds the
-    required parent ``workflow_id`` foreign key, and defaults
-    ``depends_on_ids`` and ``tool_bindings`` to empty lists.
+    tightens ``title`` to required, adds the required parent ``workflow_id``
+    foreign key, and defaults ``depends_on_ids`` and ``tool_bindings`` to
+    empty lists.
     """
 
     workflow_id: str
     title: ShortText
-    position: Position = 0
     depends_on_ids: list[str] = []
     tool_bindings: list[ToolBinding] = []
 
@@ -83,7 +81,6 @@ class WorkflowTaskTemplate(TenantScoped, BaseEntity, table=True):
     workflow_id: str
     title: str
     description: str | None = None
-    position: int = 0
 
 
 class WorkflowTaskTemplateRead(BaseEntity):
@@ -97,7 +94,6 @@ class WorkflowTaskTemplateRead(BaseEntity):
     workflow_id: str
     title: str
     description: str | None = None
-    position: int = 0
     depends_on_ids: list[str] = []
     tool_bindings: list[ToolBinding] = []
 

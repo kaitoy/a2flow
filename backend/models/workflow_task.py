@@ -7,8 +7,8 @@ instruction "use the provided skill to produce an actionable task list".
 Tasks form a directed acyclic graph (DAG) rather than a flat sequence: each task
 may depend on zero or more other tasks in the same session. Dependency edges are
 stored in the :class:`WorkflowTaskDependency` join table and surfaced on read
-models as ``depends_on_ids``. The ``position`` field is retained purely for
-layout/ordering and no longer implies execution order.
+models as ``depends_on_ids``. Tasks are listed in ``created_at`` order; there is
+no separate layout/ordering field.
 
 A task may also have MCP tools bound to it: each binding names a registered
 :class:`models.mcp_server.MCPServer` and one tool on that server. Bindings are
@@ -26,7 +26,7 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
-from models.constraints import DescText, Position, ShortText, ToolName
+from models.constraints import DescText, ShortText, ToolName
 from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -64,7 +64,6 @@ class WorkflowTaskUpdate(SQLModel):
     title: ShortText | None = None
     description: DescText | None = None
     status: WorkflowTaskStatus | None = None
-    position: Position | None = None
     depends_on_ids: list[str] | None = None
     tool_bindings: list[ToolBinding] | None = None
 
@@ -73,15 +72,14 @@ class WorkflowTaskCreate(WorkflowTaskUpdate):
     """Creation payload for a WorkflowTask.
 
     Inherits the optional fields from :class:`WorkflowTaskUpdate` and tightens
-    ``title`` to required, supplies defaults for ``status`` and ``position``,
-    adds the required parent ``workflow_execution_id`` foreign key, and defaults
+    ``title`` to required, supplies a default for ``status``, adds the required
+    parent ``workflow_execution_id`` foreign key, and defaults
     ``depends_on_ids`` and ``tool_bindings`` to empty lists.
     """
 
     workflow_execution_id: str
     title: ShortText
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
-    position: Position = 0
     depends_on_ids: list[str] = []
     tool_bindings: list[ToolBinding] = []
 
@@ -107,7 +105,6 @@ class WorkflowTask(TenantScoped, BaseEntity, table=True):
     title: str
     description: str | None = None
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
-    position: int = 0
 
 
 class WorkflowTaskRead(BaseEntity):
@@ -123,7 +120,6 @@ class WorkflowTaskRead(BaseEntity):
     title: str
     description: str | None = None
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
-    position: int = 0
     depends_on_ids: list[str] = []
     tool_bindings: list[ToolBinding] = []
 

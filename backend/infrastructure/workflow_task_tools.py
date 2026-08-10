@@ -291,7 +291,6 @@ def _task_to_dict(task: WorkflowTaskRead) -> dict[str, Any]:
         "description": task.description,
         "status": task.status.value,
         "depends_on_ids": list(task.depends_on_ids),
-        "position": task.position,
         "tool_bindings": [
             {"server_id": b.mcp_server_id, "tool_name": b.tool_name}
             for b in task.tool_bindings
@@ -447,10 +446,11 @@ async def create_workflow_task(
 
 
 async def list_workflow_tasks(tool_context: ToolContext) -> dict[str, Any]:
-    """List all WorkflowTasks in the current session, in position order.
+    """List all WorkflowTasks in the current session, in creation order.
 
     Call this to decide what to do next: pick a ``pending`` task whose
-    ``depends_on_ids`` are all ``completed`` (a "runnable" task).
+    ``depends_on_ids`` are all ``completed`` (a "runnable" task). When several
+    are runnable, the one appearing first in this list was created first.
 
     Args:
         tool_context: Injected by ADK; identifies the current session. Not shown
@@ -458,7 +458,7 @@ async def list_workflow_tasks(tool_context: ToolContext) -> dict[str, Any]:
 
     Returns:
         ``{"tasks": [{"id", "title", "description", "status", "depends_on_ids",
-        "position"}, ...]}`` ordered by position then creation time, or
+        "tool_bindings"}, ...]}`` ordered by creation time, or
         ``{"error": <message>}`` if the session cannot be resolved.
     """
     try:
@@ -499,7 +499,6 @@ async def update_workflow_task(
     title: str | None = None,
     description: str | None = None,
     status: str | None = None,
-    position: int | None = None,
     depends_on_ids: list[str] | None = None,
     tool_bindings: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
@@ -520,7 +519,6 @@ async def update_workflow_task(
         description: New description, if changing.
         status: New status, if changing. One of "pending", "in_progress",
             "completed", "failed", "skipped".
-        position: New layout position, if changing.
         depends_on_ids: Replacement dependency ids (existing same-session tasks),
             if changing.
         tool_bindings: Replacement MCP tool bindings, each
@@ -552,8 +550,6 @@ async def update_workflow_task(
                 fields["description"] = description
             if status_enum is not None:
                 fields["status"] = status_enum
-            if position is not None:
-                fields["position"] = position
             if depends_on_ids is not None:
                 fields["depends_on_ids"] = depends_on_ids
             if bindings is not None:

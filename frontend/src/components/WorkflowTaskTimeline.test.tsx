@@ -8,7 +8,6 @@ const makeTask = (
   id: string,
   title: string,
   status: WorkflowTask["status"] = "pending",
-  position = 0,
   toolBindings: ToolBinding[] = [],
   description: string | null = null
 ): WorkflowTask => ({
@@ -16,7 +15,6 @@ const makeTask = (
   workflowExecutionId: "execution",
   title,
   status,
-  position,
   dependsOnIds: [],
   toolBindings,
   description,
@@ -27,9 +25,9 @@ const makeTask = (
 });
 
 const tasks = [
-  makeTask("t1", "Gather sources", "completed", 0),
-  makeTask("t2", "Draft", "in_progress", 1),
-  makeTask("t3", "Review", "pending", 2),
+  makeTask("t1", "Gather sources", "completed"),
+  makeTask("t2", "Draft", "in_progress"),
+  makeTask("t3", "Review", "pending"),
 ];
 
 describe("WorkflowTaskTimeline", () => {
@@ -51,7 +49,7 @@ describe("WorkflowTaskTimeline", () => {
   it("shows a task's description in a tooltip on hover", async () => {
     const user = userEvent.setup();
     const withDescription = [
-      makeTask("t1", "Gather sources", "completed", 0, [], "Collect all reference material."),
+      makeTask("t1", "Gather sources", "completed", [], "Collect all reference material."),
     ];
     render(
       <WorkflowTaskTimeline
@@ -127,7 +125,7 @@ describe("WorkflowTaskTimeline", () => {
     expect(onToggle).toHaveBeenCalled();
   });
 
-  it("numbers each entry from its position by default", () => {
+  it("numbers each entry from its index by default", () => {
     render(
       <WorkflowTaskTimeline
         tasks={tasks}
@@ -145,11 +143,11 @@ describe("WorkflowTaskTimeline", () => {
 
   it("shows a tool-count indicator for a task with bound tools", () => {
     const withTools = [
-      makeTask("t1", "Gather sources", "completed", 0, [
+      makeTask("t1", "Gather sources", "completed", [
         { mcpServerId: "srv-1", toolName: "extract_text" },
         { mcpServerId: "srv-1", toolName: "ocr_scan" },
       ]),
-      makeTask("t2", "Draft", "in_progress", 1),
+      makeTask("t2", "Draft", "in_progress"),
     ];
     render(
       <WorkflowTaskTimeline
@@ -168,7 +166,7 @@ describe("WorkflowTaskTimeline", () => {
   it("opens a dialog listing the bound tools and their servers on click", async () => {
     const user = userEvent.setup();
     const withTools = [
-      makeTask("t1", "Gather sources", "completed", 0, [
+      makeTask("t1", "Gather sources", "completed", [
         { mcpServerId: "mcp-1", toolName: "extract_text" },
       ]),
     ];
@@ -190,7 +188,7 @@ describe("WorkflowTaskTimeline", () => {
   it("falls back to 'Unknown server' when the bound server isn't registered", async () => {
     const user = userEvent.setup();
     const withTools = [
-      makeTask("t1", "Gather sources", "completed", 0, [
+      makeTask("t1", "Gather sources", "completed", [
         { mcpServerId: "missing-server", toolName: "extract_text" },
       ]),
     ];

@@ -23,4 +23,4 @@ Filter operators (`op`):
 | `like` | Case-insensitive substring match (string fields) |
 | `in` | Matches any of a comma-separated list, e.g. `status:in:pending,completed` |
 
-When `s` is omitted, each endpoint falls back to its default ordering (`createdAt` descending; workflow tasks and task templates order by `position` then `createdAt` ascending).
+When `s` is omitted, each endpoint falls back to its default ordering (`createdAt` descending; workflow tasks and task templates order by `createdAt` then `id` ascending).

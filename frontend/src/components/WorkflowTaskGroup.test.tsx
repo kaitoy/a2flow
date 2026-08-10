@@ -9,7 +9,6 @@ const task: WorkflowTask = {
   workflowExecutionId: "execution",
   title: "Draft the report",
   status: "in_progress",
-  position: 0,
   dependsOnIds: [],
   toolBindings: [],
   createdAt: "2026-01-01T00:00:00Z",

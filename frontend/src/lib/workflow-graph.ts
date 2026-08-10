@@ -13,8 +13,8 @@
  * The column is deliberately not a hierarchical (dagre-style) layout: that
  * spreads independent tasks across a rank, which is exactly the horizontal
  * drift this view is meant to avoid. Tasks are ordered by a topological sort
- * instead, tie-broken by `position` so the column matches the order the task
- * list shows.
+ * instead, tie-broken by input order so the column matches the order the task
+ * list shows (the API's `createdAt` order).
  *
  * These functions are deliberately free of any React Flow rendering concerns so
  * they can be unit-tested without a DOM.
@@ -71,8 +71,6 @@ export interface GraphTask {
   id: string;
   /** Title shown inside the node. */
   title: string;
-  /** Layout/order hint shown as the node's ordinal, and the column's tie-break. */
-  position?: number | null;
   /** Ids of the tasks this one depends on (incoming edges). */
   dependsOnIds?: string[] | null;
   /** Lifecycle status, or absent for status-less entries (task templates). */
@@ -85,6 +83,8 @@ export interface GraphTask {
 export interface WorkflowTaskNodeData extends Record<string, unknown> {
   /** The task this node represents. */
   task: GraphTask;
+  /** 0-based position of this task within the column, for the ordinal badge. */
+  columnIndex: number;
 }
 
 /** Data carried by an MCP server React Flow node. */
@@ -192,7 +192,8 @@ function groupBindingsByServer(
 /**
  * Order tasks for the vertical column: a topological sort over the dependency
  * edges, so a task always sits below everything it depends on, with ties broken
- * by `position` (then input order) so the column matches the task list.
+ * by input order so the column matches the task list (the API's `createdAt`
+ * order).
  *
  * Dependencies on ids outside `tasks` — a dependency on another page of a
  * paginated list — are ignored, exactly as the edge builder ignores them.
@@ -217,21 +218,15 @@ function orderTasksForColumn(tasks: GraphTask[]): GraphTask[] {
   }
 
   /** Column order among tasks whose dependencies are all already placed. */
-  const byPosition = (a: string, b: string): number => {
-    const left = tasks[indexById.get(a) as number];
-    const right = tasks[indexById.get(b) as number];
-    return (
-      (left.position ?? 0) - (right.position ?? 0) ||
-      (indexById.get(a) as number) - (indexById.get(b) as number)
-    );
-  };
+  const byInputOrder = (a: string, b: string): number =>
+    (indexById.get(a) as number) - (indexById.get(b) as number);
 
   const ready = tasks.filter((t) => remaining.get(t.id) === 0).map((t) => t.id);
   const ordered: GraphTask[] = [];
   const placed = new Set<string>();
 
   while (ready.length > 0) {
-    ready.sort(byPosition);
+    ready.sort(byInputOrder);
     const id = ready.shift() as string;
     placed.add(id);
     ordered.push(tasks[indexById.get(id) as number]);
@@ -296,7 +291,7 @@ export function buildWorkflowGraph(
       id: task.id,
       type: "workflowTask",
       position: { x: 0, y: 0 },
-      data: { task },
+      data: { task, columnIndex: rowByTaskId.get(task.id) as number },
     });
 
     const servers = groupBindingsByServer(task.toolBindings ?? [], serverNameById);

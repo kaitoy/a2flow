@@ -57,15 +57,16 @@ function StatusDot({ status }: { status: WorkflowTaskStatus }) {
 function buildColumns(
   titleById: Map<string, string>,
   serverNameById: Map<string, string>,
-  onHoverDependency: (id: string | null) => void
+  onHoverDependency: (id: string | null) => void,
+  indexById: Map<string, number>
 ): ColumnDef<WorkflowTask>[] {
   return [
     {
       header: "#",
       className: "w-12 font-mono text-on-surface-variant",
-      sortField: "position",
+      sortField: "createdAt",
       visibility: "always",
-      cell: (t) => t.position ?? 0,
+      cell: (t) => indexById.get(t.id) ?? 0,
     },
     {
       header: "Title",
@@ -168,7 +169,7 @@ export default function WorkflowTasksPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // The graph needs every task in position order, so it takes no sort or
+      // The graph needs every task in creation order, so it takes no sort or
       // filter at all; the table takes both but is likewise unpaginated.
       const data =
         view === "graph"
@@ -207,7 +208,8 @@ export default function WorkflowTasksPage() {
     // Unpaginated, so every dependency resolves to a real title.
     new Map(tasks.map((t) => [t.id, t.title])),
     serverNameById,
-    setHighlightedId
+    setHighlightedId,
+    new Map(tasks.map((t, i) => [t.id, i + 1]))
   );
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowTasks",

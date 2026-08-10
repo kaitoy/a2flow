@@ -13,8 +13,9 @@ import { formatStatusLabel, STATUS_DOT_CLASS } from "@/lib/workflow-task-status"
 
 /**
  * Custom React Flow node rendering a single workflow task as a glass panel with
- * its position number, title, and — for status-ful session tasks — a colored
- * status dot; task templates carry no status, so the dot row is omitted.
+ * its ordinal within the column, title, and — for status-ful session tasks — a
+ * colored status dot; task templates carry no status, so the dot row is
+ * omitted.
  *
  * Handles wire the node into the two axes of the graph. A dependency between
  * neighbouring rows of the column flows in from the top and out of the bottom;
@@ -27,7 +28,7 @@ import { formatStatusLabel, STATUS_DOT_CLASS } from "@/lib/workflow-task-status"
  * @param props - React Flow node props carrying the task in `data.task`.
  */
 export function WorkflowTaskNode({ data }: NodeProps<WorkflowTaskFlowNode>) {
-  const { task } = data;
+  const { task, columnIndex } = data;
   const status = task.status ?? null;
 
   return (
@@ -52,7 +53,7 @@ export function WorkflowTaskNode({ data }: NodeProps<WorkflowTaskFlowNode>) {
       />
       <div className="flex items-start gap-2">
         <span className="mt-1 inline-block w-5 shrink-0 font-mono text-xs text-on-surface-variant">
-          #{task.position ?? 0}
+          #{columnIndex + 1}
         </span>
         <span className="line-clamp-2 flex-1 font-medium text-sm leading-snug">{task.title}</span>
       </div>

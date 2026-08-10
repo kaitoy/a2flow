@@ -34,7 +34,7 @@ async def test_create_template_returns_201(workflow_client: AsyncClient) -> None
     wf_id = await _draft_workflow(workflow_client)
     response = await workflow_client.post(
         "/api/v1/workflow-task-templates",
-        json={"workflowId": wf_id, "title": "Step 1", "position": 0},
+        json={"workflowId": wf_id, "title": "Step 1"},
     )
     body = assert_ok(response, status=201)
     assert body["title"] == "Step 1"
@@ -101,10 +101,12 @@ async def test_list_templates_empty_initially(workflow_client: AsyncClient) -> N
     assert assert_ok(response) == []
 
 
-async def test_list_templates_orders_by_position(workflow_client: AsyncClient) -> None:
+async def test_list_templates_orders_by_created_at(
+    workflow_client: AsyncClient,
+) -> None:
     wf_id = await _draft_workflow(workflow_client)
-    await add_template(workflow_client, wf_id, title="Second", position=1)
-    await add_template(workflow_client, wf_id, title="First", position=0)
+    await add_template(workflow_client, wf_id, title="First")
+    await add_template(workflow_client, wf_id, title="Second")
     response = await workflow_client.get(f"/api/v1/workflows/{wf_id}/task-templates")
     assert [t["title"] for t in assert_ok(response)] == ["First", "Second"]
 

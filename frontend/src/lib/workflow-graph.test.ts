@@ -26,7 +26,6 @@ import {
 function task(
   id: string,
   dependsOnIds: string[] = [],
-  position = 0,
   toolBindings: ToolBinding[] = []
 ): WorkflowTask {
   return {
@@ -34,7 +33,6 @@ function task(
     workflowExecutionId: "execution-1",
     title: `Task ${id}`,
     status: "pending",
-    position,
     dependsOnIds,
     toolBindings,
     createdAt: "2026-01-01T00:00:00Z",
@@ -81,11 +79,7 @@ describe("buildWorkflowGraph", () => {
 
   it("routes a dependency that skips rows through the side handles", () => {
     // c depends on a, but b sits between them in the column.
-    const { edges } = buildWorkflowGraph([
-      task("a", [], 0),
-      task("b", ["a"], 1),
-      task("c", ["a", "b"], 2),
-    ]);
+    const { edges } = buildWorkflowGraph([task("a"), task("b", ["a"]), task("c", ["a", "b"])]);
 
     expect(edges).toContainEqual(
       expect.objectContaining({
@@ -105,17 +99,16 @@ describe("buildWorkflowGraph", () => {
     );
   });
 
-  it("orders tasks so dependencies come first, tie-broken by position", () => {
-    // Input order is deliberately not the column order.
-    const { nodes } = buildWorkflowGraph([
-      task("late", ["early"], 9),
-      task("sibling", [], 1),
-      task("early", [], 0),
-    ]);
+  it("orders tasks so dependencies come first, tie-broken by input order", () => {
+    // "late" depends on "early" so it can't be placed until early is ready,
+    // but once it is, "late" (input index 0) still jumps ahead of "sibling"
+    // (input index 2), which became ready earlier — ties are broken by the
+    // original input order, not by readiness order.
+    const { nodes } = buildWorkflowGraph([task("late", ["early"]), task("early"), task("sibling")]);
     expect(nodes.filter((n) => n.type === "workflowTask").map((n) => n.id)).toEqual([
       "early",
-      "sibling",
       "late",
+      "sibling",
     ]);
   });
 
@@ -138,7 +131,7 @@ describe("buildWorkflowGraph", () => {
 
   it("creates one server node per distinct server and one tool node per binding", () => {
     const { nodes } = buildWorkflowGraph(
-      [task("a", [], 0, [binding("s1", "read"), binding("s1", "write"), binding("s2", "post")])],
+      [task("a", [], [binding("s1", "read"), binding("s1", "write"), binding("s2", "post")])],
       new Map([
         ["s1", "GitHub"],
         ["s2", "Slack"],
@@ -157,7 +150,7 @@ describe("buildWorkflowGraph", () => {
   });
 
   it("wires task -> server -> tool with the branch handles", () => {
-    const { edges } = buildWorkflowGraph([task("a", [], 0, [binding("s1", "read")])]);
+    const { edges } = buildWorkflowGraph([task("a", [], [binding("s1", "read")])]);
 
     expect(edges).toContainEqual(
       expect.objectContaining({
@@ -179,8 +172,8 @@ describe("buildWorkflowGraph", () => {
 
   it("duplicates a shared server per task instead of merging it", () => {
     const { nodes } = buildWorkflowGraph([
-      task("a", [], 0, [binding("s1", "read")]),
-      task("b", [], 1, [binding("s1", "write")]),
+      task("a", [], [binding("s1", "read")]),
+      task("b", [], [binding("s1", "write")]),
     ]);
 
     const servers = nodes.filter((n) => n.type === "mcpServer");
@@ -190,7 +183,7 @@ describe("buildWorkflowGraph", () => {
 
   it("labels a server by name and falls back to a truncated id", () => {
     const { nodes } = buildWorkflowGraph(
-      [task("a", [], 0, [binding("known-server-id", "read"), binding("0123456789ab", "write")])],
+      [task("a", [], [binding("known-server-id", "read"), binding("0123456789ab", "write")])],
       new Map([["known-server-id", "GitHub"]])
     );
 
@@ -200,7 +193,7 @@ describe("buildWorkflowGraph", () => {
 
   it("counts the tools of each server node", () => {
     const { nodes } = buildWorkflowGraph([
-      task("a", [], 0, [binding("s1", "read"), binding("s1", "write")]),
+      task("a", [], [binding("s1", "read"), binding("s1", "write")]),
     ]);
     const server = nodes.find((n) => n.type === "mcpServer");
     expect(server?.data.toolCount).toBe(2);
@@ -208,7 +201,7 @@ describe("buildWorkflowGraph", () => {
 
   it("keeps every node id unique even when a binding is repeated", () => {
     const { nodes } = buildWorkflowGraph([
-      task("a", [], 0, [binding("s1", "read"), binding("s1", "read")]),
+      task("a", [], [binding("s1", "read"), binding("s1", "read")]),
     ]);
     expect(new Set(nodes.map((n) => n.id)).size).toBe(nodes.length);
     expect(nodes.filter((n) => n.type === "mcpTool")).toHaveLength(1);
@@ -240,10 +233,10 @@ describe("layoutWorkflowGraph", () => {
     // hierarchical layout would spread them across a rank. This is the whole
     // point of the column, so pin it.
     const { nodes } = buildLayoutedWorkflowGraph([
-      task("a", [], 0, [binding("s1", "read"), binding("s2", "write")]),
-      task("b", ["a"], 1, [binding("s1", "read")]),
-      task("c", ["a"], 2),
-      task("d", ["b", "c"], 3),
+      task("a", [], [binding("s1", "read"), binding("s2", "write")]),
+      task("b", ["a"], [binding("s1", "read")]),
+      task("c", ["a"]),
+      task("d", ["b", "c"]),
     ]);
 
     const xs = nodes.filter((n) => n.type === "workflowTask").map((n) => n.position.x);
@@ -252,7 +245,7 @@ describe("layoutWorkflowGraph", () => {
   });
 
   it("places a task's servers to its right and its tools right of the servers", () => {
-    const { nodes } = buildLayoutedWorkflowGraph([task("a", [], 0, [binding("s1", "read")])]);
+    const { nodes } = buildLayoutedWorkflowGraph([task("a", [], [binding("s1", "read")])]);
     const taskX = nodes.find((n) => n.id === "a")?.position.x ?? 0;
     const serverX = nodes.find((n) => n.id === serverNodeId("a", "s1"))?.position.x ?? 0;
     const toolX = nodes.find((n) => n.id === toolNodeId("a", "s1", "read"))?.position.x ?? 0;
@@ -263,7 +256,7 @@ describe("layoutWorkflowGraph", () => {
 
   it("stacks a server's tools in binding order", () => {
     const { nodes } = buildLayoutedWorkflowGraph([
-      task("a", [], 0, [binding("s1", "read"), binding("s1", "write")]),
+      task("a", [], [binding("s1", "read"), binding("s1", "write")]),
     ]);
     const first = nodes.find((n) => n.id === toolNodeId("a", "s1", "read"))?.position.y ?? 0;
     const second = nodes.find((n) => n.id === toolNodeId("a", "s1", "write"))?.position.y ?? 0;
@@ -272,10 +265,10 @@ describe("layoutWorkflowGraph", () => {
 
   it("never overlaps two nodes", () => {
     const { nodes } = buildLayoutedWorkflowGraph([
-      task("a", [], 0, [binding("s1", "read"), binding("s1", "write"), binding("s2", "post")]),
-      task("b", ["a"], 1, [binding("s2", "post")]),
-      task("c", ["a"], 2),
-      task("d", ["b", "c"], 3, [binding("s1", "read")]),
+      task("a", [], [binding("s1", "read"), binding("s1", "write"), binding("s2", "post")]),
+      task("b", ["a"], [binding("s2", "post")]),
+      task("c", ["a"]),
+      task("d", ["b", "c"], [binding("s1", "read")]),
     ]);
 
     for (let i = 0; i < nodes.length; i++) {

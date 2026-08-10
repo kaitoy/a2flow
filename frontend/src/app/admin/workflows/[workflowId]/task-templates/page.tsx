@@ -50,15 +50,16 @@ function buildColumns(
   titleById: Map<string, string>,
   serverNameById: Map<string, string>,
   onDelete: (id: string, title: string) => void,
-  onHoverDependency: (id: string | null) => void
+  onHoverDependency: (id: string | null) => void,
+  indexById: Map<string, number>
 ): ColumnDef<WorkflowTaskTemplate>[] {
   return [
     {
       header: "#",
       className: "w-12 font-mono text-on-surface-variant",
-      sortField: "position",
+      sortField: "createdAt",
       visibility: "always",
-      cell: (t) => t.position ?? 0,
+      cell: (t) => indexById.get(t.id) ?? 0,
     },
     {
       header: "Title",
@@ -157,7 +158,7 @@ export default function WorkflowTaskTemplatesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // The graph needs every template in position order, so it takes no sort or
+      // The graph needs every template in creation order, so it takes no sort or
       // filter at all; the table takes both but is likewise unpaginated.
       const data =
         view === "graph"
@@ -213,7 +214,8 @@ export default function WorkflowTaskTemplatesPage() {
     new Map(templates.map((t) => [t.id, t.title])),
     serverNameById,
     handleDelete,
-    setHighlightedId
+    setHighlightedId,
+    new Map(templates.map((t, i) => [t.id, i + 1]))
   );
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "taskTemplates",

@@ -402,7 +402,7 @@ The two methods differ in one respect: **`mark_design_edited` also recovers a `f
 
 ### Workflow task templates
 
-A workflow task template is one step of a workflow's pre-designed task list, owned by the workflow (`workflow_id` FK, `ON DELETE CASCADE`). Templates mirror [workflow tasks](#workflow-tasks) structurally — `title`, optional `description`, `position`, DAG edges (`workflow_task_template_dependencies`, cycle-checked exactly like task edges), and MCP tool bindings (`workflow_task_template_tool_bindings`, server side `ON DELETE RESTRICT`) — but carry **no status**: the lifecycle belongs to a run. They are written by the design agent's tools (`infrastructure/design_task_tools.py`) and by the developer-gated manual CRUD endpoints (`POST /workflow-task-templates`, `GET`/`PATCH`/`DELETE /workflow-task-templates/{id}`, listing on `GET /workflows/{id}/task-templates`), all in the [API reference](http://localhost:3000/api-doc). At execute time the templates are copied into the new session as `pending` WorkflowTasks in dependency order, ids remapped, bindings included — so template edits never affect runs already started. Editing a template — through the CRUD endpoints or through the design agent's tools — also moves a `published` parent workflow to `modified`, after which runs use the published snapshot rather than these rows until the workflow is published again (see [Workflows](#workflows)).
+A workflow task template is one step of a workflow's pre-designed task list, owned by the workflow (`workflow_id` FK, `ON DELETE CASCADE`). Templates mirror [workflow tasks](#workflow-tasks) structurally — `title`, optional `description`, DAG edges (`workflow_task_template_dependencies`, cycle-checked exactly like task edges), and MCP tool bindings (`workflow_task_template_tool_bindings`, server side `ON DELETE RESTRICT`) — but carry **no status**: the lifecycle belongs to a run. They are written by the design agent's tools (`infrastructure/design_task_tools.py`) and by the developer-gated manual CRUD endpoints (`POST /workflow-task-templates`, `GET`/`PATCH`/`DELETE /workflow-task-templates/{id}`, listing on `GET /workflows/{id}/task-templates`), all in the [API reference](http://localhost:3000/api-doc). At execute time the templates are copied into the new session as `pending` WorkflowTasks in dependency order, ids remapped, bindings included — so template edits never affect runs already started. Editing a template — through the CRUD endpoints or through the design agent's tools — also moves a `published` parent workflow to `modified`, after which runs use the published snapshot rather than these rows until the workflow is published again (see [Workflows](#workflows)).
 
 ---
 
@@ -424,7 +424,7 @@ The list (ordered most-recent-first) and get endpoints are in the [API reference
 
 ### Workflow tasks
 
-A workflow task is a single actionable item belonging to a `WorkflowExecution`, copied from the workflow's task templates at execute time and driven by the execution agent via [agent tools](#agent-task-tools); they are also exposed through the REST endpoints below. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`) and an integer `position` used for stable layout ordering within an execution. Deleting the parent `WorkflowExecution` cascades to its tasks.
+A workflow task is a single actionable item belonging to a `WorkflowExecution`, copied from the workflow's task templates at execute time and driven by the execution agent via [agent tools](#agent-task-tools); they are also exposed through the REST endpoints below. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`); tasks are listed in `createdAt` order. Deleting the parent `WorkflowExecution` cascades to its tasks.
 
 Tasks form a **directed acyclic graph (DAG)**: each task may depend on other tasks in the same session through its `dependsOnIds` list (persisted as `(task_id, depends_on_id)` rows in the `workflow_task_dependencies` join table, where `depends_on_id` must precede `task_id`). Read responses include the resolved `dependsOnIds`. Dependency targets must exist and belong to the same session, otherwise the write fails with `422 FOREIGN_KEY_VIOLATION`; edges that would introduce a cycle — including a self-dependency — fail with `409 DEPENDENCY_CYCLE`. Deleting a task cascade-deletes the edges that reference it in either direction.
 
@@ -443,9 +443,9 @@ Skill-bound agents are built in one of three roles (`AgentKind` in `infrastructu
 | `register_design_tasks` | design | Register a whole set of task templates as a DAG in one call (each entry has a `key`, `title`, optional `depends_on` referencing other keys, optional `tools` binding MCP tools) |
 | `create_design_task` / `list_design_tasks` / `get_design_task` / `update_design_task` / `delete_design_task` | design | Refine the workflow's task templates (no status field) |
 | `create_workflow_task` | execution | Add a single task mid-run, optionally referencing existing task ids as dependencies and binding MCP tools |
-| `list_workflow_tasks` | execution | List the current session's tasks (id, title, status, `dependsOnIds`, position, `tool_bindings`) |
+| `list_workflow_tasks` | execution | List the current session's tasks (id, title, status, `dependsOnIds`, `tool_bindings`), in creation order |
 | `get_workflow_task` | execution | Fetch one task in the current session |
-| `update_workflow_task` | execution | Change a task's title / description / status / position / dependencies / tool bindings |
+| `update_workflow_task` | execution | Change a task's title / description / status / dependencies / tool bindings |
 | `delete_workflow_task` | execution | Delete a task |
 | `request_approval` | execution | Create a `pending` [Approval](#approvals) for the current session (optionally linked to a task) and raise an `approval_request` notification; returns the `approval_id` to pass to the client-side `render_approval` tool |
 | `get_approval` | execution | Fetch the current state of an approval in the current session (to re-check a decision) |
@@ -457,7 +457,7 @@ The task tools resolve the current run by mapping the ADK session id (the AG-UI 
 
 The approver's actual approve/reject decision is written from the frontend via `PATCH /api/v1/approvals/{id}` (not an agent tool), and surfaces to the agent as the result of the client-side `render_approval` tool. See [Approvals](#approvals).
 
-The task CRUD endpoints — create, list-for-an-execution (ordered `position` ASC then `created_at` ASC), get, update, delete — are in the [API reference](http://localhost:3000/api-doc). A few rules the spec does not spell out: `workflowExecutionId` is fixed at creation and a task cannot be re-parented; sending `dependsOnIds` or `toolBindings` replaces that full set while omitting either leaves it unchanged; and the `422 FOREIGN_KEY_VIOLATION` (unknown execution, cross-execution dependency, or unregistered MCP server) / `409 DEPENDENCY_CYCLE` validation applies to both create and update.
+The task CRUD endpoints — create, list-for-an-execution (ordered `created_at` ASC then `id` ASC), get, update, delete — are in the [API reference](http://localhost:3000/api-doc). A few rules the spec does not spell out: `workflowExecutionId` is fixed at creation and a task cannot be re-parented; sending `dependsOnIds` or `toolBindings` replaces that full set while omitting either leaves it unchanged; and the `422 FOREIGN_KEY_VIOLATION` (unknown execution, cross-execution dependency, or unregistered MCP server) / `409 DEPENDENCY_CYCLE` validation applies to both create and update.
 
 ---
 

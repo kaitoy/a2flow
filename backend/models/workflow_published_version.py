@@ -43,7 +43,6 @@ class WorkflowPublishedVersionTemplate(SQLModel):
     id: str
     title: str
     description: str | None = None
-    position: int = 0
     depends_on_ids: list[str] = []
     tool_bindings: list[ToolBinding] = []
 
@@ -95,7 +94,6 @@ def snapshot_template(
         id=template.id,
         title=template.title,
         description=template.description,
-        position=template.position,
         depends_on_ids=list(template.depends_on_ids),
         tool_bindings=list(template.tool_bindings),
     )

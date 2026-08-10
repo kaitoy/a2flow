@@ -1029,7 +1029,7 @@ export async function executeWorkflow(id: string): Promise<WorkflowExecution> {
 }
 
 /**
- * List the task templates belonging to a workflow (position ASC by default)
+ * List the task templates belonging to a workflow (createdAt ASC by default)
  * with optional pagination, sort, and filters.
  */
 export async function listWorkflowTaskTemplates(
@@ -1246,7 +1246,7 @@ export async function deleteWorkflowExecution(id: string): Promise<void> {
 }
 
 /**
- * List the WorkflowTasks belonging to the given WorkflowExecution (position ASC by
+ * List the WorkflowTasks belonging to the given WorkflowExecution (createdAt ASC by
  * default) with optional pagination, sort, and filters.
  */
 export async function listWorkflowTasks(

@@ -43,7 +43,6 @@ function task(
     workflowExecutionId: "execution-1",
     title: `Task ${id}`,
     status: "pending",
-    position: 0,
     dependsOnIds,
     toolBindings,
     createdAt: "2026-01-01T00:00:00Z",

@@ -182,7 +182,6 @@ def _template_to_dict(template: WorkflowTaskTemplateRead) -> dict[str, Any]:
         "title": template.title,
         "description": template.description,
         "depends_on_ids": list(template.depends_on_ids),
-        "position": template.position,
         "tool_bindings": [
             {"server_id": b.mcp_server_id, "tool_name": b.tool_name}
             for b in template.tool_bindings
@@ -210,7 +209,6 @@ async def register_design_tasks(
           "key": "t1",                 # required, unique within this batch
           "title": "Gather sources",   # required, 2-4 words, max 30 characters
           "description": "...",        # optional, where the detail belongs
-          "position": 0,               # optional layout/order hint
           "depends_on": ["t0"],        # optional, other entries' "key" values
           "tools": [                   # optional MCP tools this task will use
             {"server_id": "<registered MCP server id>", "tool_name": "<tool>"}
@@ -224,10 +222,10 @@ async def register_design_tasks(
     belongs in ``description``.
 
     Templates are created in dependency order; ``depends_on`` keys are resolved
-    to the real template ids before edges are written. When ``position`` is
-    omitted a template is positioned by its dependency order. ``tools`` binds
-    MCP tools to the task: when the workflow is executed, the task copied from
-    the template may invoke those tools (and only those) via ``call_mcp_tool``.
+    to the real template ids before edges are written, and that creation order
+    is what :func:`list_design_tasks` later returns. ``tools`` binds MCP tools
+    to the task: when the workflow is executed, the task copied from the
+    template may invoke those tools (and only those) via ``call_mcp_tool``.
     Discover the available servers and tools with ``list_mcp_tools`` first, and
     only bind tools a task actually needs.
 
@@ -292,18 +290,14 @@ async def register_design_tasks(
             user_id = _user_id(tool_context)
             key_to_id: dict[str, str] = {}
             created: list[dict[str, Any]] = []
-            for position, key in enumerate(order):
+            for key in order:
                 entry = by_key[key]
                 dep_ids = [key_to_id[d] for d in (entry.get("depends_on") or [])]
-                declared_position = entry.get("position")
                 try:
                     data = WorkflowTaskTemplateCreate(
                         workflow_id=s.workflow_id,
                         title=entry["title"],
                         description=entry.get("description"),
-                        position=declared_position
-                        if declared_position is not None
-                        else position,
                         depends_on_ids=dep_ids,
                         tool_bindings=bindings_by_key[key],
                     )
@@ -397,7 +391,7 @@ async def create_design_task(
 
 
 async def list_design_tasks(tool_context: ToolContext) -> dict[str, Any]:
-    """List all task templates of the current workflow, in position order.
+    """List all task templates of the current workflow, in creation order.
 
     Args:
         tool_context: Injected by ADK; identifies the current session. Not shown
@@ -405,8 +399,8 @@ async def list_design_tasks(tool_context: ToolContext) -> dict[str, Any]:
 
     Returns:
         ``{"tasks": [{"id", "title", "description", "depends_on_ids",
-        "position", "tool_bindings"}, ...]}`` ordered by position then creation
-        time, or ``{"error": <message>}`` if the session cannot be resolved.
+        "tool_bindings"}, ...]}`` ordered by creation time, or
+        ``{"error": <message>}`` if the session cannot be resolved.
     """
     try:
         async with _repos(tool_context) as s:
@@ -447,7 +441,6 @@ async def update_design_task(
     tool_context: ToolContext,
     title: str | None = None,
     description: str | None = None,
-    position: int | None = None,
     depends_on_ids: list[str] | None = None,
     tool_bindings: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
@@ -470,7 +463,6 @@ async def update_design_task(
             that depends on it, so a long one is clipped — put the detail in
             ``description``.
         description: New description, if changing.
-        position: New layout position, if changing.
         depends_on_ids: Replacement dependency ids (existing same-workflow
             templates), if changing.
         tool_bindings: Replacement MCP tool bindings, each
@@ -500,8 +492,6 @@ async def update_design_task(
                 fields["title"] = title
             if description is not None:
                 fields["description"] = description
-            if position is not None:
-                fields["position"] = position
             if depends_on_ids is not None:
                 fields["depends_on_ids"] = depends_on_ids
             if bindings is not None:

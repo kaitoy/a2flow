@@ -174,8 +174,8 @@ async def test_register_design_tasks_creates_dag(engine: AsyncEngine) -> None:
     tasks = {t["title"]: t for t in listed["tasks"]}
     assert tasks["Second"]["depends_on_ids"] == [ids["t0"]]
     assert sorted(tasks["Third"]["depends_on_ids"]) == sorted([ids["t0"], ids["t1"]])
-    # Positions follow dependency order when not declared, and templates have
-    # no status — the lifecycle belongs to a run.
+    # Templates are created in dependency order, and have no status — the
+    # lifecycle belongs to a run.
     assert [t["title"] for t in listed["tasks"]] == ["First", "Second", "Third"]
     assert all("status" not in t for t in listed["tasks"])
 
@@ -344,10 +344,11 @@ async def test_update_dependency_cycle_rejected(engine: AsyncEngine) -> None:
 async def test_update_preserves_unset_fields(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
     created = await create_design_task("Original", _ctx(), description="desc")
-    updated = await update_design_task(created["id"], _ctx(), position=5)
+    updated = await update_design_task(
+        created["id"], _ctx(), description="updated desc"
+    )
     assert updated["title"] == "Original"
-    assert updated["description"] == "desc"
-    assert updated["position"] == 5
+    assert updated["description"] == "updated desc"
 
 
 async def test_delete_design_task(engine: AsyncEngine) -> None:

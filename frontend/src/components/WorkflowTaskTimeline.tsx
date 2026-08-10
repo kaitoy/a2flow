@@ -42,7 +42,7 @@ export const TASK_TIMELINE_LIST_CLASS = "relative flex-1 overflow-y-auto px-3 pb
  * Props for {@link WorkflowTaskTimeline}.
  */
 export interface WorkflowTaskTimelineProps {
-  /** The session's workflow tasks (or a workflow's task templates), in position order. */
+  /** The session's workflow tasks (or a workflow's task templates), in creation order. */
   tasks: TimelineTask[];
   /** Id of the task currently in progress, highlighted in the list. */
   activeTaskId: string | null;

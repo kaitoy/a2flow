@@ -124,7 +124,7 @@ class SqlWorkflowTaskRepository:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> list[WorkflowTaskRead]:
-        """Return WorkflowTasks, defaulting to ``position`` then ``created_at`` order.
+        """Return WorkflowTasks, defaulting to ``created_at`` (then ``id``) order.
 
         When ``workflow_execution_id`` is supplied, only tasks belonging to that
         session are returned. Each task's outgoing dependency edges are resolved
@@ -141,8 +141,8 @@ class SqlWorkflowTaskRepository:
             WorkflowTask,
             sort,
             default=[
-                col(WorkflowTask.position).asc(),
                 col(WorkflowTask.created_at).asc(),
+                col(WorkflowTask.id).asc(),
             ],
             readable=WorkflowTaskRead,
         )

@@ -85,14 +85,12 @@ async def _create_task(
     execution_id: str,
     *,
     title: str = "Step",
-    position: int = 0,
     headers: dict[str, str] | None = None,
     **extra: object,
 ) -> Any:
     body = {
         "workflowExecutionId": execution_id,
         "title": title,
-        "position": position,
         **extra,
     }
     return assert_ok(
@@ -108,7 +106,7 @@ async def test_create_task_returns_201(workflow_client: AsyncClient) -> None:
     execution = await _create_workflow_execution(workflow_client)
     response = await workflow_client.post(
         "/api/v1/workflow-tasks",
-        json={"workflowExecutionId": execution["id"], "title": "Step 1", "position": 0},
+        json={"workflowExecutionId": execution["id"], "title": "Step 1"},
     )
     assert response.status_code == 201
 
@@ -123,7 +121,6 @@ async def test_create_task_response_contains_expected_fields(
             "workflowExecutionId": execution["id"],
             "title": "Step 1",
             "description": "Outline the doc",
-            "position": 0,
         },
     )
     body = assert_ok(response, status=201)
@@ -132,7 +129,6 @@ async def test_create_task_response_contains_expected_fields(
     assert body["title"] == "Step 1"
     assert body["description"] == "Outline the doc"
     assert body["status"] == "pending"
-    assert body["position"] == 0
 
 
 async def test_create_task_defaults_status_to_pending(
@@ -206,21 +202,21 @@ async def test_list_session_tasks_returns_created_tasks(
 ) -> None:
     execution = await _create_workflow_execution(workflow_client)
     await _create_task(workflow_client, execution["id"], title="t1")
-    await _create_task(workflow_client, execution["id"], title="t2", position=1)
+    await _create_task(workflow_client, execution["id"], title="t2")
     response = await workflow_client.get(
         f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
     )
     assert len(assert_ok(response)) == 2
 
 
-async def test_list_session_tasks_ordered_by_position_then_created_at(
+async def test_list_session_tasks_ordered_by_created_at(
     workflow_client: AsyncClient,
 ) -> None:
     execution = await _create_workflow_execution(workflow_client)
-    # Insert out of order; the API must sort by position ASC then created_at ASC.
-    await _create_task(workflow_client, execution["id"], title="b", position=2)
-    await _create_task(workflow_client, execution["id"], title="a", position=1)
-    await _create_task(workflow_client, execution["id"], title="c", position=2)
+    # The API must sort by created_at ASC by default, i.e. creation order.
+    await _create_task(workflow_client, execution["id"], title="a")
+    await _create_task(workflow_client, execution["id"], title="b")
+    await _create_task(workflow_client, execution["id"], title="c")
     response = await workflow_client.get(
         f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
     )
@@ -248,7 +244,7 @@ async def test_list_session_tasks_respects_limit_param(
 ) -> None:
     execution = await _create_workflow_execution(workflow_client)
     for i in range(3):
-        await _create_task(workflow_client, execution["id"], title=f"t{i}", position=i)
+        await _create_task(workflow_client, execution["id"], title=f"t{i}")
     response = await workflow_client.get(
         f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks",
         params={"limit": 2},
@@ -302,16 +298,17 @@ async def test_list_session_tasks_sort_multi_field(
     workflow_client: AsyncClient,
 ) -> None:
     execution = await _create_workflow_execution(workflow_client)
-    # Same position so the tie is broken by the second sort field (title).
-    await _create_task(workflow_client, execution["id"], title="b", position=1)
-    await _create_task(workflow_client, execution["id"], title="a", position=1)
-    await _create_task(workflow_client, execution["id"], title="c", position=2)
+    # Same status so the tie between "a" and "b" is broken by the second sort
+    # field (title); "c" sorts first since "failed" < "pending".
+    await _create_task(workflow_client, execution["id"], title="b", status="pending")
+    await _create_task(workflow_client, execution["id"], title="a", status="pending")
+    await _create_task(workflow_client, execution["id"], title="c", status="failed")
     response = await workflow_client.get(
         f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks",
-        params={"s": "position,title"},
+        params={"s": "status,title"},
     )
     titles = [t["title"] for t in assert_ok(response)]
-    assert titles == ["a", "b", "c"]
+    assert titles == ["c", "a", "b"]
 
 
 async def test_list_session_tasks_invalid_filter_value_returns_400(
@@ -320,7 +317,7 @@ async def test_list_session_tasks_invalid_filter_value_returns_400(
     execution = await _create_workflow_execution(workflow_client)
     response = await workflow_client.get(
         f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks",
-        params={"q": "position:eq:notanumber"},
+        params={"q": "status:eq:notarealstatus"},
     )
     assert_err(response, code="INVALID_QUERY", status=400)
 
@@ -364,14 +361,14 @@ async def test_update_task_partial_update_leaves_other_fields_unchanged(
 ) -> None:
     execution = await _create_workflow_execution(workflow_client)
     created = await _create_task(
-        workflow_client, execution["id"], title="kept", position=3
+        workflow_client, execution["id"], title="kept", description="kept-desc"
     )
     response = await workflow_client.patch(
         f"/api/v1/workflow-tasks/{created['id']}", json={"status": "completed"}
     )
     body = assert_ok(response)
     assert body["title"] == "kept"
-    assert body["position"] == 3
+    assert body["description"] == "kept-desc"
     assert body["status"] == "completed"
 
 
@@ -477,9 +474,9 @@ async def test_list_session_tasks_include_dependencies(
     workflow_client: AsyncClient,
 ) -> None:
     execution = await _create_workflow_execution(workflow_client)
-    a = await _create_task(workflow_client, execution["id"], title="a", position=0)
+    a = await _create_task(workflow_client, execution["id"], title="a")
     await _create_task(
-        workflow_client, execution["id"], title="b", position=1, dependsOnIds=[a["id"]]
+        workflow_client, execution["id"], title="b", dependsOnIds=[a["id"]]
     )
     response = await workflow_client.get(
         f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
@@ -779,25 +776,6 @@ async def test_delete_task_cascades_tool_bindings(
     # With the binding gone, the server is deletable (no CONFLICT_REFERENCED).
     response = await workflow_client.delete(f"/api/v1/mcp-servers/{server['id']}")
     assert assert_ok(response, status=200) is None
-
-
-# ---------- field validation ----------
-
-
-async def test_create_task_rejects_negative_position(
-    workflow_client: AsyncClient,
-) -> None:
-    """A negative position violates the ``ge=0`` bound and returns 422."""
-    execution = await _create_workflow_execution(workflow_client)
-    response = await workflow_client.post(
-        "/api/v1/workflow-tasks",
-        json={
-            "workflowExecutionId": execution["id"],
-            "title": "Step 1",
-            "position": -1,
-        },
-    )
-    assert_err(response, "VALIDATION_ERROR", 422)
 
 
 # ---------- status change authorization (linked approval) ----------

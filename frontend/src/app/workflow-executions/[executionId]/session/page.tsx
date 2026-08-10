@@ -71,13 +71,13 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
 
   // Task lookup for labelling the chat groups, a shared task-id -> ordinal map so
   // the timeline and chat badges match, and the in-progress task to highlight in
-  // the timeline (the latest by position when several are running).
+  // the timeline (the latest by createdAt when several are running — `tasks` is
+  // already in createdAt order, so that's simply the last one).
   const tasksById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const taskIndexById = useMemo(() => new Map(tasks.map((t, i) => [t.id, i + 1])), [tasks]);
   const activeTaskId = useMemo(() => {
     const running = tasks.filter((t) => t.status === "in_progress");
-    if (running.length === 0) return null;
-    return running.reduce((a, b) => ((b.position ?? 0) >= (a.position ?? 0) ? b : a)).id;
+    return running.at(-1)?.id ?? null;
   }, [tasks]);
 
   /** Scroll the chat to the group that introduces the selected task. */

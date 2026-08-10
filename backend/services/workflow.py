@@ -80,7 +80,7 @@ def _topo_order(
 ) -> list[WorkflowPublishedVersionTemplate]:
     """Return the templates ordered so every dependency precedes its dependents.
 
-    Kahn's algorithm seeded in the given (position) order for stability. The
+    Kahn's algorithm seeded in the given input order for stability. The
     repository enforces acyclicity when edges are written, so a cycle here is
     impossible; the defensive fallback simply appends any leftovers.
 
@@ -570,7 +570,6 @@ class WorkflowService:
                     title=template.title,
                     description=template.description,
                     status=WorkflowTaskStatus.pending,
-                    position=template.position,
                     depends_on_ids=[
                         template_to_task[dep_id]
                         for dep_id in template.depends_on_ids

@@ -19,19 +19,22 @@ function renderNode(data: WorkflowTaskNodeData) {
 }
 
 describe("WorkflowTaskNode", () => {
-  it("renders the task's ordinal and title", () => {
-    renderNode({ task: { id: "a", title: "Collect requirements", position: 3 } });
+  it("renders the task's ordinal (1-based from columnIndex) and title", () => {
+    renderNode({ task: { id: "a", title: "Collect requirements" }, columnIndex: 2 });
     expect(screen.getByText("#3")).toBeInTheDocument();
     expect(screen.getByText("Collect requirements")).toBeInTheDocument();
   });
 
   it("shows the status label for a session task", () => {
-    renderNode({ task: { id: "a", title: "Run tests", position: 1, status: "in_progress" } });
+    renderNode({
+      task: { id: "a", title: "Run tests", status: "in_progress" },
+      columnIndex: 0,
+    });
     expect(screen.getByText("in progress")).toBeInTheDocument();
   });
 
   it("omits the status row for a status-less task template", () => {
-    renderNode({ task: { id: "a", title: "Template step", position: 1 } });
+    renderNode({ task: { id: "a", title: "Template step" }, columnIndex: 0 });
     expect(screen.queryByText(/pending/i)).not.toBeInTheDocument();
   });
 });

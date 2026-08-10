@@ -145,7 +145,7 @@ class SqlWorkflowTaskTemplateRepository:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> list[WorkflowTaskTemplateRead]:
-        """Return templates, defaulting to ``position`` then ``created_at`` order.
+        """Return templates, defaulting to ``created_at`` (then ``id``) order.
 
         When ``workflow_id`` is supplied, only templates belonging to that
         workflow are returned. Each template's outgoing dependency edges are
@@ -164,8 +164,8 @@ class SqlWorkflowTaskTemplateRepository:
             WorkflowTaskTemplate,
             sort,
             default=[
-                col(WorkflowTaskTemplate.position).asc(),
                 col(WorkflowTaskTemplate.created_at).asc(),
+                col(WorkflowTaskTemplate.id).asc(),
             ],
             readable=WorkflowTaskTemplateRead,
         )
@@ -322,7 +322,6 @@ class SqlWorkflowTaskTemplateRepository:
                     workflow_id=workflow_id,
                     title=snapshot.title,
                     description=snapshot.description,
-                    position=snapshot.position,
                     tenant_id=self._tenant_id,
                     created_by=user_id,
                     updated_by=user_id,

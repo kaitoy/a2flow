@@ -11,7 +11,6 @@ const makeTask = (id: string, title: string): WorkflowTask => ({
   workflowExecutionId: "execution",
   title,
   status: "in_progress",
-  position: 0,
   dependsOnIds: [],
   toolBindings: [],
   createdAt: "2026-01-01T00:00:00Z",

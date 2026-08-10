@@ -31,16 +31,14 @@ import { showToast } from "@/store/toastSlice";
 // Generated schema carries the title/description constraints. The parent
 // workflow id comes from the URL, and the form edits dependencies and tool
 // bindings as plain string arrays (encoded values), so omit those and re-add
-// them in the form's shape. Position is coerced from the number input.
+// them in the form's shape.
 const schema = zWorkflowTaskTemplateCreate
   .omit({
     workflowId: true,
-    position: true,
     dependsOnIds: true,
     toolBindings: true,
   })
   .extend({
-    position: z.coerce.number().int().min(0, "Position must be 0 or greater").max(100000),
     dependsOnIds: z.array(z.string()),
     toolBindings: z.array(z.string()),
   });
@@ -66,7 +64,6 @@ export default function NewWorkflowTaskTemplatePage() {
     defaultValues: {
       title: "",
       description: "",
-      position: 0,
       dependsOnIds: [] as string[],
       toolBindings: [] as string[],
     },
@@ -87,7 +84,6 @@ export default function NewWorkflowTaskTemplatePage() {
           workflowId,
           title: values.title,
           description: values.description || null,
-          position: values.position,
           dependsOnIds: values.dependsOnIds,
           toolBindings: values.toolBindings.map(valueToBinding),
         });
@@ -127,10 +123,6 @@ export default function NewWorkflowTaskTemplatePage() {
               placeholder="Longer-form details (optional)"
               {...register("description")}
             />
-          </FormField>
-
-          <FormField htmlFor="position" label="Position" required error={errors.position?.message}>
-            <Input id="position" type="number" min={0} step={1} {...register("position")} />
           </FormField>
 
           <FormField htmlFor="dependsOnIds" label="Depends on">

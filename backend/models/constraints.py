@@ -15,7 +15,7 @@ model merely inherits them.
 import unicodedata
 from typing import Annotated
 
-from pydantic import AfterValidator, Field, StringConstraints
+from pydantic import AfterValidator, StringConstraints
 
 from infrastructure.url_safety import assert_public_http_url
 
@@ -314,6 +314,3 @@ ToolName = Annotated[str, StringConstraints(min_length=1, max_length=255)]
 #: except NUL (which ``execve`` cannot carry). Deliberately permissive — an
 #: argument legitimately holds JSON, paths, or free text.
 McpArg = Annotated[str, StringConstraints(max_length=4096, pattern=r"^[^\x00]*$")]
-
-#: Layout/ordering position: an integer in ``[0, 100000]``.
-Position = Annotated[int, Field(ge=0, le=100000)]
