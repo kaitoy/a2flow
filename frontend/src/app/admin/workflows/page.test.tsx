@@ -117,6 +117,15 @@ describe("WorkflowsPage", () => {
     expect(screen.getByText("published")).toBeInTheDocument();
   });
 
+  it("links the workflow Name cell to its detail page for a requester", async () => {
+    render(<WorkflowsPage />, { preloadedState: authState(["requester"]) });
+    await waitFor(() => screen.getByText("my-workflow"));
+    expect(screen.getByRole("link", { name: "my-workflow" })).toHaveAttribute(
+      "href",
+      "/admin/workflows/wf-1"
+    );
+  });
+
   it("links the Agent Skill cell to its detail page", async () => {
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-workflow"));

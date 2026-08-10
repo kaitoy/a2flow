@@ -1,11 +1,12 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { useParams } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
+import { DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import WorkflowTaskTemplatesPage from "./page";
 
 vi.mock("next/link", () => ({
@@ -154,12 +155,19 @@ describe("WorkflowTaskTemplatesPage", () => {
       http.delete("http://localhost:8000/api/v1/workflow-task-templates/:templateId", deleteSpy)
     );
 
-    render(<WorkflowTaskTemplatesPage />);
+    render(<WorkflowTaskTemplatesPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByText("Template Step 1"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));
     expect(deleteSpy).toHaveBeenCalled();
+  });
+
+  it("hides '+ Add task' and per-row Delete from a requester", async () => {
+    render(<WorkflowTaskTemplatesPage />, { preloadedState: REQUESTER });
+    await waitFor(() => screen.getByText("Template Step 1"));
+    expect(screen.queryByRole("link", { name: /\+ add task/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
   });
 
   it("shows an error toast when load fails", async () => {

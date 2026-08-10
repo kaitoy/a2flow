@@ -2,8 +2,8 @@ import userEvent from "@testing-library/user-event";
 import { delay, http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { User } from "@/lib/api";
-import { type RootState, store } from "@/store";
+import { store } from "@/store";
+import { DEVELOPER, REQUESTER, SUPER_ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -16,23 +16,6 @@ vi.mock("next/link", () => ({
     </a>
   ),
 }));
-
-/** Build a preloaded auth slice for a signed-in user holding the given roles. */
-function authState(roles: string[]): Partial<RootState> {
-  return {
-    auth: {
-      user: { id: "u1", roles } as User,
-      status: "authenticated",
-      selectedTenantId: null,
-      impersonatedUserId: null,
-      impersonatedBy: null,
-    },
-  };
-}
-
-const SUPER_ADMIN = authState(["super_admin"]);
-const REQUESTER = authState(["requester"]);
-const DEVELOPER = authState(["developer"]);
 
 /** Accessible name of the action opening the description diff dialog. */
 const DIFF_BUTTON = "Show diff from the generated description";
@@ -53,12 +36,12 @@ describe("WorkflowDetailPage", () => {
   });
 
   it("loads the workflow into the form", async () => {
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => expect(screen.getByLabelText(/^name/i)).toHaveValue("my-workflow"));
   });
 
   it("has no prompt field (workflows carry task templates, not a prompt)", async () => {
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.queryByLabelText(/prompt/i)).not.toBeInTheDocument();
   });
@@ -69,7 +52,7 @@ describe("WorkflowDetailPage", () => {
   });
 
   it("leaves the status bar unlit while nothing is generating", async () => {
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.getByRole("region", { name: "Workflow status" })).not.toHaveClass("live-edge");
   });
@@ -95,7 +78,7 @@ describe("WorkflowDetailPage", () => {
       )
     );
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() =>
       expect(screen.getByRole("region", { name: "Workflow status" })).toHaveClass("live-edge")
     );
@@ -143,7 +126,7 @@ describe("WorkflowDetailPage", () => {
       })
     );
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
     const dialog = await screen.findByRole("dialog");
@@ -158,7 +141,7 @@ describe("WorkflowDetailPage", () => {
   });
 
   it("links the Agent Skill field to its detail page", async () => {
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.getByRole("link", { name: "my-skill" })).toHaveAttribute(
       "href",
@@ -168,7 +151,7 @@ describe("WorkflowDetailPage", () => {
 
   it("shows the skill's repo URL, ref, path, and pinned commit in a tooltip on hover", async () => {
     const user = userEvent.setup();
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
 
     await user.hover(screen.getByRole("link", { name: "my-skill" }));
@@ -194,9 +177,32 @@ describe("WorkflowDetailPage", () => {
       forward: vi.fn(),
     });
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /manage task templates/i }));
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/admin/workflows/wf-1/task-templates")
+    );
+  });
+
+  it("lets a requester navigate to the read-only task template list via 'View task templates'", async () => {
+    const user = userEvent.setup();
+    const pushMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+      forward: vi.fn(),
+    });
+
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    expect(
+      screen.queryByRole("button", { name: /manage task templates/i })
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /view task templates/i }));
     await waitFor(() =>
       expect(pushMock).toHaveBeenCalledWith("/admin/workflows/wf-1/task-templates")
     );
@@ -242,7 +248,7 @@ describe("WorkflowDetailPage", () => {
       http.post("http://localhost:8000/api/v1/workflows/:id/publish", publishSpy)
     );
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
     const dialog = await screen.findByRole("dialog");
@@ -276,7 +282,7 @@ describe("WorkflowDetailPage", () => {
       )
     );
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /publish/i }));
     const dialog = await screen.findByRole("dialog");
@@ -301,7 +307,7 @@ describe("WorkflowDetailPage", () => {
       forward: vi.fn(),
     });
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /open design session/i }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflows/wf-1/design-session"));
@@ -309,7 +315,7 @@ describe("WorkflowDetailPage", () => {
 
   it("hides the Run action from a viewer without the requester or developer role", async () => {
     render(<WorkflowDetailPage />);
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /run workflow/i })).not.toBeInTheDocument();
   });
 
@@ -326,7 +332,7 @@ describe("WorkflowDetailPage", () => {
     });
 
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /run workflow/i }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
@@ -344,7 +350,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /run workflow/i }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
@@ -431,7 +437,7 @@ describe("WorkflowDetailPage", () => {
       })
     );
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     const nameInput = await screen.findByLabelText(/^name/i);
     await waitFor(() => expect(nameInput).toHaveValue("my-workflow"));
     await user.clear(nameInput);
@@ -661,8 +667,82 @@ describe("WorkflowDetailPage", () => {
 
   it("hides the generate action from a viewer who cannot edit workflows", async () => {
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: GENERATE_BUTTON })).not.toBeInTheDocument();
+  });
+
+  it("shows Name and Description as read-only text for a requester", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: "Collects the weekly report.",
+          agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
+          status: "published",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "user",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await waitFor(() =>
+      expect(screen.getByText("Collects the weekly report.")).toBeInTheDocument()
+    );
+    expect(screen.queryByLabelText(/^name/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^description/i)).not.toBeInTheDocument();
+  });
+
+  it("hides Save, Delete, and Open design session from a requester, but keeps templates viewable", async () => {
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open design session/i })).not.toBeInTheDocument();
+    // Requesters can still reach the (read-only) task templates screen, just
+    // under a label that doesn't imply edit rights.
+    expect(
+      screen.queryByRole("button", { name: /^manage task templates$/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^view task templates$/i })).toBeInTheDocument();
+    // With nothing to cancel, the navigate-back action reads "Back" instead.
+    expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^back$/i })).toBeInTheDocument();
+  });
+
+  it("hides Publish, Deactivate, and Discard changes from a requester regardless of status", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
+          status: "modified",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "user",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await waitFor(() => expect(screen.getByText("modified")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /discard changes/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /deactivate/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
   });
 
   it("disables the generate action while the task templates are still generating", async () => {
@@ -695,7 +775,7 @@ describe("WorkflowDetailPage", () => {
 
   it("disables the diff action while there is no generated description to compare against", async () => {
     render(<WorkflowDetailPage />);
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: DIFF_BUTTON })).toBeDisabled();
   });
 
@@ -723,7 +803,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />);
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: DIFF_BUTTON }));
 
     const dialog = await screen.findByRole("dialog");
@@ -758,7 +838,7 @@ describe("WorkflowDetailPage", () => {
       )
     );
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     const description = await screen.findByLabelText(/^description/i);
     await user.type(description, "Runs weekly.");
     await user.click(screen.getByRole("button", { name: DIFF_BUTTON }));
@@ -770,13 +850,13 @@ describe("WorkflowDetailPage", () => {
   });
 
   it("offers no Discard changes action while the workflow is published", async () => {
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.queryByRole("button", { name: /discard changes/i })).not.toBeInTheDocument();
   });
 
   it("hides the Publish action while the workflow is published", async () => {
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
   });
@@ -821,7 +901,7 @@ describe("WorkflowDetailPage", () => {
     );
     server.use(http.post("http://localhost:8000/api/v1/workflows/:id/discard-changes", discardSpy));
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => expect(screen.getByText("modified")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /discard changes/i }));
     await user.click(screen.getByRole("button", { name: /^discard$/i }));
@@ -842,14 +922,14 @@ describe("WorkflowDetailPage", () => {
       forward: vi.fn(),
     });
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows"));
   });
 
   it("offers a Deactivate action while the workflow is published", async () => {
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.getByRole("button", { name: /deactivate/i })).toBeInTheDocument();
   });
@@ -901,7 +981,7 @@ describe("WorkflowDetailPage", () => {
     );
     server.use(http.post("http://localhost:8000/api/v1/workflows/:id/deactivate", deactivateSpy));
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /deactivate/i }));
     const dialog = await screen.findByRole("dialog");

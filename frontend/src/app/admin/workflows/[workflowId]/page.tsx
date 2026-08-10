@@ -29,6 +29,7 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -122,6 +123,16 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * `published`. A `published`/`modified` workflow can also be "Deactivated"
  * back to `draft`, revoking `requester` execute access until it is published
  * again.
+ *
+ * A viewer without the developer role (e.g. `requester`, who can only reach
+ * this page to check on or run a workflow) gets a read-only rendering: Name
+ * and Description show as plain text, and every action that would hit a
+ * developer-only endpoint — Open design session, Discard changes, Deactivate,
+ * Publish, Save, Delete — is hidden rather than left to fail with a 403 on
+ * click. Task templates stay reachable read-only for such a viewer too — the
+ * header button is labeled "View task templates" instead of "Manage task
+ * templates" and the templates screens it opens hide their own write actions
+ * the same way.
  */
 export default function WorkflowDetailPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -130,6 +141,7 @@ export default function WorkflowDetailPage() {
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   const canRun = useHasRole(Role.REQUESTER, Role.DEVELOPER);
   const canEdit = useHasRole(Role.DEVELOPER);
+  const canViewTemplates = useHasRole(Role.REQUESTER, Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
@@ -362,13 +374,15 @@ export default function WorkflowDetailPage() {
             icon={WorkflowIcon}
             secondaryAction={
               <>
-                <HeaderIconButton
-                  label="Open design session"
-                  onClick={handleOpenDesign}
-                  disabled={generating}
-                >
-                  <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
-                </HeaderIconButton>
+                {canEdit && (
+                  <HeaderIconButton
+                    label="Open design session"
+                    onClick={handleOpenDesign}
+                    disabled={generating}
+                  >
+                    <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
+                  </HeaderIconButton>
+                )}
                 {canRun && (
                   <HeaderIconButton
                     label="Run workflow"
@@ -391,12 +405,14 @@ export default function WorkflowDetailPage() {
                     )}
                   </HeaderIconButton>
                 )}
-                <HeaderIconButton
-                  label="Manage task templates"
-                  onClick={() => router.push(`/admin/workflows/${workflowId}/task-templates`)}
-                >
-                  <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" />
-                </HeaderIconButton>
+                {canViewTemplates && (
+                  <HeaderIconButton
+                    label={canEdit ? "Manage task templates" : "View task templates"}
+                    onClick={() => router.push(`/admin/workflows/${workflowId}/task-templates`)}
+                  >
+                    <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" />
+                  </HeaderIconButton>
+                )}
               </>
             }
           />
@@ -427,7 +443,7 @@ export default function WorkflowDetailPage() {
         >
           <StatusLine workflow={workflow} />
           <div className="ml-auto flex items-center gap-2">
-            {workflow.status === "modified" && (
+            {canEdit && workflow.status === "modified" && (
               <ActionIconButton
                 icon={Undo2}
                 label="Discard changes"
@@ -436,7 +452,7 @@ export default function WorkflowDetailPage() {
                 spinning={discard.inFlight}
               />
             )}
-            {canDeactivate && (
+            {canEdit && canDeactivate && (
               <ActionIconButton
                 icon={PowerOff}
                 label="Deactivate"
@@ -445,7 +461,7 @@ export default function WorkflowDetailPage() {
                 spinning={deactivate.inFlight}
               />
             )}
-            {workflow.status !== "published" && (
+            {canEdit && workflow.status !== "published" && (
               <ActionIconButton
                 icon={Rocket}
                 label="Publish"
@@ -481,7 +497,11 @@ export default function WorkflowDetailPage() {
           </FormField>
 
           <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            <Input id="name" {...register("name")} />
+            {canEdit ? (
+              <Input id="name" {...register("name")} />
+            ) : (
+              <ReadOnlyField>{workflow.name}</ReadOnlyField>
+            )}
           </FormField>
 
           <FormField
@@ -498,12 +518,18 @@ export default function WorkflowDetailPage() {
               />
             }
           >
-            <Textarea
-              id="description"
-              rows={4}
-              placeholder="Overrides the generated description below for the workflow execution"
-              {...register("description")}
-            />
+            {canEdit ? (
+              <Textarea
+                id="description"
+                rows={4}
+                placeholder="Overrides the generated description below for the workflow execution"
+                {...register("description")}
+              />
+            ) : (
+              <ReadOnlyField className="whitespace-pre-wrap">
+                {workflow.description || "—"}
+              </ReadOnlyField>
+            )}
           </FormField>
 
           <FormField
@@ -538,9 +564,9 @@ export default function WorkflowDetailPage() {
                   {...register("generatedDescription")}
                 />
               ) : (
-                <p className="whitespace-pre-wrap py-1.5 text-sm text-on-surface">
+                <ReadOnlyField className="whitespace-pre-wrap">
                   {workflow.generatedDescription || "—"}
-                </p>
+                </ReadOnlyField>
               )}
             </div>
             <p className="text-xs text-on-surface-variant">
@@ -552,26 +578,30 @@ export default function WorkflowDetailPage() {
           </FormField>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={save.inFlight}
-              status={save.status}
-              pendingLabel="Saving…"
-            >
-              Save
-            </Button>
+            {canEdit && (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={save.inFlight}
+                status={save.status}
+                pendingLabel="Saving…"
+              >
+                Save
+              </Button>
+            )}
             <Button type="button" variant="ghost" onClick={() => router.push("/admin/workflows")}>
-              Cancel
+              {canEdit ? "Cancel" : "Back"}
             </Button>
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => setConfirmOpen(true)}
-              className="ml-auto"
-            >
-              Delete
-            </Button>
+            {canEdit && (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => setConfirmOpen(true)}
+                className="ml-auto"
+              >
+                Delete
+              </Button>
+            )}
           </div>
         </form>
       </FormLayout>

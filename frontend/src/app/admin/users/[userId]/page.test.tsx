@@ -405,4 +405,83 @@ describe("UserDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     expect(store.getState().toast.items.length).toBe(beforeCount);
   });
+
+  describe("impersonate action", () => {
+    it("shows the Impersonate button for an eligible target", async () => {
+      setup();
+      render(<UserDetailPage />, { preloadedState: superAdminState(null) });
+      await waitFor(() => screen.getByDisplayValue("alice"));
+      expect(screen.getByRole("button", { name: "Impersonate" })).toBeInTheDocument();
+    });
+
+    it("hides the Impersonate button when the target holds super_admin", async () => {
+      setup();
+      server.use(
+        http.get("http://localhost:8000/api/v1/users/:userId", () =>
+          envelope({ ...FULL_USER, roles: ["super_admin"] })
+        )
+      );
+      render(<UserDetailPage />, { preloadedState: superAdminState(null) });
+      await waitFor(() => screen.getByDisplayValue("alice"));
+      expect(screen.queryByRole("button", { name: "Impersonate" })).not.toBeInTheDocument();
+    });
+
+    it("hides the Impersonate button when viewing your own account", async () => {
+      setup();
+      render(<UserDetailPage />, {
+        preloadedState: {
+          auth: {
+            user: { id: "user-1", roles: ["super_admin"] } as User,
+            status: "authenticated",
+            selectedTenantId: null,
+            impersonatedUserId: null,
+            impersonatedBy: null,
+          },
+        },
+      });
+      await waitFor(() => screen.getByDisplayValue("alice"));
+      expect(screen.queryByRole("button", { name: "Impersonate" })).not.toBeInTheDocument();
+    });
+
+    it("calls the impersonate api after confirm and navigates to /admin", async () => {
+      setup();
+      const pushMock = vi.fn();
+      vi.mocked(useRouter).mockReturnValue({
+        push: pushMock,
+        replace: vi.fn(),
+        back: vi.fn(),
+        prefetch: vi.fn(),
+        refresh: vi.fn(),
+        forward: vi.fn(),
+      });
+      const impersonateSpy = vi.fn(() =>
+        envelope({
+          user: FULL_USER,
+          impersonatedBy: {
+            id: "u1",
+            username: "super",
+            firstName: "Super",
+            lastName: "Admin",
+            email: "super@example.com",
+            enabled: true,
+            emailVerified: false,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        })
+      );
+      server.use(http.post("http://localhost:8000/api/v1/auth/impersonate", impersonateSpy));
+
+      render(<UserDetailPage />, { preloadedState: superAdminState(null) });
+      await waitFor(() => screen.getByDisplayValue("alice"));
+      await userEvent.click(screen.getByRole("button", { name: "Impersonate" }));
+      const dialog = screen.getByRole("dialog");
+      await userEvent.click(within(dialog).getByRole("button", { name: /impersonate/i }));
+
+      await waitFor(() => expect(impersonateSpy).toHaveBeenCalled());
+      expect(pushMock).toHaveBeenCalledWith("/admin");
+    });
+  });
 });

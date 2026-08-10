@@ -79,9 +79,10 @@ function buildColumns(
       sortField: "name",
       filterField: "name",
       visibility: "always",
-      // Only developers can open the edit form; everyone else sees a plain name.
+      // Anyone who can edit or run a workflow has a reason to open its
+      // detail page; everyone else sees a plain name.
       cell: (w) =>
-        permissions.canEdit ? (
+        permissions.canEdit || permissions.canRun ? (
           <Link
             href={`/admin/workflows/${w.id}`}
             className="font-medium text-accent transition-colors hover:underline"

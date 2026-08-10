@@ -20,7 +20,7 @@ import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteUser, listUsers, startImpersonation, type User } from "@/lib/api";
-import { persistImpersonatedUserId } from "@/lib/impersonation";
+import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
 import { ROLE_LABELS, Role, useHasRole } from "@/lib/roles";
 import { setMe } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -142,20 +142,6 @@ export default function UsersPage() {
   // can only mean "genuinely holds admin, not super_admin".
   const isAdmin = useHasRole(Role.ADMIN);
 
-  /**
-   * Whether the viewer may impersonate `row`, mirroring the backend's
-   * eligibility rules: a `super_admin` row can never be impersonated, an
-   * `admin` row only by a `super_admin` viewer (a regular admin still can't
-   * impersonate a fellow admin).
-   */
-  function canImpersonate(row: User): boolean {
-    if (!viewer || row.id === viewer.id) return false;
-    if (row.roles?.includes(Role.SUPER_ADMIN)) return false;
-    if (row.roles?.includes(Role.ADMIN) && !isSuperAdmin) return false;
-    if (isSuperAdmin) return true;
-    return isAdmin && row.tenantId === viewer.tenantId;
-  }
-
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
   }
@@ -198,7 +184,7 @@ export default function UsersPage() {
       visibility: "always",
       cell: (user) => (
         <div className="flex justify-center gap-2">
-          {canImpersonate(user) && (
+          {canImpersonate(viewer, isSuperAdmin, isAdmin, user) && (
             <ActionIconButton
               icon={UserCog}
               label="Impersonate"

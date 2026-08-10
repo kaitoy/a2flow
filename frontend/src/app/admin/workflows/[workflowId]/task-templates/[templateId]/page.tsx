@@ -15,6 +15,7 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { McpToolPicker } from "@/components/admin/mcp-tool-picker";
+import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
@@ -35,6 +36,7 @@ import {
   type WorkflowTaskTemplate,
 } from "@/lib/api";
 import { bindingToValue, valueToBinding } from "@/lib/mcp-tool-options";
+import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -59,11 +61,19 @@ type FormValues = z.infer<typeof schema>;
  * Detail page of a single task template — one step of a workflow's design — with
  * its dependency and MCP tool pickers. The page is titled with the template's
  * own title, the label its row carries in the list.
+ *
+ * A viewer without the developer role (e.g. `requester`, who reaches this
+ * page read-only from the task template list) gets a read-only rendering:
+ * Title and Description show as plain text, the Depends on/MCP Tools pickers
+ * sit inside a disabled `fieldset` so their native checkboxes can't be
+ * toggled, and Save/Delete are hidden rather than left to fail with a 403 on
+ * click — the same convention the parent `WorkflowDetailPage` follows.
  */
 export default function WorkflowTaskTemplateDetailPage() {
   const { workflowId, templateId } = useParams<{ workflowId: string; templateId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const canEdit = useHasRole(Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -216,70 +226,86 @@ export default function WorkflowTaskTemplateDetailPage() {
           </div>
 
           <FormField htmlFor="title" label="Title" required error={errors.title?.message}>
-            <Input id="title" {...register("title")} />
+            {canEdit ? (
+              <Input id="title" {...register("title")} />
+            ) : (
+              <ReadOnlyField>{title}</ReadOnlyField>
+            )}
           </FormField>
 
           <FormField htmlFor="description" label="Description">
-            <Textarea id="description" rows={4} {...register("description")} />
+            {canEdit ? (
+              <Textarea id="description" rows={4} {...register("description")} />
+            ) : (
+              <ReadOnlyField className="whitespace-pre-wrap">
+                {getValues("description") || "—"}
+              </ReadOnlyField>
+            )}
           </FormField>
 
-          <FormField htmlFor="dependsOnIds" label="Depends on">
-            <Controller
-              control={control}
-              name="dependsOnIds"
-              render={({ field }) => (
-                <CheckboxGroup
-                  name="dependsOnIds"
-                  options={candidates
-                    .filter((t) => t.id !== templateId)
-                    .map((t) => ({ value: t.id, label: t.title }))}
-                  value={field.value}
-                  onChange={field.onChange}
-                  emptyMessage="No other templates in this workflow to depend on."
-                />
-              )}
-            />
-          </FormField>
+          <fieldset disabled={!canEdit} className="contents">
+            <FormField htmlFor="dependsOnIds" label="Depends on">
+              <Controller
+                control={control}
+                name="dependsOnIds"
+                render={({ field }) => (
+                  <CheckboxGroup
+                    name="dependsOnIds"
+                    options={candidates
+                      .filter((t) => t.id !== templateId)
+                      .map((t) => ({ value: t.id, label: t.title }))}
+                    value={field.value}
+                    onChange={field.onChange}
+                    emptyMessage="No other templates in this workflow to depend on."
+                  />
+                )}
+              />
+            </FormField>
 
-          <FormField htmlFor="toolBindings" label="MCP Tools">
-            <Controller
-              control={control}
-              name="toolBindings"
-              render={({ field }) => (
-                <McpToolPicker
-                  value={field.value}
-                  onChange={field.onChange}
-                  boundBindings={templateBindings}
-                />
-              )}
-            />
-          </FormField>
+            <FormField htmlFor="toolBindings" label="MCP Tools">
+              <Controller
+                control={control}
+                name="toolBindings"
+                render={({ field }) => (
+                  <McpToolPicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    boundBindings={templateBindings}
+                  />
+                )}
+              />
+            </FormField>
+          </fieldset>
 
           <div className="flex gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={save.inFlight}
-              status={save.status}
-              pendingLabel="Saving…"
-            >
-              Save
-            </Button>
+            {canEdit && (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={save.inFlight}
+                status={save.status}
+                pendingLabel="Saving…"
+              >
+                Save
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
               onClick={() => router.push(`/admin/workflows/${workflowId}/task-templates`)}
             >
-              Cancel
+              {canEdit ? "Cancel" : "Back"}
             </Button>
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => setConfirmOpen(true)}
-              className="ml-auto"
-            >
-              Delete
-            </Button>
+            {canEdit && (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => setConfirmOpen(true)}
+                className="ml-auto"
+              >
+                Delete
+              </Button>
+            )}
           </div>
         </form>
       </FormLayout>

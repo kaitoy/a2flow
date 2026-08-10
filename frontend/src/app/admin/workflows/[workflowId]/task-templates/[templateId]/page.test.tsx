@@ -3,6 +3,7 @@ import { http } from "msw";
 import { useParams } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
+import { DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -78,7 +79,7 @@ describe("WorkflowTaskTemplateDetailPage", () => {
 
   it("prefills the template's bound MCP tools", async () => {
     setup();
-    render(<WorkflowTaskTemplateDetailPage />);
+    render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
 
     await waitFor(() => expect(screen.getByDisplayValue("Template Step 1")).toBeInTheDocument());
     expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeChecked();
@@ -89,7 +90,7 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     setup({ ...TEMPLATE, toolBindings: [] });
     const captured = capturePatch();
 
-    render(<WorkflowTaskTemplateDetailPage />);
+    render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
     await userEvent.click(await screen.findByRole("checkbox", { name: "local-files: search" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -106,7 +107,7 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     setup();
     const captured = capturePatch();
 
-    render(<WorkflowTaskTemplateDetailPage />);
+    render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
     await userEvent.click(await screen.findByRole("checkbox", { name: "my-mcp-server: search" }));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -123,7 +124,7 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     );
     const captured = capturePatch();
 
-    render(<WorkflowTaskTemplateDetailPage />);
+    render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
 
     // The bound tool is still listed (and checked) even though no server
@@ -135,6 +136,19 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(captured.body).toMatchObject({ toolBindings: [] }));
+  });
+
+  it("renders read-only for a requester: no Save/Delete, fields disabled or plain text", async () => {
+    setup();
+    render(<WorkflowTaskTemplateDetailPage />, { preloadedState: REQUESTER });
+
+    await waitFor(() => expect(screen.getAllByText("Template Step 1").length).toBeGreaterThan(0));
+    expect(screen.queryByRole("textbox", { name: /^title/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^back$/i })).toBeInTheDocument();
+    expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeDisabled();
   });
 
   it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {

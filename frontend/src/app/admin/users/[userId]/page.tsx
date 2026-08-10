@@ -10,7 +10,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Users as UsersIcon } from "lucide-react";
+import { UserCog, Users as UsersIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -22,6 +22,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { RolesField } from "@/components/admin/roles-field";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Avatar } from "@/components/ui/avatar";
@@ -39,10 +40,13 @@ import {
   getUser,
   isForbiddenError,
   SUPPRESS_FORBIDDEN_TOAST,
+  startImpersonation,
   type UserUpdate,
   updateUser,
 } from "@/lib/api";
+import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
 import { Role, useHasRole } from "@/lib/roles";
+import { setMe } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -72,6 +76,7 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [impersonateConfirmOpen, setImpersonateConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   // Username is immutable after creation, so it lives outside the form state and
   // is rendered read-only.
@@ -93,6 +98,8 @@ export default function UserDetailPage() {
   // app bar's selection for a still-tenant-less target.
   const [originalTenantId, setOriginalTenantId] = useState<string | null>(null);
   const isSuperAdminViewer = useHasRole(Role.SUPER_ADMIN);
+  const isAdmin = useHasRole(Role.ADMIN);
+  const viewer = useAppSelector((s) => s.auth.user);
   const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
   const tenantLocked = originalTenantId !== null;
   const targetIsSuperAdmin = roles.includes(Role.SUPER_ADMIN);
@@ -106,6 +113,11 @@ export default function UserDetailPage() {
   // instead of round-tripping to its 422.
   const tenantMissing =
     !tenantLocked && isSuperAdminViewer && !targetIsSuperAdmin && selectedTenantId === null;
+  const canImpersonateTarget = canImpersonate(viewer, isSuperAdminViewer, isAdmin, {
+    id: userId,
+    roles,
+    tenantId: originalTenantId,
+  });
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -197,6 +209,22 @@ export default function UserDetailPage() {
     }
   }
 
+  function handleImpersonate() {
+    setImpersonateConfirmOpen(true);
+  }
+
+  async function executeImpersonate() {
+    setImpersonateConfirmOpen(false);
+    try {
+      const me = await startImpersonation(userId);
+      dispatch(setMe(me));
+      persistImpersonatedUserId(me.user.id);
+      router.push("/admin");
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
+    }
+  }
+
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Users", href: "/admin/users" },
@@ -229,7 +257,19 @@ export default function UserDetailPage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title={username} icon={UsersIcon} />}
+        header={
+          <AdminPageHeader
+            title={username}
+            icon={UsersIcon}
+            secondaryAction={
+              canImpersonateTarget && (
+                <HeaderIconButton label="Impersonate" onClick={handleImpersonate}>
+                  <UserCog size={18} strokeWidth={1.8} aria-hidden="true" />
+                </HeaderIconButton>
+              )
+            }
+          />
+        }
         aside={audit && <AuditMeta {...audit} />}
       >
         <form
@@ -322,6 +362,15 @@ export default function UserDetailPage() {
         description={`Delete "${username}"?`}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
+      />
+      <ConfirmDialog
+        open={impersonateConfirmOpen}
+        title="Impersonate User"
+        description={`Act as "${username}"? You can stop at any time.`}
+        confirmLabel="Impersonate"
+        confirmVariant="primary"
+        onConfirm={executeImpersonate}
+        onCancel={() => setImpersonateConfirmOpen(false)}
       />
     </AdminPageContainer>
   );

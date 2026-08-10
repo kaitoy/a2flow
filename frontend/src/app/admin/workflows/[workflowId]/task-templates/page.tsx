@@ -25,6 +25,7 @@ import {
   type SortSpec,
   type WorkflowTaskTemplate,
 } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 
 /**
  * Upper bound (the backend maximum) used to fetch every template in one go.
@@ -51,9 +52,10 @@ function buildColumns(
   serverNameById: Map<string, string>,
   onDelete: (id: string, title: string) => void,
   onHoverDependency: (id: string | null) => void,
-  indexById: Map<string, number>
+  indexById: Map<string, number>,
+  canEdit: boolean
 ): ColumnDef<WorkflowTaskTemplate>[] {
-  return [
+  const columns: ColumnDef<WorkflowTaskTemplate>[] = [
     {
       header: "#",
       className: "w-12 font-mono text-on-surface-variant",
@@ -123,7 +125,9 @@ function buildColumns(
         );
       },
     },
-    {
+  ];
+  if (canEdit) {
+    columns.push({
       header: "Actions",
       noTruncate: true,
       visibility: "always",
@@ -132,17 +136,25 @@ function buildColumns(
           <DeleteIconButton onClick={() => onDelete(t.id, t.title)} />
         </div>
       ),
-    },
-  ];
+    });
+  }
+  return columns;
 }
 
 /**
  * Admin list of the task templates belonging to the workflow in the URL — the
  * workflow's reusable design, copied into every run at execute time. Templates
  * carry no status; the lifecycle belongs to the runs.
+ *
+ * Reads are open to any authenticated user (the backend allows any role to
+ * list a workflow's templates), so a `requester` reaches this page read-only
+ * via the workflow detail page's "View task templates" button: the "+ Add
+ * task" button and the Actions column's Delete button — both of which hit
+ * developer-only endpoints — render only for a `developer`.
  */
 export default function WorkflowTaskTemplatesPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
+  const canEdit = useHasRole(Role.DEVELOPER);
   const [templates, setTemplates] = useState<WorkflowTaskTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState<SortSpec | null>(null);
@@ -215,7 +227,8 @@ export default function WorkflowTaskTemplatesPage() {
     serverNameById,
     handleDelete,
     setHighlightedId,
-    new Map(templates.map((t, i) => [t.id, i + 1]))
+    new Map(templates.map((t, i) => [t.id, i + 1])),
+    canEdit
   );
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "taskTemplates",
@@ -235,7 +248,7 @@ export default function WorkflowTaskTemplatesPage() {
       <AdminPageHeader
         title="Task Templates"
         icon={ListTree}
-        addHref={`/admin/workflows/${workflowId}/task-templates/new`}
+        addHref={canEdit ? `/admin/workflows/${workflowId}/task-templates/new` : undefined}
         addLabel="+ Add task"
         onRefresh={load}
         refreshing={loading}
