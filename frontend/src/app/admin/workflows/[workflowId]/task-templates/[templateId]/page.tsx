@@ -64,10 +64,13 @@ type FormValues = z.infer<typeof schema>;
  *
  * A viewer without the developer role (e.g. `requester`, who reaches this
  * page read-only from the task template list) gets a read-only rendering:
- * Title and Description show as plain text, the Depends on/MCP Tools pickers
- * sit inside a disabled `fieldset` so their native checkboxes can't be
- * toggled, and Save/Delete are hidden rather than left to fail with a 403 on
- * click — the same convention the parent `WorkflowDetailPage` follows.
+ * Title and Description show as plain text, the Depends on picker sits
+ * inside a disabled `fieldset` so its native checkboxes can't be toggled,
+ * MCP Tools is omitted entirely (there's nothing a read-only viewer can do
+ * with it, and skipping it avoids mounting `McpToolPicker`'s MCP
+ * server/tool catalog fetch), and Save/Delete are hidden rather than left
+ * to fail with a 403 on click — the same convention the parent
+ * `WorkflowDetailPage` follows.
  */
 export default function WorkflowTaskTemplateDetailPage() {
   const { workflowId, templateId } = useParams<{ workflowId: string; templateId: string }>();
@@ -261,7 +264,9 @@ export default function WorkflowTaskTemplateDetailPage() {
                 )}
               />
             </FormField>
+          </fieldset>
 
+          {canEdit && (
             <FormField htmlFor="toolBindings" label="MCP Tools">
               <Controller
                 control={control}
@@ -275,7 +280,7 @@ export default function WorkflowTaskTemplateDetailPage() {
                 )}
               />
             </FormField>
-          </fieldset>
+          )}
 
           <div className="flex gap-2">
             {canEdit && (

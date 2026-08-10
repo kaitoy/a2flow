@@ -148,7 +148,25 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^back$/i })).toBeInTheDocument();
-    expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeDisabled();
+    const dependsOnCheckboxes = screen.queryAllByRole("checkbox");
+    for (const box of dependsOnCheckboxes) {
+      expect(box).toBeDisabled();
+    }
+  });
+
+  it("omits the MCP Tools section entirely for a requester, without fetching the tool catalog", async () => {
+    setup();
+    const toolsRequest = vi.fn(() => envelope([]));
+    server.use(http.get(`${BASE}/api/v1/mcp-servers`, toolsRequest));
+
+    render(<WorkflowTaskTemplateDetailPage />, { preloadedState: REQUESTER });
+
+    await waitFor(() => expect(screen.getAllByText("Template Step 1").length).toBeGreaterThan(0));
+    expect(screen.queryByText("MCP Tools")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: "my-mcp-server: search" })
+    ).not.toBeInTheDocument();
+    expect(toolsRequest).not.toHaveBeenCalled();
   });
 
   it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {
