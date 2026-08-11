@@ -25,6 +25,7 @@ the edits are dropped through :meth:`WorkflowService.discard_changes`.
 
 import builtins
 import logging
+import secrets
 import uuid
 from collections.abc import Sequence
 from typing import Any
@@ -546,7 +547,7 @@ class WorkflowService:
 
         execution_create = WorkflowExecutionCreate(
             session_id=session_id,
-            name=name,
+            name=self._generate_execution_name(name),
             description=description,
             agent_skill_id=skill.id,
             agent_skill_name=skill.name,
@@ -587,6 +588,22 @@ class WorkflowService:
         if created is None:  # pragma: no cover - just created above
             raise NotFoundError("WorkflowExecution", execution_id)
         return created
+
+    def _generate_execution_name(self, name: str) -> str:
+        """Build a WorkflowExecution name from the workflow name plus a random suffix.
+
+        Appends a 6-character lowercase hex suffix so repeated runs of the same
+        workflow stay distinguishable in the executions list; the timestamp
+        itself is already available via ``createdAt``.
+
+        Args:
+            name: The workflow (or published snapshot) name to base the run's
+                name on.
+
+        Returns:
+            The trimmed name followed by a ``-`` and a random hex suffix.
+        """
+        return f"{name.strip()}-{secrets.token_hex(3)}"
 
     async def _resolve_design(
         self, workflow: Workflow
