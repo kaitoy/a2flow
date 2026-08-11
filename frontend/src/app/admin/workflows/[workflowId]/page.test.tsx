@@ -51,10 +51,11 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
   });
 
-  it("hides the workflow status from a requester", async () => {
+  it("shows the workflow status to a requester too", async () => {
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
     await screen.findByRole("heading", { name: "my-workflow" });
-    expect(screen.queryByText("published")).not.toBeInTheDocument();
+    expect(screen.getByText("published")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Workflow status" })).toBeInTheDocument();
   });
 
   it("leaves the status bar unlit while nothing is generating", async () => {
