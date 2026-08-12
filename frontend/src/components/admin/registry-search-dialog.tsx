@@ -1,16 +1,13 @@
 /** @module RegistrySearchDialog — modal to search the official MCP registry. */
-import { animated, useTransition } from "@react-spring/web";
 import { PackageSearch } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useDialogA11y } from "@/hooks/useDialogA11y";
 import { type McpRegistryServerEntry, searchMcpRegistry } from "@/lib/api";
-import { useMotionConfig } from "@/lib/motion";
 
 /** Props for {@link RegistrySearchDialog}. */
 export interface RegistrySearchDialogProps {
@@ -34,14 +31,6 @@ const DEBOUNCE_MS = 300;
  * result is selectable.
  */
 export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearchDialogProps) {
-  const config = useMotionConfig("gentle");
-  const transitions = useTransition(open, {
-    from: { opacity: 0, scale: 0.94 },
-    enter: { opacity: 1, scale: 1 },
-    leave: { opacity: 0, scale: 0.96 },
-    config,
-  });
-
   const [term, setTerm] = useState("");
   const [query, setQuery] = useState("");
   const [servers, setServers] = useState<McpRegistryServerEntry[]>([]);
@@ -89,8 +78,6 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
     };
   }, [open, query]);
 
-  useDialogA11y({ open, onClose, panelId: "registry-search-dialog", closeOnOutsideClick: false });
-
   async function loadMore() {
     if (!cursor) return;
     try {
@@ -104,132 +91,85 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
     }
   }
 
-  // Guard against SSR — createPortal needs document.body.
-  if (typeof document === "undefined") return null;
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      panelId="registry-search-dialog"
+      title="Browse MCP Registry"
+      description="Search the official MCP registry by name. Only servers A2Flow can register are shown: those reachable over streamable HTTP, and those published as an npm or PyPI package it can launch over stdio."
+      size="lg"
+      scrollable
+      footer={
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+      }
+    >
+      <Input
+        value={term}
+        onChange={(e) => setTerm(e.target.value)}
+        placeholder="e.g. github, weather, search…"
+        aria-label="Search the MCP registry"
+      />
 
-  return createPortal(
-    transitions(
-      (style, item) =>
-        item && (
-          <div className="fixed inset-0 z-50">
-            <animated.button
-              type="button"
-              style={{ opacity: style.opacity }}
-              className="absolute inset-0 h-full w-full cursor-default border-0 bg-black/25 backdrop-blur-[2px]"
-              onClick={onClose}
-              // Stop the backdrop itself from taking focus on click, so the
-              // a11y hook's close handler always restores focus to the
-              // trigger instead of leaving it on this transient scrim.
-              onMouseDown={(e) => e.preventDefault()}
-              aria-label="Close registry search"
-              tabIndex={-1}
-            />
-            <div className="relative flex min-h-full items-center justify-center p-4 pointer-events-none">
-              <animated.div
-                id="registry-search-dialog"
-                tabIndex={-1}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="registry-search-title"
-                style={{
-                  opacity: style.opacity,
-                  transform: style.scale.to((s) => `scale(${s})`),
-                }}
-                className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl glass-panel-overlay p-6 pointer-events-auto"
+      <div className="mt-4 flex-1 overflow-y-auto">
+        {servers.length === 0 ? (
+          <EmptyState
+            icon={PackageSearch}
+            title={loading ? "Searching…" : "No servers found"}
+            description={
+              loading ? undefined : "Try a different name, or check back as the registry grows."
+            }
+          />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {servers.map((server) => (
+              <li
+                key={`${server.name}@${server.version}`}
+                className="flex items-start justify-between gap-3 rounded-xl glass-panel p-3"
               >
-                <h2
-                  id="registry-search-title"
-                  className="mb-1 font-display text-lg font-semibold tracking-tight text-on-surface"
-                >
-                  Browse MCP Registry
-                </h2>
-                <p className="mb-4 text-sm text-on-surface-variant">
-                  Search the official MCP registry by name. Only servers A2Flow can register are
-                  shown: those reachable over streamable HTTP, and those published as an npm or PyPI
-                  package it can launch over stdio.
-                </p>
-
-                <Input
-                  value={term}
-                  onChange={(e) => setTerm(e.target.value)}
-                  placeholder="e.g. github, weather, search…"
-                  aria-label="Search the MCP registry"
-                />
-
-                <div className="mt-4 flex-1 overflow-y-auto">
-                  {servers.length === 0 ? (
-                    <EmptyState
-                      icon={PackageSearch}
-                      title={loading ? "Searching…" : "No servers found"}
-                      description={
-                        loading
-                          ? undefined
-                          : "Try a different name, or check back as the registry grows."
-                      }
-                    />
-                  ) : (
-                    <ul className="flex flex-col gap-2">
-                      {servers.map((server) => (
-                        <li
-                          key={`${server.name}@${server.version}`}
-                          className="flex items-start justify-between gap-3 rounded-xl glass-panel p-3"
-                        >
-                          <div className="min-w-0">
-                            <p className="flex items-center gap-2 truncate font-medium text-on-surface">
-                              {server.title || server.name}
-                              <span className="font-mono text-xs text-on-surface-variant">
-                                v{server.version}
-                              </span>
-                              <Badge>{server.transport === "stdio" ? "stdio" : "HTTP"}</Badge>
-                            </p>
-                            {server.description && (
-                              <p className="mt-0.5 line-clamp-2 text-sm text-on-surface-variant">
-                                {server.description}
-                              </p>
-                            )}
-                            <p className="mt-0.5 truncate font-mono text-xs text-on-surface-variant">
-                              {server.transport === "stdio"
-                                ? [server.command, ...(server.args ?? [])].join(" ")
-                                : server.url}
-                            </p>
-                          </div>
-                          <Button
-                            variant="primary"
-                            className="shrink-0"
-                            onClick={() => onSelect(server)}
-                          >
-                            Use this
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 truncate font-medium text-on-surface">
+                    {server.title || server.name}
+                    <span className="font-mono text-xs text-on-surface-variant">
+                      v{server.version}
+                    </span>
+                    <Badge>{server.transport === "stdio" ? "stdio" : "HTTP"}</Badge>
+                  </p>
+                  {server.description && (
+                    <p className="mt-0.5 line-clamp-2 text-sm text-on-surface-variant">
+                      {server.description}
+                    </p>
                   )}
-
-                  {cursor && (
-                    <div className="mt-3 flex justify-center">
-                      <Button
-                        variant="secondary"
-                        onClick={loadMore}
-                        disabled={loadMoreAction.inFlight}
-                        status={loadMoreAction.status}
-                        pendingLabel="Loading…"
-                      >
-                        Load more
-                      </Button>
-                    </div>
-                  )}
+                  <p className="mt-0.5 truncate font-mono text-xs text-on-surface-variant">
+                    {server.transport === "stdio"
+                      ? [server.command, ...(server.args ?? [])].join(" ")
+                      : server.url}
+                  </p>
                 </div>
+                <Button variant="primary" className="shrink-0" onClick={() => onSelect(server)}>
+                  Use this
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
 
-                <div className="mt-4 flex justify-end">
-                  <Button variant="ghost" onClick={onClose}>
-                    Cancel
-                  </Button>
-                </div>
-              </animated.div>
-            </div>
+        {cursor && (
+          <div className="mt-3 flex justify-center">
+            <Button
+              variant="secondary"
+              onClick={loadMore}
+              disabled={loadMoreAction.inFlight}
+              status={loadMoreAction.status}
+              pendingLabel="Loading…"
+            >
+              Load more
+            </Button>
           </div>
-        )
-    ),
-    document.body
+        )}
+      </div>
+    </Dialog>
   );
 }

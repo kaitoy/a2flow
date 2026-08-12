@@ -1,14 +1,11 @@
 /** @module DescriptionDiffDialog — modal showing a word-level diff of a workflow description against its AI-generated original. */
 "use client";
 
-import { animated, useTransition } from "@react-spring/web";
 import { diffWords } from "diff";
 import { useMemo } from "react";
-import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDialogA11y } from "@/hooks/useDialogA11y";
-import { useMotionConfig } from "@/lib/motion";
 
 /** Props for {@link DescriptionDiffDialog}. */
 export interface DescriptionDiffDialogProps {
@@ -113,110 +110,58 @@ export function DescriptionDiffDialog({
   onClose,
   loading = false,
 }: DescriptionDiffDialogProps) {
-  const config = useMotionConfig("gentle");
-  const transitions = useTransition(open, {
-    from: { opacity: 0, scale: 0.94 },
-    enter: { opacity: 1, scale: 1 },
-    leave: { opacity: 0, scale: 0.96 },
-    config,
-  });
-
-  useDialogA11y({ open, onClose, panelId: "description-diff-dialog", closeOnOutsideClick: false });
-
   const parts = useMemo(() => diffWords(generated, description), [generated, description]);
   const changed = parts.some((part) => part.added || part.removed);
-
-  // Guard against SSR — createPortal needs document.body, which is not
-  // available during Next.js prerendering.
-  if (typeof document === "undefined") return null;
 
   // An empty description is not an edit of the generated text — it means the
   // workflow execution falls back to it verbatim, so a diff would be misleading.
   const emptyDescription = description.trim() === "";
 
-  return createPortal(
-    transitions(
-      (style, item) =>
-        item && (
-          <div className="fixed inset-0 z-50">
-            <animated.button
-              type="button"
-              style={{ opacity: style.opacity }}
-              className="absolute inset-0 bg-black/25 backdrop-blur-[2px] cursor-default"
-              onClick={onClose}
-              // Stop the backdrop itself from taking focus on click, so the
-              // a11y hook's close handler always restores focus to the
-              // trigger instead of leaving it on this transient scrim.
-              onMouseDown={(e) => e.preventDefault()}
-              tabIndex={-1}
-              aria-hidden="true"
-            />
-            <div className="relative flex items-center justify-center min-h-full p-4 pointer-events-none">
-              <animated.div
-                id="description-diff-dialog"
-                tabIndex={-1}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="description-diff-dialog-title"
-                style={{
-                  opacity: style.opacity,
-                  transform: style.scale.to((s) => `scale(${s})`),
-                }}
-                className={[
-                  "flex max-h-[80vh] w-full max-w-2xl flex-col glass-panel-overlay rounded-2xl p-6 pointer-events-auto",
-                  // Signature "live edge" — matches the streaming chat
-                  // bubbles — while the server is still summarizing the
-                  // design conversation into the generated description.
-                  loading ? "live-edge" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <h2
-                  id="description-diff-dialog-title"
-                  className="mb-1 font-display text-lg font-semibold tracking-tight text-on-surface"
-                >
-                  Description diff
-                </h2>
-                <p className="mb-4 text-sm text-on-surface-variant">
-                  Changes the description makes to the generated description.
-                </p>
-                {loading ? (
-                  <DiffSkeleton />
-                ) : emptyDescription ? (
-                  <p className="text-sm text-on-surface-variant">
-                    Description is empty, so the generated description is used as is.
-                  </p>
-                ) : !changed ? (
-                  <p className="text-sm text-on-surface-variant">
-                    No differences — the description matches the generated description.
-                  </p>
-                ) : (
-                  <>
-                    <DiffLegend />
-                    <div className="flex-1 overflow-y-auto rounded-xl glass-panel p-4">
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                        {parts.map((part, index) => (
-                          // Diff parts have no stable identity of their own and
-                          // the list is fully recomputed whenever either text
-                          // changes, so the index is the only usable key.
-                          // biome-ignore lint/suspicious/noArrayIndexKey: diff parts have no stable id
-                          <DiffPart key={index} part={part} />
-                        ))}
-                      </p>
-                    </div>
-                  </>
-                )}
-                <div className="mt-4 flex justify-end">
-                  <Button variant="ghost" onClick={onClose}>
-                    Close
-                  </Button>
-                </div>
-              </animated.div>
-            </div>
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      panelId="description-diff-dialog"
+      title="Description diff"
+      description="Changes the description makes to the generated description."
+      size="lg"
+      scrollable
+      // Signature "live edge" — matches the streaming chat bubbles — while the
+      // server is still summarizing the design conversation into the generated
+      // description.
+      panelClassName={loading ? "live-edge" : undefined}
+      footer={
+        <Button variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      {loading ? (
+        <DiffSkeleton />
+      ) : emptyDescription ? (
+        <p className="text-sm text-on-surface-variant">
+          Description is empty, so the generated description is used as is.
+        </p>
+      ) : !changed ? (
+        <p className="text-sm text-on-surface-variant">
+          No differences — the description matches the generated description.
+        </p>
+      ) : (
+        <>
+          <DiffLegend />
+          <div className="flex-1 overflow-y-auto rounded-xl glass-panel p-4">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              {parts.map((part, index) => (
+                // Diff parts have no stable identity of their own and the list
+                // is fully recomputed whenever either text changes, so the
+                // index is the only usable key.
+                // biome-ignore lint/suspicious/noArrayIndexKey: diff parts have no stable id
+                <DiffPart key={index} part={part} />
+              ))}
+            </p>
           </div>
-        )
-    ),
-    document.body
+        </>
+      )}
+    </Dialog>
   );
 }
