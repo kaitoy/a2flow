@@ -37,6 +37,9 @@ interface ChipProps {
  * `Tooltip` composes its own ref and hover handlers onto the child element, so
  * it wraps the `<span>` here rather than the caller wrapping `<Chip>` — cloning
  * a component instead of a DOM element would drop both.
+ *
+ * Pass {@link ChipProps.onRemove} to add a trailing remove button for chips
+ * that represent a dismissible selection rather than a plain reference.
  */
 export function Chip({ label, onMouseEnter, onMouseLeave, onRemove }: ChipProps) {
   const ref = useRef<HTMLSpanElement>(null);

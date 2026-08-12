@@ -26,6 +26,8 @@ const BARE = "inline-flex cursor-pointer items-center";
  * {@link CheckboxGroup}, so independent boolean toggles stay visually consistent
  * with multi-select groups. Forwards its ref to the underlying input for
  * `react-hook-form` registration. The accessible name is the {@link label}.
+ * Pass {@link CheckboxProps.labelHidden} to render a bare checkbox for dense
+ * contexts, such as a table cell, that already state what is being checked.
  */
 export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(function Checkbox(
   { label, labelHidden, className, ...rest },

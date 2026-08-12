@@ -32,4 +32,17 @@ describe("Checkbox", () => {
     expect(box).toBeInTheDocument();
     expect(screen.getByText("Developers")).toHaveClass("sr-only");
   });
+
+  it("drops the row padding and hover chrome when the label is hidden", () => {
+    render(<Checkbox label="Developers" labelHidden />);
+    const wrapper = screen.getByRole("checkbox", { name: "Developers" }).closest("label");
+    expect(wrapper).toHaveClass("inline-flex");
+    expect(wrapper).not.toHaveClass("px-3");
+  });
+
+  it("keeps the row padding and hover chrome by default", () => {
+    render(<Checkbox label="Developers" />);
+    const wrapper = screen.getByRole("checkbox", { name: "Developers" }).closest("label");
+    expect(wrapper).toHaveClass("px-3");
+  });
 });
