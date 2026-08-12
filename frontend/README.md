@@ -53,6 +53,20 @@ pnpm start
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Changing the port
+
+Both `next dev` and `next start` read the `PORT` environment variable natively. Set it before running the command — it **cannot** go in `.env.local`, since Next.js starts its HTTP server before any `.env*` file is loaded:
+
+```bash
+# bash
+PORT=4000 pnpm dev
+```
+
+```powershell
+# PowerShell
+$env:PORT=4000; pnpm dev
+```
+
 ## Project structure
 
 The directory layout and where each kind of code lives is documented in [.claude/rules/frontend-patterns.md](../.claude/rules/frontend-patterns.md).
@@ -102,3 +116,4 @@ Test file placement, the shared `src/test/` infrastructure, and the per-boundary
 | Variable | Default | Description |
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | Backend base URL |
+| `PORT` | `3000` | Dev/start server port, read natively by Next.js. Must be set as a real environment variable — `.env.local` doesn't work (see [Changing the port](#changing-the-port)). |

@@ -98,7 +98,7 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). To run on a different port, see [Changing the port](frontend/README.md#changing-the-port) in the frontend README.
 
 ### 3. Git hooks (lefthook)
 
@@ -114,6 +114,8 @@ docker compose up --build
 ```
 
 Open [http://localhost:3000](http://localhost:3000). Database data persists in the `pgdata` volume across restarts.
+
+Set `FRONTEND_PORT` in `.env` to publish the frontend on a different host port (the container still listens on 3000 internally). If you do, also update `CORS_ORIGINS` in `.env` to match the new origin.
 
 ## Database
 

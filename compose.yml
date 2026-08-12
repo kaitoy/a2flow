@@ -12,9 +12,11 @@
 #   printf 'LLM_MODEL=litellm:anthropic/claude-3-5-sonnet-20241022\nANTHROPIC_API_KEY=<your-key>\n' > .env
 #   docker compose up --build
 #
-# The app is served at http://localhost:3000. The browser talks only to the
-# frontend; Next.js rewrites proxy /api/* server-side to the backend, keeping
-# the auth cookies same-origin.
+# The app is served at http://localhost:3000 by default. The browser talks
+# only to the frontend; Next.js rewrites proxy /api/* server-side to the
+# backend, keeping the auth cookies same-origin. Set FRONTEND_PORT in .env to
+# publish the frontend on a different host port (the container keeps
+# listening on 3000 internally); update CORS_ORIGINS to match if you do.
 services:
   db:
     image: postgres:17
@@ -84,7 +86,7 @@ services:
       args:
         BACKEND_BASE_URL: http://backend:8000
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       backend:
         condition: service_healthy
