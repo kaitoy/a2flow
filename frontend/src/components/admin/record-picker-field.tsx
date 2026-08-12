@@ -9,7 +9,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { type PickerOption, RecordPickerDialog } from "@/components/admin/record-picker-dialog";
 import { Button } from "@/components/ui/button";
@@ -86,12 +86,84 @@ export function RecordPickerField<T>({
     () => new Map((initialOptions ?? []).map((o) => [o.value, o.label]))
   );
 
-  // Resolve whatever the caller did not supply. Keyed on the joined id list, so
-  // a round that resolves only some of its ids shrinks `missingKey` and fires
-  // again for the rest — `labels` only ever grows, so `missingKey` can only
+  // Rebuilt every render (pickers pass at most a page's worth of options, so
+  // this is cheap) rather than folded into `labels` and read back: `value` and
+  // `initialOptions` typically change together, in the very same render — the
+  // user detail page sets `groupIds` and `groupOptions` from the same
+  // membership-fetch callback, and React batches both into one update — and a
+  // render cannot see a state write an effect of that same render has not
+  // committed yet. Consulting `initialOptions` directly here, rather than
+  // waiting for the merge effect below, is what lets both `missingKey` and the
+  // chip label below see a newly-arrived id on the render it arrives on,
+  // instead of one render later.
+  const initialOptionsById = new Map((initialOptions ?? []).map((o) => [o.value, o.label]));
+
+  // Latest `initialOptions` for the merge effect below to read, kept out of
+  // its dependency array on purpose (see `initialOptionsKey`).
+  const initialOptionsRef = useRef(initialOptions);
+  initialOptionsRef.current = initialOptions;
+
+  // Content fingerprint of `initialOptions`, used only to decide when the
+  // merge effect below needs to run again. `initialOptions` itself cannot be
+  // the dependency: a caller that inlines the array literal (as GroupPicker
+  // does when it forwards its own `initialOptions` prop through) hands this
+  // component a new array identity on every render, which would fire the
+  // effect every render too. Two renders whose `initialOptions` carry the
+  // same ids produce the same key string, and `useEffect` compares dependency
+  // values with `Object.is` — string primitives compare by value — so the
+  // effect only re-fires when the id set genuinely changes.
+  const initialOptionsKey = (initialOptions ?? []).map((o) => o.value).join(",");
+
+  // Copies `initialOptions` into the persistent `labels` map even when it
+  // arrives after the first render, not only from the `useState` initializer
+  // above (which React only ever runs once). Without this, an id `labels`
+  // has never otherwise learned (through `resolveLabels` or the dialog's
+  // `onAssign`) would fall back to `initialOptionsById` on every render
+  // instead of settling into state — harmless for what's on screen right now
+  // (see `initialOptionsById` above for why the *chip label* and
+  // `missingKey` do not wait on this effect to be correct), but it would
+  // leave `labels` never actually knowing the name for that id, so a later
+  // render whose `initialOptions` prop no longer happens to include it would
+  // regress the chip back to showing the raw id.
+  //
+  // Only ever adds entries `labels` doesn't already have, so it cannot loop:
+  // `setLabels` bails out to the same `prev` reference once every id in
+  // `initialOptions` is already present, and this effect's own dependency,
+  // `initialOptionsKey`, does not change when `labels` changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: initialOptionsKey captures the relevant change; initialOptionsRef.current is read purely to dodge depending on the array's unstable identity
+  useEffect(() => {
+    const options = initialOptionsRef.current;
+    if (!options || options.length === 0) return;
+    setLabels((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const option of options) {
+        if (!next.has(option.value)) {
+          next.set(option.value, option.label);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [initialOptionsKey]);
+
+  // Resolve whatever `labels` and `initialOptions` together do not cover.
+  // Keyed on the joined id list, so a round that resolves only some of its
+  // ids shrinks `missingKey` and fires again for the rest — `labels` only
+  // ever grows and `initialOptions` is assumed stable in content once it
+  // covers an id (see `initialOptionsById` above), so `missingKey` can only
   // shrink or hold steady across firings, and it stops once a round resolves
   // nothing at all.
-  const missingKey = value.filter((id) => !labels.has(id)).join(",");
+  //
+  // The `initialOptionsById` check is what actually keeps this from
+  // resolving over the network an id the caller already named: if this only
+  // consulted `labels`, the very render that first hands in a new `value` id
+  // alongside its `initialOptions` label — the common case, per
+  // `initialOptionsById` above — would still compute a `missingKey` that
+  // includes it, since `labels` has not caught up yet, and this effect would
+  // fire regardless of what the merge effect above goes on to do with that
+  // same render's state update.
+  const missingKey = value.filter((id) => !labels.has(id) && !initialOptionsById.has(id)).join(",");
   useEffect(() => {
     if (missingKey === "") return;
     let cancelled = false;
@@ -124,7 +196,7 @@ export function RecordPickerField<T>({
           {value.map((id) => (
             <Chip
               key={id}
-              label={labels.get(id) ?? id}
+              label={labels.get(id) ?? initialOptionsById.get(id) ?? id}
               onRemove={readOnly ? undefined : () => onChange(value.filter((v) => v !== id))}
             />
           ))}

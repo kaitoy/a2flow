@@ -15,11 +15,16 @@ import { Users } from "lucide-react";
 import { useCallback } from "react";
 import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { RecordPickerField } from "@/components/admin/record-picker-field";
+import { USER_SHARED_COLUMNS } from "@/components/admin/user-columns";
 import type { ColumnDef } from "@/components/ui/data-table";
 import { formatUserName, type ListQuery, listUsers, type User } from "@/lib/api";
 import { useAppSelector } from "@/store/hooks";
 
-/** Columns of the picker dialog, mirroring the users list page. */
+/**
+ * Columns of the picker dialog. Username is local — the dialog does not link
+ * off to the user's detail page — the rest is shared with the users list
+ * page via {@link USER_SHARED_COLUMNS}.
+ */
 const COLUMNS: ColumnDef<User>[] = [
   {
     header: "Username",
@@ -28,18 +33,7 @@ const COLUMNS: ColumnDef<User>[] = [
     visibility: "always",
     cell: (u) => u.username,
   },
-  {
-    header: "Name",
-    sortField: "firstName",
-    filterField: "firstName",
-    cell: (u) => formatUserName(u),
-  },
-  {
-    header: "Email",
-    sortField: "email",
-    filterField: "email",
-    cell: (u) => u.email,
-  },
+  ...USER_SHARED_COLUMNS,
 ];
 
 /** Label shown on a member's chip and on its checkbox in the dialog. */
@@ -47,7 +41,14 @@ function memberLabel(user: User): string {
   return `${formatUserName(user)} (${user.username})`;
 }
 
-/** Props for {@link UserPicker}. */
+/**
+ * Props for {@link UserPicker}.
+ *
+ * Unlike {@link GroupPickerProps}, there is no `initialOptions`: a
+ * `UserGroup` record carries `memberIds`, but nothing else on this page
+ * already holds user labels for the page to hand over, so there is nothing
+ * to seed the chips with.
+ */
 export interface UserPickerProps {
   /** Ids of the currently selected users. */
   value: string[];
@@ -72,6 +73,13 @@ export function UserPicker({ value, onChange, readOnly = false }: UserPickerProp
         ...query,
         filters: [
           ...(query.filters ?? []),
+          // `tenantId` is only null here for a platform-scoped viewer with no
+          // tenant selected, and that combination cannot actually reach this
+          // component: `CurrentTenantIdDep` (backend) raises `ForbiddenError`
+          // for such a caller, so the page's own tenant-scoped load already
+          // fails with a 403 before any picker renders. The guard below is
+          // still worth keeping explicit rather than assuming it can never
+          // fire, since it's cheap and the invariant lives outside this file.
           ...(tenantId ? [{ field: "tenantId", op: "eq", value: tenantId }] : []),
         ],
       }),

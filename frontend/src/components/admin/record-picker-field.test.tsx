@@ -63,6 +63,47 @@ describe("RecordPickerField", () => {
     expect(resolveLabels).not.toHaveBeenCalled();
   });
 
+  it("merges initialOptions that arrive together with value on a later render, not just at mount", async () => {
+    // Mirrors the user detail page: GroupPicker mounts with `value=[]` and
+    // `initialOptions=[]` as soon as `loading` flips false (driven by the
+    // separate `getUser` fetch), and only later — when the membership fetch
+    // resolves — do `value` and `initialOptions` change together, in the same
+    // render, batched from the same `.then()` callback. The `useState`
+    // initializer that seeds `labels` from `initialOptions` only ever runs
+    // once, at mount, so it cannot see this update; something else has to.
+    const resolveLabels = vi.fn(async (ids: string[]) =>
+      ALL.filter((r) => ids.includes(r.id)).map((r) => ({ value: r.id, label: r.name }))
+    );
+    const onChange = vi.fn();
+    const props: RecordPickerFieldProps<Row> = {
+      label: "Groups",
+      value: [],
+      onChange,
+      resolveLabels,
+      listRecords: async () => ALL,
+      columns: COLUMNS,
+      getId: (r) => r.id,
+      getLabel: (r) => r.name,
+      panelId: "test-field-dialog",
+      dialogTitle: "Select rows",
+      selectLabel: "Select rows…",
+      emptyMessage: "Nothing here.",
+      emptyIcon: UsersRound,
+    };
+    const { rerender } = render(<RecordPickerField<Row> {...props} />);
+
+    rerender(
+      <RecordPickerField<Row>
+        {...props}
+        value={["a"]}
+        initialOptions={[{ value: "a", label: "Alpha" }]}
+      />
+    );
+
+    expect(await screen.findByText("Alpha")).toBeInTheDocument();
+    expect(resolveLabels).not.toHaveBeenCalled();
+  });
+
   it("removes a selected record through its chip", async () => {
     const user = userEvent.setup();
     const { onChange } = renderField({

@@ -18,17 +18,23 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { USER_GROUP_SHARED_COLUMNS } from "@/components/admin/user-group-columns";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { deleteUserGroup, listUserGroups, type UserGroup } from "@/lib/api";
-import { EMPTY_VALUE } from "@/lib/read-only-display";
-import { ROLE_LABELS, Role, useHasRole } from "@/lib/roles";
+import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
 
+/**
+ * Static columns of the list table. Name and Created At are local to this
+ * page — Name links off to the group's detail page, which the picker dialog
+ * never does — the rest is shared with {@link GroupPicker}'s dialog table via
+ * {@link USER_GROUP_SHARED_COLUMNS}.
+ */
 const STATIC_COLUMNS: ColumnDef<UserGroup>[] = [
   {
     header: "Name",
@@ -44,28 +50,7 @@ const STATIC_COLUMNS: ColumnDef<UserGroup>[] = [
       </Link>
     ),
   },
-  {
-    header: "Description",
-    filterField: "description",
-    cell: (g) => g.description || EMPTY_VALUE,
-  },
-  {
-    // Roles are a JSON column, so they are display-only: the list API can
-    // neither sort nor filter on them.
-    header: "Roles",
-    noTruncate: true,
-    cell: (g) =>
-      g.roles && g.roles.length > 0
-        ? g.roles.map((role) => ROLE_LABELS[role]).join(", ")
-        : EMPTY_VALUE,
-  },
-  {
-    // Membership lives in a join table rather than on the group row, so this is
-    // display-only too.
-    header: "Members",
-    className: "text-center",
-    cell: (g) => g.memberIds?.length ?? 0,
-  },
+  ...USER_GROUP_SHARED_COLUMNS,
   {
     header: "Created At",
     sortField: "createdAt",

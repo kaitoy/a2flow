@@ -10,12 +10,15 @@ import { UsersRound } from "lucide-react";
 import { useCallback } from "react";
 import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { RecordPickerField } from "@/components/admin/record-picker-field";
+import { USER_GROUP_SHARED_COLUMNS } from "@/components/admin/user-group-columns";
 import type { ColumnDef } from "@/components/ui/data-table";
 import { listUserGroups, type UserGroup } from "@/lib/api";
-import { EMPTY_VALUE } from "@/lib/read-only-display";
-import { ROLE_LABELS } from "@/lib/roles";
 
-/** Columns of the picker dialog, mirroring the user-groups list page. */
+/**
+ * Columns of the picker dialog. Name is local — the dialog does not link
+ * off to the group's detail page — the rest is shared with the user-groups
+ * list page via {@link USER_GROUP_SHARED_COLUMNS}.
+ */
 const COLUMNS: ColumnDef<UserGroup>[] = [
   {
     header: "Name",
@@ -24,28 +27,7 @@ const COLUMNS: ColumnDef<UserGroup>[] = [
     visibility: "always",
     cell: (g) => g.name,
   },
-  {
-    header: "Description",
-    filterField: "description",
-    cell: (g) => g.description || EMPTY_VALUE,
-  },
-  {
-    // Roles are a JSON column, so this column is display-only: the list API can
-    // neither sort nor filter on it.
-    header: "Roles",
-    noTruncate: true,
-    cell: (g) =>
-      g.roles && g.roles.length > 0
-        ? g.roles.map((role) => ROLE_LABELS[role]).join(", ")
-        : EMPTY_VALUE,
-  },
-  {
-    // Membership lives in a join table rather than on the group row, so this is
-    // display-only too.
-    header: "Members",
-    className: "text-center",
-    cell: (g) => g.memberIds?.length ?? 0,
-  },
+  ...USER_GROUP_SHARED_COLUMNS,
 ];
 
 /** Props for {@link GroupPicker}. */

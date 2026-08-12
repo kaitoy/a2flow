@@ -39,12 +39,16 @@ describe("Chip", () => {
 
   it("clips to a single capped-width line with a modest radius", () => {
     render(<Chip label="Validate the uploaded CSV schema against the contract" />);
-    const chip = screen.getByText("Validate the uploaded CSV schema against the contract");
-    expect(chip.className).toContain("truncate");
-    expect(chip.className).toContain("max-w-64");
-    expect(chip.className).toContain("rounded-md");
+    // The label lives in an inner span that truncates; the width cap and
+    // radius live on its parent, the outer pill (see the remove-button test
+    // below for why they are split).
+    const labelSpan = screen.getByText("Validate the uploaded CSV schema against the contract");
+    expect(labelSpan.className).toContain("truncate");
+    const pill = labelSpan.parentElement;
+    expect(pill?.className).toContain("max-w-64");
+    expect(pill?.className).toContain("rounded-md");
     // A pill radius breaks open once the text wraps, so it must not be used here.
-    expect(chip.className).not.toContain("rounded-full");
+    expect(pill?.className).not.toContain("rounded-full");
   });
 
   it("reports hover to the caller", async () => {
@@ -97,6 +101,30 @@ describe("Chip", () => {
     render(<Chip label="Developers" onRemove={onRemove} />);
 
     await user.click(screen.getByRole("button", { name: "Remove Developers" }));
+
+    expect(onRemove).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the remove button reachable even when the label is long enough to clip", async () => {
+    // A label past ~36 characters is ordinary data here — e.g. UserPicker's
+    // "First Last (username)" chips in font-mono text-xs. If the truncating
+    // box ever again wrapped the button as well as the label, the button
+    // would clip out of the layout along with the overflowing text and this
+    // click would silently miss.
+    const onRemove = vi.fn();
+    const user = userEvent.setup();
+    const label = "Alexandra Montgomery-Whitfield (a.montgomery-whitfield)";
+    render(<Chip label={label} onRemove={onRemove} />);
+
+    const button = screen.getByRole("button", { name: `Remove ${label}` });
+    // The button must be a sibling of the truncating label span, not a
+    // descendant of it — the fix that keeps it out of the clipping region.
+    const labelSpan = screen.getByText(label);
+    expect(labelSpan.className).toContain("truncate");
+    expect(button.parentElement).toBe(labelSpan.parentElement);
+    expect(button.className).toContain("shrink-0");
+
+    await user.click(button);
 
     expect(onRemove).toHaveBeenCalledTimes(1);
   });

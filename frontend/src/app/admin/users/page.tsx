@@ -20,6 +20,7 @@ import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { InheritedRoles } from "@/components/admin/inherited-roles";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { USER_SHARED_COLUMNS } from "@/components/admin/user-columns";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -46,6 +47,12 @@ function boolCell(value: boolean): string {
   return value ? "✓" : "—";
 }
 
+/**
+ * Static columns of the list table. Avatar, Username, Roles, Enabled,
+ * Verified, and Created At are local to this page — Username links off to the
+ * user's detail page, which the picker dialog never does — Name and Email are
+ * shared with {@link UserPicker}'s dialog table via {@link USER_SHARED_COLUMNS}.
+ */
 const STATIC_COLUMNS: ColumnDef<User>[] = [
   {
     header: "",
@@ -67,19 +74,7 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
       </Link>
     ),
   },
-  {
-    header: "Name",
-    sortField: "firstName",
-    filterField: "firstName",
-    cell: (u) => `${u.firstName} ${u.lastName}`,
-  },
-  {
-    header: "Email",
-    sortField: "email",
-    filterField: "email",
-    visibility: "optional",
-    cell: (u) => u.email,
-  },
+  ...USER_SHARED_COLUMNS,
   {
     // Roles are stored as a JSON list, which the list API's sort/filter params
     // cannot address, so this column is display-only — and the same goes for
