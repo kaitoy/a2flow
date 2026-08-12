@@ -85,4 +85,19 @@ describe("Chip", () => {
     expect(onMouseEnter).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
+
+  it("renders no remove button without onRemove", () => {
+    render(<Chip label="Developers" />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("calls onRemove when its remove button is pressed", async () => {
+    const onRemove = vi.fn();
+    const user = userEvent.setup();
+    render(<Chip label="Developers" onRemove={onRemove} />);
+
+    await user.click(screen.getByRole("button", { name: "Remove Developers" }));
+
+    expect(onRemove).toHaveBeenCalledTimes(1);
+  });
 });

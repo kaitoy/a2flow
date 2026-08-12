@@ -12,6 +12,11 @@ interface ChipProps {
   onMouseEnter?: () => void;
   /** Called when the pointer leaves the chip. */
   onMouseLeave?: () => void;
+  /**
+   * When supplied, the chip renders a remove button labelled
+   * `Remove ${label}`. Omit it for chips that only display a reference.
+   */
+  onRemove?: () => void;
 }
 
 /**
@@ -33,7 +38,7 @@ interface ChipProps {
  * it wraps the `<span>` here rather than the caller wrapping `<Chip>` — cloning
  * a component instead of a DOM element would drop both.
  */
-export function Chip({ label, onMouseEnter, onMouseLeave }: ChipProps) {
+export function Chip({ label, onMouseEnter, onMouseLeave, onRemove }: ChipProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const [overflowing, setOverflowing] = useState(false);
 
@@ -57,6 +62,16 @@ export function Chip({ label, onMouseEnter, onMouseLeave }: ChipProps) {
         className="inline-block max-w-64 truncate rounded-md glass-panel px-2 py-0.5 font-mono text-xs text-on-surface-variant"
       >
         {label}
+        {onRemove && (
+          <button
+            type="button"
+            aria-label={`Remove ${label}`}
+            onClick={onRemove}
+            className="ml-1 text-on-surface-variant transition-colors hover:text-error"
+          >
+            ×
+          </button>
+        )}
       </span>
     </Tooltip>
   );

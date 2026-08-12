@@ -25,4 +25,11 @@ describe("Checkbox", () => {
     render(<Checkbox label="Enabled" disabled />);
     expect(screen.getByRole("checkbox", { name: "Enabled" })).toBeDisabled();
   });
+
+  it("keeps the label as the accessible name while hiding it visually", () => {
+    render(<Checkbox label="Developers" labelHidden />);
+    const box = screen.getByRole("checkbox", { name: "Developers" });
+    expect(box).toBeInTheDocument();
+    expect(screen.getByText("Developers")).toHaveClass("sr-only");
+  });
 });
