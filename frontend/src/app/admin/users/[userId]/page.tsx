@@ -26,6 +26,7 @@ import { GroupPicker } from "@/components/admin/group-picker";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { InheritedRolesField } from "@/components/admin/inherited-roles";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
+import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { RolesField } from "@/components/admin/roles-field";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Avatar } from "@/components/ui/avatar";
@@ -41,8 +42,8 @@ import {
   type AvatarConfig,
   deleteUser,
   getUser,
+  getUserGroupsForUser,
   isForbiddenError,
-  listUserGroups,
   SUPPRESS_FORBIDDEN_TOAST,
   setUserGroups,
   startImpersonation,
@@ -117,9 +118,11 @@ export default function UserDetailPage() {
   const [groupRoles, setGroupRoles] = useState<Role[]>([]);
   // Group membership, edited from this side as well as from the group detail
   // page. `savedGroupIds` remembers what the server has, so an unchanged
-  // selection skips the extra request.
+  // selection skips the extra request; `groupOptions` hands the picker the
+  // names it already fetched, so the chips render without a second round trip.
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [savedGroupIds, setSavedGroupIds] = useState<string[]>([]);
+  const [groupOptions, setGroupOptions] = useState<PickerOption[]>([]);
   // The tenantId as loaded from the server. A tenant is immutable once
   // assigned (the backend rejects any change), so it's the source of truth
   // whenever it's non-null; `tenantId` below only derives a value from the
@@ -209,15 +212,15 @@ export default function UserDetailPage() {
       .finally(() => setLoading(false));
   }, [userId, reset]);
 
-  // Membership is only exposed from the group side, so it is derived from the
-  // group list rather than fetched per user. A failure here is not fatal: the
-  // picker renders its own error state and the rest of the form still works.
+  // Membership is not carried on the user record, so it is read through the
+  // dedicated sub-resource. A failure here is not fatal: the picker renders an
+  // empty selection and the rest of the form still works.
   useEffect(() => {
-    listUserGroups({ limit: 1000 })
+    getUserGroupsForUser(userId)
       .then((groups) => {
-        const mine = groups.filter((g) => g.memberIds?.includes(userId)).map((g) => g.id);
-        setGroupIds(mine);
-        setSavedGroupIds(mine);
+        setGroupIds(groups.map((group) => group.id));
+        setSavedGroupIds(groups.map((group) => group.id));
+        setGroupOptions(groups.map((group) => ({ value: group.id, label: group.name })));
       })
       .catch(() => {
         // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -404,7 +407,12 @@ export default function UserDetailPage() {
           <InheritedRolesField roles={groupRoles} />
 
           {canJoinGroups && (
-            <GroupPicker value={groupIds} onChange={setGroupIds} readOnly={!canEdit} />
+            <GroupPicker
+              value={groupIds}
+              onChange={setGroupIds}
+              readOnly={!canEdit}
+              initialOptions={groupOptions}
+            />
           )}
 
           {canEdit ? (

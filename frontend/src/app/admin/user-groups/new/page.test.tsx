@@ -52,8 +52,9 @@ describe("NewUserGroupPage", () => {
     render(<NewUserGroupPage />, { preloadedState: ADMIN });
     await fillName();
     await userEvent.click(screen.getByRole("checkbox", { name: "Approver" }));
-    await waitFor(() => screen.getByRole("checkbox", { name: "Alice Smith (alice)" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Alice Smith (alice)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Select members…" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Alice Smith (alice)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Assign" }));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(body).toMatchObject({

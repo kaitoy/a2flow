@@ -22,11 +22,9 @@ describe("UserGroupDetailPage", () => {
     expect(screen.getByRole("checkbox", { name: "Developer" })).toBeChecked();
   });
 
-  it("checks the current members", async () => {
+  it("shows a chip for each current member", async () => {
     render(<UserGroupDetailPage />, { preloadedState: ADMIN });
-    await waitFor(() =>
-      expect(screen.getByRole("checkbox", { name: "Alice Smith (alice)" })).toBeChecked()
-    );
+    expect(await screen.findByText("Alice Smith (alice)")).toBeInTheDocument();
   });
 
   it("never offers super_admin among the roles a group can grant", async () => {

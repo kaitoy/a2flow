@@ -1,5 +1,7 @@
+import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import type { User } from "@/lib/api";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
@@ -7,56 +9,59 @@ import { UserPicker } from "./user-picker";
 
 const BASE = "http://localhost:8000";
 
-/** Build a user row for the list endpoint. */
-function user(overrides: Record<string, unknown>) {
-  return {
-    id: "u1",
-    username: "alice",
-    firstName: "Alice",
-    lastName: "Smith",
-    email: "alice@example.com",
-    enabled: true,
-    emailVerified: false,
-    tenantId: "tenant-1",
-    roles: [],
-    groupRoles: [],
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
-    createdBy: "",
-    updatedBy: "",
-    ...overrides,
-  };
-}
+// `ADMIN` from `@/test/auth-state` carries no `tenantId` on its user, and the
+// tenant filter this suite asserts on is derived from
+// `auth.user.tenantId ?? auth.selectedTenantId` — so it needs a locally built
+// preloaded state rather than the shared fixture (which other suites rely on
+// staying tenant-less).
+const ADMIN_IN_TENANT = {
+  auth: {
+    user: { id: "u1", roles: ["admin"], tenantId: "tenant-1" } as User,
+    status: "authenticated" as const,
+    selectedTenantId: null,
+    impersonatedUserId: null,
+    impersonatedBy: null,
+  },
+};
 
 describe("UserPicker", () => {
-  it("labels each user by name and username", async () => {
-    render(<UserPicker value={[]} onChange={vi.fn()} />);
-    await waitFor(() =>
-      expect(screen.getByRole("checkbox", { name: "Alice Smith (alice)" })).toBeInTheDocument()
-    );
+  it("labels each user by name and username in the dialog", async () => {
+    const user = userEvent.setup();
+    render(<UserPicker value={[]} onChange={vi.fn()} />, { preloadedState: ADMIN_IN_TENANT });
+
+    await user.click(screen.getByRole("button", { name: "Select members…" }));
+
+    expect(
+      await screen.findByRole("checkbox", { name: "Alice Smith (alice)" })
+    ).toBeInTheDocument();
   });
 
-  it("omits platform-scoped users, which can never be members", async () => {
-    // A super admin (and the seeded system user) carry no tenantId, and a group
-    // belongs to exactly one tenant — the backend rejects them with 422.
+  it("asks the server for the acting tenant's users only", async () => {
+    const user = userEvent.setup();
+    let query = "";
     server.use(
-      http.get(`${BASE}/api/v1/users`, () =>
-        envelope([
-          user({ id: "u1", username: "alice" }),
-          user({ id: "root", username: "root", tenantId: null, roles: ["super_admin"] }),
-        ])
-      )
+      http.get(`${BASE}/api/v1/users`, ({ request }) => {
+        query = new URL(request.url).search;
+        return envelope([]);
+      })
     );
-    render(<UserPicker value={[]} onChange={vi.fn()} />);
-    await waitFor(() => screen.getByRole("checkbox", { name: "Alice Smith (alice)" }));
-    expect(screen.queryByRole("checkbox", { name: /root/ })).not.toBeInTheDocument();
+    render(<UserPicker value={[]} onChange={vi.fn()} />, { preloadedState: ADMIN_IN_TENANT });
+
+    await user.click(screen.getByRole("button", { name: "Select members…" }));
+
+    // Axios's default paramsSerializer (the `listConfig` helper every list page
+    // relies on) deliberately un-escapes `%3A` back to `:` for readability, so
+    // the wire format is `q=tenantId:eq:<id>`, not percent-encoded.
+    await waitFor(() => expect(query).toContain("tenantId:eq:"));
   });
 
   it("shows an empty message when the tenant has no users", async () => {
+    const user = userEvent.setup();
     server.use(http.get(`${BASE}/api/v1/users`, () => envelope([])));
-    render(<UserPicker value={[]} onChange={vi.fn()} />);
-    await waitFor(() =>
-      expect(screen.getByText("This tenant has no users to add.")).toBeInTheDocument()
-    );
+    render(<UserPicker value={[]} onChange={vi.fn()} />, { preloadedState: ADMIN_IN_TENANT });
+
+    await user.click(screen.getByRole("button", { name: "Select members…" }));
+
+    expect(await screen.findByText("This tenant has no users to add.")).toBeInTheDocument();
   });
 });

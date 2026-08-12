@@ -572,9 +572,9 @@ describe("UserDetailPage group membership", () => {
     expect(screen.getByText(/Granted by group membership/)).toBeInTheDocument();
   });
 
-  it("checks the groups the user already belongs to", async () => {
+  it("shows a chip for each group the user already belongs to", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Developers" })).toBeChecked());
+    expect(await screen.findByText("Developers")).toBeInTheDocument();
   });
 
   it("writes membership only when the selection changed", async () => {
@@ -586,12 +586,12 @@ describe("UserDetailPage group membership", () => {
       })
     );
     renderPage();
-    await waitFor(() => screen.getByRole("checkbox", { name: "Developers" }));
+    await screen.findByText("Developers");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(membershipWrites).toBe(0));
   });
 
-  it("writes the new membership when a group is toggled", async () => {
+  it("writes the new membership when a group is removed", async () => {
     let body: unknown;
     server.use(
       http.put("http://localhost:8000/api/v1/users/:userId/groups", async ({ request }) => {
@@ -600,8 +600,8 @@ describe("UserDetailPage group membership", () => {
       })
     );
     renderPage();
-    await waitFor(() => screen.getByRole("checkbox", { name: "Developers" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Developers" }));
+    await screen.findByText("Developers");
+    await userEvent.click(screen.getByRole("button", { name: "Remove Developers" }));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(body).toEqual({ groupIds: [] }));
   });

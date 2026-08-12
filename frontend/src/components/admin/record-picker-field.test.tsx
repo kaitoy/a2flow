@@ -90,6 +90,32 @@ describe("RecordPickerField", () => {
     await waitFor(() => expect(listRecords).toHaveBeenCalled());
   });
 
+  it("keeps the dialog mounted across a close and reopen, so it does not refetch", async () => {
+    // A collapse to `{open && <RecordPickerDialog ... />}` would still pass the
+    // "fetches no records before first open" test above, since `open` is false
+    // on the very first render either way. What actually distinguishes the two
+    // implementations is what happens after the dialog has been opened once:
+    // this field keeps it mounted, so a close-then-reopen must not issue a
+    // second fetch. An eager-unmount regression would call `listRecords` again
+    // on reopen and fail the final assertion.
+    const user = userEvent.setup();
+    const listRecords = vi.fn(async () => ALL);
+    renderField({ listRecords });
+
+    await user.click(screen.getByRole("button", { name: "Select rows…" }));
+    await waitFor(() => expect(listRecords).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    // Cancel runs the dialog's leave animation on real timers before it
+    // actually unmounts, so wait for it to finish closing.
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Select rows…" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+
+    expect(listRecords).toHaveBeenCalledTimes(1);
+  });
+
   it("applies the dialog's assignment", async () => {
     const user = userEvent.setup();
     const { onChange } = renderField();

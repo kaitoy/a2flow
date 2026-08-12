@@ -247,7 +247,7 @@ A group belongs to exactly one tenant (its name is unique within that tenant) an
 
 **Roles granted.** The roles picker is the same one the [Users](#users) pages use, minus **Super Admin** — a group can never grant it, and the option is hidden from every viewer including a Super Admin. Submitting it anyway is rejected with HTTP 422, and a database check constraint backs that up.
 
-**Members.** The members picker lists the tenant's users, with a filter box once the list gets long. Platform-scoped accounts (Super Admins and the seeded system user) are omitted: they belong to no tenant, so they can never be members — which is also why `super_admin` can never arrive through a group. Supplying members replaces the group's membership wholesale; leaving the field untouched on an edit keeps it as-is. The same membership is editable from the other side, on each [user's](#users) detail page.
+**Members.** The current members show as removable chips; a **Select members…** button opens a modal table of the tenant's users, paged and filtered server-side, for adding more. Platform-scoped accounts (Super Admins and the seeded system user) are omitted: they belong to no tenant, so they can never be members — which is also why `super_admin` can never arrive through a group. Supplying members replaces the group's membership wholesale; leaving the field untouched on an edit keeps it as-is. The same membership is editable from the other side, on each [user's](#users) detail page.
 
 Writes require the `admin` role. Reads stay open like every other section, so a viewer without it sees the list and a read-only detail page. **Deleting** a group removes its membership rows with it: the accounts are untouched, but they lose the roles the group was granting them.
 
