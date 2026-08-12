@@ -10,7 +10,7 @@ const outputPath = join(__dirname, '../src/generated/basic_catalog.json');
 // fails the build instead of being silently baked into the app. Recompute
 // with `curl -s <url> | sha256sum` and update deliberately when a2ui.org
 // intentionally revises the catalog.
-const EXPECTED_SHA256 = '4c694b68ee51e0e5716add4bcfddafb6311089df07314832f27decaca319c0d3';
+const EXPECTED_SHA256 = '8cc94d0a482e67048f9fc989964ca5da56fe42f531d919315a508989fb22e13e';
 
 if (existsSync(outputPath)) {
   console.log(`${outputPath} already exists, skipping download.`);
