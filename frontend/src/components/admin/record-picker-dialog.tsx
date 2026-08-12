@@ -9,7 +9,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -87,12 +87,18 @@ export function RecordPickerDialog<T>({
   );
   const [draft, setDraft] = useState<string[]>(value);
   const [labels, setLabels] = useState<Map<string, string>>(new Map());
+  const wasOpenRef = useRef(open);
 
-  // Re-seed the draft on every open, so a cancelled edit never leaks into the
-  // next one and an assignment made elsewhere is picked up.
+  // Re-seed the draft on the closed→open transition, so a cancelled edit never
+  // leaks into the next one and an assignment made elsewhere is picked up.
+  // `value` is deliberately not a dependency: re-seeding on every `value`
+  // identity change while already open would silently discard an in-progress
+  // draft whenever the parent re-renders with a fresh (but equal) array.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-runs only on the open transition, not on every value identity change
   useEffect(() => {
-    if (open) setDraft(value);
-  }, [open, value]);
+    if (open && !wasOpenRef.current) setDraft(value);
+    wasOpenRef.current = open;
+  }, [open]);
 
   // Remember what each row seen so far is called.
   useEffect(() => {

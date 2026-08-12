@@ -30,7 +30,10 @@ async function listRows(query: ListQuery): Promise<Row[]> {
 
 function renderDialog(props: Partial<RecordPickerDialogProps<Row>> = {}) {
   const onAssign = vi.fn();
-  render(
+  // `props` (the caller's fixed overrides) is captured once and merged under
+  // every `overrides` passed to `rerender`, so a rerender only needs to state
+  // what changed — e.g. `{ open: false }` — without repeating the rest.
+  const build = (overrides: Partial<RecordPickerDialogProps<Row>>) => (
     <RecordPickerDialog<Row>
       open
       onClose={vi.fn()}
@@ -45,9 +48,15 @@ function renderDialog(props: Partial<RecordPickerDialogProps<Row>> = {}) {
       emptyMessage="Nothing here."
       emptyIcon={UsersRound}
       {...props}
+      {...overrides}
     />
   );
-  return { onAssign };
+  const result = render(build({}));
+  return {
+    onAssign,
+    rerender: (overrides: Partial<RecordPickerDialogProps<Row>>) =>
+      result.rerender(build(overrides)),
+  };
 }
 
 describe("RecordPickerDialog", () => {
@@ -111,5 +120,37 @@ describe("RecordPickerDialog", () => {
 
     expect(onClose).toHaveBeenCalled();
     expect(onAssign).not.toHaveBeenCalled();
+  });
+
+  it("re-seeds the draft from value on the closed-to-open transition", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderDialog({ value: ["r01"] });
+
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Row 01" })).toBeChecked());
+    await user.click(screen.getByRole("checkbox", { name: "Row 02" }));
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+
+    rerender({ open: false });
+    rerender({ open: true });
+
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Row 01" })).toBeChecked());
+    expect(screen.getByRole("checkbox", { name: "Row 02" })).not.toBeChecked();
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+  });
+
+  it("keeps the draft when the parent re-renders with a new but equal value array", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderDialog({ value: ["r01"] });
+
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Row 01" })).toBeChecked());
+    await user.click(screen.getByRole("checkbox", { name: "Row 02" }));
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+
+    // A fresh array instance carrying the same ids, not the same reference —
+    // the shape a parent's re-render would pass without memoizing `value`.
+    rerender({ value: ["r01"] });
+
+    expect(screen.getByRole("checkbox", { name: "Row 02" })).toBeChecked();
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
   });
 });
