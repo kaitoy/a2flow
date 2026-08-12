@@ -16,7 +16,7 @@
 # only to the frontend; Next.js rewrites proxy /api/* server-side to the
 # backend, keeping the auth cookies same-origin. Set FRONTEND_PORT in .env to
 # publish the frontend on a different host port (the container keeps
-# listening on 3000 internally); update CORS_ORIGINS to match if you do.
+# listening on 3000 internally); CORS_ORIGINS below follows it automatically.
 services:
   db:
     image: postgres:17
@@ -61,7 +61,7 @@ services:
       DEMO_AWS_ACCESS_KEY_ID: ${DEMO_AWS_ACCESS_KEY_ID:-}
       DEMO_AWS_SECRET_ACCESS_KEY: ${DEMO_AWS_SECRET_ACCESS_KEY:-}
       DEMO_AWS_REGION: ${DEMO_AWS_REGION:-us-east-1}
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
       # Store of cloned skill repositories, one directory per published
       # revision. Durable state, not a cache: a workflow execution pins the
       # revision it started with. Scaling the backend past one replica requires

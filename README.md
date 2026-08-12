@@ -115,7 +115,7 @@ docker compose up --build
 
 Open [http://localhost:3000](http://localhost:3000). Database data persists in the `pgdata` volume across restarts.
 
-Set `FRONTEND_PORT` in `.env` to publish the frontend on a different host port (the container still listens on 3000 internally). If you do, also update `CORS_ORIGINS` in `.env` to match the new origin.
+Set `FRONTEND_PORT` in `.env` to publish the frontend on a different host port (the container still listens on 3000 internally); the backend's `CORS_ORIGINS` follows it automatically.
 
 ## Database
 
