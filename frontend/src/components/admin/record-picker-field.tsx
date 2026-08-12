@@ -86,8 +86,11 @@ export function RecordPickerField<T>({
     () => new Map((initialOptions ?? []).map((o) => [o.value, o.label]))
   );
 
-  // Resolve whatever the caller did not supply. Keyed on the joined id list so
-  // the fetch runs once per genuinely new set rather than on every render.
+  // Resolve whatever the caller did not supply. Keyed on the joined id list, so
+  // a round that resolves only some of its ids shrinks `missingKey` and fires
+  // again for the rest — `labels` only ever grows, so `missingKey` can only
+  // shrink or hold steady across firings, and it stops once a round resolves
+  // nothing at all.
   const missingKey = value.filter((id) => !labels.has(id)).join(",");
   useEffect(() => {
     if (missingKey === "") return;
@@ -95,6 +98,7 @@ export function RecordPickerField<T>({
     resolveLabels(missingKey.split(","))
       .then((options) => {
         if (cancelled) return;
+        if (options.length === 0) return;
         setLabels((prev) => {
           const next = new Map(prev);
           for (const option of options) next.set(option.value, option.label);

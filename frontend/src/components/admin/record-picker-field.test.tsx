@@ -78,6 +78,18 @@ describe("RecordPickerField", () => {
     expect(onChange).toHaveBeenCalledWith(["b"]);
   });
 
+  it("fetches no records before the operator opens the dialog", async () => {
+    const user = userEvent.setup();
+    const listRecords = vi.fn(async () => ALL);
+    renderField({ listRecords });
+
+    expect(listRecords).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Select rows…" }));
+
+    await waitFor(() => expect(listRecords).toHaveBeenCalled());
+  });
+
   it("applies the dialog's assignment", async () => {
     const user = userEvent.setup();
     const { onChange } = renderField();
