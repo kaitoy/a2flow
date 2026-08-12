@@ -512,3 +512,51 @@ async def test_user_list_reports_inherited_roles(
     by_id = {user["id"]: user for user in users}
     assert by_id["alice"]["groupRoles"] == ["developer"]
     assert by_id["bob"]["groupRoles"] == []
+
+
+# ---------- membership read from the user side ----------
+
+
+async def test_groups_for_user_returns_the_groups_they_belong_to(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    await _create(client, name="Developers", memberIds=["alice"])
+    await _create(client, name="Approvers", roles=["approver"], memberIds=["bob"])
+
+    groups = assert_ok(await client.get("/api/v1/users/alice/groups", headers=ADMIN))
+
+    assert [group["name"] for group in groups] == ["Developers"]
+    assert groups[0]["memberIds"] == ["alice"]
+
+
+async def test_groups_for_user_is_readable_without_the_admin_role(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    await _create(client, memberIds=["carol"])
+
+    groups = assert_ok(await client.get("/api/v1/users/carol/groups", headers=NOBODY))
+
+    assert [group["name"] for group in groups] == ["Developers"]
+
+
+async def test_groups_for_user_is_empty_when_they_belong_to_none(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    await _create(client, memberIds=["alice"])
+
+    groups = assert_ok(await client.get("/api/v1/users/bob/groups", headers=ADMIN))
+
+    assert groups == []
+
+
+async def test_groups_for_user_404s_for_a_user_of_another_tenant(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+
+    response = await client.get("/api/v1/users/outsider/groups", headers=ADMIN)
+
+    assert_err(response, "NOT_FOUND", 404)

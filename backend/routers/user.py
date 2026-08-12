@@ -31,7 +31,7 @@ from models.user import (
     UserRead,
     UserUpdate,
 )
-from models.user_group import UserGroupMembershipUpdate
+from models.user_group import UserGroupMembershipUpdate, UserGroupRead
 from services import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -200,6 +200,26 @@ async def delete_user(
     """
     await service.delete(user_id, acting_user=acting_user)
     return ApiResponse(meta=meta, data=None)
+
+
+@router.get("/{user_id}/groups", response_model=ApiResponse[list[UserGroupRead]])
+async def list_groups_for_user(
+    user_id: str,
+    service: UserServiceDep,
+    group_service: UserGroupServiceDep,
+    acting_user: CurrentUserDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[UserGroupRead]]:
+    """Return the acting tenant's groups the given user belongs to.
+
+    The read counterpart of ``PUT /users/{user_id}/groups``. Reads are open to
+    any authenticated caller, as everywhere else, but the user is resolved
+    through :class:`~services.user.UserService` first, so a target in another
+    tenant reads as 404 rather than confirming that it exists.
+    """
+    user = await service.get(user_id, acting_user=acting_user)
+    groups = await group_service.groups_for_user(user.id)
+    return ApiResponse(meta=meta, data=groups)
 
 
 @router.put(

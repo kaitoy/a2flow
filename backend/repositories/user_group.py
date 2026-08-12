@@ -72,6 +72,8 @@ class UserGroupRepository(Protocol):
 
     async def group_ids_for_user(self, user_id: str) -> _StrList: ...
 
+    async def list_for_user(self, user_id: str) -> _GroupList: ...
+
     async def set_groups_for_user(
         self, user_id: str, group_ids: Sequence[str]
     ) -> None: ...
@@ -265,6 +267,38 @@ class SqlUserGroupRepository:
             )
         )
         return sorted((await self._db.exec(stmt)).all())
+
+    async def list_for_user(self, user_id: str) -> _GroupList:
+        """Return this tenant's groups that ``user_id`` belongs to.
+
+        The membership counterpart of :meth:`list`, used by the user detail
+        page so it never has to page through every group looking for one
+        member.
+
+        Args:
+            user_id: Identifier of the user whose memberships to list.
+
+        Returns:
+            The groups, ordered by name, each with its membership attached.
+        """
+        stmt = (
+            select(UserGroup)
+            .join(
+                UserGroupMember,
+                onclause=col(UserGroup.id) == UserGroupMember.group_id,
+            )
+            .where(
+                col(UserGroupMember.user_id) == user_id,
+                col(UserGroup.tenant_id) == self._tenant_id,
+            )
+            .order_by(col(UserGroup.name))
+        )
+        groups = list((await self._db.exec(stmt)).all())
+        members = await self._members_for_many([g.id for g in groups])
+        return [
+            UserGroupRead.from_group(g, member_ids=members.get(g.id, []))
+            for g in groups
+        ]
 
     async def set_groups_for_user(self, user_id: str, group_ids: Sequence[str]) -> None:
         """Replace the set of this tenant's groups ``user_id`` belongs to.

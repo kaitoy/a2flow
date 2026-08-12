@@ -281,6 +281,8 @@ export const handlers = [
 
   http.put(`${BASE}/api/v1/users/:userId/groups`, () => envelope(USER_1)),
 
+  http.get(`${BASE}/api/v1/users/:userId/groups`, () => envelope([USER_GROUP_1])),
+
   http.get(`${BASE}/api/v1/user-groups`, () => envelope([USER_GROUP_1])),
 
   http.get(`${BASE}/api/v1/user-groups/:groupId`, () => envelope(USER_GROUP_1)),

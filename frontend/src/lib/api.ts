@@ -100,6 +100,7 @@ import {
   zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
   zListApprovalsApiV1ApprovalsGetResponse,
+  zListGroupsForUserApiV1UsersUserIdGroupsGetResponse,
   zListMcpServersApiV1McpServersGetResponse,
   zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse,
   zListNotificationsApiV1NotificationsGetResponse,
@@ -850,6 +851,20 @@ export async function listUserGroups(query: ListQuery = {}): Promise<UserGroup[]
   return fetchEnvelope(
     apiClient.get("/api/v1/user-groups", listConfig(query)),
     zListUserGroupsApiV1UserGroupsGetResponse
+  ) as Promise<UserGroup[]>;
+}
+
+/**
+ * Fetch the acting tenant's user groups a given user belongs to.
+ *
+ * The read counterpart of {@link setUserGroups}. Membership is not carried on
+ * the user record, so this is how a user-side screen learns which groups to
+ * show without paging through every group in the tenant.
+ */
+export async function getUserGroupsForUser(userId: string): Promise<UserGroup[]> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/users/${encodeURIComponent(userId)}/groups`),
+    zListGroupsForUserApiV1UsersUserIdGroupsGetResponse
   ) as Promise<UserGroup[]>;
 }
 

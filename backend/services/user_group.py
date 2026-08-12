@@ -138,6 +138,17 @@ class UserGroupService:
         """
         return await self._repo.group_ids_for_user(user_id)
 
+    async def groups_for_user(self, user_id: str) -> _GroupList:
+        """Return the acting tenant's groups a user belongs to.
+
+        Args:
+            user_id: Identifier of the user whose memberships to list.
+
+        Returns:
+            The groups, ordered by name, each with its membership attached.
+        """
+        return await self._repo.list_for_user(user_id)
+
     async def set_groups_for_user(self, user_id: str, group_ids: Sequence[str]) -> None:
         """Replace the set of groups a user belongs to.
 
