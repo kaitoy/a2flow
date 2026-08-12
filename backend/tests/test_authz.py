@@ -395,3 +395,66 @@ async def test_reads_are_open_to_users_without_roles(
     ):
         res = await workflow_client.get(path, headers=_roles(""))
         assert res.status_code == 200, path
+
+
+# ---------- roles inherited from a user group ----------
+#
+# ``require_roles`` consumes ``get_effective_roles`` (direct grants unioned with
+# the roles of every group the caller belongs to), not ``user.roles``. The test
+# stub mirrors that split: ``X-User-Roles`` stands in for the direct half and
+# ``X-User-Group-Roles`` for the inherited half, so these tests pin the gate to
+# the union rather than to the column. See ``tests/test_user_groups.py`` for the
+# end-to-end versions that seed real groups and memberships.
+
+
+def _inherited(roles: str) -> dict[str, str]:
+    """Build headers for a caller whose only roles come from a group."""
+    return {"X-User-Roles": "", "X-User-Group-Roles": roles}
+
+
+async def test_group_inherited_developer_passes_the_developer_gate(
+    workflow_client: AsyncClient,
+) -> None:
+    res = await workflow_client.post(
+        "/api/v1/agent-skills", json=_SKILL_BODY, headers=_inherited("developer")
+    )
+    assert_ok(res, status=201)
+
+
+async def test_group_inherited_admin_passes_the_admin_gate(
+    workflow_client: AsyncClient,
+) -> None:
+    res = await workflow_client.post(
+        "/api/v1/users", json=_USER_BODY, headers=_inherited("admin")
+    )
+    assert_ok(res, status=201)
+
+
+async def test_group_inherited_requester_may_execute_a_published_workflow(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute", headers=_inherited("requester")
+    )
+    assert_ok(res, status=201)
+
+
+async def test_group_inherited_developer_may_execute_a_draft_workflow(
+    workflow_client: AsyncClient,
+) -> None:
+    """The draft-execute rule lives in the service, so it must see the union too."""
+    wf = await _create_draft_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/execute", headers=_inherited("developer")
+    )
+    assert_ok(res, status=201)
+
+
+async def test_a_group_cannot_carry_the_caller_past_a_role_they_lack(
+    workflow_client: AsyncClient,
+) -> None:
+    res = await workflow_client.post(
+        "/api/v1/users", json=_USER_BODY, headers=_inherited("developer")
+    )
+    assert_err(res, "FORBIDDEN", 403)

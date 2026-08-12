@@ -5,9 +5,15 @@ initiator and the designated approvers of its approvals (see README "Human
 approval"). This policy allows exactly those participants — plus super
 admins — and rejects unrelated third parties with :class:`ForbiddenError`
 (HTTP 403 ``FORBIDDEN``).
+
+Both checks below read the caller's **direct** roles rather than their
+effective ones. They only ever ask about ``super_admin``, and a
+:class:`~models.user_group.UserGroup` can never grant that role, so the two
+are equivalent here — and reading the column keeps them correct even if that
+invariant were ever weakened.
 """
 
-from models.user import Role, User, has_role
+from models.user import Role, User, has_any_role
 from repositories import ApprovalRepository
 from repositories.exceptions import ForbiddenError
 
@@ -46,7 +52,7 @@ class WorkflowExecutionAccessPolicy:
         """
         if caller.id == owner_id:
             return
-        if has_role(caller, Role.super_admin):
+        if has_any_role(caller.roles, Role.super_admin):
             return
         if await self._approvals.exists_for_approver(execution_id, caller.id):
             return
@@ -70,7 +76,7 @@ class WorkflowExecutionAccessPolicy:
             ForbiddenError: If the caller is not the execution's initiator
                 and not a super admin.
         """
-        if caller.id == owner_id or has_role(caller, Role.super_admin):
+        if caller.id == owner_id or has_any_role(caller.roles, Role.super_admin):
             return
         raise ForbiddenError(
             "Only the execution initiator can delete this workflow execution"

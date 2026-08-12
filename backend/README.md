@@ -205,9 +205,14 @@ If either is unset (or empty), a random password is generated instead and logged
 | Secret | `demo-aws-credentials` | `local` type with two entries, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, each Fernet-encrypted like any other secret |
 | MCP server | `AWS MCP Server` | `stdio` transport, `uvx mcp-proxy-for-aws@1.6.4 https://aws-mcp.us-east-1.api.aws/mcp --region us-east-1 --metadata AWS_REGION=${env:AWS_REGION}`; its `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars are `${secret:demo-aws-credentials/…}` references to the two entries above, and its `AWS_REGION` env var (from `DEMO_AWS_REGION`) is what the `--metadata AWS_REGION=${env:AWS_REGION}` argument expands to at connection time |
 | Agent skill | `Demo AWS EC2 Launch` | `sample_skills/aws-ec2-launch` in this repository (see [Agent skills](#agent-skills)) |
-| User | `demo-approver` | holds `approver` — the manager the sample skill routes its approval request to |
-| User | `demo-requester` | holds `requester` — may execute the workflow |
-| User | `demo-developer` | holds `developer` — may build and register the workflow, MCP server, and agent skill |
+| User | `demo-approver` | holds **no direct role**; inherits `approver` from `Demo Approvers` — the manager the sample skill routes its approval request to |
+| User | `demo-requester` | holds **no direct role**; inherits `requester` from `Demo Requesters` — may execute the workflow |
+| User | `demo-developer` | holds **no direct role**; inherits `developer` from `Demo Developers` — may build and register the workflow, MCP server, and agent skill |
+| User group | `Demo Approvers` | grants `approver`; sole member `demo-approver` |
+| User group | `Demo Requesters` | grants `requester`; sole member `demo-requester` |
+| User group | `Demo Developers` | grants `developer`; sole member `demo-developer` |
+
+Granting each demo account its role through a group rather than directly is deliberate: it makes the demo exercise [role inheritance](#authorization-roles) end to end, so removing a user from their group visibly revokes their access. A database seeded by an older version — where the roles were granted directly — is normalized on the next startup, so the grant never ends up duplicated.
 
 The Workflow itself is deliberately not seeded: these records are the ingredients you assemble one from.
 
@@ -273,6 +278,10 @@ The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`
 ### Authorization (roles)
 
 Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every route-level role gate; the seeded `root` user holds it. Two ownership-layer checks are a deliberate exception — see the bullet below. See the [Roles and authorization](../README.md#roles-and-authorization) section of the root README for the full matrix.
+
+**Effective roles.** A role reaches a user either directly (the `users.roles` column) or through a [user group](#user-groups) they belong to, and authorization uses the **union** of the two. That union is resolved per request by `dependencies/auth.py`'s `get_effective_roles` (backed by `repositories/effective_roles.py`, one indexed join) and handed to `models/user.py`'s `has_any_role`. Nothing is denormalized onto `users`, so there is no cache to invalidate and a membership change cannot leave a stale grant behind — the trade the alternative would have made is a *fail-open* one, which is why it was not taken.
+
+`has_any_role` takes a **role collection rather than a `User`** on purpose: each call site has to state whether it means the direct grants or the effective ones, and `mypy --strict` rejects passing the user object by mistake. Checks that only ask about `super_admin` deliberately keep reading `user.roles` — a group can never grant that role, so the two are equivalent there, and reading the column stays correct even if that invariant were ever weakened. Every other check uses the effective set, including the two that inspect a *third-party* user: `infrastructure/approval_tools.py`'s approver eligibility and `services/impersonation.py`'s target eligibility (where ignoring inherited roles would let a plain admin impersonate a group-inherited admin — exactly the escalation that rule exists to block).
 
 Two enforcement points:
 
@@ -369,6 +378,18 @@ An `args` entry may also embed `${env:NAME}`, referencing a key of that same ser
 The CRUD endpoints are in the [API reference](http://localhost:3000/api-doc). On create, `name` is always required, plus `url` for `streamable_http` or `command` for `stdio`; mixing the two shapes fails Pydantic validation (`422 VALIDATION_ERROR`) and a duplicate name returns `409 CONFLICT_UNIQUE`. On update, sending `headers` / `args` / `env` replaces the whole collection while omitting it leaves it unchanged, and the *merged* per-transport shape is validated by `MCPServerService.update` (`422 INVALID_MCP_SERVER`) — switching transport clears the other shape's fields automatically. Two more behaviors are worth calling out: `GET /api/v1/mcp-servers/{id}/tools` connects to the server live and returns its advertised tools (`name`, `description`, `inputSchema`), or `502 MCP_UNREACHABLE` if it cannot be reached or launched within its timeout; and a server cannot be deleted while WorkflowTask tool bindings still reference it (`409 CONFLICT_REFERENCED`).
 
 `GET /api/v1/mcp-registry` proxies the official [MCP registry](https://registry.modelcontextprotocol.io/) for server discovery. It accepts `search` (substring matched against server names) and `cursor` (pagination) query params and returns `{ servers, nextCursor }`, where each server is flattened to the fields A2Flow can use. A server is surfaced through its streamable-HTTP remote when it has one, otherwise through its first stdio package published to npm or PyPI — flattened to a best-effort `command`/`args`/`env` (`runtimeHint` or `npx`/`uvx`, then the rendered runtime arguments, the `identifier@version` reference, and the rendered package arguments). OCI/NuGet packages and SSE-only remotes are skipped, since nothing in the image can launch them, as is any package whose `runtimeHint` names a command other than `npx`/`uvx`, since the backend only accepts those two. The registry base URL is configurable via the `MCP_REGISTRY_URL` env var (default `https://registry.modelcontextprotocol.io`); a registry that cannot be reached returns `502 REGISTRY_UNREACHABLE`. Registration itself reuses the ordinary `POST /api/v1/mcp-servers` create flow from a pre-filled admin form.
+
+---
+
+### User groups
+
+Tenant-scoped bundles of users (`user_groups`) that grant their `roles` to every member; membership lives in the `user_group_members` join table. Writes require `admin`; reads are open like every other collection.
+
+`roles` is a JSON list with the same shape as `users.roles`, minus `super_admin`: a field validator rejects it (`422 VALIDATION_ERROR`, and the constraint lands in `openapi.yaml` so the generated frontend Zod schema rejects it client-side too) and the `ck_user_groups_no_super_admin` check constraint backs that up. Members must be usable users of the group's own tenant — a user of another tenant, a soft-deleted one, or the seeded system user is rejected as `422 FOREIGN_KEY_VIOLATION`, reported as a missing reference so membership never confirms an id exists elsewhere. Since a `super_admin` is platform-scoped (`tenant_id IS NULL`), that same check is what keeps `super_admin` un-grantable through inheritance.
+
+`memberIds` is carried on the create/update/read models but is **not** a column, so it can be read yet never filtered or sorted on (`400 INVALID_QUERY`). Supplying it replaces membership wholesale; omitting it on a `PATCH` leaves it untouched. Names are unique per tenant (`409 CONFLICT_UNIQUE`). Deleting a group cascades its membership rows away; the user side of that join is `ON DELETE CASCADE` too, so a grouped user stays hard-deletable rather than being forced down `SqlUserRepository.delete`'s soft-delete fallback.
+
+`PUT /api/v1/users/{user_id}/groups` is the same membership seen from the user's side, so an admin can manage it from either page. It replaces the user's group set wholesale (hence `PUT`), and returns the updated `UserRead` whose `groupRoles` already reflects the change. CRUD endpoints are in the [API reference](http://localhost:3000/api-doc).
 
 ---
 

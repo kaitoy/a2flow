@@ -15,6 +15,7 @@ from repositories import (
     AgentSkillRepository,
     ApprovalRepository,
     AuthSessionRepository,
+    EffectiveRoleRepository,
     MCPServerRepository,
     MessageMetaRepository,
     NotificationRepository,
@@ -22,12 +23,14 @@ from repositories import (
     SqlAgentSkillRepository,
     SqlApprovalRepository,
     SqlAuthSessionRepository,
+    SqlEffectiveRoleRepository,
     SqlMCPServerRepository,
     SqlMessageMetaRepository,
     SqlNotificationRepository,
     SqlSecretRepository,
     SqlTenantRepository,
     SqlUserAvatarRepository,
+    SqlUserGroupRepository,
     SqlUserRepository,
     SqlWorkflowExecutionRepository,
     SqlWorkflowPublishedVersionRepository,
@@ -36,6 +39,7 @@ from repositories import (
     SqlWorkflowTaskTemplateRepository,
     TenantRepository,
     UserAvatarRepository,
+    UserGroupRepository,
     UserRepository,
     WorkflowExecutionRepository,
     WorkflowPublishedVersionRepository,
@@ -132,6 +136,34 @@ def get_user_avatar_repository(db: DBSessionDep) -> UserAvatarRepository:
 
 UserAvatarRepositoryDep = Annotated[
     UserAvatarRepository, Depends(get_user_avatar_repository)
+]
+
+
+def get_user_group_repository(
+    db: DBSessionDep, users: UserRepositoryDep, tenant_id: CurrentTenantIdDep
+) -> UserGroupRepository:
+    """Create a UserGroupRepository backed by the current database session."""
+    return SqlUserGroupRepository(db, users, tenant_id=tenant_id)
+
+
+UserGroupRepositoryDep = Annotated[
+    UserGroupRepository, Depends(get_user_group_repository)
+]
+
+
+def get_effective_role_repository(db: DBSessionDep) -> EffectiveRoleRepository:
+    """Create an EffectiveRoleRepository backed by the current database session.
+
+    Takes no ``tenant_id``: resolving a user's inherited roles has to work for
+    a platform-scoped caller who has selected no tenant, and memberships are
+    already tenant-validated when they are written — see
+    :mod:`repositories.effective_roles`.
+    """
+    return SqlEffectiveRoleRepository(db)
+
+
+EffectiveRoleRepositoryDep = Annotated[
+    EffectiveRoleRepository, Depends(get_effective_role_repository)
 ]
 
 

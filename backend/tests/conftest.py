@@ -133,6 +133,27 @@ async def _override_get_current_user(request: Request) -> User:
     )
 
 
+async def _override_get_effective_roles(request: Request) -> frozenset[str]:
+    """Test stand-in for the effective-role resolution used by authorization.
+
+    Returns the same direct roles as :func:`_override_get_current_user`, plus
+    anything in the ``X-User-Group-Roles`` header (comma-separated) standing in
+    for roles inherited from a user group. It has to be overridden rather than
+    left to run for real: the synthetic user these tests authenticate as is
+    built with ``model_construct`` and never exists in the database, so the
+    real dependency would query group memberships for an id that has no row --
+    and, in the fixtures that never create the schema at all, against tables
+    that do not exist.
+
+    Tests that want to exercise genuine group inheritance end to end seed real
+    groups and memberships and assert through the API instead.
+    """
+    user = await _override_get_current_user(request)
+    inherited_header = request.headers.get("X-User-Group-Roles", "")
+    inherited = [r.strip() for r in inherited_header.split(",") if r.strip()]
+    return frozenset(user.roles or []) | frozenset(inherited)
+
+
 def _override_verify_csrf() -> None:
     """Test stand-in that disables CSRF validation for header-authenticated tests."""
     return None
@@ -147,10 +168,15 @@ def _install_auth_overrides(app: Any) -> None:
     cookie at all, so without this override anything depending on
     ``RealUserDep`` (``require_actor_roles``, the impersonate routes, ``GET
     /auth/me``) would 401 trying to read a cookie that was never set.
+
+    ``get_effective_roles`` / ``get_actor_effective_roles`` are overridden for
+    the same reason -- see :func:`_override_get_effective_roles`.
     """
     from dependencies.auth import (
+        get_actor_effective_roles,
         get_current_user,
         get_current_user_id,
+        get_effective_roles,
         get_session_user,
         verify_csrf,
     )
@@ -158,6 +184,8 @@ def _install_auth_overrides(app: Any) -> None:
     app.dependency_overrides[get_current_user] = _override_get_current_user
     app.dependency_overrides[get_session_user] = _override_get_current_user
     app.dependency_overrides[get_current_user_id] = _override_get_current_user_id
+    app.dependency_overrides[get_effective_roles] = _override_get_effective_roles
+    app.dependency_overrides[get_actor_effective_roles] = _override_get_effective_roles
     app.dependency_overrides[verify_csrf] = _override_verify_csrf
 
 

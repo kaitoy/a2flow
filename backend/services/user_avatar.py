@@ -7,7 +7,7 @@ never repeats the null check. Avatar writes are self-service: only the owning
 user (or a super admin) may upload or remove an avatar.
 """
 
-from models.user import Role, User, has_role
+from models.user import Role, User, has_any_role
 from models.user_avatar import UserAvatar
 from repositories import UserAvatarRepository
 from repositories.exceptions import (
@@ -20,6 +20,12 @@ from repositories.exceptions import (
 def _assert_self_or_super_admin(user_id: str, acting_user: User) -> None:
     """Reject avatar writes targeting a user other than the caller.
 
+    Checks the caller's **direct** roles rather than their effective ones. That
+    is not a shortcut: this test only asks about ``super_admin``, and a
+    :class:`~models.user_group.UserGroup` can never grant that role, so the two
+    are equivalent here — and reading the column keeps the check correct even
+    if that invariant were ever weakened.
+
     Args:
         user_id: Identifier of the avatar's owning user.
         acting_user: The authenticated user performing the write.
@@ -28,7 +34,9 @@ def _assert_self_or_super_admin(user_id: str, acting_user: User) -> None:
         ForbiddenError: If the acting user is neither the owning user nor a
             super admin.
     """
-    if user_id != acting_user.id and not has_role(acting_user, Role.super_admin):
+    if user_id != acting_user.id and not has_any_role(
+        acting_user.roles, Role.super_admin
+    ):
         raise ForbiddenError("Only the user themself can manage their avatar")
 
 

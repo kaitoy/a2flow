@@ -51,6 +51,7 @@ from infrastructure.database import get_session
 from models.user import User
 from repositories import (
     SqlAuthSessionRepository,
+    SqlEffectiveRoleRepository,
     SqlImpersonationEventRepository,
     SqlTenantRepository,
     SqlUserRepository,
@@ -94,9 +95,11 @@ AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 
 
 def get_impersonation_service(db: _DbSessionDep) -> ImpersonationService:
-    """Create an ImpersonationService wiring the audit-trail and user repositories."""
+    """Create an ImpersonationService wiring the audit-trail, user, and role repositories."""
     return ImpersonationService(
-        SqlImpersonationEventRepository(db), SqlUserRepository(db)
+        SqlImpersonationEventRepository(db),
+        SqlUserRepository(db),
+        SqlEffectiveRoleRepository(db),
     )
 
 
@@ -169,6 +172,59 @@ async def get_current_user(
 
 
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
+
+
+async def get_effective_roles(
+    user: CurrentUserDep, db: _DbSessionDep
+) -> frozenset[str]:
+    """Return the effective roles of the user this request acts as.
+
+    The effective roles are the user's direct grants (``users.roles``) unioned
+    with the roles of every group they belong to (see
+    :mod:`repositories.effective_roles`). Nothing is cached: the membership
+    lookup runs once per request -- FastAPI caches dependency results by
+    callable -- so removing someone from a group takes effect immediately.
+
+    This, not :data:`CurrentUserDep`, is what authorization checks consume; see
+    :func:`models.user.has_any_role` for why role checks take a role collection
+    instead of a ``User``.
+
+    Args:
+        user: The effective user resolved by :func:`get_current_user`.
+        db: Database session used to resolve group memberships.
+
+    Returns:
+        The roles to authorize this request against.
+    """
+    repo = SqlEffectiveRoleRepository(db)
+    return await repo.effective_roles_for_user(user.id, user.roles or [])
+
+
+EffectiveRolesDep = Annotated[frozenset[str], Depends(get_effective_roles)]
+
+
+async def get_actor_effective_roles(
+    user: RealUserDep, db: _DbSessionDep
+) -> frozenset[str]:
+    """Return the effective roles of the *real* session user, ignoring impersonation.
+
+    The :data:`EffectiveRolesDep` counterpart of :data:`RealUserDep`, used only
+    by ``dependencies.authz.require_actor_roles`` on the impersonate
+    start/stop routes -- see that module's docstring for why those two routes
+    must not resolve their role check against the impersonation target.
+
+    Args:
+        user: The real, session-authenticated user.
+        db: Database session used to resolve group memberships.
+
+    Returns:
+        The real actor's effective roles.
+    """
+    repo = SqlEffectiveRoleRepository(db)
+    return await repo.effective_roles_for_user(user.id, user.roles or [])
+
+
+ActorEffectiveRolesDep = Annotated[frozenset[str], Depends(get_actor_effective_roles)]
 
 
 def get_current_user_id(user: CurrentUserDep) -> str:

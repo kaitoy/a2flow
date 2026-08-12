@@ -8,34 +8,55 @@ request that carries the ``X-Impersonate-User-Id`` header, not just at
 whom) and the persistent audit trail (:class:`~models.impersonation_event.ImpersonationEvent`).
 """
 
+from collections.abc import Collection
+
 from models.user import SYSTEM_USER_ID, Role, User
-from repositories import ImpersonationEventRepository, UserRepository
+from repositories import (
+    EffectiveRoleRepository,
+    ImpersonationEventRepository,
+    UserRepository,
+)
 from repositories.exceptions import ForbiddenError, NotFoundError
 
 
-def _target_ineligible_for_actor(*, actor: User, target: User) -> bool:
+def _target_ineligible_for_actor(
+    *, actor: User, target: User, target_roles: Collection[str]
+) -> bool:
     """Return whether ``actor`` is barred from impersonating ``target`` by role.
 
     A ``super_admin``-held target can never be impersonated, by anyone. An
     ``admin``-held target can only be impersonated by an actor who themself
     holds ``super_admin`` -- a regular admin still cannot impersonate a
-    fellow admin. Deliberately checks raw role membership on both sides
-    rather than :func:`~models.user.has_role`: that helper's
-    ``super_admin``-bypass semantics test whether an *actor* satisfies a
-    requirement, which is backwards for the target side, and for the actor
-    side the bypass collapses to the same plain containment check anyway.
+    fellow admin.
+
+    The **target** side must be judged on *effective* roles: a user who holds
+    ``admin`` only through a :class:`~models.user_group.UserGroup` is exactly
+    as privileged as one granted it directly, so ignoring the inherited half
+    would hand a plain admin the very escalation this function exists to
+    prevent. The caller resolves them and passes them in.
+
+    The **actor** side stays on the raw ``roles`` column: it only asks about
+    ``super_admin``, which a group can never grant, so the two are equivalent
+    there.
+
+    Both sides deliberately use plain containment rather than
+    :func:`~models.user.has_any_role`: that helper's ``super_admin``-bypass
+    semantics test whether an *actor* satisfies a requirement, which is
+    backwards for the target side.
 
     Args:
         actor: The prospective impersonator.
         target: The prospective impersonation target.
+        target_roles: ``target``'s effective roles -- their direct grants
+            unioned with everything inherited from their groups.
 
     Returns:
         ``True`` if ``actor`` may not impersonate ``target``.
     """
-    target_roles = set(target.roles or [])
-    if Role.super_admin in target_roles:
+    held = set(target_roles)
+    if Role.super_admin in held:
         return True
-    if Role.admin in target_roles:
+    if Role.admin in held:
         return Role.super_admin not in (actor.roles or [])
     return False
 
@@ -44,16 +65,36 @@ class ImpersonationService:
     """Application service orchestrating impersonation eligibility and audit trail."""
 
     def __init__(
-        self, events: ImpersonationEventRepository, users: UserRepository
+        self,
+        events: ImpersonationEventRepository,
+        users: UserRepository,
+        effective_roles: EffectiveRoleRepository,
     ) -> None:
         """Initialize the service.
 
         Args:
             events: Repository for the impersonation audit trail.
             users: Repository for resolving prospective impersonation targets.
+            effective_roles: Repository resolving the roles a target inherits
+                from their groups, so an inherited ``admin`` is as protected
+                as a directly granted one.
         """
         self._events = events
         self._users = users
+        self._effective_roles = effective_roles
+
+    async def _effective_roles_of(self, user: User) -> frozenset[str]:
+        """Return a user's direct grants unioned with their inherited roles.
+
+        Args:
+            user: The user whose effective roles to resolve.
+
+        Returns:
+            The effective role set.
+        """
+        return await self._effective_roles.effective_roles_for_user(
+            user.id, user.roles or []
+        )
 
     async def start(self, *, actor: User, target_user_id: str) -> User:
         """Validate eligibility and open a new impersonation event.
@@ -89,7 +130,11 @@ class ImpersonationService:
             raise ForbiddenError("Cannot impersonate the system user")
         if not target.enabled or target.deleted_at is not None:
             raise ForbiddenError("Cannot impersonate a disabled or deleted user")
-        if _target_ineligible_for_actor(actor=actor, target=target):
+        if _target_ineligible_for_actor(
+            actor=actor,
+            target=target,
+            target_roles=await self._effective_roles_of(target),
+        ):
             raise ForbiddenError("Cannot impersonate this user")
 
         await self._events.close_open_for_actor(actor.id)
@@ -112,9 +157,10 @@ class ImpersonationService:
 
         Called on every request, not just at :meth:`start`. Never raises: a
         header that no longer names a valid, open impersonation (stopped
-        elsewhere, target since disabled/promoted, or -- since eligibility
-        for an ``admin`` target also depends on the actor's own role -- the
-        actor since demoted from ``super_admin``) silently falls back to the
+        elsewhere, target since disabled/promoted -- including promoted by
+        being added to an ``admin``-granting user group -- or, since
+        eligibility for an ``admin`` target also depends on the actor's own
+        role, the actor since demoted from ``super_admin``) falls back to the
         real actor and closes the stale event, rather than failing the
         request -- an error here would otherwise be able to lock a legitimate
         admin out of the whole app on a stale ``localStorage`` value (see
@@ -138,7 +184,11 @@ class ImpersonationService:
             target is None
             or not target.enabled
             or target.deleted_at is not None
-            or _target_ineligible_for_actor(actor=actor, target=target)
+            or _target_ineligible_for_actor(
+                actor=actor,
+                target=target,
+                target_roles=await self._effective_roles_of(target),
+            )
         ):
             await self._events.close_open_for_actor(actor.id)
             return actor

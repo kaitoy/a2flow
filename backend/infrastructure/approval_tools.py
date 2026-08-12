@@ -19,7 +19,7 @@ mapping errors to an ``{"error": ...}`` payload instead of raising.
 """
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Collection
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -36,11 +36,13 @@ from infrastructure.workflow_task_tools import (
 )
 from models.approval import ApprovalCreate
 from models.notification import NotificationType
-from models.user import Role, User, has_role
+from models.user import Role, User, has_any_role
 from repositories import (
     ApprovalRepository,
+    EffectiveRoleRepository,
     NotificationRepository,
     SqlApprovalRepository,
+    SqlEffectiveRoleRepository,
     SqlMCPServerRepository,
     SqlNotificationRepository,
     SqlUserRepository,
@@ -68,6 +70,7 @@ class _Scope:
     task_repo: WorkflowTaskRepository
     notif_repo: NotificationRepository
     user_repo: UserRepository
+    effective_role_repo: EffectiveRoleRepository
 
 
 @asynccontextmanager
@@ -108,10 +111,13 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
             ),
             notif_repo=SqlNotificationRepository(db, tenant_id=tenant_id),
             user_repo=SqlUserRepository(db),
+            effective_role_repo=SqlEffectiveRoleRepository(db),
         )
 
 
-def _is_eligible_approver(user: User | None, *, tenant_id: str) -> bool:
+def _is_eligible_approver(
+    user: User | None, *, tenant_id: str, effective_roles: Collection[str]
+) -> bool:
     """Return whether a user may be designated as an approval's approver.
 
     Eligible approvers belong to the given tenant, are enabled, not
@@ -123,10 +129,17 @@ def _is_eligible_approver(user: User | None, *, tenant_id: str) -> bool:
     this means a super admin is never eligible as approver for a
     tenant-scoped session -- there is no platform-scoped exception here.
 
+    The role test runs against **effective** roles, so a user who holds
+    ``approver`` only through a :class:`~models.user_group.UserGroup` is just
+    as eligible as one granted it directly. The caller resolves them, batching
+    the lookup where it has several candidates.
+
     Args:
         user: The candidate user, or ``None`` when the lookup found nobody.
         tenant_id: Tenant the approver must belong to (the current run's
             resolved tenant).
+        effective_roles: The candidate's direct roles unioned with the roles of
+            every group they belong to.
 
     Returns:
         ``True`` if the user exists and may receive approval requests.
@@ -136,7 +149,7 @@ def _is_eligible_approver(user: User | None, *, tenant_id: str) -> bool:
         and user.enabled
         and user.deleted_at is None
         and user.tenant_id == tenant_id
-        and has_role(user, Role.approver)
+        and has_any_role(effective_roles, Role.approver)
     )
 
 
@@ -186,8 +199,17 @@ async def request_approval(
                         "error": f"WorkflowTask {workflow_task_id!r} "
                         "not found in the current session"
                     }
+            candidate = await s.user_repo.get(approver)
             if not _is_eligible_approver(
-                await s.user_repo.get(approver), tenant_id=s.tenant_id
+                candidate,
+                tenant_id=s.tenant_id,
+                effective_roles=(
+                    frozenset()
+                    if candidate is None
+                    else await s.effective_role_repo.effective_roles_for_user(
+                        candidate.id, candidate.roles or []
+                    )
+                ),
             ):
                 return {
                     "error": f"User {approver!r} cannot be designated as an approver: "
@@ -261,11 +283,21 @@ async def list_users(tool_context: ToolContext) -> dict[str, Any]:
                 offset=0,
                 filters=[FilterSpec(field="tenantId", op="eq", value=s.tenant_id)],
             )
+            # One query for the whole page's group memberships, not one per
+            # candidate.
+            inherited = await s.effective_role_repo.group_roles_for_users(
+                [u.id for u in users]
+            )
             return {
                 "users": [
                     _user_to_dict(u)
                     for u in users
-                    if _is_eligible_approver(u, tenant_id=s.tenant_id)
+                    if _is_eligible_approver(
+                        u,
+                        tenant_id=s.tenant_id,
+                        effective_roles=set(u.roles or [])
+                        | inherited.get(u.id, frozenset()),
+                    )
                 ]
             }
     except NoTenantSessionError:

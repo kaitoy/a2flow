@@ -3,9 +3,23 @@
 The ``User`` table stores a bcrypt hash in its ``password`` column. Responses
 use :class:`UserRead`, which omits ``password`` entirely so the hash is never
 serialized to clients.
+
+A user holds roles from two sources, and the distinction matters at every
+authorization check:
+
+* **Direct roles** — the ``users.roles`` column, edited through the admin API.
+* **Inherited roles** — the roles of every :class:`~models.user_group.UserGroup`
+  the user belongs to.
+
+The **effective roles** are the union of the two. Nothing is denormalized: the
+inherited half is resolved on demand by
+:class:`repositories.effective_roles.SqlEffectiveRoleRepository` and handed to
+:func:`has_any_role`, which is why that helper takes a role collection instead
+of a ``User`` — see its docstring.
 """
 
 import re
+from collections.abc import Collection, Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -32,11 +46,16 @@ _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 class Role(StrEnum):
     """Application roles grantable to a user.
 
-    Roles are independent grants (no inheritance): a user holds any subset of
-    them, and each role unlocks a specific group of operations. The single
-    exception is :attr:`super_admin`, which bypasses every authorization
+    Roles are independent grants (no hierarchy between them): a user holds any
+    subset of them, and each role unlocks a specific group of operations. The
+    single exception is :attr:`super_admin`, which bypasses every authorization
     check and, for that reason, is mutually exclusive with every other role —
     see :func:`services.user._reject_super_admin_role_combination`.
+
+    A role reaches a user either directly (the ``users.roles`` column) or
+    through a :class:`~models.user_group.UserGroup` they belong to.
+    :attr:`super_admin` is the exception again: a group can never grant it, so
+    it is always a direct grant.
     """
 
     #: All operations; bypasses every role and ownership check.
@@ -55,26 +74,38 @@ class Role(StrEnum):
     approver = "approver"
 
 
-def has_role(user: "User | UserRead", *allowed: Role) -> bool:
-    """Return whether ``user`` holds any of the ``allowed`` roles.
+def has_any_role(roles: Collection[str], *allowed: Role) -> bool:
+    """Return whether ``roles`` includes any of the ``allowed`` roles.
 
     ``super_admin`` always passes, regardless of ``allowed`` — it bypasses
     every authorization check. This helper is the single source of truth for
     role checks, shared by the ``require_roles`` router dependency and the
     service-layer ownership checks.
 
+    It takes a **role collection rather than a user** on purpose. A user's
+    roles come in two flavors: the ``roles`` column (granted directly) and the
+    *effective* roles, which also include every role inherited from the groups
+    the user belongs to (see :mod:`models.user_group`). Most authorization
+    checks want the effective set — resolved once per request by
+    ``dependencies.auth.get_effective_roles`` — while a handful of checks
+    deliberately want the direct grants only (the ``super_admin`` guards in
+    :mod:`services.user`, since a group can never grant that role). Passing the
+    collection makes each call site state which one it means, and ``mypy``
+    rejects handing over a ``User`` by mistake.
+
     Args:
-        user: The user whose roles to inspect.
-        allowed: Roles that grant access. May be empty, in which case only a
+        roles: The roles to test — either ``user.roles`` for the direct grants
+            or a resolved effective-role set.
+        allowed: Roles that grant access. May be empty, in which case only
             ``super_admin`` passes.
 
     Returns:
-        ``True`` if the user holds ``super_admin`` or any role in ``allowed``.
+        ``True`` if ``roles`` includes ``super_admin`` or any role in ``allowed``.
     """
-    roles = set(user.roles or [])
-    if Role.super_admin in roles:
+    held = set(roles)
+    if Role.super_admin in held:
         return True
-    return bool(roles & set(allowed))
+    return bool(held & set(allowed))
 
 
 #: Maximum number of palette colors allowed in an avatar config.
@@ -312,8 +343,16 @@ class UserRead(BaseEntity):
     email: str
     enabled: bool
     email_verified: bool
-    #: Roles granted to the user; empty for a chat-only account.
+    #: Roles granted to the user directly; empty for a chat-only account. This
+    #: is what the admin UI edits — see :attr:`group_roles` for the inherited
+    #: half of the user's effective roles.
     roles: list[Role] = []
+    #: Roles the user inherits from the groups they belong to (see
+    #: :mod:`models.user_group`). Read-only: it is derived, not a column of
+    #: ``users``, and is populated by :meth:`from_user`. The user's effective
+    #: roles are ``roles | group_roles``. Never contains ``super_admin``, which
+    #: a group can never grant.
+    group_roles: list[Role] = []
     deleted_at: datetime | None = None
     #: ISO-8601 timestamp of the last custom-avatar change, or ``None`` when the
     #: user has no uploaded avatar (the client then renders a generated default).
@@ -323,6 +362,30 @@ class UserRead(BaseEntity):
     avatar_config: AvatarConfig | None = None
     #: Tenant this user belongs to; ``None`` for a platform-scoped user.
     tenant_id: str | None = None
+
+    @classmethod
+    def from_user(cls, user: User, *, group_roles: Iterable[str] = ()) -> "UserRead":
+        """Build the read view of a stored user, attaching their inherited roles.
+
+        ``group_roles`` is not a column of ``users``: it is derived from the
+        user's group memberships (see :mod:`models.user_group`) and must be
+        resolved by the caller — normally through
+        :meth:`services.user.UserService.group_roles_for`, which batches the
+        lookup so a list endpoint issues one query rather than one per row.
+
+        Args:
+            user: The persisted user to project.
+            group_roles: Roles the user inherits from their groups. Defaults to
+                empty, for callers with no membership context to report.
+
+        Returns:
+            A read view carrying the user's fields plus the inherited roles,
+            and never the password hash.
+        """
+        return cls(
+            **user.model_dump(exclude={"password"}),
+            group_roles=sorted(group_roles),
+        )
 
     @field_serializer("deleted_at", "avatar_updated_at", when_used="json")
     def _serialize_deleted_at(self, dt: datetime | None) -> str | None:

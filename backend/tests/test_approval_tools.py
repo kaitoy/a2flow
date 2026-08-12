@@ -25,7 +25,8 @@ from infrastructure.workflow_task_tools import (
 )
 from models.approval import Approval, ApprovalStatus
 from models.notification import Notification, NotificationType
-from models.user import Role
+from models.user import SYSTEM_USER_ID, Role
+from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
 from repositories import SqlApprovalRepository, SqlNotificationRepository
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
@@ -337,3 +338,73 @@ async def test_list_users_excludes_users_without_approver_role(
     assert "norole" not in usernames
     # The default seeded actors hold the approver role and stay listed.
     assert {"alice", "bob", "carol", "owner", "tester"} <= usernames
+
+
+# ---------- approver eligibility via a user group ----------
+
+
+async def _put_in_group(
+    eng: AsyncEngine,
+    *,
+    user_id: str,
+    roles: list[str],
+    group_id: str = "group-1",
+    name: str = "Approvers",
+) -> None:
+    """Create a user group granting ``roles`` and place ``user_id`` in it."""
+    async with AsyncSession(eng) as db:
+        db.add(
+            UserGroup(
+                id=group_id,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                name=name,
+                roles=roles,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        db.add(UserGroupMember(group_id=group_id, user_id=user_id))
+        await db.commit()
+
+
+async def test_group_inherited_approver_is_eligible(engine: AsyncEngine) -> None:
+    """A user whose only ``approver`` grant comes from a group can be designated.
+
+    This is the demo dataset's shape: ``demo-approver`` holds no direct role
+    and inherits ``approver`` from the ``Demo Approvers`` group.
+    """
+    await seed_users(
+        engine, ids=("grouped",), roles=(), tenant_id=DEFAULT_TEST_TENANT_ID
+    )
+    await _put_in_group(engine, user_id="grouped", roles=[Role.approver.value])
+    await _seed_session(engine)
+    result = await request_approval("Approve me", _ctx(), approver="grouped")
+    assert "error" not in result, result
+    assert result["status"] == ApprovalStatus.pending.value
+
+
+async def test_group_inherited_approver_appears_in_list_users(
+    engine: AsyncEngine,
+) -> None:
+    await seed_users(
+        engine, ids=("grouped",), roles=(), tenant_id=DEFAULT_TEST_TENANT_ID
+    )
+    await _put_in_group(engine, user_id="grouped", roles=[Role.approver.value])
+    await _seed_session(engine)
+    result = await list_users(_ctx())
+    assert "grouped" in {user["id"] for user in result["users"]}
+
+
+async def test_a_group_granting_another_role_does_not_make_an_approver(
+    engine: AsyncEngine,
+) -> None:
+    await seed_users(
+        engine, ids=("grouped",), roles=(), tenant_id=DEFAULT_TEST_TENANT_ID
+    )
+    await _put_in_group(
+        engine, user_id="grouped", roles=[Role.developer.value], name="Developers"
+    )
+    await _seed_session(engine)
+    result = await request_approval("Approve me", _ctx(), approver="grouped")
+    assert "error" in result
+    assert "grouped" not in {user["id"] for user in (await list_users(_ctx()))["users"]}

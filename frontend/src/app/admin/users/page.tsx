@@ -18,6 +18,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
+import { InheritedRoles } from "@/components/admin/inherited-roles";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -81,18 +82,24 @@ const STATIC_COLUMNS: ColumnDef<User>[] = [
   },
   {
     // Roles are stored as a JSON list, which the list API's sort/filter params
-    // cannot address, so this column is display-only. The Super Admin badge is
-    // a chip, not plain text, so it opts out of single-line truncation.
+    // cannot address, so this column is display-only — and the same goes for
+    // the group-inherited half. The Super Admin badge and the inherited chips
+    // are chips, not plain text, so the column opts out of single-line
+    // truncation. Inherited roles render as muted chips so it stays obvious
+    // which grants editing the user can actually change.
     header: "Roles",
     noTruncate: true,
     cell: (u) => {
       const isSuperAdmin = u.roles?.includes(Role.SUPER_ADMIN);
       const otherRoles = (u.roles ?? []).filter((r) => r !== Role.SUPER_ADMIN);
+      const groupRoles = u.groupRoles ?? [];
+      const nothingHeld = !isSuperAdmin && otherRoles.length === 0 && groupRoles.length === 0;
       return (
         <div className="flex items-center gap-1.5">
           {isSuperAdmin && <Badge>Super Admin</Badge>}
           {otherRoles.length > 0 && <span>{otherRoles.map((r) => ROLE_LABELS[r]).join(", ")}</span>}
-          {!isSuperAdmin && otherRoles.length === 0 && "—"}
+          <InheritedRoles roles={groupRoles} />
+          {nothingHeld && "—"}
         </div>
       );
     },

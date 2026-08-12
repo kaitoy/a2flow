@@ -7,6 +7,7 @@ import {
   type LucideIcon,
   Server,
   Users,
+  UsersRound,
   Wand2,
   Workflow,
 } from "lucide-react";
@@ -54,6 +55,13 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Users",
     icon: Users,
     description: "Manage accounts and roles",
+    roles: [Role.ADMIN],
+  },
+  {
+    href: "/admin/user-groups",
+    label: "User Groups",
+    icon: UsersRound,
+    description: "Grant roles to several accounts at once",
     roles: [Role.ADMIN],
   },
   {

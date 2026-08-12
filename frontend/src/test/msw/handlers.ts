@@ -28,6 +28,22 @@ const USER_1 = {
   email: "alice@example.com",
   enabled: true,
   emailVerified: false,
+  tenantId: "tenant-1",
+  roles: [],
+  groupRoles: [],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+export const USER_GROUP_1 = {
+  id: "group-1",
+  tenantId: "tenant-1",
+  name: "Developers",
+  description: "People who build workflows",
+  roles: ["developer"],
+  memberIds: ["user-1"],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -262,6 +278,20 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/users/:userId`, () => envelope(USER_1)),
 
   http.delete(`${BASE}/api/v1/users/:userId`, () => envelope(null)),
+
+  http.put(`${BASE}/api/v1/users/:userId/groups`, () => envelope(USER_1)),
+
+  http.get(`${BASE}/api/v1/user-groups`, () => envelope([USER_GROUP_1])),
+
+  http.get(`${BASE}/api/v1/user-groups/:groupId`, () => envelope(USER_GROUP_1)),
+
+  http.post(`${BASE}/api/v1/user-groups`, () =>
+    envelope({ ...USER_GROUP_1, id: "new-group-id" }, 201)
+  ),
+
+  http.patch(`${BASE}/api/v1/user-groups/:groupId`, () => envelope(USER_GROUP_1)),
+
+  http.delete(`${BASE}/api/v1/user-groups/:groupId`, () => envelope(null)),
 
   http.get(`${BASE}/api/v1/workflows`, () => envelope([WORKFLOW_1])),
 

@@ -20,6 +20,7 @@ from services import (
     SecretService,
     TenantService,
     UserAvatarService,
+    UserGroupService,
     UserService,
     WorkflowDesignService,
     WorkflowExecutionAccessPolicy,
@@ -35,12 +36,14 @@ from .context import APP_NAME
 from .repository import (
     AgentSkillRepositoryDep,
     ApprovalRepositoryDep,
+    EffectiveRoleRepositoryDep,
     MCPServerRepositoryDep,
     MessageMetaRepositoryDep,
     NotificationRepositoryDep,
     SecretRepositoryDep,
     TenantRepositoryDep,
     UserAvatarRepositoryDep,
+    UserGroupRepositoryDep,
     UserRepositoryDep,
     WorkflowExecutionRepositoryDep,
     WorkflowPublishedVersionRepositoryDep,
@@ -148,12 +151,29 @@ def get_tenant_service(repo: TenantRepositoryDep) -> TenantService:
 TenantServiceDep = Annotated[TenantService, Depends(get_tenant_service)]
 
 
-def get_user_service(repo: UserRepositoryDep) -> UserService:
-    """Create a UserService backed by the request's repository."""
-    return UserService(repo)
+def get_user_service(
+    repo: UserRepositoryDep, effective_roles: EffectiveRoleRepositoryDep
+) -> UserService:
+    """Create a UserService backed by the request's repositories.
+
+    Deliberately takes no tenant-scoped repository: ``CurrentTenantIdDep``
+    raises for a platform-scoped caller who has selected no tenant, which
+    would lock a tenant-less super admin out of every user route -- including
+    their own profile page. ``EffectiveRoleRepositoryDep`` is tenant-unscoped
+    and therefore safe to pull in here.
+    """
+    return UserService(repo, effective_roles)
 
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+
+
+def get_user_group_service(repo: UserGroupRepositoryDep) -> UserGroupService:
+    """Create a UserGroupService backed by the request's repository."""
+    return UserGroupService(repo)
+
+
+UserGroupServiceDep = Annotated[UserGroupService, Depends(get_user_group_service)]
 
 
 def get_user_avatar_service(repo: UserAvatarRepositoryDep) -> UserAvatarService:

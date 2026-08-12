@@ -26,7 +26,7 @@ no separate exemption, so a plain ``admin`` can never view, edit, or delete a
 ``super_admin`` actor can.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 
 from infrastructure.password import hash_password
 from models.user import (
@@ -36,9 +36,9 @@ from models.user import (
     User,
     UserCreate,
     UserUpdate,
-    has_role,
+    has_any_role,
 )
-from repositories import UserRepository
+from repositories import EffectiveRoleRepository, UserRepository
 from repositories.exceptions import ForbiddenError, NotFoundError, UserValidationError
 from repositories.query import FilterSpec, SortSpec
 
@@ -101,7 +101,7 @@ def _reject_super_admin_role_combination(roles: Sequence[str] | None) -> None:
 
     Runs independent of the acting user's role, mirroring
     :func:`_reject_super_admin_tenant_conflict` — ``super_admin`` already
-    bypasses every other role via :func:`has_role`, so holding one alongside
+    bypasses every other role via :func:`has_any_role`, so holding one alongside
     it is redundant at best and confusing at worst. This is the fast,
     friendly-error path (HTTP 422); the same invariant is also enforced at
     the database level by the ``ck_users_super_admin_exclusive`` CHECK
@@ -143,7 +143,9 @@ def _assert_tenant_visible(acting_user: User, target: User) -> None:
             (or platform-scoped) reference never confirms the target's
             existence.
     """
-    if has_role(acting_user, Role.super_admin):
+    # Direct roles, not effective ones: this asks only about ``super_admin``,
+    # which a user group can never grant.
+    if has_any_role(acting_user.roles, Role.super_admin):
         return
     if target.tenant_id != acting_user.tenant_id:
         raise NotFoundError("User", target.id)
@@ -185,10 +187,9 @@ def _visible_display_name(acting_user: User, target: User) -> str | None:
     except NotFoundError:
         if target.id == SYSTEM_USER_ID:
             return _MASKED_SYSTEM_USER_NAME
-        # An empty ``allowed`` makes has_role a plain "is a super admin?" test.
-        if has_role(
-            target,
-        ):
+        # An empty ``allowed`` makes has_any_role a plain "is a super admin?"
+        # test. Direct roles: a user group can never grant ``super_admin``.
+        if has_any_role(target.roles):
             return _MASKED_SUPER_ADMIN_NAME
         return None
     return f"{target.first_name} {target.last_name}".strip()
@@ -197,13 +198,39 @@ def _visible_display_name(acting_user: User, target: User) -> str | None:
 class UserService:
     """Application service orchestrating User operations."""
 
-    def __init__(self, repo: UserRepository) -> None:
+    def __init__(
+        self, repo: UserRepository, effective_roles: EffectiveRoleRepository
+    ) -> None:
         """Initialize the service.
 
         Args:
             repo: Repository providing User persistence.
+            effective_roles: Repository resolving the roles users inherit from
+                their groups, used to populate :attr:`UserRead.group_roles`.
+                Deliberately not tenant-scoped — see
+                :mod:`repositories.effective_roles`.
         """
         self._repo = repo
+        self._effective_roles = effective_roles
+
+    async def group_roles_for(self, users: Sequence[User]) -> dict[str, list[str]]:
+        """Return the group-inherited roles of each user, resolved in one query.
+
+        Feeds :meth:`models.user.UserRead.from_user` so a response reports the
+        inherited half of a user's roles alongside their direct grants. Batched
+        so a list endpoint stays at one membership query per page.
+
+        Args:
+            users: The users about to be serialized.
+
+        Returns:
+            A mapping of user id to their sorted inherited roles. Every id in
+            ``users`` is present; a user in no group maps to an empty list.
+        """
+        inherited = await self._effective_roles.group_roles_for_users(
+            [user.id for user in users]
+        )
+        return {user.id: sorted(inherited.get(user.id, frozenset())) for user in users}
 
     async def get(self, user_id: str, *, acting_user: User) -> User:
         """Return the User with the given ID.
@@ -296,7 +323,7 @@ class UserService:
         Returns:
             The requested page of users.
         """
-        if has_role(acting_user, Role.super_admin):
+        if has_any_role(acting_user.roles, Role.super_admin):
             return await self._repo.list(
                 limit=limit,
                 offset=offset,
@@ -335,13 +362,17 @@ class UserService:
                 ``super_admin`` nor a ``tenant_id``, or would hold
                 ``super_admin`` together with another role.
         """
-        if Role.super_admin in data.roles and not has_role(
-            acting_user, Role.super_admin
+        if Role.super_admin in data.roles and not has_any_role(
+            acting_user.roles, Role.super_admin
         ):
             raise ForbiddenError("Only a super admin can grant the super_admin role")
-        if data.tenant_id is not None and not has_role(acting_user, Role.super_admin):
+        if data.tenant_id is not None and not has_any_role(
+            acting_user.roles, Role.super_admin
+        ):
             raise ForbiddenError("Only a super admin can assign a tenant")
-        if data.tenant_id is None and not has_role(acting_user, Role.super_admin):
+        if data.tenant_id is None and not has_any_role(
+            acting_user.roles, Role.super_admin
+        ):
             # A non-super-admin actor can't supply a tenant_id explicitly (see
             # above), yet every non-super-admin user must carry one — silently
             # scope the new user to the acting admin's own tenant instead of
@@ -354,7 +385,12 @@ class UserService:
         return await self._repo.create(hashed, user_id=acting_user.id)
 
     async def update(
-        self, target_id: str, data: UserUpdate, *, acting_user: User
+        self,
+        target_id: str,
+        data: UserUpdate,
+        *,
+        acting_user: User,
+        acting_roles: Collection[str],
     ) -> User:
         """Apply a partial update to a User, authorizing the acting user.
 
@@ -375,6 +411,9 @@ class UserService:
             target_id: Identifier of the user to update.
             data: Fields to update (password optional).
             acting_user: The authenticated user performing the update.
+            acting_roles: The acting user's effective roles — direct grants
+                plus everything inherited from their groups — so an ``admin``
+                held only through a group still takes the admin path below.
 
         Returns:
             The updated User.
@@ -397,8 +436,10 @@ class UserService:
         """
         target = await self.get(target_id, acting_user=acting_user)
         update = data.model_dump(exclude_unset=True)
-        if has_role(acting_user, Role.admin):
-            if data.roles is not None and not has_role(acting_user, Role.super_admin):
+        if has_any_role(acting_roles, Role.admin):
+            if data.roles is not None and not has_any_role(
+                acting_user.roles, Role.super_admin
+            ):
                 had_super = Role.super_admin in (target.roles or [])
                 gets_super = Role.super_admin in data.roles
                 if had_super != gets_super:
@@ -414,7 +455,7 @@ class UserService:
                     raise UserValidationError(
                         "A user's tenant cannot be changed once assigned"
                     )
-                if not has_role(acting_user, Role.super_admin):
+                if not has_any_role(acting_user.roles, Role.super_admin):
                     raise ForbiddenError("Only a super admin can assign a tenant")
             effective_roles = data.roles if data.roles is not None else target.roles
             effective_tenant_id = update.get("tenant_id", target.tenant_id)

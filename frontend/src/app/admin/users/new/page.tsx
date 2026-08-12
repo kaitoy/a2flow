@@ -18,6 +18,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
+import { GroupPicker } from "@/components/admin/group-picker";
 import { RolesField } from "@/components/admin/roles-field";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { createUser } from "@/lib/api";
+import { createUser, setUserGroups } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -41,6 +42,9 @@ export default function NewUserPage() {
   // Roles live outside the form state: the picker is a controlled multi-select
   // rather than a registered input.
   const [roles, setRoles] = useState<Role[]>([]);
+  // Group membership, applied right after the account is created. A super admin
+  // is platform-scoped and can never be a member, so the picker is hidden then.
+  const [groupIds, setGroupIds] = useState<string[]>([]);
   const isSuperAdminViewer = useHasRole(Role.SUPER_ADMIN);
   const canEdit = useHasRole(Role.ADMIN);
   const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
@@ -76,7 +80,7 @@ export default function NewUserPage() {
   async function onSubmit(values: FormValues) {
     try {
       await save.run(async () => {
-        await createUser({
+        const created = await createUser({
           username: values.username,
           firstName: values.firstName,
           lastName: values.lastName,
@@ -87,6 +91,11 @@ export default function NewUserPage() {
           roles,
           tenantId,
         });
+        // Membership is a sub-resource of the created user, so it can only be
+        // written once the account exists.
+        if (groupIds.length > 0) {
+          await setUserGroups(created.id, groupIds);
+        }
         dispatch(showToast({ message: "User created" }));
         router.push("/admin/users");
       });
@@ -152,6 +161,8 @@ export default function NewUserPage() {
           </FormField>
 
           <RolesField value={roles} onChange={setRoles} />
+
+          {!targetIsSuperAdmin && <GroupPicker value={groupIds} onChange={setGroupIds} />}
 
           <Checkbox label="Enabled" {...register("enabled")} />
           <Checkbox label="Email verified" {...register("emailVerified")} />

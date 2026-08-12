@@ -20,6 +20,7 @@ from dependencies import (
     ApiMetaDep,
     AuthServiceDep,
     CurrentUserDep,
+    EffectiveRoleRepositoryDep,
     ImpersonationServiceDep,
     RealUserDep,
     require_actor_roles,
@@ -27,9 +28,30 @@ from dependencies import (
 )
 from models.constraints import TenantSlug
 from models.response import ApiResponse
-from models.user import Role, UserRead
+from models.user import Role, User, UserRead
+from repositories import EffectiveRoleRepository
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+async def _to_read(repo: EffectiveRoleRepository, user: User) -> UserRead:
+    """Project a user into its read view, resolving its group-inherited roles.
+
+    Every response from this router carries ``groupRoles`` alongside ``roles``:
+    the frontend unions the two to decide which navigation and actions to show,
+    so a user whose only ``developer`` grant comes from a group must still see
+    the developer UI right after signing in.
+
+    Args:
+        repo: Repository resolving the roles inherited from group membership.
+        user: The user to project.
+
+    Returns:
+        The read view, carrying both direct and inherited roles.
+    """
+    return UserRead.from_user(
+        user, group_roles=await repo.group_roles_for_user(user.id)
+    )
 
 
 class LoginRequest(BaseModel):
@@ -111,6 +133,7 @@ async def login(
     body: LoginRequest,
     response: Response,
     service: AuthServiceDep,
+    effective_roles: EffectiveRoleRepositoryDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[UserRead]:
     """Authenticate a user and start a session, returning the current user.
@@ -126,7 +149,7 @@ async def login(
         session_token=result.session_token,
         csrf_token=result.csrf_token,
     )
-    return ApiResponse(meta=meta, data=UserRead.model_validate(result.user))
+    return ApiResponse(meta=meta, data=await _to_read(effective_roles, result.user))
 
 
 @router.post("/logout", response_model=ApiResponse[None])
@@ -153,6 +176,7 @@ async def logout(
 async def me(
     user: CurrentUserDep,
     real_user: RealUserDep,
+    effective_roles: EffectiveRoleRepositoryDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[MeResponse]:
     """Return the currently authenticated (effective) user.
@@ -161,12 +185,13 @@ async def me(
     effective user, i.e. an impersonation is active.
     """
     impersonated_by = (
-        UserRead.model_validate(real_user) if real_user.id != user.id else None
+        await _to_read(effective_roles, real_user) if real_user.id != user.id else None
     )
     return ApiResponse(
         meta=meta,
         data=MeResponse(
-            user=UserRead.model_validate(user), impersonated_by=impersonated_by
+            user=await _to_read(effective_roles, user),
+            impersonated_by=impersonated_by,
         ),
     )
 
@@ -176,6 +201,7 @@ async def start_impersonation(
     body: ImpersonateRequest,
     actor: RealUserDep,
     service: ImpersonationServiceDep,
+    effective_roles: EffectiveRoleRepositoryDep,
     _role: Annotated[None, Depends(require_actor_roles(Role.admin))],
     _csrf: Annotated[None, Depends(verify_csrf)],
     meta: ApiMetaDep,
@@ -190,8 +216,8 @@ async def start_impersonation(
     return ApiResponse(
         meta=meta,
         data=MeResponse(
-            user=UserRead.model_validate(target),
-            impersonated_by=UserRead.model_validate(actor),
+            user=await _to_read(effective_roles, target),
+            impersonated_by=await _to_read(effective_roles, actor),
         ),
     )
 
@@ -200,6 +226,7 @@ async def start_impersonation(
 async def stop_impersonation(
     actor: RealUserDep,
     service: ImpersonationServiceDep,
+    effective_roles: EffectiveRoleRepositoryDep,
     _csrf: Annotated[None, Depends(verify_csrf)],
     meta: ApiMetaDep,
 ) -> ApiResponse[MeResponse]:
@@ -212,5 +239,7 @@ async def stop_impersonation(
     await service.stop(actor=actor)
     return ApiResponse(
         meta=meta,
-        data=MeResponse(user=UserRead.model_validate(actor), impersonated_by=None),
+        data=MeResponse(
+            user=await _to_read(effective_roles, actor), impersonated_by=None
+        ),
     )

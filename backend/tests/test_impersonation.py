@@ -26,6 +26,8 @@ from dependencies.auth import (
 from infrastructure.password import hash_password
 from models.impersonation_event import ImpersonationEvent
 from models.user import SYSTEM_USER_ID, Role, User
+from models.user_group import UserGroup, UserGroupMember
+from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.exceptions import ForbiddenError, NotFoundError
 from repositories.impersonation_event import SqlImpersonationEventRepository
 from repositories.user import SqlUserRepository
@@ -120,7 +122,9 @@ async def _service_and_user(
     engine: Any, session: AsyncSession, user_id: str
 ) -> tuple[ImpersonationService, User]:
     service = ImpersonationService(
-        SqlImpersonationEventRepository(session), SqlUserRepository(session)
+        SqlImpersonationEventRepository(session),
+        SqlUserRepository(session),
+        SqlEffectiveRoleRepository(session),
     )
     actor = await session.get(User, user_id)
     assert actor is not None
@@ -816,3 +820,105 @@ async def test_deleting_user_with_impersonation_history_soft_deletes(
         assert user is not None
         assert user.deleted_at is not None
         assert user.enabled is False
+
+
+# ---------- eligibility against roles inherited from a user group ----------
+#
+# The target side of ``_target_ineligible_for_actor`` must judge *effective*
+# roles: a user who holds ``admin`` only through a group is exactly as
+# privileged as one granted it directly, so treating them as a plain user would
+# hand a regular admin the escalation the rule exists to block.
+
+
+async def _grant_via_group(
+    session: AsyncSession, *, user_id: str, role: Role, group_id: str
+) -> None:
+    """Place ``user_id`` in a new group granting ``role`` within tenant A."""
+    session.add(
+        UserGroup(
+            id=group_id,
+            tenant_id=TENANT_A,
+            name=f"{group_id}-name",
+            roles=[role.value],
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+    )
+    session.add(UserGroupMember(group_id=group_id, user_id=user_id))
+    await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_impersonate_a_group_inherited_admin(
+    impersonation_service_engine: Any,
+) -> None:
+    async with AsyncSession(
+        impersonation_service_engine, expire_on_commit=False
+    ) as session:
+        await _grant_via_group(
+            session, user_id="dev-a", role=Role.admin, group_id="admins-group"
+        )
+        service, actor = await _service_and_user(
+            impersonation_service_engine, session, "admin-a"
+        )
+        with pytest.raises(ForbiddenError):
+            await service.start(actor=actor, target_user_id="dev-a")
+
+
+@pytest.mark.asyncio
+async def test_super_admin_can_still_impersonate_a_group_inherited_admin(
+    impersonation_service_engine: Any,
+) -> None:
+    async with AsyncSession(
+        impersonation_service_engine, expire_on_commit=False
+    ) as session:
+        await _grant_via_group(
+            session, user_id="dev-a", role=Role.admin, group_id="admins-group"
+        )
+        service, actor = await _service_and_user(
+            impersonation_service_engine, session, "root"
+        )
+        target = await service.start(actor=actor, target_user_id="dev-a")
+        assert target.id == "dev-a"
+
+
+@pytest.mark.asyncio
+async def test_admin_may_impersonate_a_group_inherited_developer(
+    impersonation_service_engine: Any,
+) -> None:
+    """Only ``admin``/``super_admin`` targets are protected; other roles are fine."""
+    async with AsyncSession(
+        impersonation_service_engine, expire_on_commit=False
+    ) as session:
+        await _grant_via_group(
+            session, user_id="dev-a", role=Role.developer, group_id="devs-group"
+        )
+        service, actor = await _service_and_user(
+            impersonation_service_engine, session, "admin-a"
+        )
+        target = await service.start(actor=actor, target_user_id="dev-a")
+        assert target.id == "dev-a"
+
+
+@pytest.mark.asyncio
+async def test_an_open_impersonation_ends_when_the_target_joins_an_admin_group(
+    impersonation_service_engine: Any,
+) -> None:
+    """Eligibility is re-checked per request, so a promotion mid-session stops it."""
+    async with AsyncSession(
+        impersonation_service_engine, expire_on_commit=False
+    ) as session:
+        service, actor = await _service_and_user(
+            impersonation_service_engine, session, "admin-a"
+        )
+        await service.start(actor=actor, target_user_id="dev-a")
+        assert (
+            await service.resolve_effective_user(actor=actor, target_user_id="dev-a")
+        ).id == "dev-a"
+
+        await _grant_via_group(
+            session, user_id="dev-a", role=Role.admin, group_id="admins-group"
+        )
+        assert (
+            await service.resolve_effective_user(actor=actor, target_user_id="dev-a")
+        ).id == actor.id

@@ -25,12 +25,15 @@ from infrastructure.demo_data import (
     DEMO_AGENT_SKILL_ID,
     DEMO_AGENT_SKILL_NAME,
     DEMO_APPROVER_USER_ID,
+    DEMO_APPROVERS_GROUP_ID,
     DEMO_AWS_SECRET_ID,
     DEMO_AWS_SECRET_NAME,
     DEMO_DEVELOPER_USER_ID,
+    DEMO_DEVELOPERS_GROUP_ID,
     DEMO_MCP_SERVER_ID,
     DEMO_MCP_SERVER_NAME,
     DEMO_REQUESTER_USER_ID,
+    DEMO_REQUESTERS_GROUP_ID,
     DEMO_SECRET_KEY_ENTRY_KEY,
     sync_demo_data,
 )
@@ -41,6 +44,8 @@ from models.mcp_server import McpCommand, MCPServer, McpTransport
 from models.secret import Secret, SecretType
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
+from models.user_group import UserGroup, UserGroupMember
+from repositories.effective_roles import SqlEffectiveRoleRepository
 
 #: Fixed id of the ``Default`` tenant the fixture seeds, so tests can assert on
 #: the ``tenant_id`` the demo records land in without re-querying it.
@@ -218,7 +223,7 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _rows(engine, AgentSkill)) == 1
 
 
-async def test_demo_users_hold_the_approver_requester_and_developer_roles(
+async def test_demo_users_hold_no_direct_roles(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
@@ -226,17 +231,99 @@ async def test_demo_users_hold_the_approver_requester_and_developer_roles(
     approver, developer, requester = await _demo_users(engine)
     assert approver.id == DEMO_APPROVER_USER_ID
     assert approver.username == "demo-approver"
-    assert approver.roles == [Role.approver.value]
     assert developer.id == DEMO_DEVELOPER_USER_ID
     assert developer.username == "demo-developer"
-    assert developer.roles == [Role.developer.value]
     assert requester.id == DEMO_REQUESTER_USER_ID
     assert requester.username == "demo-requester"
-    assert requester.roles == [Role.requester.value]
     for user in (approver, developer, requester):
+        assert user.roles == []
         assert user.tenant_id == TENANT_ID
         assert user.enabled is True
         assert user.created_by == SYSTEM_USER_ID
+
+
+async def test_demo_groups_grant_the_approver_requester_and_developer_roles(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    groups = {group.id: group for group in await _rows(engine, UserGroup)}
+    assert len(groups) == 3
+    expected = {
+        DEMO_APPROVERS_GROUP_ID: ("Demo Approvers", Role.approver),
+        DEMO_REQUESTERS_GROUP_ID: ("Demo Requesters", Role.requester),
+        DEMO_DEVELOPERS_GROUP_ID: ("Demo Developers", Role.developer),
+    }
+    for group_id, (name, role) in expected.items():
+        group = groups[group_id]
+        assert group.name == name
+        assert group.roles == [role.value]
+        assert group.tenant_id == TENANT_ID
+        assert group.created_by == SYSTEM_USER_ID
+
+
+async def test_each_demo_user_is_the_sole_member_of_their_group(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    members = {
+        (row.group_id, row.user_id) for row in await _rows(engine, UserGroupMember)
+    }
+    assert members == {
+        (DEMO_APPROVERS_GROUP_ID, DEMO_APPROVER_USER_ID),
+        (DEMO_REQUESTERS_GROUP_ID, DEMO_REQUESTER_USER_ID),
+        (DEMO_DEVELOPERS_GROUP_ID, DEMO_DEVELOPER_USER_ID),
+    }
+
+
+async def test_demo_users_effective_roles_come_from_their_group(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        inherited = await SqlEffectiveRoleRepository(session).group_roles_for_users(
+            [DEMO_APPROVER_USER_ID, DEMO_REQUESTER_USER_ID, DEMO_DEVELOPER_USER_ID]
+        )
+    assert inherited == {
+        DEMO_APPROVER_USER_ID: frozenset({Role.approver.value}),
+        DEMO_REQUESTER_USER_ID: frozenset({Role.requester.value}),
+        DEMO_DEVELOPER_USER_ID: frozenset({Role.developer.value}),
+    }
+
+
+async def test_reviving_an_older_demo_user_strips_its_direct_roles(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A database seeded before groups existed migrates to pure inheritance."""
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        legacy = await session.get(User, DEMO_APPROVER_USER_ID)
+        assert legacy is not None
+        legacy.roles = [Role.approver.value]
+        session.add(legacy)
+        await session.commit()
+
+    await _sync(engine)
+
+    async with AsyncSession(engine) as session:
+        migrated = await session.get(User, DEMO_APPROVER_USER_ID)
+        assert migrated is not None
+        assert migrated.roles == []
+
+
+async def test_removing_demo_data_deletes_the_groups(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    monkeypatch.setenv("DEMO_DATA", "false")
+    get_settings.cache_clear()
+    await _sync(engine)
+    assert await _rows(engine, UserGroup) == []
+    assert await _rows(engine, UserGroupMember) == []
 
 
 async def test_demo_users_honour_the_configured_password(

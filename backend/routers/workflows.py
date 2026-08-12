@@ -31,6 +31,7 @@ from dependencies import (
     ApiMetaDep,
     CurrentUserDep,
     CurrentUserIdDep,
+    EffectiveRolesDep,
     FilterDep,
     PaginationDep,
     SortDep,
@@ -120,6 +121,7 @@ async def get_design_session_messages(
     workflow_id: str,
     service: WorkflowServiceDep,
     caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[dict[str, Any]]]:
     """Return the chat history of a Workflow's design session.
@@ -132,7 +134,9 @@ async def get_design_session_messages(
     ADK session has not been created yet (the background generation run has not
     started). Raises HTTP 404 if the workflow does not exist.
     """
-    messages = await service.get_messages(workflow_id, caller=caller)
+    messages = await service.get_messages(
+        workflow_id, caller=caller, caller_roles=caller_roles
+    )
     return ApiResponse(meta=meta, data=messages)
 
 
@@ -143,6 +147,7 @@ async def design_session_agent(
     request: Request,
     service: WorkflowServiceDep,
     caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent driving a Workflow's design session.
 
@@ -174,7 +179,9 @@ async def design_session_agent(
     """
     # Resolve (and authorize) before locking, so a caller with no business here
     # gets their 403/404 rather than queueing behind someone else's run.
-    adk_agent, workflow = await service.resolve_agent(workflow_id, caller=caller)
+    adk_agent, workflow = await service.resolve_agent(
+        workflow_id, caller=caller, caller_roles=caller_roles
+    )
     current_user_id = caller.id
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
@@ -366,6 +373,7 @@ async def execute_workflow(
     workflow_id: str,
     service: WorkflowServiceDep,
     caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowExecution]:
     """Create a WorkflowExecution pre-filled with the workflow's task templates.
@@ -377,5 +385,7 @@ async def execute_workflow(
     session is created lazily on the first agent call, which starts executing
     immediately.
     """
-    execution = await service.execute(workflow_id, caller=caller)
+    execution = await service.execute(
+        workflow_id, caller=caller, caller_roles=caller_roles
+    )
     return ApiResponse(meta=meta, data=execution)

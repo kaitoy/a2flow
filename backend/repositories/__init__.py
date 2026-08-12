@@ -1,6 +1,7 @@
 from .agent_skill import AgentSkillRepository, SqlAgentSkillRepository
 from .approval import ApprovalRepository, SqlApprovalRepository
 from .auth_session import AuthSessionRepository, SqlAuthSessionRepository
+from .effective_roles import EffectiveRoleRepository, SqlEffectiveRoleRepository
 from .exceptions import (
     CsrfError,
     ForeignKeyViolationError,
@@ -21,6 +22,7 @@ from .secret import SecretRepository, SqlSecretRepository
 from .tenant import SqlTenantRepository, TenantRepository
 from .user import SqlUserRepository, UserRepository
 from .user_avatar import SqlUserAvatarRepository, UserAvatarRepository
+from .user_group import SqlUserGroupRepository, UserGroupRepository
 from .workflow import SqlWorkflowRepository, WorkflowRepository
 from .workflow_execution import (
     SqlWorkflowExecutionRepository,
@@ -42,6 +44,7 @@ __all__ = [
     "ApprovalRepository",
     "AuthSessionRepository",
     "CsrfError",
+    "EffectiveRoleRepository",
     "ForeignKeyViolationError",
     "MAX_TASK_TEMPLATES",
     "ImpersonationEventRepository",
@@ -55,6 +58,7 @@ __all__ = [
     "SqlAgentSkillRepository",
     "SqlApprovalRepository",
     "SqlAuthSessionRepository",
+    "SqlEffectiveRoleRepository",
     "SqlImpersonationEventRepository",
     "SqlMCPServerRepository",
     "SqlMessageMetaRepository",
@@ -62,6 +66,7 @@ __all__ = [
     "SqlSecretRepository",
     "SqlTenantRepository",
     "SqlUserAvatarRepository",
+    "SqlUserGroupRepository",
     "SqlUserRepository",
     "SqlWorkflowPublishedVersionRepository",
     "SqlWorkflowRepository",
@@ -72,6 +77,7 @@ __all__ = [
     "UnauthorizedError",
     "UniqueViolationError",
     "UserAvatarRepository",
+    "UserGroupRepository",
     "UserRepository",
     "WorkflowPublishedVersionRepository",
     "WorkflowRepository",

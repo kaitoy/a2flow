@@ -181,7 +181,12 @@ async def _get_scoped(self, skill_id: str) -> AgentSkill | None:
 
 A cross-tenant fetch this way returns `None`, which the existing `NotFoundError` path on `update`/`delete` already handles — a caller in tenant A gets 404, not 403, when it references an id that exists only in tenant B, matching the "fetch entity first so a missing record still surfaces as 404, not 403" rule below. `list()` adds `.where(Model.tenant_id == self._tenant_id)` to its `select()`; `create()` adds `"tenant_id": self._tenant_id` to the `model_validate({...})` merge dict.
 
-Enforcement is deliberately explicit at this layer rather than via `with_loader_criteria`/ORM event listeners: ADK agent tools and background jobs (`infrastructure/*_tools.py`, `services/workflow_design.py`, `services/agent_skill_sync.py`) open their own `AsyncSession` on the module-level engine outside FastAPI's request scope, so a request-scoped listener would silently not apply to them — the most dangerous path. Those callers resolve `tenant_id` themselves via `repositories/tenant_bootstrap.py` (the single audited module of intentionally tenant-*unscoped* queries — an opaque ADK session id or bare entity id is all they start with) before constructing any repository.
+Enforcement is deliberately explicit at this layer rather than via `with_loader_criteria`/ORM event listeners: ADK agent tools and background jobs (`infrastructure/*_tools.py`, `services/workflow_design.py`, `services/agent_skill_sync.py`) open their own `AsyncSession` on the module-level engine outside FastAPI's request scope, so a request-scoped listener would silently not apply to them — the most dangerous path. Those callers resolve `tenant_id` themselves via `repositories/tenant_bootstrap.py` (an opaque ADK session id or bare entity id is all they start with) before constructing any repository.
+
+There are exactly **two** audited modules of intentionally tenant-*unscoped* queries, and new ones need the same justification in their module docstring:
+
+- `repositories/tenant_bootstrap.py` — resolves the tenant in the first place, so it cannot already be scoped to one.
+- `repositories/effective_roles.py` — resolves the roles a user inherits from their groups. It must work for a platform-scoped caller who has selected no tenant (`CurrentTenantIdDep` raises for them), and the membership rows it reads were already tenant-validated at write time by `repositories/user_group.py`; filtering again here would be redundant and would silently drop grants a user genuinely holds whenever the acting tenant differed.
 
 ### List Query Field Exposure
 

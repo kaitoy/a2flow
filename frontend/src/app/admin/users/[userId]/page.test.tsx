@@ -540,3 +540,96 @@ describe("UserDetailPage", () => {
     });
   });
 });
+
+describe("UserDetailPage group membership", () => {
+  it("shows the roles inherited from the user's groups, apart from the direct ones", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({
+          id: "user-1",
+          username: "alice",
+          firstName: "Alice",
+          lastName: "Smith",
+          email: "alice@example.com",
+          enabled: true,
+          emailVerified: false,
+          tenantId: "tenant-1",
+          roles: ["approver"],
+          groupRoles: ["developer"],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Roles from groups")).toBeInTheDocument());
+    // Direct grants stay editable; inherited ones render as read-only chips.
+    expect(screen.getByRole("checkbox", { name: "Approver" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Developer" })).not.toBeChecked();
+    // The explanatory line only renders when something is actually inherited.
+    expect(screen.getByText(/Granted by group membership/)).toBeInTheDocument();
+  });
+
+  it("checks the groups the user already belongs to", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Developers" })).toBeChecked());
+  });
+
+  it("writes membership only when the selection changed", async () => {
+    let membershipWrites = 0;
+    server.use(
+      http.put("http://localhost:8000/api/v1/users/:userId/groups", () => {
+        membershipWrites += 1;
+        return envelope({ id: "user-1" });
+      })
+    );
+    renderPage();
+    await waitFor(() => screen.getByRole("checkbox", { name: "Developers" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(membershipWrites).toBe(0));
+  });
+
+  it("writes the new membership when a group is toggled", async () => {
+    let body: unknown;
+    server.use(
+      http.put("http://localhost:8000/api/v1/users/:userId/groups", async ({ request }) => {
+        body = await request.json();
+        return envelope({ id: "user-1" });
+      })
+    );
+    renderPage();
+    await waitFor(() => screen.getByRole("checkbox", { name: "Developers" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Developers" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(body).toEqual({ groupIds: [] }));
+  });
+
+  it("hides the group picker for a platform-scoped user", async () => {
+    // A super admin carries no tenantId and can never be a group member.
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({
+          id: "user-1",
+          username: "root",
+          firstName: "Root",
+          lastName: "User",
+          email: "root@example.com",
+          enabled: true,
+          emailVerified: false,
+          tenantId: null,
+          roles: ["super_admin"],
+          groupRoles: [],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+    renderPage();
+    await waitFor(() => screen.getByDisplayValue("Root"));
+    expect(screen.queryByText("Groups")).not.toBeInTheDocument();
+  });
+});

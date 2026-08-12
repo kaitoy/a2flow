@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { User } from "@/lib/api";
-import { ALL_ROLES, hasRole, ROLE_LABELS, Role } from "@/lib/roles";
+import { ALL_ROLES, effectiveRoles, hasRole, ROLE_LABELS, Role } from "@/lib/roles";
 
 /** Build a minimal signed-in user holding the given roles. */
-function user(roles: Role[]): User {
-  return { id: "u1", roles } as User;
+function user(roles: Role[], groupRoles: Role[] = []): User {
+  return { id: "u1", roles, groupRoles } as User;
 }
 
 describe("hasRole", () => {
@@ -36,5 +36,31 @@ describe("role metadata", () => {
     for (const role of ALL_ROLES) {
       expect(ROLE_LABELS[role]).toBeTruthy();
     }
+  });
+});
+
+describe("roles inherited from user groups", () => {
+  it("unions the direct grants with the inherited ones", () => {
+    expect(effectiveRoles(user([Role.ADMIN], [Role.DEVELOPER]))).toEqual([
+      Role.ADMIN,
+      Role.DEVELOPER,
+    ]);
+  });
+
+  it("passes a role held only through a group", () => {
+    expect(hasRole(user([], [Role.DEVELOPER]), Role.DEVELOPER)).toBe(true);
+  });
+
+  it("still refuses a role held neither way", () => {
+    expect(hasRole(user([Role.REQUESTER], [Role.DEVELOPER]), Role.ADMIN)).toBe(false);
+  });
+
+  it("keeps the super_admin bypass on the direct grants", () => {
+    // A user group can never grant super_admin, matching the backend.
+    expect(hasRole(user([Role.SUPER_ADMIN], []), Role.REQUESTER)).toBe(true);
+  });
+
+  it("tolerates a user with no groupRoles field", () => {
+    expect(effectiveRoles({ id: "u1", roles: [Role.ADMIN] } as User)).toEqual([Role.ADMIN]);
   });
 });

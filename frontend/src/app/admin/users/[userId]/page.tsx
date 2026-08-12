@@ -22,7 +22,9 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { GroupPicker } from "@/components/admin/group-picker";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { InheritedRolesField } from "@/components/admin/inherited-roles";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { RolesField } from "@/components/admin/roles-field";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
@@ -40,7 +42,9 @@ import {
   deleteUser,
   getUser,
   isForbiddenError,
+  listUserGroups,
   SUPPRESS_FORBIDDEN_TOAST,
+  setUserGroups,
   startImpersonation,
   type UserUpdate,
   updateUser,
@@ -65,6 +69,11 @@ const schema = zUserCreate.omit({ username: true, password: true }).extend({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+/** Whether two id selections hold the same members, ignoring order. */
+function sameIds(a: string[], b: string[]): boolean {
+  return a.length === b.length && [...a].sort().join() === [...b].sort().join();
+}
 
 /**
  * Detail page of a user account: avatar, profile fields, roles, and flags. The
@@ -103,6 +112,14 @@ export default function UserDetailPage() {
   // Roles live outside the form state: the picker is a controlled multi-select
   // rather than a registered input.
   const [roles, setRoles] = useState<Role[]>([]);
+  // Roles inherited from the user's groups. Read-only here: only editing the
+  // groups (below, or from the group page) can change them.
+  const [groupRoles, setGroupRoles] = useState<Role[]>([]);
+  // Group membership, edited from this side as well as from the group detail
+  // page. `savedGroupIds` remembers what the server has, so an unchanged
+  // selection skips the extra request.
+  const [groupIds, setGroupIds] = useState<string[]>([]);
+  const [savedGroupIds, setSavedGroupIds] = useState<string[]>([]);
   // The tenantId as loaded from the server. A tenant is immutable once
   // assigned (the backend rejects any change), so it's the source of truth
   // whenever it's non-null; `tenantId` below only derives a value from the
@@ -131,8 +148,12 @@ export default function UserDetailPage() {
   const canImpersonateTarget = canImpersonate(viewer, isSuperAdminViewer, isAdmin, {
     id: userId,
     roles,
+    groupRoles,
     tenantId: originalTenantId,
   });
+  // A platform-scoped account (a super admin, or the seeded system user) can
+  // never be a member of a tenant's group, so the picker is not offered.
+  const canJoinGroups = originalTenantId !== null;
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -161,6 +182,7 @@ export default function UserDetailPage() {
         setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
         setAvatarConfig(user.avatarConfig ?? null);
         setRoles(user.roles ?? []);
+        setGroupRoles(user.groupRoles ?? []);
         setOriginalTenantId(user.tenantId ?? null);
         reset({
           firstName: user.firstName,
@@ -187,6 +209,21 @@ export default function UserDetailPage() {
       .finally(() => setLoading(false));
   }, [userId, reset]);
 
+  // Membership is only exposed from the group side, so it is derived from the
+  // group list rather than fetched per user. A failure here is not fatal: the
+  // picker renders its own error state and the rest of the form still works.
+  useEffect(() => {
+    listUserGroups({ limit: 1000 })
+      .then((groups) => {
+        const mine = groups.filter((g) => g.memberIds?.includes(userId)).map((g) => g.id);
+        setGroupIds(mine);
+        setSavedGroupIds(mine);
+      })
+      .catch(() => {
+        // Failure toast is shown globally by api.ts; nothing else to do here.
+      });
+  }, [userId]);
+
   async function onSubmit(values: FormValues) {
     const body: UserUpdate = {
       firstName: values.firstName,
@@ -203,6 +240,12 @@ export default function UserDetailPage() {
     try {
       await save.run(async () => {
         await updateUser(userId, body);
+        // Membership is a separate sub-resource, so it is only written when it
+        // actually changed. It goes second because its response carries the
+        // freshly resolved `groupRoles`.
+        if (!sameIds(groupIds, savedGroupIds)) {
+          await setUserGroups(userId, groupIds);
+        }
         dispatch(showToast({ message: "User updated" }));
         router.push("/admin/users");
       });
@@ -357,6 +400,12 @@ export default function UserDetailPage() {
           )}
 
           <RolesField value={roles} onChange={setRoles} readOnly={!canEdit} />
+
+          <InheritedRolesField roles={groupRoles} />
+
+          {canJoinGroups && (
+            <GroupPicker value={groupIds} onChange={setGroupIds} readOnly={!canEdit} />
+          )}
 
           {canEdit ? (
             <>

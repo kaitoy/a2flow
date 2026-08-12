@@ -17,6 +17,14 @@ export interface RolesFieldProps {
    * whose role cannot write users. `onChange` is then never called.
    */
   readOnly?: boolean;
+  /**
+   * Whether `super_admin` may appear as an option at all. `false` for the user
+   * group forms: a group can never grant it, and the backend rejects the
+   * attempt with HTTP 422.
+   */
+  allowSuperAdmin?: boolean;
+  /** Label above the group; distinguishes direct grants from inherited ones. */
+  label?: string;
 }
 
 /**
@@ -25,7 +33,13 @@ export interface RolesFieldProps {
  * The `super_admin` option is omitted entirely for a non-super-admin viewer —
  * the backend rejects granting or revoking it otherwise (HTTP 403), and only a
  * super admin should even know the role exists. The same filter applies to the
- * read-only rendering, so no viewer learns of a role they may not see.
+ * read-only rendering, so no viewer learns of a role they may not see. Callers
+ * that grant roles to something other than a user pass `allowSuperAdmin={false}`
+ * to drop the option for every viewer — a user group can never grant it.
+ *
+ * These are the roles held *directly*. Roles a user inherits from their groups
+ * are rendered apart by {@link InheritedRolesField}, since editing the user
+ * cannot change them.
  *
  * `super_admin` is mutually exclusive with every other role (it already
  * bypasses every role-based check, so combining it with another role is
@@ -37,10 +51,17 @@ export interface RolesFieldProps {
  * checkbox itself stays hidden from them, but nothing else can be toggled
  * until a super admin lifts the grant.
  */
-export function RolesField({ value, onChange, readOnly = false }: RolesFieldProps) {
-  const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
+export function RolesField({
+  value,
+  onChange,
+  readOnly = false,
+  allowSuperAdmin = true,
+  label = "Roles",
+}: RolesFieldProps) {
+  const viewerIsSuperAdmin = useHasRole(Role.SUPER_ADMIN);
+  const showSuperAdmin = allowSuperAdmin && viewerIsSuperAdmin;
 
-  const visibleRoles = isSuperAdmin
+  const visibleRoles = showSuperAdmin
     ? ALL_ROLES
     : ALL_ROLES.filter((role) => role !== Role.SUPER_ADMIN);
 
@@ -48,7 +69,7 @@ export function RolesField({ value, onChange, readOnly = false }: RolesFieldProp
     const held = visibleRoles.filter((role) => value.includes(role));
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-label-caps">Roles</span>
+        <span className="text-label-caps">{label}</span>
         <ReadOnlyField>
           {held.length === 0 ? EMPTY_VALUE : held.map((role) => ROLE_LABELS[role]).join(", ")}
         </ReadOnlyField>
@@ -63,19 +84,19 @@ export function RolesField({ value, onChange, readOnly = false }: RolesFieldProp
     value: role,
     label: ROLE_LABELS[role],
     disabled: role === Role.SUPER_ADMIN ? holdsOtherRole : holdsSuperAdmin,
-    dividerBefore: isSuperAdmin && i === 1,
+    dividerBefore: showSuperAdmin && i === 1,
   }));
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">Roles</span>
+      <span className="text-label-caps">{label}</span>
       <CheckboxGroup
         name="roles"
         options={options}
         value={value}
         onChange={(next) => onChange(next as Role[])}
       />
-      {isSuperAdmin && (
+      {showSuperAdmin && (
         <p className="text-xs text-on-surface-variant">
           Super Admin can&apos;t be combined with other roles — uncheck it to change the others.
         </p>

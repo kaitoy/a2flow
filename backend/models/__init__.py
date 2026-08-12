@@ -19,6 +19,14 @@ from .notification import (
 from .session import Session
 from .tenant import Tenant, TenantCreate, TenantUpdate
 from .user_avatar import UserAvatar
+from .user_group import (
+    UserGroup,
+    UserGroupCreate,
+    UserGroupMember,
+    UserGroupMembershipUpdate,
+    UserGroupRead,
+    UserGroupUpdate,
+)
 from .workflow import (
     GenerateWorkflowRequest,
     Workflow,
@@ -81,6 +89,12 @@ __all__ = [
     "TenantUpdate",
     "ToolBinding",
     "UserAvatar",
+    "UserGroup",
+    "UserGroupCreate",
+    "UserGroupMember",
+    "UserGroupMembershipUpdate",
+    "UserGroupRead",
+    "UserGroupUpdate",
     "Workflow",
     "WorkflowCreate",
     "WorkflowPublishedVersion",

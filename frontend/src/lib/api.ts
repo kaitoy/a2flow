@@ -39,6 +39,9 @@ import type {
   TenantUpdate,
   ToolBinding,
   UserCreate,
+  UserGroupCreate,
+  UserGroupRead as UserGroupModel,
+  UserGroupUpdate,
   UserRead as UserReadModel,
   UserUpdate,
   WorkflowExecution as WorkflowExecutionModel,
@@ -59,6 +62,7 @@ import {
   zCreateSecretApiV1SecretsPostResponse,
   zCreateTenantApiV1TenantsPostResponse,
   zCreateUserApiV1UsersPostResponse,
+  zCreateUserGroupApiV1UserGroupsPostResponse,
   zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zCreateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPostResponse,
   zDeactivateWorkflowApiV1WorkflowsWorkflowIdDeactivatePostResponse,
@@ -70,6 +74,7 @@ import {
   zDeleteTenantApiV1TenantsTenantIdDeleteResponse,
   zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse,
+  zDeleteUserGroupApiV1UserGroupsGroupIdDeleteResponse,
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
   zDeleteWorkflowExecutionApiV1WorkflowExecutionsExecutionIdDeleteResponse,
   zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
@@ -87,6 +92,7 @@ import {
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
   zGetTenantApiV1TenantsTenantIdGetResponse,
   zGetUserApiV1UsersUserIdGetResponse,
+  zGetUserGroupApiV1UserGroupsGroupIdGetResponse,
   zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
   zGetWorkflowExecutionApiV1WorkflowExecutionsExecutionIdGetResponse,
   zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse,
@@ -101,6 +107,7 @@ import {
   zListSecretsApiV1SecretsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
   zListTenantsApiV1TenantsGetResponse,
+  zListUserGroupsApiV1UserGroupsGetResponse,
   zListUsersApiV1UsersGetResponse,
   zListWorkflowExecutionsApiV1WorkflowExecutionsGetResponse,
   zListWorkflowExecutionTasksApiV1WorkflowExecutionsExecutionIdWorkflowTasksGetResponse,
@@ -115,6 +122,7 @@ import {
   zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
   zResolveUserNamesApiV1UsersResolveNamesPostResponse,
   zSearchMcpRegistryApiV1McpRegistryGetResponse,
+  zSetUserGroupsApiV1UsersUserIdGroupsPutResponse,
   zStartImpersonationApiV1AuthImpersonatePostResponse,
   zStopImpersonationApiV1AuthImpersonateDeleteResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
@@ -123,6 +131,7 @@ import {
   zUpdateSecretApiV1SecretsSecretIdPatchResponse,
   zUpdateTenantApiV1TenantsTenantIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
+  zUpdateUserGroupApiV1UserGroupsGroupIdPatchResponse,
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
   zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
   zUpdateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdPatchResponse,
@@ -398,6 +407,7 @@ export type Notification = WithAudit<NotificationModel>;
 export type Secret = WithAudit<SecretModel>;
 export type Tenant = WithAudit<TenantModel>;
 export type User = WithAudit<UserReadModel>;
+export type UserGroup = WithAudit<UserGroupModel>;
 export type Workflow = WithAudit<WorkflowModel>;
 export type WorkflowExecution = WithAudit<WorkflowExecutionModel>;
 export type WorkflowTask = WithAudit<WorkflowTaskModel>;
@@ -429,6 +439,8 @@ export type {
   TenantUpdate,
   ToolBinding,
   UserCreate,
+  UserGroupCreate,
+  UserGroupUpdate,
   UserUpdate,
   WorkflowStatus,
   WorkflowTaskCreate,
@@ -831,6 +843,65 @@ export async function deleteUser(id: string): Promise<void> {
     apiClient.delete(`/api/v1/users/${encodeURIComponent(id)}`),
     zDeleteUserApiV1UsersUserIdDeleteResponse
   );
+}
+
+/** List user groups in the acting tenant, with optional pagination, sort, and filters. */
+export async function listUserGroups(query: ListQuery = {}): Promise<UserGroup[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/user-groups", listConfig(query)),
+    zListUserGroupsApiV1UserGroupsGetResponse
+  ) as Promise<UserGroup[]>;
+}
+
+/** Fetch a single user group by ID, including its member IDs. */
+export async function getUserGroup(id: string, config?: AxiosRequestConfig): Promise<UserGroup> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/user-groups/${encodeURIComponent(id)}`, config),
+    zGetUserGroupApiV1UserGroupsGroupIdGetResponse
+  ) as Promise<UserGroup>;
+}
+
+/** Create a new user group in the acting tenant. */
+export async function createUserGroup(body: UserGroupCreate): Promise<UserGroup> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/user-groups", body),
+    zCreateUserGroupApiV1UserGroupsPostResponse
+  ) as Promise<UserGroup>;
+}
+
+/**
+ * Apply a partial update to a user group.
+ *
+ * Omitting `memberIds` leaves membership untouched; supplying a list replaces
+ * it wholesale.
+ */
+export async function updateUserGroup(id: string, body: UserGroupUpdate): Promise<UserGroup> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/user-groups/${encodeURIComponent(id)}`, body),
+    zUpdateUserGroupApiV1UserGroupsGroupIdPatchResponse
+  ) as Promise<UserGroup>;
+}
+
+/** Delete a user group. Its members keep their accounts but lose its roles. */
+export async function deleteUserGroup(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/user-groups/${encodeURIComponent(id)}`),
+    zDeleteUserGroupApiV1UserGroupsGroupIdDeleteResponse
+  );
+}
+
+/**
+ * Replace the set of user groups a user belongs to, returning the updated user.
+ *
+ * The counterpart of editing a group's `memberIds`, so membership can be
+ * managed from the user page as well as the group page. The returned user's
+ * `groupRoles` already reflects the new membership.
+ */
+export async function setUserGroups(userId: string, groupIds: string[]): Promise<User> {
+  return fetchEnvelope(
+    apiClient.put(`/api/v1/users/${encodeURIComponent(userId)}/groups`, { groupIds }),
+    zSetUserGroupsApiV1UsersUserIdGroupsPutResponse
+  ) as Promise<User>;
 }
 
 /** Join a user's first and last name into a single display string. */

@@ -12,10 +12,16 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
   entries from its ``env`` via ``${secret:NAME/KEY}``,
 * one AgentSkill pointing at ``sample_skills/aws-ec2-launch`` in this
   repository,
-* three Users: a ``demo-approver`` (the manager the skill asks for approval),
+* three Users -- a ``demo-approver`` (the manager the skill asks for approval),
   a ``demo-requester`` (who runs the workflow), and a ``demo-developer`` (who
   may build and register the workflow, MCP server, and agent skill in the
-  first place).
+  first place) -- each holding **no direct role at all**,
+* three UserGroups -- ``Demo Approvers``, ``Demo Requesters``, and
+  ``Demo Developers`` -- each granting one role and holding the matching user
+  as its only member, so every demo account gets its role purely by
+  inheritance. That makes the group feature visible in the demo dataset
+  itself: remove a user from their group and their access disappears on the
+  next request.
 
 The Workflow itself is deliberately *not* seeded — these records are the
 ingredients an operator assembles one into.
@@ -50,6 +56,7 @@ from models.mcp_server import McpCommand, MCPServer, McpTransport
 from models.secret import Secret, SecretType
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
+from models.user_group import UserGroup, UserGroupMember
 from repositories.user import SqlUserRepository
 
 logger = logging.getLogger(__name__)
@@ -64,6 +71,15 @@ DEMO_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d002"
 #: Fixed identifier of the demo ``developer`` user (who builds and registers
 #: the workflow, MCP server, and agent skill).
 DEMO_DEVELOPER_USER_ID = "00000000-0000-0000-0000-00000000d003"
+
+#: Fixed identifier of the demo ``Demo Approvers`` user group.
+DEMO_APPROVERS_GROUP_ID = "00000000-0000-0000-0000-00000000d401"
+
+#: Fixed identifier of the demo ``Demo Requesters`` user group.
+DEMO_REQUESTERS_GROUP_ID = "00000000-0000-0000-0000-00000000d402"
+
+#: Fixed identifier of the demo ``Demo Developers`` user group.
+DEMO_DEVELOPERS_GROUP_ID = "00000000-0000-0000-0000-00000000d403"
 
 #: Fixed identifier of the demo Secret holding the AWS credentials.
 DEMO_AWS_SECRET_ID = "00000000-0000-0000-0000-00000000d101"
@@ -123,46 +139,91 @@ _RowT = TypeVar("_RowT", bound=SQLModel)
 class _DemoUserSpec:
     """The fixed identity of one demo user, minus its password.
 
+    Carries no role: every demo account is granted its role through the
+    matching :class:`_DemoGroupSpec` instead.
+
     Attributes:
         id: Fixed primary key, so the user can be found again for removal.
         username: Login name, unique within the ``Default`` tenant.
         first_name: Given name shown in the UI.
         last_name: Family name shown in the UI.
-        role: The single role granted to this account.
     """
 
     id: str
     username: str
     first_name: str
     last_name: str
+
+
+@dataclass(frozen=True)
+class _DemoGroupSpec:
+    """One demo user group: a single role granted to a single member.
+
+    Attributes:
+        id: Fixed primary key, so the group can be found again for removal.
+        name: Group name shown in the admin UI, unique within the tenant.
+        description: Sentence shown on the group list and detail pages.
+        role: The one role this group grants to its members.
+        member_id: Id of the demo user placed in the group.
+    """
+
+    id: str
+    name: str
+    description: str
     role: Role
+    member_id: str
 
 
-#: The demo accounts, in creation order. The sample skill looks for a user
-#: holding ``approver`` to route its approval request to; ``requester`` is the
-#: role that may execute a workflow; ``developer`` is the role that may build
-#: and register a workflow, MCP server, or agent skill.
+#: The demo accounts, in creation order. Each is created with an empty
+#: ``roles`` list and gets its role from :data:`_DEMO_GROUPS`.
 _DEMO_USERS = (
     _DemoUserSpec(
         id=DEMO_APPROVER_USER_ID,
         username="demo-approver",
         first_name="Demo",
         last_name="Approver",
-        role=Role.approver,
     ),
     _DemoUserSpec(
         id=DEMO_REQUESTER_USER_ID,
         username="demo-requester",
         first_name="Demo",
         last_name="Requester",
-        role=Role.requester,
     ),
     _DemoUserSpec(
         id=DEMO_DEVELOPER_USER_ID,
         username="demo-developer",
         first_name="Demo",
         last_name="Developer",
+    ),
+)
+
+#: The demo user groups, one per demo account. The sample skill looks for a
+#: user holding ``approver`` to route its approval request to; ``requester`` is
+#: the role that may execute a workflow; ``developer`` is the role that may
+#: build and register a workflow, MCP server, or agent skill. Granting each
+#: through a group rather than directly is what makes the demo exercise role
+#: inheritance.
+_DEMO_GROUPS = (
+    _DemoGroupSpec(
+        id=DEMO_APPROVERS_GROUP_ID,
+        name="Demo Approvers",
+        description="Managers who can be designated as workflow approvers.",
+        role=Role.approver,
+        member_id=DEMO_APPROVER_USER_ID,
+    ),
+    _DemoGroupSpec(
+        id=DEMO_REQUESTERS_GROUP_ID,
+        name="Demo Requesters",
+        description="People who can run published workflows.",
+        role=Role.requester,
+        member_id=DEMO_REQUESTER_USER_ID,
+    ),
+    _DemoGroupSpec(
+        id=DEMO_DEVELOPERS_GROUP_ID,
+        name="Demo Developers",
+        description="People who can build workflows, MCP servers, and agent skills.",
         role=Role.developer,
+        member_id=DEMO_DEVELOPER_USER_ID,
     ),
 )
 
@@ -209,6 +270,7 @@ async def _seed_demo_data(session: AsyncSession) -> str | None:
         )
         return None
     await _seed_demo_users(session, tenant_id)
+    await _seed_demo_groups(session, tenant_id)
     await _seed_demo_secrets(session, tenant_id)
     await _seed_demo_mcp_server(session, tenant_id)
     return await _seed_demo_agent_skill(session, tenant_id)
@@ -218,11 +280,16 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     """Delete every demo record that is still present.
 
     Deletion follows the direction of the foreign keys — agent skill, then MCP
-    server, then secrets, then users — so a record is never orphaned by the
-    removal of something it points at. A record that other data has come to
-    depend on (a Workflow built on the demo skill, a task tool binding on the
-    demo MCP server) cannot be deleted; that is logged and skipped rather than
-    allowed to fail startup.
+    server, then secrets, then user groups, then users — so a record is never
+    orphaned by the removal of something it points at. A record that other data
+    has come to depend on (a Workflow built on the demo skill, a task tool
+    binding on the demo MCP server) cannot be deleted; that is logged and
+    skipped rather than allowed to fail startup.
+
+    Groups go before their members: the membership rows cascade away with the
+    group, so the users are then free of them and the roles they granted are
+    gone from the accounts' effective roles immediately. Nothing has to be
+    recomputed, since inherited roles are never stored on the user.
 
     Args:
         session: Database session used to read and delete records.
@@ -234,6 +301,10 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     await _delete_demo_row(
         session, Secret, DEMO_AWS_SECRET_ID, label="AWS credentials secret"
     )
+    for group_spec in _DEMO_GROUPS:
+        await _delete_demo_row(
+            session, UserGroup, group_spec.id, label=f"user group {group_spec.name!r}"
+        )
     for spec in _DEMO_USERS:
         await _delete_demo_user(session, spec.id)
 
@@ -349,7 +420,9 @@ async def _seed_demo_users(session: AsyncSession, tenant_id: str) -> None:
                 email=f"{spec.username}@localhost",
                 enabled=True,
                 email_verified=False,
-                roles=[spec.role.value],
+                # No direct roles: every demo account inherits its role from
+                # the matching group seeded by _seed_demo_groups.
+                roles=[],
                 tenant_id=tenant_id,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
@@ -359,16 +432,24 @@ async def _seed_demo_users(session: AsyncSession, tenant_id: str) -> None:
 
 
 async def _revive_demo_user(session: AsyncSession, user: User) -> None:
-    """Clear a demo user's soft delete and re-enable it, if either applies.
+    """Normalize an existing demo user back to this module's declared shape.
+
+    Clears a soft delete, re-enables the account, and — for a database seeded
+    by an older version of this module, which granted each demo account its
+    role directly — strips the direct roles so the account gets them from its
+    group instead. Without that last step, upgrading with ``DEMO_DATA`` left
+    enabled would leave the role granted twice over, and removing a user from
+    their demo group would visibly fail to revoke anything.
 
     Args:
         session: Database session used to update the user.
         user: The existing demo user row.
     """
-    if user.deleted_at is None and user.enabled:
+    if user.deleted_at is None and user.enabled and not user.roles:
         return
     user.deleted_at = None
     user.enabled = True
+    user.roles = []
     user.updated_by = SYSTEM_USER_ID
     session.add(user)
     await session.commit()
@@ -389,6 +470,49 @@ async def _delete_demo_user(session: AsyncSession, user_id: str) -> None:
     if await session.get(User, user_id) is None:
         return
     await SqlUserRepository(session).delete(user_id)
+
+
+async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
+    """Create the demo user groups and place each demo account in its own.
+
+    Must run after :func:`_seed_demo_users`: the membership rows reference
+    ``users.id``. A group whose row already exists is left alone, but its
+    membership is re-asserted, so a member removed by hand in the admin UI
+    comes back on the next restart — matching this module's declarative
+    contract for every other record.
+
+    Nothing needs recomputing afterwards: a member's inherited roles are
+    resolved from these rows on every request rather than stored on the user.
+
+    Args:
+        session: Database session used to read and insert groups and members.
+        tenant_id: Id of the ``Default`` tenant the groups belong to.
+    """
+    for spec in _DEMO_GROUPS:
+        if await session.get(UserGroup, spec.id) is None:
+            await _insert(
+                session,
+                UserGroup(
+                    id=spec.id,
+                    tenant_id=tenant_id,
+                    name=spec.name,
+                    description=spec.description,
+                    roles=[spec.role.value],
+                    created_by=SYSTEM_USER_ID,
+                    updated_by=SYSTEM_USER_ID,
+                ),
+                label=f"user group '{spec.name}'",
+            )
+        if await session.get(UserGroup, spec.id) is None:
+            # The insert collided with an operator's own group of that name;
+            # there is nothing to attach a membership to.
+            continue
+        if await session.get(UserGroupMember, (spec.id, spec.member_id)) is None:
+            await _insert(
+                session,
+                UserGroupMember(group_id=spec.id, user_id=spec.member_id),
+                label=f"membership of user group '{spec.name}'",
+            )
 
 
 async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:

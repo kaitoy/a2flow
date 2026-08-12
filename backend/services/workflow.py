@@ -27,7 +27,7 @@ import builtins
 import logging
 import secrets
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Any
 
 from ag_ui_adk import ADKAgent, adk_events_to_messages
@@ -36,7 +36,7 @@ from google.adk.sessions import BaseSessionService, Session
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
 from models.message_meta import MessageScope
-from models.user import Role, User, has_role
+from models.user import Role, User, has_any_role
 from models.workflow import Workflow, WorkflowStatus, WorkflowUpdate
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionCreate
 from models.workflow_published_version import (
@@ -182,13 +182,15 @@ class WorkflowService:
         return workflow
 
     @staticmethod
-    def _assert_design_access(workflow: Workflow, caller: User) -> None:
+    def _assert_design_access(
+        workflow: Workflow, caller: User, caller_roles: Collection[str]
+    ) -> None:
         """Reject callers with no business in this workflow's design session.
 
         Designing a workflow is developer work — the same role that gates
         editing and publishing it — so every ``developer`` in the tenant may
         read and drive the chat, just as an execution's approvers share its
-        workflow session. ``has_role`` lets a ``super_admin`` through. The
+        workflow session. ``has_any_role`` lets a ``super_admin`` through. The
         workflow's ``created_by`` is admitted explicitly as well, so the user
         who generated it is not locked out of their own conversation if their
         ``developer`` role is later revoked.
@@ -200,21 +202,30 @@ class WorkflowService:
         Args:
             workflow: The workflow whose design session is being operated on.
             caller: The authenticated user performing the operation.
+            caller_roles: The caller's effective roles — direct grants plus
+                everything inherited from their groups — so a ``developer``
+                held only through a group still admits them.
 
         Raises:
             ForbiddenError: If the caller is neither a developer, a super admin,
                 nor the workflow's creator.
         """
-        if caller.id == workflow.created_by or has_role(caller, Role.developer):
+        if caller.id == workflow.created_by or has_any_role(
+            caller_roles, Role.developer
+        ):
             return
         raise ForbiddenError("Only developers can access this design session")
 
-    async def get_for_design(self, workflow_id: str, *, caller: User) -> Workflow:
+    async def get_for_design(
+        self, workflow_id: str, *, caller: User, caller_roles: Collection[str]
+    ) -> Workflow:
         """Return a Workflow, authorizing the caller against its design session.
 
         Args:
             workflow_id: Identifier of the workflow to fetch.
             caller: The authenticated user requesting the design session.
+            caller_roles: The caller's effective roles, including any inherited
+                from their groups.
 
         Returns:
             The matching Workflow.
@@ -225,11 +236,11 @@ class WorkflowService:
                 nor the workflow's creator.
         """
         workflow = await self.get(workflow_id)
-        self._assert_design_access(workflow, caller)
+        self._assert_design_access(workflow, caller, caller_roles)
         return workflow
 
     async def resolve_agent(
-        self, workflow_id: str, *, caller: User
+        self, workflow_id: str, *, caller: User, caller_roles: Collection[str]
     ) -> tuple[ADKAgent, Workflow]:
         """Resolve the design agent bound to a workflow's design session.
 
@@ -242,6 +253,8 @@ class WorkflowService:
         Args:
             workflow_id: Identifier of the workflow whose agent to resolve.
             caller: The authenticated user driving the agent run.
+            caller_roles: The caller's effective roles, including any inherited
+                from their groups.
 
         Returns:
             An ``(agent, workflow)`` tuple.
@@ -253,7 +266,9 @@ class WorkflowService:
             SkillNotReadyError: If neither the pinned revision nor the skill's
                 current revision is present in the store.
         """
-        workflow = await self.get_for_design(workflow_id, caller=caller)
+        workflow = await self.get_for_design(
+            workflow_id, caller=caller, caller_roles=caller_roles
+        )
         skill = await self._skills.get(workflow.agent_skill_id)
         if skill is None:
             raise SkillNotReadyError(workflow.agent_skill_id)
@@ -305,7 +320,7 @@ class WorkflowService:
         )
 
     async def get_messages(
-        self, workflow_id: str, *, caller: User
+        self, workflow_id: str, *, caller: User, caller_roles: Collection[str]
     ) -> builtins.list[dict[str, Any]]:
         """Return the chat history of a workflow's design session.
 
@@ -323,6 +338,8 @@ class WorkflowService:
         Args:
             workflow_id: Identifier of the workflow whose messages to fetch.
             caller: The authenticated user requesting the history.
+            caller_roles: The caller's effective roles, including any inherited
+                from their groups.
 
         Returns:
             The session's messages as plain JSON-serializable dicts.
@@ -332,7 +349,9 @@ class WorkflowService:
             ForbiddenError: If the caller is neither a developer, a super admin,
                 nor the workflow's creator.
         """
-        workflow = await self.get_for_design(workflow_id, caller=caller)
+        workflow = await self.get_for_design(
+            workflow_id, caller=caller, caller_roles=caller_roles
+        )
         session = await self._adk_session(workflow)
         if session is None:
             return []
@@ -455,7 +474,9 @@ class WorkflowService:
         if (
             "generated_description" in update
             and update["generated_description"] != current.generated_description
-            and not has_role(caller, Role.super_admin)
+            # Direct roles, not effective ones: this asks only about
+            # ``super_admin``, which a user group can never grant.
+            and not has_any_role(caller.roles, Role.super_admin)
         ):
             raise ForbiddenError(
                 "Only a super admin can edit the generated description"
@@ -480,7 +501,9 @@ class WorkflowService:
         """
         await self._workflows.delete(workflow_id)
 
-    async def execute(self, workflow_id: str, *, caller: User) -> WorkflowExecution:
+    async def execute(
+        self, workflow_id: str, *, caller: User, caller_roles: Collection[str]
+    ) -> WorkflowExecution:
         """Start a workflow run by creating a WorkflowExecution with its tasks.
 
         Resolves the workflow and its skill, records a new WorkflowExecution
@@ -505,12 +528,15 @@ class WorkflowService:
 
         Args:
             workflow_id: Identifier of the workflow to execute.
-            caller: The authenticated user starting the run. A ``draft``
-                workflow is only runnable when this user holds the
-                ``developer`` role (``super_admin`` bypasses via
-                :func:`~models.user.has_role`); ``published`` and ``modified``
-                workflows are runnable by any caller who reached this route
-                (role-gated to ``requester``/``developer`` at the router).
+            caller: The authenticated user starting the run.
+            caller_roles: The caller's effective roles — direct grants plus
+                everything inherited from their groups. A ``draft`` workflow is
+                only runnable when they hold the ``developer`` role
+                (``super_admin`` bypasses via
+                :func:`~models.user.has_any_role`); ``published`` and
+                ``modified`` workflows are runnable by any caller who reached
+                this route (role-gated to ``requester``/``developer`` at the
+                router).
 
         Returns:
             The created WorkflowExecution.
@@ -527,7 +553,8 @@ class WorkflowService:
             WorkflowStatus.published,
             WorkflowStatus.modified,
         ) or (
-            workflow.status is WorkflowStatus.draft and has_role(caller, Role.developer)
+            workflow.status is WorkflowStatus.draft
+            and has_any_role(caller_roles, Role.developer)
         )
         if not runnable:
             raise WorkflowNotRunnableError(

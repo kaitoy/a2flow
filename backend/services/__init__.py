@@ -10,6 +10,7 @@ from .secret import SecretService
 from .tenant import TenantService
 from .user import UserService
 from .user_avatar import UserAvatarService
+from .user_group import UserGroupService
 from .workflow import WorkflowService
 from .workflow_design import WorkflowDesignService, generate_workflow_design
 from .workflow_execution import WorkflowExecutionService
@@ -29,6 +30,7 @@ __all__ = [
     "SecretService",
     "TenantService",
     "UserAvatarService",
+    "UserGroupService",
     "UserService",
     "WorkflowDesignService",
     "WorkflowService",

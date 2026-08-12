@@ -12,10 +12,12 @@ from dependencies import (
     ApiMetaDep,
     CurrentTenantIdDep,
     CurrentUserDep,
+    EffectiveRolesDep,
     FilterDep,
     PaginationDep,
     SortDep,
     UserAvatarServiceDep,
+    UserGroupServiceDep,
     UserServiceDep,
     require_roles,
 )
@@ -23,11 +25,14 @@ from models.response import ApiResponse
 from models.user import (
     ResolvedUserName,
     Role,
+    User,
     UserCreate,
     UserNameResolveRequest,
     UserRead,
     UserUpdate,
 )
+from models.user_group import UserGroupMembershipUpdate
+from services import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -35,6 +40,34 @@ router = APIRouter(prefix="/users", tags=["users"])
 #: ``PATCH`` is not listed here — it allows a limited self-service path and is
 #: authorized in :class:`~services.user.UserService` instead.
 _requires_admin = [Depends(require_roles(Role.admin))]
+
+
+async def _to_read(service: UserService, user: User) -> UserRead:
+    """Project one user into its read view, resolving its inherited roles.
+
+    Args:
+        service: The user service, used to resolve group-inherited roles.
+        user: The user to project.
+
+    Returns:
+        The read view, carrying both direct and group-inherited roles.
+    """
+    group_roles = await service.group_roles_for([user])
+    return UserRead.from_user(user, group_roles=group_roles[user.id])
+
+
+async def _to_read_many(service: UserService, users: list[User]) -> list[UserRead]:
+    """Project a page of users into read views with one membership query.
+
+    Args:
+        service: The user service, used to resolve group-inherited roles.
+        users: The users to project.
+
+    Returns:
+        The read views, in the order given.
+    """
+    group_roles = await service.group_roles_for(users)
+    return [UserRead.from_user(u, group_roles=group_roles[u.id]) for u in users]
 
 
 @router.post(
@@ -55,7 +88,7 @@ async def create_user(
     ``tenantId`` additionally requires the acting user to be a super admin.
     """
     user = await service.create(body, acting_user=acting_user)
-    return ApiResponse(meta=meta, data=UserRead.model_validate(user))
+    return ApiResponse(meta=meta, data=await _to_read(service, user))
 
 
 @router.get("", response_model=ApiResponse[list[UserRead]])
@@ -83,7 +116,7 @@ async def list_users(
         acting_user=acting_user,
         acting_tenant_id=acting_tenant_id,
     )
-    return ApiResponse(meta=meta, data=[UserRead.model_validate(u) for u in items])
+    return ApiResponse(meta=meta, data=await _to_read_many(service, items))
 
 
 @router.post("/resolve-names", response_model=ApiResponse[list[ResolvedUserName]])
@@ -124,7 +157,7 @@ async def get_user(
     tenant than the caller, unless the caller is a super admin.
     """
     user = await service.get(user_id, acting_user=acting_user)
-    return ApiResponse(meta=meta, data=UserRead.model_validate(user))
+    return ApiResponse(meta=meta, data=await _to_read(service, user))
 
 
 @router.patch("/{user_id}", response_model=ApiResponse[UserRead])
@@ -133,16 +166,20 @@ async def update_user(
     body: UserUpdate,
     service: UserServiceDep,
     acting_user: CurrentUserDep,
+    acting_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[UserRead]:
     """Apply a partial update to a user and return it without the password hash.
 
     Admins may update any user; other callers may update only their own
     avatar customization (the self-service ``/profile`` page). The
-    authorization rules live in :meth:`UserService.update`.
+    authorization rules live in :meth:`UserService.update`. ``admin`` counts
+    whether it is granted directly or inherited from a user group.
     """
-    user = await service.update(user_id, body, acting_user=acting_user)
-    return ApiResponse(meta=meta, data=UserRead.model_validate(user))
+    user = await service.update(
+        user_id, body, acting_user=acting_user, acting_roles=acting_roles
+    )
+    return ApiResponse(meta=meta, data=await _to_read(service, user))
 
 
 @router.delete(
@@ -163,6 +200,44 @@ async def delete_user(
     """
     await service.delete(user_id, acting_user=acting_user)
     return ApiResponse(meta=meta, data=None)
+
+
+@router.put(
+    "/{user_id}/groups",
+    response_model=ApiResponse[UserRead],
+    dependencies=_requires_admin,
+)
+async def set_user_groups(
+    user_id: str,
+    body: UserGroupMembershipUpdate,
+    service: UserServiceDep,
+    group_service: UserGroupServiceDep,
+    acting_user: CurrentUserDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[UserRead]:
+    """Replace the set of user groups a user belongs to.
+
+    The counterpart of editing a group's ``memberIds`` from the group side, so
+    membership can be managed from whichever page the admin is already on.
+    ``PUT`` rather than ``PATCH`` because the supplied list replaces the user's
+    membership wholesale.
+
+    The target is fetched through :meth:`UserService.get` first, so a user in
+    another tenant raises a 404 rather than a 403 and never confirms their
+    existence. The returned user's ``groupRoles`` reflects the new membership
+    immediately — nothing is cached, so the change is live on the next request.
+
+    Requires the ``admin`` role. Raises HTTP 422 if a group id is not a group
+    of the acting tenant, or if the target cannot be a member of one (a
+    platform-scoped user such as a super admin).
+    """
+    user = await service.get(user_id, acting_user=acting_user)
+    await group_service.set_groups_for_user(user.id, body.group_ids)
+    # Re-read after the membership commit: it expires the instance fetched
+    # above, and serializing an expired one outside the request's greenlet
+    # context would fail.
+    refreshed = await service.get(user_id, acting_user=acting_user)
+    return ApiResponse(meta=meta, data=await _to_read(service, refreshed))
 
 
 @router.put("/{user_id}/avatar", response_model=ApiResponse[UserRead])
@@ -189,7 +264,7 @@ async def upload_user_avatar(
         acting_user=acting_user,
     )
     user = await service.get(user_id, acting_user=acting_user)
-    return ApiResponse(meta=meta, data=UserRead.model_validate(user))
+    return ApiResponse(meta=meta, data=await _to_read(service, user))
 
 
 @router.get("/{user_id}/avatar")
@@ -235,4 +310,4 @@ async def delete_user_avatar(
     """
     await avatar_service.remove(user_id, acting_user=acting_user)
     user = await service.get(user_id, acting_user=acting_user)
-    return ApiResponse(meta=meta, data=UserRead.model_validate(user))
+    return ApiResponse(meta=meta, data=await _to_read(service, user))
