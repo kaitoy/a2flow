@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ListTree } from "lucide-react";
+import { ListTree, MessageSquareText } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -14,6 +14,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { McpToolPicker } from "@/components/admin/mcp-tool-picker";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
@@ -181,6 +182,11 @@ export default function WorkflowTaskTemplateDetailPage() {
     }
   }
 
+  function handleOpenDesign() {
+    // A design session has no id of its own — it is addressed by its workflow.
+    router.push(`/workflows/${encodeURIComponent(workflowId)}/design-session`);
+  }
+
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Workflows", href: "/admin/workflows" },
@@ -217,7 +223,19 @@ export default function WorkflowTaskTemplateDetailPage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title={title} icon={ListTree} />}
+        header={
+          <AdminPageHeader
+            title={title}
+            icon={ListTree}
+            secondaryAction={
+              canEdit ? (
+                <HeaderIconButton label="Open design session" onClick={handleOpenDesign}>
+                  <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
+                </HeaderIconButton>
+              ) : undefined
+            }
+          />
+        }
         aside={audit && <AuditMeta {...audit} />}
       >
         <form
