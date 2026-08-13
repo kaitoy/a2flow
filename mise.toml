@@ -1,0 +1,13 @@
+# Toolchain versions for A2Flow - the single source of truth.
+# After cloning: `mise trust` then `mise install`.
+#
+# Kept in sync by hand with:
+#   - backend/.python-version      (uv interpreter selection)
+#   - frontend/package.json        ("packageManager", used by corepack in Docker)
+#   - backend/Dockerfile, frontend/Dockerfile (base image tags)
+[tools]
+python = "3.13.15"
+node = "24.19.0"
+pnpm = "11.2.2"
+uv = "0.12.3"
+lefthook = "2.1.10"

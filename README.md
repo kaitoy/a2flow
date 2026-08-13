@@ -73,9 +73,30 @@ each message, so the chat shows every participant's avatar.
 
 ## Quick start
 
+### 0. Toolchain ([mise](https://mise.jdx.dev/))
+
+Python, Node.js, pnpm, uv, and lefthook versions are pinned in [mise.toml](mise.toml) and provisioned by mise, so every machine runs the same toolchain. Install mise once:
+
+| OS | Command |
+|---|---|
+| Windows | `winget install jdx.mise` |
+| macOS | `brew install mise` |
+| Linux | See the [installation docs](https://mise.jdx.dev/installing-mise.html) |
+
+Activate it in your shell (see [activation docs](https://mise.jdx.dev/installing-mise.html#shells) for bash/zsh/fish; on Windows add `(&mise activate pwsh) | Out-String | Invoke-Expression` to your PowerShell `$PROFILE`), then install the tools from the repository root:
+
+```bash
+mise trust
+mise install
+```
+
+On Windows, also put mise's shims directory (`%LOCALAPPDATA%\mise\shims`) on your `PATH`. Git hooks and editor integrations are spawned outside an activated shell and resolve `uv` / `pnpm` / `python` from `PATH` alone.
+
+Not using mise? The minimum versions are Python 3.11+, Node.js 20+, plus [uv](https://docs.astral.sh/uv/), pnpm, and lefthook installed by hand.
+
 ### 1. Backend
 
-Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/). Node.js is optional and only needed to launch stdio [MCP servers](#mcp-servers) published as npm packages (`npx`); the `docker compose` image ships it.
+The backend itself needs only Python and uv; Node.js is used only to launch stdio [MCP servers](#mcp-servers) published as npm packages (`npx`), and the `docker compose` image ships it.
 
 ```bash
 cd backend
@@ -89,8 +110,6 @@ The API is now available at `http://localhost:8000`.
 
 ### 2. Frontend
 
-Requirements: Node.js 20+, pnpm
-
 ```bash
 cd frontend
 pnpm install
@@ -102,7 +121,7 @@ Open [http://localhost:3000](http://localhost:3000). To run on a different port,
 
 ### 3. Git hooks (lefthook)
 
-Pre-commit / pre-push hooks (lefthook) run linters, formatters, type checkers, and tests. See [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md) for installation and details.
+Pre-commit / pre-push hooks (lefthook) run linters, formatters, type checkers, and tests. `mise install` already provides the `lefthook` binary; run `lefthook install` once from the repository root to wire it into `.git/hooks/`. See [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md) for details.
 
 ## Run with Docker Compose
 

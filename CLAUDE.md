@@ -16,6 +16,20 @@ See each directory's README.md for details.
 
 All documentation (docs, comments, commit messages) must be written in English.
 
+## Toolchain versions
+
+[mise.toml](mise.toml) at the repository root is the single source of truth for the Python, Node.js, pnpm, uv, and lefthook versions used in development. Run `mise install` after cloning or after any change to that file.
+
+When bumping a version in `mise.toml`, update the places that pin the same tool independently in the same change:
+
+| `mise.toml` entry | Also update |
+|---|---|
+| `python` | `backend/.python-version`, `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
+| `node` | `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
+| `pnpm` | `packageManager` in `frontend/package.json` (corepack reads it during the Docker build, and pnpm self-switches to it) |
+
+`backend/pyproject.toml` sets `[tool.uv] python-preference = "only-system"` so `uv sync` builds `backend/.venv` from the mise-pinned interpreter on `PATH` instead of downloading its own. `requires-python`, ruff's `target-version`, and mypy's `python_version` stay at the 3.11 support floor and are deliberately not bumped alongside `mise.toml`.
+
 ## Documentation comments
 
 When adding or modifying any module, class, or function, write and maintain a documentation comment for it:

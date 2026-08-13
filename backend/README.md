@@ -4,8 +4,9 @@ A Google ADK agent with [A2UI](https://a2ui.org/) support. Accepts prompts via H
 
 ## Requirements
 
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/)
+Python and [uv](https://docs.astral.sh/uv/) are pinned in [mise.toml](../mise.toml) and installed by `mise install` — see [Quick start](../README.md#0-toolchain-mise). Without mise, install Python 3.11+ and uv by hand.
+
+`uv sync` resolves the interpreter from `PATH` (`python-preference = "only-system"` in [pyproject.toml](pyproject.toml)) rather than downloading its own, so `backend/.venv` uses the Python version mise pins.
 
 ## A2UI support
 
