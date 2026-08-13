@@ -1,6 +1,8 @@
 # Git hooks (lefthook)
 
-Pre-commit / pre-push hooks run linters, formatters, type checkers, and tests automatically. Configuration lives in [lefthook.yml](../../lefthook.yml). Install [lefthook](https://lefthook.dev/) once per machine using your preferred package manager:
+Pre-commit / pre-push hooks run linters, formatters, type checkers, and tests automatically. Configuration lives in [lefthook.yml](../../lefthook.yml).
+
+[lefthook](https://lefthook.dev/) is pinned in [mise.toml](../../mise.toml), so `mise install` (see [Quick start](../../README.md#0-toolchain-mise)) already provides the binary. If you are not using mise, install it once per machine:
 
 | OS | Command |
 |---|---|
@@ -8,7 +10,7 @@ Pre-commit / pre-push hooks run linters, formatters, type checkers, and tests au
 | macOS | `brew install lefthook` |
 | Linux | See [installation docs](https://lefthook.dev/installation/) |
 
-Then wire the hooks into `.git/hooks/` from the repository root:
+Either way, wire the hooks into `.git/hooks/` once per clone, from the repository root:
 
 ```bash
 lefthook install

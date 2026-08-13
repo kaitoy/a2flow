@@ -16,6 +16,10 @@ wheels/
 .env
 .env.local
 
+# mise local overrides (mise.toml itself is committed)
+mise.local.toml
+.mise.local.toml
+
 # IDE
 .idea/
 *.swp

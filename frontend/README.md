@@ -21,9 +21,11 @@ Chat UI for [A2Flow](../README.md). Streams responses from the backend via SSE a
 
 ## Requirements
 
-- Node.js 20+
-- pnpm
-- [A2Flow backend](../backend/) running on `http://localhost:8000`
+Node.js and pnpm are pinned in [mise.toml](../mise.toml) and installed by `mise install` — see [Quick start](../README.md#0-toolchain-mise). Without mise, install Node.js 20+ and pnpm by hand.
+
+Note that `pnpm dev` / `pnpm build` also shell out to `uv` (via `generate:api`), so the backend toolchain must be on `PATH` too.
+
+At runtime the UI expects the [A2Flow backend](../backend/) to be running on `http://localhost:8000`.
 
 ## Setup
 
