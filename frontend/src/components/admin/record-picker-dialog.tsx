@@ -163,7 +163,7 @@ export function RecordPickerDialog<T>({
               )
             }
           >
-            Assign
+            Select
           </Button>
         </>
       }

@@ -30,7 +30,7 @@ describe("GroupPicker", () => {
 
     await user.click(screen.getByRole("button", { name: "Select groups…" }));
     await user.click(await screen.findByRole("checkbox", { name: "Developers" }));
-    await user.click(screen.getByRole("button", { name: "Assign" }));
+    await user.click(screen.getByRole("button", { name: "Select" }));
 
     expect(onChange).toHaveBeenCalledWith(["group-1"]);
   });

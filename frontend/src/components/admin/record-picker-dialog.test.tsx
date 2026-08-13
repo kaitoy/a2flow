@@ -77,7 +77,7 @@ describe("RecordPickerDialog", () => {
     const { onAssign } = renderDialog();
 
     await user.click(await screen.findByRole("checkbox", { name: "Row 02" }));
-    await user.click(screen.getByRole("button", { name: "Assign" }));
+    await user.click(screen.getByRole("button", { name: "Select" }));
 
     expect(onAssign).toHaveBeenCalledWith(["r02"], [{ value: "r02", label: "Row 02" }]);
   });
@@ -99,7 +99,7 @@ describe("RecordPickerDialog", () => {
     await user.click(screen.getByRole("button", { name: /next/i }));
     await screen.findByRole("checkbox", { name: "Row 11" });
     await user.click(screen.getByRole("checkbox", { name: "Row 11" }));
-    await user.click(screen.getByRole("button", { name: "Assign" }));
+    await user.click(screen.getByRole("button", { name: "Select" }));
 
     expect(onAssign).toHaveBeenCalledWith(
       ["r01", "r11"],

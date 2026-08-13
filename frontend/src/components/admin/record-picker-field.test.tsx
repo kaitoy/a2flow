@@ -163,7 +163,7 @@ describe("RecordPickerField", () => {
 
     await user.click(screen.getByRole("button", { name: "Select rows…" }));
     await user.click(await screen.findByRole("checkbox", { name: "Bravo" }));
-    await user.click(screen.getByRole("button", { name: "Assign" }));
+    await user.click(screen.getByRole("button", { name: "Select" }));
 
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(["b"]));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
