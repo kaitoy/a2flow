@@ -349,7 +349,7 @@ All REST endpoints are documented interactively by the [Scalar API reference](ht
 - **Base path** — every REST endpoint is served under `/api/v1` (e.g. `GET /api/v1/agent-skills`).
 - **Identity** — the caller is resolved from the authenticated `a2flow_session` cookie (see [Authentication](#authentication)); calling a protected endpoint with `curl` needs a logged-in cookie jar saved with `curl -c`/`-b`.
 - **CSRF** — state-changing requests (`POST` / `PATCH` / `DELETE`) must echo the `a2flow_csrf` cookie in the `X-CSRF-Token` header.
-- **List parameters** — collection endpoints accept shared `limit` / `offset` / sort (`s`) / filter (`q`) query parameters with camelCase field names.
+- **List parameters** — collection endpoints accept shared `limit` / `offset` / sort (`s`) / filter (`q`) query parameters with camelCase field names. The four taggable collections additionally accept a repeatable `tag` parameter carrying tag ids; a record must carry **every** id listed to match (see [Tags](#tags)).
 - **Envelope** — JSON responses are wrapped in a uniform `{meta, data, error}` shape by middleware (the `POST /agent` SSE stream and `GET /health` are excluded).
 
 ### Session management
@@ -365,6 +365,18 @@ Agent skills are reusable skill definitions that can be attached to workflows. E
 Private repositories are supported through the optional `repoAuthPassword` field — a `NAME/KEY` reference to one entry of a registered [secret](#secrets), whose value is used as the HTTP basic-auth password for the clone — plus `repoAuthUsername` (default `x-access-token`, which suits GitHub PATs). Create/update validates that the **name** half exists (`422 FOREIGN_KEY_VIOLATION` otherwise); the key is not checked there, since a `vault` secret's keys would need a live Vault read and the two types should behave alike. (`GET /api/v1/secrets/{id}/keys` does perform that read, but it is a picker's lookup — putting it on the save path would make every write depend on Vault being up.) The whole reference is resolved lazily at clone time: a later rename or delete of the secret, or a key that no longer exists, makes the next clone fail with `502 SECRET_RESOLUTION_FAILED`.
 
 The content at `repoUrl`/`repoPath` (e.g. `SKILL.md`) is loaded directly into the workflow agent's LLM prompt, unsandboxed — only register repositories you trust, since their content is effectively an instruction to the agent, not inert data.
+
+---
+
+### Tags
+
+A tag is a tenant-scoped label — a `name` unique within the tenant plus a `color` naming one of eight fixed palette slots — that secrets, workflows, MCP servers, and agent skills are classified by. One vocabulary serves all four. CRUD endpoints are in the [API reference](http://localhost:3000/api-doc); writes require `admin` **or** `developer`, since secrets are administered by the former and the other three by the latter.
+
+Attachment lives in one join table per resource type (`secret_tags`, `workflow_tags`, `mcp_server_tags`, `agent_skill_tags`), each keyed by the record's id and the tag's **id** — never its name, which is what makes a rename free of any re-sync. Four tables rather than one polymorphic table because a polymorphic owner column cannot carry a real foreign key; with real ones, `ondelete="CASCADE"` on both sides cleans up an attachment when either the record or the tag is deleted. Deleting a tag therefore detaches it everywhere instead of being refused.
+
+Tags are **not** a field of a resource's create/update payload: those table classes inherit their `...Create` schema, so a `list[str]` added there would have to become a column of the resource's own table. Attachment is written through `PUT /api/v1/{resource}/{id}/tags` (body `{"tagIds": [...]}`, replacing the set wholesale, capped at 50) and read back as `tagIds` on each resource's `...Read` projection. The sub-resource is gated by the *record's* write role, not the tag's — so a `developer` may tag an MCP server but not a secret. A tag id belonging to another tenant is reported as `422 FOREIGN_KEY_VIOLATION`, never as "exists elsewhere".
+
+Filtering is a separate axis from `q`: `?tag=<id>` is repeatable and conjunctive, applied as one correlated `EXISTS` per tag before the page window. `q=tagIds:…` and `s=tagIds` are rejected as unknown fields — `apply_filters`/`apply_sort` resolve names against the model, and keeping tags out of that grammar is what lets the `readable=` guard stay strict.
 
 ---
 

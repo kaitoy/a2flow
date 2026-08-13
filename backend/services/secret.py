@@ -16,10 +16,14 @@ from collections.abc import Sequence
 
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.secret_resolver import SecretResolver
-from models.secret import Secret, SecretCreate, SecretType, SecretUpdate
+from models.secret import Secret, SecretCreate, SecretRead, SecretType, SecretUpdate
 from repositories import SecretRepository
 from repositories.exceptions import NotFoundError, SecretValidationError
 from repositories.query import FilterSpec, SortSpec
+
+#: Alias for ``list[SecretRead]``: the ``list`` method below shadows the
+#: builtin inside the service class body.
+_ReadList = list[SecretRead]
 
 #: The Vault reference fields that must all be present on a ``vault`` secret
 #: and all be absent on a ``local`` one.
@@ -84,6 +88,7 @@ class SecretService:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> list[Secret]:
         """Return a page of Secret records.
 
@@ -92,13 +97,56 @@ class SecretService:
             offset: Number of records to skip.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
+            tag_ids: Narrows the page to secrets carrying every listed tag.
 
         Returns:
             The requested page of secrets.
         """
         return await self._repo.list(
-            limit=limit, offset=offset, sort=sort, filters=filters
+            limit=limit, offset=offset, sort=sort, filters=filters, tag_ids=tag_ids
         )
+
+    async def to_read(self, secret: Secret) -> SecretRead:
+        """Project one Secret into its API read view, attaching its tags.
+
+        Args:
+            secret: The persisted secret to project.
+
+        Returns:
+            The read view, with values dropped and tag ids attached.
+        """
+        return SecretRead.from_secret(
+            secret, tag_ids=await self._repo.tag_ids_for(secret.id)
+        )
+
+    async def to_read_many(self, secrets: Sequence[Secret]) -> _ReadList:
+        """Project a page of Secrets into read views, reading their tags in one query.
+
+        Args:
+            secrets: The persisted secrets to project.
+
+        Returns:
+            The read views, in the order they were given.
+        """
+        by_id = await self._repo.tag_ids_for_many([s.id for s in secrets])
+        return [SecretRead.from_secret(s, tag_ids=by_id.get(s.id, [])) for s in secrets]
+
+    async def set_tags(self, secret_id: str, tag_ids: Sequence[str]) -> Secret:
+        """Replace a Secret's tag attachments wholesale.
+
+        Args:
+            secret_id: Identifier of the secret to retag.
+            tag_ids: Ids of the tags it should carry.
+
+        Returns:
+            The secret, unchanged apart from its attachments.
+
+        Raises:
+            NotFoundError: If no secret exists with the given ID.
+            ForeignKeyViolationError: If any id does not name a tag of this
+                tenant.
+        """
+        return await self._repo.set_tags(secret_id, tag_ids)
 
     async def create(self, data: SecretCreate, *, user_id: str) -> Secret:
         """Create a new Secret, encrypting local entry values before persistence.

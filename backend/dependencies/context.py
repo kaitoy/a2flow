@@ -12,6 +12,7 @@ from typing import Annotated
 from fastapi import Depends, Query, Request
 
 from models.response import ApiMeta
+from models.tag import MAX_RECORD_TAGS
 from repositories.exceptions import QueryValidationError
 from repositories.query import FILTER_OPERATORS, FilterSpec, SortSpec
 
@@ -241,3 +242,49 @@ def parse_filters(
 
 
 FilterDep = Annotated[FilterParams, Depends(parse_filters)]
+
+
+@dataclass
+class TagFilterParams:
+    """Parsed tag filter for a list endpoint.
+
+    Carries the tag ids extracted from the repeatable ``tag`` query parameter.
+    A record must carry **every** one of them to match, so repeating the
+    parameter narrows the result rather than widening it.
+    """
+
+    tag_ids: list[str] = field(default_factory=list)
+
+
+def parse_tags(
+    tag: Annotated[
+        list[str] | None,
+        Query(
+            description=(
+                "Tag id a record must carry. Repeatable; a record must carry "
+                "every tag listed to match."
+            ),
+        ),
+    ] = None,
+) -> TagFilterParams:
+    """Parse the repeatable ``tag`` query parameter into a :class:`TagFilterParams`.
+
+    Tags are a separate axis from ``q``: they are not a column of any resource,
+    so they cannot be resolved against a model the way ``field:op:value`` terms
+    are. Keeping them in their own parameter is what lets ``apply_filters`` stay
+    strict — ``q=tagIds:eq:...`` is rejected as an unknown field, as it should
+    be.
+
+    Raises:
+        QueryValidationError: If more tags are requested than a record could
+            ever carry, since each one adds a subquery to the statement.
+    """
+    if not tag:
+        return TagFilterParams()
+    tag_ids = list(dict.fromkeys(tag))
+    if len(tag_ids) > MAX_RECORD_TAGS:
+        raise QueryValidationError(f"At most {MAX_RECORD_TAGS} tag filters are allowed")
+    return TagFilterParams(tag_ids=tag_ids)
+
+
+TagFilterDep = Annotated[TagFilterParams, Depends(parse_tags)]

@@ -5,6 +5,7 @@ import { Inbox, type LucideIcon } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FilterSpec, SortSpec } from "@/lib/api";
+import type { CheckboxOption } from "./checkbox-group";
 import { EmptyState } from "./empty-state";
 import { Skeleton } from "./skeleton";
 import { type FilterOption, TableHeaderMenu } from "./table-header-menu";
@@ -33,6 +34,18 @@ export interface ColumnDef<T> {
   filterOp?: string;
   /** When set, the filter renders a select of these options (use with `filterOp: "eq"`). */
   filterOptions?: FilterOption[];
+  /**
+   * Marks the column as filtered by tag rather than by a field of the record.
+   *
+   * Tags are a separate axis from `filters`: they are not a column of any
+   * resource, so the API takes them as their own repeatable parameter. Such a
+   * column reads its state from {@link DataTableProps.tagIds} and writes it
+   * through {@link DataTableProps.onTagIdsChange}, and offers a multi-select
+   * whose selections are ANDed. It has no `filterField` and cannot be sorted.
+   */
+  filterKind?: "tags";
+  /** Tag options offered by a `filterKind: "tags"` column, with their palette swatches. */
+  tagOptions?: CheckboxOption[];
   /** Optional fixed initial width in pixels; otherwise the natural width is measured. */
   width?: number;
   /**
@@ -67,6 +80,10 @@ interface DataTableProps<T> {
   filters?: FilterSpec[];
   /** Called when the user edits a column filter. Required to enable filter UI. */
   onFilterChange?: (filters: FilterSpec[]) => void;
+  /** Tag ids the list is narrowed by (controlled). Omit to disable the tag filter UI. */
+  tagIds?: string[];
+  /** Called when the user changes the tag selection. Required to enable the tag filter UI. */
+  onTagIdsChange?: (tagIds: string[]) => void;
   /**
    * `getRowKey` value of the row to call out, e.g. the task a hovered dependency
    * chip points at. No row is highlighted when null or omitted.
@@ -244,6 +261,8 @@ export function DataTable<T>({
   onSortChange,
   filters,
   onFilterChange,
+  tagIds,
+  onTagIdsChange,
   highlightedRowKey = null,
 }: DataTableProps<T>) {
   const colSpan = columns.length;
@@ -296,7 +315,12 @@ export function DataTable<T>({
       const kept = filters.filter((f) => current.some((col) => col.filterField === f.field));
       if (kept.length !== filters.length) onFilterChange(kept);
     }
-  }, [columnsKey, sort, filters, onSortChange, onFilterChange]);
+    // Tags live outside `filters`, so the sweep above cannot reach them; clear
+    // them here for the same reason it clears the rest.
+    if (onTagIdsChange && tagIds?.length && !current.some((col) => col.filterKind === "tags")) {
+      onTagIdsChange([]);
+    }
+  }, [columnsKey, sort, filters, onSortChange, onFilterChange, tagIds, onTagIdsChange]);
 
   // Measure natural column widths once real rows have painted, then fit them to
   // the panel. Header-only widths (while loading, or an empty table rendering a
@@ -406,7 +430,8 @@ export function DataTable<T>({
           <tr>
             {columns.map((col) => {
               const sortable = !!col.sortField && !!onSortChange;
-              const filterable = !!col.filterField && !!onFilterChange;
+              const tagFilterable = col.filterKind === "tags" && !!onTagIdsChange;
+              const filterable = (!!col.filterField && !!onFilterChange) || tagFilterable;
               const direction =
                 col.sortField && sort?.field === col.sortField
                   ? sort.descending
@@ -430,17 +455,20 @@ export function DataTable<T>({
                         sortable ? (dir) => setColumnSort(col.sortField as string, dir) : undefined
                       }
                       filterValue={
-                        filterable
+                        filterable && !tagFilterable
                           ? (filters?.find((f) => f.field === col.filterField)?.value ?? "")
                           : undefined
                       }
                       onFilterChange={
-                        filterable
+                        filterable && !tagFilterable
                           ? (v) =>
                               setColumnFilter(col.filterField as string, col.filterOp ?? "like", v)
                           : undefined
                       }
-                      filterOptions={col.filterOptions}
+                      filterOptions={tagFilterable ? undefined : col.filterOptions}
+                      filterValues={tagFilterable ? (tagIds ?? []) : undefined}
+                      onFilterValuesChange={tagFilterable ? onTagIdsChange : undefined}
+                      filterCheckboxOptions={tagFilterable ? col.tagOptions : undefined}
                     />
                   ) : (
                     <span className="block truncate">{col.header}</span>

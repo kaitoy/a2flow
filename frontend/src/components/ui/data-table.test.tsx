@@ -680,4 +680,38 @@ describe("DataTable column fitting", () => {
     // overflows slightly; Prompt's header is narrow, so the ceiling takes it.
     expect(colWidths(container)).toEqual([SIZER.Name + HEADER_CHROME, 100, 100]);
   });
+
+  it("clears the tag filter when the tag column is hidden", () => {
+    const onTagIdsChange = vi.fn();
+    const tagCol: ColumnDef<Row> = {
+      header: "Tags",
+      filterKind: "tags",
+      tagOptions: [{ value: "t1", label: "production" }],
+      cell: () => null,
+    };
+    const { rerender } = render(
+      <DataTable
+        columns={[...COLUMNS, tagCol]}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        tagIds={["t1"]}
+        onTagIdsChange={onTagIdsChange}
+      />
+    );
+    expect(onTagIdsChange).not.toHaveBeenCalled();
+
+    // Tags travel outside `filters`, so the sweep that drops a hidden column's
+    // filter cannot reach them — without this the rows would stay narrowed by
+    // a criterion nothing on the page can show or undo.
+    rerender(
+      <DataTable
+        columns={COLUMNS}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        tagIds={["t1"]}
+        onTagIdsChange={onTagIdsChange}
+      />
+    );
+    expect(onTagIdsChange).toHaveBeenCalledWith([]);
+  });
 });

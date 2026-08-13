@@ -111,3 +111,53 @@ class AgentSkill(AgentSkillCreate, TenantScoped, BaseEntity, table=True):
     def _serialize_synced_at(self, dt: datetime | None) -> str | None:
         """Serialize the sync timestamp as ISO-8601 with a ``Z`` suffix, or ``None`` when unset."""
         return iso_z_or_none(dt)
+
+
+class AgentSkillRead(BaseEntity):
+    """Read view of an AgentSkill returned by the API, including its tags.
+
+    Mirrors every column of :class:`AgentSkill` and adds ``tag_ids``, which
+    lives in :class:`models.tag.AgentSkillTag` rather than on the skill row. The
+    mirroring is not cosmetic: this class is what
+    :meth:`repositories.agent_skill.SqlAgentSkillRepository.list` passes as
+    ``readable=``, and a column missing here becomes unfilterable and
+    unsortable through the list API.
+
+    ``synced_at`` repeats the table class's serializer for the same reason it
+    exists there: the generated frontend schemas reject the ``+00:00`` offset
+    Pydantic emits by default.
+    """
+
+    model_config = _alias_config
+    tenant_id: str
+    name: str
+    repo_url: str
+    repo_path: str = ""
+    repo_ref: str | None = None
+    description: str | None = None
+    repo_auth_password: str | None = None
+    repo_auth_username: str | None = None
+    sync_status: SkillSyncStatus = SkillSyncStatus.pending
+    sync_error: str | None = None
+    commit_sha: str | None = None
+    synced_at: datetime | None = None
+    #: Ids of the tags attached to this skill.
+    tag_ids: list[str] = []
+
+    @field_serializer("synced_at", when_used="json")
+    def _serialize_synced_at(self, dt: datetime | None) -> str | None:
+        """Serialize the sync timestamp as ISO-8601 with a ``Z`` suffix, or ``None`` when unset."""
+        return iso_z_or_none(dt)
+
+    @classmethod
+    def from_skill(cls, skill: AgentSkill, *, tag_ids: list[str]) -> "AgentSkillRead":
+        """Build the read view of a stored skill with its tags attached.
+
+        Args:
+            skill: The persisted skill to project.
+            tag_ids: Ids of the tags attached to ``skill``.
+
+        Returns:
+            A read view carrying the skill's columns plus its tags.
+        """
+        return cls(**skill.model_dump(), tag_ids=tag_ids)

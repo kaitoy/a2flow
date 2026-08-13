@@ -16,6 +16,7 @@ from infrastructure.secret_resolver import SecretResolver
 from models.mcp_server import (
     MCPServer,
     MCPServerCreate,
+    McpServerRead,
     MCPServerUpdate,
     McpToolInfo,
     McpTransport,
@@ -30,6 +31,11 @@ from repositories.query import FilterSpec, SortSpec
 # in methods declared after it to that method rather than the builtin; the
 # alias is evaluated in module scope where ``list`` is unambiguously the builtin.
 _McpToolInfoList = list[McpToolInfo]
+
+
+#: Alias for ``list[McpServerRead]``: the ``list`` method below shadows the
+#: builtin inside the service class body.
+_ReadList = list[McpServerRead]
 
 
 class MCPServerService:
@@ -70,6 +76,7 @@ class MCPServerService:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> list[MCPServer]:
         """Return a page of MCPServer records.
 
@@ -78,13 +85,58 @@ class MCPServerService:
             offset: Number of records to skip.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
+            tag_ids: Narrows the page to servers carrying every listed tag.
 
         Returns:
             The requested page of servers.
         """
         return await self._repo.list(
-            limit=limit, offset=offset, sort=sort, filters=filters
+            limit=limit, offset=offset, sort=sort, filters=filters, tag_ids=tag_ids
         )
+
+    async def to_read(self, server: MCPServer) -> McpServerRead:
+        """Project one MCPServer into its API read view, attaching its tags.
+
+        Args:
+            server: The persisted server to project.
+
+        Returns:
+            The read view, with tag ids attached.
+        """
+        return McpServerRead.from_server(
+            server, tag_ids=await self._repo.tag_ids_for(server.id)
+        )
+
+    async def to_read_many(self, servers: Sequence[MCPServer]) -> _ReadList:
+        """Project a page of MCPServers into read views, reading their tags in one query.
+
+        Args:
+            servers: The persisted records to project.
+
+        Returns:
+            The read views, in the order they were given.
+        """
+        by_id = await self._repo.tag_ids_for_many([x.id for x in servers])
+        return [
+            McpServerRead.from_server(x, tag_ids=by_id.get(x.id, [])) for x in servers
+        ]
+
+    async def set_tags(self, server_id: str, tag_ids: Sequence[str]) -> MCPServer:
+        """Replace a MCPServer's tag attachments wholesale.
+
+        Args:
+            server_id: Identifier of the server to retag.
+            tag_ids: Ids of the tags it should carry.
+
+        Returns:
+            The server, unchanged apart from its attachments.
+
+        Raises:
+            NotFoundError: If no server exists with the given ID.
+            ForeignKeyViolationError: If any id does not name a tag of this
+                tenant.
+        """
+        return await self._repo.set_tags(server_id, tag_ids)
 
     async def create(self, data: MCPServerCreate, *, user_id: str) -> MCPServer:
         """Create a new MCPServer.

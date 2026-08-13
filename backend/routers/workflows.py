@@ -35,6 +35,7 @@ from dependencies import (
     FilterDep,
     PaginationDep,
     SortDep,
+    TagFilterDep,
     WorkflowDesignServiceDep,
     WorkflowServiceDep,
     WorkflowTaskTemplateServiceDep,
@@ -43,8 +44,9 @@ from dependencies import (
 from infrastructure.agent import tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
 from models.response import ApiResponse
+from models.tag import TagIdsUpdate
 from models.user import Role
-from models.workflow import Workflow, WorkflowUpdate
+from models.workflow import WorkflowRead, WorkflowUpdate
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task_template import WorkflowTaskTemplateRead
 from repositories.exceptions import SessionRunInProgressError
@@ -61,31 +63,33 @@ _requires_developer = [Depends(require_roles(Role.developer))]
 _requires_execute = [Depends(require_roles(Role.requester, Role.developer))]
 
 
-@router.get("", response_model=ApiResponse[list[Workflow]])
+@router.get("", response_model=ApiResponse[list[WorkflowRead]])
 async def list_workflows(
     service: WorkflowServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
+    tags: TagFilterDep,
     meta: ApiMetaDep,
-) -> ApiResponse[list[Workflow]]:
+) -> ApiResponse[list[WorkflowRead]]:
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
         sort=sort.sort,
         filters=filters.filters,
+        tag_ids=tags.tag_ids,
     )
-    return ApiResponse(meta=meta, data=items)
+    return ApiResponse(meta=meta, data=await service.to_read_many(items))
 
 
-@router.get("/{workflow_id}", response_model=ApiResponse[Workflow])
+@router.get("/{workflow_id}", response_model=ApiResponse[WorkflowRead])
 async def get_workflow(
     workflow_id: str,
     service: WorkflowServiceDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Workflow]:
+) -> ApiResponse[WorkflowRead]:
     workflow = await service.get(workflow_id)
-    return ApiResponse(meta=meta, data=workflow)
+    return ApiResponse(meta=meta, data=await service.to_read(workflow))
 
 
 @router.get(
@@ -243,7 +247,7 @@ async def design_session_agent(
 
 @router.patch(
     "/{workflow_id}",
-    response_model=ApiResponse[Workflow],
+    response_model=ApiResponse[WorkflowRead],
     dependencies=_requires_developer,
 )
 async def update_workflow(
@@ -252,7 +256,7 @@ async def update_workflow(
     service: WorkflowServiceDep,
     caller: CurrentUserDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Workflow]:
+) -> ApiResponse[WorkflowRead]:
     """Apply a partial update to a Workflow.
 
     Changing ``generated_description`` is restricted to a ``super_admin``
@@ -260,7 +264,7 @@ async def update_workflow(
     caller who reaches this route.
     """
     workflow = await service.update(workflow_id, body, caller=caller)
-    return ApiResponse(meta=meta, data=workflow)
+    return ApiResponse(meta=meta, data=await service.to_read(workflow))
 
 
 @router.delete(
@@ -279,7 +283,7 @@ async def delete_workflow(
 
 @router.post(
     "/{workflow_id}/publish",
-    response_model=ApiResponse[Workflow],
+    response_model=ApiResponse[WorkflowRead],
     dependencies=_requires_developer,
 )
 async def publish_workflow(
@@ -287,7 +291,7 @@ async def publish_workflow(
     service: WorkflowDesignServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Workflow]:
+) -> ApiResponse[WorkflowRead]:
     """Publish a workflow, making it executable.
 
     Freezes the current design into the workflow's published snapshot. Raises
@@ -296,12 +300,12 @@ async def publish_workflow(
     and therefore has no changes to promote.
     """
     workflow = await service.publish(workflow_id, user_id=user_id)
-    return ApiResponse(meta=meta, data=workflow)
+    return ApiResponse(meta=meta, data=await service.to_read(workflow))
 
 
 @router.post(
     "/{workflow_id}/generate-description",
-    response_model=ApiResponse[Workflow],
+    response_model=ApiResponse[WorkflowRead],
     dependencies=_requires_developer,
 )
 async def generate_workflow_description(
@@ -309,7 +313,7 @@ async def generate_workflow_description(
     service: WorkflowDesignServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Workflow]:
+) -> ApiResponse[WorkflowRead]:
     """Summarize the workflow's design conversation into its description.
 
     Overwrites the workflow's AI-generated description and returns the updated
@@ -319,12 +323,12 @@ async def generate_workflow_description(
     (``SUMMARIZATION_FAILED``) when the summarizer call fails.
     """
     workflow = await service.generate_description(workflow_id, user_id=user_id)
-    return ApiResponse(meta=meta, data=workflow)
+    return ApiResponse(meta=meta, data=await service.to_read(workflow))
 
 
 @router.post(
     "/{workflow_id}/discard-changes",
-    response_model=ApiResponse[Workflow],
+    response_model=ApiResponse[WorkflowRead],
     dependencies=_requires_developer,
 )
 async def discard_workflow_changes(
@@ -332,7 +336,7 @@ async def discard_workflow_changes(
     service: WorkflowServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Workflow]:
+) -> ApiResponse[WorkflowRead]:
     """Drop a modified workflow's edits, restoring its last published version.
 
     Rewrites the task templates from the snapshot taken at publish time and
@@ -340,12 +344,12 @@ async def discard_workflow_changes(
     (``WORKFLOW_NOT_MODIFIED``) when the workflow has no unpublished changes.
     """
     workflow = await service.discard_changes(workflow_id, user_id=user_id)
-    return ApiResponse(meta=meta, data=workflow)
+    return ApiResponse(meta=meta, data=await service.to_read(workflow))
 
 
 @router.post(
     "/{workflow_id}/deactivate",
-    response_model=ApiResponse[Workflow],
+    response_model=ApiResponse[WorkflowRead],
     dependencies=_requires_developer,
 )
 async def deactivate_workflow(
@@ -353,14 +357,14 @@ async def deactivate_workflow(
     service: WorkflowServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Workflow]:
+) -> ApiResponse[WorkflowRead]:
     """Deactivate a workflow, returning it to draft.
 
     Raises HTTP 409 (``WORKFLOW_NOT_DEACTIVATABLE``) unless the workflow is
     currently ``published`` or ``modified``.
     """
     workflow = await service.deactivate(workflow_id, user_id=user_id)
-    return ApiResponse(meta=meta, data=workflow)
+    return ApiResponse(meta=meta, data=await service.to_read(workflow))
 
 
 @router.post(
@@ -389,3 +393,18 @@ async def execute_workflow(
         workflow_id, caller=caller, caller_roles=caller_roles
     )
     return ApiResponse(meta=meta, data=execution)
+
+
+@router.put(
+    "/{workflow_id}/tags",
+    response_model=ApiResponse[WorkflowRead],
+    dependencies=_requires_developer,
+)
+async def set_workflow_tags(
+    workflow_id: str,
+    body: TagIdsUpdate,
+    service: WorkflowServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[WorkflowRead]:
+    workflow = await service.set_tags(workflow_id, body.tag_ids)
+    return ApiResponse(meta=meta, data=await service.to_read(workflow))

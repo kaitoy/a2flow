@@ -19,6 +19,7 @@ import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { RegistrySearchDialog } from "@/components/admin/registry-search-dialog";
+import { tagsColumn } from "@/components/admin/tag-columns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -26,6 +27,7 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTags } from "@/hooks/useTags";
 import {
   deleteMcpServer,
   listMcpServers,
@@ -96,8 +98,11 @@ export default function McpServersPage() {
     setOffset,
     setSort,
     setFilters,
+    tagIds,
+    setTagIds,
     reload,
   } = useTableQuery<McpServer>(listMcpServers, { limit: LIMIT });
+  const { byId: tagsById } = useTags();
   const router = useRouter();
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [registryOpen, setRegistryOpen] = useState(false);
@@ -126,6 +131,7 @@ export default function McpServersPage() {
 
   const columns: ColumnDef<McpServer>[] = [
     ...STATIC_COLUMNS,
+    tagsColumn<McpServer>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [
           {
@@ -192,6 +198,8 @@ export default function McpServersPage() {
         onSortChange={setSort}
         filters={filters}
         onFilterChange={setFilters}
+        tagIds={tagIds}
+        onTagIdsChange={setTagIds}
       />
       <PaginationControls
         offset={offset}

@@ -8,6 +8,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.secret import Secret, SecretCreate, SecretRead, SecretUpdate
+from models.tag import SecretTag
 from repositories._integrity import is_foreign_key_error
 from repositories.exceptions import (
     ForeignKeyViolationError,
@@ -16,6 +17,11 @@ from repositories.exceptions import (
     UniqueViolationError,
 )
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
+from repositories.tags import TagLinks
+
+#: Alias for ``list[str]``: the ``list`` method below shadows the builtin
+#: inside every class body in this module.
+_StrList = list[str]
 
 
 class SecretRepository(Protocol):
@@ -32,6 +38,7 @@ class SecretRepository(Protocol):
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> list[Secret]: ...
 
     async def create(self, data: SecretCreate, *, user_id: str) -> Secret: ...
@@ -43,6 +50,14 @@ class SecretRepository(Protocol):
     async def delete(self, secret_id: str) -> None: ...
 
     async def exists(self, secret_id: str) -> bool: ...
+
+    async def tag_ids_for(self, secret_id: str) -> _StrList: ...
+
+    async def tag_ids_for_many(
+        self, secret_ids: Sequence[str]
+    ) -> dict[str, _StrList]: ...
+
+    async def set_tags(self, secret_id: str, tag_ids: Sequence[str]) -> Secret: ...
 
 
 class SqlSecretRepository:
@@ -58,6 +73,7 @@ class SqlSecretRepository:
         """Store the SQLModel session and the tenant these operations are scoped to."""
         self._db = session
         self._tenant_id = tenant_id
+        self._tags = TagLinks(session, SecretTag, tenant_id=tenant_id)
 
     async def _get_scoped(self, secret_id: str) -> Secret | None:
         """Return the Secret with the given ID within the current tenant, or ``None``."""
@@ -90,9 +106,17 @@ class SqlSecretRepository:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> list[Secret]:
-        """Return a page of Secrets, defaulting to ``created_at`` descending."""
+        """Return a page of Secrets, defaulting to ``created_at`` descending.
+
+        ``tag_ids`` narrows the page to secrets carrying **every** listed tag.
+        It is applied before the page window, so paging stays consistent with
+        the filter.
+        """
         stmt = select(Secret).where(Secret.tenant_id == self._tenant_id)
+        for clause in self._tags.filter_clauses(col(Secret.id), tag_ids):
+            stmt = stmt.where(clause)
         stmt = apply_filters(stmt, Secret, filters, readable=SecretRead)
         stmt = apply_sort(
             stmt,
@@ -164,3 +188,36 @@ class SqlSecretRepository:
         except IntegrityError as e:
             await self._db.rollback()
             raise ReferencedError("Secret is referenced by other records") from e
+
+    async def tag_ids_for(self, secret_id: str) -> _StrList:
+        """Return the sorted ids of the tags attached to one Secret."""
+        return await self._tags.for_one(secret_id)
+
+    async def tag_ids_for_many(self, secret_ids: Sequence[str]) -> dict[str, _StrList]:
+        """Return each Secret's sorted tag ids, in one query."""
+        return await self._tags.for_many(secret_ids)
+
+    async def set_tags(self, secret_id: str, tag_ids: Sequence[str]) -> Secret:
+        """Replace a Secret's tag attachments wholesale.
+
+        Args:
+            secret_id: Id of the secret to retag.
+            tag_ids: Ids of the tags it should carry; an empty sequence
+                detaches every tag.
+
+        Returns:
+            The secret, unchanged apart from its attachments.
+
+        Raises:
+            NotFoundError: If the secret does not exist in this tenant.
+            ForeignKeyViolationError: If any id does not name a tag of this
+                tenant.
+        """
+        secret = await self._get_scoped(secret_id)
+        if secret is None:
+            raise NotFoundError("Secret", secret_id)
+        await self._tags.validate(tag_ids)
+        await self._tags.replace(secret_id, tag_ids)
+        await self._db.commit()
+        await self._db.refresh(secret)
+        return secret

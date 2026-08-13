@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Server } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -17,10 +17,11 @@ import {
   mcpServerFormSchema,
   toMcpServerBody,
 } from "@/components/admin/mcp-server-fields";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { createMcpServer } from "@/lib/api";
+import { createMcpServer, setMcpServerTags } from "@/lib/api";
 import { parsePrefill } from "@/lib/mcp-registry-prefill";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
@@ -40,6 +41,10 @@ function NewMcpServerForm() {
     return { ...emptyMcpServerFormValues(), ...prefill };
   }, [searchParams]);
 
+  // Tags live outside the form state: the picker is a controlled
+  // multi-select rather than a registered input.
+  const [tagIds, setTagIds] = useState<string[]>([]);
+
   const save = useAsyncAction({ showDone: false });
   const {
     register,
@@ -57,7 +62,12 @@ function NewMcpServerForm() {
   async function onSubmit(values: McpServerFormValues) {
     try {
       await save.run(async () => {
-        await createMcpServer(toMcpServerBody(values));
+        const created = await createMcpServer(toMcpServerBody(values));
+        // Tags are a sub-resource of the record, so they can only be
+        // written once it exists.
+        if (tagIds.length > 0) {
+          await setMcpServerTags(created.id, tagIds);
+        }
         dispatch(showToast({ message: "MCP server created" }));
         router.push("/admin/mcp-servers");
       });
@@ -101,6 +111,8 @@ function NewMcpServerForm() {
             transport={transport}
             showPlaceholders
           />
+
+          <TagPicker value={tagIds} onChange={setTagIds} />
 
           <div className="flex gap-2">
             <Button

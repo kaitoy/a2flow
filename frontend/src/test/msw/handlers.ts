@@ -205,6 +205,28 @@ export const SECRET_VAULT_1 = {
   updatedBy: "",
 };
 
+export const TAG_1 = {
+  id: "tag-1",
+  tenantId: "tenant-1",
+  name: "production",
+  color: "rose",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+export const TAG_2 = {
+  id: "tag-2",
+  tenantId: "tenant-1",
+  name: "aws",
+  color: "amber",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 export const handlers = [
   http.get(`${BASE}/api/v1/sessions`, () =>
     envelope([
@@ -378,6 +400,24 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(MCP_SERVER_1)),
 
   http.delete(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/tags`, () => envelope([TAG_2, TAG_1])),
+
+  http.get(`${BASE}/api/v1/tags/:tagId`, () => envelope(TAG_1)),
+
+  http.post(`${BASE}/api/v1/tags`, () => envelope({ ...TAG_1, id: "new-tag-id" }, 201)),
+
+  http.patch(`${BASE}/api/v1/tags/:tagId`, () => envelope(TAG_1)),
+
+  http.delete(`${BASE}/api/v1/tags/:tagId`, () => envelope(null)),
+
+  http.put(`${BASE}/api/v1/secrets/:secretId/tags`, () => envelope(SECRET_1)),
+
+  http.put(`${BASE}/api/v1/workflows/:workflowId/tags`, () => envelope(WORKFLOW_1)),
+
+  http.put(`${BASE}/api/v1/mcp-servers/:serverId/tags`, () => envelope(MCP_SERVER_1)),
+
+  http.put(`${BASE}/api/v1/agent-skills/:skillId/tags`, () => envelope(SKILL_1)),
 
   http.get(`${BASE}/api/v1/secrets`, () => envelope([SECRET_1, SECRET_VAULT_1])),
 

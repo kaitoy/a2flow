@@ -30,6 +30,7 @@ import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -51,10 +52,12 @@ import {
   isForbiddenError,
   publishWorkflow,
   SUPPRESS_FORBIDDEN_TOAST,
+  setWorkflowTags,
   updateWorkflow,
   type Workflow,
   type WorkflowStatus,
 } from "@/lib/api";
+import { sameIds } from "@/lib/ids";
 import { Role, useHasRole } from "@/lib/roles";
 import {
   canExecuteWorkflow,
@@ -157,6 +160,12 @@ export default function WorkflowDetailPage() {
   const [diffOpen, setDiffOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
+  // Tags live outside the form state and outside `applyWorkflow`: that runs on
+  // every generation poll too, and re-applying the server's tags mid-edit would
+  // discard the user's in-progress selection.
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [savedTagIds, setSavedTagIds] = useState<string[]>([]);
+
   const save = useAsyncAction({ showDone: false });
   const publish = useAsyncAction({ showDone: false });
   const discard = useAsyncAction({ showDone: false });
@@ -204,6 +213,8 @@ export default function WorkflowDetailPage() {
     getWorkflow(workflowId, SUPPRESS_FORBIDDEN_TOAST)
       .then(async (wf) => {
         applyWorkflow(wf);
+        setTagIds(wf.tagIds ?? []);
+        setSavedTagIds(wf.tagIds ?? []);
         setSkill(await getAgentSkill(wf.agentSkillId, SUPPRESS_FORBIDDEN_TOAST));
       })
       .catch((err: unknown) => {
@@ -239,7 +250,14 @@ export default function WorkflowDetailPage() {
           description: values.description || null,
           ...(isSuperAdmin ? { generatedDescription: values.generatedDescription || null } : {}),
         });
-        applyWorkflow(updated);
+        // Tags are a separate sub-resource, so they are only written when the
+        // selection actually changed; its response is the fresher record.
+        let latest = updated;
+        if (!sameIds(tagIds, savedTagIds)) {
+          latest = await setWorkflowTags(workflowId, tagIds);
+          setSavedTagIds(tagIds);
+        }
+        applyWorkflow(latest);
         dispatch(showToast({ message: "Workflow updated" }));
       });
     } catch {
@@ -580,6 +598,8 @@ export default function WorkflowDetailPage() {
               Used for the workflow execution whenever Description above is empty.
             </p>
           </FormField>
+
+          <TagPicker value={tagIds} onChange={setTagIds} readOnly={!canEdit} />
 
           <div className="flex flex-wrap gap-2">
             {canEdit && (

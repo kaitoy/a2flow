@@ -4,6 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -16,10 +17,11 @@ import {
 } from "@/components/admin/agent-skill-fields";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { createAgentSkill } from "@/lib/api";
+import { createAgentSkill, setAgentSkillTags } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -28,6 +30,10 @@ export default function NewAgentSkillPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
+
+  // Tags live outside the form state: the picker is a controlled
+  // multi-select rather than a registered input.
+  const [tagIds, setTagIds] = useState<string[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -44,7 +50,12 @@ export default function NewAgentSkillPage() {
   async function onSubmit(values: AgentSkillFormValues) {
     try {
       await save.run(async () => {
-        await createAgentSkill(toAgentSkillCreateBody(values));
+        const created = await createAgentSkill(toAgentSkillCreateBody(values));
+        // Tags are a sub-resource of the record, so they can only be
+        // written once it exists.
+        if (tagIds.length > 0) {
+          await setAgentSkillTags(created.id, tagIds);
+        }
         dispatch(showToast({ message: "Agent skill created" }));
         router.push("/admin/agent-skills");
       });
@@ -86,6 +97,8 @@ export default function NewAgentSkillPage() {
             errors={errors}
             showPlaceholders
           />
+
+          <TagPicker value={tagIds} onChange={setTagIds} />
 
           <div className="flex gap-2">
             <Button

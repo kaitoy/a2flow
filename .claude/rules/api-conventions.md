@@ -13,6 +13,7 @@ Every collection endpoint (`GET /agent-skills`, `GET /workflows`, `GET /workflow
 | `offset` | Records to skip (default 0) | integer | `?offset=100` |
 | `s` | Sort | Comma-separated fields; prefix `-` for descending | `?s=-createdAt,name` |
 | `q` | Filter (repeatable) | `field:op:value` | `?q=name:like:foo&q=status:eq:pending` |
+| `tag` | Tag filter (repeatable) | tag id | `?tag=<id>&tag=<id>` |
 
 Filter operators (`op`):
 
@@ -23,4 +24,6 @@ Filter operators (`op`):
 | `like` | Case-insensitive substring match (string fields) |
 | `in` | Matches any of a comma-separated list, e.g. `status:in:pending,completed` |
 
-When `s` is omitted, each endpoint falls back to its default ordering (`createdAt` descending; workflow tasks and task templates order by `createdAt` then `id` ascending).
+When `s` is omitted, each endpoint falls back to its default ordering (`createdAt` descending; workflow tasks and task templates order by `createdAt` then `id` ascending; tags order by `name` ascending).
+
+`tag` is accepted only by the four taggable collections (`GET /secrets`, `/workflows`, `/mcp-servers`, `/agent-skills`) and is **conjunctive**: a record must carry every tag listed, so repeating the parameter narrows the result rather than widening it. It is a parameter of its own rather than a `q` term because tags are not a column of any record — `apply_filters`/`apply_sort` resolve field names against the model, so `q=tagIds:eq:…` and `s=tagIds` are rejected as unknown fields, which is the intended behavior.

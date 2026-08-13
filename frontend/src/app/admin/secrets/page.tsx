@@ -16,11 +16,13 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tagsColumn } from "@/components/admin/tag-columns";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTags } from "@/hooks/useTags";
 import { deleteSecret, listSecrets, type Secret } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 
@@ -78,8 +80,11 @@ export default function SecretsPage() {
     setOffset,
     setSort,
     setFilters,
+    tagIds,
+    setTagIds,
     reload,
   } = useTableQuery<Secret>(listSecrets, { limit: LIMIT });
+  const { byId: tagsById } = useTags();
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   function handleDelete(id: string, name: string) {
@@ -100,6 +105,7 @@ export default function SecretsPage() {
 
   const columns: ColumnDef<Secret>[] = [
     ...STATIC_COLUMNS,
+    tagsColumn<Secret>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [
           {
@@ -152,6 +158,8 @@ export default function SecretsPage() {
         onSortChange={setSort}
         filters={filters}
         onFilterChange={setFilters}
+        tagIds={tagIds}
+        onTagIdsChange={setTagIds}
       />
       <PaginationControls
         offset={offset}

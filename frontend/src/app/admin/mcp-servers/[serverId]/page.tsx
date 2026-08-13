@@ -21,6 +21,7 @@ import {
   toMcpServerBody,
 } from "@/components/admin/mcp-server-fields";
 import { McpServerToolsPanel } from "@/components/admin/mcp-server-tools-panel";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -30,8 +31,10 @@ import {
   getMcpServer,
   isForbiddenError,
   SUPPRESS_FORBIDDEN_TOAST,
+  setMcpServerTags,
   updateMcpServer,
 } from "@/lib/api";
+import { sameIds } from "@/lib/ids";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -59,6 +62,12 @@ export default function McpServerDetailPage() {
   // heading names the saved record rather than following every keystroke.
   const [name, setName] = useState("");
 
+  // Tags live outside the form state: the picker is a controlled
+  // multi-select rather than a registered input. `savedTagIds` is what the
+  // record carried when it loaded, so an untouched selection writes nothing.
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [savedTagIds, setSavedTagIds] = useState<string[]>([]);
+
   const save = useAsyncAction({ showDone: false });
   const {
     register,
@@ -79,6 +88,8 @@ export default function McpServerDetailPage() {
     getMcpServer(serverId, SUPPRESS_FORBIDDEN_TOAST)
       .then((server) => {
         setName(server.name);
+        setTagIds(server.tagIds ?? []);
+        setSavedTagIds(server.tagIds ?? []);
         reset({
           ...emptyMcpServerFormValues(),
           name: server.name,
@@ -110,6 +121,11 @@ export default function McpServerDetailPage() {
     try {
       await save.run(async () => {
         await updateMcpServer(serverId, toMcpServerBody(values));
+        // Tags are a separate sub-resource, so they are only written when
+        // the selection actually changed.
+        if (!sameIds(tagIds, savedTagIds)) {
+          await setMcpServerTags(serverId, tagIds);
+        }
         dispatch(showToast({ message: "MCP server updated" }));
         router.push("/admin/mcp-servers");
       });
@@ -181,6 +197,8 @@ export default function McpServerDetailPage() {
           ) : (
             <McpServerFields readOnly values={getValues()} />
           )}
+
+          <TagPicker value={tagIds} onChange={setTagIds} readOnly={!canEdit} />
 
           <div className="flex gap-2">
             {canEdit && (

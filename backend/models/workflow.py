@@ -186,6 +186,44 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
         return self.description or self.generated_description
 
 
+class WorkflowRead(BaseEntity):
+    """Read view of a Workflow returned by the API, including its tags.
+
+    Mirrors every column of :class:`Workflow` and adds ``tag_ids``, which lives
+    in :class:`models.tag.WorkflowTag` rather than on the workflow row. The
+    mirroring is not cosmetic: this class is what
+    :meth:`repositories.workflow.SqlWorkflowRepository.list` passes as
+    ``readable=``, and a column missing here becomes unfilterable and
+    unsortable through the list API.
+    """
+
+    model_config = _alias_config
+    tenant_id: str
+    name: str
+    description: str | None = None
+    generated_description: str | None = None
+    agent_skill_id: str
+    session_id: str
+    agent_skill_commit_sha: str
+    status: WorkflowStatus = WorkflowStatus.draft
+    generation_error: str | None = None
+    #: Ids of the tags attached to this workflow.
+    tag_ids: list[str] = []
+
+    @classmethod
+    def from_workflow(cls, workflow: Workflow, *, tag_ids: list[str]) -> "WorkflowRead":
+        """Build the read view of a stored workflow with its tags attached.
+
+        Args:
+            workflow: The persisted workflow to project.
+            tag_ids: Ids of the tags attached to ``workflow``.
+
+        Returns:
+            A read view carrying the workflow's columns plus its tags.
+        """
+        return cls(**workflow.model_dump(), tag_ids=tag_ids)
+
+
 class GenerateWorkflowRequest(SQLModel):
     """Request body of ``POST /agent-skills/{skill_id}/workflows``.
 

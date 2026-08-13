@@ -10,14 +10,16 @@ from dependencies import (
     PaginationDep,
     SkillSyncJobDep,
     SortDep,
+    TagFilterDep,
     WorkflowDesignServiceDep,
     WorkflowGenerationJobDep,
     require_roles,
 )
-from models.agent_skill import AgentSkill, AgentSkillCreate, AgentSkillUpdate
+from models.agent_skill import AgentSkillCreate, AgentSkillRead, AgentSkillUpdate
 from models.response import ApiResponse
+from models.tag import TagIdsUpdate
 from models.user import Role
-from models.workflow import GenerateWorkflowRequest, Workflow
+from models.workflow import GenerateWorkflowRequest, WorkflowRead
 
 router = APIRouter(prefix="/agent-skills", tags=["agent-skills"])
 
@@ -27,7 +29,7 @@ _requires_developer = [Depends(require_roles(Role.developer))]
 
 @router.post(
     "",
-    response_model=ApiResponse[AgentSkill],
+    response_model=ApiResponse[AgentSkillRead],
     status_code=201,
     dependencies=_requires_developer,
 )
@@ -38,7 +40,7 @@ async def create_agent_skill(
     sync_job: SkillSyncJobDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[AgentSkill]:
+) -> ApiResponse[AgentSkillRead]:
     """Register a skill and start cloning its repository in the background.
 
     Returns as soon as the row exists (``syncStatus: "pending"``, no
@@ -50,12 +52,12 @@ async def create_agent_skill(
     """
     skill = await service.create(body, user_id=user_id)
     background.add_task(sync_job, skill.id, user_id=user_id)
-    return ApiResponse(meta=meta, data=skill)
+    return ApiResponse(meta=meta, data=await service.to_read(skill))
 
 
 @router.post(
     "/{skill_id}/pull",
-    response_model=ApiResponse[AgentSkill],
+    response_model=ApiResponse[AgentSkillRead],
     status_code=202,
     dependencies=_requires_developer,
 )
@@ -66,7 +68,7 @@ async def pull_agent_skill(
     sync_job: SkillSyncJobDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[AgentSkill]:
+) -> ApiResponse[AgentSkillRead]:
     """Re-clone a skill's repository at its configured ref, or the default branch.
 
     The way a skill picks up upstream changes, and the way a failed
@@ -80,12 +82,12 @@ async def pull_agent_skill(
     """
     skill = await service.mark_pending(skill_id, user_id=user_id)
     background.add_task(sync_job, skill.id, user_id=user_id)
-    return ApiResponse(meta=meta, data=skill)
+    return ApiResponse(meta=meta, data=await service.to_read(skill))
 
 
 @router.post(
     "/{skill_id}/workflows",
-    response_model=ApiResponse[Workflow],
+    response_model=ApiResponse[WorkflowRead],
     status_code=201,
     dependencies=_requires_developer,
 )
@@ -97,7 +99,7 @@ async def generate_workflow(
     generation_job: WorkflowGenerationJobDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Workflow]:
+) -> ApiResponse[WorkflowRead]:
     """Generate a draft Workflow from this skill ("Generate workflow").
 
     Registers the workflow (``status: "generating"``) and its design session
@@ -111,39 +113,43 @@ async def generate_workflow(
     """
     workflow = await service.generate(skill_id, body.name, user_id=user_id)
     background.add_task(generation_job, workflow.id, body.prompt, user_id=user_id)
-    return ApiResponse(meta=meta, data=workflow)
+    # A workflow born a moment ago carries no tags, so its read view is
+    # built directly rather than through another round trip.
+    return ApiResponse(meta=meta, data=WorkflowRead.from_workflow(workflow, tag_ids=[]))
 
 
-@router.get("", response_model=ApiResponse[list[AgentSkill]])
+@router.get("", response_model=ApiResponse[list[AgentSkillRead]])
 async def list_agent_skills(
     service: AgentSkillServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
+    tags: TagFilterDep,
     meta: ApiMetaDep,
-) -> ApiResponse[list[AgentSkill]]:
+) -> ApiResponse[list[AgentSkillRead]]:
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
         sort=sort.sort,
         filters=filters.filters,
+        tag_ids=tags.tag_ids,
     )
-    return ApiResponse(meta=meta, data=items)
+    return ApiResponse(meta=meta, data=await service.to_read_many(items))
 
 
-@router.get("/{skill_id}", response_model=ApiResponse[AgentSkill])
+@router.get("/{skill_id}", response_model=ApiResponse[AgentSkillRead])
 async def get_agent_skill(
     skill_id: str,
     service: AgentSkillServiceDep,
     meta: ApiMetaDep,
-) -> ApiResponse[AgentSkill]:
+) -> ApiResponse[AgentSkillRead]:
     skill = await service.get(skill_id)
-    return ApiResponse(meta=meta, data=skill)
+    return ApiResponse(meta=meta, data=await service.to_read(skill))
 
 
 @router.patch(
     "/{skill_id}",
-    response_model=ApiResponse[AgentSkill],
+    response_model=ApiResponse[AgentSkillRead],
     dependencies=_requires_developer,
 )
 async def update_agent_skill(
@@ -152,9 +158,9 @@ async def update_agent_skill(
     service: AgentSkillServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[AgentSkill]:
+) -> ApiResponse[AgentSkillRead]:
     skill = await service.update(skill_id, body, user_id=user_id)
-    return ApiResponse(meta=meta, data=skill)
+    return ApiResponse(meta=meta, data=await service.to_read(skill))
 
 
 @router.delete(
@@ -169,3 +175,18 @@ async def delete_agent_skill(
 ) -> ApiResponse[None]:
     await service.delete(skill_id)
     return ApiResponse(meta=meta, data=None)
+
+
+@router.put(
+    "/{skill_id}/tags",
+    response_model=ApiResponse[AgentSkillRead],
+    dependencies=_requires_developer,
+)
+async def set_agent_skill_tags(
+    skill_id: str,
+    body: TagIdsUpdate,
+    service: AgentSkillServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[AgentSkillRead]:
+    skill = await service.set_tags(skill_id, body.tag_ids)
+    return ApiResponse(meta=meta, data=await service.to_read(skill))

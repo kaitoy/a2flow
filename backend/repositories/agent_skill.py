@@ -11,12 +11,19 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.agent_skill import (
     AgentSkill,
     AgentSkillCreate,
+    AgentSkillRead,
     AgentSkillUpdate,
     SkillSyncStatus,
 )
+from models.tag import AgentSkillTag
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import NotFoundError, ReferencedError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
+from repositories.tags import TagLinks
+
+#: Alias for ``list[str]``: the ``list`` method below shadows the builtin
+#: inside every class body in this module.
+_StrList = list[str]
 
 
 class AgentSkillRepository(Protocol):
@@ -31,6 +38,7 @@ class AgentSkillRepository(Protocol):
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> list[AgentSkill]: ...
 
     async def create(self, data: AgentSkillCreate, *, user_id: str) -> AgentSkill: ...
@@ -53,6 +61,14 @@ class AgentSkillRepository(Protocol):
 
     async def exists(self, skill_id: str) -> bool: ...
 
+    async def tag_ids_for(self, skill_id: str) -> _StrList: ...
+
+    async def tag_ids_for_many(
+        self, skill_ids: Sequence[str]
+    ) -> dict[str, _StrList]: ...
+
+    async def set_tags(self, skill_id: str, tag_ids: Sequence[str]) -> AgentSkill: ...
+
 
 class SqlAgentSkillRepository:
     """SQLModel-backed implementation of AgentSkillRepository.
@@ -64,6 +80,7 @@ class SqlAgentSkillRepository:
     def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
         self._db = session
         self._tenant_id = tenant_id
+        self._tags = TagLinks(session, AgentSkillTag, tenant_id=tenant_id)
 
     async def _get_scoped(self, skill_id: str) -> AgentSkill | None:
         stmt = select(AgentSkill).where(
@@ -85,15 +102,24 @@ class SqlAgentSkillRepository:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> list[AgentSkill]:
+        """Return a page of AgentSkills, defaulting to ``created_at`` descending.
+
+        ``tag_ids`` narrows the page to skills carrying **every** listed tag.
+        It is applied before the page window, so paging stays consistent with
+        the filter.
+        """
         stmt = select(AgentSkill).where(AgentSkill.tenant_id == self._tenant_id)
-        stmt = apply_filters(stmt, AgentSkill, filters, readable=AgentSkill)
+        for clause in self._tags.filter_clauses(col(AgentSkill.id), tag_ids):
+            stmt = stmt.where(clause)
+        stmt = apply_filters(stmt, AgentSkill, filters, readable=AgentSkillRead)
         stmt = apply_sort(
             stmt,
             AgentSkill,
             sort,
             default=[col(AgentSkill.created_at).desc()],
-            readable=AgentSkill,
+            readable=AgentSkillRead,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
@@ -182,3 +208,36 @@ class SqlAgentSkillRepository:
             raise ReferencedError(
                 "AgentSkill is referenced by one or more workflows"
             ) from e
+
+    async def tag_ids_for(self, skill_id: str) -> _StrList:
+        """Return the sorted ids of the tags attached to one AgentSkill."""
+        return await self._tags.for_one(skill_id)
+
+    async def tag_ids_for_many(self, skill_ids: Sequence[str]) -> dict[str, _StrList]:
+        """Return each AgentSkill's sorted tag ids, in one query."""
+        return await self._tags.for_many(skill_ids)
+
+    async def set_tags(self, skill_id: str, tag_ids: Sequence[str]) -> AgentSkill:
+        """Replace an AgentSkill's tag attachments wholesale.
+
+        Args:
+            skill_id: Id of the skill to retag.
+            tag_ids: Ids of the tags it should carry; an empty sequence
+                detaches every tag.
+
+        Returns:
+            The skill, unchanged apart from its attachments.
+
+        Raises:
+            NotFoundError: If the skill does not exist in this tenant.
+            ForeignKeyViolationError: If any id does not name a tag of this
+                tenant.
+        """
+        skill = await self._get_scoped(skill_id)
+        if skill is None:
+            raise NotFoundError("AgentSkill", skill_id)
+        await self._tags.validate(tag_ids)
+        await self._tags.replace(skill_id, tag_ids)
+        await self._db.commit()
+        await self._db.refresh(skill)
+        return skill

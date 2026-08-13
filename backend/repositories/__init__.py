@@ -20,6 +20,8 @@ from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
 from .metrics import MetricsRepository, SqlMetricsRepository
 from .notification import NotificationRepository, SqlNotificationRepository
 from .secret import SecretRepository, SqlSecretRepository
+from .tag import SqlTagRepository, TagRepository
+from .tags import TagLinks
 from .tenant import SqlTenantRepository, TenantRepository
 from .user import SqlUserRepository, UserRepository
 from .user_avatar import SqlUserAvatarRepository, UserAvatarRepository
@@ -67,6 +69,7 @@ __all__ = [
     "SqlMetricsRepository",
     "SqlNotificationRepository",
     "SqlSecretRepository",
+    "SqlTagRepository",
     "SqlTenantRepository",
     "SqlUserAvatarRepository",
     "SqlUserGroupRepository",
@@ -76,6 +79,8 @@ __all__ = [
     "SqlWorkflowExecutionRepository",
     "SqlWorkflowTaskRepository",
     "SqlWorkflowTaskTemplateRepository",
+    "TagLinks",
+    "TagRepository",
     "TenantRepository",
     "UnauthorizedError",
     "UniqueViolationError",

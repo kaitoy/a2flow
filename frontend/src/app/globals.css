@@ -160,6 +160,19 @@
      as a static rgba() literal. Approximates the brighter aurora-mint glow. */
   --c-accent-rgb: 22, 191, 169;
 
+  /* Tag palette (DESIGN.md → Colors → Tag palette). One hue per slot; the
+     chip derives its fill and border from it with color-mix, so a single
+     value per theme is all a slot needs. Kept at the accent's chroma so a
+     wall of tags never out-shouts the one accent the UI is built around. */
+  --c-tag-mint: oklch(0.52 0.13 165);
+  --c-tag-teal: oklch(0.52 0.13 195);
+  --c-tag-cyan: oklch(0.52 0.13 225);
+  --c-tag-indigo: oklch(0.52 0.13 265);
+  --c-tag-violet: oklch(0.52 0.13 295);
+  --c-tag-rose: oklch(0.52 0.13 15);
+  --c-tag-amber: oklch(0.55 0.14 65);
+  --c-tag-slate: oklch(0.45 0.02 250);
+
   /* Skeleton placeholder: a soft gray tint with a white sweeping sheen so the
      shimmer reads clearly against the light glass panels. */
   --skeleton-base: rgba(15, 23, 42, 0.1);
@@ -233,6 +246,17 @@
   --c-accent: oklch(0.87 0.16 170);
   --c-accent-soft: oklch(0.87 0.16 170 / 0.16);
   --c-accent-rgb: 85, 242, 194;
+
+  /* Tag palette, lifted for the dark glass: same hues, inverted lightness so
+     the chip's text carries the color and its fill stays a whisper. */
+  --c-tag-mint: oklch(0.85 0.13 165);
+  --c-tag-teal: oklch(0.85 0.13 195);
+  --c-tag-cyan: oklch(0.85 0.13 225);
+  --c-tag-indigo: oklch(0.82 0.13 265);
+  --c-tag-violet: oklch(0.82 0.13 295);
+  --c-tag-rose: oklch(0.82 0.13 15);
+  --c-tag-amber: oklch(0.85 0.14 75);
+  --c-tag-slate: oklch(0.75 0.02 250);
 
   /* Skeleton placeholder: a light slate tint with a brighter sweeping sheen
      against the dark glass panels. */
@@ -656,6 +680,49 @@ body::after {
    components` class, not an `@utility`: Tailwind v4 silently drops any
    `@utility` containing descendant element selectors (`& p`, `& h1`, ...),
    the same way it drops raw `backdrop-filter` declarations. */
+/* Tag chip surface, replacing `glass-panel` on a Chip that carries a color.
+   Each `.tag-*` class only sets `--tag-color`; `.tag-chip` and `.tag-swatch`
+   derive everything from it, so adding a palette slot is one token plus one
+   one-line class. A plain `@layer components` class rather than an `@utility`
+   because the fill is mixed from a custom property — the same reason
+   `.markdown-body` below is one. */
+@layer components {
+  .tag-chip {
+    background-color: color-mix(in oklab, var(--tag-color) 14%, transparent);
+    border: 1px solid color-mix(in oklab, var(--tag-color) 32%, transparent);
+    color: var(--tag-color);
+  }
+
+  .tag-swatch {
+    background-color: var(--tag-color);
+  }
+
+  .tag-mint {
+    --tag-color: var(--c-tag-mint);
+  }
+  .tag-teal {
+    --tag-color: var(--c-tag-teal);
+  }
+  .tag-cyan {
+    --tag-color: var(--c-tag-cyan);
+  }
+  .tag-indigo {
+    --tag-color: var(--c-tag-indigo);
+  }
+  .tag-violet {
+    --tag-color: var(--c-tag-violet);
+  }
+  .tag-rose {
+    --tag-color: var(--c-tag-rose);
+  }
+  .tag-amber {
+    --tag-color: var(--c-tag-amber);
+  }
+  .tag-slate {
+    --tag-color: var(--c-tag-slate);
+  }
+}
+
 @layer components {
   .markdown-body {
     & > :first-child {

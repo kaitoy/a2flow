@@ -5,7 +5,7 @@ import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
 import type { z } from "zod";
 import type {
   AgentSkillCreate,
-  AgentSkill as AgentSkillModel,
+  AgentSkillRead as AgentSkillModel,
   AgentSkillUpdate,
   ApiError,
   ApiMeta,
@@ -21,7 +21,7 @@ import type {
   McpRegistrySearchResult,
   McpRegistryServerEntry,
   McpServerCreate,
-  McpServer as McpServerModel,
+  McpServerRead as McpServerModel,
   McpServerUpdate,
   McpToolInfo,
   McpTransport,
@@ -34,6 +34,10 @@ import type {
   SecretUpdate,
   Session as SessionModel,
   SkillSyncStatus,
+  TagColor,
+  TagCreate,
+  Tag as TagModel,
+  TagUpdate,
   TenantCreate,
   Tenant as TenantModel,
   TenantUpdate,
@@ -45,7 +49,7 @@ import type {
   UserRead as UserReadModel,
   UserUpdate,
   WorkflowExecution as WorkflowExecutionModel,
-  Workflow as WorkflowModel,
+  WorkflowRead as WorkflowModel,
   WorkflowStatus,
   WorkflowTaskCreate,
   WorkflowTaskRead as WorkflowTaskModel,
@@ -60,6 +64,7 @@ import {
   zCreateAgentSkillApiV1AgentSkillsPostResponse,
   zCreateMcpServerApiV1McpServersPostResponse,
   zCreateSecretApiV1SecretsPostResponse,
+  zCreateTagApiV1TagsPostResponse,
   zCreateTenantApiV1TenantsPostResponse,
   zCreateUserApiV1UsersPostResponse,
   zCreateUserGroupApiV1UserGroupsPostResponse,
@@ -71,6 +76,7 @@ import {
   zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse,
   zDeleteSecretApiV1SecretsSecretIdDeleteResponse,
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
+  zDeleteTagApiV1TagsTagIdDeleteResponse,
   zDeleteTenantApiV1TenantsTenantIdDeleteResponse,
   zDeleteUserApiV1UsersUserIdDeleteResponse,
   zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse,
@@ -90,6 +96,7 @@ import {
   zGetSecretApiV1SecretsSecretIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
+  zGetTagApiV1TagsTagIdGetResponse,
   zGetTenantApiV1TenantsTenantIdGetResponse,
   zGetUserApiV1UsersUserIdGetResponse,
   zGetUserGroupApiV1UserGroupsGroupIdGetResponse,
@@ -107,6 +114,7 @@ import {
   zListSecretKeysApiV1SecretsSecretIdKeysGetResponse,
   zListSecretsApiV1SecretsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
+  zListTagsApiV1TagsGetResponse,
   zListTenantsApiV1TenantsGetResponse,
   zListUserGroupsApiV1UserGroupsGetResponse,
   zListUsersApiV1UsersGetResponse,
@@ -123,13 +131,18 @@ import {
   zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
   zResolveUserNamesApiV1UsersResolveNamesPostResponse,
   zSearchMcpRegistryApiV1McpRegistryGetResponse,
+  zSetAgentSkillTagsApiV1AgentSkillsSkillIdTagsPutResponse,
+  zSetMcpServerTagsApiV1McpServersServerIdTagsPutResponse,
+  zSetSecretTagsApiV1SecretsSecretIdTagsPutResponse,
   zSetUserGroupsApiV1UsersUserIdGroupsPutResponse,
+  zSetWorkflowTagsApiV1WorkflowsWorkflowIdTagsPutResponse,
   zStartImpersonationApiV1AuthImpersonatePostResponse,
   zStopImpersonationApiV1AuthImpersonateDeleteResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
   zUpdateNotificationApiV1NotificationsNotificationIdPatchResponse,
   zUpdateSecretApiV1SecretsSecretIdPatchResponse,
+  zUpdateTagApiV1TagsTagIdPatchResponse,
   zUpdateTenantApiV1TenantsTenantIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
   zUpdateUserGroupApiV1UserGroupsGroupIdPatchResponse,
@@ -406,6 +419,7 @@ export type Approval = WithAudit<ApprovalModel>;
 export type McpServer = WithAudit<McpServerModel>;
 export type Notification = WithAudit<NotificationModel>;
 export type Secret = WithAudit<SecretModel>;
+export type Tag = WithAudit<TagModel>;
 export type Tenant = WithAudit<TenantModel>;
 export type User = WithAudit<UserReadModel>;
 export type UserGroup = WithAudit<UserGroupModel>;
@@ -436,6 +450,9 @@ export type {
   SecretType,
   SecretUpdate,
   SkillSyncStatus,
+  TagColor,
+  TagCreate,
+  TagUpdate,
   TenantCreate,
   TenantUpdate,
   ToolBinding,
@@ -480,6 +497,13 @@ export interface ListQuery {
   sort?: SortSpec | null;
   /** Filter directives, combined with AND. */
   filters?: FilterSpec[];
+  /**
+   * Tag ids a record must carry. A record must carry every id listed, so
+   * adding one narrows the result. Serialized as a repeated `tag` parameter,
+   * separate from `filters`: tags are not a column of any resource, so the
+   * `field:op:value` grammar cannot express them.
+   */
+  tagIds?: string[];
 }
 
 /**
@@ -494,10 +518,12 @@ function listConfig({
   offset = 0,
   sort = null,
   filters = [],
+  tagIds = [],
 }: ListQuery = {}): Pick<AxiosRequestConfig, "params" | "paramsSerializer"> {
   const params: Record<string, unknown> = { limit, offset };
   if (sort) params.s = `${sort.descending ? "-" : ""}${sort.field}`;
   if (filters.length > 0) params.q = filters.map((f) => `${f.field}:${f.op}:${f.value}`);
+  if (tagIds.length > 0) params.tag = tagIds;
   return { params, paramsSerializer: { indexes: null } };
 }
 
@@ -764,6 +790,88 @@ export async function deleteSecret(id: string): Promise<void> {
     apiClient.delete(`/api/v1/secrets/${encodeURIComponent(id)}`),
     zDeleteSecretApiV1SecretsSecretIdDeleteResponse
   );
+}
+
+/** List tags with optional pagination, sort, and filters. */
+export async function listTags(query: ListQuery = {}): Promise<Tag[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/tags", listConfig(query)),
+    zListTagsApiV1TagsGetResponse
+  ) as Promise<Tag[]>;
+}
+
+/** Fetch a single tag by ID. */
+export async function getTag(id: string, config?: AxiosRequestConfig): Promise<Tag> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/tags/${encodeURIComponent(id)}`, config),
+    zGetTagApiV1TagsTagIdGetResponse
+  ) as Promise<Tag>;
+}
+
+/** Register a new tag. Requires the `admin` or `developer` role. */
+export async function createTag(body: TagCreate): Promise<Tag> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/tags", body),
+    zCreateTagApiV1TagsPostResponse
+  ) as Promise<Tag>;
+}
+
+/**
+ * Apply a partial update to a tag.
+ *
+ * Renaming is safe at any time: records reference a tag by id, so every record
+ * carrying it picks up the new name.
+ */
+export async function updateTag(id: string, body: TagUpdate): Promise<Tag> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/tags/${encodeURIComponent(id)}`, body),
+    zUpdateTagApiV1TagsTagIdPatchResponse
+  ) as Promise<Tag>;
+}
+
+/** Delete a tag, detaching it from every record that carried it. */
+export async function deleteTag(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/tags/${encodeURIComponent(id)}`),
+    zDeleteTagApiV1TagsTagIdDeleteResponse
+  );
+}
+
+/**
+ * Replace a secret's tags wholesale. An empty array detaches every tag.
+ *
+ * Tags are a sub-resource rather than a field of the secret payload, so
+ * creating a tagged record is a create followed by this call.
+ */
+export async function setSecretTags(id: string, tagIds: string[]): Promise<Secret> {
+  return fetchEnvelope(
+    apiClient.put(`/api/v1/secrets/${encodeURIComponent(id)}/tags`, { tagIds }),
+    zSetSecretTagsApiV1SecretsSecretIdTagsPutResponse
+  ) as Promise<Secret>;
+}
+
+/** Replace a workflow's tags wholesale. An empty array detaches every tag. */
+export async function setWorkflowTags(id: string, tagIds: string[]): Promise<Workflow> {
+  return fetchEnvelope(
+    apiClient.put(`/api/v1/workflows/${encodeURIComponent(id)}/tags`, { tagIds }),
+    zSetWorkflowTagsApiV1WorkflowsWorkflowIdTagsPutResponse
+  ) as Promise<Workflow>;
+}
+
+/** Replace an MCP server's tags wholesale. An empty array detaches every tag. */
+export async function setMcpServerTags(id: string, tagIds: string[]): Promise<McpServer> {
+  return fetchEnvelope(
+    apiClient.put(`/api/v1/mcp-servers/${encodeURIComponent(id)}/tags`, { tagIds }),
+    zSetMcpServerTagsApiV1McpServersServerIdTagsPutResponse
+  ) as Promise<McpServer>;
+}
+
+/** Replace an agent skill's tags wholesale. An empty array detaches every tag. */
+export async function setAgentSkillTags(id: string, tagIds: string[]): Promise<AgentSkill> {
+  return fetchEnvelope(
+    apiClient.put(`/api/v1/agent-skills/${encodeURIComponent(id)}/tags`, { tagIds }),
+    zSetAgentSkillTagsApiV1AgentSkillsSkillIdTagsPutResponse
+  ) as Promise<AgentSkill>;
 }
 
 /** List tenants with optional pagination, sort, and filters. */

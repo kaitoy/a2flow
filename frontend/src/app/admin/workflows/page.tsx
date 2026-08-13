@@ -12,12 +12,14 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tagsColumn } from "@/components/admin/tag-columns";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTags } from "@/hooks/useTags";
 import {
   deleteWorkflow,
   executeWorkflow,
@@ -177,8 +179,11 @@ export default function WorkflowsPage() {
     setOffset,
     setSort,
     setFilters,
+    tagIds,
+    setTagIds,
     reload,
   } = useTableQuery<Workflow>(listWorkflows, { limit: LIMIT });
+  const { byId: tagsById } = useTags();
   const [skillMap, setSkillMap] = useState<Map<string, string>>(new Map());
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [runTarget, setRunTarget] = useState<{ id: string; name: string } | null>(null);
@@ -245,10 +250,13 @@ export default function WorkflowsPage() {
     router.push(`/workflows/${encodeURIComponent(id)}/design-session`);
   }
 
-  const columns = buildColumns(skillMap, handleRun, runningId, handleDelete, handleOpenDesign, {
-    canRun,
-    canEdit,
-  });
+  const columns = [
+    ...buildColumns(skillMap, handleRun, runningId, handleDelete, handleOpenDesign, {
+      canRun,
+      canEdit,
+    }),
+    tagsColumn<Workflow>((w) => w.tagIds, tagsById),
+  ];
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflows",
     columns
@@ -283,6 +291,8 @@ export default function WorkflowsPage() {
         onSortChange={setSort}
         filters={filters}
         onFilterChange={setFilters}
+        tagIds={tagIds}
+        onTagIdsChange={setTagIds}
       />
       <PaginationControls
         offset={offset}

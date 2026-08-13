@@ -6,6 +6,7 @@ import {
   ListChecks,
   type LucideIcon,
   Server,
+  Tags,
   Users,
   UsersRound,
   Wand2,
@@ -84,6 +85,13 @@ export const adminNavItems: AdminNavItem[] = [
     icon: KeyRound,
     description: "Store credentials for tools and repos",
     roles: [Role.ADMIN],
+  },
+  {
+    href: "/admin/tags",
+    label: "Tags",
+    icon: Tags,
+    description: "Curate the labels records are classified by",
+    roles: [Role.ADMIN, Role.DEVELOPER],
   },
   {
     href: "/admin/workflows",

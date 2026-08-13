@@ -77,4 +77,19 @@ describe("CheckboxGroup", () => {
     expect(screen.getByText("Nothing here.")).toBeInTheDocument();
     expect(container.firstElementChild?.className).not.toContain("glass-panel");
   });
+
+  it("draws a decorative swatch before an option's label", () => {
+    render(
+      <CheckboxGroup
+        options={[{ value: "t1", label: "production", swatch: "rose" }]}
+        value={[]}
+        onChange={vi.fn()}
+      />
+    );
+    const swatch = document.querySelector(".tag-swatch");
+    expect(swatch).toHaveClass("tag-rose");
+    // Decorative only — the label stays the option's accessible name.
+    expect(swatch).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("checkbox", { name: "production" })).toBeInTheDocument();
+  });
 });

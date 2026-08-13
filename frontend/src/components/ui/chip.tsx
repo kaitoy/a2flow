@@ -3,12 +3,20 @@
 
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import type { TagColor } from "@/lib/api";
+import { TAG_COLOR_CLASS } from "@/lib/tag-palette";
 import { Tooltip } from "./tooltip";
 
 /** Props for {@link Chip}. */
 interface ChipProps {
   /** Text shown in the chip; clipped to one line and revealed in full on hover. */
   label: string;
+  /**
+   * Palette slot to tint the chip with. Omit for the neutral `glass-panel`
+   * chip every non-tag caller uses; pass a slot to render a tag, which draws
+   * its fill, border, and text from that slot's hue instead.
+   */
+  color?: TagColor;
   /** Called when the pointer enters the chip. */
   onMouseEnter?: () => void;
   /** Called when the pointer leaves the chip. */
@@ -92,9 +100,15 @@ const REMOVE_BUTTON_CLASS = [
  * sized and styled as a real icon button (see {@link REMOVE_BUTTON_CLASS}), so
  * a chip carrying one stands 4px taller than a plain reference chip.
  */
-export function Chip({ label, onMouseEnter, onMouseLeave, onRemove }: ChipProps) {
+export function Chip({ label, color, onMouseEnter, onMouseLeave, onRemove }: ChipProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const [overflowing, setOverflowing] = useState(false);
+  // A colored chip swaps the neutral glass surface for the slot's tint rather
+  // than layering one over the other: stacking a translucent hue on translucent
+  // glass muddies the color differently on every background it floats over.
+  const surface = color
+    ? `tag-chip ${TAG_COLOR_CLASS[color]}`
+    : "glass-panel text-on-surface-variant";
 
   useEffect(() => {
     const el = ref.current;
@@ -111,7 +125,7 @@ export function Chip({ label, onMouseEnter, onMouseLeave, onRemove }: ChipProps)
     <span
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className="inline-flex max-w-64 items-center rounded-md glass-panel px-2 py-0.5 font-mono text-xs text-on-surface-variant"
+      className={`inline-flex max-w-64 items-center rounded-md px-2 py-0.5 font-mono text-xs ${surface}`}
     >
       <Tooltip label={label} disabled={!overflowing}>
         <span ref={ref} className="min-w-0 truncate">

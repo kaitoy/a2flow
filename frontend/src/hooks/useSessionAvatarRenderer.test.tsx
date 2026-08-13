@@ -1,6 +1,7 @@
 import { A2UIActivityType } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { A2UI_SOURCE_TOOL_CALL_ID_KEY } from "@/lib/agentActivity";
 import type { User } from "@/lib/api";
@@ -62,30 +63,46 @@ function userMessage(id: string): Message {
   return { id, role: "user", content: "hi" } as Message;
 }
 
+/**
+ * Render whatever the hook's callback returned.
+ *
+ * The callback's return type is `ReactNode`, which admits `null` (what it
+ * yields for a message carrying no avatar) and `undefined`; Testing Library's
+ * `render` accepts only an element. The node therefore goes through a
+ * pass-through component rather than a fragment (which Biome flags as useless)
+ * or a wrapper element (which would show up in `container` and break the
+ * empty-DOM assertion below).
+ */
+function Rendered({ node }: { node: ReactNode }) {
+  return node;
+}
+
 describe("useSessionAvatarRenderer", () => {
   it("labels the agent's own messages with the agent label", () => {
     const renderAvatar = renderer();
-    render(renderAvatar({ id: "m1", role: "assistant", content: "hello" } as Message));
+    render(
+      <Rendered node={renderAvatar({ id: "m1", role: "assistant", content: "hello" } as Message)} />
+    );
     expect(screen.getByTestId("agent-avatar")).toBeInTheDocument();
     expect(screen.getByTestId("tooltip")).toHaveAttribute("data-label", "my-workflow");
   });
 
   it("resolves an attributed user message to its recorded sender", () => {
     const renderAvatar = renderer({ messageSenders: new Map([["m1", OTHER.id]]) });
-    render(renderAvatar(userMessage("m1")));
+    render(<Rendered node={renderAvatar(userMessage("m1"))} />);
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", OTHER.id);
     expect(screen.getByTestId("tooltip")).toHaveAttribute("data-label", "Dana Developer");
   });
 
   it("attributes a message this viewer just sent to the current user", () => {
     const renderAvatar = renderer({ locallySentMessageIds: new Set(["m1"]) });
-    render(renderAvatar(userMessage("m1")));
+    render(<Rendered node={renderAvatar(userMessage("m1"))} />);
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", VIEWER.id);
   });
 
   it("falls back to the session owner for unattributed history", () => {
     const renderAvatar = renderer();
-    render(renderAvatar(userMessage("m1")));
+    render(<Rendered node={renderAvatar(userMessage("m1"))} />);
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", OWNER.id);
   });
 
@@ -93,7 +110,7 @@ describe("useSessionAvatarRenderer", () => {
     const renderAvatar = renderer({
       messageSenders: new Map([["m1", "deleted-user"]]),
     });
-    render(renderAvatar(userMessage("m1")));
+    render(<Rendered node={renderAvatar(userMessage("m1"))} />);
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", "unresolved");
     expect(screen.getByTestId("tooltip")).toHaveAttribute("data-label", "Unknown sender");
   });
@@ -101,12 +118,14 @@ describe("useSessionAvatarRenderer", () => {
   it("resolves an A2UI surface by the tool call that produced it", () => {
     const renderAvatar = renderer({ messageSenders: new Map([["tc-1", OTHER.id]]) });
     render(
-      renderAvatar({
-        id: "m1",
-        role: "activity",
-        activityType: A2UIActivityType,
-        content: { [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
-      } as unknown as Message)
+      <Rendered
+        node={renderAvatar({
+          id: "m1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
+        } as unknown as Message)}
+      />
     );
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", OTHER.id);
   });
@@ -114,12 +133,14 @@ describe("useSessionAvatarRenderer", () => {
   it("shows no avatar on a surface nobody has acted on", () => {
     const renderAvatar = renderer();
     const { container } = render(
-      renderAvatar({
-        id: "m1",
-        role: "activity",
-        activityType: A2UIActivityType,
-        content: { [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
-      } as unknown as Message)
+      <Rendered
+        node={renderAvatar({
+          id: "m1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
+        } as unknown as Message)}
+      />
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -127,12 +148,14 @@ describe("useSessionAvatarRenderer", () => {
   it("resolves an approval control to whoever decided it", () => {
     const renderAvatar = renderer({ messageSenders: new Map([["tc-approve", OTHER.id]]) });
     render(
-      renderAvatar({
-        id: "tc-approve",
-        role: "activity",
-        activityType: APPROVAL_ACTIVITY_TYPE,
-        content: { approvalId: "ap-1" },
-      } as unknown as Message)
+      <Rendered
+        node={renderAvatar({
+          id: "tc-approve",
+          role: "activity",
+          activityType: APPROVAL_ACTIVITY_TYPE,
+          content: { approvalId: "ap-1" },
+        } as unknown as Message)}
+      />
     );
     expect(screen.getByTestId("avatar")).toHaveAttribute("data-user", OTHER.id);
   });

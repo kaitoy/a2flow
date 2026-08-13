@@ -277,7 +277,7 @@ Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/adm
 | Generate a workflow from a skill | "Generate workflow" in the list's Actions column, or the Generate Workflow icon button in the detail page's header (see [Generating a workflow](#generating-a-workflow)) |
 | Pull a skill's repository | `POST /api/v1/agent-skills/{id}/pull` |
 
-Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, an optional **Ref** (a branch or tag name), and description.
+Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, an optional **Ref** (a branch or tag name), and description, plus any [tags](#tags) it is classified by.
 
 #### The skill store
 
@@ -312,7 +312,7 @@ Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admi
 | Register a new server | `GET /admin/mcp-servers/new` |
 | A server's detail page — edit / delete | `GET /admin/mcp-servers/{id}` |
 
-Each record stores a unique name plus a **transport**, which decides the rest of the form:
+Each record stores a unique name, any [tags](#tags) it is classified by, and a **transport**, which decides the rest of the form:
 
 | Transport | Fields | Notes |
 |---|---|---|
@@ -335,7 +335,7 @@ The list page's **Browse registry** button opens a search dialog backed by the o
 
 Navigate to [http://localhost:3000/admin/secrets](http://localhost:3000/admin/secrets) to manage named credentials used for authentication elsewhere in the app.
 
-A secret is a **named bundle of key/value entries**, the same shape [HashiCorp Vault's KV engine](https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2) uses: one path holds a map of keys to values. Credentials that belong together — an AWS access key id and its secret access key, say — live in one secret as two entries rather than in two separate secrets.
+A secret is a **named bundle of key/value entries**, the same shape [HashiCorp Vault's KV engine](https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2) uses: one path holds a map of keys to values. Like the other registries, a secret can carry [tags](#tags). Credentials that belong together — an AWS access key id and its secret access key, say — live in one secret as two entries rather than in two separate secrets.
 
 A single entry is referenced as `name/key`:
 
@@ -373,6 +373,24 @@ The Fernet key for local secrets is resolved at first use with the following pre
 
 A single global Vault connection is configured through env vars (see `backend/.env.example`): `VAULT_ADDR` selects the server, and either a static `VAULT_TOKEN` or **AppRole** credentials (`VAULT_ROLE_ID` + `VAULT_SECRET_ID`, login mount configurable via `VAULT_APPROLE_MOUNT`, default `approle`) authenticate. AppRole takes precedence when both are set; its client token is cached and refreshed automatically when its lease expires. Only the KV v2 secrets engine is supported. When Vault is not configured, `vault`-type secrets fail to resolve with `SECRET_RESOLUTION_FAILED`.
 
+### Tags
+
+Navigate to [http://localhost:3000/admin/tags](http://localhost:3000/admin/tags) to curate the tenant's **tags** — the labels [secrets](#secrets), [MCP servers](#mcp-servers), [agent skills](#agent-skills), and [workflows](#workflows) are classified by. One tag set is shared by all four, so a `aws` tag narrows secrets and MCP servers alike.
+
+| Operation | Path |
+|-----------|------|
+| List all tags | `GET /admin/tags` |
+| Create a new tag | `GET /admin/tags/new` |
+| A tag's detail page — rename / recolor / delete | `GET /admin/tags/{id}` |
+
+Each tag stores a **name** (unique within its tenant) and a **color** picked from a fixed eight-slot palette (see [DESIGN.md](DESIGN.md#colors)) — an arbitrary color value is rejected. Writes require `admin` **or** `developer`: secrets are administered by the former and the other three resources by the latter, so gating on either alone would leave half the taggable resources unable to mint a label. Reads stay open like every other section.
+
+**Renaming is safe at any time.** Records reference a tag by its id, never its name, so every record carrying it follows the new name with nothing to re-sync — which is the whole reason tags are registered up front instead of typed free-form on each record. **Deleting** a tag, conversely, removes it from every record that carried it rather than being blocked by them; the confirmation says so.
+
+**Attaching tags.** Each taggable resource's create and detail form carries a **Tags** picker: the current selection shows as removable colored chips above a checkbox list of the tenant's vocabulary (with a filter box once there are more than 12). Attachment is a sub-resource of the record — `PUT /api/v1/{resource}/{id}/tags` with `{"tagIds": [...]}`, replacing the set wholesale — gated by that resource's own write role, so a `developer` can tag an MCP server but not a secret. Creating a tagged record is therefore a create followed by that call; editing writes it only when the selection actually changed.
+
+**Filtering by tag.** Every taggable list has a **Tags** column showing each record's chips, and its column header menu offers a multi-select. The selection is **conjunctive** — a record must carry *every* tag picked, so adding one narrows the result — which the menu states as "Filter (all of)". It is applied server-side through a repeatable `?tag=<id>` query parameter (see [.claude/rules/api-conventions.md](.claude/rules/api-conventions.md)), so it covers the whole dataset rather than the current page. Tags are a separate axis from the other column filters: hiding the Tags column through the column picker clears the tag filter, exactly as hiding any other column clears its own.
+
 ### Workflows
 
 Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/workflows) to manage Workflows — reusable units of work that pair an Agent Skill with a **pre-designed task list** (the workflow's *task templates*). A workflow's lifecycle is **generate → adjust → publish → execute**: the task templates are designed and settled *before* any run, so executing a workflow starts working immediately instead of redesigning them every time.
@@ -385,7 +403,7 @@ Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/
 | Manage its task templates | `GET /admin/workflows/{id}/task-templates` |
 | Run a workflow | "Run" button in the list (calls `POST /workflows/{id}/execute`) |
 
-Each workflow record stores a name, a reference to an Agent Skill, a lifecycle **status** (`generating` / `draft` / `failed` / `published` / `modified`), and two description fields: `generatedDescription` — **summarized from the design conversation** by the AI when the workflow is generated and again whenever a `developer` presses the field's **generate action**, editable directly only by a **Super Admin** — and `description`, a free-form field any `developer` can set to override it. Whichever is non-empty (`description` takes precedence, else `generatedDescription`) is handed to the execution agent as run context. Since the override is usually a hand-edit of the AI's summary, the Description field on the detail page carries a **diff action** opening a dialog with a word-level diff from `generatedDescription` to `description`; it reads the values currently in the form, so unsaved edits are diffed too. Workflows are persisted in `a2flow.db`; there is no bare `POST /workflows` — generation is the only way a workflow is born.
+Each workflow record stores a name, any [tags](#tags) it is classified by, a reference to an Agent Skill, a lifecycle **status** (`generating` / `draft` / `failed` / `published` / `modified`), and two description fields: `generatedDescription` — **summarized from the design conversation** by the AI when the workflow is generated and again whenever a `developer` presses the field's **generate action**, editable directly only by a **Super Admin** — and `description`, a free-form field any `developer` can set to override it. Whichever is non-empty (`description` takes precedence, else `generatedDescription`) is handed to the execution agent as run context. Since the override is usually a hand-edit of the AI's summary, the Description field on the detail page carries a **diff action** opening a dialog with a word-level diff from `generatedDescription` to `description`; it reads the values currently in the form, so unsaved edits are diffed too. Workflows are persisted in `a2flow.db`; there is no bare `POST /workflows` — generation is the only way a workflow is born.
 
 #### Generating a workflow
 

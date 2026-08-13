@@ -4,6 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { KeyRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -16,10 +17,11 @@ import {
   type SecretFormValues,
   toSecretBody,
 } from "@/components/admin/secret-fields";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { createSecret } from "@/lib/api";
+import { createSecret, setSecretTags } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -31,6 +33,10 @@ export default function NewSecretPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.ADMIN);
+
+  // Tags live outside the form state: the picker is a controlled
+  // multi-select rather than a registered input.
+  const [tagIds, setTagIds] = useState<string[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -49,7 +55,12 @@ export default function NewSecretPage() {
   async function onSubmit(values: SecretFormValues) {
     try {
       await save.run(async () => {
-        await createSecret(toSecretBody(values));
+        const created = await createSecret(toSecretBody(values));
+        // Tags are a sub-resource of the record, so they can only be
+        // written once it exists.
+        if (tagIds.length > 0) {
+          await setSecretTags(created.id, tagIds);
+        }
         dispatch(showToast({ message: "Secret created" }));
         router.push("/admin/secrets");
       });
@@ -92,6 +103,8 @@ export default function NewSecretPage() {
             type={type}
             showPlaceholders
           />
+
+          <TagPicker value={tagIds} onChange={setTagIds} />
 
           <div className="flex gap-2">
             <Button

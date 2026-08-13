@@ -37,7 +37,7 @@ from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
 from models.message_meta import MessageScope
 from models.user import Role, User, has_any_role
-from models.workflow import Workflow, WorkflowStatus, WorkflowUpdate
+from models.workflow import Workflow, WorkflowRead, WorkflowStatus, WorkflowUpdate
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionCreate
 from models.workflow_published_version import (
     WorkflowPublishedVersionTemplate,
@@ -113,6 +113,34 @@ def _topo_order(
         seen = set(order)
         ordered.extend(t for t in templates if t.id not in seen)
     return ordered
+
+
+#: Alias for ``list[WorkflowRead]``: the ``list`` method below shadows the
+#: builtin inside the service class body.
+_ReadList = list[WorkflowRead]
+
+
+async def build_workflow_read(
+    workflows: WorkflowRepository, workflow: Workflow
+) -> WorkflowRead:
+    """Project one Workflow into its API read view, attaching its tags.
+
+    A module-level function rather than a method because two services return
+    workflows to the API — this one and
+    :class:`services.workflow_design.WorkflowDesignService`, which owns publish,
+    deactivate, and the description regeneration — and both need the identical
+    projection.
+
+    Args:
+        workflows: Repository used to read the workflow's tag attachments.
+        workflow: The persisted workflow to project.
+
+    Returns:
+        The read view, with tag ids attached.
+    """
+    return WorkflowRead.from_workflow(
+        workflow, tag_ids=await workflows.tag_ids_for(workflow.id)
+    )
 
 
 class WorkflowService:
@@ -425,6 +453,7 @@ class WorkflowService:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> list[Workflow]:
         """Return a page of Workflow records.
 
@@ -433,13 +462,57 @@ class WorkflowService:
             offset: Number of records to skip.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
+            tag_ids: Narrows the page to workflows carrying every listed tag.
 
         Returns:
             The requested page of workflows.
         """
         return await self._workflows.list(
-            limit=limit, offset=offset, sort=sort, filters=filters
+            limit=limit, offset=offset, sort=sort, filters=filters, tag_ids=tag_ids
         )
+
+    async def to_read(self, workflow: Workflow) -> WorkflowRead:
+        """Project one Workflow into its API read view, attaching its tags.
+
+        Args:
+            workflow: The persisted workflow to project.
+
+        Returns:
+            The read view, with tag ids attached.
+        """
+        return await build_workflow_read(self._workflows, workflow)
+
+    async def to_read_many(self, workflows: Sequence[Workflow]) -> _ReadList:
+        """Project a page of Workflows into read views, reading their tags in one query.
+
+        Args:
+            workflows: The persisted records to project.
+
+        Returns:
+            The read views, in the order they were given.
+        """
+        by_id = await self._workflows.tag_ids_for_many([x.id for x in workflows])
+        return [
+            WorkflowRead.from_workflow(x, tag_ids=by_id.get(x.id, []))
+            for x in workflows
+        ]
+
+    async def set_tags(self, workflow_id: str, tag_ids: Sequence[str]) -> Workflow:
+        """Replace a Workflow's tag attachments wholesale.
+
+        Args:
+            workflow_id: Identifier of the workflow to retag.
+            tag_ids: Ids of the tags it should carry.
+
+        Returns:
+            The workflow, unchanged apart from its attachments.
+
+        Raises:
+            NotFoundError: If no workflow exists with the given ID.
+            ForeignKeyViolationError: If any id does not name a tag of this
+                tenant.
+        """
+        return await self._workflows.set_tags(workflow_id, tag_ids)
 
     async def update(
         self, workflow_id: str, data: WorkflowUpdate, *, caller: User

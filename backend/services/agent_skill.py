@@ -11,12 +11,17 @@ from infrastructure.secret_resolver import split_secret_ref
 from models.agent_skill import (
     AgentSkill,
     AgentSkillCreate,
+    AgentSkillRead,
     AgentSkillUpdate,
     SkillSyncStatus,
 )
 from repositories import AgentSkillRepository, SecretRepository
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 from repositories.query import FilterSpec, SortSpec
+
+#: Alias for ``list[AgentSkillRead]``: the ``list`` method below shadows the
+#: builtin inside the service class body.
+_ReadList = list[AgentSkillRead]
 
 
 class AgentSkillService:
@@ -79,6 +84,7 @@ class AgentSkillService:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> list[AgentSkill]:
         """Return a page of AgentSkill records.
 
@@ -87,13 +93,58 @@ class AgentSkillService:
             offset: Number of records to skip.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
+            tag_ids: Narrows the page to skills carrying every listed tag.
 
         Returns:
             The requested page of skills.
         """
         return await self._repo.list(
-            limit=limit, offset=offset, sort=sort, filters=filters
+            limit=limit, offset=offset, sort=sort, filters=filters, tag_ids=tag_ids
         )
+
+    async def to_read(self, skill: AgentSkill) -> AgentSkillRead:
+        """Project one AgentSkill into its API read view, attaching its tags.
+
+        Args:
+            skill: The persisted skill to project.
+
+        Returns:
+            The read view, with tag ids attached.
+        """
+        return AgentSkillRead.from_skill(
+            skill, tag_ids=await self._repo.tag_ids_for(skill.id)
+        )
+
+    async def to_read_many(self, skills: Sequence[AgentSkill]) -> _ReadList:
+        """Project a page of AgentSkills into read views, reading their tags in one query.
+
+        Args:
+            skills: The persisted records to project.
+
+        Returns:
+            The read views, in the order they were given.
+        """
+        by_id = await self._repo.tag_ids_for_many([x.id for x in skills])
+        return [
+            AgentSkillRead.from_skill(x, tag_ids=by_id.get(x.id, [])) for x in skills
+        ]
+
+    async def set_tags(self, skill_id: str, tag_ids: Sequence[str]) -> AgentSkill:
+        """Replace a AgentSkill's tag attachments wholesale.
+
+        Args:
+            skill_id: Identifier of the skill to retag.
+            tag_ids: Ids of the tags it should carry.
+
+        Returns:
+            The skill, unchanged apart from its attachments.
+
+        Raises:
+            NotFoundError: If no skill exists with the given ID.
+            ForeignKeyViolationError: If any id does not name a tag of this
+                tenant.
+        """
+        return await self._repo.set_tags(skill_id, tag_ids)
 
     async def create(self, data: AgentSkillCreate, *, user_id: str) -> AgentSkill:
         """Create a new AgentSkill.

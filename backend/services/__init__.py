@@ -8,6 +8,7 @@ from .mcp_server import MCPServerService
 from .metrics import MetricsService, MetricsWindow
 from .notification import NotificationService
 from .secret import SecretService
+from .tag import TagService
 from .tenant import TenantService
 from .user import UserService
 from .user_avatar import UserAvatarService
@@ -31,6 +32,7 @@ __all__ = [
     "MetricsWindow",
     "NotificationService",
     "SecretService",
+    "TagService",
     "TenantService",
     "UserAvatarService",
     "UserGroupService",

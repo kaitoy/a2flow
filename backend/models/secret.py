@@ -203,13 +203,17 @@ class SecretRead(BaseEntity):
     keys: list[str] = []
     vault_mount: str | None = None
     vault_path: str | None = None
+    #: Ids of the tags attached to this secret, which live in
+    #: :class:`models.tag.SecretTag` rather than on the secret row.
+    tag_ids: list[str] = []
 
     @classmethod
-    def from_secret(cls, secret: Secret) -> "SecretRead":
+    def from_secret(cls, secret: Secret, *, tag_ids: list[str]) -> "SecretRead":
         """Build the read view of a stored secret, dropping every value.
 
         Args:
             secret: The persisted secret to project.
+            tag_ids: Ids of the tags attached to ``secret``.
 
         Returns:
             A read view carrying the sorted entry keys but no values.
@@ -217,4 +221,5 @@ class SecretRead(BaseEntity):
         return cls(
             **secret.model_dump(exclude={"entries"}),
             keys=sorted(secret.entries),
+            tag_ids=tag_ids,
         )

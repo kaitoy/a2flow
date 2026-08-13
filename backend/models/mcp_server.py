@@ -237,6 +237,43 @@ class MCPServer(MCPServerCreate, TenantScoped, BaseEntity, table=True):
     )
 
 
+class McpServerRead(BaseEntity):
+    """Read view of an MCPServer returned by the API, including its tags.
+
+    Mirrors every column of :class:`MCPServer` and adds ``tag_ids``, which lives
+    in :class:`models.tag.McpServerTag` rather than on the server row. The
+    mirroring is not cosmetic: this class is what
+    :meth:`repositories.mcp_server.SqlMCPServerRepository.list` passes as
+    ``readable=``, and a column missing here becomes unfilterable and
+    unsortable through the list API.
+    """
+
+    model_config = _alias_config
+    tenant_id: str
+    name: str
+    transport: McpTransport = McpTransport.streamable_http
+    url: str | None = None
+    headers: dict[str, str] = {}
+    command: McpCommand | None = None
+    args: list[str] = []
+    env: dict[str, str] = {}
+    #: Ids of the tags attached to this server.
+    tag_ids: list[str] = []
+
+    @classmethod
+    def from_server(cls, server: MCPServer, *, tag_ids: list[str]) -> "McpServerRead":
+        """Build the read view of a stored MCP server with its tags attached.
+
+        Args:
+            server: The persisted server to project.
+            tag_ids: Ids of the tags attached to ``server``.
+
+        Returns:
+            A read view carrying the server's columns plus its tags.
+        """
+        return cls(**server.model_dump(), tag_ids=tag_ids)
+
+
 class McpToolInfo(SQLModel):
     """A tool advertised by a registered MCP server.
 

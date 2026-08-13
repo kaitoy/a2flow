@@ -20,6 +20,7 @@ from services import (
     MetricsService,
     NotificationService,
     SecretService,
+    TagService,
     TenantService,
     UserAvatarService,
     UserGroupService,
@@ -44,6 +45,7 @@ from .repository import (
     MetricsRepositoryDep,
     NotificationRepositoryDep,
     SecretRepositoryDep,
+    TagRepositoryDep,
     TenantRepositoryDep,
     UserAvatarRepositoryDep,
     UserGroupRepositoryDep,
@@ -116,6 +118,14 @@ def get_secret_service(
 
 
 SecretServiceDep = Annotated[SecretService, Depends(get_secret_service)]
+
+
+def get_tag_service(repo: TagRepositoryDep) -> TagService:
+    """Create a TagService backed by the request's tenant-scoped repository."""
+    return TagService(repo)
+
+
+TagServiceDep = Annotated[TagService, Depends(get_tag_service)]
 
 
 def get_mcp_server_service(

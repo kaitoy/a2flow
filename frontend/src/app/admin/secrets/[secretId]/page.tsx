@@ -19,6 +19,7 @@ import {
   type SecretFormValues,
   toSecretBody,
 } from "@/components/admin/secret-fields";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -28,8 +29,10 @@ import {
   getSecret,
   isForbiddenError,
   SUPPRESS_FORBIDDEN_TOAST,
+  setSecretTags,
   updateSecret,
 } from "@/lib/api";
+import { sameIds } from "@/lib/ids";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -63,6 +66,12 @@ export default function SecretDetailPage() {
   // heading names the saved record rather than following every keystroke.
   const [name, setName] = useState("");
 
+  // Tags live outside the form state: the picker is a controlled
+  // multi-select rather than a registered input. `savedTagIds` is what the
+  // record carried when it loaded, so an untouched selection writes nothing.
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [savedTagIds, setSavedTagIds] = useState<string[]>([]);
+
   const save = useAsyncAction({ showDone: false });
   const {
     register,
@@ -83,6 +92,8 @@ export default function SecretDetailPage() {
     getSecret(secretId, SUPPRESS_FORBIDDEN_TOAST)
       .then((secret) => {
         setName(secret.name);
+        setTagIds(secret.tagIds ?? []);
+        setSavedTagIds(secret.tagIds ?? []);
         reset({
           name: secret.name,
           type: secret.type,
@@ -113,6 +124,11 @@ export default function SecretDetailPage() {
     try {
       await save.run(async () => {
         await updateSecret(secretId, toSecretBody(values));
+        // Tags are a separate sub-resource, so they are only written when
+        // the selection actually changed.
+        if (!sameIds(tagIds, savedTagIds)) {
+          await setSecretTags(secretId, tagIds);
+        }
         dispatch(showToast({ message: "Secret updated" }));
         router.push("/admin/secrets");
       });
@@ -179,6 +195,8 @@ export default function SecretDetailPage() {
           ) : (
             <SecretFields readOnly values={getValues()} />
           )}
+
+          <TagPicker value={tagIds} onChange={setTagIds} readOnly={!canEdit} />
 
           <div className="flex gap-2">
             {canEdit && (

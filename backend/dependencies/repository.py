@@ -30,6 +30,7 @@ from repositories import (
     SqlMetricsRepository,
     SqlNotificationRepository,
     SqlSecretRepository,
+    SqlTagRepository,
     SqlTenantRepository,
     SqlUserAvatarRepository,
     SqlUserGroupRepository,
@@ -39,6 +40,7 @@ from repositories import (
     SqlWorkflowRepository,
     SqlWorkflowTaskRepository,
     SqlWorkflowTaskTemplateRepository,
+    TagRepository,
     TenantRepository,
     UserAvatarRepository,
     UserGroupRepository,
@@ -119,6 +121,16 @@ def get_secret_repository(
 
 
 SecretRepositoryDep = Annotated[SecretRepository, Depends(get_secret_repository)]
+
+
+def get_tag_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> TagRepository:
+    """Create a TagRepository backed by the current database session."""
+    return SqlTagRepository(db, tenant_id=tenant_id)
+
+
+TagRepositoryDep = Annotated[TagRepository, Depends(get_tag_repository)]
 
 
 def get_tenant_repository(db: DBSessionDep) -> TenantRepository:

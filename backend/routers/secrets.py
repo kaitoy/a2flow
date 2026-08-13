@@ -20,10 +20,12 @@ from dependencies import (
     PaginationDep,
     SecretServiceDep,
     SortDep,
+    TagFilterDep,
     require_roles,
 )
 from models.response import ApiResponse
 from models.secret import SecretCreate, SecretRead, SecretUpdate
+from models.tag import TagIdsUpdate
 from models.user import Role
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
@@ -45,7 +47,7 @@ async def create_secret(
     meta: ApiMetaDep,
 ) -> ApiResponse[SecretRead]:
     secret = await service.create(body, user_id=user_id)
-    return ApiResponse(meta=meta, data=SecretRead.from_secret(secret))
+    return ApiResponse(meta=meta, data=await service.to_read(secret))
 
 
 @router.get("", response_model=ApiResponse[list[SecretRead]])
@@ -54,6 +56,7 @@ async def list_secrets(
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
+    tags: TagFilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[SecretRead]]:
     items = await service.list(
@@ -61,8 +64,9 @@ async def list_secrets(
         offset=pagination.offset,
         sort=sort.sort,
         filters=filters.filters,
+        tag_ids=tags.tag_ids,
     )
-    return ApiResponse(meta=meta, data=[SecretRead.from_secret(s) for s in items])
+    return ApiResponse(meta=meta, data=await service.to_read_many(items))
 
 
 @router.get("/{secret_id}", response_model=ApiResponse[SecretRead])
@@ -72,7 +76,7 @@ async def get_secret(
     meta: ApiMetaDep,
 ) -> ApiResponse[SecretRead]:
     secret = await service.get(secret_id)
-    return ApiResponse(meta=meta, data=SecretRead.from_secret(secret))
+    return ApiResponse(meta=meta, data=await service.to_read(secret))
 
 
 @router.get("/{secret_id}/keys", response_model=ApiResponse[list[str]])
@@ -98,7 +102,22 @@ async def update_secret(
     meta: ApiMetaDep,
 ) -> ApiResponse[SecretRead]:
     secret = await service.update(secret_id, body, user_id=user_id)
-    return ApiResponse(meta=meta, data=SecretRead.from_secret(secret))
+    return ApiResponse(meta=meta, data=await service.to_read(secret))
+
+
+@router.put(
+    "/{secret_id}/tags",
+    response_model=ApiResponse[SecretRead],
+    dependencies=_requires_admin,
+)
+async def set_secret_tags(
+    secret_id: str,
+    body: TagIdsUpdate,
+    service: SecretServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[SecretRead]:
+    secret = await service.set_tags(secret_id, body.tag_ids)
+    return ApiResponse(meta=meta, data=await service.to_read(secret))
 
 
 @router.delete(

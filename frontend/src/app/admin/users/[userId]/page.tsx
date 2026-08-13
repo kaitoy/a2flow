@@ -50,6 +50,7 @@ import {
   type UserUpdate,
   updateUser,
 } from "@/lib/api";
+import { sameIds } from "@/lib/ids";
 import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
 import { EMPTY_VALUE, formatFlag } from "@/lib/read-only-display";
 import { Role, useHasRole } from "@/lib/roles";
@@ -70,11 +71,6 @@ const schema = zUserCreate.omit({ username: true, password: true }).extend({
 });
 
 type FormValues = z.infer<typeof schema>;
-
-/** Whether two id selections hold the same members, ignoring order. */
-function sameIds(a: string[], b: string[]): boolean {
-  return a.length === b.length && [...a].sort().join() === [...b].sort().join();
-}
 
 /**
  * Detail page of a user account: avatar, profile fields, roles, and flags. The

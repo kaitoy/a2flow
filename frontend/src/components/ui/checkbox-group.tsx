@@ -1,4 +1,6 @@
 import type React from "react";
+import type { TagColor } from "@/lib/api";
+import { TAG_COLOR_CLASS } from "@/lib/tag-palette";
 
 /** A single selectable option in a {@link CheckboxGroup}. */
 export interface CheckboxOption {
@@ -6,6 +8,12 @@ export interface CheckboxOption {
   value: string;
   /** Human-readable label shown next to the checkbox. */
   label: string;
+  /**
+   * Palette slot drawn as a small dot before the label. Purely decorative — the
+   * label stays the option's accessible name — so a group of tags reads as the
+   * same colors the chips elsewhere on the page use.
+   */
+  swatch?: TagColor;
   /**
    * When true the checkbox cannot be toggled; its current checked state is kept
    * (used for selections the viewer may see but not change, e.g. a role only a
@@ -119,7 +127,13 @@ export function CheckboxGroup({
               toggle(option.value, e.target.checked)
             }
           />
-          <span>{option.label}</span>
+          {option.swatch && (
+            <span
+              aria-hidden="true"
+              className={`size-2.5 shrink-0 rounded-full tag-swatch ${TAG_COLOR_CLASS[option.swatch]}`}
+            />
+          )}
+          <span className="min-w-0 truncate">{option.label}</span>
         </label>
       ))}
     </div>

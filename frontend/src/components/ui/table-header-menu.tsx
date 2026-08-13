@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
 import { useMotionConfig } from "@/lib/motion";
+import { CheckboxGroup, type CheckboxOption } from "./checkbox-group";
 import { Input } from "./input";
 import { Select } from "./select";
 
@@ -32,6 +33,22 @@ interface TableHeaderMenuProps {
   onFilterChange?: (value: string) => void;
   /** When provided, the filter section renders a select of these options instead of a free-text input. */
   filterOptions?: FilterOption[];
+  /**
+   * Currently selected values for the multi-select filter variant. Supply this
+   * (with {@link TableHeaderMenuProps.onFilterValuesChange} and
+   * {@link TableHeaderMenuProps.filterOptions}) instead of
+   * {@link TableHeaderMenuProps.filterValue} to let the user pick several
+   * values at once. The variants are mutually exclusive.
+   */
+  filterValues?: string[];
+  /** Called with the next selection for the multi-select variant. Present iff {@link TableHeaderMenuProps.filterValues} is. */
+  onFilterValuesChange?: (next: string[]) => void;
+  /**
+   * Options for the multi-select variant, carrying an optional decorative
+   * swatch. Kept separate from {@link TableHeaderMenuProps.filterOptions} so
+   * the single-select variant's shape is unchanged.
+   */
+  filterCheckboxOptions?: CheckboxOption[];
 }
 
 const PANEL_WIDTH = 220;
@@ -72,6 +89,9 @@ export function TableHeaderMenu({
   filterValue,
   onFilterChange,
   filterOptions,
+  filterValues,
+  onFilterValuesChange,
+  filterCheckboxOptions,
 }: TableHeaderMenuProps) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,8 +104,9 @@ export function TableHeaderMenu({
   const panelId = `table-header-menu-${useId()}`;
 
   const sortable = sortDirection !== undefined && !!onSortChange;
-  const filterable = filterValue !== undefined && !!onFilterChange;
-  const filterActive = (filterValue ?? "") !== "";
+  const multi = filterValues !== undefined && !!onFilterValuesChange;
+  const filterable = (filterValue !== undefined && !!onFilterChange) || multi;
+  const filterActive = (filterValue ?? "") !== "" || (filterValues?.length ?? 0) > 0;
 
   // Keep the draft in sync when the applied value changes from outside.
   useEffect(() => {
@@ -247,9 +268,22 @@ export function TableHeaderMenu({
                   {filterable ? (
                     <div>
                       <div className="px-3 pt-1 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant">
-                        Filter
+                        {/* The multi-select variant is conjunctive, which is
+                            not the reading people default to — say so rather
+                            than let a narrowing selection look broken. */}
+                        {multi ? "Filter (all of)" : "Filter"}
                       </div>
-                      {filterOptions ? (
+                      {multi ? (
+                        <div className="max-h-64 overflow-y-auto">
+                          <CheckboxGroup
+                            flush
+                            options={filterCheckboxOptions ?? []}
+                            value={filterValues ?? []}
+                            onChange={(next) => onFilterValuesChange?.(next)}
+                            emptyMessage="Nothing to filter by yet."
+                          />
+                        </div>
+                      ) : filterOptions ? (
                         <Select
                           aria-label={`Filter ${label}`}
                           value={filterValue ?? ""}

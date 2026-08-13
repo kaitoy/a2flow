@@ -36,7 +36,13 @@ from infrastructure.summarizer import (
     summarize_design_transcript,
 )
 from models.notification import NotificationCreate, NotificationType
-from models.workflow import Workflow, WorkflowCreate, WorkflowStatus, WorkflowUpdate
+from models.workflow import (
+    Workflow,
+    WorkflowCreate,
+    WorkflowRead,
+    WorkflowStatus,
+    WorkflowUpdate,
+)
 from models.workflow_published_version import dump_templates, snapshot_template
 from repositories import (
     MAX_TASK_TEMPLATES,
@@ -52,6 +58,7 @@ from repositories.exceptions import (
     WorkflowDescriptionNotGeneratableError,
     WorkflowNotRunnableError,
 )
+from services.workflow import build_workflow_read
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +213,21 @@ class WorkflowDesignService:
         if created is None:  # pragma: no cover - just created above
             raise NotFoundError("Workflow", workflow_id)
         return created
+
+    async def to_read(self, workflow: Workflow) -> WorkflowRead:
+        """Project one Workflow into its API read view, attaching its tags.
+
+        Shares :func:`services.workflow.build_workflow_read` with
+        :class:`services.workflow.WorkflowService` so a workflow serializes
+        identically whichever service returned it.
+
+        Args:
+            workflow: The persisted workflow to project.
+
+        Returns:
+            The read view, with tag ids attached.
+        """
+        return await build_workflow_read(self._workflows, workflow)
 
     async def publish(self, workflow_id: str, *, user_id: str) -> Workflow:
         """Publish a workflow, making it executable.

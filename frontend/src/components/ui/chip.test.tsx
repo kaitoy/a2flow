@@ -37,6 +37,22 @@ describe("Chip", () => {
     expect(screen.getByText("Gather sources")).toBeInTheDocument();
   });
 
+  it("keeps the neutral glass surface when no color is given", () => {
+    render(<Chip label="Gather sources" />);
+    const pill = screen.getByText("Gather sources").closest("span")?.parentElement;
+    expect(pill).toHaveClass("glass-panel");
+    expect(pill).not.toHaveClass("tag-chip");
+  });
+
+  it("swaps the glass surface for the palette slot when given a color", () => {
+    render(<Chip label="production" color="violet" />);
+    const pill = screen.getByText("production").closest("span")?.parentElement;
+    // Swapped rather than layered: a translucent hue over translucent glass
+    // reads differently on every background the chip floats over.
+    expect(pill).toHaveClass("tag-chip", "tag-violet");
+    expect(pill).not.toHaveClass("glass-panel");
+  });
+
   it("clips to a single capped-width line with a modest radius", () => {
     render(<Chip label="Validate the uploaded CSV schema against the contract" />);
     // The label lives in an inner span that truncates; the width cap and

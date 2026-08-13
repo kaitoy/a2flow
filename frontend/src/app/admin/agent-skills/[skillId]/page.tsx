@@ -22,6 +22,7 @@ import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { GenerateWorkflowDialog } from "@/components/admin/generate-workflow-dialog";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -39,8 +40,10 @@ import {
   pullAgentSkill,
   type SkillSyncStatus,
   SUPPRESS_FORBIDDEN_TOAST,
+  setAgentSkillTags,
   updateAgentSkill,
 } from "@/lib/api";
+import { sameIds } from "@/lib/ids";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -84,6 +87,12 @@ export default function AgentSkillDetailPage() {
   // heading names the saved record rather than following every keystroke.
   const [name, setName] = useState("");
 
+  // Tags live outside the form state: the picker is a controlled
+  // multi-select rather than a registered input. `savedTagIds` is what the
+  // record carried when it loaded, so an untouched selection writes nothing.
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [savedTagIds, setSavedTagIds] = useState<string[]>([]);
+
   const save = useAsyncAction({ showDone: false });
   const pull = useAsyncAction({ showDone: false });
   const {
@@ -111,6 +120,8 @@ export default function AgentSkillDetailPage() {
     getAgentSkill(skillId, SUPPRESS_FORBIDDEN_TOAST)
       .then((skill) => {
         setName(skill.name);
+        setTagIds(skill.tagIds ?? []);
+        setSavedTagIds(skill.tagIds ?? []);
         reset({
           name: skill.name,
           repoUrl: skill.repoUrl,
@@ -169,6 +180,11 @@ export default function AgentSkillDetailPage() {
   async function persist(values: AgentSkillFormValues) {
     await save.run(async () => {
       await updateAgentSkill(skillId, toAgentSkillUpdateBody(values));
+      // Tags are a separate sub-resource, so they are only written when
+      // the selection actually changed.
+      if (!sameIds(tagIds, savedTagIds)) {
+        await setAgentSkillTags(skillId, tagIds);
+      }
       setName(values.name);
       dispatch(showToast({ message: "Agent skill updated" }));
       // Re-seed the form with what was just saved so `isDirty` goes back to
@@ -319,6 +335,8 @@ export default function AgentSkillDetailPage() {
           ) : (
             <AgentSkillFields readOnly values={getValues()} />
           )}
+
+          <TagPicker value={tagIds} onChange={setTagIds} readOnly={!canEdit} />
 
           <div className="flex gap-2">
             {canEdit && (

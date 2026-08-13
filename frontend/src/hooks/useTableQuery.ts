@@ -42,12 +42,20 @@ export interface UseTableQueryResult<T> {
   sort: SortSpec | null;
   /** Active filter directives. */
   filters: FilterSpec[];
+  /**
+   * Tag ids the list is narrowed by. A record must carry every one of them.
+   * Held apart from {@link UseTableQueryResult.filters} because tags are not a
+   * field of any record and travel to the API as their own parameter.
+   */
+  tagIds: string[];
   /** Update the pagination offset (accepts a value or updater function). */
   setOffset: Dispatch<SetStateAction<number>>;
   /** Set the sort directive; resets the offset to the first page. */
   setSort: (sort: SortSpec | null) => void;
   /** Set the filter directives; resets the offset to the first page. */
   setFilters: (filters: FilterSpec[]) => void;
+  /** Set the tag ids to narrow by; resets the offset to the first page. */
+  setTagIds: (tagIds: string[]) => void;
   /**
    * Re-run the fetch with the current query (e.g. after a delete), keeping the
    * current rows visible until the new ones land.
@@ -67,8 +75,8 @@ export interface UseTableQueryOptions {
  *
  * The `fetcher` is read through a ref, so callers may pass a fresh inline
  * function each render (e.g. `(q) => listUsers(q)`) without triggering refetch
- * loops. Changing `sort` or `filters` resets the offset to the first page so the
- * user is never stranded on an out-of-range page.
+ * loops. Changing `sort`, `filters`, or `tagIds` resets the offset to the first page so
+ * the user is never stranded on an out-of-range page.
  *
  * Only a query change raises `loading`; a `reload` swaps the rows in place under
  * the `refreshing` flag. That keeps a refresh — and especially a poll loop —
@@ -90,6 +98,7 @@ export function useTableQuery<T>(
   const [offset, setOffset] = useState(0);
   const [sort, setSortState] = useState<SortSpec | null>(null);
   const [filters, setFiltersState] = useState<FilterSpec[]>([]);
+  const [tagIds, setTagIdsState] = useState<string[]>([]);
 
   // Keep the latest fetcher without making it a `load` dependency, so inline
   // fetchers do not retrigger the effect on every render.
@@ -100,7 +109,7 @@ export function useTableQuery<T>(
     async ({ silent = false }: ReloadOptions = {}) => {
       if (!silent) setRefreshing(true);
       try {
-        setRows(await fetcherRef.current({ limit, offset, sort, filters }));
+        setRows(await fetcherRef.current({ limit, offset, sort, filters, tagIds }));
       } catch {
         // Failure toast is shown globally by api.ts; the rows on screen stay
         // as they were before this fetch.
@@ -109,7 +118,7 @@ export function useTableQuery<T>(
         if (!silent) setRefreshing(false);
       }
     },
-    [limit, offset, sort, filters]
+    [limit, offset, sort, filters, tagIds]
   );
 
   // `load` is recreated only when the query changes, so this effect fires on
@@ -130,6 +139,11 @@ export function useTableQuery<T>(
     setOffset(0);
   }, []);
 
+  const setTagIds = useCallback((next: string[]) => {
+    setTagIdsState(next);
+    setOffset(0);
+  }, []);
+
   return {
     rows,
     loading,
@@ -137,9 +151,11 @@ export function useTableQuery<T>(
     offset,
     sort,
     filters,
+    tagIds,
     setOffset,
     setSort,
     setFilters,
+    setTagIds,
     reload: load,
   };
 }

@@ -37,7 +37,13 @@ describe("useTableQuery", () => {
     const fetcher = vi.fn(async (_q: ListQuery) => [{ id: "1" }]);
     const { result } = renderHook(() => useTableQuery(fetcher, { limit: 10 }));
     await waitFor(() => expect(result.current.rows).toEqual([{ id: "1" }]));
-    expect(fetcher).toHaveBeenCalledWith({ limit: 10, offset: 0, sort: null, filters: [] });
+    expect(fetcher).toHaveBeenCalledWith({
+      limit: 10,
+      offset: 0,
+      sort: null,
+      filters: [],
+      tagIds: [],
+    });
   });
 
   it("is loading until the first page lands", async () => {
