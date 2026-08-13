@@ -308,7 +308,10 @@ async def get_approval(approval_id: str, tool_context: ToolContext) -> dict[str,
     """Fetch the current state of an approval in the current session.
 
     Use this to re-check a decision (for example after calling ``render_approval``)
-    before continuing.
+    before continuing. ``status`` is one of "pending" (still waiting), "approved"
+    (go ahead), "rejected" (stop; do not retry), or "returned" (the approver
+    wants the work revised and re-submitted — address their ``response`` comment
+    and request approval again rather than abandoning the task).
 
     Args:
         approval_id: Id of the approval to fetch.

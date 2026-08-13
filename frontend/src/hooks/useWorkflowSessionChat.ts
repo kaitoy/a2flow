@@ -322,7 +322,7 @@ export function useWorkflowSessionChat(
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendApprovalResult = useCallback(
-    async (toolCallId: string, decision: "approved" | "rejected") => {
+    async (toolCallId: string, decision: "approved" | "rejected" | "returned") => {
       if (!sessionId || isRunning) return;
 
       dispatch(startRun());

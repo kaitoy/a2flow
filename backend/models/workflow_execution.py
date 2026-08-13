@@ -12,11 +12,40 @@ session exists one-to-one with its execution, so the execution's id identifies
 it, exactly as a workflow's id identifies its design session.
 """
 
-from sqlalchemy import ForeignKeyConstraint, Index
-from sqlmodel import SQLModel
+from datetime import datetime
+from enum import StrEnum
 
-from models.base import BaseEntity
+from pydantic import field_serializer
+from sqlalchemy import ForeignKeyConstraint, Index
+from sqlmodel import Field, SQLModel
+
+from models.base import BaseEntity, TZDateTime, iso_z_or_none
 from models.tenant_scoped import TenantScoped
+
+
+class WorkflowExecutionStatus(StrEnum):
+    """Lifecycle states a WorkflowExecution can occupy.
+
+    The status is derived from the run's WorkflowTasks rather than set
+    directly: a run finishes once it has at least one task and every task has
+    reached a terminal state (``completed``/``failed``/``skipped``). See
+    :meth:`services.workflow_execution.WorkflowExecutionService.evaluate_completion`,
+    which both the agent's task tools and the REST task endpoints call after
+    every task write.
+    """
+
+    running = "running"
+    """The run is still working through its tasks (or has none yet).
+
+    A run with no tasks at all stays ``running`` — an empty task list is
+    indistinguishable from a run whose agent has not registered its tasks yet.
+    """
+
+    completed = "completed"
+    """Every task reached a terminal state and none of them failed."""
+
+    failed = "failed"
+    """Every task reached a terminal state and at least one of them failed."""
 
 
 class WorkflowExecutionCreate(SQLModel):
@@ -57,12 +86,39 @@ class WorkflowExecution(WorkflowExecutionCreate, TenantScoped, BaseEntity, table
     FKs on :class:`~models.base.BaseEntity` -- a user who started a run cannot
     be hard-deleted out from under it, and is soft-deleted instead so the run's
     initiator still resolves to a name.
+
+    ``status`` and ``finished_at`` are server-managed: they are declared on the
+    table class only, so they are absent from ``WorkflowExecutionCreate`` and
+    cannot be written through the API. Both are stamped by
+    :meth:`services.workflow_execution.WorkflowExecutionService.evaluate_completion`
+    through
+    :meth:`repositories.workflow_execution.SqlWorkflowExecutionRepository.mark_finished`,
+    following the same pattern as :attr:`models.workflow.Workflow.status`. They
+    exist to make a run's lifecycle queryable — active-run counts, per-day
+    completion counts, and the ``created_at`` -> ``finished_at`` lead time all
+    read them (``repositories/metrics.py``).
     """
 
     __tablename__ = "workflow_executions"
     workflow_id: str | None = None
+    status: WorkflowExecutionStatus = Field(default=WorkflowExecutionStatus.running)
+    finished_at: datetime | None = Field(default=None, sa_type=TZDateTime)
     __table_args__ = (
         Index("ix_workflow_executions_session_id", "session_id"),
+        Index("ix_workflow_executions_tenant_id_status", "tenant_id", "status"),
+        Index("ix_workflow_executions_tenant_id_created_at", "tenant_id", "created_at"),
         ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="SET NULL"),
         ForeignKeyConstraint(["initiator_id"], ["users.id"], ondelete="RESTRICT"),
     )
+
+    @field_serializer("finished_at", when_used="json")
+    def _serialize_finished_at(self, dt: datetime | None) -> str | None:
+        """Serialize ``finished_at`` as ISO-8601 with a ``Z`` suffix, or ``None``.
+
+        Args:
+            dt: The completion timestamp, or ``None`` while the run is active.
+
+        Returns:
+            The ISO-8601 string with a ``Z`` suffix, or ``None``.
+        """
+        return iso_z_or_none(dt)

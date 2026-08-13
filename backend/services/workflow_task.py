@@ -9,6 +9,11 @@ when the task has a linked ``Approval`` (``Approval.workflow_task_id``): only
 the execution initiator or that Approval's designated ``approver`` may do so — not
 merely any approver of the execution — mirroring ``ApprovalService.resolve``'s
 no-bypass rule.
+
+Every write that can change the set of unfinished tasks also re-runs the shared
+completion bookkeeping in :mod:`services.workflow_execution_completion`, so a
+run driven through these endpoints ends up in the same terminal state as one
+driven by the agent's own task tools.
 """
 
 from models.user import User
@@ -19,6 +24,7 @@ from models.workflow_task import (
 )
 from repositories import (
     ApprovalRepository,
+    NotificationRepository,
     WorkflowExecutionRepository,
     WorkflowTaskRepository,
 )
@@ -28,6 +34,7 @@ from repositories.exceptions import (
     NotFoundError,
 )
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
+from services.workflow_execution_completion import evaluate_completion
 
 
 class WorkflowTaskService:
@@ -39,6 +46,7 @@ class WorkflowTaskService:
         execution_repo: WorkflowExecutionRepository,
         access: WorkflowExecutionAccessPolicy,
         approvals: ApprovalRepository,
+        notifications: NotificationRepository,
     ) -> None:
         """Initialize the service.
 
@@ -51,11 +59,31 @@ class WorkflowTaskService:
             approvals: Repository used to look up whether a task being updated
                 has a linked Approval and, if so, its designated approver, to
                 restrict ``status`` changes on such tasks.
+            notifications: Repository the shared completion bookkeeping uses to
+                emit the one-shot ``execution_completed`` notification.
         """
         self._repo = repo
         self._execution_repo = execution_repo
         self._access = access
         self._approvals = approvals
+        self._notifications = notifications
+
+    async def _evaluate_completion(self, execution_id: str) -> None:
+        """Re-evaluate whether the parent run has finished after a task write.
+
+        Delegates to the rule shared with the agent's task tools so a run
+        driven through the REST endpoints reaches the same terminal ``status``,
+        ``finished_at``, and completion notification as one driven by the agent.
+
+        Args:
+            execution_id: Primary key of the task's parent workflow execution.
+        """
+        await evaluate_completion(
+            executions=self._execution_repo,
+            tasks=self._repo,
+            notifications=self._notifications,
+            execution_id=execution_id,
+        )
 
     async def _assert_execution_access(self, execution_id: str, caller: User) -> None:
         """Authorize the caller against a task's parent workflow execution.
@@ -170,6 +198,10 @@ class WorkflowTaskService:
         approver, on top of the general execution-access check — see
         :meth:`_assert_status_change_allowed`.
 
+        Once the write lands, the parent run's completion is re-evaluated, so a
+        run finished through these endpoints reaches the same terminal state as
+        one finished by the agent.
+
         Args:
             task_id: Identifier of the task to update.
             data: Fields to update.
@@ -187,10 +219,15 @@ class WorkflowTaskService:
         task = await self.get(task_id, caller=caller)
         if data.status is not None and data.status != task.status:
             await self._assert_status_change_allowed(task, caller)
-        return await self._repo.update(task_id, data, user_id=caller.id)
+        updated = await self._repo.update(task_id, data, user_id=caller.id)
+        await self._evaluate_completion(updated.workflow_execution_id)
+        return updated
 
     async def delete(self, task_id: str, *, caller: User) -> None:
         """Delete a WorkflowTask.
+
+        Deleting the last non-terminal task of a run can finish it, so the
+        parent run's completion is re-evaluated afterwards.
 
         Args:
             task_id: Identifier of the task to delete.
@@ -200,5 +237,6 @@ class WorkflowTaskService:
             NotFoundError: If no task exists with the given ID.
             ForbiddenError: If the caller may not access the task's execution.
         """
-        await self.get(task_id, caller=caller)
+        task = await self.get(task_id, caller=caller)
         await self._repo.delete(task_id)
+        await self._evaluate_completion(task.workflow_execution_id)

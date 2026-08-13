@@ -1,6 +1,7 @@
 """Approval repository: Protocol interface and SQLModel-backed implementation."""
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Protocol
 
 from sqlmodel import col, select
@@ -31,6 +32,10 @@ class ApprovalRepository(Protocol):
     async def create(self, data: ApprovalCreate, *, user_id: str) -> Approval: ...
 
     async def update(
+        self, approval_id: str, data: ApprovalUpdate, *, user_id: str
+    ) -> Approval: ...
+
+    async def resolve(
         self, approval_id: str, data: ApprovalUpdate, *, user_id: str
     ) -> Approval: ...
 
@@ -151,6 +156,42 @@ class SqlApprovalRepository:
         if approval is None:
             raise NotFoundError("Approval", approval_id)
         approval.sqlmodel_update(data.model_dump(exclude_unset=True))
+        approval.updated_by = user_id
+        self._db.add(approval)
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
+        await self._db.refresh(approval)
+        return approval
+
+    async def resolve(
+        self, approval_id: str, data: ApprovalUpdate, *, user_id: str
+    ) -> Approval:
+        """Apply an approver's decision, stamping ``decided_at`` on the transition.
+
+        Behaves like :meth:`update` but additionally maintains the server-managed
+        ``decided_at`` column, which no client payload can write. The stamp lands
+        exactly once — on the write that first moves the approval out of
+        ``pending`` — so a later edit to the ``response`` comment leaves the
+        recorded decision time alone, and the ``created_at`` -> ``decided_at``
+        turnaround stays the approver's real one.
+
+        Args:
+            approval_id: Identifier of the approval to resolve.
+            data: The new status and optional response comment.
+            user_id: The acting user, recorded in the audit fields.
+
+        Returns:
+            The updated approval.
+
+        Raises:
+            NotFoundError: If the approval does not exist in this tenant.
+        """
+        approval = await self._get_scoped(approval_id)
+        if approval is None:
+            raise NotFoundError("Approval", approval_id)
+        was_pending = approval.status == ApprovalStatus.pending
+        approval.sqlmodel_update(data.model_dump(exclude_unset=True))
+        if was_pending and approval.status != ApprovalStatus.pending:
+            approval.decided_at = datetime.now(UTC)
         approval.updated_by = user_id
         self._db.add(approval)
         await commit_or_translate_user_fk(self._db, user_id=user_id)

@@ -22,7 +22,7 @@ import { ReasoningBubble } from "./ReasoningBubble";
 import { ToolActivityBubble } from "./ToolActivityBubble";
 
 /** A resolved (non-pending) approval decision. */
-type Decision = "approved" | "rejected";
+type Decision = "approved" | "rejected" | "returned";
 
 /**
  * Render an activity message by delegating to the renderer for its type: A2UI

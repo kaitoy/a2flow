@@ -29,6 +29,7 @@ const STATUS_STYLES: Record<ApprovalStatus, string> = {
   pending: "text-on-surface-variant",
   approved: "text-accent",
   rejected: "text-error",
+  returned: "text-alert",
 };
 
 /**

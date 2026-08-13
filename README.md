@@ -500,9 +500,65 @@ Navigate to [http://localhost:3000/admin/workflow-executions](http://localhost:3
 | Delete an execution | `DELETE /api/v1/workflow-executions/{id}` |
 | View an execution's tasks | `GET /admin/workflow-executions/{id}/workflow-tasks` |
 
+A run also carries a **lifecycle** of its own: it starts `running` and reaches `completed` or `failed` — with a `finishedAt` timestamp — once it has at least one task and every task has reached a terminal state (`completed` / `failed` / `skipped`). A run whose tasks include a failure ends `failed`. This is evaluated after every task write, whether the write came from the execution agent or from the REST task endpoints, and the recorded `finishedAt` is never moved by a later edit. A run with no tasks at all stays `running`. These fields are server-managed — they cannot be set through the API — and are what the [operations metrics](#operations-metrics) count.
+
 ### Approvals
 
-Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/approvals) to browse every **Approval** request (see [Human approval](#human-approval)). The list shows the title, status (`pending` / `approved` / `rejected`), the designated approver, the approver's comment, a link to the originating `/workflow-executions/{id}/session` workflow session, and the creation time, with sort and filter controls. Decisions are normally made from the in-chat Approve / Reject controls; this view is read-only browsing. The `GET`/`PATCH /api/v1/approvals` endpoints are documented in the [API reference](http://localhost:3000/api-doc).
+Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/approvals) to browse every **Approval** request (see [Human approval](#human-approval)). The list shows the title, status (`pending` / `approved` / `rejected` / `returned`), the designated approver, the approver's comment, a link to the originating `/workflow-executions/{id}/session` workflow session, and the creation time, with sort and filter controls. Decisions are normally made from the in-chat Approve / Reject / Return controls; this view is read-only browsing. The `GET`/`PATCH /api/v1/approvals` endpoints are documented in the [API reference](http://localhost:3000/api-doc).
+
+**`returned`** is a third decision alongside approve and reject: it sends the work back to be revised and re-submitted rather than settling the request, so a high return rate points at an upstream quality problem rather than at work that should not have been requested at all. Whichever decision is recorded, the transition out of `pending` stamps a server-managed **`decidedAt`**; a later edit to the comment leaves it alone, so the `createdAt` → `decidedAt` turnaround stays the approver's real one.
+
+## Operations metrics
+
+Workflow operations data — approval backlog, run volume, failures, and lead time — is exposed for third-party dashboards in two shapes, both scoped to the caller's tenant and both available to any authenticated user.
+
+### Prometheus endpoint
+
+`GET /api/v1/metrics` renders the single-value KPIs in [Prometheus](https://prometheus.io/) text exposition format. Every sample carries a `tenant` label.
+
+| Metric | Meaning |
+|---|---|
+| `a2flow_approvals_pending` | Approval requests awaiting a decision |
+| `a2flow_approvals_pending_over_threshold{threshold}` | Of those, the ones waiting longer than the threshold (default 24h) |
+| `a2flow_approval_pending_age_seconds_max` | How long the longest-waiting request has been waiting |
+| `a2flow_workflow_executions_active` | Runs currently in progress |
+| `a2flow_workflow_executions_finished_today{status}` | Runs that finished today, by terminal status |
+| `a2flow_approvals_decided_today{decision}` | Approvals decided today, by `approved` / `rejected` / `returned` |
+| `a2flow_workflow_executions_failed_recently{window}` | Runs that finished in failure in the last 24h |
+| `a2flow_workflow_tasks_failed_recently{window,error_kind}` | Tasks that failed in the last 24h, by cause |
+| `a2flow_workflow_executions_started_recently{window,workflow}` | Runs started in the last 24h, by workflow |
+| `a2flow_workflow_execution_lead_time_seconds_avg{window,workflow}` | Mean start-to-finish duration of runs finishing in the last 24h |
+
+`?thresholdHours=` overrides the stalled-approval cutoff. `METRICS_TIMEZONE` (an IANA name, default `UTC`) decides where "today" starts; an unrecognized name falls back to UTC rather than failing startup.
+
+The endpoint is protected by the ordinary session cookie, so a scrape config has to carry one. `GET` is a safe method, so no CSRF token is needed:
+
+```yaml
+- job_name: a2flow
+  metrics_path: /api/v1/metrics
+  http_headers:
+    Cookie: { values: ["a2flow_session=<token>"] }
+```
+
+The session's idle timeout slides on every request, so a running scrape keeps its own session alive indefinitely; it does not survive a backend restart or an explicit logout, which is when the token has to be refreshed. A scrape covers exactly one tenant — to watch several, configure one job per tenant.
+
+### Aggregate sub-resources
+
+Anything whose natural key is a user id, a run id, or a free-text error message is deliberately kept out of Prometheus — those are unbounded label sets. Those views are served as JSON sub-resources of the existing collections instead, in the usual `{meta, data, error}` envelope:
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/v1/workflow-executions/by-workflow` | Per-workflow run counts (`total` / `running` / `completed` / `failed`) and average lead time |
+| `GET /api/v1/workflow-executions/lead-time-trend` | Daily average lead time, one bucket per calendar day including empty ones |
+| `GET /api/v1/workflow-executions/failures` | Runs needing triage, each with its failed tasks and their recorded cause |
+| `GET /api/v1/approvals/by-approver` | Pending-approval backlog per designated approver |
+| `GET /api/v1/approvals/by-workflow` | The same backlog, grouped by workflow |
+
+The execution endpoints take `since` / `until` (ISO-8601, defaulting to the last 30 days, capped at 366) and `limit`; the approval endpoints take `thresholdHours` (default 24) and `limit`. Backlog entries come back longest-single-wait first, so `?limit=5` is the worst five. Durations are always whole seconds.
+
+`by-approver` returns approver **ids**, not names — resolving a name is `UserService`'s decision, and clients already resolve ids in bulk through `POST /api/v1/users/resolve-names`.
+
+A task that fails records **why**: the execution agent passes `error_kind` (one of `api_error`, `timeout`, `script_error`, `invalid_input`, `permission_denied`, `rejected`, `other`) and a free-text `error_message` alongside `status="failed"`. Both are ordinary task fields, so they are also filterable through the [list query parameters](#list-query-parameters) — e.g. `?q=errorKind:eq:timeout`.
 
 ## Notifications
 
@@ -517,7 +573,7 @@ Four workflow events generate a notification. The recipient depends on the event
 | `workflow_draft_ready` | The background design run of ["Generate workflow"](#generating-a-workflow) finished and the draft's initial task templates are ready for review. |
 | `workflow_generation_failed` | That same design run failed. Since it runs unattended with no client watching it, this is how the user finds out; the reason is on the workflow's detail page and in its design chat. |
 | `approval_request` | The agent requests a mid-execution decision (`request_approval`) and waits for the designated approver. |
-| `session_completed` | Every `WorkflowTask` in the session has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per session. |
+| `execution_completed` | Every `WorkflowTask` in the run has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per run, whether the final task was written by the execution agent or through the REST task endpoints. The same evaluation stamps the run's own [terminal status](#workflow-executions). |
 
 Clicking a notification marks it read and deep-links to the relevant place: run-scoped events to the `/workflow-executions/{id}/session` chat, workflow-scoped ones (`workflow_draft_ready`, `workflow_generation_failed`) to the workflow's detail page. Each row also has a **"Mark as read" (✓)** button that clears it from the dropdown without navigating, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once. Nothing in the dropdown deletes a notification — marking it read only moves it out of the way.
 

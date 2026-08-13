@@ -26,6 +26,7 @@ their own env vars in the test body; going through this module's
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -49,6 +50,12 @@ _DEFAULT_PRUNE_GRACE_SECONDS = 3600
 #: rather than waits when the lock is held, see ``_LOCK_WAIT_SECONDS`` in
 #: ``services/agent_skill_sync.py``).
 _DEFAULT_CLONE_TIMEOUT_SECONDS = 120
+
+#: Timezone the operations metrics use to decide where a calendar day starts,
+#: used when reporting "today" counts and when bucketing the lead-time trend.
+#: UTC is the safe default; an operations team reading these numbers against
+#: their own working day will want their local zone instead.
+_DEFAULT_METRICS_TIMEZONE = "UTC"
 
 
 class Settings(BaseSettings):
@@ -111,6 +118,8 @@ class Settings(BaseSettings):
             attribute.
         session_idle_timeout_seconds: Sliding idle timeout, in seconds, for a
             login session.
+        metrics_timezone: IANA timezone name deciding where a calendar day
+            starts for the operations metrics.
     """
 
     model_config = SettingsConfigDict(
@@ -161,6 +170,8 @@ class Settings(BaseSettings):
     session_cookie_secure: bool = False
     session_idle_timeout_seconds: int = _DEFAULT_IDLE_TIMEOUT_SECONDS
 
+    metrics_timezone: str = _DEFAULT_METRICS_TIMEZONE
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_cors_origins(cls, value: Any) -> Any:
@@ -184,6 +195,24 @@ class Settings(BaseSettings):
             return int(value)
         except (TypeError, ValueError):
             return _DEFAULT_IDLE_TIMEOUT_SECONDS
+
+    @field_validator("metrics_timezone", mode="before")
+    @classmethod
+    def _fallback_metrics_timezone(cls, value: Any) -> Any:
+        """Fall back to UTC on an unset or unrecognized IANA timezone name.
+
+        Follows :meth:`_fallback_idle_timeout` in preferring a working default
+        over a hard validation failure: a typo in this setting should skew the
+        day boundary of a dashboard, not stop the whole application from
+        starting.
+        """
+        if not isinstance(value, str) or not value:
+            return _DEFAULT_METRICS_TIMEZONE
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            return _DEFAULT_METRICS_TIMEZONE
+        return value
 
 
 @lru_cache(maxsize=1)

@@ -1,6 +1,10 @@
 import logging
 
-from infrastructure.logging_context import HEALTH_CHECK_PATH, HealthCheckAccessFilter
+from infrastructure.logging_context import (
+    HEALTH_CHECK_PATH,
+    METRICS_PATH,
+    PolledEndpointAccessFilter,
+)
 
 
 def _access_record(full_path: str) -> logging.LogRecord:
@@ -17,16 +21,28 @@ def _access_record(full_path: str) -> logging.LogRecord:
 
 
 def test_health_check_access_is_dropped() -> None:
-    assert HealthCheckAccessFilter().filter(_access_record(HEALTH_CHECK_PATH)) is False
+    record = _access_record(HEALTH_CHECK_PATH)
+    assert PolledEndpointAccessFilter().filter(record) is False
+
+
+def test_metrics_access_is_dropped() -> None:
+    record = _access_record(METRICS_PATH)
+    assert PolledEndpointAccessFilter().filter(record) is False
 
 
 def test_health_check_access_with_query_string_is_dropped() -> None:
     record = _access_record(f"{HEALTH_CHECK_PATH}?foo=bar")
-    assert HealthCheckAccessFilter().filter(record) is False
+    assert PolledEndpointAccessFilter().filter(record) is False
+
+
+def test_metrics_access_with_query_string_is_dropped() -> None:
+    record = _access_record(f"{METRICS_PATH}?thresholdHours=48")
+    assert PolledEndpointAccessFilter().filter(record) is False
 
 
 def test_other_route_access_is_kept() -> None:
-    assert HealthCheckAccessFilter().filter(_access_record("/api/v1/sessions")) is True
+    record = _access_record("/api/v1/sessions")
+    assert PolledEndpointAccessFilter().filter(record) is True
 
 
 def test_record_without_access_log_args_is_kept() -> None:
@@ -39,4 +55,4 @@ def test_record_without_access_log_args_is_kept() -> None:
         args=(),
         exc_info=None,
     )
-    assert HealthCheckAccessFilter().filter(record) is True
+    assert PolledEndpointAccessFilter().filter(record) is True

@@ -251,3 +251,78 @@ async def test_resolve_unknown_approval_is_404(
         headers={"X-User-Id": "alice"},
     )
     assert_err(res, "NOT_FOUND", 404)
+
+
+async def test_resolve_stamps_decided_at(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="alice"
+    )
+
+    before = assert_ok(
+        await client.get(
+            f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}
+        )
+    )
+    assert before["decidedAt"] is None
+
+    data = assert_ok(
+        await client.patch(
+            f"/api/v1/approvals/{approval_id}",
+            json={"status": "approved"},
+            headers={"X-User-Id": "alice"},
+        )
+    )
+    assert data["decidedAt"] is not None
+
+
+async def test_decided_at_is_not_moved_by_a_later_edit(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Editing the comment afterwards must not rewrite the approver's turnaround time."""
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="alice"
+    )
+    first = assert_ok(
+        await client.patch(
+            f"/api/v1/approvals/{approval_id}",
+            json={"status": "approved"},
+            headers={"X-User-Id": "alice"},
+        )
+    )
+
+    second = assert_ok(
+        await client.patch(
+            f"/api/v1/approvals/{approval_id}",
+            json={"response": "on reflection, still fine"},
+            headers={"X-User-Id": "alice"},
+        )
+    )
+
+    assert second["decidedAt"] == first["decidedAt"]
+
+
+async def test_resolve_approval_returns_it_for_rework(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="alice"
+    )
+
+    data = assert_ok(
+        await client.patch(
+            f"/api/v1/approvals/{approval_id}",
+            json={"status": "returned", "response": "please add the cost breakdown"},
+            headers={"X-User-Id": "alice"},
+        )
+    )
+
+    assert data["status"] == ApprovalStatus.returned.value
+    assert data["decidedAt"] is not None

@@ -1,12 +1,17 @@
 """WorkflowExecution repository: Protocol interface and SQLModel-backed implementation."""
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Protocol
 
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from models.workflow_execution import WorkflowExecution, WorkflowExecutionCreate
+from models.workflow_execution import (
+    WorkflowExecution,
+    WorkflowExecutionCreate,
+    WorkflowExecutionStatus,
+)
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
@@ -33,6 +38,14 @@ class WorkflowExecutionRepository(Protocol):
     ) -> WorkflowExecution: ...
 
     async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]: ...
+
+    async def mark_finished(
+        self,
+        execution_id: str,
+        *,
+        status: WorkflowExecutionStatus,
+        finished_at: datetime,
+    ) -> None: ...
 
     async def delete(self, execution_id: str) -> None: ...
 
@@ -149,6 +162,38 @@ class SqlWorkflowExecutionRepository:
         )
         result = await self._db.exec(stmt)
         return {sha for sha in result.all() if sha is not None}
+
+    async def mark_finished(
+        self,
+        execution_id: str,
+        *,
+        status: WorkflowExecutionStatus,
+        finished_at: datetime,
+    ) -> None:
+        """Stamp a run's terminal status and completion time.
+
+        ``status`` and ``finished_at`` are server-managed, so they are written
+        only here and never through the generic create/update path — the same
+        arrangement as :meth:`repositories.workflow.SqlWorkflowRepository.mark_design_edited`.
+
+        The write is idempotent: a run whose ``finished_at`` is already set is
+        left untouched, so a later task write cannot move a recorded completion
+        time. A missing (or cross-tenant) execution is a no-op rather than an
+        error, because the caller is the best-effort completion evaluation that
+        runs after every task write.
+
+        Args:
+            execution_id: Primary key of the execution to stamp.
+            status: The terminal status to record.
+            finished_at: The moment the run finished.
+        """
+        execution = await self._get_scoped(execution_id)
+        if execution is None or execution.finished_at is not None:
+            return
+        execution.status = status
+        execution.finished_at = finished_at
+        self._db.add(execution)
+        await self._db.commit()
 
     async def delete(self, execution_id: str) -> None:
         """Delete the WorkflowExecution with the given ID, raising NotFoundError if missing."""

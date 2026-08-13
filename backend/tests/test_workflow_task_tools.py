@@ -28,7 +28,7 @@ from infrastructure.workflow_task_tools import (
     update_workflow_task,
 )
 from models.notification import Notification, NotificationType
-from models.workflow_execution import WorkflowExecution
+from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
 from models.workflow_task import WorkflowTask
 from repositories import SqlNotificationRepository, SqlWorkflowExecutionRepository
 from repositories.tenant_bootstrap import NoTenantSessionError
@@ -399,3 +399,80 @@ async def test_get_workflow_task_cross_tenant_guard(engine: AsyncEngine) -> None
     assert "error" in blocked
     allowed = await get_workflow_task(created["id"], _ctx("sess-tenant-a"))
     assert allowed["id"] == created["id"]
+
+
+async def _execution(eng: AsyncEngine, execution_id: str) -> WorkflowExecution:
+    """Return the run, re-read so its lifecycle fields are current."""
+    async with AsyncSession(eng) as db:
+        repo = SqlWorkflowExecutionRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
+        execution = await repo.get(execution_id)
+        assert execution is not None
+        return execution
+
+
+async def test_agent_completing_every_task_finishes_the_run(
+    engine: AsyncEngine,
+) -> None:
+    execution_id = await _seed_session(engine, user_id="owner")
+    a = await create_workflow_task("A", _ctx())
+    b = await create_workflow_task("B", _ctx())
+
+    await update_workflow_task(a["id"], _ctx(), status="completed")
+    assert (
+        await _execution(engine, execution_id)
+    ).status is WorkflowExecutionStatus.running
+
+    await update_workflow_task(b["id"], _ctx(), status="completed")
+    finished = await _execution(engine, execution_id)
+    assert finished.status is WorkflowExecutionStatus.completed
+    assert finished.finished_at is not None
+
+
+async def test_agent_failing_a_task_fails_the_run(engine: AsyncEngine) -> None:
+    execution_id = await _seed_session(engine, user_id="owner")
+    task = await create_workflow_task("A", _ctx())
+
+    await update_workflow_task(
+        task["id"],
+        _ctx(),
+        status="failed",
+        error_kind="timeout",
+        error_message="no response after 30s",
+    )
+
+    finished = await _execution(engine, execution_id)
+    assert finished.status is WorkflowExecutionStatus.failed
+    assert finished.finished_at is not None
+
+
+async def test_agent_records_the_failure_cause(engine: AsyncEngine) -> None:
+    await _seed_session(engine, user_id="owner")
+    task = await create_workflow_task("A", _ctx())
+
+    updated = await update_workflow_task(
+        task["id"],
+        _ctx(),
+        status="failed",
+        error_kind="api_error",
+        error_message="billing API returned 503",
+    )
+
+    assert updated["error_kind"] == "api_error"
+    assert updated["error_message"] == "billing API returned 503"
+
+
+async def test_agent_unknown_error_kind_is_rejected(engine: AsyncEngine) -> None:
+    """An invalid classification is reported back to the model, listing the valid ones."""
+    execution_id = await _seed_session(engine, user_id="owner")
+    task = await create_workflow_task("A", _ctx())
+
+    result = await update_workflow_task(
+        task["id"], _ctx(), status="failed", error_kind="disk_on_fire"
+    )
+
+    assert "invalid error_kind" in result["error"]
+    assert "script_error" in result["error"]
+    # The rejected call wrote nothing at all.
+    assert (
+        await _execution(engine, execution_id)
+    ).status is WorkflowExecutionStatus.running

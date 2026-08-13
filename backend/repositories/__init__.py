@@ -17,6 +17,7 @@ from .impersonation_event import (
 )
 from .mcp_server import MCPServerRepository, SqlMCPServerRepository
 from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
+from .metrics import MetricsRepository, SqlMetricsRepository
 from .notification import NotificationRepository, SqlNotificationRepository
 from .secret import SecretRepository, SqlSecretRepository
 from .tenant import SqlTenantRepository, TenantRepository
@@ -50,6 +51,7 @@ __all__ = [
     "ImpersonationEventRepository",
     "MCPServerRepository",
     "MessageMetaRepository",
+    "MetricsRepository",
     "NotFoundError",
     "NotificationRepository",
     "ReferencedError",
@@ -62,6 +64,7 @@ __all__ = [
     "SqlImpersonationEventRepository",
     "SqlMCPServerRepository",
     "SqlMessageMetaRepository",
+    "SqlMetricsRepository",
     "SqlNotificationRepository",
     "SqlSecretRepository",
     "SqlTenantRepository",

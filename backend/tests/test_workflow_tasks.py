@@ -940,3 +940,170 @@ async def test_update_status_forbidden_for_super_admin_who_is_not_owner_or_appro
         headers={"X-User-Id": "alice", "X-User-Roles": "super_admin"},
     )
     assert_err(response, "FORBIDDEN", 403)
+
+
+# ---------- run completion bookkeeping ----------
+
+
+async def _execution_state(client: AsyncClient, execution_id: str) -> Any:
+    """Fetch a run's lifecycle fields as ``(status, finishedAt)``."""
+    body = assert_ok(await client.get(f"/api/v1/workflow-executions/{execution_id}"))
+    return body["status"], body["finishedAt"]
+
+
+async def test_run_stays_running_while_a_task_is_unfinished(
+    workflow_client: AsyncClient,
+) -> None:
+    execution = await _create_workflow_execution(workflow_client)
+    first = await _create_task(workflow_client, execution["id"], title="One")
+    await _create_task(workflow_client, execution["id"], title="Two")
+
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{first['id']}", json={"status": "completed"}
+        )
+    )
+
+    assert await _execution_state(workflow_client, execution["id"]) == ("running", None)
+
+
+async def test_run_with_no_tasks_stays_running(workflow_client: AsyncClient) -> None:
+    """An empty task list means the agent has not registered its tasks yet, not that it finished."""
+    execution = await _create_workflow_execution(workflow_client)
+
+    assert await _execution_state(workflow_client, execution["id"]) == ("running", None)
+
+
+async def test_run_completes_once_every_task_is_terminal(
+    workflow_client: AsyncClient,
+) -> None:
+    execution = await _create_workflow_execution(workflow_client)
+    first = await _create_task(workflow_client, execution["id"], title="One")
+    second = await _create_task(workflow_client, execution["id"], title="Two")
+
+    for task in (first, second):
+        assert_ok(
+            await workflow_client.patch(
+                f"/api/v1/workflow-tasks/{task['id']}", json={"status": "completed"}
+            )
+        )
+
+    status, finished_at = await _execution_state(workflow_client, execution["id"])
+    assert status == "completed"
+    assert finished_at is not None
+
+
+async def test_run_fails_when_any_task_failed(workflow_client: AsyncClient) -> None:
+    execution = await _create_workflow_execution(workflow_client)
+    first = await _create_task(workflow_client, execution["id"], title="One")
+    second = await _create_task(workflow_client, execution["id"], title="Two")
+
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{first['id']}", json={"status": "completed"}
+        )
+    )
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{second['id']}",
+            json={
+                "status": "failed",
+                "errorKind": "api_error",
+                "errorMessage": "billing API returned 503",
+            },
+        )
+    )
+
+    status, finished_at = await _execution_state(workflow_client, execution["id"])
+    assert status == "failed"
+    assert finished_at is not None
+
+
+async def test_a_skipped_task_alone_does_not_fail_the_run(
+    workflow_client: AsyncClient,
+) -> None:
+    execution = await _create_workflow_execution(workflow_client)
+    task = await _create_task(workflow_client, execution["id"], title="One")
+
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{task['id']}", json={"status": "skipped"}
+        )
+    )
+
+    assert (await _execution_state(workflow_client, execution["id"]))[0] == "completed"
+
+
+async def test_finished_at_is_not_moved_by_a_later_task_write(
+    workflow_client: AsyncClient,
+) -> None:
+    """The recorded completion time is the first one, so lead time stays honest."""
+    execution = await _create_workflow_execution(workflow_client)
+    task = await _create_task(workflow_client, execution["id"], title="One")
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{task['id']}", json={"status": "completed"}
+        )
+    )
+    _, first_finished_at = await _execution_state(workflow_client, execution["id"])
+
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{task['id']}", json={"title": "renamed"}
+        )
+    )
+
+    assert await _execution_state(workflow_client, execution["id"]) == (
+        "completed",
+        first_finished_at,
+    )
+
+
+async def test_deleting_the_last_unfinished_task_completes_the_run(
+    workflow_client: AsyncClient,
+) -> None:
+    execution = await _create_workflow_execution(workflow_client)
+    done = await _create_task(workflow_client, execution["id"], title="One")
+    pending = await _create_task(workflow_client, execution["id"], title="Two")
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{done['id']}", json={"status": "completed"}
+        )
+    )
+
+    assert_ok(await workflow_client.delete(f"/api/v1/workflow-tasks/{pending['id']}"))
+
+    assert (await _execution_state(workflow_client, execution["id"]))[0] == "completed"
+
+
+async def test_failure_cause_round_trips_through_the_api(
+    workflow_client: AsyncClient,
+) -> None:
+    execution = await _create_workflow_execution(workflow_client)
+    task = await _create_task(workflow_client, execution["id"])
+
+    body = assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{task['id']}",
+            json={
+                "status": "failed",
+                "errorKind": "timeout",
+                "errorMessage": "no response after 30s",
+            },
+        )
+    )
+
+    assert body["errorKind"] == "timeout"
+    assert body["errorMessage"] == "no response after 30s"
+
+
+async def test_unknown_error_kind_is_rejected(workflow_client: AsyncClient) -> None:
+    execution = await _create_workflow_execution(workflow_client)
+    task = await _create_task(workflow_client, execution["id"])
+
+    response = await workflow_client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"status": "failed", "errorKind": "disk_on_fire"},
+    )
+
+    assert_err(response, "VALIDATION_ERROR", 422)

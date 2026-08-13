@@ -5,6 +5,7 @@ from .auth import AuthService
 from .impersonation import ImpersonationService
 from .mcp_registry import MCPRegistryService
 from .mcp_server import MCPServerService
+from .metrics import MetricsService, MetricsWindow
 from .notification import NotificationService
 from .secret import SecretService
 from .tenant import TenantService
@@ -26,6 +27,8 @@ __all__ = [
     "ImpersonationService",
     "MCPRegistryService",
     "MCPServerService",
+    "MetricsService",
+    "MetricsWindow",
     "NotificationService",
     "SecretService",
     "TenantService",

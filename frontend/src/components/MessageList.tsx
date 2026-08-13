@@ -137,7 +137,7 @@ export function MessageList({
   /** Called with a task id when a group is hovered, and `null` on leave. */
   onHoverTask?: (taskId: string | null) => void;
   onAction?: (action: A2UIUserAction, values: Record<string, unknown>) => void;
-  onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected") => void;
+  onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected" | "returned") => void;
   /**
    * `render_a2ui` calls still awaiting an acknowledging tool result. Drives
    * which A2UI surfaces render as answered (locked and pre-filled) versus

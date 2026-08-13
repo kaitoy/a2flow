@@ -75,6 +75,38 @@ describe("ApprovalControls", () => {
     expect(onResolved).toHaveBeenCalledWith("tc1", "rejected");
   });
 
+  it("returns: calls resolveApproval with the returned decision", async () => {
+    const onResolved = vi.fn();
+    render(
+      <ApprovalControls approvalId="a1" title="Deploy?" toolCallId="tc1" onResolved={onResolved} />,
+      { preloadedState: authState("u1") }
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Return" }));
+
+    await waitFor(() =>
+      expect(api.resolveApproval).toHaveBeenCalledWith("a1", "returned", undefined)
+    );
+    expect(onResolved).toHaveBeenCalledWith("tc1", "returned");
+    await waitFor(() => expect(screen.getByText("Returned for rework")).toBeInTheDocument());
+  });
+
+  it("shows the returned state for an approval already sent back", async () => {
+    vi.mocked(api.getApproval).mockResolvedValue({
+      status: "returned",
+      approver: "u1",
+      response: "Please add the cost breakdown",
+    } as never);
+
+    render(<ApprovalControls approvalId="a1" title="Deploy?" toolCallId="tc1" />, {
+      preloadedState: authState("u1"),
+    });
+
+    await waitFor(() => expect(screen.getByText("Returned for rework")).toBeInTheDocument());
+    expect(screen.getByText("Please add the cost breakdown")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Return" })).not.toBeInTheDocument();
+  });
+
   it("passes the typed comment to resolveApproval and shows it once resolved", async () => {
     render(<ApprovalControls approvalId="a1" title="Deploy?" toolCallId="tc1" />, {
       preloadedState: authState("u1"),
@@ -103,6 +135,7 @@ describe("ApprovalControls", () => {
     );
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Return" })).not.toBeInTheDocument();
   });
 
   it("hides the controls from a super admin who is not the designated approver", async () => {
@@ -119,6 +152,7 @@ describe("ApprovalControls", () => {
     );
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Return" })).not.toBeInTheDocument();
   });
 
   it("shows the resolved state and prior comment when already decided", async () => {

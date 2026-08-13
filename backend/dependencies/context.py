@@ -6,7 +6,7 @@ the authenticated session (via :func:`dependencies.auth.get_current_user`).
 """
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends, Query, Request
@@ -44,6 +44,107 @@ class PaginationParams:
 
 
 PaginationDep = Annotated[PaginationParams, Depends(PaginationParams)]
+
+
+#: Default span, in days, of a metrics window when the caller names no bounds.
+_DEFAULT_METRICS_WINDOW_DAYS = 30
+
+#: Longest span, in days, a metrics window may cover. The aggregate endpoints
+#: read every row in the window and fold it in Python, so an unbounded span is
+#: an unbounded query; a year is far beyond what an operations dashboard plots.
+_MAX_METRICS_WINDOW_DAYS = 366
+
+
+@dataclass
+class MetricsWindowParams:
+    """Resolved ``[since, until)`` bounds for an aggregate metrics endpoint.
+
+    Both bounds are optional on the wire: ``until`` defaults to now and
+    ``since`` to 30 days before it, so the common case needs no query string at
+    all.
+    """
+
+    since: datetime
+    until: datetime
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Attach UTC to a naive datetime, passing through aware values and ``None``.
+
+    Args:
+        value: A bound parsed from the query string, or ``None`` when absent.
+
+    Returns:
+        The timezone-aware equivalent, or ``None``.
+    """
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=UTC)
+
+
+def parse_metrics_window(
+    since: Annotated[
+        datetime | None,
+        Query(
+            description=(
+                "Inclusive start of the window (ISO-8601). Defaults to 30 days "
+                "before 'until'."
+            ),
+        ),
+    ] = None,
+    until: Annotated[
+        datetime | None,
+        Query(
+            description=(
+                "Exclusive end of the window (ISO-8601). Defaults to the current time."
+            ),
+        ),
+    ] = None,
+) -> MetricsWindowParams:
+    """Resolve the ``since``/``until`` query parameters into a concrete window.
+
+    Naive datetimes are read as UTC, matching how the API serializes every other
+    timestamp.
+
+    Raises:
+        QueryValidationError: If ``since`` is not before ``until``, or the span
+            exceeds :data:`_MAX_METRICS_WINDOW_DAYS`.
+    """
+    end = _as_utc(until) or datetime.now(UTC)
+    start = _as_utc(since) or end - timedelta(days=_DEFAULT_METRICS_WINDOW_DAYS)
+    if start >= end:
+        raise QueryValidationError("'since' must be earlier than 'until'")
+    if end - start > timedelta(days=_MAX_METRICS_WINDOW_DAYS):
+        raise QueryValidationError(
+            f"window must not exceed {_MAX_METRICS_WINDOW_DAYS} days"
+        )
+    return MetricsWindowParams(since=start, until=end)
+
+
+MetricsWindowDep = Annotated[MetricsWindowParams, Depends(parse_metrics_window)]
+
+#: Default waiting time, in hours, past which a pending approval counts as
+#: stalled. 24 hours is the figure the operations view highlights.
+_DEFAULT_BACKLOG_THRESHOLD_HOURS = 24.0
+
+
+@dataclass
+class BacklogThresholdParams:
+    """The stalled-approval threshold for an approval-backlog endpoint."""
+
+    threshold_hours: float = Query(
+        default=_DEFAULT_BACKLOG_THRESHOLD_HOURS,
+        alias="thresholdHours",
+        gt=0,
+        le=8760,
+        description=(
+            "Hours a pending approval must have been waiting to count toward "
+            "'overThreshold'."
+        ),
+    )
+
+
+BacklogThresholdDep = Annotated[BacklogThresholdParams, Depends(BacklogThresholdParams)]
 
 
 @dataclass

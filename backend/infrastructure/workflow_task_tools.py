@@ -39,6 +39,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure import database
 from models.notification import NotificationCreate, NotificationType
 from models.workflow_task import (
+    TaskErrorKind,
     ToolBinding,
     WorkflowTaskCreate,
     WorkflowTaskRead,
@@ -178,16 +179,6 @@ def _user_id(tool_context: ToolContext) -> str:
     return getattr(tool_context, "user_id", None) or "user"
 
 
-#: WorkflowTask statuses that count as "done" for session-completion detection.
-_TERMINAL_STATUSES = frozenset(
-    {
-        WorkflowTaskStatus.completed,
-        WorkflowTaskStatus.failed,
-        WorkflowTaskStatus.skipped,
-    }
-)
-
-
 async def _notify(
     execution_repo: WorkflowExecutionRepository,
     notif_repo: NotificationRepository,
@@ -238,48 +229,26 @@ async def _notify(
         )
 
 
-async def _maybe_notify_execution_completed(
-    execution_repo: WorkflowExecutionRepository,
-    task_repo: WorkflowTaskRepository,
-    notif_repo: NotificationRepository,
-    execution_id: str,
-) -> None:
-    """Emit a ``execution_completed`` notification once every task is terminal.
+async def _evaluate_completion(scope: _Scope) -> None:
+    """Re-run the shared run-completion bookkeeping after a task write.
 
-    The notification is created at most once per session: if every task in the
-    session is in a terminal state (and there is at least one task) and no
-    ``execution_completed`` notification exists yet for the session, one is created.
-    Like :func:`_notify`, this is best-effort and never raises.
+    The import is deferred to call time on purpose. ``evaluate_completion``
+    lives in the service layer, where the rule belongs, and importing any
+    ``services`` submodule executes ``services/__init__``, which pulls in
+    ``services.workflow_execution`` -> ``infrastructure.agent`` -> this module:
+    a cycle at import time. Resolving it here, once the modules are loaded,
+    keeps the rule in its proper layer instead of duplicating it down here.
 
     Args:
-        execution_repo: Repository used to resolve the execution initiator.
-        task_repo: Repository used to read the session's tasks.
-        notif_repo: Repository used to check for and persist the notification.
-        execution_id: Primary key of the workflow execution to evaluate.
+        scope: The current tool call's resolved run and repositories.
     """
-    try:
-        tasks = await task_repo.list(
-            limit=1000, offset=0, workflow_execution_id=execution_id
-        )
-        if not tasks or any(t.status not in _TERMINAL_STATUSES for t in tasks):
-            return
-        if await notif_repo.exists_for_session(
-            execution_id, NotificationType.execution_completed
-        ):
-            return
-    except Exception:
-        logger.exception(
-            "failed to evaluate completion for workflow execution %s", execution_id
-        )
-        return
-    await _notify(
-        execution_repo,
-        notif_repo,
-        execution_id,
-        NotificationType.execution_completed,
-        "Workflow execution completed",
-        f"All {len(tasks)} task{'s' if len(tasks) != 1 else ''} "
-        "in this workflow execution have finished.",
+    from services.workflow_execution_completion import evaluate_completion
+
+    await evaluate_completion(
+        executions=scope.execution_repo,
+        tasks=scope.task_repo,
+        notifications=scope.notif_repo,
+        execution_id=scope.execution_id,
     )
 
 
@@ -290,6 +259,8 @@ def _task_to_dict(task: WorkflowTaskRead) -> dict[str, Any]:
         "title": task.title,
         "description": task.description,
         "status": task.status.value,
+        "error_kind": task.error_kind.value if task.error_kind else None,
+        "error_message": task.error_message,
         "depends_on_ids": list(task.depends_on_ids),
         "tool_bindings": [
             {"server_id": b.mcp_server_id, "tool_name": b.tool_name}
@@ -349,6 +320,22 @@ def _invalid_status_error(status: str) -> dict[str, Any]:
     """Build the error payload for an unrecognized status value."""
     valid = ", ".join(s.value for s in WorkflowTaskStatus)
     return {"error": f"invalid status {status!r}; must be one of: {valid}"}
+
+
+def _parse_error_kind(error_kind: str | None) -> TaskErrorKind | None:
+    """Coerce a failure-cause string to a TaskErrorKind, or ``None`` if invalid/absent."""
+    if error_kind is None:
+        return None
+    try:
+        return TaskErrorKind(error_kind)
+    except ValueError:
+        return None
+
+
+def _invalid_error_kind_error(error_kind: str) -> dict[str, Any]:
+    """Build the error payload for an unrecognized error_kind value."""
+    valid = ", ".join(k.value for k in TaskErrorKind)
+    return {"error": f"invalid error_kind {error_kind!r}; must be one of: {valid}"}
 
 
 def _not_in_session_error(task_id: str) -> dict[str, Any]:
@@ -499,6 +486,8 @@ async def update_workflow_task(
     title: str | None = None,
     description: str | None = None,
     status: str | None = None,
+    error_kind: str | None = None,
+    error_message: str | None = None,
     depends_on_ids: list[str] | None = None,
     tool_bindings: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
@@ -507,9 +496,11 @@ async def update_workflow_task(
     Only the arguments you pass are changed. Use ``status`` to drive the
     lifecycle (``pending`` -> ``in_progress`` -> ``completed``/``failed``/
     ``skipped``): mark a task ``in_progress`` before working on it and
-    ``completed``/``failed`` afterwards. Passing ``depends_on_ids`` replaces the
-    task's full dependency set, letting you edit the DAG after creation;
-    ``tool_bindings`` likewise replaces the task's full set of bound MCP tools.
+    ``completed``/``failed`` afterwards. Whenever you set ``status`` to
+    "failed", also pass ``error_kind`` and ``error_message`` so the failure can
+    be triaged later. Passing ``depends_on_ids`` replaces the task's full
+    dependency set, letting you edit the DAG after creation; ``tool_bindings``
+    likewise replaces the task's full set of bound MCP tools.
 
     Args:
         task_id: Id of the task to update.
@@ -519,6 +510,19 @@ async def update_workflow_task(
         description: New description, if changing.
         status: New status, if changing. One of "pending", "in_progress",
             "completed", "failed", "skipped".
+        error_kind: Why the task failed. Set this together with
+            ``status="failed"``. Must be exactly one of these seven values:
+            "api_error" (an external API or MCP tool returned an error
+            response), "timeout" (a call did not return within its time limit),
+            "script_error" (the skill's own code raised an unhandled
+            exception), "invalid_input" (the data the task was given was
+            malformed or incomplete), "permission_denied" (you lacked the
+            credentials or authorization to proceed), "rejected" (a human
+            rejected the task's approval request), or "other" (none of the
+            above — explain in ``error_message``).
+        error_message: One-sentence description of the failure, up to 200
+            characters. Include the concrete detail ``error_kind`` cannot carry,
+            such as the tool or endpoint that failed and what it reported.
         depends_on_ids: Replacement dependency ids (existing same-session tasks),
             if changing.
         tool_bindings: Replacement MCP tool bindings, each
@@ -526,13 +530,16 @@ async def update_workflow_task(
             if changing.
 
     Returns:
-        The updated task dict, or ``{"error": <message>}`` on an invalid status,
-        unknown task, cross-session task, unknown dependency, unknown MCP
-        server, cycle, or unresolved session.
+        The updated task dict, or ``{"error": <message>}`` on an invalid status
+        or error kind, unknown task, cross-session task, unknown dependency,
+        unknown MCP server, cycle, or unresolved session.
     """
     status_enum = _parse_status(status)
     if status is not None and status_enum is None:
         return _invalid_status_error(status)
+    error_kind_enum = _parse_error_kind(error_kind)
+    if error_kind is not None and error_kind_enum is None:
+        return _invalid_error_kind_error(error_kind)
     bindings = (
         _parse_tool_bindings(tool_bindings) if tool_bindings is not None else None
     )
@@ -550,6 +557,10 @@ async def update_workflow_task(
                 fields["description"] = description
             if status_enum is not None:
                 fields["status"] = status_enum
+            if error_kind_enum is not None:
+                fields["error_kind"] = error_kind_enum
+            if error_message is not None:
+                fields["error_message"] = error_message
             if depends_on_ids is not None:
                 fields["depends_on_ids"] = depends_on_ids
             if bindings is not None:
@@ -562,9 +573,7 @@ async def update_workflow_task(
                 )
             except NotFoundError:
                 return _not_in_session_error(task_id)
-            await _maybe_notify_execution_completed(
-                s.execution_repo, s.task_repo, s.notif_repo, s.execution_id
-            )
+            await _evaluate_completion(s)
             return _task_to_dict(task)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}

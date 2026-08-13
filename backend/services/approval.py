@@ -66,11 +66,14 @@ class ApprovalService:
     async def resolve(
         self, approval_id: str, data: ApprovalUpdate, *, acting_user: User
     ) -> Approval:
-        """Resolve a pending approval to ``approved`` or ``rejected``.
+        """Resolve a pending approval to ``approved``, ``rejected``, or ``returned``.
 
         Only the approval's designated ``approver`` may resolve it — with no
         exception, not even for a super admin — so an approval request can be
         acted on solely by its addressee.
+
+        Goes through :meth:`ApprovalRepository.resolve` rather than the generic
+        ``update`` so the decision also stamps the server-managed ``decided_at``.
 
         Args:
             approval_id: Identifier of the approval to update.
@@ -90,4 +93,4 @@ class ApprovalService:
             raise ForbiddenError(
                 "Only the designated approver can resolve this approval"
             )
-        return await self._repo.update(approval_id, data, user_id=acting_user.id)
+        return await self._repo.resolve(approval_id, data, user_id=acting_user.id)

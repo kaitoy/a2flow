@@ -10,12 +10,14 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from config import get_settings
 from infrastructure.secret_resolver import SecretResolver
 from services import (
     AgentSkillService,
     ApprovalService,
     MCPRegistryService,
     MCPServerService,
+    MetricsService,
     NotificationService,
     SecretService,
     TenantService,
@@ -39,6 +41,7 @@ from .repository import (
     EffectiveRoleRepositoryDep,
     MCPServerRepositoryDep,
     MessageMetaRepositoryDep,
+    MetricsRepositoryDep,
     NotificationRepositoryDep,
     SecretRepositoryDep,
     TenantRepositoryDep,
@@ -131,6 +134,14 @@ def get_mcp_registry_service() -> MCPRegistryService:
 
 
 MCPRegistryServiceDep = Annotated[MCPRegistryService, Depends(get_mcp_registry_service)]
+
+
+def get_metrics_service(repo: MetricsRepositoryDep) -> MetricsService:
+    """Create a MetricsService, resolving the day-boundary timezone from settings."""
+    return MetricsService(repo, timezone=get_settings().metrics_timezone)
+
+
+MetricsServiceDep = Annotated[MetricsService, Depends(get_metrics_service)]
 
 
 def get_notification_service(repo: NotificationRepositoryDep) -> NotificationService:
@@ -322,9 +333,10 @@ def get_workflow_task_service(
     execution_repo: WorkflowExecutionRepositoryDep,
     access: WorkflowExecutionAccessPolicyDep,
     approvals: ApprovalRepositoryDep,
+    notifications: NotificationRepositoryDep,
 ) -> WorkflowTaskService:
-    """Create a WorkflowTaskService wiring the task, session, and approval repositories and the access policy."""
-    return WorkflowTaskService(repo, execution_repo, access, approvals)
+    """Create a WorkflowTaskService wiring the task, session, approval, and notification repositories and the access policy."""
+    return WorkflowTaskService(repo, execution_repo, access, approvals, notifications)
 
 
 WorkflowTaskServiceDep = Annotated[

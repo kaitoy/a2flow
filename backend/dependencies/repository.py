@@ -18,6 +18,7 @@ from repositories import (
     EffectiveRoleRepository,
     MCPServerRepository,
     MessageMetaRepository,
+    MetricsRepository,
     NotificationRepository,
     SecretRepository,
     SqlAgentSkillRepository,
@@ -26,6 +27,7 @@ from repositories import (
     SqlEffectiveRoleRepository,
     SqlMCPServerRepository,
     SqlMessageMetaRepository,
+    SqlMetricsRepository,
     SqlNotificationRepository,
     SqlSecretRepository,
     SqlTenantRepository,
@@ -85,6 +87,16 @@ def get_mcp_server_repository(
 MCPServerRepositoryDep = Annotated[
     MCPServerRepository, Depends(get_mcp_server_repository)
 ]
+
+
+def get_metrics_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> MetricsRepository:
+    """Create a MetricsRepository backed by the current database session."""
+    return SqlMetricsRepository(db, tenant_id=tenant_id)
+
+
+MetricsRepositoryDep = Annotated[MetricsRepository, Depends(get_metrics_repository)]
 
 
 def get_notification_repository(

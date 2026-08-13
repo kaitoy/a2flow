@@ -10,13 +10,24 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
 /** A resolved (non-pending) approval decision. */
-type Decision = Extract<ApprovalStatus, "approved" | "rejected">;
+type Decision = Extract<ApprovalStatus, "approved" | "rejected" | "returned">;
+
+/** How each decision is labelled and coloured once recorded. */
+const DECISION_DISPLAY: Record<Decision, { label: string; className: string }> = {
+  approved: { label: "Approved", className: "text-accent" },
+  rejected: { label: "Rejected", className: "text-error" },
+  returned: { label: "Returned for rework", className: "text-alert" },
+};
 
 /**
- * In-chat approve/reject controls for a pending approval request.
+ * In-chat approve/reject/return controls for a pending approval request.
+ *
+ * "Return" is a third decision alongside approve and reject: it sends the work
+ * back to be revised and re-submitted rather than settling the request, so the
+ * comment matters more there than anywhere else.
  *
  * Rendered from a `render_approval` frontend tool call. Only the approval's
- * designated approver sees the approve/reject controls; everyone else
+ * designated approver sees the decision controls; everyone else
  * (including a super admin who isn't the designated approver) gets a
  * read-only "waiting" view, mirroring the backend rule that only the
  * approver may resolve the request — with no exception. On click it writes the decision directly to the backend
@@ -71,7 +82,7 @@ export function ApprovalControls({
   /** Whether the current viewer is this approval's designated approver. */
   const isApprover = currentUserId != null && currentUserId === approver;
 
-  /** Approve/reject controls, shown only to the approver while still pending. */
+  /** Decision controls, shown only to the approver while still pending. */
   const pendingControls = isApprover ? (
     <>
       <Textarea
@@ -101,6 +112,15 @@ export function ApprovalControls({
           onClick={() => resolve("rejected")}
         >
           Reject
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={action.inFlight}
+          status={pendingDecision === "returned" ? action.status : "idle"}
+          pendingLabel="Returning…"
+          onClick={() => resolve("returned")}
+        >
+          Return
         </Button>
       </div>
     </>
@@ -140,10 +160,10 @@ export function ApprovalControls({
           <p
             className={[
               "mt-3 text-sm font-medium",
-              status === "approved" ? "text-accent" : "text-on-surface-variant",
+              DECISION_DISPLAY[status as Decision]?.className ?? "text-on-surface-variant",
             ].join(" ")}
           >
-            {status === "approved" ? "Approved" : "Rejected"}
+            {DECISION_DISPLAY[status as Decision]?.label ?? status}
           </p>
           {resolvedComment && (
             <p className="mt-1 text-sm text-on-surface-variant">{resolvedComment}</p>

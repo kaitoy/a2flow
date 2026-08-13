@@ -65,6 +65,14 @@ PORT=8000
 
 Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted. `RELOAD` (default `false`) enables uvicorn autoreload; it only affects `python -m backend.main` — the `uv run uvicorn main:app --reload` command below and the Dockerfile's startup path are unaffected either way.
 
+### Operations metrics
+
+```env
+# METRICS_TIMEZONE=Asia/Tokyo
+```
+
+IANA timezone name deciding where a calendar day starts for the workflow operations metrics — the "today" counts on `GET /api/v1/metrics` and the daily buckets of the lead-time trend. Defaults to `UTC`; an unrecognized name falls back to `UTC` rather than failing startup, so a typo skews a dashboard's day boundary instead of stopping the app. The metrics themselves are described in the [root README](../README.md#operations-metrics).
+
 ### Agent skill store
 
 ```env

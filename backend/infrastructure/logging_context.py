@@ -21,12 +21,22 @@ class RequestIdFilter(logging.Filter):
 #: safe to import from an infrastructure-layer module.
 HEALTH_CHECK_PATH = "/api/v1/health"
 
+#: Path of the Prometheus exposition route (``routers/metrics.py``), a literal
+#: for the same reason as :data:`HEALTH_CHECK_PATH`.
+METRICS_PATH = "/api/v1/metrics"
 
-class HealthCheckAccessFilter(logging.Filter):
-    """Drop uvicorn access-log records for the health check endpoint.
+#: Routes polled on a timer by infrastructure rather than driven by a user, and
+#: therefore dropped from the access log: logging every hit would bury the real
+#: traffic.
+POLLED_PATHS = frozenset({HEALTH_CHECK_PATH, METRICS_PATH})
 
-    It's polled every few seconds by load balancers and container
-    orchestrators, so logging every hit would just be noise.
+
+class PolledEndpointAccessFilter(logging.Filter):
+    """Drop uvicorn access-log records for the frequently polled endpoints.
+
+    The health check is hit every few seconds by load balancers and container
+    orchestrators, and the metrics endpoint on whatever interval Prometheus is
+    configured to scrape at, so logging every hit would just be noise.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -34,7 +44,7 @@ class HealthCheckAccessFilter(logging.Filter):
         if not isinstance(args, tuple) or len(args) < 3:
             return True
         full_path = str(args[2]).split("?", 1)[0]
-        return full_path != HEALTH_CHECK_PATH
+        return full_path not in POLLED_PATHS
 
 
 class IsoTimeFormatter(logging.Formatter):
@@ -81,4 +91,4 @@ def setup_logging() -> None:
 
     # Filtered on the logger itself (not the root handler) so a dropped
     # record never reaches root and is never written at all.
-    logging.getLogger("uvicorn.access").addFilter(HealthCheckAccessFilter())
+    logging.getLogger("uvicorn.access").addFilter(PolledEndpointAccessFilter())

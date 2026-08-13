@@ -489,6 +489,17 @@ def upgrade() -> None:
         ),
         sa.Column("initiator_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "running",
+                "completed",
+                "failed",
+                name="workflowexecutionstatus",
+            ),
+            nullable=False,
+        ),
+        sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
@@ -507,6 +518,18 @@ def upgrade() -> None:
         "ix_workflow_executions_tenant_id",
         "workflow_executions",
         ["tenant_id"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_workflow_executions_tenant_id_status",
+        "workflow_executions",
+        ["tenant_id", "status"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_workflow_executions_tenant_id_created_at",
+        "workflow_executions",
+        ["tenant_id", "created_at"],
         unique=False,
     )
     op.create_table(
@@ -604,6 +627,21 @@ def upgrade() -> None:
             ),
             nullable=False,
         ),
+        sa.Column(
+            "error_kind",
+            sa.Enum(
+                "api_error",
+                "timeout",
+                "script_error",
+                "invalid_input",
+                "permission_denied",
+                "rejected",
+                "other",
+                name="taskerrorkind",
+            ),
+            nullable=True,
+        ),
+        sa.Column("error_message", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
@@ -625,6 +663,12 @@ def upgrade() -> None:
         ["tenant_id"],
         unique=False,
     )
+    op.create_index(
+        "ix_workflow_tasks_tenant_id_status",
+        "workflow_tasks",
+        ["tenant_id", "status"],
+        unique=False,
+    )
     op.create_table(
         "approvals",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
@@ -634,7 +678,9 @@ def upgrade() -> None:
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column(
             "status",
-            sa.Enum("pending", "approved", "rejected", name="approvalstatus"),
+            sa.Enum(
+                "pending", "approved", "rejected", "returned", name="approvalstatus"
+            ),
             nullable=False,
         ),
         sa.Column("response", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
@@ -647,6 +693,7 @@ def upgrade() -> None:
             "workflow_task_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
         sa.Column("approver", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("decided_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(
             ["approver"],
@@ -682,6 +729,18 @@ def upgrade() -> None:
         "ix_approvals_workflow_task_id", "approvals", ["workflow_task_id"], unique=False
     )
     op.create_index("ix_approvals_tenant_id", "approvals", ["tenant_id"], unique=False)
+    op.create_index(
+        "ix_approvals_tenant_id_status",
+        "approvals",
+        ["tenant_id", "status"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_approvals_tenant_id_decided_at",
+        "approvals",
+        ["tenant_id", "decided_at"],
+        unique=False,
+    )
     op.create_table(
         "message_meta",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
@@ -907,11 +966,14 @@ def downgrade() -> None:
     op.drop_index("ix_approvals_workflow_execution_id", table_name="approvals")
     op.drop_index("ix_approvals_approver", table_name="approvals")
     op.drop_index("ix_approvals_tenant_id", table_name="approvals")
+    op.drop_index("ix_approvals_tenant_id_status", table_name="approvals")
+    op.drop_index("ix_approvals_tenant_id_decided_at", table_name="approvals")
     op.drop_table("approvals")
     op.drop_index(
         "ix_workflow_tasks_workflow_execution_id", table_name="workflow_tasks"
     )
     op.drop_index("ix_workflow_tasks_tenant_id", table_name="workflow_tasks")
+    op.drop_index("ix_workflow_tasks_tenant_id_status", table_name="workflow_tasks")
     op.drop_table("workflow_tasks")
     op.drop_index("ix_notifications_workflow_id", table_name="notifications")
     op.drop_index("ix_notifications_workflow_execution_id", table_name="notifications")
@@ -920,6 +982,12 @@ def downgrade() -> None:
     op.drop_table("notifications")
     op.drop_index("ix_workflow_executions_session_id", table_name="workflow_executions")
     op.drop_index("ix_workflow_executions_tenant_id", table_name="workflow_executions")
+    op.drop_index(
+        "ix_workflow_executions_tenant_id_status", table_name="workflow_executions"
+    )
+    op.drop_index(
+        "ix_workflow_executions_tenant_id_created_at", table_name="workflow_executions"
+    )
     op.drop_table("workflow_executions")
     op.drop_index("ix_workflows_session_id", table_name="workflows")
     op.drop_index("ix_workflows_tenant_id_name", table_name="workflows")

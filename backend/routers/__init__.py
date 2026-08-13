@@ -9,6 +9,7 @@ from routers import (
     health,
     mcp_registry,
     mcp_servers,
+    metrics,
     notifications,
     secrets,
     sessions,
@@ -39,6 +40,7 @@ api_router.include_router(agent_skills.router, dependencies=_protected)
 api_router.include_router(approvals.router, dependencies=_protected)
 api_router.include_router(mcp_registry.router, dependencies=_protected)
 api_router.include_router(mcp_servers.router, dependencies=_protected)
+api_router.include_router(metrics.router, dependencies=_protected)
 api_router.include_router(notifications.router, dependencies=_protected)
 api_router.include_router(secrets.router, dependencies=_protected)
 api_router.include_router(sessions.router, dependencies=_protected)

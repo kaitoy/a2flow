@@ -7,6 +7,13 @@ named by ``WorkflowExecution.session_id``. It has no table of its own, so it is
 identified by its execution and served from this router's ``/messages`` and
 ``/agent`` sub-resources — the same pair ``routers/workflows.py`` uses to serve
 a workflow's design session, the design-time counterpart.
+
+Three further sub-resources aggregate these records for operational dashboards
+rather than returning them one by one: ``/by-workflow`` (run volume and lead
+time per workflow), ``/lead-time-trend`` (the same lead time as a daily series),
+and ``/failures`` (runs needing human triage, with the failure cause each of
+their failed tasks recorded). All three are declared before ``/{execution_id}``
+so their literal path segment is matched first.
 """
 
 from collections.abc import AsyncGenerator
@@ -24,16 +31,24 @@ from dependencies import (
     ApiMetaDep,
     CurrentUserDep,
     FilterDep,
+    MetricsServiceDep,
+    MetricsWindowDep,
     PaginationDep,
     SortDep,
     WorkflowExecutionServiceDep,
 )
 from infrastructure.agent import keep_a2ui_context, tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from models.metrics import (
+    FailedExecutionEntry,
+    LeadTimeBucket,
+    WorkflowVolumeEntry,
+)
 from models.response import ApiResponse
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
 from repositories.exceptions import SessionRunInProgressError
+from services import MetricsWindow
 
 router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 
@@ -54,6 +69,64 @@ async def list_workflow_executions(
         filters=filters.filters,
     )
     return ApiResponse(meta=meta, data=items)
+
+
+@router.get("/by-workflow", response_model=ApiResponse[list[WorkflowVolumeEntry]])
+async def workflow_execution_volume_by_workflow(
+    service: MetricsServiceDep,
+    window: MetricsWindowDep,
+    pagination: PaginationDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[WorkflowVolumeEntry]]:
+    """Return per-workflow run volume and average lead time over a time window.
+
+    Answers "which workflows run most, and how long do they take end to end".
+    The window defaults to the last 30 days; ``limit`` caps how many workflows
+    come back, busiest first.
+    """
+    entries = await service.volume_by_workflow(
+        MetricsWindow(since=window.since, until=window.until),
+        limit=pagination.limit,
+    )
+    return ApiResponse(meta=meta, data=entries)
+
+
+@router.get("/lead-time-trend", response_model=ApiResponse[list[LeadTimeBucket]])
+async def workflow_execution_lead_time_trend(
+    service: MetricsServiceDep,
+    window: MetricsWindowDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[LeadTimeBucket]]:
+    """Return the daily average lead time of runs finishing in a time window.
+
+    One bucket per calendar day in the configured ``METRICS_TIMEZONE``,
+    including days on which nothing finished, so the series can be plotted as
+    is.
+    """
+    buckets = await service.lead_time_trend(
+        MetricsWindow(since=window.since, until=window.until)
+    )
+    return ApiResponse(meta=meta, data=buckets)
+
+
+@router.get("/failures", response_model=ApiResponse[list[FailedExecutionEntry]])
+async def list_failed_workflow_executions(
+    service: MetricsServiceDep,
+    window: MetricsWindowDep,
+    pagination: PaginationDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[FailedExecutionEntry]]:
+    """Return the runs with failed tasks in a window, each with its failures.
+
+    The triage list: driven by the failed tasks rather than by the runs' own
+    status, so a run that is still in flight but already has a failure shows up
+    right away.
+    """
+    entries = await service.failed_executions(
+        MetricsWindow(since=window.since, until=window.until),
+        limit=pagination.limit,
+    )
+    return ApiResponse(meta=meta, data=entries)
 
 
 @router.get("/{execution_id}", response_model=ApiResponse[WorkflowExecution])
