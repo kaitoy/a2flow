@@ -780,6 +780,34 @@ describe("WorkflowDetailPage", () => {
     );
   });
 
+  it("disables the task templates navigation button while the task templates are still generating", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          generatedDescription: null,
+          agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
+          status: "generating",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "user",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /manage task templates/i })).toBeDisabled()
+    );
+  });
+
   it("disables the diff action while there is no generated description to compare against", async () => {
     render(<WorkflowDetailPage />);
     await screen.findByRole("heading", { name: "my-workflow" });

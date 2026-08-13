@@ -12,9 +12,11 @@
 #   printf 'LLM_MODEL=litellm:anthropic/claude-3-5-sonnet-20241022\nANTHROPIC_API_KEY=<your-key>\n' > .env
 #   docker compose up --build
 #
-# The app is served at http://localhost:3000. The browser talks only to the
-# frontend; Next.js rewrites proxy /api/* server-side to the backend, keeping
-# the auth cookies same-origin.
+# The app is served at http://localhost:3000 by default. The browser talks
+# only to the frontend; Next.js rewrites proxy /api/* server-side to the
+# backend, keeping the auth cookies same-origin. Set FRONTEND_PORT in .env to
+# publish the frontend on a different host port (the container keeps
+# listening on 3000 internally); CORS_ORIGINS below follows it automatically.
 services:
   db:
     image: postgres:17
@@ -59,7 +61,7 @@ services:
       DEMO_AWS_ACCESS_KEY_ID: ${DEMO_AWS_ACCESS_KEY_ID:-}
       DEMO_AWS_SECRET_ACCESS_KEY: ${DEMO_AWS_SECRET_ACCESS_KEY:-}
       DEMO_AWS_REGION: ${DEMO_AWS_REGION:-us-east-1}
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
       # Store of cloned skill repositories, one directory per published
       # revision. Durable state, not a cache: a workflow execution pins the
       # revision it started with. Scaling the backend past one replica requires
@@ -84,7 +86,7 @@ services:
       args:
         BACKEND_BASE_URL: http://backend:8000
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       backend:
         condition: service_healthy

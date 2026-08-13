@@ -412,6 +412,7 @@ export default function WorkflowDetailPage() {
                   <HeaderIconButton
                     label={canEdit ? "Manage task templates" : "View task templates"}
                     onClick={() => router.push(`/admin/workflows/${workflowId}/task-templates`)}
+                    disabled={generating}
                   >
                     <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" />
                   </HeaderIconButton>

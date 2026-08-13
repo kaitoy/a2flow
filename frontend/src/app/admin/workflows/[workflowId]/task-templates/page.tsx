@@ -1,15 +1,16 @@
 /** @module WorkflowTaskTemplatesPage — Admin list page for a workflow's task templates. */
 "use client";
 
-import { ListTree } from "lucide-react";
+import { ListTree, MessageSquareText } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
+import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { Chip } from "@/components/ui/chip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
@@ -154,6 +155,7 @@ function buildColumns(
  */
 export default function WorkflowTaskTemplatesPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
+  const router = useRouter();
   const canEdit = useHasRole(Role.DEVELOPER);
   const [templates, setTemplates] = useState<WorkflowTaskTemplate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -208,6 +210,11 @@ export default function WorkflowTaskTemplatesPage() {
     setConfirmTarget({ id, title });
   }
 
+  function handleOpenDesign() {
+    // A design session has no id of its own — it is addressed by its workflow.
+    router.push(`/workflows/${encodeURIComponent(workflowId)}/design-session`);
+  }
+
   async function executeDelete() {
     if (!confirmTarget) return;
     try {
@@ -252,6 +259,13 @@ export default function WorkflowTaskTemplatesPage() {
         addLabel="+ Add task"
         onRefresh={load}
         refreshing={loading}
+        secondaryAction={
+          canEdit ? (
+            <HeaderIconButton label="Open design session" onClick={handleOpenDesign}>
+              <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
+            </HeaderIconButton>
+          ) : undefined
+        }
         columnPicker={
           // The graph view has no columns to choose from.
           view === "table" ? (
