@@ -417,7 +417,7 @@ async def _seed_demo_users(session: AsyncSession, tenant_id: str) -> None:
                 first_name=spec.first_name,
                 last_name=spec.last_name,
                 password=hash_password(password),
-                email=f"{spec.username}@localhost",
+                email=f"{spec.username}@example.com",
                 enabled=True,
                 email_verified=False,
                 # No direct roles: every demo account inherits its role from
