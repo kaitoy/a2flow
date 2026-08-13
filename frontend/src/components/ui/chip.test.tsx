@@ -105,6 +105,27 @@ describe("Chip", () => {
     expect(onRemove).toHaveBeenCalledTimes(1);
   });
 
+  it("renders the remove button as a pressable icon target", () => {
+    render(<Chip label="Developers" onRemove={() => {}} />);
+
+    const button = screen.getByRole("button", { name: "Remove Developers" });
+    // A bare text glyph gave the button no hit area, no cursor change and no
+    // focus treatment — it did not read as pressable at all.
+    expect(button.className).toContain("cursor-pointer");
+    expect(button.className).toContain("size-5");
+    expect(button.className).toContain("rounded-full");
+    expect(button.className).toContain("hover:border-error/40");
+    expect(button.className).toContain("focus-visible:ring-error/50");
+  });
+
+  it("keeps the remove icon out of the accessible name", () => {
+    render(<Chip label="Developers" onRemove={() => {}} />);
+
+    const button = screen.getByRole("button", { name: "Remove Developers" });
+    // The aria-label is the whole accessible name; the glyph must not add to it.
+    expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
   it("keeps the remove button reachable even when the label is long enough to clip", async () => {
     // A label past ~36 characters is ordinary data here — e.g. UserPicker's
     // "First Last (username)" chips in font-mono text-xs. If the truncating

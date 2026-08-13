@@ -1,6 +1,7 @@
 /** @module Chip — single-line data pill for variable-length labels, with an overflow tooltip. */
 "use client";
 
+import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Tooltip } from "./tooltip";
 
@@ -13,11 +14,46 @@ interface ChipProps {
   /** Called when the pointer leaves the chip. */
   onMouseLeave?: () => void;
   /**
-   * When supplied, the chip renders a remove button labelled
-   * `Remove ${label}`. Omit it for chips that only display a reference.
+   * When supplied, the chip renders a trailing remove button labelled
+   * `Remove ${label}` — a 20px round icon target that borders and tints
+   * `error` on hover/focus. Omit it for chips that only display a reference.
    */
   onRemove?: () => void;
 }
+
+/**
+ * Class list for the remove button.
+ *
+ * Hand-rolled rather than reusing {@link DeleteIconButton} or
+ * {@link ActionIconButton}: both are `size-8` and carry a `glass-panel`
+ * surface of their own, which is far too large and stacks a second glass tier
+ * inside this pill (itself a `glass-panel`) at `py-0.5 text-xs`. There is no
+ * shared small icon button to reach for, so this matches the shared
+ * conventions by hand instead — `cursor-pointer`, the standard
+ * `focus-visible:ring-2` treatment (DESIGN.md → Accessibility), and the motion
+ * duration/ease tokens rather than a bare `transition-colors`.
+ *
+ * The border is reserved at rest as `border-transparent` so the hover outline
+ * appears without nudging the layout, and the `error` palette is borrowed from
+ * `DeleteIconButton` because removing an assignment is the same destructive
+ * verb.
+ */
+const REMOVE_BUTTON_CLASS = [
+  // 20px round hit target. The pill pads `px-2`; `-mr-1` pulls the button
+  // back into that padding so the trailing gap stays visually even.
+  "-mr-1 ml-1 inline-flex size-5 shrink-0 items-center justify-center rounded-full",
+  // DESIGN.md → Responsive & touch puts icon buttons at ~44px under
+  // `pointer-coarse`. Deliberately smaller here: 44px inside a `text-xs` pill
+  // would take the whole chip to ~48px tall. 28px is the compromise.
+  "pointer-coarse:size-7",
+  "cursor-pointer border border-transparent text-on-surface-variant",
+  // `translate`/`scale` must be named for the `active:scale-90` below to
+  // animate — Tailwind v4 drives transforms through separate properties.
+  "transition-[background-color,border-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
+  "hover:border-error/40 hover:bg-error/10 hover:text-error",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/50",
+  "motion-safe:active:scale-90",
+].join(" ");
 
 /**
  * Pill naming a single related record (a dependency task, a bound MCP tool) in
@@ -52,7 +88,9 @@ interface ChipProps {
  * area matched to the exact box that clips.
  *
  * Pass {@link ChipProps.onRemove} to add a trailing remove button for chips
- * that represent a dismissible selection rather than a plain reference.
+ * that represent a dismissible selection rather than a plain reference. It is
+ * sized and styled as a real icon button (see {@link REMOVE_BUTTON_CLASS}), so
+ * a chip carrying one stands 4px taller than a plain reference chip.
  */
 export function Chip({ label, onMouseEnter, onMouseLeave, onRemove }: ChipProps) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -85,9 +123,11 @@ export function Chip({ label, onMouseEnter, onMouseLeave, onRemove }: ChipProps)
           type="button"
           aria-label={`Remove ${label}`}
           onClick={onRemove}
-          className="ml-1 shrink-0 text-on-surface-variant transition-colors hover:text-error"
+          className={REMOVE_BUTTON_CLASS}
         >
-          ×
+          {/* `strokeWidth` is raised above the house 1.8 (DESIGN.md →
+              Iconography): at 14px the lighter stroke reads as a hairline. */}
+          <X size={14} strokeWidth={2} aria-hidden="true" />
         </button>
       )}
     </span>
