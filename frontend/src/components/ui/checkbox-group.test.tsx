@@ -78,6 +78,26 @@ describe("CheckboxGroup", () => {
     expect(container.firstElementChild?.className).not.toContain("glass-panel");
   });
 
+  it("stacks the rows in a single column by default", () => {
+    const { container } = render(<CheckboxGroup options={OPTIONS} value={[]} onChange={vi.fn()} />);
+    expect(container.firstElementChild?.className).toContain("flex-col");
+    expect(container.firstElementChild?.className).not.toContain("grid-cols-2");
+  });
+
+  it("lays the rows out as a grid when asked for two columns", () => {
+    const { container } = render(
+      <CheckboxGroup columns={2} options={OPTIONS} value={[]} onChange={vi.fn()} />
+    );
+    expect(container.firstElementChild?.className).toContain("grid-cols-2");
+    expect(container.firstElementChild?.className).not.toContain("flex-col");
+    expect(screen.getByRole("checkbox", { name: "Alpha" })).toBeInTheDocument();
+  });
+
+  it("keeps a clipped label readable through a title attribute", () => {
+    render(<CheckboxGroup options={OPTIONS} value={[]} onChange={vi.fn()} />);
+    expect(screen.getByText("Alpha")).toHaveAttribute("title", "Alpha");
+  });
+
   it("draws a decorative swatch before an option's label", () => {
     render(
       <CheckboxGroup

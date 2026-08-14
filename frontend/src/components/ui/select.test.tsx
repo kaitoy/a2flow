@@ -78,6 +78,17 @@ describe("Select", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("caps the listbox at the height its side of the trigger offers", async () => {
+    const user = userEvent.setup();
+    render(<Select options={OPTIONS} value="a" onChange={vi.fn()} aria-label="Tenant" />);
+
+    await user.click(screen.getByRole("combobox", { name: "Tenant" }));
+
+    const listbox = screen.getByRole("listbox");
+    expect(listbox.style.maxHeight).not.toBe("");
+    expect(listbox.className).toContain("overflow-y-auto");
+  });
+
   it("does not open when disabled", async () => {
     const user = userEvent.setup();
     render(<Select options={OPTIONS} value="a" onChange={vi.fn()} aria-label="Tenant" disabled />);

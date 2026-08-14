@@ -11,8 +11,9 @@
 
 import { animated, useTransition } from "@react-spring/web";
 import { ChevronDown } from "lucide-react";
-import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAnchoredPanel } from "@/hooks/useAnchoredPanel";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
 import { useMotionConfig } from "@/lib/motion";
 
@@ -62,22 +63,18 @@ const OPTION_CLASSES =
   "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass";
 
 const MIN_PANEL_WIDTH = 160;
-const GAP = 6;
-const EDGE_PADDING = 8;
-
-interface Coords {
-  top: number;
-  left: number;
-  width: number;
-}
+/** Cap on the listbox's height; below it, whatever room the chosen side has wins. */
+const MAX_LISTBOX_HEIGHT = 240;
 
 /**
  * Glass-panel dropdown/listbox picker. Renders a `glass-panel` trigger button
  * showing the selected option's label, and — on open — a portaled
- * `glass-panel-overlay` listbox positioned beneath it, sized to the
- * trigger's own measured width (clamped to the viewport with a floor)
- * rather than a fixed pixel constant, since a value-picker's popup should
- * match its control's width.
+ * `glass-panel-overlay` listbox placed by the shared `useAnchoredPanel` hook:
+ * sized to the trigger's own measured width (clamped to the viewport with a
+ * floor) rather than a fixed pixel constant, since a value-picker's popup
+ * should match its control's width, and fitted vertically — beneath the
+ * trigger where there is room, flipped above it where there is not, scrolling
+ * within whatever height that side offers.
  *
  * The trigger carries `role="combobox"` / `aria-expanded` / `aria-controls`.
  * Once open, DOM focus moves into the listbox itself via the shared
@@ -100,7 +97,6 @@ export function Select({
 }: SelectProps) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<Coords | null>(null);
   const [highlighted, setHighlighted] = useState(0);
   const config = useMotionConfig("snappy");
   const panelId = `select-listbox-${useId()}`;
@@ -108,32 +104,13 @@ export function Select({
   const selectedIndex = options.findIndex((o) => o.value === value);
   const selectedLabel = selectedIndex >= 0 ? options[selectedIndex].label : "";
 
-  const computeCoords = useCallback((): Coords | null => {
-    const anchor = triggerRef.current;
-    if (!anchor) return null;
-    const rect = anchor.getBoundingClientRect();
-    const width = Math.max(
-      MIN_PANEL_WIDTH,
-      Math.min(rect.width, window.innerWidth - EDGE_PADDING * 2)
-    );
-    const left = Math.max(
-      EDGE_PADDING,
-      Math.min(rect.left, window.innerWidth - width - EDGE_PADDING)
-    );
-    return { top: rect.bottom + GAP, left, width };
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    setCoords(computeCoords());
-    const onChangePos = () => setCoords(computeCoords());
-    window.addEventListener("scroll", onChangePos, true);
-    window.addEventListener("resize", onChangePos);
-    return () => {
-      window.removeEventListener("scroll", onChangePos, true);
-      window.removeEventListener("resize", onChangePos);
-    };
-  }, [open, computeCoords]);
+  const coords = useAnchoredPanel({
+    open,
+    anchorRef: triggerRef,
+    width: "anchor",
+    minWidth: MIN_PANEL_WIDTH,
+    preferredMaxHeight: MAX_LISTBOX_HEIGHT,
+  });
 
   useDialogA11y({
     open,
@@ -206,10 +183,12 @@ export function Select({
     }
   }
 
+  // Slide out of the trigger, whichever side the listbox ended up on.
+  const offset = coords?.placement === "top" ? 6 : -6;
   const transitions = useTransition(open, {
-    from: { opacity: 0, y: -6 },
+    from: { opacity: 0, y: offset },
     enter: { opacity: 1, y: 0 },
-    leave: { opacity: 0, y: -6 },
+    leave: { opacity: 0, y: offset },
     config,
   });
 
@@ -257,14 +236,16 @@ export function Select({
                   style={{
                     position: "fixed",
                     top: coords.top,
+                    bottom: coords.bottom,
                     left: coords.left,
                     width: coords.width,
+                    maxHeight: coords.maxHeight,
                     opacity: style.opacity,
                     transform: style.y.to((y) => `translateY(${y}px)`),
                     zIndex: 9999,
                     boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
                   }}
-                  className="glass-panel-overlay max-h-60 overflow-y-auto rounded-xl p-2 text-on-surface"
+                  className="glass-panel-overlay overflow-y-auto rounded-xl p-2 text-on-surface"
                 >
                   {options.map((opt, index) => (
                     // biome-ignore lint/a11y/useFocusableInteractive: intentionally not focusable — the listbox owns keyboard focus and drives highlighting via aria-activedescendant (roving-focus pattern), matching onListboxKeyDown above

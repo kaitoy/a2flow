@@ -119,6 +119,61 @@ describe("ColumnPicker", () => {
     );
   });
 
+  it("shows every column from the bulk toggle", async () => {
+    const user = userEvent.setup();
+    const { onChange } = setup();
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("button", { name: "Show all" }));
+
+    expect(onChange).toHaveBeenCalledWith(["Type", "Reference"]);
+  });
+
+  it("turns the bulk toggle into Hide all once every column is shown", async () => {
+    const user = userEvent.setup();
+    const { onChange } = setup({ value: ["Type", "Reference"] });
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("button", { name: "Hide all" }));
+
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("caps the panel's height and scrolls the column list inside it", async () => {
+    const user = userEvent.setup();
+    setup();
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    const panel = await screen.findByRole("dialog", { name: "Column visibility" });
+
+    expect(panel.style.maxHeight).not.toBe("");
+    expect(panel.querySelector(".overflow-y-auto")).toBeInTheDocument();
+  });
+
+  it("keeps a short list in one column", async () => {
+    const user = userEvent.setup();
+    setup();
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    const panel = await screen.findByRole("dialog", { name: "Column visibility" });
+
+    expect(panel.querySelector(".grid-cols-2")).not.toBeInTheDocument();
+  });
+
+  it("splits a long list into two columns", async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      value: `Column ${i}`,
+      label: `Column ${i}`,
+    }));
+    setup({ options: many, value: [] });
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    const panel = await screen.findByRole("dialog", { name: "Column visibility" });
+
+    expect(panel.querySelector(".grid-cols-2")).toBeInTheDocument();
+  });
+
   it("explains itself when the table offers no toggleable columns", async () => {
     const user = userEvent.setup();
     setup({ options: [], value: [] });
