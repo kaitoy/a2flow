@@ -105,14 +105,15 @@ const RESIZE_HANDLE_ALLOWANCE = 2;
 
 /**
  * Trigger chrome around the label in an interactive header: the menu trigger's
- * `px-1` padding (8px) plus the gap (6px) and the fixed `size-4` sort/menu
- * indicator slot (16px). Mirrors {@link TableHeaderMenu}'s trigger markup —
- * the two must move together.
+ * `pl-1` + `pr-2.5` padding, and nothing else. Its sort/filter indicator is
+ * absolutely positioned in the header cell's right padding (see
+ * {@link TableHeaderMenu}), so the glyph itself costs the column nothing —
+ * which is the whole reason a menu column is barely wider than a plain one.
+ * The right side is the larger half because the slot reaches back over it to
+ * stay clear of the resize strip. Mirrors the trigger's markup; the two must
+ * move together.
  */
-const TRIGGER_ALLOWANCE = 30;
-
-/** Reserved filter indicator in the trigger: the 12px funnel plus its 6px gap. */
-const FILTER_ALLOWANCE = 18;
+const TRIGGER_ALLOWANCE = 14;
 
 /**
  * Highest width every column may take before the total exceeds `budget`.
@@ -136,6 +137,45 @@ function widthCeiling(widths: number[], budget: number): number {
     remaining -= ascending[i];
   }
   return remaining;
+}
+
+/** Which header controls a column offers. See {@link headerControls}. */
+interface HeaderControls {
+  /** The header offers sort actions. */
+  sortable: boolean;
+  /** The header filters by tag rather than by a field of the record. */
+  tagFilterable: boolean;
+  /** The header offers a filter of either kind. */
+  filterable: boolean;
+  /** The header renders a {@link TableHeaderMenu} rather than plain text. */
+  interactive: boolean;
+}
+
+/**
+ * Resolve a column's header controls from the handlers the table was given.
+ *
+ * Both the width measurement and the header markup ask this one function, so
+ * the trigger allowance added to a column's floor cannot drift from what is
+ * actually rendered — it already had: the measurement recognised only
+ * `sortField`/`filterField` columns and so gave no allowance to a
+ * `filterKind: "tags"` column, which has neither yet still renders the menu.
+ *
+ * @param col The column definition.
+ * @param onSortChange The table's sort handler, if sorting is enabled.
+ * @param onFilterChange The table's filter handler, if filtering is enabled.
+ * @param onTagIdsChange The table's tag handler, if the tag filter is enabled.
+ * @returns The controls that column's header renders.
+ */
+function headerControls<T>(
+  col: ColumnDef<T>,
+  onSortChange?: DataTableProps<T>["onSortChange"],
+  onFilterChange?: DataTableProps<T>["onFilterChange"],
+  onTagIdsChange?: DataTableProps<T>["onTagIdsChange"]
+): HeaderControls {
+  const sortable = !!col.sortField && !!onSortChange;
+  const tagFilterable = col.filterKind === "tags" && !!onTagIdsChange;
+  const filterable = (!!col.filterField && !!onFilterChange) || tagFilterable;
+  return { sortable, tagFilterable, filterable, interactive: sortable || filterable };
 }
 
 /**
@@ -219,7 +259,9 @@ export function fitColumnWidths<T>(
  * surface. When `onSortChange`/`onFilterChange` are provided, a column with
  * `sortField`/`filterField` renders its whole header as a single
  * {@link TableHeaderMenu} trigger opening labeled sort actions and the column
- * filter, with persistent sort/filter indicators on the header itself. By
+ * filter, with a persistent sort/filter indicator on the header itself — one
+ * slot, parked in the header cell's padding, so an interactive column is no
+ * wider than a plain one. By
  * default every cell clips to a single line and reveals its full text in a
  * tooltip on overflow; columns that render interactive or multi-line content
  * opt out with `noTruncate`.
@@ -334,21 +376,18 @@ export function DataTable<T>({
     for (const col of columns) {
       const el = thRefs.current.get(col.header);
       if (el) measured[col.header] = col.width ?? el.offsetWidth;
-      const sortable = !!col.sortField && !!onSortChange;
-      const filterable = !!col.filterField && !!onFilterChange;
-      let min =
+      const { interactive } = headerControls(col, onSortChange, onFilterChange, onTagIdsChange);
+      headerMin[col.header] =
         Math.ceil(sizerRefs.current.get(col.header)?.offsetWidth ?? 0) +
         TH_PADDING_X +
-        RESIZE_HANDLE_ALLOWANCE;
-      if (sortable || filterable) min += TRIGGER_ALLOWANCE;
-      if (filterable) min += FILTER_ALLOWANCE;
-      headerMin[col.header] = min;
+        RESIZE_HANDLE_ALLOWANCE +
+        (interactive ? TRIGGER_ALLOWANCE : 0);
     }
     if (Object.keys(measured).length !== columns.length) return;
     naturalRef.current = measured;
     headerMinRef.current = headerMin;
     setWidths(fitColumnWidths(columns, measured, wrapperRef.current?.clientWidth ?? 0, headerMin));
-  }, [columns, widths, loading, rows.length, onSortChange, onFilterChange]);
+  }, [columns, widths, loading, rows.length, onSortChange, onFilterChange, onTagIdsChange]);
 
   // Refit when the panel resizes (window, sidebar) so the columns give ground
   // instead of the rightmost one falling off the edge.
@@ -429,9 +468,12 @@ export function DataTable<T>({
         <thead className="bg-glass-strong/70 backdrop-blur-md">
           <tr>
             {columns.map((col) => {
-              const sortable = !!col.sortField && !!onSortChange;
-              const tagFilterable = col.filterKind === "tags" && !!onTagIdsChange;
-              const filterable = (!!col.filterField && !!onFilterChange) || tagFilterable;
+              const { sortable, tagFilterable, filterable, interactive } = headerControls(
+                col,
+                onSortChange,
+                onFilterChange,
+                onTagIdsChange
+              );
               const direction =
                 col.sortField && sort?.field === col.sortField
                   ? sort.descending
@@ -447,7 +489,7 @@ export function DataTable<T>({
                   }}
                   className="relative border-divider border-b px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant [&:not(:last-child)]:border-r"
                 >
-                  {sortable || filterable ? (
+                  {interactive ? (
                     <TableHeaderMenu
                       label={col.header}
                       sortDirection={sortable ? direction : undefined}

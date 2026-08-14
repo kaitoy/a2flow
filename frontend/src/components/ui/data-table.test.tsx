@@ -360,7 +360,10 @@ describe("DataTable", () => {
         onFilterChange={vi.fn()}
       />
     );
-    expect(container.querySelector('[data-filter-indicator="idle"]')).toBeInTheDocument();
+    expect(container.querySelector("[data-header-indicator]")).toHaveAttribute(
+      "data-header-indicator",
+      "idle"
+    );
 
     rerender(
       <DataTable
@@ -371,7 +374,10 @@ describe("DataTable", () => {
         onFilterChange={vi.fn()}
       />
     );
-    expect(container.querySelector('[data-filter-indicator="active"]')).toBeInTheDocument();
+    expect(container.querySelector("[data-header-indicator]")).toHaveAttribute(
+      "data-header-indicator",
+      "filter"
+    );
   });
 
   it("clears the sort when its column stops being rendered", () => {
@@ -563,16 +569,23 @@ describe("DataTable column fitting", () => {
   ];
 
   /** Natural width each column reports, keyed by its header text. */
-  const NATURAL: Record<string, number> = { Name: 200, Prompt: 800, Actions: 100 };
+  const NATURAL: Record<string, number> = { Name: 200, Prompt: 800, Actions: 100, Tags: 200 };
 
   /** Label width each hidden header sizer reports, keyed by its text. */
-  const SIZER: Record<string, number> = { Name: 80 };
+  const SIZER: Record<string, number> = { Name: 80, Tags: 80 };
 
   /**
    * Chrome the component adds around a measured sizer on a non-interactive
    * header. Mirrors TH_PADDING_X + RESIZE_HANDLE_ALLOWANCE in data-table.tsx.
    */
   const HEADER_CHROME = 42;
+
+  /**
+   * What an interactive header adds on top of that — the menu trigger's own
+   * padding, and nothing more, since its indicator is parked in the header
+   * cell's padding. Mirrors TRIGGER_ALLOWANCE in data-table.tsx.
+   */
+  const TRIGGER_CHROME = 14;
 
   let panelWidth = 600;
   /** Every ResizeObserver the render creates, so a resize can be replayed. */
@@ -679,6 +692,42 @@ describe("DataTable column fitting", () => {
     // label (80) plus the header chrome = 122, so it stops there and the panel
     // overflows slightly; Prompt's header is narrow, so the ceiling takes it.
     expect(colWidths(container)).toEqual([SIZER.Name + HEADER_CHROME, 100, 100]);
+  });
+
+  it("adds only the trigger's own padding to an interactive column's floor", () => {
+    const { container } = render(
+      <DataTable
+        columns={[
+          { header: "Name", sortField: "name", filterField: "name", cell },
+          ...COLS.slice(1),
+        ]}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        onSortChange={vi.fn()}
+        onFilterChange={vi.fn()}
+      />
+    );
+    resizePanel(300);
+    // The sort/filter indicator lives in the header cell's padding, so a menu
+    // column's floor is its plain floor plus the trigger's own padding — not
+    // the ~48px of inline chrome the trigger used to reserve.
+    expect(colWidths(container)).toEqual([SIZER.Name + HEADER_CHROME + TRIGGER_CHROME, 100, 100]);
+  });
+
+  it("gives a tag-filter column the same trigger allowance", () => {
+    const { container } = render(
+      <DataTable
+        columns={[{ header: "Tags", filterKind: "tags", tagOptions: [], cell }, ...COLS.slice(1)]}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+        tagIds={[]}
+        onTagIdsChange={vi.fn()}
+      />
+    );
+    resizePanel(300);
+    // A tag column has neither sortField nor filterField, yet still renders the
+    // menu — the measurement has to recognise it the same way the markup does.
+    expect(colWidths(container)).toEqual([SIZER.Tags + HEADER_CHROME + TRIGGER_CHROME, 100, 100]);
   });
 
   it("clears the tag filter when the tag column is hidden", () => {

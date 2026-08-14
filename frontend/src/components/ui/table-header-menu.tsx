@@ -1,4 +1,4 @@
-/** @module TableHeaderMenu — unified column header: a full-width trigger opening a menu with labeled sort actions and the column filter. */
+/** @module TableHeaderMenu — unified column header: a full-width trigger opening a menu with labeled sort actions and the column filter, with its state indicator parked outside the flow so it costs the column no width. */
 "use client";
 
 import { animated, useTransition } from "@react-spring/web";
@@ -72,9 +72,17 @@ const ITEM_CLASSES =
  * whole header is one full-width button that opens a floating glass menu with
  * labeled "Sort ascending" / "Sort descending" actions and, below a divider,
  * the column filter (a debounced text input or, when `options` are given, a
- * select). The trigger carries persistent state indicators — an accent
- * arrow for the active sort direction, an accent funnel + dot when a filter
- * is applied, and a subtle chevron (strengthening on hover) when idle.
+ * select).
+ *
+ * The trigger's persistent state lives in a *single* 16px indicator slot,
+ * absolutely positioned in the header cell's own right padding: an accent
+ * arrow for the active sort direction, an accent funnel when only a filter is
+ * applied, and a subtle chevron (strengthening on hover) when idle, with an
+ * accent dot riding along whenever a filter is applied. One slot outside the
+ * flow rather than two inline ones is what keeps the control from widening its
+ * column — it contributes nothing to the header's intrinsic width, and the
+ * label cannot shift when a filter comes or goes. See `data-table.tsx`'s
+ * `TRIGGER_ALLOWANCE`, which mirrors what is left (the trigger's own padding).
  *
  * The panel renders through a portal so it is never clipped by the table's
  * overflow, uses the dialog a11y pattern (it embeds an input, which rules out
@@ -107,6 +115,16 @@ export function TableHeaderMenu({
   const multi = filterValues !== undefined && !!onFilterValuesChange;
   const filterable = (filterValue !== undefined && !!onFilterChange) || multi;
   const filterActive = (filterValue ?? "") !== "" || (filterValues?.length ?? 0) > 0;
+  // Which of the four states the single indicator slot is showing. Exposed on
+  // the element so tests (and anyone inspecting the DOM) can read the state
+  // without matching on lucide's class names.
+  const indicatorState = sortDirection
+    ? filterActive
+      ? "sort-filter"
+      : "sort"
+    : filterActive
+      ? "filter"
+      : "idle";
 
   // Keep the draft in sync when the applied value changes from outside.
   useEffect(() => {
@@ -186,30 +204,31 @@ export function TableHeaderMenu({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`group flex w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5 text-left uppercase tracking-[0.08em] transition-colors hover:bg-accent-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${sortDirection ? "text-accent" : "hover:text-on-surface"}`}
+        className={`group relative flex w-full min-w-0 cursor-pointer items-center rounded-md py-0.5 pr-2.5 pl-1 text-left uppercase tracking-[0.08em] transition-colors hover:bg-accent-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${sortDirection ? "text-accent" : "hover:text-on-surface"}`}
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        {filterable ? (
-          // Rendered even when idle (just invisible) so the header's measured
-          // minimum width stays valid and the label never shifts when a
-          // filter is applied.
-          <span
-            aria-hidden="true"
-            data-filter-indicator={filterActive ? "active" : "idle"}
-            className={`relative shrink-0 transition-opacity ${filterActive ? "opacity-100" : "opacity-0"}`}
-          >
-            <Funnel size={12} strokeWidth={1.8} className="text-accent" />
-            <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-accent" />
-          </span>
-        ) : null}
+        {/* Parked mostly in the header cell's own right padding, so the
+            indicator costs the column almost no width and applying a filter
+            never shifts the label. `-right-2.5` stops the slot — and the dot
+            that pokes 2px past it — short of the cell's 8px resize strip,
+            which sits above it at `z-10` and would otherwise swallow clicks
+            aimed at the icon and put a col-resize cursor on it; the trigger's
+            matching `pr-2.5` is what keeps the label clear of the slot in
+            return. It stays a child of the button, since an absolutely
+            positioned descendant is still part of its hit area — clicking the
+            icon opens the menu — while contributing nothing to the intrinsic
+            width. */}
         <span
           aria-hidden="true"
-          className="inline-flex size-4 shrink-0 items-center justify-center"
+          data-header-indicator={indicatorState}
+          className="-right-2.5 -translate-y-1/2 absolute top-1/2 inline-flex size-4 items-center justify-center"
         >
           {sortDirection === "asc" ? (
             <ArrowUp size={16} strokeWidth={1.8} className="text-accent" />
           ) : sortDirection === "desc" ? (
             <ArrowDown size={16} strokeWidth={1.8} className="text-accent" />
+          ) : filterActive ? (
+            <Funnel size={14} strokeWidth={1.8} className="text-accent" />
           ) : (
             <ChevronDown
               size={16}
@@ -217,6 +236,11 @@ export function TableHeaderMenu({
               className="text-on-surface-variant/40 transition-colors group-hover:text-on-surface-variant"
             />
           )}
+          {/* A sorted column shows its arrow, so "also filtered" has to ride
+              along as the dot rather than as a second glyph. */}
+          {filterActive ? (
+            <span className="-top-0.5 -right-0.5 absolute size-1.5 rounded-full bg-accent" />
+          ) : null}
         </span>
       </button>
       {typeof document !== "undefined" &&

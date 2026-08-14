@@ -114,7 +114,7 @@ describe("TableHeaderMenu", () => {
     );
   });
 
-  it("shows the sort direction and filter state on the trigger", () => {
+  it("shows the sort direction and filter state in one indicator slot", () => {
     const { rerender, container } = render(
       <TableHeaderMenu
         label="Name"
@@ -124,22 +124,60 @@ describe("TableHeaderMenu", () => {
         onFilterChange={vi.fn()}
       />
     );
-    // Idle: a subtle menu chevron and an invisible (reserved) filter indicator.
-    expect(container.querySelector(".lucide-chevron-down")).toBeInTheDocument();
-    expect(container.querySelector('[data-filter-indicator="idle"]')).toBeInTheDocument();
+    /** The single indicator slot, whatever it currently shows. */
+    const slot = () => container.querySelector("[data-header-indicator]");
+    /** The accent "filter applied" dot riding along inside the slot. */
+    const dot = () => slot()?.querySelector(".bg-accent");
 
+    // Idle: a subtle menu chevron, nothing else.
+    expect(slot()).toHaveAttribute("data-header-indicator", "idle");
+    expect(container.querySelector(".lucide-chevron-down")).toBeInTheDocument();
+    expect(dot()).toBeFalsy();
+
+    // Filtered only: the funnel takes the slot and the dot appears.
     rerender(
       <TableHeaderMenu
         label="Name"
-        sortDirection="asc"
+        sortDirection={null}
         onSortChange={vi.fn()}
         filterValue="abc"
         onFilterChange={vi.fn()}
       />
     );
-    expect(container.querySelector(".lucide-arrow-up")).toBeInTheDocument();
+    expect(slot()).toHaveAttribute("data-header-indicator", "filter");
+    expect(container.querySelector(".lucide-funnel")).toBeInTheDocument();
     expect(container.querySelector(".lucide-chevron-down")).not.toBeInTheDocument();
-    expect(container.querySelector('[data-filter-indicator="active"]')).toBeInTheDocument();
+    expect(dot()).toBeTruthy();
+
+    // Sorted only: the arrow takes the slot, no dot.
+    rerender(
+      <TableHeaderMenu
+        label="Name"
+        sortDirection="asc"
+        onSortChange={vi.fn()}
+        filterValue=""
+        onFilterChange={vi.fn()}
+      />
+    );
+    expect(slot()).toHaveAttribute("data-header-indicator", "sort");
+    expect(container.querySelector(".lucide-arrow-up")).toBeInTheDocument();
+    expect(dot()).toBeFalsy();
+
+    // Both: the arrow wins the slot and "also filtered" rides along as the dot,
+    // since there is only ever one glyph to spend.
+    rerender(
+      <TableHeaderMenu
+        label="Name"
+        sortDirection="desc"
+        onSortChange={vi.fn()}
+        filterValue="abc"
+        onFilterChange={vi.fn()}
+      />
+    );
+    expect(slot()).toHaveAttribute("data-header-indicator", "sort-filter");
+    expect(container.querySelector(".lucide-arrow-down")).toBeInTheDocument();
+    expect(container.querySelector(".lucide-funnel")).not.toBeInTheDocument();
+    expect(dot()).toBeTruthy();
   });
 
   it("debounces the text filter and keeps the menu open", async () => {
