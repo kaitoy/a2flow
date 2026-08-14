@@ -113,9 +113,7 @@ async def generate_workflow(
     """
     workflow = await service.generate(skill_id, body.name, user_id=user_id)
     background.add_task(generation_job, workflow.id, body.prompt, user_id=user_id)
-    # A workflow born a moment ago carries no tags, so its read view is
-    # built directly rather than through another round trip.
-    return ApiResponse(meta=meta, data=WorkflowRead.from_workflow(workflow, tag_ids=[]))
+    return ApiResponse(meta=meta, data=await service.to_read(workflow))
 
 
 @router.get("", response_model=ApiResponse[list[AgentSkillRead]])

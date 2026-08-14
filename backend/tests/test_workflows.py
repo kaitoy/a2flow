@@ -56,7 +56,24 @@ async def test_generate_workflow_response_is_generating(
     body = assert_ok(response, status=201)
     assert body["name"] == "my-workflow"
     assert body["status"] == "generating"
+    assert body["tagIds"] == []
     assert "prompt" not in body
+
+
+async def test_generate_workflow_copies_the_skills_tags(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    tag = assert_ok(
+        await workflow_client.post("/api/v1/tags", json={"name": "prod"}), status=201
+    )
+    assert_ok(
+        await workflow_client.put(
+            f"/api/v1/agent-skills/{skill['id']}/tags", json={"tagIds": [tag["id"]]}
+        )
+    )
+    wf = await generate_workflow(workflow_client, skill["id"])
+    assert wf["tagIds"] == [tag["id"]]
 
 
 async def test_generate_workflow_schedules_generation_job(

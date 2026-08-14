@@ -168,7 +168,9 @@ class WorkflowDesignService:
         current published revision, then returns; the caller schedules
         :func:`generate_workflow_design` as a background job to fill in the
         task templates. The prompt itself is not stored — it becomes the design
-        session's first chat message.
+        session's first chat message. The workflow also inherits the skill's
+        tag attachments as a one-time copy at creation time; the two records'
+        tags are independent from then on.
 
         Args:
             skill_id: Identifier of the skill to generate a workflow from.
@@ -203,6 +205,9 @@ class WorkflowDesignService:
             user_id=user_id,
         )
         workflow_id = workflow.id
+        tag_ids = await self._skills.tag_ids_for(skill_id)
+        if tag_ids:
+            await self._workflows.set_tags(workflow_id, tag_ids)
         await self._workflows.set_status(
             workflow_id, WorkflowStatus.generating, user_id=user_id
         )
