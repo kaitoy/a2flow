@@ -54,6 +54,11 @@ describe("AdminPage (welcome)", () => {
     expect(screen.getByRole("link", { name: /Users/ })).toHaveAttribute("href", "/admin/users");
   });
 
+  it("never renders an API Docs card (it's a sidebar-only footer link, not an adminNavItems entry)", () => {
+    render(<AdminPage />, { preloadedState: authState(["super_admin"]) });
+    expect(screen.queryByRole("link", { name: /API Docs/ })).not.toBeInTheDocument();
+  });
+
   it("hides role-gated cards from a user without those roles", () => {
     render(<AdminPage />, { preloadedState: authState([]) });
     expect(screen.queryByRole("link", { name: /Users/ })).not.toBeInTheDocument();

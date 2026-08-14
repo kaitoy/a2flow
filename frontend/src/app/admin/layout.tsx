@@ -8,7 +8,7 @@
  */
 "use client";
 
-import { ChevronLeft, Menu } from "lucide-react";
+import { ChevronLeft, ExternalLink, Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
@@ -18,6 +18,7 @@ import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useVisibleAdminNavItems } from "@/lib/admin-nav";
+import { Role, useHasRole } from "@/lib/roles";
 
 /**
  * The admin section's navigation link list, shared by the static desktop
@@ -87,6 +88,50 @@ function AdminNavList({
   );
 }
 
+/**
+ * Bottom-pinned link to the interactive API reference (`/api-doc`), opened in
+ * a new tab. Visible only to admins and super admins (super_admin bypasses via
+ * {@link useHasRole}, mirroring every role-gated entry in `adminNavItems`).
+ * Kept out of `adminNavItems` deliberately: it isn't a route this section
+ * navigates into (no active-state highlighting applies) and must not appear
+ * among the welcome page's quick-action cards.
+ */
+function AdminNavFooter({
+  collapsed,
+  onNavigate,
+}: {
+  /** Whether to render the icon-only rail variant (desktop collapse). */
+  collapsed: boolean;
+  /** Called after the link is activated (the drawer closes itself with this). */
+  onNavigate?: () => void;
+}) {
+  const canViewApiDocs = useHasRole(Role.ADMIN);
+  if (!canViewApiDocs) return null;
+
+  return (
+    <div className="mt-auto px-3 py-3">
+      <Tooltip label="API Docs" placement="right" disabled={!collapsed}>
+        <span className="block">
+          <a
+            href="/api-doc"
+            target="_blank"
+            rel="noreferrer"
+            onClick={onNavigate}
+            className="relative block rounded-xl px-3 py-2 text-sm text-on-surface-variant transition-all duration-150 hover:bg-glass hover:text-on-surface"
+          >
+            <span
+              className={["flex items-center gap-2.5", collapsed ? "justify-center" : ""].join(" ")}
+            >
+              <ExternalLink size={18} strokeWidth={1.8} aria-hidden="true" className="shrink-0" />
+              {!collapsed && "API Docs"}
+            </span>
+          </a>
+        </span>
+      </Tooltip>
+    </div>
+  );
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -123,10 +168,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
           </div>
           <AdminNavList collapsed={collapsed} />
+          <AdminNavFooter collapsed={collapsed} />
         </nav>
         <SidebarDrawer open={drawerOpen} onClose={closeDrawer} label="Admin navigation">
           <nav className="flex w-64 flex-col border-r border-glass-border glass-chrome pt-3">
             <AdminNavList collapsed={false} onNavigate={closeDrawer} />
+            <AdminNavFooter collapsed={false} onNavigate={closeDrawer} />
           </nav>
         </SidebarDrawer>
         <div className="flex min-w-0 flex-1 flex-col">
