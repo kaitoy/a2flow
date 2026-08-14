@@ -5,27 +5,26 @@
  * stay in step, the same way {@link McpToolPicker} is shared across the task
  * template forms.
  *
- * Deliberately not built on {@link RecordPickerField} / {@link RecordPickerDialog}:
- * those exist for record sets too large to render at once and carry a modal
- * with server-side paging. Tags are a small curated vocabulary, so this follows
- * {@link McpToolPicker} instead — load them all, render a checkbox group, and
- * add a filter box only once the list gets long.
+ * Shaped like {@link RecordPickerField}: the attached tags read as a row of
+ * removable chips and changing them opens a modal, so the field's height is the
+ * selection's, not the vocabulary's. It does not *use* that component, though —
+ * `RecordPickerField` pairs with a paged, server-filtered table and has to
+ * resolve ids to labels over the network, while {@link useTags} already holds
+ * the whole vocabulary and every chip here needs a color. The modal is
+ * {@link TagPickerDialog} instead.
  */
 "use client";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
-import { CheckboxGroup, type CheckboxOption } from "@/components/ui/checkbox-group";
+import { TagPickerDialog } from "@/components/admin/tag-picker-dialog";
+import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTags } from "@/hooks/useTags";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 import { resolveTagColor } from "@/lib/tag-palette";
-
-/** Option count above which a filter box is worth showing. */
-const FILTER_THRESHOLD = 12;
 
 /** Props for {@link TagPicker}. */
 export interface TagPickerProps {
@@ -45,11 +44,8 @@ export interface TagPickerProps {
 /**
  * Controlled multi-select over the tenant's tags.
  *
- * The current selection is shown above the group as colored chips carrying a
- * remove button, so a long vocabulary never hides what is already attached.
- * Selected tags are also kept in the filtered list — {@link CheckboxGroup}
- * derives the next selection from the options it was handed, so filtering one
- * out would silently drop it.
+ * The current selection is shown as colored chips carrying a remove button, so
+ * the common edit — dropping one tag — costs no dialog at all.
  *
  * An id with no matching tag is rendered as a chip labelled with the id itself
  * rather than dropped: that only happens when a tag was deleted between the
@@ -58,7 +54,8 @@ export interface TagPickerProps {
  */
 export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }: TagPickerProps) {
   const { tags, byId, loading } = useTags();
-  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [everOpened, setEverOpened] = useState(false);
 
   const selected = useMemo(
     () =>
@@ -70,26 +67,27 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
     [value, byId]
   );
 
-  const options: CheckboxOption[] = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return tags
-      .filter((tag) => !needle || tag.name.toLowerCase().includes(needle) || value.includes(tag.id))
-      .map((tag) => ({ value: tag.id, label: tag.name, swatch: resolveTagColor(tag.color) }));
-  }, [tags, query, value]);
+  const chips =
+    selected.length === 0 ? (
+      <ReadOnlyField>{EMPTY_VALUE}</ReadOnlyField>
+    ) : (
+      <div className="flex flex-wrap gap-1.5">
+        {selected.map((tag) => (
+          <Chip
+            key={tag.id}
+            label={tag.name}
+            color={tag.color}
+            onRemove={readOnly ? undefined : () => onChange(value.filter((id) => id !== tag.id))}
+          />
+        ))}
+      </div>
+    );
 
   if (readOnly) {
     return (
       <div className="flex flex-col gap-1.5">
         <span className="text-label-caps">{label}</span>
-        {selected.length === 0 ? (
-          <ReadOnlyField>{EMPTY_VALUE}</ReadOnlyField>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {selected.map((tag) => (
-              <Chip key={tag.id} label={tag.name} color={tag.color} />
-            ))}
-          </div>
-        )}
+        {chips}
       </div>
     );
   }
@@ -97,21 +95,12 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-label-caps">{label}</span>
-      {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {selected.map((tag) => (
-            <Chip
-              key={tag.id}
-              label={tag.name}
-              color={tag.color}
-              onRemove={() => onChange(value.filter((id) => id !== tag.id))}
-            />
-          ))}
-        </div>
-      )}
+      {chips}
       {loading ? (
-        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-9 w-40 rounded-xl" />
       ) : tags.length === 0 ? (
+        // Shown in place of the button rather than inside the dialog: there is
+        // nothing to pick, so opening one would be a dead end.
         <p className="rounded-xl glass-panel px-4 py-3 text-sm text-on-surface-variant">
           No tags are registered yet.{" "}
           <Link href="/admin/tags" className="text-accent transition-colors hover:underline">
@@ -120,23 +109,34 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
           to start classifying records.
         </p>
       ) : (
-        <>
-          {tags.length > FILTER_THRESHOLD && (
-            <Input
-              aria-label="Filter tags"
-              placeholder="Filter tags…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          )}
-          <CheckboxGroup
-            name="tagIds"
-            options={options}
-            value={value}
-            onChange={onChange}
-            emptyMessage="No tags match the filter."
-          />
-        </>
+        <div>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setEverOpened(true);
+              setOpen(true);
+            }}
+          >
+            Select tags…
+          </Button>
+        </div>
+      )}
+      {/* Mounted on the first open and then kept mounted, so it costs nothing
+          until asked for and its leave animation still has a component to run
+          on — the same lifecycle RecordPickerField gives its dialog. */}
+      {everOpened && (
+        <TagPickerDialog
+          open={open}
+          onClose={() => setOpen(false)}
+          onAssign={(ids) => {
+            onChange(ids);
+            setOpen(false);
+          }}
+          panelId="tag-picker-dialog"
+          value={value}
+          tags={tags}
+        />
       )}
     </div>
   );

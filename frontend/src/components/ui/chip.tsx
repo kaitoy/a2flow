@@ -1,7 +1,7 @@
 /** @module Chip — single-line data pill for variable-length labels, with an overflow tooltip. */
 "use client";
 
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { TagColor } from "@/lib/api";
 import { TAG_COLOR_CLASS } from "@/lib/tag-palette";
@@ -27,6 +27,16 @@ interface ChipProps {
    * `error` on hover/focus. Omit it for chips that only display a reference.
    */
   onRemove?: () => void;
+  /**
+   * When supplied, the whole chip becomes a toggle button reporting its state
+   * through `aria-pressed`. Mutually exclusive with {@link ChipProps.onRemove}:
+   * a chip cannot both be a button and contain one.
+   */
+  onToggle?: () => void;
+  /**
+   * Pressed state of the toggle. Ignored without {@link ChipProps.onToggle}.
+   */
+  selected?: boolean;
 }
 
 /**
@@ -61,6 +71,30 @@ const REMOVE_BUTTON_CLASS = [
   "hover:border-error/40 hover:bg-error/10 hover:text-error",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/50",
   "motion-safe:active:scale-90",
+].join(" ");
+
+/**
+ * Shape shared by both roots, so the toggle button and the plain pill are the
+ * same object with a different element under it.
+ */
+const PILL = "inline-flex max-w-64 items-center rounded-md px-2 py-0.5 font-mono text-xs";
+
+/**
+ * Extra classes carried only by a chip in toggle mode.
+ *
+ * Matches the shared conventions rather than inventing a pressable style: the
+ * house `focus-visible:ring-2` treatment (DESIGN.md → Accessibility) and the
+ * motion duration/ease tokens. `scale` is named in the transition property list
+ * because Tailwind v4 drives transforms through separate custom properties, so
+ * `transition-colors` alone would leave `active:scale` un-animated — the same
+ * reason {@link REMOVE_BUTTON_CLASS} names it.
+ */
+const TOGGLE_CLASS = [
+  "cursor-pointer text-left",
+  "transition-[background-color,border-color,color,box-shadow,transform,translate,scale]",
+  "duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
+  "motion-safe:active:scale-[0.97]",
 ].join(" ");
 
 /**
@@ -99,8 +133,25 @@ const REMOVE_BUTTON_CLASS = [
  * that represent a dismissible selection rather than a plain reference. It is
  * sized and styled as a real icon button (see {@link REMOVE_BUTTON_CLASS}), so
  * a chip carrying one stands 4px taller than a plain reference chip.
+ *
+ * Pass {@link ChipProps.onToggle} instead to make the *whole* chip a toggle
+ * button — how {@link TagPickerDialog} offers the tenant's vocabulary. The root
+ * element becomes a `<button aria-pressed>`, which is why the two props are
+ * mutually exclusive: `onRemove`'s button cannot nest inside it. A pressed chip
+ * takes `.tag-chip-selected` *and* a leading check, so the state is never
+ * carried by color alone. The pressed fill derives from the palette slot, so a
+ * toggle chip is expected to carry a {@link ChipProps.color}; without one only
+ * the check distinguishes it.
  */
-export function Chip({ label, color, onMouseEnter, onMouseLeave, onRemove }: ChipProps) {
+export function Chip({
+  label,
+  color,
+  onMouseEnter,
+  onMouseLeave,
+  onRemove,
+  onToggle,
+  selected = false,
+}: ChipProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const [overflowing, setOverflowing] = useState(false);
   // A colored chip swaps the neutral glass surface for the slot's tint rather
@@ -120,13 +171,15 @@ export function Chip({ label, color, onMouseEnter, onMouseLeave, onRemove }: Chi
     return () => observer.disconnect();
   }, []);
 
-  return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: hover is a non-essential visual link to the referenced row; the chip's text is the accessible content
-    <span
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      className={`inline-flex max-w-64 items-center rounded-md px-2 py-0.5 font-mono text-xs ${surface}`}
-    >
+  // Shared by both roots so the pill's contents — and the ref the overflow
+  // measurement above hangs off — are written once.
+  const body = (
+    <>
+      {onToggle && selected && (
+        // `strokeWidth` is raised above the house 1.8 for the same reason the
+        // remove icon raises it: at 14px the lighter stroke reads as a hairline.
+        <Check size={14} strokeWidth={2} aria-hidden="true" className="-ml-0.5 mr-1 shrink-0" />
+      )}
       <Tooltip label={label} disabled={!overflowing}>
         <span ref={ref} className="min-w-0 truncate">
           {label}
@@ -144,6 +197,28 @@ export function Chip({ label, color, onMouseEnter, onMouseLeave, onRemove }: Chi
           <X size={14} strokeWidth={2} aria-hidden="true" />
         </button>
       )}
+    </>
+  );
+
+  if (onToggle) {
+    return (
+      <button
+        type="button"
+        aria-pressed={selected}
+        onClick={onToggle}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        className={`${PILL} ${surface} ${selected ? "tag-chip-selected " : ""}${TOGGLE_CLASS}`}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover is a non-essential visual link to the referenced row; the chip's text is the accessible content
+    <span onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} className={`${PILL} ${surface}`}>
+      {body}
     </span>
   );
 }

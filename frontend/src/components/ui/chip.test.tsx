@@ -165,4 +165,57 @@ describe("Chip", () => {
 
     expect(onRemove).toHaveBeenCalledTimes(1);
   });
+
+  it("stays a plain span without onToggle", () => {
+    render(<Chip label="production" color="rose" />);
+    const pill = screen.getByText("production").parentElement;
+    expect(pill?.tagName).toBe("SPAN");
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("becomes a pressable button reporting its state when given onToggle", async () => {
+    const onToggle = vi.fn();
+    const user = userEvent.setup();
+    render(<Chip label="production" color="rose" onToggle={onToggle} />);
+
+    const button = screen.getByRole("button", { name: "production" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(button.className).toContain("cursor-pointer");
+    expect(button.className).toContain("focus-visible:ring-accent/50");
+
+    await user.click(button);
+
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks a selected toggle chip with both a fill and a check", () => {
+    render(<Chip label="production" color="rose" onToggle={() => {}} selected />);
+
+    const button = screen.getByRole("button", { name: "production" });
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    // The fill alone would carry the state in color only, which a tag grid
+    // cannot rely on — every chip in it is already colored.
+    expect(button.className).toContain("tag-chip-selected");
+    expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("draws no check on an unpressed toggle chip", () => {
+    render(<Chip label="production" color="rose" onToggle={() => {}} />);
+
+    const button = screen.getByRole("button", { name: "production" });
+    expect(button.className).not.toContain("tag-chip-selected");
+    expect(button.querySelector("svg")).toBeNull();
+  });
+
+  it("keeps the pill's shape in toggle mode", () => {
+    render(<Chip label="production" color="rose" onToggle={() => {}} />);
+
+    // Same object, different element under it — the width cap and radius that
+    // keep an arbitrary-length label honest must survive the swap.
+    const button = screen.getByRole("button", { name: "production" });
+    expect(button.className).toContain("max-w-64");
+    expect(button.className).toContain("rounded-md");
+    expect(button.className).toContain("tag-chip");
+    expect(screen.getByText("production").className).toContain("truncate");
+  });
 });
