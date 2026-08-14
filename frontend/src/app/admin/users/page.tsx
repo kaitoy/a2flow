@@ -135,39 +135,6 @@ function buildColumns(names: Map<string, string>): ColumnDef<User>[] {
       cell: (u) =>
         u.deletedAt ? <DateTime value={u.deletedAt} className="text-on-surface-variant" /> : "—",
     },
-    {
-      header: "Avatar Updated At",
-      visibility: "optional",
-      cell: (u) =>
-        u.avatarUpdatedAt ? (
-          <DateTime value={u.avatarUpdatedAt} className="text-on-surface-variant" />
-        ) : (
-          "—"
-        ),
-    },
-    {
-      // The avatar's palette, not the avatar itself — a row of small swatches,
-      // one per color, so a viewer can tell two users' palettes apart at a glance.
-      header: "Avatar Colors",
-      visibility: "optional",
-      noTruncate: true,
-      cell: (u) => {
-        const colors = u.avatarConfig?.colors ?? [];
-        if (colors.length === 0) return "—";
-        return (
-          <div className="flex items-center gap-1">
-            {colors.map((c, i) => (
-              <span
-                // biome-ignore lint/suspicious/noArrayIndexKey: colors carry no id of their own
-                key={`${i}-${c}`}
-                className="inline-block size-3.5 rounded-full ring-1 ring-glass-border"
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-        );
-      },
-    },
     ...auditColumns<User>(names),
   ];
 }
