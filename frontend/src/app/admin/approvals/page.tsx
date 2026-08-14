@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { auditColumns } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { PaginationControls } from "@/components/admin/pagination-controls";
@@ -39,18 +40,18 @@ export default function ApprovalsPage() {
     reload,
   } = useTableQuery<Approval>(listApprovals, { limit: LIMIT });
 
-  // Resolve the intended approvers' user IDs to display names (best-effort,
-  // falling back to the raw ID), mirroring AuditMeta. The comma-joined key lets
-  // the effect depend on the set of IDs without re-running on array identity.
+  // Resolve approver and audit user IDs to display names (best-effort, falling
+  // back to the raw ID), mirroring AuditMeta. The comma-joined key lets the
+  // effect depend on the set of IDs without re-running on array identity.
   const [names, setNames] = useState<Map<string, string>>(new Map());
-  const approverKey = rows
-    .map((a) => a.approver)
+  const userIdsKey = rows
+    .flatMap((a) => [a.approver, a.createdBy, a.updatedBy])
     .filter(Boolean)
     .join(",");
   useEffect(() => {
-    if (!approverKey) return;
+    if (!userIdsKey) return;
     let active = true;
-    getUserNames(approverKey.split(","))
+    getUserNames(userIdsKey.split(","))
       .then((resolved) => {
         if (active) setNames(resolved);
       })
@@ -60,7 +61,7 @@ export default function ApprovalsPage() {
     return () => {
       active = false;
     };
-  }, [approverKey]);
+  }, [userIdsKey]);
 
   const columns = useMemo<ColumnDef<Approval>[]>(
     () => [
@@ -116,6 +117,16 @@ export default function ApprovalsPage() {
         sortField: "createdAt",
         cell: (a) => <DateTime value={a.createdAt} className="text-on-surface-variant" />,
       },
+      {
+        header: "Description",
+        cell: (a) => a.description || "—",
+      },
+      {
+        header: "Decided At",
+        cell: (a) =>
+          a.decidedAt ? <DateTime value={a.decidedAt} className="text-on-surface-variant" /> : "—",
+      },
+      ...auditColumns<Approval>(names),
     ],
     [names]
   );

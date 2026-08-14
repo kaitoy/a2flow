@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { auditColumns } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
@@ -115,6 +116,30 @@ const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
     sortField: "createdAt",
     cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
   },
+  {
+    header: "Description",
+    visibility: "optional",
+    cell: (s) => s.description || "—",
+  },
+  {
+    header: "Auth Username",
+    visibility: "optional",
+    className: "font-mono",
+    cell: (s) => s.repoAuthUsername || "—",
+  },
+  {
+    header: "Auth Password",
+    visibility: "optional",
+    className: "font-mono",
+    cell: (s) => s.repoAuthPassword || "—",
+  },
+  {
+    header: "Synced At",
+    visibility: "optional",
+    cell: (s) =>
+      s.syncedAt ? <DateTime value={s.syncedAt} className="text-on-surface-variant" /> : "—",
+  },
+  ...auditColumns<AgentSkill>(),
 ];
 
 export default function AgentSkillsPage() {

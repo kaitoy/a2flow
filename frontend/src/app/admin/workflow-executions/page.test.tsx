@@ -80,6 +80,14 @@ describe("WorkflowExecutionsPage", () => {
     expect(requests).toEqual([["ann", "bob", "cal"]]);
   });
 
+  it("shows the Status and Finished At columns by default", async () => {
+    render(<WorkflowExecutionsPage />);
+    await waitFor(() => screen.getByText("My Workflow"));
+    expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Finished At" })).toBeInTheDocument();
+    expect(screen.getByText("completed")).toBeInTheDocument();
+  });
+
   it("links the user name to the user's edit page", async () => {
     render(<WorkflowExecutionsPage />);
     const link = await screen.findByRole("link", { name: "Alice Smith" });

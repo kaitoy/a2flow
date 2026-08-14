@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { auditColumns } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { Chip } from "@/components/ui/chip";
@@ -143,6 +144,17 @@ function buildColumns(
         );
       },
     },
+    {
+      // Meaningful only alongside status "failed"; see TaskErrorKind's docstring.
+      header: "Error Kind",
+      cell: (t) =>
+        t.errorKind ? <span className="capitalize">{t.errorKind.replace("_", " ")}</span> : "—",
+    },
+    {
+      header: "Error Message",
+      cell: (t) => t.errorMessage || "—",
+    },
+    ...auditColumns<WorkflowTask>(),
   ];
 }
 

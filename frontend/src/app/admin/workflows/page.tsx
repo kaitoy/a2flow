@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { auditColumns } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
@@ -20,6 +21,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { formatRevision } from "@/lib/agent-skill-sync-status";
 import {
   deleteWorkflow,
   executeWorkflow,
@@ -132,6 +134,13 @@ function buildColumns(
       sortField: "createdAt",
       cell: (w) => <DateTime value={w.createdAt} className="text-on-surface-variant" />,
     },
+    {
+      header: "Agent Skill Commit SHA",
+      visibility: "optional",
+      className: "font-mono",
+      cell: (w) => formatRevision(w.agentSkillCommitSha),
+    },
+    ...auditColumns<Workflow>(),
     {
       header: "Actions",
       noTruncate: true,

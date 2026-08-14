@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { auditColumns } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
@@ -126,6 +127,7 @@ function buildColumns(
         );
       },
     },
+    ...auditColumns<WorkflowTaskTemplate>(),
   ];
   if (canEdit) {
     columns.push({

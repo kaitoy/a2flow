@@ -187,6 +187,36 @@ describe("WorkflowTasksPage", () => {
     expect(screen.queryByRole("combobox", { name: /Status for/ })).not.toBeInTheDocument();
   });
 
+  it("shows the Error Kind and Error Message columns by default", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:executionId/workflow-tasks", () =>
+        envelope([
+          {
+            id: "task-1",
+            workflowExecutionId: "execution-1",
+            title: "Step 1",
+            description: null,
+            status: "failed",
+            errorKind: "invalid_input",
+            errorMessage: "Missing required field",
+            dependsOnIds: [],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+
+    render(<WorkflowTasksPage />);
+    await waitFor(() => screen.getByText("Step 1"));
+    expect(screen.getByRole("columnheader", { name: "Error Kind" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Error Message" })).toBeInTheDocument();
+    expect(screen.getByText("invalid input")).toBeInTheDocument();
+    expect(screen.getByText("Missing required field")).toBeInTheDocument();
+  });
+
   it("offers no create, edit, or delete controls", async () => {
     render(<WorkflowTasksPage />);
     await waitFor(() => screen.getByText("Step 1"));

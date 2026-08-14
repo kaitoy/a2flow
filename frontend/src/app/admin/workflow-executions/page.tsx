@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { auditColumns } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
@@ -16,14 +17,23 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { formatRevision } from "@/lib/agent-skill-sync-status";
 import {
   deleteWorkflowExecution,
   getUserNames,
   listWorkflowExecutions,
   type WorkflowExecution,
+  type WorkflowExecutionStatus,
 } from "@/lib/api";
 
 const LIMIT = 20;
+
+/** Muted-to-vivid color per lifecycle state, matching the Approvals status treatment. */
+const STATUS_STYLES: Record<WorkflowExecutionStatus, string> = {
+  running: "text-on-surface-variant",
+  completed: "text-accent",
+  failed: "text-error",
+};
 
 /**
  * Build the table columns, resolving user ids to display names via `userMap`
@@ -74,6 +84,51 @@ function buildColumns(
       sortField: "createdAt",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
+    {
+      header: "Status",
+      sortField: "status",
+      filterField: "status",
+      filterOp: "eq",
+      filterOptions: [
+        { label: "Running", value: "running" },
+        { label: "Completed", value: "completed" },
+        { label: "Failed", value: "failed" },
+      ],
+      cell: (s) => (
+        <span className={`font-medium capitalize ${STATUS_STYLES[s.status ?? "running"]}`}>
+          {s.status ?? "running"}
+        </span>
+      ),
+    },
+    {
+      header: "Finished At",
+      cell: (s) =>
+        s.finishedAt ? <DateTime value={s.finishedAt} className="text-on-surface-variant" /> : "—",
+    },
+    {
+      header: "Description",
+      visibility: "optional",
+      cell: (s) => s.description || "—",
+    },
+    {
+      header: "Agent Skill Repo URL",
+      visibility: "optional",
+      className: "font-mono",
+      cell: (s) => s.agentSkillRepoUrl,
+    },
+    {
+      header: "Agent Skill Repo Path",
+      visibility: "optional",
+      className: "font-mono",
+      cell: (s) => s.agentSkillRepoPath || "—",
+    },
+    {
+      header: "Agent Skill Commit SHA",
+      visibility: "optional",
+      className: "font-mono",
+      cell: (s) => formatRevision(s.agentSkillCommitSha),
+    },
+    ...auditColumns<WorkflowExecution>(userMap),
     {
       header: "Actions",
       noTruncate: true,
@@ -132,7 +187,9 @@ export default function WorkflowExecutionsPage() {
 
   // Resolve user display names for the current page of sessions.
   useEffect(() => {
-    const ids = rows.map((s) => s.initiatorId).filter((id): id is string => !!id);
+    const ids = rows
+      .flatMap((s) => [s.initiatorId, s.createdBy, s.updatedBy])
+      .filter((id): id is string => !!id);
     if (ids.length === 0) return;
     getUserNames(ids)
       .then(setUserMap)

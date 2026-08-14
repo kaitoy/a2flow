@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { auditColumns } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
@@ -66,6 +67,7 @@ const STATIC_COLUMNS: ColumnDef<Secret>[] = [
     sortField: "createdAt",
     cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
   },
+  ...auditColumns<Secret>(),
 ];
 
 export default function SecretsPage() {

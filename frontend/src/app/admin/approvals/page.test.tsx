@@ -35,7 +35,7 @@ describe("ApprovalsPage", () => {
     expect(screen.getByText("Looks good to me")).toBeInTheDocument();
   });
 
-  it("resolves every row's approver in a single request", async () => {
+  it("resolves every row's approver, creator, and updater in a single request", async () => {
     const requests: string[][] = [];
     server.use(
       http.get("http://localhost:8000/api/v1/approvals", () =>
@@ -67,7 +67,38 @@ describe("ApprovalsPage", () => {
     render(<ApprovalsPage />);
 
     await waitFor(() => expect(screen.getByText("ANN")).toBeInTheDocument());
-    expect(requests).toEqual([["ann", "bob", "cal"]]);
+    // "owner" is every row's createdBy/updatedBy, deduplicated with the approvers.
+    expect(requests).toEqual([["ann", "owner", "bob", "cal"]]);
+  });
+
+  it("shows the Description and Decided At columns by default", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/approvals", () =>
+        envelope([
+          {
+            id: "appr-1",
+            tenantId: "tenant-1",
+            workflowExecutionId: "execution-1",
+            workflowTaskId: null,
+            title: "Deploy to production",
+            description: "Ship the release build to prod",
+            status: "approved",
+            response: "Looks good to me",
+            approver: "user-1",
+            decidedAt: "2026-01-02T00:00:00Z",
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "owner",
+            updatedBy: "owner",
+          },
+        ])
+      )
+    );
+    render(<ApprovalsPage />);
+    await waitFor(() =>
+      expect(screen.getByText("Ship the release build to prod")).toBeInTheDocument()
+    );
+    expect(screen.getByRole("columnheader", { name: "Decided At" })).toBeInTheDocument();
   });
 
   it("links to the workflow execution chat", async () => {

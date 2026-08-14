@@ -91,6 +91,8 @@ const WORKFLOW_EXECUTION_1 = {
   agentSkillRepoPath: "",
   skillDir: "/tmp/skill",
   initiatorId: "user",
+  status: "completed",
+  finishedAt: "2026-01-01T00:05:00Z",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
