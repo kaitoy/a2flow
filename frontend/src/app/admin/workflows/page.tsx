@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { auditColumns } from "@/components/admin/audit-columns";
+import { auditColumns, idColumn } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
@@ -80,6 +80,7 @@ function buildColumns(
   permissions: WorkflowExecutePermissions
 ): ColumnDef<Workflow>[] {
   return [
+    idColumn<Workflow>(),
     {
       header: "Name",
       sortField: "name",

@@ -2,7 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DataTable } from "@/components/ui/data-table";
 import { render, screen } from "@/test/test-utils";
-import { auditColumns } from "./audit-columns";
+import { auditColumns, idColumn } from "./audit-columns";
 
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -27,12 +27,20 @@ const ROW: Row = {
 function renderTable(rows: Row[], userNameById?: Map<string, string>) {
   render(
     <DataTable<Row>
-      columns={auditColumns<Row>(userNameById)}
+      columns={[idColumn<Row>(), ...auditColumns<Row>(userNameById)]}
       rows={rows}
       getRowKey={(row) => row.id}
     />
   );
 }
+
+describe("idColumn", () => {
+  it("renders the raw id", () => {
+    render(<DataTable<Row> columns={[idColumn<Row>()]} rows={[ROW]} getRowKey={(row) => row.id} />);
+    expect(screen.getByRole("columnheader", { name: "ID" })).toBeInTheDocument();
+    expect(screen.getByText("row-1")).toBeInTheDocument();
+  });
+});
 
 describe("auditColumns", () => {
   it("links created-by/updated-by to the user's detail page, labeled with the raw id when no name map is given", () => {
@@ -68,15 +76,16 @@ describe("auditColumns", () => {
     );
   });
 
-  it("exposes exactly the four expected headers", () => {
-    renderTable([ROW]);
-    expect(screen.getByRole("columnheader", { name: "ID" })).toBeInTheDocument();
+  it("exposes exactly the three expected headers", () => {
+    render(
+      <DataTable<Row> columns={auditColumns<Row>()} rows={[ROW]} getRowKey={(row) => row.id} />
+    );
     expect(screen.getByRole("columnheader", { name: "Updated At" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Created By" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Updated By" })).toBeInTheDocument();
   });
 
-  it("makes Updated At sortable but leaves ID/Created By/Updated By display-only", async () => {
+  it("makes Updated At sortable but leaves Created By/Updated By display-only", async () => {
     const user = userEvent.setup();
     render(
       <DataTable<Row>
@@ -91,7 +100,6 @@ describe("auditColumns", () => {
     await user.click(screen.getByRole("button", { name: /Updated At/ }));
     expect(await screen.findByRole("button", { name: "Sort ascending" })).toBeInTheDocument();
 
-    expect(screen.queryByRole("button", { name: /^ID$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Created By$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Updated By$/ })).not.toBeInTheDocument();
   });

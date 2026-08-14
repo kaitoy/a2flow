@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { auditColumns } from "@/components/admin/audit-columns";
+import { auditColumns, idColumn } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { PaginationControls } from "@/components/admin/pagination-controls";
@@ -47,6 +47,7 @@ export default function ApprovalsPage() {
 
   const columns = useMemo<ColumnDef<Approval>[]>(
     () => [
+      idColumn<Approval>(),
       {
         header: "Title",
         sortField: "title",
