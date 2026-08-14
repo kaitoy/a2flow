@@ -28,6 +28,7 @@ import {
   executeWorkflow,
   listAgentSkills,
   listWorkflows,
+  type Tag,
   type Workflow,
   type WorkflowStatus,
 } from "@/lib/api";
@@ -77,7 +78,8 @@ function buildColumns(
   runningId: string | null,
   onDelete: (id: string, name: string) => void,
   onOpenDesign: (id: string) => void,
-  permissions: WorkflowExecutePermissions
+  permissions: WorkflowExecutePermissions,
+  tagsById: Map<string, Tag>
 ): ColumnDef<Workflow>[] {
   return [
     idColumn<Workflow>(),
@@ -144,6 +146,7 @@ function buildColumns(
       cell: (w) => formatRevision(w.agentSkillCommitSha),
     },
     ...auditColumns<Workflow>(names),
+    tagsColumn<Workflow>((w) => w.tagIds, tagsById),
     {
       header: "Actions",
       noTruncate: true,
@@ -263,13 +266,16 @@ export default function WorkflowsPage() {
     router.push(`/workflows/${encodeURIComponent(id)}/design-session`);
   }
 
-  const columns = [
-    ...buildColumns(skillMap, names, handleRun, runningId, handleDelete, handleOpenDesign, {
-      canRun,
-      canEdit,
-    }),
-    tagsColumn<Workflow>((w) => w.tagIds, tagsById),
-  ];
+  const columns = buildColumns(
+    skillMap,
+    names,
+    handleRun,
+    runningId,
+    handleDelete,
+    handleOpenDesign,
+    { canRun, canEdit },
+    tagsById
+  );
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflows",
     columns
