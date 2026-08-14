@@ -23,7 +23,8 @@ export interface CheckboxOption {
   /**
    * When true, renders a thin divider above this option, visually separating
    * it from the previous one (e.g. splitting a mutually-exclusive option from
-   * the rest of the group).
+   * the rest of the group). Assumes the single-column layout — a divider drawn
+   * over one cell of a two-column grid would only rule off half the row.
    */
   dividerBefore?: boolean;
 }
@@ -46,6 +47,13 @@ export interface CheckboxGroupProps {
    * where a second panel would stack two elevation tiers on top of each other.
    */
   flush?: boolean;
+  /**
+   * How many columns the options are laid out in. Two halves a long list's
+   * height, which is what lets a panel with many options fit a short viewport;
+   * it needs roughly 360px of width to stay readable, so a caller should fall
+   * back to one column below that.
+   */
+  columns?: 1 | 2;
 }
 
 const ROW =
@@ -68,7 +76,8 @@ const DIVIDER_BEFORE = "mt-1.5 border-t border-divider/60 pt-2.5";
  * and name. Options marked `disabled` render as read-only checkboxes that keep
  * their current state. An option marked `dividerBefore` renders a thin divider
  * above it, splitting the list into visually distinct groups. Pass `flush` to
- * drop the glass panel when the group is already inside one.
+ * drop the glass panel when the group is already inside one, and `columns={2}`
+ * to lay a long list out as a grid instead of one tall column.
  */
 export function CheckboxGroup({
   options,
@@ -77,6 +86,7 @@ export function CheckboxGroup({
   emptyMessage = "No options available.",
   name,
   flush = false,
+  columns = 1,
 }: CheckboxGroupProps) {
   if (options.length === 0) {
     return (
@@ -104,12 +114,10 @@ export function CheckboxGroup({
     }
   }
 
+  const layout = columns === 2 ? "grid grid-cols-2 gap-x-1 gap-y-0.5" : "flex flex-col gap-0.5";
+
   return (
-    <div
-      className={
-        flush ? "flex flex-col gap-0.5" : "flex flex-col gap-0.5 rounded-xl glass-panel p-1.5"
-      }
-    >
+    <div className={flush ? layout : `${layout} rounded-xl glass-panel p-1.5`}>
       {options.map((option) => (
         <label
           key={option.value}
@@ -133,7 +141,11 @@ export function CheckboxGroup({
               className={`size-2.5 shrink-0 rounded-full tag-swatch ${TAG_COLOR_CLASS[option.swatch]}`}
             />
           )}
-          <span className="min-w-0 truncate">{option.label}</span>
+          {/* A narrow cell (a two-column grid, a fixed-width popover) clips the
+              label, so keep the full text reachable on hover. */}
+          <span className="min-w-0 truncate" title={option.label}>
+            {option.label}
+          </span>
         </label>
       ))}
     </div>
