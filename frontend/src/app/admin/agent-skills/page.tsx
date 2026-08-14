@@ -78,6 +78,10 @@ function buildColumns(names: Map<string, string>): ColumnDef<AgentSkill>[] {
       ),
     },
     {
+      header: "Description",
+      cell: (s) => s.description || "—",
+    },
+    {
       header: "Repo URL",
       sortField: "repoUrl",
       filterField: "repoUrl",
@@ -89,6 +93,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<AgentSkill>[] {
       sortField: "repoPath",
       filterField: "repoPath",
       className: "font-mono",
+      visibility: "optional",
       cell: (s) => s.repoPath || "—",
     },
     {
@@ -116,12 +121,8 @@ function buildColumns(names: Map<string, string>): ColumnDef<AgentSkill>[] {
     {
       header: "Created At",
       sortField: "createdAt",
-      cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
-    },
-    {
-      header: "Description",
       visibility: "optional",
-      cell: (s) => s.description || "—",
+      cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
     {
       header: "Auth Username",
