@@ -29,6 +29,7 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useUserNames } from "@/hooks/useUserNames";
 import { deleteUser, listUsers, startImpersonation, type User } from "@/lib/api";
 import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
 import { ROLE_LABELS, Role, useHasRole } from "@/lib/roles";
@@ -49,122 +50,127 @@ function boolCell(value: boolean): string {
 }
 
 /**
- * Static columns of the list table. Avatar, Username, Roles, Enabled,
- * Verified, and Created At are local to this page — Username links off to the
- * user's detail page, which the picker dialog never does — Name and Email are
- * shared with {@link UserPicker}'s dialog table via {@link USER_SHARED_COLUMNS}.
+ * Columns of the list table. Avatar, Username, Roles, Enabled, Verified, and
+ * Created At are local to this page — Username links off to the user's detail
+ * page, which the picker dialog never does — Name and Email are shared with
+ * {@link UserPicker}'s dialog table via {@link USER_SHARED_COLUMNS}. Takes
+ * `names` (rather than being a static array) because the audit columns need it.
  */
-const STATIC_COLUMNS: ColumnDef<User>[] = [
-  {
-    header: "",
-    noTruncate: true,
-    visibility: "always",
-    cell: (u) => <Avatar user={u} size={28} />,
-  },
-  {
-    header: "Username",
-    sortField: "username",
-    filterField: "username",
-    visibility: "always",
-    cell: (u) => (
-      <Link
-        href={`/admin/users/${u.id}`}
-        className="font-medium text-accent transition-colors hover:underline"
-      >
-        {u.username}
-      </Link>
-    ),
-  },
-  ...USER_SHARED_COLUMNS,
-  {
-    // Roles are stored as a JSON list, which the list API's sort/filter params
-    // cannot address, so this column is display-only — and the same goes for
-    // the group-inherited half. The Super Admin badge and the inherited chips
-    // are chips, not plain text, so the column opts out of single-line
-    // truncation. Inherited roles render as muted chips so it stays obvious
-    // which grants editing the user can actually change.
-    header: "Roles",
-    noTruncate: true,
-    cell: (u) => {
-      const isSuperAdmin = u.roles?.includes(Role.SUPER_ADMIN);
-      const otherRoles = (u.roles ?? []).filter((r) => r !== Role.SUPER_ADMIN);
-      const groupRoles = u.groupRoles ?? [];
-      const nothingHeld = !isSuperAdmin && otherRoles.length === 0 && groupRoles.length === 0;
-      return (
-        <div className="flex items-center gap-1.5">
-          {isSuperAdmin && <Badge>Super Admin</Badge>}
-          {otherRoles.length > 0 && <span>{otherRoles.map((r) => ROLE_LABELS[r]).join(", ")}</span>}
-          <InheritedRoles roles={groupRoles} />
-          {nothingHeld && "—"}
-        </div>
-      );
+function buildColumns(names: Map<string, string>): ColumnDef<User>[] {
+  return [
+    {
+      header: "",
+      noTruncate: true,
+      visibility: "always",
+      cell: (u) => <Avatar user={u} size={28} />,
     },
-  },
-  {
-    header: "Enabled",
-    sortField: "enabled",
-    filterField: "enabled",
-    filterOp: "eq",
-    filterOptions: BOOL_FILTER_OPTIONS,
-    className: "text-center",
-    cell: (u) => boolCell(u.enabled),
-  },
-  {
-    header: "Verified",
-    sortField: "emailVerified",
-    filterField: "emailVerified",
-    filterOp: "eq",
-    filterOptions: BOOL_FILTER_OPTIONS,
-    className: "text-center",
-    visibility: "optional",
-    cell: (u) => boolCell(u.emailVerified),
-  },
-  {
-    header: "Created At",
-    sortField: "createdAt",
-    cell: (u) => <DateTime value={u.createdAt} className="text-on-surface-variant" />,
-  },
-  {
-    header: "Deleted At",
-    visibility: "optional",
-    cell: (u) =>
-      u.deletedAt ? <DateTime value={u.deletedAt} className="text-on-surface-variant" /> : "—",
-  },
-  {
-    header: "Avatar Updated At",
-    visibility: "optional",
-    cell: (u) =>
-      u.avatarUpdatedAt ? (
-        <DateTime value={u.avatarUpdatedAt} className="text-on-surface-variant" />
-      ) : (
-        "—"
+    {
+      header: "Username",
+      sortField: "username",
+      filterField: "username",
+      visibility: "always",
+      cell: (u) => (
+        <Link
+          href={`/admin/users/${u.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {u.username}
+        </Link>
       ),
-  },
-  {
-    // The avatar's palette, not the avatar itself — a row of small swatches,
-    // one per color, so a viewer can tell two users' palettes apart at a glance.
-    header: "Avatar Colors",
-    visibility: "optional",
-    noTruncate: true,
-    cell: (u) => {
-      const colors = u.avatarConfig?.colors ?? [];
-      if (colors.length === 0) return "—";
-      return (
-        <div className="flex items-center gap-1">
-          {colors.map((c, i) => (
-            <span
-              // biome-ignore lint/suspicious/noArrayIndexKey: colors carry no id of their own
-              key={`${i}-${c}`}
-              className="inline-block size-3.5 rounded-full ring-1 ring-glass-border"
-              style={{ backgroundColor: c }}
-            />
-          ))}
-        </div>
-      );
     },
-  },
-  ...auditColumns<User>(),
-];
+    ...USER_SHARED_COLUMNS,
+    {
+      // Roles are stored as a JSON list, which the list API's sort/filter params
+      // cannot address, so this column is display-only — and the same goes for
+      // the group-inherited half. The Super Admin badge and the inherited chips
+      // are chips, not plain text, so the column opts out of single-line
+      // truncation. Inherited roles render as muted chips so it stays obvious
+      // which grants editing the user can actually change.
+      header: "Roles",
+      noTruncate: true,
+      cell: (u) => {
+        const isSuperAdmin = u.roles?.includes(Role.SUPER_ADMIN);
+        const otherRoles = (u.roles ?? []).filter((r) => r !== Role.SUPER_ADMIN);
+        const groupRoles = u.groupRoles ?? [];
+        const nothingHeld = !isSuperAdmin && otherRoles.length === 0 && groupRoles.length === 0;
+        return (
+          <div className="flex items-center gap-1.5">
+            {isSuperAdmin && <Badge>Super Admin</Badge>}
+            {otherRoles.length > 0 && (
+              <span>{otherRoles.map((r) => ROLE_LABELS[r]).join(", ")}</span>
+            )}
+            <InheritedRoles roles={groupRoles} />
+            {nothingHeld && "—"}
+          </div>
+        );
+      },
+    },
+    {
+      header: "Enabled",
+      sortField: "enabled",
+      filterField: "enabled",
+      filterOp: "eq",
+      filterOptions: BOOL_FILTER_OPTIONS,
+      className: "text-center",
+      cell: (u) => boolCell(u.enabled),
+    },
+    {
+      header: "Verified",
+      sortField: "emailVerified",
+      filterField: "emailVerified",
+      filterOp: "eq",
+      filterOptions: BOOL_FILTER_OPTIONS,
+      className: "text-center",
+      visibility: "optional",
+      cell: (u) => boolCell(u.emailVerified),
+    },
+    {
+      header: "Created At",
+      sortField: "createdAt",
+      cell: (u) => <DateTime value={u.createdAt} className="text-on-surface-variant" />,
+    },
+    {
+      header: "Deleted At",
+      visibility: "optional",
+      cell: (u) =>
+        u.deletedAt ? <DateTime value={u.deletedAt} className="text-on-surface-variant" /> : "—",
+    },
+    {
+      header: "Avatar Updated At",
+      visibility: "optional",
+      cell: (u) =>
+        u.avatarUpdatedAt ? (
+          <DateTime value={u.avatarUpdatedAt} className="text-on-surface-variant" />
+        ) : (
+          "—"
+        ),
+    },
+    {
+      // The avatar's palette, not the avatar itself — a row of small swatches,
+      // one per color, so a viewer can tell two users' palettes apart at a glance.
+      header: "Avatar Colors",
+      visibility: "optional",
+      noTruncate: true,
+      cell: (u) => {
+        const colors = u.avatarConfig?.colors ?? [];
+        if (colors.length === 0) return "—";
+        return (
+          <div className="flex items-center gap-1">
+            {colors.map((c, i) => (
+              <span
+                // biome-ignore lint/suspicious/noArrayIndexKey: colors carry no id of their own
+                key={`${i}-${c}`}
+                className="inline-block size-3.5 rounded-full ring-1 ring-glass-border"
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        );
+      },
+    },
+    ...auditColumns<User>(names),
+  ];
+}
 
 export default function UsersPage() {
   const {
@@ -179,6 +185,7 @@ export default function UsersPage() {
     setFilters,
     reload,
   } = useTableQuery<User>(listUsers, { limit: LIMIT });
+  const names = useUserNames(rows.flatMap((u) => [u.createdBy, u.updatedBy]));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [impersonateTarget, setImpersonateTarget] = useState<{ id: string; name: string } | null>(
     null
@@ -227,7 +234,7 @@ export default function UsersPage() {
   }
 
   const columns: ColumnDef<User>[] = [
-    ...STATIC_COLUMNS,
+    ...buildColumns(names),
     // Both actions in this column need the admin role — deleting a user
     // outright, and `canImpersonate`, which already answers false without it —
     // so the whole column goes for a viewer who only holds a read role.

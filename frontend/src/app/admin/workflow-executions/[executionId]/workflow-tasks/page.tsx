@@ -14,6 +14,7 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useUserNames } from "@/hooks/useUserNames";
 import {
   type FilterSpec,
   getWorkflowExecution,
@@ -58,6 +59,7 @@ function StatusDot({ status }: { status: WorkflowTaskStatus }) {
 function buildColumns(
   titleById: Map<string, string>,
   serverNameById: Map<string, string>,
+  names: Map<string, string>,
   onHoverDependency: (id: string | null) => void,
   indexById: Map<string, number>
 ): ColumnDef<WorkflowTask>[] {
@@ -154,7 +156,7 @@ function buildColumns(
       header: "Error Message",
       cell: (t) => t.errorMessage || "—",
     },
-    ...auditColumns<WorkflowTask>(),
+    ...auditColumns<WorkflowTask>(names),
   ];
 }
 
@@ -216,10 +218,13 @@ export default function WorkflowTasksPage() {
       });
   }, [executionId]);
 
+  const names = useUserNames(tasks.flatMap((t) => [t.createdBy, t.updatedBy]));
+
   const columns = buildColumns(
     // Unpaginated, so every dependency resolves to a real title.
     new Map(tasks.map((t) => [t.id, t.title])),
     serverNameById,
+    names,
     setHighlightedId,
     new Map(tasks.map((t, i) => [t.id, i + 1]))
   );

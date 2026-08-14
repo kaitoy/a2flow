@@ -8,6 +8,7 @@
  */
 "use client";
 
+import Link from "next/link";
 import type { ColumnDef } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 
@@ -25,12 +26,14 @@ interface Audited {
  * detail rather than a record's primary content, so they stay out of the way
  * until a viewer asks for them via the column picker.
  *
- * ID, Created By, and Updated By deliberately carry no `sortField`/`filterField`
- * even when `userNameById` is omitted (where the cell shows the literal
- * underlying value and so could technically be sorted/filtered): keeping them
- * display-only uniformly means a column's interactive behavior doesn't
- * silently change depending on whether the calling page happens to have a name
- * lookup in scope.
+ * ID deliberately carries no `sortField`/`filterField` even though the cell
+ * shows the literal underlying value and so could technically be sorted or
+ * filtered: keeping it display-only means a column's interactive behavior
+ * doesn't silently change depending on whether the calling page happens to
+ * have a name lookup in scope. Created By and Updated By link to the user's
+ * detail page regardless of whether `userNameById` was supplied — with no map,
+ * the link is simply labeled with the raw id, mirroring the Initiator column's
+ * fallback.
  *
  * @param userNameById - Optional map from user id to display name, built by
  *   whatever lookup the calling page already runs for its own columns (e.g. an
@@ -43,6 +46,14 @@ export function auditColumns<T extends Audited>(
   userNameById?: Map<string, string>
 ): ColumnDef<T>[] {
   const nameOf = (id: string) => userNameById?.get(id) ?? id;
+  const userLink = (id: string) => (
+    <Link
+      href={`/admin/users/${id}`}
+      className="font-medium text-accent transition-colors hover:underline"
+    >
+      {nameOf(id)}
+    </Link>
+  );
   return [
     {
       header: "ID",
@@ -59,12 +70,12 @@ export function auditColumns<T extends Audited>(
     {
       header: "Created By",
       visibility: "optional",
-      cell: (row) => nameOf(row.createdBy),
+      cell: (row) => userLink(row.createdBy),
     },
     {
       header: "Updated By",
       visibility: "optional",
-      cell: (row) => nameOf(row.updatedBy),
+      cell: (row) => userLink(row.updatedBy),
     },
   ];
 }

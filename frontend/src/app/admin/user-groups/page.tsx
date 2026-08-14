@@ -25,40 +25,43 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useUserNames } from "@/hooks/useUserNames";
 import { deleteUserGroup, listUserGroups, type UserGroup } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
 
 /**
- * Static columns of the list table. Name and Created At are local to this
- * page — Name links off to the group's detail page, which the picker dialog
- * never does — the rest is shared with {@link GroupPicker}'s dialog table via
+ * Columns of the list table. Name and Created At are local to this page —
+ * Name links off to the group's detail page, which the picker dialog never
+ * does — the rest is shared with {@link GroupPicker}'s dialog table via
  * {@link USER_GROUP_SHARED_COLUMNS}.
  */
-const STATIC_COLUMNS: ColumnDef<UserGroup>[] = [
-  {
-    header: "Name",
-    sortField: "name",
-    filterField: "name",
-    visibility: "always",
-    cell: (g) => (
-      <Link
-        href={`/admin/user-groups/${g.id}`}
-        className="font-medium text-accent transition-colors hover:underline"
-      >
-        {g.name}
-      </Link>
-    ),
-  },
-  ...USER_GROUP_SHARED_COLUMNS,
-  {
-    header: "Created At",
-    sortField: "createdAt",
-    cell: (g) => <DateTime value={g.createdAt} className="text-on-surface-variant" />,
-  },
-  ...auditColumns<UserGroup>(),
-];
+function buildColumns(names: Map<string, string>): ColumnDef<UserGroup>[] {
+  return [
+    {
+      header: "Name",
+      sortField: "name",
+      filterField: "name",
+      visibility: "always",
+      cell: (g) => (
+        <Link
+          href={`/admin/user-groups/${g.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {g.name}
+        </Link>
+      ),
+    },
+    ...USER_GROUP_SHARED_COLUMNS,
+    {
+      header: "Created At",
+      sortField: "createdAt",
+      cell: (g) => <DateTime value={g.createdAt} className="text-on-surface-variant" />,
+    },
+    ...auditColumns<UserGroup>(names),
+  ];
+}
 
 export default function UserGroupsPage() {
   const canEdit = useHasRole(Role.ADMIN);
@@ -74,6 +77,7 @@ export default function UserGroupsPage() {
     setFilters,
     reload,
   } = useTableQuery<UserGroup>(listUserGroups, { limit: LIMIT });
+  const names = useUserNames(rows.flatMap((g) => [g.createdBy, g.updatedBy]));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   async function executeDelete() {
@@ -89,7 +93,7 @@ export default function UserGroupsPage() {
   }
 
   const columns: ColumnDef<UserGroup>[] = [
-    ...STATIC_COLUMNS,
+    ...buildColumns(names),
     ...(canEdit
       ? [
           {

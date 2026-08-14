@@ -29,6 +29,7 @@ import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useUserNames } from "@/hooks/useUserNames";
 import {
   deleteMcpServer,
   listMcpServers,
@@ -40,53 +41,55 @@ import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
 
-const STATIC_COLUMNS: ColumnDef<McpServer>[] = [
-  {
-    header: "Name",
-    sortField: "name",
-    filterField: "name",
-    visibility: "always",
-    cell: (s) => (
-      <Link
-        href={`/admin/mcp-servers/${s.id}`}
-        className="font-medium text-accent transition-colors hover:underline"
-      >
-        {s.name}
-      </Link>
-    ),
-  },
-  {
-    header: "Transport",
-    sortField: "transport",
-    filterField: "transport",
-    className: "text-center",
-    visibility: "optional",
-    cell: (s) => <Badge>{s.transport === "stdio" ? "stdio" : "HTTP"}</Badge>,
-  },
-  {
-    header: "Endpoint",
-    sortField: "url",
-    filterField: "url",
-    className: "font-mono",
-    cell: (s) => (s.transport === "stdio" ? [s.command, ...(s.args ?? [])].join(" ") : s.url),
-  },
-  {
-    header: "Headers / Env",
-    visibility: "optional",
-    cell: (s) => {
-      const count = Object.keys((s.transport === "stdio" ? s.env : s.headers) ?? {}).length;
-      if (count === 0) return <span className="text-on-surface-variant">—</span>;
-      const noun = s.transport === "stdio" ? "variable" : "header";
-      return `${count} ${noun}${count === 1 ? "" : "s"}`;
+function buildColumns(names: Map<string, string>): ColumnDef<McpServer>[] {
+  return [
+    {
+      header: "Name",
+      sortField: "name",
+      filterField: "name",
+      visibility: "always",
+      cell: (s) => (
+        <Link
+          href={`/admin/mcp-servers/${s.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {s.name}
+        </Link>
+      ),
     },
-  },
-  {
-    header: "Created At",
-    sortField: "createdAt",
-    cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
-  },
-  ...auditColumns<McpServer>(),
-];
+    {
+      header: "Transport",
+      sortField: "transport",
+      filterField: "transport",
+      className: "text-center",
+      visibility: "optional",
+      cell: (s) => <Badge>{s.transport === "stdio" ? "stdio" : "HTTP"}</Badge>,
+    },
+    {
+      header: "Endpoint",
+      sortField: "url",
+      filterField: "url",
+      className: "font-mono",
+      cell: (s) => (s.transport === "stdio" ? [s.command, ...(s.args ?? [])].join(" ") : s.url),
+    },
+    {
+      header: "Headers / Env",
+      visibility: "optional",
+      cell: (s) => {
+        const count = Object.keys((s.transport === "stdio" ? s.env : s.headers) ?? {}).length;
+        if (count === 0) return <span className="text-on-surface-variant">—</span>;
+        const noun = s.transport === "stdio" ? "variable" : "header";
+        return `${count} ${noun}${count === 1 ? "" : "s"}`;
+      },
+    },
+    {
+      header: "Created At",
+      sortField: "createdAt",
+      cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
+    },
+    ...auditColumns<McpServer>(names),
+  ];
+}
 
 export default function McpServersPage() {
   const canEdit = useHasRole(Role.DEVELOPER);
@@ -105,6 +108,7 @@ export default function McpServersPage() {
     reload,
   } = useTableQuery<McpServer>(listMcpServers, { limit: LIMIT });
   const { byId: tagsById } = useTags();
+  const names = useUserNames(rows.flatMap((s) => [s.createdBy, s.updatedBy]));
   const router = useRouter();
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [registryOpen, setRegistryOpen] = useState(false);
@@ -132,7 +136,7 @@ export default function McpServersPage() {
   }
 
   const columns: ColumnDef<McpServer>[] = [
-    ...STATIC_COLUMNS,
+    ...buildColumns(names),
     tagsColumn<McpServer>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [

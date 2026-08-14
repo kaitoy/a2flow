@@ -26,49 +26,52 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useUserNames } from "@/hooks/useUserNames";
 import { deleteTag, listTags, type Tag } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { resolveTagColor, tagColorLabel } from "@/lib/tag-palette";
 
 const LIMIT = 20;
 
-const STATIC_COLUMNS: ColumnDef<Tag>[] = [
-  {
-    header: "Name",
-    sortField: "name",
-    filterField: "name",
-    visibility: "always",
-    cell: (tag) => (
-      <Link
-        href={`/admin/tags/${tag.id}`}
-        className="font-medium text-accent transition-colors hover:underline"
-      >
-        {tag.name}
-      </Link>
-    ),
-  },
-  {
-    header: "Preview",
-    // The chip is what a tag looks like everywhere else, so the list shows the
-    // real thing rather than naming a color the reader has to imagine.
-    noTruncate: true,
-    cell: (tag) => <Chip label={tag.name} color={resolveTagColor(tag.color)} />,
-  },
-  {
-    header: "Color",
-    sortField: "color",
-    visibility: "optional",
-    cell: (tag) => (
-      <span className="text-on-surface-variant">{tagColorLabel(resolveTagColor(tag.color))}</span>
-    ),
-  },
-  {
-    header: "Created At",
-    sortField: "createdAt",
-    cell: (tag) => <DateTime value={tag.createdAt} className="text-on-surface-variant" />,
-  },
-  ...auditColumns<Tag>(),
-];
+function buildColumns(names: Map<string, string>): ColumnDef<Tag>[] {
+  return [
+    {
+      header: "Name",
+      sortField: "name",
+      filterField: "name",
+      visibility: "always",
+      cell: (tag) => (
+        <Link
+          href={`/admin/tags/${tag.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {tag.name}
+        </Link>
+      ),
+    },
+    {
+      header: "Preview",
+      // The chip is what a tag looks like everywhere else, so the list shows the
+      // real thing rather than naming a color the reader has to imagine.
+      noTruncate: true,
+      cell: (tag) => <Chip label={tag.name} color={resolveTagColor(tag.color)} />,
+    },
+    {
+      header: "Color",
+      sortField: "color",
+      visibility: "optional",
+      cell: (tag) => (
+        <span className="text-on-surface-variant">{tagColorLabel(resolveTagColor(tag.color))}</span>
+      ),
+    },
+    {
+      header: "Created At",
+      sortField: "createdAt",
+      cell: (tag) => <DateTime value={tag.createdAt} className="text-on-surface-variant" />,
+    },
+    ...auditColumns<Tag>(names),
+  ];
+}
 
 export default function TagsPage() {
   const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
@@ -84,6 +87,7 @@ export default function TagsPage() {
     setFilters,
     reload,
   } = useTableQuery<Tag>(listTags, { limit: LIMIT });
+  const names = useUserNames(rows.flatMap((tag) => [tag.createdBy, tag.updatedBy]));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   async function executeDelete() {
@@ -99,7 +103,7 @@ export default function TagsPage() {
   }
 
   const columns: ColumnDef<Tag>[] = [
-    ...STATIC_COLUMNS,
+    ...buildColumns(names),
     ...(canEdit
       ? [
           {

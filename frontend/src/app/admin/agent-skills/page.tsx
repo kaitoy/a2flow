@@ -21,6 +21,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useUserNames } from "@/hooks/useUserNames";
 import {
   formatRevision,
   formatSyncStatusLabel,
@@ -60,87 +61,89 @@ function SyncStatus({ skill }: { skill: AgentSkill }) {
   return skill.syncError ? <Tooltip label={skill.syncError}>{label}</Tooltip> : label;
 }
 
-const STATIC_COLUMNS: ColumnDef<AgentSkill>[] = [
-  {
-    header: "Name",
-    sortField: "name",
-    filterField: "name",
-    visibility: "always",
-    cell: (s) => (
-      <Link
-        href={`/admin/agent-skills/${s.id}`}
-        className="font-medium text-accent transition-colors hover:underline"
-      >
-        {s.name}
-      </Link>
-    ),
-  },
-  {
-    header: "Repo URL",
-    sortField: "repoUrl",
-    filterField: "repoUrl",
-    className: "font-mono",
-    cell: (s) => s.repoUrl,
-  },
-  {
-    header: "Repo Path",
-    sortField: "repoPath",
-    filterField: "repoPath",
-    className: "font-mono",
-    cell: (s) => s.repoPath || "—",
-  },
-  {
-    header: "Ref",
-    sortField: "repoRef",
-    filterField: "repoRef",
-    className: "font-mono",
-    visibility: "optional",
-    cell: (s) => s.repoRef || "—",
-  },
-  {
-    header: "Status",
-    sortField: "syncStatus",
-    filterField: "syncStatus",
-    noTruncate: true,
-    cell: (s) => <SyncStatus skill={s} />,
-  },
-  {
-    header: "Revision",
-    sortField: "commitSha",
-    className: "font-mono",
-    visibility: "optional",
-    cell: (s) => formatRevision(s.commitSha),
-  },
-  {
-    header: "Created At",
-    sortField: "createdAt",
-    cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
-  },
-  {
-    header: "Description",
-    visibility: "optional",
-    cell: (s) => s.description || "—",
-  },
-  {
-    header: "Auth Username",
-    visibility: "optional",
-    className: "font-mono",
-    cell: (s) => s.repoAuthUsername || "—",
-  },
-  {
-    header: "Auth Password",
-    visibility: "optional",
-    className: "font-mono",
-    cell: (s) => s.repoAuthPassword || "—",
-  },
-  {
-    header: "Synced At",
-    visibility: "optional",
-    cell: (s) =>
-      s.syncedAt ? <DateTime value={s.syncedAt} className="text-on-surface-variant" /> : "—",
-  },
-  ...auditColumns<AgentSkill>(),
-];
+function buildColumns(names: Map<string, string>): ColumnDef<AgentSkill>[] {
+  return [
+    {
+      header: "Name",
+      sortField: "name",
+      filterField: "name",
+      visibility: "always",
+      cell: (s) => (
+        <Link
+          href={`/admin/agent-skills/${s.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {s.name}
+        </Link>
+      ),
+    },
+    {
+      header: "Repo URL",
+      sortField: "repoUrl",
+      filterField: "repoUrl",
+      className: "font-mono",
+      cell: (s) => s.repoUrl,
+    },
+    {
+      header: "Repo Path",
+      sortField: "repoPath",
+      filterField: "repoPath",
+      className: "font-mono",
+      cell: (s) => s.repoPath || "—",
+    },
+    {
+      header: "Ref",
+      sortField: "repoRef",
+      filterField: "repoRef",
+      className: "font-mono",
+      visibility: "optional",
+      cell: (s) => s.repoRef || "—",
+    },
+    {
+      header: "Status",
+      sortField: "syncStatus",
+      filterField: "syncStatus",
+      noTruncate: true,
+      cell: (s) => <SyncStatus skill={s} />,
+    },
+    {
+      header: "Revision",
+      sortField: "commitSha",
+      className: "font-mono",
+      visibility: "optional",
+      cell: (s) => formatRevision(s.commitSha),
+    },
+    {
+      header: "Created At",
+      sortField: "createdAt",
+      cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
+    },
+    {
+      header: "Description",
+      visibility: "optional",
+      cell: (s) => s.description || "—",
+    },
+    {
+      header: "Auth Username",
+      visibility: "optional",
+      className: "font-mono",
+      cell: (s) => s.repoAuthUsername || "—",
+    },
+    {
+      header: "Auth Password",
+      visibility: "optional",
+      className: "font-mono",
+      cell: (s) => s.repoAuthPassword || "—",
+    },
+    {
+      header: "Synced At",
+      visibility: "optional",
+      cell: (s) =>
+        s.syncedAt ? <DateTime value={s.syncedAt} className="text-on-surface-variant" /> : "—",
+    },
+    ...auditColumns<AgentSkill>(names),
+  ];
+}
 
 export default function AgentSkillsPage() {
   const canEdit = useHasRole(Role.DEVELOPER);
@@ -159,6 +162,7 @@ export default function AgentSkillsPage() {
     reload,
   } = useTableQuery<AgentSkill>(listAgentSkills, { limit: LIMIT });
   const { byId: tagsById } = useTags();
+  const names = useUserNames(rows.flatMap((s) => [s.createdBy, s.updatedBy]));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [generateTarget, setGenerateTarget] = useState<{ id: string; name: string } | null>(null);
   const [pullingId, setPullingId] = useState<string | null>(null);
@@ -206,7 +210,7 @@ export default function AgentSkillsPage() {
   }
 
   const columns: ColumnDef<AgentSkill>[] = [
-    ...STATIC_COLUMNS,
+    ...buildColumns(names),
     tagsColumn<AgentSkill>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [

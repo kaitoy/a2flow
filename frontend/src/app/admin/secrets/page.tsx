@@ -24,51 +24,54 @@ import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useUserNames } from "@/hooks/useUserNames";
 import { deleteSecret, listSecrets, type Secret } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
 
-const STATIC_COLUMNS: ColumnDef<Secret>[] = [
-  {
-    header: "Name",
-    sortField: "name",
-    filterField: "name",
-    visibility: "always",
-    cell: (s) => (
-      <Link
-        href={`/admin/secrets/${s.id}`}
-        className="font-medium text-accent transition-colors hover:underline"
-      >
-        {s.name}
-      </Link>
-    ),
-  },
-  {
-    header: "Type",
-    sortField: "type",
-    filterField: "type",
-    cell: (s) => (s.type === "vault" ? "Vault" : "Local"),
-  },
-  {
-    header: "Reference",
-    visibility: "optional",
-    cell: (s) =>
-      s.type === "vault" ? (
-        `${s.vaultMount}/${s.vaultPath}`
-      ) : (
-        <span className="text-on-surface-variant">
-          {(s.keys ?? []).length === 1 ? "1 entry" : `${(s.keys ?? []).length} entries`}
-        </span>
+function buildColumns(names: Map<string, string>): ColumnDef<Secret>[] {
+  return [
+    {
+      header: "Name",
+      sortField: "name",
+      filterField: "name",
+      visibility: "always",
+      cell: (s) => (
+        <Link
+          href={`/admin/secrets/${s.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {s.name}
+        </Link>
       ),
-  },
-  {
-    header: "Created At",
-    sortField: "createdAt",
-    cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
-  },
-  ...auditColumns<Secret>(),
-];
+    },
+    {
+      header: "Type",
+      sortField: "type",
+      filterField: "type",
+      cell: (s) => (s.type === "vault" ? "Vault" : "Local"),
+    },
+    {
+      header: "Reference",
+      visibility: "optional",
+      cell: (s) =>
+        s.type === "vault" ? (
+          `${s.vaultMount}/${s.vaultPath}`
+        ) : (
+          <span className="text-on-surface-variant">
+            {(s.keys ?? []).length === 1 ? "1 entry" : `${(s.keys ?? []).length} entries`}
+          </span>
+        ),
+    },
+    {
+      header: "Created At",
+      sortField: "createdAt",
+      cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
+    },
+    ...auditColumns<Secret>(names),
+  ];
+}
 
 export default function SecretsPage() {
   const canEdit = useHasRole(Role.ADMIN);
@@ -87,6 +90,7 @@ export default function SecretsPage() {
     reload,
   } = useTableQuery<Secret>(listSecrets, { limit: LIMIT });
   const { byId: tagsById } = useTags();
+  const names = useUserNames(rows.flatMap((s) => [s.createdBy, s.updatedBy]));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   function handleDelete(id: string, name: string) {
@@ -106,7 +110,7 @@ export default function SecretsPage() {
   }
 
   const columns: ColumnDef<Secret>[] = [
-    ...STATIC_COLUMNS,
+    ...buildColumns(names),
     tagsColumn<Secret>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [

@@ -3,7 +3,7 @@
 
 import { ClipboardList, ListChecks, MessageSquareText } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -17,10 +17,10 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useUserNames } from "@/hooks/useUserNames";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import {
   deleteWorkflowExecution,
-  getUserNames,
   listWorkflowExecutions,
   type WorkflowExecution,
   type WorkflowExecutionStatus,
@@ -166,7 +166,6 @@ export default function WorkflowExecutionsPage() {
     setFilters,
     reload,
   } = useTableQuery<WorkflowExecution>(listWorkflowExecutions, { limit: LIMIT });
-  const [userMap, setUserMap] = useState<Map<string, string>>(new Map());
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   function handleDelete(id: string, name: string) {
@@ -186,17 +185,7 @@ export default function WorkflowExecutionsPage() {
   }
 
   // Resolve user display names for the current page of sessions.
-  useEffect(() => {
-    const ids = rows
-      .flatMap((s) => [s.initiatorId, s.createdBy, s.updatedBy])
-      .filter((id): id is string => !!id);
-    if (ids.length === 0) return;
-    getUserNames(ids)
-      .then(setUserMap)
-      .catch(() => {
-        // Non-fatal: the column falls back to showing the raw user id.
-      });
-  }, [rows]);
+  const userMap = useUserNames(rows.flatMap((s) => [s.initiatorId, s.createdBy, s.updatedBy]));
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowExecutions",

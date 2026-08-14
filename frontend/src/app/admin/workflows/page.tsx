@@ -21,6 +21,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useUserNames } from "@/hooks/useUserNames";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import {
   deleteWorkflow,
@@ -71,6 +72,7 @@ function StatusCell({ workflow }: { workflow: Workflow }) {
 
 function buildColumns(
   skillMap: Map<string, string>,
+  names: Map<string, string>,
   onRun: (id: string, name: string) => void,
   runningId: string | null,
   onDelete: (id: string, name: string) => void,
@@ -140,7 +142,7 @@ function buildColumns(
       className: "font-mono",
       cell: (w) => formatRevision(w.agentSkillCommitSha),
     },
-    ...auditColumns<Workflow>(),
+    ...auditColumns<Workflow>(names),
     {
       header: "Actions",
       noTruncate: true,
@@ -194,6 +196,7 @@ export default function WorkflowsPage() {
   } = useTableQuery<Workflow>(listWorkflows, { limit: LIMIT });
   const { byId: tagsById } = useTags();
   const [skillMap, setSkillMap] = useState<Map<string, string>>(new Map());
+  const names = useUserNames(rows.flatMap((w) => [w.createdBy, w.updatedBy]));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [runTarget, setRunTarget] = useState<{ id: string; name: string } | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -260,7 +263,7 @@ export default function WorkflowsPage() {
   }
 
   const columns = [
-    ...buildColumns(skillMap, handleRun, runningId, handleDelete, handleOpenDesign, {
+    ...buildColumns(skillMap, names, handleRun, runningId, handleDelete, handleOpenDesign, {
       canRun,
       canEdit,
     }),

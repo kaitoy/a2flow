@@ -24,6 +24,7 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useUserNames } from "@/hooks/useUserNames";
 import { deleteTenant, listTenants, type Tenant } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
@@ -37,43 +38,45 @@ const BOOL_FILTER_OPTIONS = [
   { label: "No", value: "false" },
 ];
 
-const STATIC_COLUMNS: ColumnDef<Tenant>[] = [
-  {
-    header: "Display Name",
-    sortField: "displayName",
-    filterField: "displayName",
-    visibility: "always",
-    cell: (t) => (
-      <Link
-        href={`/admin/tenants/${t.id}`}
-        className="font-medium text-accent transition-colors hover:underline"
-      >
-        {t.displayName}
-      </Link>
-    ),
-  },
-  {
-    header: "Name",
-    sortField: "name",
-    filterField: "name",
-    cell: (t) => t.name,
-  },
-  {
-    header: "Enabled",
-    sortField: "enabled",
-    filterField: "enabled",
-    filterOp: "eq",
-    filterOptions: BOOL_FILTER_OPTIONS,
-    className: "text-center",
-    cell: (t) => (t.enabled ? "✓" : "—"),
-  },
-  {
-    header: "Created At",
-    sortField: "createdAt",
-    cell: (t) => <DateTime value={t.createdAt} className="text-on-surface-variant" />,
-  },
-  ...auditColumns<Tenant>(),
-];
+function buildColumns(names: Map<string, string>): ColumnDef<Tenant>[] {
+  return [
+    {
+      header: "Display Name",
+      sortField: "displayName",
+      filterField: "displayName",
+      visibility: "always",
+      cell: (t) => (
+        <Link
+          href={`/admin/tenants/${t.id}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {t.displayName}
+        </Link>
+      ),
+    },
+    {
+      header: "Name",
+      sortField: "name",
+      filterField: "name",
+      cell: (t) => t.name,
+    },
+    {
+      header: "Enabled",
+      sortField: "enabled",
+      filterField: "enabled",
+      filterOp: "eq",
+      filterOptions: BOOL_FILTER_OPTIONS,
+      className: "text-center",
+      cell: (t) => (t.enabled ? "✓" : "—"),
+    },
+    {
+      header: "Created At",
+      sortField: "createdAt",
+      cell: (t) => <DateTime value={t.createdAt} className="text-on-surface-variant" />,
+    },
+    ...auditColumns<Tenant>(names),
+  ];
+}
 
 export default function TenantsPage() {
   const canEdit = useHasRole(Role.SUPER_ADMIN);
@@ -90,6 +93,7 @@ export default function TenantsPage() {
     setFilters,
     reload,
   } = useTableQuery<Tenant>(listTenants, { limit: LIMIT });
+  const names = useUserNames(rows.flatMap((t) => [t.createdBy, t.updatedBy]));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   function handleDelete(id: string, displayName: string) {
@@ -110,7 +114,7 @@ export default function TenantsPage() {
   }
 
   const columns: ColumnDef<Tenant>[] = [
-    ...STATIC_COLUMNS,
+    ...buildColumns(names),
     ...(canEdit
       ? [
           {

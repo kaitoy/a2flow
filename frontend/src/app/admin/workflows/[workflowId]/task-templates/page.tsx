@@ -18,6 +18,7 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useUserNames } from "@/hooks/useUserNames";
 import {
   deleteWorkflowTaskTemplate,
   type FilterSpec,
@@ -52,6 +53,7 @@ function buildColumns(
   workflowId: string,
   titleById: Map<string, string>,
   serverNameById: Map<string, string>,
+  names: Map<string, string>,
   onDelete: (id: string, title: string) => void,
   onHoverDependency: (id: string | null) => void,
   indexById: Map<string, number>,
@@ -127,7 +129,7 @@ function buildColumns(
         );
       },
     },
-    ...auditColumns<WorkflowTaskTemplate>(),
+    ...auditColumns<WorkflowTaskTemplate>(names),
   ];
   if (canEdit) {
     columns.push({
@@ -229,11 +231,14 @@ export default function WorkflowTaskTemplatesPage() {
     }
   }
 
+  const names = useUserNames(templates.flatMap((t) => [t.createdBy, t.updatedBy]));
+
   const columns = buildColumns(
     workflowId,
     // Unpaginated, so every dependency resolves to a real title.
     new Map(templates.map((t) => [t.id, t.title])),
     serverNameById,
+    names,
     handleDelete,
     setHighlightedId,
     new Map(templates.map((t, i) => [t.id, i + 1])),

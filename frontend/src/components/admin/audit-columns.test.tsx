@@ -4,6 +4,12 @@ import { DataTable } from "@/components/ui/data-table";
 import { render, screen } from "@/test/test-utils";
 import { auditColumns } from "./audit-columns";
 
+vi.mock("next/link", () => ({
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
+
 interface Row {
   id: string;
   updatedAt: string;
@@ -29,11 +35,13 @@ function renderTable(rows: Row[], userNameById?: Map<string, string>) {
 }
 
 describe("auditColumns", () => {
-  it("renders the raw id, created-by id, and updated-by id when no name map is given", () => {
+  it("links created-by/updated-by to the user's detail page, labeled with the raw id when no name map is given", () => {
     renderTable([ROW]);
     expect(screen.getByText("row-1")).toBeInTheDocument();
-    expect(screen.getByText("user-1")).toBeInTheDocument();
-    expect(screen.getByText("user-2")).toBeInTheDocument();
+    const createdByLink = screen.getByRole("link", { name: "user-1" });
+    expect(createdByLink).toHaveAttribute("href", "/admin/users/user-1");
+    const updatedByLink = screen.getByRole("link", { name: "user-2" });
+    expect(updatedByLink).toHaveAttribute("href", "/admin/users/user-2");
   });
 
   it("resolves created-by/updated-by to display names when a name map is given", () => {
@@ -42,14 +50,22 @@ describe("auditColumns", () => {
       ["user-2", "Bob"],
     ]);
     renderTable([ROW], names);
-    expect(screen.getByText("Alice")).toBeInTheDocument();
-    expect(screen.getByText("Bob")).toBeInTheDocument();
+    const createdByLink = screen.getByRole("link", { name: "Alice" });
+    expect(createdByLink).toHaveAttribute("href", "/admin/users/user-1");
+    const updatedByLink = screen.getByRole("link", { name: "Bob" });
+    expect(updatedByLink).toHaveAttribute("href", "/admin/users/user-2");
   });
 
-  it("falls back to the raw id for an id missing from the name map", () => {
+  it("falls back to the raw id label for an id missing from the name map, still linked", () => {
     renderTable([ROW], new Map([["user-1", "Alice"]]));
-    expect(screen.getByText("Alice")).toBeInTheDocument();
-    expect(screen.getByText("user-2")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Alice" })).toHaveAttribute(
+      "href",
+      "/admin/users/user-1"
+    );
+    expect(screen.getByRole("link", { name: "user-2" })).toHaveAttribute(
+      "href",
+      "/admin/users/user-2"
+    );
   });
 
   it("exposes exactly the four expected headers", () => {

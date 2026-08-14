@@ -3,7 +3,7 @@
 
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { auditColumns } from "@/components/admin/audit-columns";
@@ -14,7 +14,8 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { type Approval, type ApprovalStatus, getUserNames, listApprovals } from "@/lib/api";
+import { useUserNames } from "@/hooks/useUserNames";
+import { type Approval, type ApprovalStatus, listApprovals } from "@/lib/api";
 
 const LIMIT = 20;
 
@@ -41,27 +42,8 @@ export default function ApprovalsPage() {
   } = useTableQuery<Approval>(listApprovals, { limit: LIMIT });
 
   // Resolve approver and audit user IDs to display names (best-effort, falling
-  // back to the raw ID), mirroring AuditMeta. The comma-joined key lets the
-  // effect depend on the set of IDs without re-running on array identity.
-  const [names, setNames] = useState<Map<string, string>>(new Map());
-  const userIdsKey = rows
-    .flatMap((a) => [a.approver, a.createdBy, a.updatedBy])
-    .filter(Boolean)
-    .join(",");
-  useEffect(() => {
-    if (!userIdsKey) return;
-    let active = true;
-    getUserNames(userIdsKey.split(","))
-      .then((resolved) => {
-        if (active) setNames(resolved);
-      })
-      .catch(() => {
-        // Name resolution is best-effort; the raw ID is shown as a fallback.
-      });
-    return () => {
-      active = false;
-    };
-  }, [userIdsKey]);
+  // back to the raw ID), mirroring AuditMeta.
+  const names = useUserNames(rows.flatMap((a) => [a.approver, a.createdBy, a.updatedBy]));
 
   const columns = useMemo<ColumnDef<Approval>[]>(
     () => [
