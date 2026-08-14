@@ -6,12 +6,16 @@ approval-gated "launch an EC2 instance" workflow needs, all inside the
 seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
 
 * one Secret holding the AWS access key id and secret access key as two
-  entries,
+  entries, described for the admin UI,
 * one stdio MCPServer reaching the managed AWS MCP Server through the
   ``mcp-proxy-for-aws`` proxy launched with ``uvx``, referencing those
-  entries from its ``env`` via ``${secret:NAME/KEY}``,
+  entries from its ``env`` via ``${secret:NAME/KEY}``, also described,
 * one AgentSkill pointing at ``sample_skills/aws-ec2-launch`` in this
   repository,
+* two Tags -- ``AWS`` (attached to the secret, MCP server, and agent skill,
+  showing that one tag classifies across resource types) and ``Approval
+  Required`` (attached to the agent skill alone, calling out its approval
+  gate),
 * three Users -- a ``demo-approver`` (the manager the skill asks for approval),
   a ``demo-requester`` (who runs the workflow), and a ``demo-developer`` (who
   may build and register the workflow, MCP server, and agent skill in the
@@ -24,7 +28,9 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
   next request.
 
 The Workflow itself is deliberately *not* seeded — these records are the
-ingredients an operator assembles one into.
+ingredients an operator assembles one into. Both tags stay unattached to any
+workflow for the same reason; an operator is free to attach either once they
+build one.
 
 The flag is declarative in both directions: ``DEMO_DATA=true`` guarantees the
 records exist, and leaving it unset (the default) guarantees they do not, so
@@ -54,6 +60,7 @@ from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
 from models.mcp_server import McpCommand, MCPServer, McpTransport
 from models.secret import Secret, SecretType
+from models.tag import AgentSkillTag, McpServerTag, SecretTag, Tag, TagColor, TagLink
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from models.user_group import UserGroup, UserGroupMember
@@ -89,6 +96,18 @@ DEMO_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d201"
 
 #: Fixed identifier of the demo ``aws-ec2-launch`` agent skill.
 DEMO_AGENT_SKILL_ID = "00000000-0000-0000-0000-00000000d301"
+
+#: Fixed identifier of the demo ``AWS`` tag.
+DEMO_AWS_TAG_ID = "00000000-0000-0000-0000-00000000d501"
+
+#: Fixed identifier of the demo ``Approval Required`` tag.
+DEMO_APPROVAL_TAG_ID = "00000000-0000-0000-0000-00000000d502"
+
+#: Name of the demo tag shared by the secret, MCP server, and agent skill.
+DEMO_AWS_TAG_NAME = "AWS"
+
+#: Name of the demo tag attached only to the agent skill.
+DEMO_APPROVAL_TAG_NAME = "Approval Required"
 
 #: Name of the demo Secret holding both AWS credentials. Its two entries are
 #: embedded in the demo MCP server's ``env`` as ``${secret:NAME/KEY}``
@@ -131,6 +150,19 @@ _DEMO_SKILL_REPO_PATH = "sample_skills/aws-ec2-launch"
 #: ``DEMO_AWS_SECRET_ACCESS_KEY`` are unset. The demo is then complete in shape
 #: but cannot reach AWS until an operator edits the secret in the admin UI.
 _PLACEHOLDER_SECRET_VALUE = "REPLACE_ME"
+
+#: Description shown on the demo secret in the admin UI.
+_DEMO_AWS_SECRET_DESCRIPTION = (
+    "AWS access key and secret key used by the demo MCP server to sign "
+    "requests to the managed AWS MCP endpoint."
+)
+
+#: Description shown on the demo MCP server in the admin UI.
+_DEMO_MCP_SERVER_DESCRIPTION = (
+    "Managed AWS MCP Server reached through the mcp-proxy-for-aws bridge, "
+    "providing tools to launch and manage AWS resources such as EC2 "
+    "instances."
+)
 
 _RowT = TypeVar("_RowT", bound=SQLModel)
 
@@ -273,18 +305,25 @@ async def _seed_demo_data(session: AsyncSession) -> str | None:
     await _seed_demo_groups(session, tenant_id)
     await _seed_demo_secrets(session, tenant_id)
     await _seed_demo_mcp_server(session, tenant_id)
-    return await _seed_demo_agent_skill(session, tenant_id)
+    new_skill_id = await _seed_demo_agent_skill(session, tenant_id)
+    await _seed_demo_tags(session, tenant_id)
+    return new_skill_id
 
 
 async def _remove_demo_data(session: AsyncSession) -> None:
     """Delete every demo record that is still present.
 
     Deletion follows the direction of the foreign keys — agent skill, then MCP
-    server, then secrets, then user groups, then users — so a record is never
-    orphaned by the removal of something it points at. A record that other data
-    has come to depend on (a Workflow built on the demo skill, a task tool
-    binding on the demo MCP server) cannot be deleted; that is logged and
-    skipped rather than allowed to fail startup.
+    server, then secrets, then tags, then user groups, then users — so a
+    record is never orphaned by the removal of something it points at. A
+    record that other data has come to depend on (a Workflow built on the
+    demo skill, a task tool binding on the demo MCP server) cannot be
+    deleted; that is logged and skipped rather than allowed to fail startup.
+
+    Deleting a tag has no such protection — the join tables cascade rather
+    than restrict, by design (see the module docstring of ``models.tag``) —
+    so it also detaches the tag from any of an operator's own records that
+    happen to carry it, the same as deleting it by hand in the admin UI would.
 
     Groups go before their members: the membership rows cascade away with the
     group, so the users are then free of them and the roles they granted are
@@ -300,6 +339,12 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     await _delete_demo_row(session, MCPServer, DEMO_MCP_SERVER_ID, label="MCP server")
     await _delete_demo_row(
         session, Secret, DEMO_AWS_SECRET_ID, label="AWS credentials secret"
+    )
+    await _delete_demo_row(
+        session, Tag, DEMO_AWS_TAG_ID, label=f"tag '{DEMO_AWS_TAG_NAME}'"
+    )
+    await _delete_demo_row(
+        session, Tag, DEMO_APPROVAL_TAG_ID, label=f"tag '{DEMO_APPROVAL_TAG_NAME}'"
     )
     for group_spec in _DEMO_GROUPS:
         await _delete_demo_row(
@@ -540,6 +585,7 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
             id=DEMO_AWS_SECRET_ID,
             tenant_id=tenant_id,
             name=DEMO_AWS_SECRET_NAME,
+            description=_DEMO_AWS_SECRET_DESCRIPTION,
             type=SecretType.local,
             entries={
                 DEMO_ACCESS_KEY_ENTRY_KEY: cipher.encrypt(
@@ -587,6 +633,7 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
             id=DEMO_MCP_SERVER_ID,
             tenant_id=tenant_id,
             name=DEMO_MCP_SERVER_NAME,
+            description=_DEMO_MCP_SERVER_DESCRIPTION,
             transport=McpTransport.stdio,
             command=McpCommand.uvx,
             args=[
@@ -648,3 +695,131 @@ async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str |
         label=f"agent skill '{DEMO_AGENT_SKILL_NAME}'",
     )
     return DEMO_AGENT_SKILL_ID if created else None
+
+
+async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
+    """Create the demo tags and attach them to the secret, MCP server, and agent skill.
+
+    Must run after :func:`_seed_demo_secrets`, :func:`_seed_demo_mcp_server`,
+    and :func:`_seed_demo_agent_skill`: attaching a tag looks up the record it
+    attaches to. The demo Workflow does not exist — see the module docstring
+    — so neither tag is attached to one; an operator is free to attach either
+    once they build a workflow from these records themselves.
+
+    Args:
+        session: Database session used to read and insert tags and their
+            attachments.
+        tenant_id: Id of the ``Default`` tenant the tags belong to.
+    """
+    if await _ensure_demo_tag(
+        session, tenant_id, DEMO_AWS_TAG_ID, DEMO_AWS_TAG_NAME, TagColor.cyan
+    ):
+        await _link_tag(
+            session,
+            SecretTag,
+            resource_model=Secret,
+            resource_id=DEMO_AWS_SECRET_ID,
+            tag_id=DEMO_AWS_TAG_ID,
+            label=f"tag '{DEMO_AWS_TAG_NAME}' on secret '{DEMO_AWS_SECRET_NAME}'",
+        )
+        await _link_tag(
+            session,
+            McpServerTag,
+            resource_model=MCPServer,
+            resource_id=DEMO_MCP_SERVER_ID,
+            tag_id=DEMO_AWS_TAG_ID,
+            label=f"tag '{DEMO_AWS_TAG_NAME}' on MCP server '{DEMO_MCP_SERVER_NAME}'",
+        )
+        await _link_tag(
+            session,
+            AgentSkillTag,
+            resource_model=AgentSkill,
+            resource_id=DEMO_AGENT_SKILL_ID,
+            tag_id=DEMO_AWS_TAG_ID,
+            label=f"tag '{DEMO_AWS_TAG_NAME}' on agent skill '{DEMO_AGENT_SKILL_NAME}'",
+        )
+    if await _ensure_demo_tag(
+        session,
+        tenant_id,
+        DEMO_APPROVAL_TAG_ID,
+        DEMO_APPROVAL_TAG_NAME,
+        TagColor.amber,
+    ):
+        await _link_tag(
+            session,
+            AgentSkillTag,
+            resource_model=AgentSkill,
+            resource_id=DEMO_AGENT_SKILL_ID,
+            tag_id=DEMO_APPROVAL_TAG_ID,
+            label=(
+                f"tag '{DEMO_APPROVAL_TAG_NAME}' on agent skill "
+                f"'{DEMO_AGENT_SKILL_NAME}'"
+            ),
+        )
+
+
+async def _ensure_demo_tag(
+    session: AsyncSession, tenant_id: str, tag_id: str, name: str, color: TagColor
+) -> bool:
+    """Create one demo tag if missing, and report whether it now exists.
+
+    Args:
+        session: Database session used to read and insert the tag.
+        tenant_id: Id of the ``Default`` tenant the tag belongs to.
+        tag_id: Fixed identifier of the demo tag.
+        name: Name shown in the admin UI.
+        color: Palette slot the tag's chip is drawn in.
+
+    Returns:
+        ``True`` when the tag is present after this call (already existed or
+        was just created), ``False`` when creation was skipped by a name
+        collision with an operator's own tag.
+    """
+    if await session.get(Tag, tag_id) is not None:
+        return True
+    return await _insert(
+        session,
+        Tag(
+            id=tag_id,
+            tenant_id=tenant_id,
+            name=name,
+            color=color,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"tag '{name}'",
+    )
+
+
+async def _link_tag(
+    session: AsyncSession,
+    link_model: type[TagLink],
+    *,
+    resource_model: type[SQLModel],
+    resource_id: str,
+    tag_id: str,
+    label: str,
+) -> None:
+    """Attach one tag to one record, unless already attached or the record is missing.
+
+    The record may be missing because its own seeding step was skipped by a
+    name collision (see :func:`_insert`); attaching to a nonexistent id would
+    fail the join table's foreign key, so this checks for it first rather
+    than letting that failure propagate.
+
+    Args:
+        session: Database session used to read and insert the join row.
+        link_model: The join table model, e.g. :class:`~models.tag.SecretTag`.
+        resource_model: Table model class the record belongs to.
+        resource_id: Id of the record the tag attaches to.
+        tag_id: Id of the tag to attach.
+        label: Human-readable description of the attachment, used in the log
+            message.
+    """
+    if await session.get(resource_model, resource_id) is None:
+        return
+    if await session.get(link_model, (resource_id, tag_id)) is not None:
+        return
+    await _insert(
+        session, link_model(resource_id=resource_id, tag_id=tag_id), label=label
+    )

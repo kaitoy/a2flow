@@ -24,10 +24,14 @@ from infrastructure.demo_data import (
     DEMO_ACCESS_KEY_ENTRY_KEY,
     DEMO_AGENT_SKILL_ID,
     DEMO_AGENT_SKILL_NAME,
+    DEMO_APPROVAL_TAG_ID,
+    DEMO_APPROVAL_TAG_NAME,
     DEMO_APPROVER_USER_ID,
     DEMO_APPROVERS_GROUP_ID,
     DEMO_AWS_SECRET_ID,
     DEMO_AWS_SECRET_NAME,
+    DEMO_AWS_TAG_ID,
+    DEMO_AWS_TAG_NAME,
     DEMO_DEVELOPER_USER_ID,
     DEMO_DEVELOPERS_GROUP_ID,
     DEMO_MCP_SERVER_ID,
@@ -42,6 +46,7 @@ from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.mcp_server import McpCommand, MCPServer, McpTransport
 from models.secret import Secret, SecretType
+from models.tag import AgentSkillTag, McpServerTag, SecretTag, Tag
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from models.user_group import UserGroup, UserGroupMember
@@ -192,6 +197,7 @@ async def test_sync_demo_data_seeds_the_full_dataset(
     assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
     assert len(await _rows(engine, AgentSkill)) == 1
+    assert len(await _rows(engine, Tag)) == 2
 
 
 async def test_sync_demo_data_returns_the_new_skill_id(
@@ -221,6 +227,36 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
     assert len(await _rows(engine, AgentSkill)) == 1
+    assert len(await _rows(engine, Tag)) == 2
+    assert len(await _rows(engine, SecretTag)) == 1
+    assert len(await _rows(engine, McpServerTag)) == 1
+    assert len(await _rows(engine, AgentSkillTag)) == 2
+
+
+async def test_demo_tags_classify_the_secret_mcp_server_and_agent_skill(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    tags = {tag.id: tag for tag in await _rows(engine, Tag)}
+    assert set(tags) == {DEMO_AWS_TAG_ID, DEMO_APPROVAL_TAG_ID}
+    assert tags[DEMO_AWS_TAG_ID].name == DEMO_AWS_TAG_NAME
+    assert tags[DEMO_APPROVAL_TAG_ID].name == DEMO_APPROVAL_TAG_NAME
+    secret_tags = {
+        (row.resource_id, row.tag_id) for row in await _rows(engine, SecretTag)
+    }
+    assert secret_tags == {(DEMO_AWS_SECRET_ID, DEMO_AWS_TAG_ID)}
+    mcp_server_tags = {
+        (row.resource_id, row.tag_id) for row in await _rows(engine, McpServerTag)
+    }
+    assert mcp_server_tags == {(DEMO_MCP_SERVER_ID, DEMO_AWS_TAG_ID)}
+    agent_skill_tags = {
+        (row.resource_id, row.tag_id) for row in await _rows(engine, AgentSkillTag)
+    }
+    assert agent_skill_tags == {
+        (DEMO_AGENT_SKILL_ID, DEMO_AWS_TAG_ID),
+        (DEMO_AGENT_SKILL_ID, DEMO_APPROVAL_TAG_ID),
+    }
 
 
 async def test_demo_users_hold_no_direct_roles(
@@ -384,6 +420,7 @@ async def test_demo_secrets_store_the_configured_values_encrypted(
         secret = await session.get(Secret, DEMO_AWS_SECRET_ID)
     assert secret is not None
     assert secret.name == DEMO_AWS_SECRET_NAME
+    assert secret.description
     assert secret.type is SecretType.local
     assert secret.tenant_id == TENANT_ID
     assert sorted(secret.entries) == [
@@ -419,6 +456,7 @@ async def test_demo_mcp_server_proxies_the_managed_aws_server(
         server = await session.get(MCPServer, DEMO_MCP_SERVER_ID)
     assert server is not None
     assert server.name == DEMO_MCP_SERVER_NAME
+    assert server.description
     assert server.tenant_id == TENANT_ID
     assert server.transport is McpTransport.stdio
     assert server.command is McpCommand.uvx
@@ -514,6 +552,13 @@ async def test_a_name_collision_is_skipped_without_failing(
         assert await session.get(Secret, DEMO_AWS_SECRET_ID) is None
         assert await session.get(MCPServer, DEMO_MCP_SERVER_ID) is not None
     assert any("conflicts with an existing" in r.getMessage() for r in caplog.records)
+    # The AWS tag itself is still created and attached to the MCP server and
+    # agent skill; only the link to the missing secret is skipped.
+    assert await _rows(engine, SecretTag) == []
+    mcp_server_tags = {
+        (row.resource_id, row.tag_id) for row in await _rows(engine, McpServerTag)
+    }
+    assert mcp_server_tags == {(DEMO_MCP_SERVER_ID, DEMO_AWS_TAG_ID)}
 
 
 # ---------- removal ----------
@@ -530,6 +575,10 @@ async def test_disabling_removes_the_full_dataset(
     assert await _rows(engine, Secret) == []
     assert await _rows(engine, MCPServer) == []
     assert await _rows(engine, AgentSkill) == []
+    assert await _rows(engine, Tag) == []
+    assert await _rows(engine, SecretTag) == []
+    assert await _rows(engine, McpServerTag) == []
+    assert await _rows(engine, AgentSkillTag) == []
 
 
 async def test_removal_on_a_database_without_demo_data_is_a_noop(
