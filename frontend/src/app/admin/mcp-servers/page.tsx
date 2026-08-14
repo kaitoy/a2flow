@@ -59,6 +59,10 @@ function buildColumns(names: Map<string, string>): ColumnDef<McpServer>[] {
       ),
     },
     {
+      header: "Description",
+      cell: (s) => s.description || "—",
+    },
+    {
       header: "Transport",
       sortField: "transport",
       filterField: "transport",

@@ -39,6 +39,11 @@ describe("McpServerFields", () => {
     expect(screen.queryByText("Arguments")).not.toBeInTheDocument();
   });
 
+  it("shows a description field", () => {
+    render(<Host />);
+    expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+  });
+
   it("shows command, args, and env fields for the stdio transport", () => {
     render(<Host defaults={{ transport: "stdio" }} />);
     expect(screen.getByRole("tablist", { name: "Command" })).toBeInTheDocument();
@@ -122,8 +127,18 @@ describe("McpServerFields", () => {
 
     it("falls back to a placeholder for empty pair and list fields", () => {
       render(<McpServerFields readOnly values={{ ...emptyMcpServerFormValues(), name: "srv" }} />);
-      // URL and HTTP Headers are both empty for a freshly blank remote server.
-      expect(screen.getAllByText("—")).toHaveLength(2);
+      // Description, URL, and HTTP Headers are all empty for a freshly blank remote server.
+      expect(screen.getAllByText("—")).toHaveLength(3);
+    });
+
+    it("renders a set description as text", () => {
+      render(
+        <McpServerFields
+          readOnly
+          values={{ ...emptyMcpServerFormValues(), name: "srv", description: "Handles web search" }}
+        />
+      );
+      expect(screen.getByText("Handles web search")).toBeInTheDocument();
     });
   });
 });
@@ -178,6 +193,7 @@ describe("toMcpServerBody", () => {
       })
     ).toEqual({
       name: "srv",
+      description: null,
       transport: "streamable_http",
       url: "https://mcp.example.com/mcp",
       headers: { Authorization: "Bearer x" },
@@ -198,10 +214,22 @@ describe("toMcpServerBody", () => {
       })
     ).toEqual({
       name: "srv",
+      description: null,
       transport: "stdio",
       command: "npx",
       args: ["-y", "pkg"],
       env: { API_KEY: "x" },
     });
+  });
+
+  it("includes a set description", () => {
+    expect(
+      toMcpServerBody({
+        ...emptyMcpServerFormValues(),
+        name: "srv",
+        description: "Handles web search",
+        url: "https://mcp.example.com/mcp",
+      })
+    ).toMatchObject({ description: "Handles web search" });
   });
 });

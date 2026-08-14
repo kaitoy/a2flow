@@ -37,6 +37,7 @@ from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity, JSONColumn
 from models.constraints import (
+    DescText,
     SecretEntryKey,
     SecretName,
     SecretValue,
@@ -101,6 +102,7 @@ class SecretUpdate(SQLModel):
 
     model_config = _alias_config
     name: SecretName | None = None
+    description: DescText | None = None
     type: SecretType | None = None
     entries: dict[str, str] | None = None
     vault_mount: VaultMount | None = None
@@ -139,6 +141,7 @@ class SecretCreate(SecretUpdate):
     """Creation payload for a Secret with required fields and shape validation."""
 
     name: SecretName
+    description: DescText | None = None
     type: SecretType
     entries: dict[str, SecretValue] = Field(default_factory=dict)
 
@@ -199,6 +202,7 @@ class SecretRead(BaseEntity):
 
     model_config = _alias_config
     name: str
+    description: str | None = None
     type: SecretType
     keys: list[str] = []
     vault_mount: str | None = None

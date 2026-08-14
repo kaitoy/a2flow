@@ -48,6 +48,10 @@ function buildColumns(names: Map<string, string>): ColumnDef<Secret>[] {
       ),
     },
     {
+      header: "Description",
+      cell: (s) => s.description || "—",
+    },
+    {
       header: "Type",
       sortField: "type",
       filterField: "type",

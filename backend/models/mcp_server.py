@@ -44,7 +44,7 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity, JSONColumn
-from models.constraints import EntityName, HttpUrl, McpArg
+from models.constraints import DescText, EntityName, HttpUrl, McpArg
 from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -113,6 +113,7 @@ class MCPServerUpdate(SQLModel):
 
     model_config = _alias_config
     name: EntityName | None = None
+    description: DescText | None = None
     transport: McpTransport | None = None
     url: HttpUrl | None = None
     headers: dict[str, str] | None = None
@@ -176,6 +177,7 @@ class MCPServerCreate(MCPServerUpdate):
     """
 
     name: EntityName
+    description: DescText | None = None
     transport: McpTransport = McpTransport.streamable_http
     url: HttpUrl | None = None
     headers: dict[str, str] = Field(default_factory=dict)
@@ -251,6 +253,7 @@ class McpServerRead(BaseEntity):
     model_config = _alias_config
     tenant_id: str
     name: str
+    description: str | None = None
     transport: McpTransport = McpTransport.streamable_http
     url: str | None = None
     headers: dict[str, str] = {}

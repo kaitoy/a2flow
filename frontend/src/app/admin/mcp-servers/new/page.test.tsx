@@ -43,6 +43,7 @@ describe("NewMcpServerPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "test-server",
+        description: null,
         transport: "streamable_http",
         url: "https://mcp.test/mcp",
         headers: { Authorization: "Bearer abc" },
@@ -74,6 +75,7 @@ describe("NewMcpServerPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "local-files",
+        description: null,
         transport: "stdio",
         command: "npx",
         args: ["-y"],

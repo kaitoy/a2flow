@@ -96,6 +96,7 @@ export default function SecretDetailPage() {
         setSavedTagIds(secret.tagIds ?? []);
         reset({
           name: secret.name,
+          description: secret.description ?? "",
           type: secret.type,
           // Values are write-only, so each stored key comes back with a blank
           // value the user may either leave (keeping it) or overwrite.

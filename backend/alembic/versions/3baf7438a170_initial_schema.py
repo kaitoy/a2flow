@@ -229,6 +229,7 @@ def upgrade() -> None:
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
             "transport",
             sa.Enum("streamable_http", "stdio", name="mcptransport"),
@@ -276,6 +277,7 @@ def upgrade() -> None:
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("type", sa.Enum("local", "vault", name="secrettype"), nullable=False),
         sa.Column(
             "entries",

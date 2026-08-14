@@ -25,6 +25,7 @@ import {
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
+import { Textarea } from "@/components/ui/textarea";
 import { zSecretCreate } from "@/generated/api/zod.gen";
 import type { SecretCreate } from "@/lib/api";
 import { EMPTY_VALUE, formatChoice, formatLines } from "@/lib/read-only-display";
@@ -49,6 +50,7 @@ export function buildSecretFormSchema(requireEntryValues: boolean) {
   return z
     .object({
       name: zSecretCreate.shape.name,
+      description: z.string(),
       type: zSecretCreate.shape.type,
       entries: z.array(z.object({ key: z.string(), value: z.string().max(8192) })),
       vaultMount: z.string().max(256),
@@ -131,6 +133,7 @@ const SECRET_TYPE_OPTIONS: ReadonlyArray<SegmentedOption<SecretFormValues["type"
 export function emptySecretFormValues(): SecretFormValues {
   return {
     name: "",
+    description: "",
     type: "local",
     entries: [{ key: "", value: "" }],
     vaultMount: "",
@@ -149,12 +152,14 @@ export function toSecretBody(values: SecretFormValues): SecretCreate {
   if (values.type === "local") {
     return {
       name: values.name,
+      description: values.description || null,
       type: "local",
       entries: pairsToRecord(values.entries),
     };
   }
   return {
     name: values.name,
+    description: values.description || null,
     type: "vault",
     vaultMount: values.vaultMount,
     vaultPath: values.vaultPath,
@@ -206,6 +211,12 @@ function SecretFieldValues({ values }: { values: SecretFormValues }) {
     <>
       <FormField htmlFor="name" label="Name" required>
         <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
+      </FormField>
+
+      <FormField htmlFor="description" label="Description">
+        <ReadOnlyField className="whitespace-pre-wrap">
+          {values.description || EMPTY_VALUE}
+        </ReadOnlyField>
       </FormField>
 
       <FormField htmlFor="type" label="Type" required>
@@ -262,6 +273,15 @@ export function SecretFields(props: SecretFieldsProps) {
           {"${secret:name/key}"} in MCP server headers and environment variables, and as{" "}
           <code>name/key</code> in Agent Skill repo auth. The key is always required.
         </p>
+      </FormField>
+
+      <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+        <Textarea
+          id="description"
+          rows={4}
+          placeholder={showPlaceholders ? "What this secret is for (optional)" : undefined}
+          {...register("description")}
+        />
       </FormField>
 
       <FormField htmlFor="type" label="Type" required>

@@ -64,6 +64,7 @@ describe("NewSecretPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "api-token",
+        description: null,
         type: "local",
         entries: { token: "tok-123" },
       })
@@ -91,6 +92,7 @@ describe("NewSecretPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "aws-credentials",
+        description: null,
         type: "local",
         entries: { AWS_ACCESS_KEY_ID: "AKIA1", AWS_SECRET_ACCESS_KEY: "sk-1" },
       })
@@ -117,6 +119,7 @@ describe("NewSecretPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "vault-token",
+        description: null,
         type: "vault",
         vaultMount: "secret",
         vaultPath: "myapp/github",

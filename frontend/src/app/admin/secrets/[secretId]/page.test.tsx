@@ -70,6 +70,7 @@ describe("SecretDetailPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "github-token",
+        description: null,
         type: "local",
         entries: { token: "" },
       })
@@ -94,6 +95,7 @@ describe("SecretDetailPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "github-token",
+        description: null,
         type: "local",
         entries: { token: "tok-456" },
       })
@@ -121,6 +123,7 @@ describe("SecretDetailPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "github-token",
+        description: null,
         type: "local",
         entries: { token: "" },
       })

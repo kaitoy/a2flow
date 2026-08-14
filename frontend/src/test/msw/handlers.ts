@@ -146,6 +146,7 @@ export const MCP_SERVER_1 = {
   id: "mcp-1",
   tenantId: "tenant-1",
   name: "my-mcp-server",
+  description: null,
   transport: "streamable_http",
   url: "https://mcp.example.com/mcp",
   headers: { Authorization: "Bearer secret" },
@@ -161,6 +162,7 @@ export const MCP_STDIO_SERVER = {
   id: "mcp-2",
   tenantId: "tenant-1",
   name: "local-files",
+  description: null,
   transport: "stdio",
   headers: {},
   command: "npx",
@@ -184,6 +186,7 @@ export const MCP_TOOL_1 = {
 export const SECRET_1 = {
   id: "secret-1",
   name: "github-token",
+  description: null,
   type: "local",
   keys: ["token"],
   vaultMount: null,
@@ -197,6 +200,7 @@ export const SECRET_1 = {
 export const SECRET_VAULT_1 = {
   id: "secret-2",
   name: "vault-token",
+  description: null,
   type: "vault",
   keys: [],
   vaultMount: "secret",

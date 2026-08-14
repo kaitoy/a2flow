@@ -22,6 +22,7 @@ import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { StringListEditor } from "@/components/admin/string-list-editor";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
+import { Textarea } from "@/components/ui/textarea";
 import { zMcpCommand, zMcpServerCreate, zMcpTransport } from "@/generated/api/zod.gen";
 import type { McpServerCreate } from "@/lib/api";
 import { EMPTY_VALUE, formatChoice, formatLines, formatPairs } from "@/lib/read-only-display";
@@ -61,6 +62,7 @@ function validateRequired(
 export const mcpServerFormSchema = z
   .object({
     name: zMcpServerCreate.shape.name,
+    description: z.string(),
     transport: zMcpTransport,
     url: z.string(),
     headers: z.array(z.object({ key: z.string(), value: z.string() })),
@@ -97,6 +99,7 @@ const COMMAND_OPTIONS: ReadonlyArray<SegmentedOption<McpServerFormValues["comman
 export function emptyMcpServerFormValues(): McpServerFormValues {
   return {
     name: "",
+    description: "",
     transport: "streamable_http",
     url: "",
     headers: [] as KeyValuePair[],
@@ -118,6 +121,7 @@ export function toMcpServerBody(values: McpServerFormValues): McpServerCreate {
   if (values.transport === "streamable_http") {
     return {
       name: values.name,
+      description: values.description || null,
       transport: "streamable_http",
       url: values.url,
       headers: pairsToRecord(values.headers),
@@ -125,6 +129,7 @@ export function toMcpServerBody(values: McpServerFormValues): McpServerCreate {
   }
   return {
     name: values.name,
+    description: values.description || null,
     transport: "stdio",
     command: values.command,
     args: values.args.filter((arg) => arg !== ""),
@@ -202,6 +207,12 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
         <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
 
+      <FormField htmlFor="description" label="Description">
+        <ReadOnlyField className="whitespace-pre-wrap">
+          {values.description || EMPTY_VALUE}
+        </ReadOnlyField>
+      </FormField>
+
       <FormField htmlFor="transport" label="Transport" required>
         <ReadOnlyField>{formatChoice(TRANSPORT_OPTIONS, values.transport)}</ReadOnlyField>
       </FormField>
@@ -262,6 +273,15 @@ export function McpServerFields(props: McpServerFieldsProps) {
           id="name"
           placeholder={showPlaceholders ? "e.g. web-search" : undefined}
           {...register("name")}
+        />
+      </FormField>
+
+      <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+        <Textarea
+          id="description"
+          rows={4}
+          placeholder={showPlaceholders ? "What this server is for (optional)" : undefined}
+          {...register("description")}
         />
       </FormField>
 

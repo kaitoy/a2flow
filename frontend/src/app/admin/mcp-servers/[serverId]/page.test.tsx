@@ -55,6 +55,7 @@ describe("McpServerDetailPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "my-mcp-server",
+        description: null,
         transport: "streamable_http",
         url: "https://mcp.example.com/mcp",
         headers: {},
@@ -98,6 +99,7 @@ describe("McpServerDetailPage", () => {
     await waitFor(() =>
       expect(receivedBody).toEqual({
         name: "my-mcp-server",
+        description: null,
         transport: "stdio",
         command: "uvx",
         args: [],

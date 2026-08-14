@@ -93,6 +93,7 @@ export default function McpServerDetailPage() {
         reset({
           ...emptyMcpServerFormValues(),
           name: server.name,
+          description: server.description ?? "",
           transport: server.transport ?? "streamable_http",
           url: server.url ?? "",
           headers: recordToPairs(server.headers ?? {}),
