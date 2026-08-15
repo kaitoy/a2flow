@@ -3,9 +3,13 @@
 Every operation on a workflow execution (get, list, messages, task listing,
 agent stream, task CRUD) is restricted to the execution initiator, the
 designated approvers of the session's approvals, and super admins; deletion is
-stricter (owner or super admin only). The auth test stub reads roles from the
-``X-User-Roles`` header (defaulting to ``super_admin``), so these tests pass
-explicit role headers to model each participant.
+stricter (owner or super admin only). A plain admin gets the same access as a
+super admin for the read-only operations (get, list, messages, task listing,
+reading a single task) but not for the ones that act (agent stream, task
+create/update/delete, deletion) -- see ``services/workflow_execution_access.py``.
+The auth test stub reads roles from the ``X-User-Roles`` header (defaulting to
+``super_admin``), so these tests pass explicit role headers to model each
+participant.
 """
 
 from collections.abc import AsyncGenerator
@@ -36,6 +40,8 @@ APPROVER = {"X-User-Id": "carol", "X-User-Roles": "approver"}
 UNRELATED = {"X-User-Id": "bob", "X-User-Roles": "developer,requester,approver"}
 #: Headers modeling an unrelated super admin.
 SUPER_ADMIN = {"X-User-Id": "alice", "X-User-Roles": "super_admin"}
+#: Headers modeling an unrelated plain admin (read-only bypass, no action bypass).
+ADMIN = {"X-User-Id": "dave", "X-User-Roles": "admin"}
 
 
 #: Id and published revision of the AgentSkill every seeded session references.
@@ -241,6 +247,16 @@ async def test_super_admin_can_get_any_session(
     )
 
 
+async def test_admin_can_get_any_session(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    assert_ok(
+        await client.get(f"/api/v1/workflow-executions/{execution_id}", headers=ADMIN)
+    )
+
+
 async def test_missing_session_is_404_even_for_unrelated_user(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
@@ -312,6 +328,17 @@ async def test_super_admin_sees_all_executions_in_list(
     assert {id_a, id_b} <= ids
 
 
+async def test_admin_sees_all_executions_in_list(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    id_a = await _seed_session(eng, user_id="owner")
+    id_b = await _seed_session(eng, user_id="bob")
+    res = await client.get("/api/v1/workflow-executions", headers=ADMIN)
+    ids = {item["id"] for item in assert_ok(res)}
+    assert {id_a, id_b} <= ids
+
+
 async def test_execution_list_scoping_composes_with_filters(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
@@ -355,6 +382,18 @@ async def test_approver_can_get_messages(
     )
 
 
+async def test_admin_can_get_messages(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution_id}/messages", headers=ADMIN
+        )
+    )
+
+
 async def test_unrelated_user_cannot_list_session_tasks(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
@@ -366,6 +405,18 @@ async def test_unrelated_user_cannot_list_session_tasks(
     assert_err(res, "FORBIDDEN", 403)
 
 
+async def test_admin_can_list_session_tasks(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution_id}/workflow-tasks", headers=ADMIN
+        )
+    )
+
+
 async def test_unrelated_user_cannot_stream_agent(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
@@ -375,6 +426,20 @@ async def test_unrelated_user_cannot_stream_agent(
         f"/api/v1/workflow-executions/{execution_id}/agent",
         json=_run_agent_input(),
         headers=UNRELATED,
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_admin_cannot_stream_agent(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A plain admin can view an execution but must not be able to drive its agent."""
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    res = await client.post(
+        f"/api/v1/workflow-executions/{execution_id}/agent",
+        json=_run_agent_input(),
+        headers=ADMIN,
     )
     assert_err(res, "FORBIDDEN", 403)
 
@@ -404,6 +469,15 @@ async def test_unrelated_user_cannot_create_task(
     assert_err(await _create_task(client, execution_id, UNRELATED), "FORBIDDEN", 403)
 
 
+async def test_admin_cannot_create_task(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A plain admin can read an execution's tasks but must not be able to create one."""
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    assert_err(await _create_task(client, execution_id, ADMIN), "FORBIDDEN", 403)
+
+
 async def test_approver_can_create_and_update_task(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
@@ -428,6 +502,24 @@ async def test_unrelated_user_cannot_read_or_delete_task(
     res = await client.get(f"/api/v1/workflow-tasks/{task['id']}", headers=UNRELATED)
     assert_err(res, "FORBIDDEN", 403)
     res = await client.delete(f"/api/v1/workflow-tasks/{task['id']}", headers=UNRELATED)
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_admin_can_read_but_not_update_or_delete_task(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A plain admin can read a single task but must not update or delete it."""
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    task = assert_ok(await _create_task(client, execution_id, OWNER), status=201)
+    assert_ok(await client.get(f"/api/v1/workflow-tasks/{task['id']}", headers=ADMIN))
+    res = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"status": "in_progress"},
+        headers=ADMIN,
+    )
+    assert_err(res, "FORBIDDEN", 403)
+    res = await client.delete(f"/api/v1/workflow-tasks/{task['id']}", headers=ADMIN)
     assert_err(res, "FORBIDDEN", 403)
 
 
@@ -468,3 +560,15 @@ async def test_super_admin_can_delete_session(
             f"/api/v1/workflow-executions/{execution_id}", headers=SUPER_ADMIN
         )
     )
+
+
+async def test_admin_cannot_delete_session(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A plain admin can view an execution but must not be able to delete it."""
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    res = await client.delete(
+        f"/api/v1/workflow-executions/{execution_id}", headers=ADMIN
+    )
+    assert_err(res, "FORBIDDEN", 403)

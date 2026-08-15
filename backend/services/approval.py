@@ -5,6 +5,8 @@ single-entity fetches raise :class:`NotFoundError` instead of returning ``None``
 so the router never repeats the null check.
 """
 
+from collections.abc import Collection
+
 from models.approval import Approval, ApprovalUpdate
 from models.user import Role, User, has_any_role
 from repositories import ApprovalRepository
@@ -29,19 +31,22 @@ class ApprovalService:
         limit: int,
         offset: int,
         caller: User,
+        caller_roles: Collection[str],
         sort: tuple[SortSpec, ...] | list[SortSpec] = (),
         filters: tuple[FilterSpec, ...] | list[FilterSpec] = (),
     ) -> list[Approval]:
         """Return approvals visible to the caller, defaulting to ``created_at`` descending.
 
-        A super admin sees every approval in the tenant; anyone else sees only
-        approvals addressed to them or belonging to a WorkflowExecution they
-        initiated.
+        A super admin or admin sees every approval in the tenant; anyone else
+        sees only approvals addressed to them or belonging to a
+        WorkflowExecution they initiated.
 
         Args:
             limit: Maximum number of records.
             offset: Number of records to skip.
             caller: The authenticated user requesting the list.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
             sort: Sort specifications.
             filters: Filter specifications.
 
@@ -49,7 +54,9 @@ class ApprovalService:
             The matching approvals.
         """
         visible_to_user_id = (
-            None if has_any_role(caller.roles, Role.super_admin) else caller.id
+            None
+            if has_any_role(caller_roles, Role.super_admin, Role.admin)
+            else caller.id
         )
         return await self._repo.list(
             limit=limit,
@@ -82,8 +89,8 @@ class ApprovalService:
         """Resolve a pending approval to ``approved``, ``rejected``, or ``returned``.
 
         Only the approval's designated ``approver`` may resolve it — with no
-        exception, not even for a super admin — so an approval request can be
-        acted on solely by its addressee.
+        exception, not even for a super admin (or a plain admin) — so an
+        approval request can be acted on solely by its addressee.
 
         Goes through :meth:`ApprovalRepository.resolve` rather than the generic
         ``update`` so the decision also stamps the server-managed ``decided_at``.

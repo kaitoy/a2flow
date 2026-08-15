@@ -2,9 +2,13 @@
 
 Wraps the :class:`WorkflowTaskRepository` with the business rules the router
 needs: raising :class:`NotFoundError` when a task is missing and authorizing
-every operation against the task's parent workflow execution — only the
-execution's initiator, a designated approver of it, or a super admin may read
-or modify an execution's tasks. Changing a task's ``status`` is further restricted
+every operation against the task's parent workflow execution. Reading a task
+(``get``) is open to the execution's initiator, a designated approver of it, a
+super admin, or a plain admin (read-only, tenant-scoped); creating, updating,
+or deleting one is restricted to the initiator, a designated approver, or a
+super admin -- a plain admin cannot mutate tasks, mirroring
+``WorkflowExecutionService.resolve_agent``'s exclusion of admins from driving
+an execution's agent. Changing a task's ``status`` is further restricted
 when the task has a linked ``Approval`` (``Approval.workflow_task_id``): only
 the execution initiator or that Approval's designated ``approver`` may do so — not
 merely any approver of the execution — mirroring ``ApprovalService.resolve``'s
@@ -15,6 +19,8 @@ completion bookkeeping in :mod:`services.workflow_execution_completion`, so a
 run driven through these endpoints ends up in the same terminal state as one
 driven by the agent's own task tools.
 """
+
+from collections.abc import Collection
 
 from models.user import User
 from models.workflow_task import (
@@ -55,7 +61,8 @@ class WorkflowTaskService:
             execution_repo: Repository used to resolve a task's parent execution for
                 the access check.
             access: Policy restricting task operations to the execution initiator,
-                the execution's designated approvers, and super admins.
+                the execution's designated approvers, admins (read-only), and
+                super admins.
             approvals: Repository used to look up whether a task being updated
                 has a linked Approval and, if so, its designated approver, to
                 restrict ``status`` changes on such tasks.
@@ -85,12 +92,65 @@ class WorkflowTaskService:
             execution_id=execution_id,
         )
 
-    async def _assert_execution_access(self, execution_id: str, caller: User) -> None:
-        """Authorize the caller against a task's parent workflow execution.
+    async def _get_or_404(self, task_id: str) -> WorkflowTaskRead:
+        """Return the WorkflowTask with the given ID, without authorization.
+
+        Args:
+            task_id: Identifier of the task to fetch.
+
+        Returns:
+            The matching WorkflowTask.
+
+        Raises:
+            NotFoundError: If no task exists with the given ID.
+        """
+        task = await self._repo.get(task_id)
+        if task is None:
+            raise NotFoundError("WorkflowTask", task_id)
+        return task
+
+    async def _assert_execution_access(
+        self, execution_id: str, caller: User, caller_roles: Collection[str]
+    ) -> None:
+        """Authorize the caller to read a task's parent workflow execution.
+
+        Read-only: also admits a plain admin in the caller's tenant. Used by
+        :meth:`get` only -- :meth:`create`/:meth:`update`/:meth:`delete` go
+        through :meth:`_assert_execution_write_access` instead, which does
+        not.
 
         Args:
             execution_id: Identifier of the parent workflow execution.
             caller: The authenticated user performing the task operation.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
+
+        Raises:
+            NotFoundError: If the parent execution does not exist (so a missing
+                parent surfaces as 404 before any 403).
+            ForbiddenError: If the caller is neither the execution initiator, a
+                designated approver of the execution, nor holds ``admin`` or
+                ``super_admin``.
+        """
+        execution = await self._execution_repo.get(execution_id)
+        if execution is None:
+            raise NotFoundError("WorkflowExecution", execution_id)
+        await self._access.assert_read_access(
+            execution_id, execution.initiator_id, caller, caller_roles
+        )
+
+    async def _assert_execution_write_access(
+        self, execution_id: str, caller: User
+    ) -> None:
+        """Authorize the caller to create, update, or delete a task.
+
+        Stricter than :meth:`_assert_execution_access`: a plain admin does
+        not pass here, only the execution initiator, a designated approver,
+        or a super admin -- mirroring ``WorkflowExecutionService.resolve_agent``.
+
+        Args:
+            execution_id: Identifier of the parent workflow execution.
+            caller: The authenticated user performing the task mutation.
 
         Raises:
             NotFoundError: If the parent execution does not exist (so a missing
@@ -110,7 +170,7 @@ class WorkflowTaskService:
 
         Only applies when the task has a linked Approval with a non-null
         ``approver``; tasks without one keep the broader rule already enforced
-        by :meth:`_assert_execution_access`. No ``super_admin`` bypass, for
+        by :meth:`_assert_execution_write_access`. No ``super_admin`` bypass, for
         consistency with ``ApprovalService.resolve``'s no-bypass rule — this
         check protects the same "only the addressee decides" invariant,
         reachable here via the task's ``status`` field instead of the
@@ -137,24 +197,31 @@ class WorkflowTaskService:
             "approver can change this task's status"
         )
 
-    async def get(self, task_id: str, *, caller: User) -> WorkflowTaskRead:
+    async def get(
+        self, task_id: str, *, caller: User, caller_roles: Collection[str]
+    ) -> WorkflowTaskRead:
         """Return the WorkflowTask with the given ID.
+
+        Read-only: also passes a plain ``admin`` in the caller's tenant --
+        see :meth:`_assert_execution_access`.
 
         Args:
             task_id: Identifier of the task to fetch.
             caller: The authenticated user requesting the task.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
 
         Returns:
             The matching WorkflowTask.
 
         Raises:
             NotFoundError: If no task exists with the given ID.
-            ForbiddenError: If the caller may not access the task's execution.
+            ForbiddenError: If the caller may not read the task's execution.
         """
-        task = await self._repo.get(task_id)
-        if task is None:
-            raise NotFoundError("WorkflowTask", task_id)
-        await self._assert_execution_access(task.workflow_execution_id, caller)
+        task = await self._get_or_404(task_id)
+        await self._assert_execution_access(
+            task.workflow_execution_id, caller, caller_roles
+        )
         return task
 
     async def create(
@@ -176,7 +243,9 @@ class WorkflowTaskService:
 
         Raises:
             ForeignKeyViolationError: If the parent execution does not exist.
-            ForbiddenError: If the caller may not access the parent execution.
+            ForbiddenError: If the caller may not act on the parent execution
+                (a plain admin who is not the initiator or a designated
+                approver is rejected, same as :meth:`update`/:meth:`delete`).
         """
         execution = await self._execution_repo.get(data.workflow_execution_id)
         if execution is None:
@@ -212,11 +281,13 @@ class WorkflowTaskService:
 
         Raises:
             NotFoundError: If no task exists with the given ID.
-            ForbiddenError: If the caller may not access the task's execution,
+            ForbiddenError: If the caller may not act on the task's execution
+                (a plain admin is rejected, see :meth:`_assert_execution_write_access`),
                 or is changing ``status`` on a task whose linked Approval
                 designates someone else as approver.
         """
-        task = await self.get(task_id, caller=caller)
+        task = await self._get_or_404(task_id)
+        await self._assert_execution_write_access(task.workflow_execution_id, caller)
         if data.status is not None and data.status != task.status:
             await self._assert_status_change_allowed(task, caller)
         updated = await self._repo.update(task_id, data, user_id=caller.id)
@@ -235,8 +306,10 @@ class WorkflowTaskService:
 
         Raises:
             NotFoundError: If no task exists with the given ID.
-            ForbiddenError: If the caller may not access the task's execution.
+            ForbiddenError: If the caller may not act on the task's execution
+                (a plain admin is rejected, see :meth:`_assert_execution_write_access`).
         """
-        task = await self.get(task_id, caller=caller)
+        task = await self._get_or_404(task_id)
+        await self._assert_execution_write_access(task.workflow_execution_id, caller)
         await self._repo.delete(task_id)
         await self._evaluate_completion(task.workflow_execution_id)

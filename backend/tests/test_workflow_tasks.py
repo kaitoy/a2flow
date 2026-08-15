@@ -942,6 +942,30 @@ async def test_update_status_forbidden_for_super_admin_who_is_not_owner_or_appro
     assert_err(response, "FORBIDDEN", 403)
 
 
+async def test_update_status_forbidden_for_admin_who_is_not_owner_or_approver(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A plain admin cannot change a task's status either -- rejected even earlier, by
+    the general execution-write-access gate, since a plain admin never passes
+    that check (only the read-only variant admits it)."""
+    client, eng = workflow_client_with_engine
+    execution = await _create_workflow_execution(client)
+    task = await _create_task(client, execution["id"])
+    await _insert_approval(
+        eng,
+        workflow_execution_id=execution["id"],
+        workflow_task_id=task["id"],
+        approver="bob",
+    )
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"status": "completed"},
+        headers={"X-User-Id": "dave", "X-User-Roles": "admin"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
 # ---------- run completion bookkeeping ----------
 
 

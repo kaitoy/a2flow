@@ -1,11 +1,13 @@
 """Tests for the approvals API (``GET``/``PATCH /api/v1/approvals``).
 
-``GET`` list is scoped to the caller: a super admin sees every approval in the
-tenant, everyone else sees only approvals addressed to them or belonging to a
-WorkflowExecution they initiated. ``GET`` by id remains unscoped (admin
-browsing), while ``PATCH`` records the requesting user as the approver.
-Approvals reference a workflow execution via a foreign key, so each test seeds
-a session before inserting approvals.
+``GET`` list is scoped to the caller: a super admin or a plain admin sees
+every approval in the tenant, everyone else sees only approvals addressed to
+them or belonging to a WorkflowExecution they initiated. ``GET`` by id
+remains unscoped (admin browsing), while ``PATCH`` records the requesting
+user as the approver -- and admits only the designated approver, with no
+bypass for a super admin or a plain admin. Approvals reference a workflow
+execution via a foreign key, so each test seeds a session before inserting
+approvals.
 """
 
 from collections.abc import AsyncGenerator
@@ -194,6 +196,22 @@ async def test_super_admin_sees_all_approvals_in_list(
     assert approval_id in ids
 
 
+async def test_admin_sees_all_approvals_in_list(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng, user_id="owner")
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
+    res = await client.get(
+        "/api/v1/approvals",
+        headers={"X-User-Id": "dave", "X-User-Roles": "admin"},
+    )
+    ids = {a["id"] for a in assert_ok(res)}
+    assert approval_id in ids
+
+
 async def test_get_approval(
     approval_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
@@ -280,6 +298,30 @@ async def test_resolve_by_super_admin_who_is_not_approver_is_forbidden(
         f"/api/v1/approvals/{approval_id}",
         json={"status": "approved"},
         headers={"X-User-Id": "alice", "X-User-Roles": "super_admin"},
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+    # The approval remains pending.
+    res = await client.get(
+        f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}
+    )
+    assert assert_ok(res)["status"] == ApprovalStatus.pending.value
+
+
+async def test_resolve_by_admin_who_is_not_approver_is_forbidden(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A plain admin who is not the designated approver still cannot resolve it."""
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
+
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": "dave", "X-User-Roles": "admin"},
     )
     assert_err(res, "FORBIDDEN", 403)
 

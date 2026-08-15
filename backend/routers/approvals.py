@@ -2,13 +2,13 @@
 
 Approvals are created by the workflow agent (via the ``request_approval`` tool)
 and resolved here by the approver: ``PATCH /approvals/{id}`` moves a request to
-``approved``, ``rejected``, or ``returned``. Only the designated approver (or a
-super admin) may resolve a request; the resolver's identity is recorded in the
-approval's audit fields. List is scoped like ``GET /workflow-executions``: a
-super admin sees every approval in the tenant, everyone else sees only
-approvals addressed to them or belonging to a WorkflowExecution they
-initiated. Get remains unscoped -- any authenticated user may fetch any single
-approval by id.
+``approved``, ``rejected``, or ``returned``. Only the designated approver may
+resolve a request -- with no exception, not even for a super admin or an admin;
+the resolver's identity is recorded in the approval's audit fields. List is
+scoped like ``GET /workflow-executions``: a super admin or admin sees every
+approval in the tenant, everyone else sees only approvals addressed to them or
+belonging to a WorkflowExecution they initiated. Get remains unscoped -- any
+authenticated user may fetch any single approval by id.
 
 ``GET /approvals/by-approver`` and ``GET /approvals/by-workflow`` aggregate the
 same records into approval-backlog breakdowns for operational dashboards. Both
@@ -23,6 +23,7 @@ from dependencies import (
     ApprovalServiceDep,
     BacklogThresholdDep,
     CurrentUserDep,
+    EffectiveRolesDep,
     FilterDep,
     MetricsServiceDep,
     PaginationDep,
@@ -39,6 +40,7 @@ router = APIRouter(prefix="/approvals", tags=["approvals"])
 async def list_approvals(
     service: ApprovalServiceDep,
     caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -46,14 +48,15 @@ async def list_approvals(
 ) -> ApiResponse[list[Approval]]:
     """Return Approval records, defaulting to ``created_at`` descending.
 
-    A super admin sees every approval in the tenant; anyone else sees only
-    approvals addressed to them or belonging to a WorkflowExecution they
-    initiated.
+    A super admin or admin sees every approval in the tenant; anyone else
+    sees only approvals addressed to them or belonging to a
+    WorkflowExecution they initiated.
     """
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
         caller=caller,
+        caller_roles=caller_roles,
         sort=sort.sort,
         filters=filters.filters,
     )
@@ -121,10 +124,10 @@ async def resolve_approval(
     """Resolve an approval, recording the requesting user as the approver.
 
     Accepts ``approved``, ``rejected``, or ``returned`` (sent back for rework).
-    Only the designated approver or a super admin may resolve; anyone else
-    receives HTTP 403 (``FORBIDDEN``). Raises HTTP 404 if the approval does
-    not exist. The transition out of ``pending`` stamps the server-managed
-    ``decidedAt``.
+    Only the designated approver may resolve -- with no exception, not even
+    for a super admin or an admin; anyone else receives HTTP 403
+    (``FORBIDDEN``). Raises HTTP 404 if the approval does not exist. The
+    transition out of ``pending`` stamps the server-managed ``decidedAt``.
     """
     approval = await service.resolve(approval_id, data, acting_user=acting_user)
     return ApiResponse(meta=meta, data=approval)

@@ -30,6 +30,7 @@ from dependencies import (
     APP_NAME,
     ApiMetaDep,
     CurrentUserDep,
+    EffectiveRolesDep,
     FilterDep,
     MetricsServiceDep,
     MetricsWindowDep,
@@ -57,6 +58,7 @@ router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 async def list_workflow_executions(
     service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -64,13 +66,14 @@ async def list_workflow_executions(
 ) -> ApiResponse[list[WorkflowExecution]]:
     """Return WorkflowExecution records, defaulting to ``created_at`` descending.
 
-    A super admin sees every execution in the tenant; anyone else sees only
-    executions they initiated or are a designated approver of.
+    A super admin or admin sees every execution in the tenant; anyone else
+    sees only executions they initiated or are a designated approver of.
     """
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
         caller=caller,
+        caller_roles=caller_roles,
         sort=sort.sort,
         filters=filters.filters,
     )
@@ -140,14 +143,18 @@ async def get_workflow_execution(
     execution_id: str,
     service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowExecution]:
     """Return the WorkflowExecution record for the given ID.
 
-    Only the execution's initiator, a designated approver of the execution, or
-    a super admin may access it; anyone else receives HTTP 403 (``FORBIDDEN``).
+    Only the execution's initiator, a designated approver of the execution,
+    an admin, or a super admin may access it; anyone else receives HTTP 403
+    (``FORBIDDEN``).
     """
-    execution = await service.get(execution_id, caller=caller)
+    execution = await service.get(
+        execution_id, caller=caller, caller_roles=caller_roles
+    )
     return ApiResponse(meta=meta, data=execution)
 
 
@@ -158,6 +165,7 @@ async def list_workflow_execution_tasks(
     execution_id: str,
     service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -165,14 +173,15 @@ async def list_workflow_execution_tasks(
 ) -> ApiResponse[list[WorkflowTaskRead]]:
     """Return the WorkflowTasks belonging to the given WorkflowExecution.
 
-    Restricted to the execution's initiator, its designated approvers, and
-    super admins. Raises HTTP 404 (``NotFoundError``) if the parent execution
-    does not exist, so callers can distinguish "no such execution" from
-    "execution exists but has no tasks".
+    Restricted to the execution's initiator, its designated approvers,
+    admins, and super admins. Raises HTTP 404 (``NotFoundError``) if the
+    parent execution does not exist, so callers can distinguish "no such
+    execution" from "execution exists but has no tasks".
     """
     items = await service.list_tasks(
         execution_id,
         caller=caller,
+        caller_roles=caller_roles,
         limit=pagination.limit,
         offset=pagination.offset,
         sort=sort.sort,
@@ -209,9 +218,11 @@ async def workflow_session_agent(
     """Stream AG-UI events from the agent driving an execution's workflow session.
 
     Restricted to the execution's initiator, its designated approvers, and
-    super admins. The skill and skill directory are resolved from the
-    WorkflowExecution record so the correct ADK tools are loaded regardless of
-    the global agent state. SystemMessages are stripped to prevent prompt
+    super admins -- deliberately excluding plain admins, who may view this
+    execution (``GET`` above) but not drive its agent. The skill and skill
+    directory are resolved from the WorkflowExecution record so the correct
+    ADK tools are loaded regardless of the global agent state. SystemMessages
+    are stripped to prevent prompt
     injection.
 
     Because the run is keyed by the execution's initiator, the new messages are
@@ -324,15 +335,19 @@ async def get_workflow_session_messages(
     execution_id: str,
     service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[dict[str, Any]]]:
     """Return the chat history of a WorkflowExecution's workflow session.
 
-    Restricted to the execution's initiator, its designated approvers, and
-    super admins. The history is keyed by the initiator, so a designated
-    approver opening the chat sees their conversation rather than an empty,
-    separate session. Returns an empty list when the ADK session has not been
-    created yet. Raises HTTP 404 if the WorkflowExecution does not exist.
+    Restricted to the execution's initiator, its designated approvers,
+    admins, and super admins. The history is keyed by the initiator, so a
+    designated approver opening the chat sees their conversation rather than
+    an empty, separate session. Returns an empty list when the ADK session
+    has not been created yet. Raises HTTP 404 if the WorkflowExecution does
+    not exist.
     """
-    messages = await service.get_messages(execution_id, caller=caller)
+    messages = await service.get_messages(
+        execution_id, caller=caller, caller_roles=caller_roles
+    )
     return ApiResponse(meta=meta, data=messages)

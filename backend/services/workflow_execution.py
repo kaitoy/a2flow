@@ -8,7 +8,7 @@ and agent-resolution business rules.
 
 import builtins
 import logging
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Any
 
 from ag_ui_adk import ADKAgent, adk_events_to_messages
@@ -65,8 +65,8 @@ class WorkflowExecutionService:
                 session when a WorkflowExecution is removed.
             app_name: ADK application name keying sessions in the store.
             access: Policy restricting execution-scoped operations to the
-                initiator, the execution's designated approvers, and super
-                admins.
+                initiator, the execution's designated approvers, admins
+                (read-only), and super admins.
         """
         self._execution_repo = execution_repo
         self._tasks = tasks
@@ -100,23 +100,35 @@ class WorkflowExecutionService:
             raise NotFoundError("WorkflowExecution", execution_id)
         return execution
 
-    async def get(self, execution_id: str, *, caller: User) -> WorkflowExecution:
+    async def get(
+        self, execution_id: str, *, caller: User, caller_roles: Collection[str]
+    ) -> WorkflowExecution:
         """Return the WorkflowExecution with the given ID, authorizing the caller.
+
+        Read-only: also passes a plain ``admin`` in the caller's tenant. Do
+        not use this to authorize driving the execution's agent — see
+        :meth:`resolve_agent`, which stays on the stricter participant-only
+        check.
 
         Args:
             execution_id: Identifier of the execution to fetch.
             caller: The authenticated user requesting the execution.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
 
         Returns:
             The matching WorkflowExecution.
 
         Raises:
             NotFoundError: If no execution exists with the given ID.
-            ForbiddenError: If the caller is neither the execution initiator, a
-                designated approver of the execution, nor a super admin.
+            ForbiddenError: If the caller is neither the execution initiator,
+                a designated approver of the execution, nor holds ``admin``
+                or ``super_admin``.
         """
         execution = await self._get(execution_id)
-        await self._access.assert_access(execution_id, execution.initiator_id, caller)
+        await self._access.assert_read_access(
+            execution_id, execution.initiator_id, caller, caller_roles
+        )
         return execution
 
     async def list(
@@ -125,19 +137,22 @@ class WorkflowExecutionService:
         limit: int,
         offset: int,
         caller: User,
+        caller_roles: Collection[str],
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> builtins.list[WorkflowExecution]:
         """Return a page of WorkflowExecution records visible to the caller.
 
-        A super admin sees every execution in the tenant; anyone else sees
-        only executions they initiated or are a designated approver of (any
-        approval status).
+        A super admin or admin sees every execution in the tenant; anyone
+        else sees only executions they initiated or are a designated
+        approver of (any approval status).
 
         Args:
             limit: Maximum number of records to return.
             offset: Number of records to skip.
             caller: The authenticated user requesting the list.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
 
@@ -145,7 +160,9 @@ class WorkflowExecutionService:
             The requested page of executions, newest first by default.
         """
         visible_to_user_id = (
-            None if has_any_role(caller.roles, Role.super_admin) else caller.id
+            None
+            if has_any_role(caller_roles, Role.super_admin, Role.admin)
+            else caller.id
         )
         return await self._execution_repo.list(
             limit=limit,
@@ -160,6 +177,7 @@ class WorkflowExecutionService:
         execution_id: str,
         *,
         caller: User,
+        caller_roles: Collection[str],
         limit: int,
         offset: int,
         sort: Sequence[SortSpec] = (),
@@ -170,6 +188,8 @@ class WorkflowExecutionService:
         Args:
             execution_id: Identifier of the parent execution.
             caller: The authenticated user requesting the tasks.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
             limit: Maximum number of records to return.
             offset: Number of records to skip.
             sort: Ordering instructions applied to the query.
@@ -182,10 +202,11 @@ class WorkflowExecutionService:
             NotFoundError: If the parent execution does not exist, so callers
                 can distinguish "no such execution" from "execution has no
                 tasks".
-            ForbiddenError: If the caller is neither the execution initiator, a
-                designated approver of the execution, nor a super admin.
+            ForbiddenError: If the caller is neither the execution initiator,
+                a designated approver of the execution, nor holds ``admin``
+                or ``super_admin``.
         """
-        await self.get(execution_id, caller=caller)
+        await self.get(execution_id, caller=caller, caller_roles=caller_roles)
         return await self._tasks.list(
             limit=limit,
             offset=offset,
@@ -211,6 +232,11 @@ class WorkflowExecutionService:
         rather than the current user, letting every authorized viewer (for
         example a designated approver) share the one workflow session.
 
+        Deliberately does not go through :meth:`get`: driving the agent is an
+        action, not a read, so a plain ``admin`` who is neither the initiator
+        nor a designated approver must not be able to trigger a run merely by
+        being able to view it — see ``WorkflowExecutionAccessPolicy.assert_access``.
+
         Args:
             execution_id: Identifier of the execution whose agent to resolve.
             caller: The authenticated user driving the agent run.
@@ -223,13 +249,15 @@ class WorkflowExecutionService:
         Raises:
             NotFoundError: If no execution exists with the given ID.
             ForbiddenError: If the caller is neither the execution initiator, a
-                designated approver of the execution, nor a super admin.
+                designated approver of the execution, nor a super admin. A
+                plain ``admin`` who is none of those is rejected too.
             SkillNotReadyError: If neither the revision the execution pinned nor
                 the skill's current revision is present in the store — the skill
                 has never been cloned, or its store was wiped. An admin fixes it
                 by pulling the skill.
         """
-        execution = await self.get(execution_id, caller=caller)
+        execution = await self._get(execution_id)
+        await self._access.assert_access(execution_id, execution.initiator_id, caller)
         skill = await self._skills.get(execution.agent_skill_id)
         if skill is None:
             raise SkillNotReadyError(execution.agent_skill_id)
@@ -271,7 +299,7 @@ class WorkflowExecutionService:
         return agent, execution
 
     async def get_messages(
-        self, execution_id: str, *, caller: User
+        self, execution_id: str, *, caller: User, caller_roles: Collection[str]
     ) -> builtins.list[dict[str, Any]]:
         """Return the chat history of a WorkflowExecution's workflow session.
 
@@ -286,6 +314,8 @@ class WorkflowExecutionService:
         Args:
             execution_id: Identifier of the WorkflowExecution whose messages to fetch.
             caller: The authenticated user requesting the history.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
 
         Returns:
             The workflow session's messages as plain JSON-serializable dicts
@@ -293,10 +323,13 @@ class WorkflowExecutionService:
 
         Raises:
             NotFoundError: If no WorkflowExecution exists with the given ID.
-            ForbiddenError: If the caller is neither the execution initiator, a
-                designated approver of the execution, nor a super admin.
+            ForbiddenError: If the caller is neither the execution initiator,
+                a designated approver of the execution, nor holds ``admin``
+                or ``super_admin``.
         """
-        execution = await self.get(execution_id, caller=caller)
+        execution = await self.get(
+            execution_id, caller=caller, caller_roles=caller_roles
+        )
         session = await self._adk_session(execution)
         if session is None:
             return []
@@ -428,7 +461,8 @@ class WorkflowExecutionService:
 
         Deletion is stricter than the shared-session access rule: only the
         execution initiator or a super admin may delete an execution — a
-        designated approver may participate in the chat but not destroy it.
+        designated approver may participate in the chat but not destroy it,
+        and neither may a plain ``admin``.
 
         Removes, in order: the ADK session keyed by the record's
         ``session_id`` (best effort — skipped if it no longer exists), then the
