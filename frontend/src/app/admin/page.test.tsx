@@ -76,4 +76,13 @@ describe("AdminPage (welcome)", () => {
     expect(screen.getByRole("link", { name: /Workflows/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Users/ })).not.toBeInTheDocument();
   });
+
+  it("shows the sections newly opened to admin (read-only), alongside the ones admin can edit", () => {
+    render(<AdminPage />, { preloadedState: authState(["admin"]) });
+    expect(screen.getByRole("link", { name: /Agent Skills/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /MCP Servers/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Workflows/ })).toBeInTheDocument();
+    // Tenants stays super_admin-only.
+    expect(screen.queryByRole("link", { name: /Tenants/ })).not.toBeInTheDocument();
+  });
 });
