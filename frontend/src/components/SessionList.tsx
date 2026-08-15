@@ -172,7 +172,7 @@ export function SessionList({
                   type="button"
                   onClick={() => !isActive && onSelect(s.id)}
                   disabled={disabled || isActive}
-                  className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-3 py-2 text-left text-xs disabled:cursor-default"
+                  className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-3 py-2 text-left text-xs disabled:cursor-not-allowed"
                 >
                   <span className="block truncate font-mono text-[11px] uppercase tracking-wider text-on-surface-variant">
                     {s.title ? label : `${s.id.slice(0, 8)}…`}
@@ -193,7 +193,7 @@ export function SessionList({
                   "text-on-surface-variant opacity-0 pointer-coarse:opacity-100 pointer-coarse:w-10",
                   "transition-[opacity,background-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
                   "group-hover:opacity-100 hover:bg-error/10 hover:text-error motion-safe:hover:scale-110",
-                  "focus-visible:opacity-100 disabled:cursor-default disabled:hover:scale-100 disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",
+                  "focus-visible:opacity-100 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",
                 ].join(" ")}
               >
                 <span aria-hidden="true" className="text-[14px] leading-none">
