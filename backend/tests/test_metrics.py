@@ -304,26 +304,31 @@ async def test_metrics_reports_decisions_and_failures(
     client, eng = metrics_env
     workflow_id = await _seed_workflow(eng, name="Invoices")
     now = datetime.now(UTC)
+    # Clamped to today's UTC midnight (METRICS_TIMEZONE defaults to UTC, see
+    # MetricsService._day_start): a plain `now - timedelta(...)` would fall on
+    # the previous day, and drop out of the "today" gauges below, whenever the
+    # suite runs within a couple of hours of UTC midnight.
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     execution_id = await _seed_execution(
         eng,
         workflow_id=workflow_id,
         status=WorkflowExecutionStatus.failed,
-        created_at=now - timedelta(hours=2),
-        finished_at=now - timedelta(hours=1),
+        created_at=max(today_start, now - timedelta(hours=2)),
+        finished_at=max(today_start, now - timedelta(hours=1)),
     )
     await _seed_approval(
         eng,
         execution_id=execution_id,
         approver="alice",
         status=ApprovalStatus.approved,
-        decided_at=now - timedelta(minutes=30),
+        decided_at=max(today_start, now - timedelta(minutes=30)),
     )
     await _seed_approval(
         eng,
         execution_id=execution_id,
         approver="bob",
         status=ApprovalStatus.returned,
-        decided_at=now - timedelta(minutes=20),
+        decided_at=max(today_start, now - timedelta(minutes=20)),
     )
     await _seed_task(
         eng,
