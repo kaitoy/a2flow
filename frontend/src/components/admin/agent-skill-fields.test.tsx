@@ -122,8 +122,11 @@ describe("AgentSkillFields", () => {
 
   it("renders the auth password as a secret picker, not a text box", () => {
     render(<Harness />);
-    expect(screen.getByRole("combobox", { name: "Auth Password" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Entry Key" })).toBeInTheDocument();
+    expect(screen.getByText("Auth Password")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Select secret…" })).toBeInTheDocument();
+    // The entry select has nothing to offer until a secret is chosen, so it
+    // is not rendered yet — see secret-ref-field.test.tsx for that behavior.
+    expect(screen.queryByRole("combobox", { name: "Entry Key" })).not.toBeInTheDocument();
   });
 
   it("explains that the password comes from a registered secret", () => {

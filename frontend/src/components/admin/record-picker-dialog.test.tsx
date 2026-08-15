@@ -13,6 +13,14 @@ interface Row {
 
 const COLUMNS: ColumnDef<Row>[] = [{ header: "Name", visibility: "always", cell: (r) => r.name }];
 
+/** A `filterKind: "tags"` column, for the tag-filter-wiring test below. */
+const TAG_COLUMN: ColumnDef<Row> = {
+  header: "Tags",
+  filterKind: "tags",
+  tagOptions: [{ value: "t1", label: "prod" }],
+  cell: () => null,
+};
+
 /**
  * Twelve rows, so the first page comes back full and `PaginationControls`
  * enables Next — it disables it whenever `count < limit`.
@@ -152,5 +160,75 @@ describe("RecordPickerDialog", () => {
 
     expect(screen.getByRole("checkbox", { name: "Row 02" })).toBeChecked();
     expect(screen.getByText("2 selected")).toBeInTheDocument();
+  });
+
+  it("passes a filterKind: tags column's picks through to the record fetch", async () => {
+    const user = userEvent.setup();
+    const listRecords = vi.fn(listRows);
+    renderDialog({ columns: [...COLUMNS, TAG_COLUMN], listRecords });
+
+    await user.click(await screen.findByRole("button", { name: /Tags/ }));
+    await user.click(await screen.findByRole("checkbox", { name: "prod" }));
+
+    await waitFor(() =>
+      expect(listRecords).toHaveBeenLastCalledWith(expect.objectContaining({ tagIds: ["t1"] }))
+    );
+  });
+
+  describe("single-select", () => {
+    it("lists the records with a radio each instead of a checkbox", async () => {
+      renderDialog({ multiple: false });
+      expect(await screen.findByRole("radio", { name: "Row 01" })).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    });
+
+    it("pre-selects the record already assigned", async () => {
+      renderDialog({ multiple: false, value: ["r01"] });
+      await waitFor(() => expect(screen.getByRole("radio", { name: "Row 01" })).toBeChecked());
+      expect(screen.getByRole("radio", { name: "Row 02" })).not.toBeChecked();
+    });
+
+    it("replaces the draft rather than adding to it", async () => {
+      const user = userEvent.setup();
+      const { onAssign } = renderDialog({ multiple: false });
+
+      await user.click(await screen.findByRole("radio", { name: "Row 02" }));
+      await user.click(screen.getByRole("radio", { name: "Row 03" }));
+      await user.click(screen.getByRole("button", { name: "Select" }));
+
+      expect(screen.getByRole("radio", { name: "Row 02" })).not.toBeChecked();
+      expect(onAssign).toHaveBeenCalledWith(["r03"], [{ value: "r03", label: "Row 03" }]);
+    });
+
+    it("names the pick in the footer instead of counting it", async () => {
+      const user = userEvent.setup();
+      renderDialog({ multiple: false });
+
+      expect(await screen.findByText("None selected")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("radio", { name: "Row 02" }));
+
+      // The name itself is asserted by the paging test below, where the chosen
+      // row is off-screen and so the footer is its only occurrence; here the
+      // point is that a count never appears.
+      expect(screen.queryByText("None selected")).not.toBeInTheDocument();
+      expect(screen.queryByText(/\d+ selected/)).not.toBeInTheDocument();
+    });
+
+    it("keeps a pick made on a page the operator has paged away from", async () => {
+      const user = userEvent.setup();
+      const { onAssign } = renderDialog({ multiple: false });
+
+      await user.click(await screen.findByRole("radio", { name: "Row 01" }));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+      await screen.findByRole("radio", { name: "Row 11" });
+
+      // The chosen row is off-screen, so the footer is the only thing that can
+      // still name it — which is what `labels` exists for.
+      expect(screen.getByText("Row 01")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Select" }));
+      expect(onAssign).toHaveBeenCalledWith(["r01"], [{ value: "r01", label: "Row 01" }]);
+    });
   });
 });

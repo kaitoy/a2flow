@@ -67,6 +67,18 @@ describe("Chip", () => {
     expect(pill?.className).not.toContain("rounded-full");
   });
 
+  it("defaults to the compact sm size", () => {
+    render(<Chip label="Gather sources" />);
+    const pill = screen.getByText("Gather sources").closest("span")?.parentElement;
+    expect(pill).toHaveClass("px-2", "py-0.5", "text-xs");
+  });
+
+  it("grows to the lg size's padding and type scale when asked", () => {
+    render(<Chip label="Gather sources" size="lg" />);
+    const pill = screen.getByText("Gather sources").closest("span")?.parentElement;
+    expect(pill).toHaveClass("px-4", "py-2.5", "text-sm");
+  });
+
   it("reports hover to the caller", async () => {
     const user = userEvent.setup();
     const onMouseEnter = vi.fn();

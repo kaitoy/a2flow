@@ -80,8 +80,9 @@ describe("NewAgentSkillPage", () => {
     await user.type(screen.getByLabelText(/^name/i), "Test");
     await user.type(screen.getByLabelText(/repo url/i), "https://x.com");
     // github-token holds a single entry, so choosing it completes the reference.
-    await user.click(screen.getByRole("combobox", { name: "Auth Password" }));
-    await user.click(await screen.findByRole("option", { name: "github-token" }));
+    await user.click(screen.getByRole("button", { name: "Select secret…" }));
+    await user.click(await screen.findByRole("radio", { name: "github-token" }));
+    await user.click(screen.getByRole("button", { name: "Select" }));
     await user.type(screen.getByLabelText(/auth username/i), "oauth2");
     await user.click(screen.getByRole("button", { name: /save/i }));
 

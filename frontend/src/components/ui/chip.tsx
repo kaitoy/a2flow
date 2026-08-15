@@ -37,6 +37,13 @@ interface ChipProps {
    * Pressed state of the toggle. Ignored without {@link ChipProps.onToggle}.
    */
   selected?: boolean;
+  /**
+   * Pill dimensions. Defaults to `"sm"`, the compact data-pill size every
+   * other caller wants. Pass `"lg"` where the chip sits beside a full-size
+   * form control (e.g. {@link SecretRefField}'s secret chip next to its
+   * entry `Select`) and the default reads as visually undersized next to it.
+   */
+  size?: "sm" | "lg";
 }
 
 /**
@@ -57,8 +64,10 @@ interface ChipProps {
  * verb.
  */
 const REMOVE_BUTTON_CLASS = [
-  // 20px round hit target. The pill pads `px-2`; `-mr-1` pulls the button
-  // back into that padding so the trailing gap stays visually even.
+  // 20px round hit target. The `sm` pill pads `px-2`; `-mr-1` pulls the
+  // button back into that padding so the trailing gap stays visually even
+  // (the `lg` pill's wider `px-4` leaves a bit more air, which is fine —
+  // that size exists to look substantial next to a full-size form control).
   "-mr-1 ml-1 inline-flex size-5 shrink-0 items-center justify-center rounded-full",
   // DESIGN.md → Responsive & touch puts icon buttons at ~44px under
   // `pointer-coarse`. Deliberately smaller here: 44px inside a `text-xs` pill
@@ -77,7 +86,18 @@ const REMOVE_BUTTON_CLASS = [
  * Shape shared by both roots, so the toggle button and the plain pill are the
  * same object with a different element under it.
  */
-const PILL = "inline-flex max-w-64 items-center rounded-md px-2 py-0.5 font-mono text-xs";
+const PILL = "inline-flex max-w-64 items-center rounded-md font-mono";
+
+/**
+ * Padding and type scale per {@link ChipProps.size}. `lg`'s `px-4 py-2.5
+ * text-sm` mirrors {@link Select}'s `TRIGGER_BASE` padding and type scale so a
+ * chip standing in for a chosen value lands at the same height as the control
+ * beside it.
+ */
+const SIZE: Record<"sm" | "lg", string> = {
+  sm: "px-2 py-0.5 text-xs",
+  lg: "px-4 py-2.5 text-sm",
+};
 
 /**
  * Extra classes carried only by a chip in toggle mode.
@@ -151,6 +171,7 @@ export function Chip({
   onRemove,
   onToggle,
   selected = false,
+  size = "sm",
 }: ChipProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const [overflowing, setOverflowing] = useState(false);
@@ -208,7 +229,7 @@ export function Chip({
         onClick={onToggle}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`${PILL} ${surface} ${selected ? "tag-chip-selected " : ""}${TOGGLE_CLASS}`}
+        className={`${PILL} ${SIZE[size]} ${surface} ${selected ? "tag-chip-selected " : ""}${TOGGLE_CLASS}`}
       >
         {body}
       </button>
@@ -217,7 +238,11 @@ export function Chip({
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: hover is a non-essential visual link to the referenced row; the chip's text is the accessible content
-    <span onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} className={`${PILL} ${surface}`}>
+    <span
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      className={`${PILL} ${SIZE[size]} ${surface}`}
+    >
       {body}
     </span>
   );

@@ -425,7 +425,23 @@ export const handlers = [
 
   http.put(`${BASE}/api/v1/agent-skills/:skillId/tags`, () => envelope(SKILL_1)),
 
-  http.get(`${BASE}/api/v1/secrets`, () => envelope([SECRET_1, SECRET_VAULT_1])),
+  // The one list route that honours its query string. `SecretRefField` resolves
+  // a stored `name/key` reference by asking for that one name, and an empty
+  // result is precisely what marks the reference as dangling — a handler that
+  // returned the whole fixture set regardless could never produce that case.
+  // Only `name:eq:` is understood, which is all any caller sends; anything else
+  // is ignored rather than guessed at.
+  http.get(`${BASE}/api/v1/secrets`, ({ request }) => {
+    const all = [SECRET_1, SECRET_VAULT_1];
+    // `listConfig` in lib/api.ts serialises each filter as a repeated
+    // `q=field:op:value` param.
+    const rows = new URL(request.url).searchParams.getAll("q").reduce((kept, spec) => {
+      const [field, op, ...rest] = spec.split(":");
+      if (field !== "name" || op !== "eq") return kept;
+      return kept.filter((secret) => secret.name === rest.join(":"));
+    }, all);
+    return envelope(rows);
+  }),
 
   http.get(`${BASE}/api/v1/secrets/:secretId`, () => envelope(SECRET_1)),
 

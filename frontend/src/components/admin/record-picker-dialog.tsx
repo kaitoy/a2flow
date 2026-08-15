@@ -1,10 +1,12 @@
 /**
  * @module RecordPickerDialog — modal table for choosing which records to assign.
  *
- * The scalable replacement for a checkbox list: the same `DataTable` +
+ * The scalable replacement for a checkbox list — and, in single-select mode,
+ * for a select that downloads every option: the same `DataTable` +
  * `useTableQuery` + `PaginationControls` trio the admin list pages use, so
- * paging, per-column sort, and per-column filters are all server-side and the
- * dialog behaves exactly like the list page for the same resource.
+ * paging, per-column sort, per-column filters, and — for a `filterKind: "tags"`
+ * column — the tag filter are all server-side and the dialog behaves exactly
+ * like the list page for the same resource.
  */
 "use client";
 
@@ -15,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { Dialog } from "@/components/ui/dialog";
+import { Radio } from "@/components/ui/radio";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import type { ListQuery } from "@/lib/api";
 
@@ -43,6 +46,16 @@ export interface RecordPickerDialogProps<T> {
   title: string;
   /** Ids already assigned; the draft is seeded from these on every open. */
   value: string[];
+  /**
+   * Whether more than one record may be chosen. Multi-select rows carry a
+   * checkbox; single-select rows carry a radio, and picking one replaces the
+   * draft rather than adding to it.
+   *
+   * The `string[]` in/out contract is the same either way — a single-select
+   * draft is simply never longer than one — so a caller holding a scalar wraps
+   * and unwraps it at this boundary.
+   */
+  multiple?: boolean;
   /** Fetches one page of records for the table. */
   listRecords: (query: ListQuery) => Promise<T[]>;
   /** Columns describing the record, excluding the checkbox column. */
@@ -66,6 +79,10 @@ export interface RecordPickerDialogProps<T> {
  * cannot express through the rendered checkboxes alone. Labels of every row
  * seen are remembered for the same reason: `onAssign` must be able to name a
  * record that is no longer on screen.
+ *
+ * Pass {@link RecordPickerDialogProps.multiple} as `false` for a one-of-many
+ * pick. That swaps the checkbox column for a radio group, so the browser itself
+ * enforces the "at most one" invariant the draft encodes.
  */
 export function RecordPickerDialog<T>({
   open,
@@ -74,6 +91,7 @@ export function RecordPickerDialog<T>({
   panelId,
   title,
   value,
+  multiple = true,
   listRecords,
   columns,
   getId,
@@ -81,10 +99,18 @@ export function RecordPickerDialog<T>({
   emptyMessage,
   emptyIcon,
 }: RecordPickerDialogProps<T>) {
-  const { rows, loading, offset, sort, filters, setOffset, setSort, setFilters } = useTableQuery<T>(
-    listRecords,
-    { limit: LIMIT }
-  );
+  const {
+    rows,
+    loading,
+    offset,
+    sort,
+    filters,
+    tagIds,
+    setOffset,
+    setSort,
+    setFilters,
+    setTagIds,
+  } = useTableQuery<T>(listRecords, { limit: LIMIT });
   const [draft, setDraft] = useState<string[]>(value);
   const [labels, setLabels] = useState<Map<string, string>>(new Map());
   const wasOpenRef = useRef(open);
@@ -124,20 +150,42 @@ export function RecordPickerDialog<T>({
         width: 44,
         cell: (row: T) => {
           const id = getId(row);
-          return (
+          // A radio group, not a checkbox, when only one row may win: the
+          // browser then enforces the invariant the draft encodes, and a
+          // screen reader announces "one of many" rather than a set of
+          // independent toggles that mysteriously clear each other.
+          return multiple ? (
             <Checkbox
               labelHidden
               label={getLabel(row)}
               checked={draft.includes(id)}
               onChange={() => toggle(id)}
             />
+          ) : (
+            <Radio
+              labelHidden
+              label={getLabel(row)}
+              name={`${panelId}-selection`}
+              checked={draft[0] === id}
+              onChange={() => setDraft([id])}
+            />
           );
         },
       },
       ...columns,
     ],
-    [columns, draft, getId, getLabel, toggle]
+    [columns, draft, getId, getLabel, toggle, multiple, panelId]
   );
+
+  // A count is the natural summary of a multi-select, but "1 selected" says
+  // nothing an operator does not already see when only one row can ever win —
+  // so name the pick instead. `labels` is consulted rather than the current
+  // page, because the chosen row may have been paged away.
+  let summary = `${draft.length} selected`;
+  if (!multiple) {
+    const [only] = draft;
+    summary = only === undefined ? "None selected" : (labels.get(only) ?? only);
+  }
 
   return (
     <Dialog
@@ -149,7 +197,7 @@ export function RecordPickerDialog<T>({
       scrollable
       footer={
         <>
-          <span className="mr-auto text-sm text-on-surface-variant">{draft.length} selected</span>
+          <span className="mr-auto text-sm text-on-surface-variant">{summary}</span>
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
@@ -180,6 +228,8 @@ export function RecordPickerDialog<T>({
           onSortChange={setSort}
           filters={filters}
           onFilterChange={setFilters}
+          tagIds={tagIds}
+          onTagIdsChange={setTagIds}
         />
       </div>
       <PaginationControls

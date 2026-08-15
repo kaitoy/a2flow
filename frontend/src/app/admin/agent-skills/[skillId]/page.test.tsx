@@ -80,16 +80,12 @@ describe("AgentSkillDetailPage", () => {
     );
 
     render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
-    await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Auth Password" })).toHaveTextContent(
-        "github-token"
-      )
-    );
+    // The chip's remove button is what names the chosen secret uniquely.
+    const chip = await screen.findByRole("button", { name: "Remove github-token" });
     expect(screen.getByRole("combobox", { name: "Entry Key" })).toHaveTextContent("token");
     expect(screen.getByDisplayValue("oauth2")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("combobox", { name: "Auth Password" }));
-    await userEvent.click(await screen.findByRole("option", { name: "None" }));
+    await userEvent.click(chip);
     await userEvent.clear(screen.getByLabelText(/auth username/i));
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
