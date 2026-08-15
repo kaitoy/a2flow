@@ -4,11 +4,13 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Protocol
 
+from sqlalchemy import or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalCreate, ApprovalStatus, ApprovalUpdate
 from models.user import User
+from models.workflow_execution import WorkflowExecution
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
@@ -27,6 +29,7 @@ class ApprovalRepository(Protocol):
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        visible_to_user_id: str | None = None,
     ) -> list[Approval]: ...
 
     async def create(self, data: ApprovalCreate, *, user_id: str) -> Approval: ...
@@ -87,6 +90,7 @@ class SqlApprovalRepository:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        visible_to_user_id: str | None = None,
     ) -> list[Approval]:
         """Return Approvals, defaulting to ``created_at`` descending (newest first).
 
@@ -95,11 +99,27 @@ class SqlApprovalRepository:
             offset: Number of records to skip.
             sort: Sort specifications; defaults to ``created_at`` descending.
             filters: Filter specifications applied as a conjunction.
+            visible_to_user_id: If given, restricts results to approvals
+                addressed to this user, or belonging to a WorkflowExecution
+                this user initiated; ``None`` (the default) returns every
+                approval in the tenant, unscoped.
 
         Returns:
             The matching approvals.
         """
         stmt = select(Approval).where(Approval.tenant_id == self._tenant_id)
+        if visible_to_user_id is not None:
+            stmt = stmt.where(
+                or_(
+                    col(Approval.approver) == visible_to_user_id,
+                    col(Approval.workflow_execution_id).in_(
+                        select(WorkflowExecution.id).where(
+                            col(WorkflowExecution.initiator_id) == visible_to_user_id,
+                            WorkflowExecution.tenant_id == self._tenant_id,
+                        )
+                    ),
+                )
+            )
         stmt = apply_filters(stmt, Approval, filters, readable=Approval)
         stmt = apply_sort(
             stmt,

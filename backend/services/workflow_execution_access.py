@@ -11,6 +11,12 @@ effective ones. They only ever ask about ``super_admin``, and a
 :class:`~models.user_group.UserGroup` can never grant that role, so the two
 are equivalent here — and reading the column keeps them correct even if that
 invariant were ever weakened.
+
+``WorkflowExecutionService.list`` and ``ApprovalService.list`` apply the same
+initiator-or-designated-approver-or-super-admin rule to the collection
+endpoints (``GET /workflow-executions``, ``GET /approvals``), so a caller
+never sees a record in a list that this policy would then reject on the
+single-record read.
 """
 
 from models.user import Role, User, has_any_role

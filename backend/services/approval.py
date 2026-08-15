@@ -6,7 +6,7 @@ so the router never repeats the null check.
 """
 
 from models.approval import Approval, ApprovalUpdate
-from models.user import User
+from models.user import Role, User, has_any_role
 from repositories import ApprovalRepository
 from repositories.exceptions import ForbiddenError, NotFoundError
 from repositories.query import FilterSpec, SortSpec
@@ -28,22 +28,35 @@ class ApprovalService:
         *,
         limit: int,
         offset: int,
+        caller: User,
         sort: tuple[SortSpec, ...] | list[SortSpec] = (),
         filters: tuple[FilterSpec, ...] | list[FilterSpec] = (),
     ) -> list[Approval]:
-        """Return approvals, defaulting to ``created_at`` descending.
+        """Return approvals visible to the caller, defaulting to ``created_at`` descending.
+
+        A super admin sees every approval in the tenant; anyone else sees only
+        approvals addressed to them or belonging to a WorkflowExecution they
+        initiated.
 
         Args:
             limit: Maximum number of records.
             offset: Number of records to skip.
+            caller: The authenticated user requesting the list.
             sort: Sort specifications.
             filters: Filter specifications.
 
         Returns:
             The matching approvals.
         """
+        visible_to_user_id = (
+            None if has_any_role(caller.roles, Role.super_admin) else caller.id
+        )
         return await self._repo.list(
-            limit=limit, offset=offset, sort=sort, filters=filters
+            limit=limit,
+            offset=offset,
+            sort=sort,
+            filters=filters,
+            visible_to_user_id=visible_to_user_id,
         )
 
     async def get(self, approval_id: str) -> Approval:

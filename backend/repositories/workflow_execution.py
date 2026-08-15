@@ -4,9 +4,11 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol
 
+from sqlalchemy import or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.approval import Approval
 from models.workflow_execution import (
     WorkflowExecution,
     WorkflowExecutionCreate,
@@ -31,6 +33,7 @@ class WorkflowExecutionRepository(Protocol):
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        visible_to_user_id: str | None = None,
     ) -> list[WorkflowExecution]: ...
 
     async def create(
@@ -105,11 +108,38 @@ class SqlWorkflowExecutionRepository:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        visible_to_user_id: str | None = None,
     ) -> list[WorkflowExecution]:
-        """Return WorkflowExecutions, defaulting to ``created_at`` descending (newest first)."""
+        """Return WorkflowExecutions, defaulting to ``created_at`` descending (newest first).
+
+        Args:
+            limit: Maximum number of records.
+            offset: Number of records to skip.
+            sort: Sort specifications; defaults to ``created_at`` descending.
+            filters: Filter specifications applied as a conjunction.
+            visible_to_user_id: If given, restricts results to executions this
+                user initiated or is a designated approver of (any approval
+                status); ``None`` (the default) returns every execution in the
+                tenant, unscoped.
+
+        Returns:
+            The matching executions.
+        """
         stmt = select(WorkflowExecution).where(
             WorkflowExecution.tenant_id == self._tenant_id
         )
+        if visible_to_user_id is not None:
+            stmt = stmt.where(
+                or_(
+                    col(WorkflowExecution.initiator_id) == visible_to_user_id,
+                    col(WorkflowExecution.id).in_(
+                        select(Approval.workflow_execution_id).where(
+                            col(Approval.approver) == visible_to_user_id,
+                            Approval.tenant_id == self._tenant_id,
+                        )
+                    ),
+                )
+            )
         stmt = apply_filters(
             stmt, WorkflowExecution, filters, readable=WorkflowExecution
         )

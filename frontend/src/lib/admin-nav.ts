@@ -39,9 +39,10 @@ export interface AdminNavItem {
  * (`app/admin/page.tsx`) so the two stay in sync.
  *
  * Entries carrying `roles` are filtered per user by {@link useVisibleAdminNavItems}.
- * Workflow Executions and Approvals stay visible to everyone: they are read views
- * whose per-record access is enforced by the backend (session owners and
- * designated approvers).
+ * Workflow Executions and Approvals carry no `roles` restriction — every
+ * signed-in user may navigate there — because the backend scopes the list
+ * itself: a super admin sees every record in the tenant, everyone else sees
+ * only executions/approvals they initiated or were designated an approver of.
  */
 export const adminNavItems: AdminNavItem[] = [
   {

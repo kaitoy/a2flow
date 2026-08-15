@@ -1,9 +1,9 @@
 """Access-control tests for workflow-execution-scoped operations.
 
-Every operation on a workflow execution (get, messages, task listing, agent
-stream, task CRUD) is restricted to the execution initiator, the designated
-approvers of the session's approvals, and super admins; deletion is stricter
-(owner or super admin only). The auth test stub reads roles from the
+Every operation on a workflow execution (get, list, messages, task listing,
+agent stream, task CRUD) is restricted to the execution initiator, the
+designated approvers of the session's approvals, and super admins; deletion is
+stricter (owner or super admin only). The auth test stub reads roles from the
 ``X-User-Roles`` header (defaulting to ``super_admin``), so these tests pass
 explicit role headers to model each participant.
 """
@@ -12,6 +12,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 import pytest_asyncio
 from google.adk.sessions import InMemorySessionService
 from httpx import ASGITransport, AsyncClient
@@ -130,14 +131,18 @@ async def _seed_session(eng: AsyncEngine, *, user_id: str = "owner") -> str:
 
 
 async def _insert_approval(
-    eng: AsyncEngine, *, workflow_execution_id: str, approver: str = "carol"
+    eng: AsyncEngine,
+    *,
+    workflow_execution_id: str,
+    approver: str = "carol",
+    status: ApprovalStatus = ApprovalStatus.pending,
 ) -> str:
-    """Insert a pending Approval addressed to ``approver`` and return its id."""
+    """Insert an Approval addressed to ``approver`` and return its id."""
     async with AsyncSession(eng) as db:
         approval = Approval(
             workflow_execution_id=workflow_execution_id,
             title="Approve me",
-            status=ApprovalStatus.pending,
+            status=status,
             approver=approver,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by="owner",
@@ -244,12 +249,83 @@ async def test_missing_session_is_404_even_for_unrelated_user(
     assert_err(res, "NOT_FOUND", 404)
 
 
-async def test_session_list_stays_open(
+async def test_owner_sees_own_execution_in_list(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = access_env
-    await _seed_session(eng)
-    assert_ok(await client.get("/api/v1/workflow-executions", headers=UNRELATED))
+    execution_id = await _seed_session(eng)
+    res = await client.get("/api/v1/workflow-executions", headers=OWNER)
+    ids = {item["id"] for item in assert_ok(res)}
+    assert execution_id in ids
+
+
+async def test_unrelated_user_does_not_see_others_execution_in_list(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    res = await client.get("/api/v1/workflow-executions", headers=UNRELATED)
+    ids = {item["id"] for item in assert_ok(res)}
+    assert execution_id not in ids
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        ApprovalStatus.pending,
+        ApprovalStatus.approved,
+        ApprovalStatus.rejected,
+        ApprovalStatus.returned,
+    ],
+)
+async def test_designated_approver_sees_assigned_execution_in_list(
+    access_env: tuple[AsyncClient, AsyncEngine], status: ApprovalStatus
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    await _insert_approval(eng, workflow_execution_id=execution_id, status=status)
+    res = await client.get("/api/v1/workflow-executions", headers=APPROVER)
+    ids = {item["id"] for item in assert_ok(res)}
+    assert execution_id in ids
+
+
+async def test_approver_of_other_session_does_not_see_it_in_list(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    other_execution = await _seed_session(eng)
+    await _insert_approval(eng, workflow_execution_id=other_execution, approver="carol")
+    res = await client.get("/api/v1/workflow-executions", headers=APPROVER)
+    ids = {item["id"] for item in assert_ok(res)}
+    assert execution_id not in ids
+
+
+async def test_super_admin_sees_all_executions_in_list(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    id_a = await _seed_session(eng, user_id="owner")
+    id_b = await _seed_session(eng, user_id="bob")
+    res = await client.get("/api/v1/workflow-executions", headers=SUPER_ADMIN)
+    ids = {item["id"] for item in assert_ok(res)}
+    assert {id_a, id_b} <= ids
+
+
+async def test_execution_list_scoping_composes_with_filters(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    own_id = await _seed_session(eng)
+    unrelated_id = await _seed_session(eng, user_id="bob")
+    res = await client.get(
+        "/api/v1/workflow-executions",
+        params={"limit": 10, "offset": 0, "s": "-createdAt"},
+        headers=OWNER,
+    )
+    ids = {item["id"] for item in assert_ok(res)}
+    assert own_id in ids
+    assert unrelated_id not in ids
 
 
 # ---------- messages / tasks / agent ----------

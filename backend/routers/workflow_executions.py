@@ -56,15 +56,21 @@ router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 @router.get("", response_model=ApiResponse[list[WorkflowExecution]])
 async def list_workflow_executions(
     service: WorkflowExecutionServiceDep,
+    caller: CurrentUserDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[WorkflowExecution]]:
-    """Return WorkflowExecution records, defaulting to ``created_at`` descending."""
+    """Return WorkflowExecution records, defaulting to ``created_at`` descending.
+
+    A super admin sees every execution in the tenant; anyone else sees only
+    executions they initiated or are a designated approver of.
+    """
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
+        caller=caller,
         sort=sort.sort,
         filters=filters.filters,
     )

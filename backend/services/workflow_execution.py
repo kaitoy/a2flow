@@ -17,7 +17,7 @@ from google.adk.sessions import BaseSessionService, Session
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
 from models.message_meta import MessageScope
-from models.user import User
+from models.user import Role, User, has_any_role
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
 from repositories import (
@@ -124,22 +124,35 @@ class WorkflowExecutionService:
         *,
         limit: int,
         offset: int,
+        caller: User,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> builtins.list[WorkflowExecution]:
-        """Return a page of WorkflowExecution records.
+        """Return a page of WorkflowExecution records visible to the caller.
+
+        A super admin sees every execution in the tenant; anyone else sees
+        only executions they initiated or are a designated approver of (any
+        approval status).
 
         Args:
             limit: Maximum number of records to return.
             offset: Number of records to skip.
+            caller: The authenticated user requesting the list.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
 
         Returns:
             The requested page of executions, newest first by default.
         """
+        visible_to_user_id = (
+            None if has_any_role(caller.roles, Role.super_admin) else caller.id
+        )
         return await self._execution_repo.list(
-            limit=limit, offset=offset, sort=sort, filters=filters
+            limit=limit,
+            offset=offset,
+            sort=sort,
+            filters=filters,
+            visible_to_user_id=visible_to_user_id,
         )
 
     async def list_tasks(

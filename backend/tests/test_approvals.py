@@ -1,13 +1,17 @@
 """Tests for the approvals API (``GET``/``PATCH /api/v1/approvals``).
 
-The list and get endpoints are unscoped (admin browsing), while ``PATCH`` records
-the requesting user as the approver. Approvals reference a workflow execution via a
-foreign key, so each test seeds a session before inserting approvals.
+``GET`` list is scoped to the caller: a super admin sees every approval in the
+tenant, everyone else sees only approvals addressed to them or belonging to a
+WorkflowExecution they initiated. ``GET`` by id remains unscoped (admin
+browsing), while ``PATCH`` records the requesting user as the approver.
+Approvals reference a workflow execution via a foreign key, so each test seeds
+a session before inserting approvals.
 """
 
 from collections.abc import AsyncGenerator
 from typing import Any
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
@@ -115,6 +119,79 @@ async def test_list_returns_approvals(
     res = await client.get("/api/v1/approvals", headers={"X-User-Id": "owner"})
     data = assert_ok(res)
     assert {a["title"] for a in data} == {"First", "Second"}
+
+
+async def test_owner_sees_approval_on_own_execution_in_list(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng, user_id="owner")
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
+    res = await client.get(
+        "/api/v1/approvals",
+        headers={"X-User-Id": "owner", "X-User-Roles": "requester"},
+    )
+    ids = {a["id"] for a in assert_ok(res)}
+    assert approval_id in ids
+
+
+async def test_unrelated_user_does_not_see_others_approval_in_list(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng, user_id="owner")
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
+    res = await client.get(
+        "/api/v1/approvals",
+        headers={"X-User-Id": "alice", "X-User-Roles": "requester"},
+    )
+    ids = {a["id"] for a in assert_ok(res)}
+    assert approval_id not in ids
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        ApprovalStatus.pending,
+        ApprovalStatus.approved,
+        ApprovalStatus.rejected,
+        ApprovalStatus.returned,
+    ],
+)
+async def test_designated_approver_sees_addressed_approval_in_list(
+    approval_env: tuple[AsyncClient, AsyncEngine], status: ApprovalStatus
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng, user_id="owner")
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob", status=status
+    )
+    res = await client.get(
+        "/api/v1/approvals",
+        headers={"X-User-Id": "bob", "X-User-Roles": "approver"},
+    )
+    ids = {a["id"] for a in assert_ok(res)}
+    assert approval_id in ids
+
+
+async def test_super_admin_sees_all_approvals_in_list(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng, user_id="owner")
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
+    res = await client.get(
+        "/api/v1/approvals",
+        headers={"X-User-Id": "alice", "X-User-Roles": "super_admin"},
+    )
+    ids = {a["id"] for a in assert_ok(res)}
+    assert approval_id in ids
 
 
 async def test_get_approval(

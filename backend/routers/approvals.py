@@ -4,8 +4,11 @@ Approvals are created by the workflow agent (via the ``request_approval`` tool)
 and resolved here by the approver: ``PATCH /approvals/{id}`` moves a request to
 ``approved``, ``rejected``, or ``returned``. Only the designated approver (or a
 super admin) may resolve a request; the resolver's identity is recorded in the
-approval's audit fields. List and get are unscoped so the admin UI can browse
-every approval, mirroring the workflow-executions router.
+approval's audit fields. List is scoped like ``GET /workflow-executions``: a
+super admin sees every approval in the tenant, everyone else sees only
+approvals addressed to them or belonging to a WorkflowExecution they
+initiated. Get remains unscoped -- any authenticated user may fetch any single
+approval by id.
 
 ``GET /approvals/by-approver`` and ``GET /approvals/by-workflow`` aggregate the
 same records into approval-backlog breakdowns for operational dashboards. Both
@@ -35,15 +38,22 @@ router = APIRouter(prefix="/approvals", tags=["approvals"])
 @router.get("", response_model=ApiResponse[list[Approval]])
 async def list_approvals(
     service: ApprovalServiceDep,
+    caller: CurrentUserDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[Approval]]:
-    """Return Approval records, defaulting to ``created_at`` descending."""
+    """Return Approval records, defaulting to ``created_at`` descending.
+
+    A super admin sees every approval in the tenant; anyone else sees only
+    approvals addressed to them or belonging to a WorkflowExecution they
+    initiated.
+    """
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
+        caller=caller,
         sort=sort.sort,
         filters=filters.filters,
     )
