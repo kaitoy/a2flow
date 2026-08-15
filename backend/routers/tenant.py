@@ -1,9 +1,10 @@
 """CRUD endpoints for Tenant resources.
 
 Tenants are the platform-wide organizational boundary (see
-:mod:`models.tenant`), so every write is gated behind the ``super_admin``
-role — unlike most resources, there is no self-service or ``admin``-level
-carve-out.
+:mod:`models.tenant`), so every route — reads included — is gated behind the
+``super_admin`` role — unlike most resources, there is no self-service or
+``admin``-level carve-out, and reads are not left open the way they are for
+most resources.
 """
 
 from fastapi import APIRouter, Depends
@@ -23,7 +24,7 @@ from models.user import Role
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
-#: Route dependency gating every tenant write behind the ``super_admin`` role.
+#: Route dependency gating every tenant route behind the ``super_admin`` role.
 _requires_super_admin = [Depends(require_roles(Role.super_admin))]
 
 
@@ -44,7 +45,11 @@ async def create_tenant(
     return ApiResponse(meta=meta, data=tenant)
 
 
-@router.get("", response_model=ApiResponse[list[Tenant]])
+@router.get(
+    "",
+    response_model=ApiResponse[list[Tenant]],
+    dependencies=_requires_super_admin,
+)
 async def list_tenants(
     service: TenantServiceDep,
     pagination: PaginationDep,
@@ -62,7 +67,11 @@ async def list_tenants(
     return ApiResponse(meta=meta, data=items)
 
 
-@router.get("/{tenant_id}", response_model=ApiResponse[Tenant])
+@router.get(
+    "/{tenant_id}",
+    response_model=ApiResponse[Tenant],
+    dependencies=_requires_super_admin,
+)
 async def get_tenant(
     tenant_id: str,
     service: TenantServiceDep,

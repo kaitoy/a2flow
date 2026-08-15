@@ -144,6 +144,15 @@ async def test_list_tenants_returns_created_tenant(tenant_client: AsyncClient) -
     assert len(assert_ok(response)) == 1
 
 
+async def test_non_super_admin_cannot_list_tenants(
+    tenant_client: AsyncClient,
+) -> None:
+    response = await tenant_client.get(
+        "/api/v1/tenants", headers={"X-User-Roles": "admin"}
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
+
+
 # ---------- get ----------
 
 
@@ -159,6 +168,18 @@ async def test_get_tenant_returns_correct_data(tenant_client: AsyncClient) -> No
 async def test_get_tenant_unknown_id_returns_404(tenant_client: AsyncClient) -> None:
     response = await tenant_client.get("/api/v1/tenants/nonexistent")
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_non_super_admin_cannot_get_tenant(
+    tenant_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+    response = await tenant_client.get(
+        f"/api/v1/tenants/{created['id']}", headers={"X-User-Roles": "admin"}
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
 
 
 # ---------- patch ----------

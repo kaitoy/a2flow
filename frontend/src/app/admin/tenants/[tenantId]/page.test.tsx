@@ -3,7 +3,7 @@ import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
-import { ADMIN, SUPER_ADMIN } from "@/test/auth-state";
+import { SUPER_ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -167,44 +167,5 @@ describe("TenantDetailPage", () => {
         variant: "error",
       })
     );
-  });
-
-  it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {
-    setup();
-    server.use(
-      http.get("http://localhost:8000/api/v1/tenants/:tenantId", () =>
-        envelopeErr("FORBIDDEN", "Requires developer", 403)
-      )
-    );
-    const beforeCount = store.getState().toast.items.length;
-
-    renderPage();
-
-    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
-    expect(store.getState().toast.items.length).toBe(beforeCount);
-  });
-
-  describe("without the super admin role", () => {
-    it("renders every field as a value instead of a control", async () => {
-      setup();
-      render(<TenantDetailPage />, { preloadedState: ADMIN });
-
-      expect(await screen.findByRole("heading", { name: "Acme Corp" })).toBeInTheDocument();
-      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-      expect(screen.getByText("acme-corp")).toBeInTheDocument();
-      expect(screen.getByText("Yes")).toBeInTheDocument();
-    });
-
-    it("hides Save and Delete and offers Back instead of Cancel", async () => {
-      setup();
-      render(<TenantDetailPage />, { preloadedState: ADMIN });
-
-      expect(await screen.findByRole("heading", { name: "Acme Corp" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
-    });
   });
 });

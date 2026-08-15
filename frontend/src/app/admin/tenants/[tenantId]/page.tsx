@@ -15,23 +15,14 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
-import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import {
-  deleteTenant,
-  getTenant,
-  isForbiddenError,
-  SUPPRESS_FORBIDDEN_TOAST,
-  type TenantUpdate,
-  updateTenant,
-} from "@/lib/api";
-import { EMPTY_VALUE, formatFlag } from "@/lib/read-only-display";
-import { Role, useHasRole } from "@/lib/roles";
+import { deleteTenant, getTenant, type TenantUpdate, updateTenant } from "@/lib/api";
+import { EMPTY_VALUE } from "@/lib/read-only-display";
 import { useAppDispatch } from "@/store/hooks";
 import { tenantsChanged } from "@/store/tenantsSlice";
 import { showToast } from "@/store/toastSlice";
@@ -45,21 +36,16 @@ type FormValues = z.infer<typeof schema>;
 /**
  * Detail page of a tenant: its display name, its immutable URL-safe name, and
  * whether it is enabled. The page is titled with the tenant's display name —
- * the same label its row carries in the list.
- *
- * A viewer without the super admin role gets a read-only rendering — reads are
- * open to every authenticated user, but every tenant write is super-admin-only
- * — so Display Name and Enabled show as plain values and Save/Delete are hidden
- * rather than left to fail with a 403 on click. Name is read-only for everyone,
- * super admins included: it is immutable once the tenant exists.
+ * the same label its row carries in the list. Reachable only by `super_admin`
+ * — `layout.tsx` blocks every other viewer before this page mounts. Name is
+ * read-only for everyone, super admins included: it is immutable once the
+ * tenant exists.
  */
 export default function TenantDetailPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const canEdit = useHasRole(Role.SUPER_ADMIN);
   const [loading, setLoading] = useState(true);
-  const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   // The persisted display name, which titles the page. Kept out of the form so
@@ -74,7 +60,6 @@ export default function TenantDetailPage() {
     register,
     handleSubmit,
     reset,
-    getValues,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -86,7 +71,7 @@ export default function TenantDetailPage() {
   });
 
   useEffect(() => {
-    getTenant(tenantId, SUPPRESS_FORBIDDEN_TOAST)
+    getTenant(tenantId)
       .then((tenant) => {
         setDisplayName(tenant.displayName);
         setName(tenant.name);
@@ -101,11 +86,7 @@ export default function TenantDetailPage() {
           updatedAt: tenant.updatedAt,
         });
       })
-      .catch((err: unknown) => {
-        if (isForbiddenError(err)) {
-          setForbidden(true);
-          return;
-        }
+      .catch(() => {
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
@@ -151,15 +132,6 @@ export default function TenantDetailPage() {
     { label: displayName || "…" },
   ];
 
-  if (forbidden) {
-    return (
-      <AdminPageContainer>
-        <Breadcrumbs items={breadcrumbItems} />
-        <AccessDeniedState fill="full" />
-      </AdminPageContainer>
-    );
-  }
-
   if (loading) {
     return (
       <AdminPageContainer>
@@ -188,45 +160,31 @@ export default function TenantDetailPage() {
             required
             error={errors.displayName?.message}
           >
-            {canEdit ? (
-              <Input id="displayName" {...register("displayName")} />
-            ) : (
-              <ReadOnlyField>{displayName || EMPTY_VALUE}</ReadOnlyField>
-            )}
+            <Input id="displayName" {...register("displayName")} />
           </FormField>
 
           <FormField htmlFor="name" label="Name">
             <ReadOnlyField>{name || EMPTY_VALUE}</ReadOnlyField>
           </FormField>
 
-          {canEdit ? (
-            <Checkbox label="Enabled" {...register("enabled")} />
-          ) : (
-            <FormField htmlFor="enabled" label="Enabled">
-              <ReadOnlyField>{formatFlag(getValues("enabled") ?? false)}</ReadOnlyField>
-            </FormField>
-          )}
+          <Checkbox label="Enabled" {...register("enabled")} />
 
           <div className="flex gap-2">
-            {canEdit && (
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={save.inFlight}
-                status={save.status}
-                pendingLabel="Saving…"
-              >
-                Save
-              </Button>
-            )}
-            <Button type="button" variant="ghost" onClick={() => router.push("/admin/tenants")}>
-              {canEdit ? "Cancel" : "Back"}
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={save.inFlight}
+              status={save.status}
+              pendingLabel="Saving…"
+            >
+              Save
             </Button>
-            {canEdit && (
-              <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-                Delete
-              </Button>
-            )}
+            <Button type="button" variant="ghost" onClick={() => router.push("/admin/tenants")}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
+              Delete
+            </Button>
           </div>
         </form>
       </FormLayout>

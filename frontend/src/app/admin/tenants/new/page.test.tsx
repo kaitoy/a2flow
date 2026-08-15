@@ -3,7 +3,7 @@ import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
-import { ADMIN, SUPER_ADMIN } from "@/test/auth-state";
+import { SUPER_ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
@@ -116,13 +116,5 @@ describe("NewTenantPage", () => {
         variant: "error",
       })
     );
-  });
-
-  it("refuses the form for a viewer without the super admin role", () => {
-    render(<NewTenantPage />, { preloadedState: ADMIN });
-
-    expect(screen.getByRole("heading", { name: "Access denied" })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
   });
 });

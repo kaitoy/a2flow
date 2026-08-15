@@ -2,7 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { store as appStore } from "@/store";
-import { ADMIN, SUPER_ADMIN } from "@/test/auth-state";
+import { SUPER_ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -94,18 +94,5 @@ describe("TenantsPage", () => {
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));
 
     await waitFor(() => expect(store.getState().tenants.version).toBe(1));
-  });
-
-  describe("without the super admin role", () => {
-    it("hides the add link and the per-row delete", async () => {
-      render(<TenantsPage />, { preloadedState: ADMIN });
-      await waitFor(() => screen.getByText("Acme Corp"));
-
-      expect(screen.queryByRole("link", { name: /add tenant/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("columnheader", { name: "Actions" })).not.toBeInTheDocument();
-      // The list itself stays readable — only the write actions are gated.
-      expect(screen.getByRole("link", { name: "Acme Corp" })).toBeInTheDocument();
-    });
   });
 });
