@@ -45,7 +45,7 @@ export function ImpersonationIndicator() {
   return (
     <div className="flex items-center gap-1.5">
       <Badge>Acting as {user.username}</Badge>
-      <Tooltip label="Stop impersonating">
+      <Tooltip label="Stop impersonating" placement="bottom">
         <button
           type="button"
           aria-label="Stop impersonating"
