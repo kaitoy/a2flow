@@ -73,6 +73,13 @@ export const adminNavItems: AdminNavItem[] = [
     roles: [Role.ADMIN, Role.DEVELOPER],
   },
   {
+    href: "/admin/secrets",
+    label: "Secrets",
+    icon: KeyRound,
+    description: "Store credentials for tools and repos",
+    roles: [Role.ADMIN],
+  },
+  {
     href: "/admin/agent-skills",
     label: "Agent Skills",
     icon: Wand2,
@@ -85,13 +92,6 @@ export const adminNavItems: AdminNavItem[] = [
     icon: Server,
     description: "Register tool servers",
     roles: [Role.DEVELOPER],
-  },
-  {
-    href: "/admin/secrets",
-    label: "Secrets",
-    icon: KeyRound,
-    description: "Store credentials for tools and repos",
-    roles: [Role.ADMIN],
   },
   {
     href: "/admin/workflows",
