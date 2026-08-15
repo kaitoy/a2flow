@@ -1,9 +1,12 @@
 /**
  * @module SecretsPage — Admin list page for managing registered secrets.
  *
- * Reads are open to every authenticated user, so a viewer without the admin
- * role sees the list but neither the Add button nor the per-row Delete — the
- * same convention the detail page follows by rendering read-only.
+ * Writes need `admin` or `developer` — a developer registering an MCP server
+ * or agent skill needs to be able to mint the credential it references, not
+ * just point at one an admin already created. Reads stay open, so a viewer
+ * with neither role sees the list but neither the Add button nor the per-row
+ * Delete — the same convention the detail page follows by rendering
+ * read-only.
  */
 "use client";
 
@@ -79,7 +82,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<Secret>[] {
 }
 
 export default function SecretsPage() {
-  const canEdit = useHasRole(Role.ADMIN);
+  const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
   const {
     rows,
     loading,

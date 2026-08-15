@@ -9,6 +9,12 @@ plaintext nor the stored ciphertext is ever serialized to clients.
 can only report a ``local`` secret's entries; a ``vault`` secret's keys live at
 its KV v2 path and need a live read, which would be far too expensive to do for
 every row of a list response. Pickers that must offer both kinds use this route.
+
+Writes are open to ``admin`` **or** ``developer``: secrets are one of the four
+resources a tag can label (see ``routers/tags.py``), and a developer wiring an
+MCP server's ``${secret:...}`` reference or an agent skill's auth password needs
+to be able to register the credential in the first place, not just point at one
+an admin happened to create first.
 """
 
 from fastapi import APIRouter, Depends
@@ -30,15 +36,15 @@ from models.user import Role
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 
-#: Route dependency gating secret writes behind the ``admin`` role.
-_requires_admin = [Depends(require_roles(Role.admin))]
+#: Route dependency gating secret writes behind the ``admin`` or ``developer`` role.
+_requires_write = [Depends(require_roles(Role.admin, Role.developer))]
 
 
 @router.post(
     "",
     response_model=ApiResponse[SecretRead],
     status_code=201,
-    dependencies=_requires_admin,
+    dependencies=_requires_write,
 )
 async def create_secret(
     body: SecretCreate,
@@ -92,7 +98,7 @@ async def list_secret_keys(
 @router.patch(
     "/{secret_id}",
     response_model=ApiResponse[SecretRead],
-    dependencies=_requires_admin,
+    dependencies=_requires_write,
 )
 async def update_secret(
     secret_id: str,
@@ -108,7 +114,7 @@ async def update_secret(
 @router.put(
     "/{secret_id}/tags",
     response_model=ApiResponse[SecretRead],
-    dependencies=_requires_admin,
+    dependencies=_requires_write,
 )
 async def set_secret_tags(
     secret_id: str,
@@ -123,7 +129,7 @@ async def set_secret_tags(
 @router.delete(
     "/{secret_id}",
     response_model=ApiResponse[None],
-    dependencies=_requires_admin,
+    dependencies=_requires_write,
 )
 async def delete_secret(
     secret_id: str,

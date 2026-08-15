@@ -47,17 +47,18 @@ const schema = buildSecretFormSchema(false);
  * Detail page of a registered secret: its type and the entry keys it holds
  * (values are write-only). The page is titled with the secret's own name.
  *
- * A viewer without the admin role gets a read-only rendering — reads are open
- * to every authenticated user, but writes are admin-only — so the fields show
- * as plain values, with a `local` secret's entries listed by key alone (see
- * {@link SecretFields}'s `readOnly` mode), and Save/Delete are hidden rather
- * than left to fail with a 403 on click.
+ * A viewer with neither the admin nor developer role gets a read-only
+ * rendering — reads are open to every authenticated user, but writes need one
+ * of those two roles — so the fields show as plain values, with a `local`
+ * secret's entries listed by key alone (see {@link SecretFields}'s `readOnly`
+ * mode), and Save/Delete are hidden rather than left to fail with a 403 on
+ * click.
  */
 export default function SecretDetailPage() {
   const { secretId } = useParams<{ secretId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const canEdit = useHasRole(Role.ADMIN);
+  const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);

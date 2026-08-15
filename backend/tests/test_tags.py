@@ -346,9 +346,11 @@ async def test_setting_tags_requires_the_records_own_write_role(
 ) -> None:
     client, _ = tag_env
     secret = await _create_secret(client)
-    # A developer may mint tags but may not write a secret, which is admin's.
+    # Attaching tags is gated by the target record's own write role, not by
+    # tag-mint eligibility — a role-less caller fails here for the same reason
+    # it would fail POST /secrets, regardless of what mints a tag.
     response = await client.put(
-        f"/api/v1/secrets/{secret['id']}/tags", json={"tagIds": []}, headers=DEVELOPER
+        f"/api/v1/secrets/{secret['id']}/tags", json={"tagIds": []}, headers=NOBODY
     )
     assert_err(response, "FORBIDDEN", 403)
 

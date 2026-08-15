@@ -62,9 +62,9 @@ class Role(StrEnum):
     super_admin = "super_admin"
     #: User CRUD and secrets CRUD.
     admin = "admin"
-    #: MCP server CRUD, workflow CRUD, and agent-skill CRUD. Also grants
-    #: workflow execution (``POST /workflows/{id}/execute``), including on
-    #: ``draft`` workflows for pre-publish testing — see
+    #: Secrets CRUD, MCP server CRUD, workflow CRUD, and agent-skill CRUD.
+    #: Also grants workflow execution (``POST /workflows/{id}/execute``),
+    #: including on ``draft`` workflows for pre-publish testing — see
     #: :meth:`services.workflow.WorkflowService.execute`.
     developer = "developer"
     #: Workflow execution (``POST /workflows/{id}/execute``), restricted to

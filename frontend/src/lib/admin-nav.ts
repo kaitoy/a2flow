@@ -77,7 +77,7 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Secrets",
     icon: KeyRound,
     description: "Store credentials for tools and repos",
-    roles: [Role.ADMIN],
+    roles: [Role.ADMIN, Role.DEVELOPER],
   },
   {
     href: "/admin/agent-skills",

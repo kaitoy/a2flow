@@ -3,16 +3,16 @@ import { http } from "msw";
 import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
-import { ADMIN, REQUESTER } from "@/test/auth-state";
+import { ADMIN, DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { SECRET_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewSecretPage from "./page";
 
-/** Render the form as an admin — the role creating a secret requires. */
-function renderPage() {
-  return render(<NewSecretPage />, { preloadedState: ADMIN });
+/** Render the form as an admin by default — one of the two roles creating a secret requires. */
+function renderPage(state = ADMIN) {
+  return render(<NewSecretPage />, { preloadedState: state });
 }
 
 /** Fill the first entry row, which the form starts with. */
@@ -34,6 +34,12 @@ describe("NewSecretPage", () => {
   it("masks entry values so they are not shoulder-readable", () => {
     renderPage();
     expect(screen.getByLabelText("entries value 1")).toHaveAttribute("type", "password");
+  });
+
+  it("renders the form for a developer", () => {
+    renderPage(DEVELOPER);
+    expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
   });
 
   it("switching to vault shows the reference inputs and hides the entries", async () => {
@@ -209,7 +215,7 @@ describe("NewSecretPage", () => {
     );
   });
 
-  it("refuses the form for a viewer without the admin role", () => {
+  it("refuses the form for a viewer without the admin or developer role", () => {
     render(<NewSecretPage />, { preloadedState: REQUESTER });
 
     expect(screen.getByRole("heading", { name: "Access denied" })).toBeInTheDocument();

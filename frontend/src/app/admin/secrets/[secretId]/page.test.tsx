@@ -3,7 +3,7 @@ import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
-import { ADMIN, REQUESTER } from "@/test/auth-state";
+import { ADMIN, DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { SECRET_1, SECRET_VAULT_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
@@ -14,9 +14,14 @@ function setup() {
   vi.mocked(useParams).mockReturnValue({ secretId: "secret-1" });
 }
 
-/** Render the page as an admin — the role every secret write requires. */
+/** Render the page as an admin — one of the two roles every secret write requires. */
 function renderPage() {
   return render(<SecretDetailPage />, { preloadedState: ADMIN });
+}
+
+/** Render the page as a developer, who may write a secret exactly like an admin. */
+function renderPageAsDeveloper() {
+  return render(<SecretDetailPage />, { preloadedState: DEVELOPER });
 }
 
 /** Render the page as a requester, who may read a secret but never write one. */
@@ -205,7 +210,15 @@ describe("SecretDetailPage", () => {
     expect(store.getState().toast.items.length).toBe(beforeCount);
   });
 
-  describe("without the admin role", () => {
+  it("offers the same edit form to a developer as to an admin", async () => {
+    setup();
+    renderPageAsDeveloper();
+    await waitFor(() => screen.getByDisplayValue("github-token"));
+    expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
+  });
+
+  describe("without the admin or developer role", () => {
     it("lists the entry keys as values, with no value column to type into", async () => {
       setup();
       renderPageReadOnly();

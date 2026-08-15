@@ -22,6 +22,15 @@ from tests._envelope import assert_err, assert_ok
 from tests._seed import seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
 
+#: Headers selecting a plain (non-super-admin) admin of the default tenant.
+ADMIN: dict[str, str] = {"X-User-Id": "alice", "X-User-Roles": "admin"}
+
+#: Headers selecting a developer of the default tenant.
+DEVELOPER: dict[str, str] = {"X-User-Id": "bob", "X-User-Roles": "developer"}
+
+#: Headers selecting a role-less user of the default tenant.
+NOBODY: dict[str, str] = {"X-User-Id": "carol", "X-User-Roles": ""}
+
 
 @pytest_asyncio.fixture()
 async def mem_engine() -> AsyncGenerator[AsyncEngine, None]:
@@ -577,3 +586,76 @@ async def test_list_keys_of_vault_secret_without_vault_returns_502(
 async def test_list_keys_unknown_id_returns_404(secrets_client: AsyncClient) -> None:
     response = await secrets_client.get("/api/v1/secrets/nonexistent/keys")
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+# ---------- role gates ----------
+
+
+async def test_an_admin_may_create_a_secret(secrets_client: AsyncClient) -> None:
+    response = await secrets_client.post(
+        "/api/v1/secrets", json=_LOCAL_BODY, headers=ADMIN
+    )
+    assert response.status_code == 201
+
+
+async def test_a_developer_may_create_a_secret(secrets_client: AsyncClient) -> None:
+    response = await secrets_client.post(
+        "/api/v1/secrets", json=_LOCAL_BODY, headers=DEVELOPER
+    )
+    assert response.status_code == 201
+
+
+async def test_a_role_less_user_may_not_create_a_secret(
+    secrets_client: AsyncClient,
+) -> None:
+    response = await secrets_client.post(
+        "/api/v1/secrets", json=_LOCAL_BODY, headers=NOBODY
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_a_role_less_user_may_still_read_secrets(
+    secrets_client: AsyncClient,
+) -> None:
+    await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY, headers=ADMIN)
+    response = await secrets_client.get("/api/v1/secrets", headers=NOBODY)
+    assert response.status_code == 200
+
+
+async def test_a_role_less_user_may_not_delete_a_secret(
+    secrets_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY, headers=ADMIN),
+        status=201,
+    )
+    response = await secrets_client.delete(
+        f"/api/v1/secrets/{created['id']}", headers=NOBODY
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_a_developer_may_update_a_secret(secrets_client: AsyncClient) -> None:
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY, headers=ADMIN),
+        status=201,
+    )
+    response = await secrets_client.patch(
+        f"/api/v1/secrets/{created['id']}",
+        json={"name": "renamed"},
+        headers=DEVELOPER,
+    )
+    assert response.status_code == 200
+
+
+async def test_a_developer_may_set_secret_tags(secrets_client: AsyncClient) -> None:
+    created = assert_ok(
+        await secrets_client.post("/api/v1/secrets", json=_LOCAL_BODY, headers=ADMIN),
+        status=201,
+    )
+    response = await secrets_client.put(
+        f"/api/v1/secrets/{created['id']}/tags",
+        json={"tagIds": []},
+        headers=DEVELOPER,
+    )
+    assert response.status_code == 200

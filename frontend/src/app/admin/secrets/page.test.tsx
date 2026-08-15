@@ -2,7 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { store as appStore } from "@/store";
-import { ADMIN, REQUESTER } from "@/test/auth-state";
+import { ADMIN, DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -14,9 +14,9 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-/** Render the list as an admin — the role every secret write requires. */
-function renderPage() {
-  return render(<SecretsPage />, { preloadedState: ADMIN });
+/** Render the list as an admin by default — one of the two roles every secret write requires. */
+function renderPage(state = ADMIN) {
+  return render(<SecretsPage />, { preloadedState: state });
 }
 
 describe("SecretsPage", () => {
@@ -104,9 +104,18 @@ describe("SecretsPage", () => {
     expect(deleteSpy).toHaveBeenCalled();
   });
 
-  describe("without the admin role", () => {
+  it("offers the Add button to a developer", async () => {
+    renderPage(DEVELOPER);
+    await waitFor(() => screen.getByText("github-token"));
+    expect(screen.getByRole("link", { name: /add secret/i })).toHaveAttribute(
+      "href",
+      "/admin/secrets/new"
+    );
+  });
+
+  describe("without the admin or developer role", () => {
     it("hides the add link and the per-row delete", async () => {
-      render(<SecretsPage />, { preloadedState: REQUESTER });
+      renderPage(REQUESTER);
       await waitFor(() => screen.getByText("github-token"));
 
       expect(screen.queryByRole("link", { name: /add secret/i })).not.toBeInTheDocument();

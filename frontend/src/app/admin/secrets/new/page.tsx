@@ -32,7 +32,7 @@ const schema = buildSecretFormSchema(true);
 export default function NewSecretPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const canEdit = useHasRole(Role.ADMIN);
+  const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
 
   // Tags live outside the form state: the picker is a controlled
   // multi-select rather than a registered input.

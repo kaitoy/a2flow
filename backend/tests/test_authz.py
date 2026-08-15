@@ -88,12 +88,14 @@ async def test_delete_user_requires_admin_role(workflow_client: AsyncClient) -> 
     assert_err(res, "FORBIDDEN", 403)
 
 
-# ---------- secrets: admin ----------
+# ---------- secrets: admin or developer ----------
 
 
-async def test_create_secret_requires_admin_role(workflow_client: AsyncClient) -> None:
+async def test_create_secret_requires_admin_or_developer_role(
+    workflow_client: AsyncClient,
+) -> None:
     res = await workflow_client.post(
-        "/api/v1/secrets", json=_SECRET_BODY, headers=_roles("developer")
+        "/api/v1/secrets", json=_SECRET_BODY, headers=_roles("requester")
     )
     assert_err(res, "FORBIDDEN", 403)
 
@@ -105,7 +107,18 @@ async def test_create_secret_allowed_for_admin(workflow_client: AsyncClient) -> 
     assert_ok(res, status=201)
 
 
-async def test_update_secret_requires_admin_role(workflow_client: AsyncClient) -> None:
+async def test_create_secret_allowed_for_developer(
+    workflow_client: AsyncClient,
+) -> None:
+    res = await workflow_client.post(
+        "/api/v1/secrets", json=_SECRET_BODY, headers=_roles("developer")
+    )
+    assert_ok(res, status=201)
+
+
+async def test_update_secret_requires_admin_or_developer_role(
+    workflow_client: AsyncClient,
+) -> None:
     created = assert_ok(
         await workflow_client.post(
             "/api/v1/secrets", json=_SECRET_BODY, headers=_roles("admin")
