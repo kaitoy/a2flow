@@ -12,7 +12,10 @@ const FOCUSABLE_SELECTOR =
  * popover it happens to be nested in (e.g. a `Select` listbox opened inside
  * `TableHeaderMenu`'s dialog) — the two panels are DOM siblings once
  * portaled, not ancestor/descendant, so a plain containment check can't tell
- * they're related.
+ * they're related. This only applies to a popover that is genuinely a
+ * sibling; a popover whose anchor sits inside an ancestor `Dialog` (which
+ * tags its own panel too) must still close on a click elsewhere in that
+ * ancestor — see the `anchorRef` containment check in `handlePointerDown`.
  */
 const NESTED_POPOVER_ATTR = "data-glass-popover";
 
@@ -133,9 +136,17 @@ export function useDialogA11y({
       if (document.getElementById(panelId)?.contains(target)) return;
       // A portaled panel is a DOM sibling of this one, not a descendant, so
       // a nested popover (e.g. a Select listbox opened inside this dialog)
-      // needs its own explicit "inside" check via the shared marker.
+      // needs its own explicit "inside" check via the shared marker. But the
+      // marker alone can't distinguish that from an *ancestor* Dialog that
+      // also tags its own panel — the fix is whether the marked element
+      // contains this popover's own anchor: a true sibling popover never
+      // does (it's an unrelated portal), while a wrapping Dialog always does
+      // (the anchor renders inside it), so only the former counts as inside.
       const targetEl = target instanceof Element ? target : target.parentElement;
-      if (targetEl?.closest(`[${NESTED_POPOVER_ATTR}]`)) return;
+      const nestedPopover = targetEl?.closest(`[${NESTED_POPOVER_ATTR}]`);
+      if (nestedPopover && !(anchorRef?.current && nestedPopover.contains(anchorRef.current))) {
+        return;
+      }
       onClose();
     }
 

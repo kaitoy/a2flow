@@ -199,4 +199,46 @@ describe("useDialogA11y", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("listbox")).toBeInTheDocument();
   });
+
+  it("closes on a pointerdown elsewhere inside an ancestor dialog that also tags its own panel", async () => {
+    // Mirrors TableHeaderMenu rendered inside Dialog: the inner popover's
+    // anchor is a genuine DOM descendant of the outer dialog's panel (not a
+    // sibling portal), so a click elsewhere in that outer panel must still
+    // count as "outside" the inner popover.
+    function AncestorHarness() {
+      const [innerOpen, setInnerOpen] = useState(true);
+      const innerAnchorRef = useRef<HTMLButtonElement | null>(null);
+      useDialogA11y({
+        open: true,
+        onClose: () => {},
+        panelId: "outer-panel",
+      });
+      useDialogA11y({
+        open: innerOpen,
+        onClose: () => setInnerOpen(false),
+        anchorRef: innerAnchorRef,
+        panelId: "inner-panel",
+      });
+
+      return (
+        <div id="outer-panel" role="dialog" aria-label="Outer panel" tabIndex={-1}>
+          <button type="button" ref={innerAnchorRef}>
+            inner anchor
+          </button>
+          <button type="button">elsewhere in dialog</button>
+          {innerOpen && (
+            <div id="inner-panel" role="menu" aria-label="Inner panel" tabIndex={-1}>
+              inner panel
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    render(<AncestorHarness />);
+
+    fireEvent.pointerDown(screen.getByText("elsewhere in dialog"));
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
 });
