@@ -253,6 +253,66 @@ async def test_list_workflows_invalid_filter_field_returns_400(
     assert_err(response, code="INVALID_QUERY", status=400)
 
 
+# ---------- draft visibility ----------
+
+
+async def test_list_workflows_excludes_draft_for_requester(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        "/api/v1/workflows", headers={"X-User-Roles": "requester"}
+    )
+    assert assert_ok(response) == []
+
+
+async def test_list_workflows_excludes_draft_for_approver(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        "/api/v1/workflows", headers={"X-User-Roles": "approver"}
+    )
+    assert assert_ok(response) == []
+
+
+async def test_list_workflows_includes_draft_for_developer(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        "/api/v1/workflows", headers={"X-User-Roles": "developer"}
+    )
+    assert len(assert_ok(response)) == 1
+
+
+async def test_list_workflows_includes_draft_for_super_admin(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        "/api/v1/workflows", headers={"X-User-Roles": "super_admin"}
+    )
+    assert len(assert_ok(response)) == 1
+
+
+async def test_list_workflows_excludes_draft_alongside_published(
+    workflow_client: AsyncClient,
+) -> None:
+    """A requester still sees the published workflows on the same page."""
+    skill = await create_skill(workflow_client)
+    await generate_workflow(workflow_client, skill["id"], name="draft-wf")
+    await create_published_workflow(workflow_client, skill["id"], name="published-wf")
+    response = await workflow_client.get(
+        "/api/v1/workflows", headers={"X-User-Roles": "requester"}
+    )
+    assert [w["name"] for w in assert_ok(response)] == ["published-wf"]
+
+
 # ---------- get ----------
 
 
@@ -275,6 +335,52 @@ async def test_get_workflow_unknown_id_returns_404(
 ) -> None:
     response = await workflow_client.get("/api/v1/workflows/nonexistent")
     assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_get_workflow_draft_returns_404_for_requester(
+    workflow_client: AsyncClient,
+) -> None:
+    """A draft's existence is not confirmed to a caller who cannot see it."""
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        f"/api/v1/workflows/{wf['id']}", headers={"X-User-Roles": "requester"}
+    )
+    assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_get_workflow_draft_returns_404_for_approver(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        f"/api/v1/workflows/{wf['id']}", headers={"X-User-Roles": "approver"}
+    )
+    assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_get_workflow_draft_returns_200_for_developer(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        f"/api/v1/workflows/{wf['id']}", headers={"X-User-Roles": "developer"}
+    )
+    assert response.status_code == 200
+
+
+async def test_get_workflow_published_returns_200_for_requester(
+    workflow_client: AsyncClient,
+) -> None:
+    """Only ``draft`` is hidden -- a published workflow stays visible."""
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        f"/api/v1/workflows/{wf['id']}", headers={"X-User-Roles": "requester"}
+    )
+    assert response.status_code == 200
 
 
 # ---------- create removed ----------

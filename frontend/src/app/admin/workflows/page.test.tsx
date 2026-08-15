@@ -221,13 +221,6 @@ describe("WorkflowsPage", () => {
     );
   }
 
-  it("disables Run for a requester on a workflow that is not published", async () => {
-    mockDraftWorkflowRow();
-    render(<WorkflowsPage />, { preloadedState: authState(["requester"]) });
-    await waitFor(() => screen.getByText("my-workflow"));
-    expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
-  });
-
   it("enables Run for a developer on a draft workflow, for pre-publish testing", async () => {
     mockDraftWorkflowRow();
     render(<WorkflowsPage />, { preloadedState: authState(["developer"]) });

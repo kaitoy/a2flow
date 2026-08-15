@@ -70,14 +70,22 @@ async def list_workflows(
     sort: SortDep,
     filters: FilterDep,
     tags: TagFilterDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[WorkflowRead]]:
+    """List Workflows, excluding ``draft`` ones for non-developer callers.
+
+    Only a ``developer`` (or ``super_admin``) may create, edit, or execute a
+    ``draft`` workflow, so it is also hidden from the page for every other
+    role -- see ``WorkflowService.list``.
+    """
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
         sort=sort.sort,
         filters=filters.filters,
         tag_ids=tags.tag_ids,
+        caller_roles=caller_roles,
     )
     return ApiResponse(meta=meta, data=await service.to_read_many(items))
 
@@ -86,9 +94,12 @@ async def list_workflows(
 async def get_workflow(
     workflow_id: str,
     service: WorkflowServiceDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowRead]:
-    workflow = await service.get(workflow_id)
+    """Return a Workflow, raising HTTP 404 if it is a ``draft`` the caller
+    may not see (see ``WorkflowService.get_for_read``)."""
+    workflow = await service.get_for_read(workflow_id, caller_roles=caller_roles)
     return ApiResponse(meta=meta, data=await service.to_read(workflow))
 
 

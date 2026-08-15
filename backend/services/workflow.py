@@ -209,6 +209,38 @@ class WorkflowService:
             raise NotFoundError("Workflow", workflow_id)
         return workflow
 
+    async def get_for_read(
+        self, workflow_id: str, *, caller_roles: Collection[str]
+    ) -> Workflow:
+        """Return the Workflow with the given ID, authorizing draft visibility.
+
+        A ``draft`` workflow can only be created, edited, or executed
+        (pre-publish) by a ``developer`` (or, via the ``super_admin`` bypass,
+        a ``super_admin``) -- see :meth:`execute`. This extends the same
+        restriction to *viewing* it: any other caller (``requester``,
+        ``approver``, plain ``admin``) gets a 404 rather than a 403, so a
+        draft's existence is never confirmed to someone who couldn't act on
+        it, matching ``services.user._assert_tenant_visible``'s convention.
+
+        Args:
+            workflow_id: Identifier of the workflow to fetch.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
+
+        Returns:
+            The matching Workflow.
+
+        Raises:
+            NotFoundError: If no workflow exists with the given ID, or it is
+                ``draft`` and the caller is not a developer or super admin.
+        """
+        workflow = await self.get(workflow_id)
+        if workflow.status == WorkflowStatus.draft and not has_any_role(
+            caller_roles, Role.developer
+        ):
+            raise NotFoundError("Workflow", workflow_id)
+        return workflow
+
     @staticmethod
     def _assert_design_access(
         workflow: Workflow, caller: User, caller_roles: Collection[str]
@@ -451,15 +483,25 @@ class WorkflowService:
         *,
         limit: int,
         offset: int,
+        caller_roles: Collection[str],
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
         tag_ids: Sequence[str] = (),
     ) -> list[Workflow]:
-        """Return a page of Workflow records.
+        """Return a page of Workflow records visible to the caller.
+
+        A caller who is not a ``developer`` (or, via the ``super_admin``
+        bypass, a ``super_admin``) never sees ``draft`` workflows: a matching
+        ``status:ne:draft`` filter is appended to ``filters``, combining with
+        (never widening) whatever the caller supplied -- mirrors
+        ``UserService.list``'s tenant-scoping filter
+        (``services/user.py``).
 
         Args:
             limit: Maximum number of records to return.
             offset: Number of records to skip.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
             tag_ids: Narrows the page to workflows carrying every listed tag.
@@ -467,6 +509,11 @@ class WorkflowService:
         Returns:
             The requested page of workflows.
         """
+        if not has_any_role(caller_roles, Role.developer):
+            filters = (
+                *filters,
+                FilterSpec(field="status", op="ne", value=WorkflowStatus.draft.value),
+            )
         return await self._workflows.list(
             limit=limit, offset=offset, sort=sort, filters=filters, tag_ids=tag_ids
         )
