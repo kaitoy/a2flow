@@ -32,7 +32,6 @@ import {
   isForbiddenError,
   listWorkflowTaskTemplates,
   SUPPRESS_FORBIDDEN_TOAST,
-  type ToolBinding,
   updateWorkflowTaskTemplate,
   type WorkflowTaskTemplate,
 } from "@/lib/api";
@@ -67,11 +66,11 @@ type FormValues = z.infer<typeof schema>;
  * page read-only from the task template list) gets a read-only rendering:
  * Title and Description show as plain text, the Depends on picker sits
  * inside a disabled `fieldset` so its native checkboxes can't be toggled,
- * MCP Tools is omitted entirely (there's nothing a read-only viewer can do
- * with it, and skipping it avoids mounting `McpToolPicker`'s MCP
- * server/tool catalog fetch), and Save/Delete are hidden rather than left
- * to fail with a 403 on click — the same convention the parent
- * `WorkflowDetailPage` follows.
+ * MCP Tools is omitted entirely (a picker whose every control is disabled
+ * says nothing the bound tools on the list page don't already say, and
+ * skipping it also spares the read-only viewer `McpToolPicker`'s registry
+ * read), and Save/Delete are hidden rather than left to fail with a 403 on
+ * click — the same convention the parent `WorkflowDetailPage` follows.
  */
 export default function WorkflowTaskTemplateDetailPage() {
   const { workflowId, templateId } = useParams<{ workflowId: string; templateId: string }>();
@@ -83,7 +82,6 @@ export default function WorkflowTaskTemplateDetailPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [candidates, setCandidates] = useState<WorkflowTaskTemplate[]>([]);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
-  const [templateBindings, setTemplateBindings] = useState<ToolBinding[]>([]);
   // The persisted title, which names the page. Kept out of the form so the
   // heading names the saved record rather than following every keystroke.
   const [title, setTitle] = useState("");
@@ -120,7 +118,6 @@ export default function WorkflowTaskTemplateDetailPage() {
           dependsOnIds: template.dependsOnIds ?? [],
           toolBindings: (template.toolBindings ?? []).map(bindingToValue),
         });
-        setTemplateBindings(template.toolBindings ?? []);
         setAudit({
           createdBy: template.createdBy,
           updatedBy: template.updatedBy,
@@ -290,11 +287,7 @@ export default function WorkflowTaskTemplateDetailPage() {
                 control={control}
                 name="toolBindings"
                 render={({ field }) => (
-                  <McpToolPicker
-                    value={field.value}
-                    onChange={field.onChange}
-                    boundBindings={templateBindings}
-                  />
+                  <McpToolPicker value={field.value} onChange={field.onChange} />
                 )}
               />
             </FormField>

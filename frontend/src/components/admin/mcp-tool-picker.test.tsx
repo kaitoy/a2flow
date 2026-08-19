@@ -1,5 +1,7 @@
+import type { UserEvent } from "@testing-library/user-event";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
@@ -7,143 +9,234 @@ import { render, screen, waitFor } from "@/test/test-utils";
 import { McpToolPicker } from "./mcp-tool-picker";
 
 const BASE = "http://localhost:8000";
+const SERVERS_URL = `${BASE}/api/v1/mcp-servers`;
+const TOOLS_URL = `${BASE}/api/v1/mcp-servers/:serverId/tools`;
 
-/** Replace the shared tools handler so each server advertises the given names. */
-function serveTools(names: string[]) {
+/** Minimal `McpToolInfo` — the picker only ever reads the name. */
+function tool(name: string) {
+  return { name, description: null, inputSchema: {} };
+}
+
+/**
+ * Give each registered server its own tools, so "only the picked server's
+ * tools are offered" is actually assertable. The shared handler serves the same
+ * single tool for every server.
+ */
+function serveToolsPerServer() {
   server.use(
-    http.get(`${BASE}/api/v1/mcp-servers/:serverId/tools`, () =>
-      envelope(names.map((name) => ({ name, description: null, inputSchema: {} })))
+    http.get(TOOLS_URL, ({ params }) =>
+      envelope(params.serverId === "mcp-1" ? [tool("search"), tool("fetch")] : [tool("read")])
     )
   );
 }
 
+/**
+ * Controlled harness. The picker owns no selection of its own, so a static
+ * `value` prop would make every pick silently fail to stick.
+ */
+function Harness({
+  initial = [],
+  onChange,
+}: {
+  initial?: string[];
+  onChange?: (next: string[]) => void;
+}) {
+  const [value, setValue] = useState(initial);
+  return (
+    <McpToolPicker
+      value={value}
+      onChange={(next) => {
+        setValue(next);
+        onChange?.(next);
+      }}
+    />
+  );
+}
+
+/** Open the server dialog, choose `name`, and confirm — what an operator does. */
+async function pickServer(user: UserEvent, name: string) {
+  await user.click(await screen.findByRole("button", { name: "Select MCP server…" }));
+  await user.click(await screen.findByRole("radio", { name }));
+  await user.click(screen.getByRole("button", { name: "Select" }));
+}
+
+/** The tool dropdown, once its options have arrived. */
+async function toolSelect() {
+  const select = await screen.findByRole("combobox", { name: "Tool" });
+  await waitFor(() => expect(select).toBeEnabled());
+  return select;
+}
+
+/** Open the tool dropdown and add `name`. */
+async function pickTool(user: UserEvent, name: string) {
+  await user.click(await toolSelect());
+  await user.click(await screen.findByRole("option", { name }));
+}
+
 describe("McpToolPicker", () => {
-  it("says it is loading rather than showing an empty list", () => {
-    render(<McpToolPicker value={[]} onChange={vi.fn()} />);
-    expect(screen.getByText("Loading tools…")).toBeInTheDocument();
+  it("queries no MCP server for tools until one is picked", async () => {
+    let toolCalls = 0;
+    server.use(
+      http.get(TOOLS_URL, () => {
+        toolCalls += 1;
+        return envelope([tool("search")]);
+      })
+    );
+
+    render(<Harness />);
+
+    // The registry read has landed — the pick entry point is on screen...
+    expect(await screen.findByRole("button", { name: "Select MCP server…" })).toBeInTheDocument();
+    // ...and not one live MCP connection was made to get there.
+    expect(toolCalls).toBe(0);
   });
 
-  it("lists every reachable server's tools once loaded", async () => {
-    render(<McpToolPicker value={[]} onChange={vi.fn()} />);
+  it("offers only the picked server's tools", async () => {
+    serveToolsPerServer();
+    const user = userEvent.setup();
+    render(<Harness />);
 
-    expect(
-      await screen.findByRole("checkbox", { name: "my-mcp-server: search" })
-    ).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "local-files: search" })).toBeInTheDocument();
+    await pickServer(user, "my-mcp-server");
+    await user.click(await toolSelect());
+
+    expect(await screen.findByRole("option", { name: "search" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "fetch" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "read" })).not.toBeInTheDocument();
   });
 
-  it("reports the selection when a tool is checked", async () => {
+  it("reports the composite binding and shows a chip when a tool is added", async () => {
+    serveToolsPerServer();
     const onChange = vi.fn();
-    render(<McpToolPicker value={[]} onChange={onChange} />);
+    const user = userEvent.setup();
+    render(<Harness onChange={onChange} />);
 
-    await userEvent.click(await screen.findByRole("checkbox", { name: "my-mcp-server: search" }));
+    await pickServer(user, "my-mcp-server");
+    await pickTool(user, "search");
 
     expect(onChange).toHaveBeenCalledWith(["mcp-1::search"]);
+    expect(
+      await screen.findByRole("button", { name: "Remove my-mcp-server: search" })
+    ).toBeInTheDocument();
+  });
+
+  it("keeps earlier picks when tools are added from a second server", async () => {
+    serveToolsPerServer();
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<Harness onChange={onChange} />);
+
+    await pickServer(user, "my-mcp-server");
+    await pickTool(user, "search");
+    await pickServer(user, "local-files");
+    await pickTool(user, "read");
+
+    expect(onChange).toHaveBeenLastCalledWith(["mcp-1::search", "mcp-2::read"]);
+    expect(
+      screen.getByRole("button", { name: "Remove my-mcp-server: search" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove local-files: read" })).toBeInTheDocument();
+  });
+
+  it("stops offering a tool that is already bound", async () => {
+    serveToolsPerServer();
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await pickServer(user, "my-mcp-server");
+    await pickTool(user, "search");
+    await user.click(await toolSelect());
+
+    expect(await screen.findByRole("option", { name: "fetch" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "search" })).not.toBeInTheDocument();
+  });
+
+  it("says so when every advertised tool has been added", async () => {
+    server.use(http.get(TOOLS_URL, () => envelope([tool("search")])));
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await pickServer(user, "my-mcp-server");
+    await pickTool(user, "search");
+
+    expect(await screen.findByRole("combobox", { name: "Tool" })).toHaveTextContent(
+      "All tools added"
+    );
+  });
+
+  it("removes a binding when its chip is dismissed", async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<Harness initial={["mcp-1::search", "mcp-2::read"]} onChange={onChange} />);
+
+    await user.click(await screen.findByRole("button", { name: "Remove my-mcp-server: search" }));
+
+    expect(onChange).toHaveBeenCalledWith(["mcp-2::read"]);
+  });
+
+  it("labels a prefilled binding with its server's name", async () => {
+    render(<Harness initial={["mcp-2::read"]} />);
+
+    expect(
+      await screen.findByRole("button", { name: "Remove local-files: read" })
+    ).toBeInTheDocument();
+  });
+
+  it("explains an unreachable server instead of an empty dropdown, and recovers on retry", async () => {
+    let attempt = 0;
+    server.use(
+      http.get(TOOLS_URL, () => {
+        attempt += 1;
+        return attempt === 1
+          ? envelopeErr("MCP_UNREACHABLE", "MCP server 'my-mcp-server' unreachable", 502)
+          : envelope([tool("search")]);
+      })
+    );
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await pickServer(user, "my-mcp-server");
+
+    expect(await screen.findByText(/unreachable/)).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Tool" })).toHaveTextContent(
+      "Could not load tools"
+    );
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    await pickTool(user, "search");
+
+    expect(
+      await screen.findByRole("button", { name: "Remove my-mcp-server: search" })
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces a registry failure and recovers on retry", async () => {
+    let attempt = 0;
+    server.use(
+      http.get(SERVERS_URL, () => {
+        attempt += 1;
+        return attempt === 1
+          ? envelopeErr("INTERNAL_ERROR", "registry exploded", 500)
+          : envelope([]);
+      })
+    );
+    render(<Harness />);
+
+    expect(await screen.findByText("Could not load the MCP server registry.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText(/No MCP servers are registered/)).toBeInTheDocument();
   });
 
   it("points at the registry when no MCP server is registered", async () => {
-    server.use(http.get(`${BASE}/api/v1/mcp-servers`, () => envelope([])));
-    render(<McpToolPicker value={[]} onChange={vi.fn()} />);
+    server.use(http.get(SERVERS_URL, () => envelope([])));
+    render(<Harness />);
 
     expect(await screen.findByText(/No MCP servers are registered/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Register one" })).toHaveAttribute(
       "href",
       "/admin/mcp-servers"
     );
-  });
-
-  it("names the unreachable server instead of claiming none are registered", async () => {
-    server.use(
-      http.get(`${BASE}/api/v1/mcp-servers/:serverId/tools`, ({ params }) =>
-        params.serverId === "mcp-2"
-          ? envelopeErr("MCP_UNREACHABLE", "MCP server 'local-files' unreachable", 502)
-          : envelope([{ name: "search", description: null, inputSchema: {} }])
-      )
-    );
-    render(<McpToolPicker value={[]} onChange={vi.fn()} />);
-
-    // The reachable server's tool is still offered...
-    expect(
-      await screen.findByRole("checkbox", { name: "my-mcp-server: search" })
-    ).toBeInTheDocument();
-    // ...and the failure is explained rather than silently swallowed.
-    expect(screen.getByText("local-files")).toBeInTheDocument();
-    expect(screen.getByText(/unreachable/)).toBeInTheDocument();
-    expect(screen.queryByText(/No MCP servers are registered/)).not.toBeInTheDocument();
-  });
-
-  it("surfaces a registry failure and recovers on retry", async () => {
-    let attempt = 0;
-    server.use(
-      http.get(`${BASE}/api/v1/mcp-servers`, () => {
-        attempt += 1;
-        return attempt === 1
-          ? envelopeErr("INTERNAL_ERROR", "registry exploded", 500)
-          : envelope([
-              {
-                id: "mcp-1",
-                tenantId: "tenant-1",
-                name: "my-mcp-server",
-                transport: "streamable_http",
-                url: "https://mcp.example.com/mcp",
-                headers: {},
-                args: [],
-                env: {},
-                createdAt: "2026-01-01T00:00:00Z",
-                updatedAt: "2026-01-01T00:00:00Z",
-                createdBy: "",
-                updatedBy: "",
-              },
-            ]);
-      })
-    );
-    render(<McpToolPicker value={[]} onChange={vi.fn()} />);
-
-    expect(await screen.findByText("Could not load the MCP server registry.")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
-
-    expect(
-      await screen.findByRole("checkbox", { name: "my-mcp-server: search" })
-    ).toBeInTheDocument();
-  });
-
-  it("keeps a bound tool selectable when its server no longer advertises it", async () => {
-    serveTools([]);
-    render(
-      <McpToolPicker
-        value={["mcp-1::retired"]}
-        onChange={vi.fn()}
-        boundBindings={[{ mcpServerId: "mcp-1", toolName: "retired" }]}
-      />
-    );
-
-    const checkbox = await screen.findByRole("checkbox", { name: "my-mcp-server: retired" });
-    expect(checkbox).toBeChecked();
-  });
-
-  it("offers no filter for a short list", async () => {
-    render(<McpToolPicker value={[]} onChange={vi.fn()} />);
-    await screen.findByRole("checkbox", { name: "my-mcp-server: search" });
-    expect(screen.queryByLabelText("Filter tools")).not.toBeInTheDocument();
-  });
-
-  it("filters a long list while keeping the current selection visible", async () => {
-    // 8 tools on each of the two servers = 16 options, past the filter threshold.
-    serveTools(["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"]);
-    render(<McpToolPicker value={["mcp-1::zeta"]} onChange={vi.fn()} />);
-
-    const filter = await screen.findByLabelText("Filter tools");
-    await userEvent.type(filter, "alpha");
-
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("checkbox", { name: "my-mcp-server: beta" })
-      ).not.toBeInTheDocument()
-    );
-    expect(screen.getByRole("checkbox", { name: "my-mcp-server: alpha" })).toBeInTheDocument();
-    // Selected but non-matching options stay rendered: CheckboxGroup derives the
-    // next selection from the options it is given, so hiding one would drop it.
-    expect(screen.getByRole("checkbox", { name: "my-mcp-server: zeta" })).toBeChecked();
+    expect(screen.queryByRole("button", { name: "Select MCP server…" })).not.toBeInTheDocument();
   });
 });

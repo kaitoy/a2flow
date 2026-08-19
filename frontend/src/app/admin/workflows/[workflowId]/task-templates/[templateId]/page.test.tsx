@@ -60,6 +60,21 @@ function capturePatch() {
   return captured;
 }
 
+/** Open the MCP server dialog, choose `name`, and confirm. */
+async function pickServer(name: string) {
+  await userEvent.click(await screen.findByRole("button", { name: "Select MCP server…" }));
+  await userEvent.click(await screen.findByRole("radio", { name }));
+  await userEvent.click(screen.getByRole("button", { name: "Select" }));
+}
+
+/** Open the tool dropdown, once its options have arrived, and add `name`. */
+async function pickTool(name: string) {
+  const select = await screen.findByRole("combobox", { name: "Tool" });
+  await waitFor(() => expect(select).toBeEnabled());
+  await userEvent.click(select);
+  await userEvent.click(await screen.findByRole("option", { name }));
+}
+
 describe("WorkflowTaskTemplateDetailPage", () => {
   it("titles the page and ends the breadcrumb trail with the template's title", async () => {
     setup();
@@ -82,17 +97,22 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
 
     await waitFor(() => expect(screen.getByDisplayValue("Template Step 1")).toBeInTheDocument());
-    expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "local-files: search" })).not.toBeChecked();
+    expect(
+      await screen.findByRole("button", { name: "Remove my-mcp-server: search" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove local-files: search" })
+    ).not.toBeInTheDocument();
   });
 
-  it("submits the tools the operator checks", async () => {
+  it("submits the tool the operator picks off a chosen server", async () => {
     setup({ ...TEMPLATE, toolBindings: [] });
     const captured = capturePatch();
 
     render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
-    await userEvent.click(await screen.findByRole("checkbox", { name: "local-files: search" }));
+    await pickServer("local-files");
+    await pickTool("search");
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() =>
@@ -109,7 +129,9 @@ describe("WorkflowTaskTemplateDetailPage", () => {
 
     render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
-    await userEvent.click(await screen.findByRole("checkbox", { name: "my-mcp-server: search" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Remove my-mcp-server: search" })
+    );
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => expect(captured.body).toMatchObject({ toolBindings: [] }));
@@ -127,10 +149,10 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
 
-    // The bound tool is still listed (and checked) even though no server
-    // answered, so the operator can remove it.
-    const bound = await screen.findByRole("checkbox", { name: "my-mcp-server: search" });
-    expect(bound).toBeChecked();
+    // The bound tool still has a chip even though no server answered, so the
+    // operator can remove it. Its name comes from the registry listing, which
+    // is a plain database read and is unaffected by the server being down.
+    const bound = await screen.findByRole("button", { name: "Remove my-mcp-server: search" });
 
     await userEvent.click(bound);
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -164,7 +186,7 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     await waitFor(() => expect(screen.getAllByText("Template Step 1").length).toBeGreaterThan(0));
     expect(screen.queryByText("MCP Tools")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("checkbox", { name: "my-mcp-server: search" })
+      screen.queryByRole("button", { name: "Remove my-mcp-server: search" })
     ).not.toBeInTheDocument();
     expect(toolsRequest).not.toHaveBeenCalled();
   });
