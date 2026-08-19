@@ -57,14 +57,14 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Users",
     icon: Users,
     description: "Manage accounts and roles",
-    roles: [Role.ADMIN],
+    roles: [Role.ADMIN, Role.DEVELOPER],
   },
   {
     href: "/admin/user-groups",
     label: "User Groups",
     icon: UsersRound,
     description: "Grant roles to several accounts at once",
-    roles: [Role.ADMIN],
+    roles: [Role.ADMIN, Role.DEVELOPER],
   },
   {
     href: "/admin/tags",
