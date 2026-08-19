@@ -28,6 +28,7 @@ from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalStatus
+from models.user_group import UserGroup
 from models.workflow import Workflow
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
 from models.workflow_task import TaskErrorKind, WorkflowTask, WorkflowTaskStatus
@@ -75,7 +76,13 @@ class ApprovalRow:
     """One approval request, reduced to the columns the metrics need."""
 
     approval_id: str
+    #: The single user the request is addressed to, or ``None`` when it is
+    #: addressed to a group (or, on legacy rows, to nobody).
     approver: str | None
+    #: The group the request is addressed to; mutually exclusive with
+    #: ``approver``.
+    approver_group_id: str | None
+    approver_group_name: str | None
     workflow_id: str | None
     workflow_name: str
     status: ApprovalStatus
@@ -264,6 +271,8 @@ class SqlMetricsRepository:
             select(  # type: ignore[call-overload]
                 Approval.id,
                 Approval.approver,
+                Approval.approver_group_id,
+                UserGroup.name,
                 WorkflowExecution.workflow_id,
                 Workflow.name,
                 WorkflowExecution.name,
@@ -274,6 +283,11 @@ class SqlMetricsRepository:
             .join(
                 WorkflowExecution,
                 col(Approval.workflow_execution_id) == WorkflowExecution.id,
+            )
+            .join(
+                UserGroup,
+                col(Approval.approver_group_id) == UserGroup.id,
+                isouter=True,
             )
             .join(
                 Workflow,
@@ -288,11 +302,13 @@ class SqlMetricsRepository:
             ApprovalRow(
                 approval_id=row[0],
                 approver=row[1],
-                workflow_id=row[2],
-                workflow_name=row[3] or row[4],
-                status=row[5],
-                created_at=_utc(row[6]),
-                decided_at=_utc_or_none(row[7]),
+                approver_group_id=row[2],
+                approver_group_name=row[3],
+                workflow_id=row[4],
+                workflow_name=row[5] or row[6],
+                status=row[7],
+                created_at=_utc(row[8]),
+                decided_at=_utc_or_none(row[9]),
             )
             for row in result.all()
         ]

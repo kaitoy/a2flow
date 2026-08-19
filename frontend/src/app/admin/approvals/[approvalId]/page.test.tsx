@@ -3,7 +3,7 @@ import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
-import { envelopeErr } from "@/test/msw/envelope";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, within } from "@/test/test-utils";
 import ApprovalDetailPage from "./page";
@@ -33,10 +33,13 @@ describe("ApprovalDetailPage", () => {
     await screen.findByRole("heading", { name: "Deploy to production" });
     expect(screen.getByText("approved")).toBeInTheDocument();
     expect(screen.getByText("Looks good to me")).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Alice Smith" })).toHaveAttribute(
-      "href",
-      "/admin/users/user-1"
-    );
+    // The same user is both the approver and the decider, so two links carry
+    // the name: the Approver row and the Decided By row.
+    const links = await screen.findAllByRole("link", { name: "Alice Smith" });
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "/admin/users/user-1");
+    }
   });
 
   it("links to the workflow execution", async () => {
@@ -101,5 +104,38 @@ describe("ApprovalDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     expect(store.getState().toast.items.length).toBe(beforeCount);
+  });
+
+  it("links a group-addressed approval to the group rather than a user", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/approvals/appr-1", () =>
+        envelope({
+          id: "appr-1",
+          tenantId: "tenant-1",
+          workflowExecutionId: "execution-1",
+          workflowTaskId: null,
+          title: "Restart the cluster",
+          description: null,
+          status: "pending",
+          response: null,
+          approver: null,
+          approverGroupId: "group-1",
+          decidedBy: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "owner",
+          updatedBy: "owner",
+        })
+      )
+    );
+
+    render(<ApprovalDetailPage />);
+    await screen.findByRole("heading", { name: "Restart the cluster" });
+
+    // "Developers" is USER_GROUP_1's name in the default MSW fixtures.
+    expect(await screen.findByRole("link", { name: "Developers" })).toHaveAttribute(
+      "href",
+      "/admin/user-groups/group-1"
+    );
   });
 });

@@ -2,7 +2,22 @@
 
 A workflow execution's session (the chat it runs in) is shared between its
 initiator and the designated approvers of its approvals (see README "Human
-approval"). This policy exposes three methods, from broadest to narrowest:
+approval"). "Designated approver" covers both destinations an approval can
+have: the single user named in ``Approval.approver``, and every member of the
+group named in ``Approval.approver_group_id`` who holds the ``approver`` role.
+That second half is resolved by
+:class:`services.approver_groups.ApproverGroupResolver` and is deliberately
+role-filtered -- passing raw group memberships to
+``ApprovalRepository.exists_for_approver`` would share the chat with members
+who cannot approve anything.
+
+Note that this makes participation *mutable*: adding someone to an approver
+group grants them access to every execution that group has ever been asked to
+approve, and removing them revokes it, both on the next request. That follows
+directly from "any member of the group can resolve it" -- resolving is what the
+chat access exists to enable.
+
+This policy exposes three methods, from broadest to narrowest:
 
 - :meth:`assert_read_access` — participants (initiator, designated
   approvers), super admins, **and plain admins** (tenant-scoped, read-only).
@@ -41,19 +56,50 @@ from collections.abc import Collection
 from models.user import Role, User, has_any_role
 from repositories import ApprovalRepository
 from repositories.exceptions import ForbiddenError
+from services.approver_groups import ApproverGroupResolver
 
 
 class WorkflowExecutionAccessPolicy:
     """Decides whether a user may operate on a given workflow execution."""
 
-    def __init__(self, approvals: ApprovalRepository) -> None:
+    def __init__(
+        self,
+        approvals: ApprovalRepository,
+        approver_groups: ApproverGroupResolver,
+    ) -> None:
         """Initialize the policy.
 
         Args:
             approvals: Repository used to look up whether the caller is a
                 designated approver of any approval in the execution.
+            approver_groups: Resolver for the groups the caller counts as an
+                eligible approver for, so an approval addressed to a group
+                admits its eligible members the same way a directly addressed
+                one admits its named user.
         """
         self._approvals = approvals
+        self._approver_groups = approver_groups
+
+    async def approver_group_ids(
+        self, caller: User, caller_roles: Collection[str] | None = None
+    ) -> tuple[str, ...]:
+        """Return the groups whose approvals ``caller`` may act on.
+
+        Exposed so the collection endpoints can apply the same rule as the
+        single-record checks: ``WorkflowExecutionService.list`` needs the ids to
+        build its visibility filter, and duplicating the resolver there would
+        let the two drift apart.
+
+        Args:
+            caller: The authenticated user being authorized.
+            caller_roles: The caller's already-resolved effective roles, when
+                available; omitting them costs one extra query.
+
+        Returns:
+            The caller's eligible approver group ids, empty when they hold no
+            ``approver`` role.
+        """
+        return await self._approver_groups.group_ids_for(caller, caller_roles)
 
     async def assert_access(
         self, execution_id: str, owner_id: str, caller: User
@@ -85,7 +131,11 @@ class WorkflowExecutionAccessPolicy:
             return
         if has_any_role(caller.roles, Role.super_admin):
             return
-        if await self._approvals.exists_for_approver(execution_id, caller.id):
+        if await self._approvals.exists_for_approver(
+            execution_id,
+            caller.id,
+            group_ids=await self._approver_groups.group_ids_for(caller),
+        ):
             return
         raise ForbiddenError(
             "Only the execution initiator or a designated approver can access "
@@ -129,7 +179,11 @@ class WorkflowExecutionAccessPolicy:
             return
         if has_any_role(caller_roles, Role.super_admin, Role.admin):
             return
-        if await self._approvals.exists_for_approver(execution_id, caller.id):
+        if await self._approvals.exists_for_approver(
+            execution_id,
+            caller.id,
+            group_ids=await self._approver_groups.group_ids_for(caller, caller_roles),
+        ):
             return
         raise ForbiddenError(
             "Only the execution initiator, a designated approver, or an admin "

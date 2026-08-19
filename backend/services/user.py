@@ -232,6 +232,25 @@ class UserService:
         )
         return {user.id: sorted(inherited.get(user.id, frozenset())) for user in users}
 
+    async def group_ids_for(self, users: Sequence[User]) -> dict[str, list[str]]:
+        """Return the group ids of each user, resolved in one query.
+
+        The membership counterpart of :meth:`group_roles_for`, feeding
+        :attr:`models.user.UserRead.group_ids`. Batched the same way, so a list
+        endpoint stays at one membership query per page.
+
+        Args:
+            users: The users about to be serialized.
+
+        Returns:
+            A mapping of user id to their sorted group ids. Every id in
+            ``users`` is present; a user in no group maps to an empty list.
+        """
+        memberships = await self._effective_roles.group_ids_for_users(
+            [user.id for user in users]
+        )
+        return {user.id: memberships.get(user.id, []) for user in users}
+
     async def get(self, user_id: str, *, acting_user: User) -> User:
         """Return the User with the given ID.
 

@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from dependencies.auth import CSRF_COOKIE_NAME, SESSION_COOKIE_NAME
 from models.response import ApiError, ApiMeta, ApiResponse
 from repositories.exceptions import (
+    ApprovalAlreadyResolvedError,
     AvatarValidationError,
     CsrfError,
     DependencyCycleError,
@@ -284,6 +285,20 @@ async def workflow_not_runnable_exception_handler(
         message=str(exc),
         status_code=409,
         details={"workflowId": exc.workflow_id, "reason": exc.reason},
+    )
+
+
+async def approval_already_resolved_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with APPROVAL_ALREADY_RESOLVED when a decision is already recorded."""
+    assert isinstance(exc, ApprovalAlreadyResolvedError)
+    return _envelope_error(
+        request,
+        code="APPROVAL_ALREADY_RESOLVED",
+        message=str(exc),
+        status_code=409,
+        details={"approvalId": exc.approval_id, "status": exc.status},
     )
 
 

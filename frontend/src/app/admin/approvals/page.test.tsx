@@ -31,7 +31,8 @@ describe("ApprovalsPage", () => {
   it("shows the resolved approver name and comment", async () => {
     render(<ApprovalsPage />);
     await waitFor(() => screen.getByText("Deploy to production"));
-    await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
+    // The name lands in both the Approver and the Decided By cell.
+    await waitFor(() => expect(screen.getAllByText("Alice Smith")).toHaveLength(2));
     expect(screen.getByText("Looks good to me")).toBeInTheDocument();
   });
 
@@ -127,5 +128,37 @@ describe("ApprovalsPage", () => {
         variant: "error",
       })
     );
+  });
+
+  it("shows the approver group's name, linked to the group, for a group-addressed row", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/approvals", () =>
+        envelope([
+          {
+            id: "appr-g",
+            tenantId: "tenant-1",
+            workflowExecutionId: "execution-1",
+            workflowTaskId: null,
+            title: "Restart the cluster",
+            description: null,
+            status: "pending",
+            response: null,
+            approver: null,
+            approverGroupId: "group-1",
+            decidedBy: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "owner",
+            updatedBy: "owner",
+          },
+        ])
+      )
+    );
+
+    render(<ApprovalsPage />);
+
+    // "Developers" is USER_GROUP_1's name in the default MSW fixtures.
+    const link = await screen.findByRole("link", { name: "Developers" });
+    expect(link).toHaveAttribute("href", "/admin/user-groups/group-1");
   });
 });

@@ -53,7 +53,10 @@ async def _to_read(service: UserService, user: User) -> UserRead:
         The read view, carrying both direct and group-inherited roles.
     """
     group_roles = await service.group_roles_for([user])
-    return UserRead.from_user(user, group_roles=group_roles[user.id])
+    group_ids = await service.group_ids_for([user])
+    return UserRead.from_user(
+        user, group_roles=group_roles[user.id], group_ids=group_ids[user.id]
+    )
 
 
 async def _to_read_many(service: UserService, users: list[User]) -> list[UserRead]:
@@ -67,7 +70,11 @@ async def _to_read_many(service: UserService, users: list[User]) -> list[UserRea
         The read views, in the order given.
     """
     group_roles = await service.group_roles_for(users)
-    return [UserRead.from_user(u, group_roles=group_roles[u.id]) for u in users]
+    group_ids = await service.group_ids_for(users)
+    return [
+        UserRead.from_user(u, group_roles=group_roles[u.id], group_ids=group_ids[u.id])
+        for u in users
+    ]
 
 
 @router.post(

@@ -20,6 +20,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
 from models.approval import Approval, ApprovalStatus
+from models.user_group import UserGroup
 from models.workflow import Workflow, WorkflowStatus
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
 from models.workflow_task import TaskErrorKind, WorkflowTask, WorkflowTaskStatus
@@ -176,6 +177,7 @@ async def _seed_approval(
     *,
     execution_id: str,
     approver: str | None,
+    approver_group_id: str | None = None,
     status: ApprovalStatus = ApprovalStatus.pending,
     created_at: datetime | None = None,
     decided_at: datetime | None = None,
@@ -188,6 +190,7 @@ async def _seed_approval(
             title="Approve me",
             status=status,
             approver=approver,
+            approver_group_id=approver_group_id,
             created_at=created_at or datetime.now(UTC),
             decided_at=decided_at,
             tenant_id=tenant_id,
@@ -635,3 +638,57 @@ async def test_metrics_window_must_be_ordered(
 
     assert res.status_code == 400
     assert res.json()["error"]["code"] == "INVALID_QUERY"
+
+
+async def test_approval_backlog_by_approver_distinguishes_users_from_groups(
+    metrics_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A group destination is labelled and tagged so a client can tell them apart.
+
+    User and group ids are indistinguishable as bare UUIDs, and only user ids
+    resolve through ``POST /users/resolve-names``, so ``groupKind`` says which
+    kind each entry carries and a group entry arrives with its name already
+    filled in.
+    """
+    client, eng = metrics_env
+    execution_id = await _seed_execution(eng, workflow_id=None)
+    async with AsyncSession(eng) as db:
+        db.add(
+            UserGroup(
+                id="ops-team",
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                name="Ops Team",
+                roles=["approver"],
+                created_by="owner",
+                updated_by="owner",
+            )
+        )
+        await db.commit()
+
+    now = datetime.now(UTC)
+    await _seed_approval(
+        eng,
+        execution_id=execution_id,
+        approver="alice",
+        created_at=now - timedelta(hours=2),
+    )
+    await _seed_approval(
+        eng,
+        execution_id=execution_id,
+        approver=None,
+        approver_group_id="ops-team",
+        created_at=now - timedelta(hours=40),
+    )
+
+    data = assert_ok(
+        await client.get(
+            "/api/v1/approvals/by-approver", headers={"X-User-Id": "owner"}
+        )
+    )
+    entries = {e["groupId"]: e for e in data}
+
+    assert entries["ops-team"]["groupKind"] == "group"
+    assert entries["ops-team"]["groupLabel"] == "Ops Team"
+    assert entries["alice"]["groupKind"] == "user"
+    # User names stay the client's job to resolve, as before.
+    assert entries["alice"]["groupLabel"] is None

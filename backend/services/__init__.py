@@ -1,6 +1,7 @@
 from .agent_skill import AgentSkillService
 from .agent_skill_sync import AgentSkillSyncService, sync_agent_skill
 from .approval import ApprovalService
+from .approver_groups import ApproverGroupResolver
 from .auth import AuthService
 from .impersonation import ImpersonationService
 from .mcp_registry import MCPRegistryService
@@ -24,6 +25,7 @@ __all__ = [
     "AgentSkillService",
     "AgentSkillSyncService",
     "ApprovalService",
+    "ApproverGroupResolver",
     "AuthService",
     "ImpersonationService",
     "MCPRegistryService",

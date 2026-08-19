@@ -28,6 +28,14 @@ def test_upgrade_head_matches_model_metadata(
     command.upgrade(cfg, "head")
 
     engine = create_engine(f"sqlite:///{db_path}")
-    actual_tables = set(inspect(engine).get_table_names()) - {"alembic_version"}
+    inspector = inspect(engine)
+    actual_tables = set(inspector.get_table_names()) - {"alembic_version"}
     expected_tables = set(SQLModel.metadata.tables.keys())
     assert actual_tables == expected_tables
+
+    # Table names alone would miss a column added to a model without a
+    # migration, which is the far likelier drift, so compare the columns too.
+    for table in sorted(expected_tables):
+        actual_columns = {c["name"] for c in inspector.get_columns(table)}
+        expected_columns = set(SQLModel.metadata.tables[table].columns.keys())
+        assert actual_columns == expected_columns, table

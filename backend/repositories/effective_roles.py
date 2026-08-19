@@ -63,6 +63,10 @@ class EffectiveRoleRepository(Protocol):
         self, user_id: str, direct_roles: Collection[str]
     ) -> frozenset[str]: ...
 
+    async def group_ids_for_users(
+        self, user_ids: Collection[str]
+    ) -> dict[str, list[str]]: ...
+
 
 class SqlEffectiveRoleRepository:
     """SQLModel-backed implementation of EffectiveRoleRepository.
@@ -116,6 +120,39 @@ class SqlEffectiveRoleRepository:
             for member_user_id, roles in result.all():
                 out[member_user_id].update(roles or [])
         return {uid: frozenset(roles) for uid, roles in out.items()}
+
+    async def group_ids_for_users(
+        self, user_ids: Collection[str]
+    ) -> dict[str, list[str]]:
+        """Return the ids of the groups each user belongs to, in one pass.
+
+        The membership half of :meth:`group_roles_for_users`, batched the same
+        way so a list endpoint resolves a whole page with one query per chunk.
+        It backs :attr:`models.user.UserRead.group_ids`, which lets the client
+        answer "may I act on this group-addressed approval?" from the session
+        user it already holds, rather than issuing a request per approval it
+        renders.
+
+        Args:
+            user_ids: Identifiers of the users to resolve. Duplicates are
+                tolerated.
+
+        Returns:
+            A mapping of user id to group ids, sorted for a stable response.
+            Every requested id is present; users in no group map to an empty
+            list.
+        """
+        unique_ids = list(dict.fromkeys(user_ids))
+        if not unique_ids:
+            return {}
+        out: dict[str, set[str]] = {uid: set() for uid in unique_ids}
+        for chunk in _chunked(unique_ids):
+            stmt = select(UserGroupMember.user_id, UserGroupMember.group_id).where(
+                col(UserGroupMember.user_id).in_(chunk)
+            )
+            for member_user_id, group_id in (await self._db.exec(stmt)).all():
+                out[member_user_id].add(group_id)
+        return {uid: sorted(ids) for uid, ids in out.items()}
 
     async def effective_roles_for_user(
         self, user_id: str, direct_roles: Collection[str]

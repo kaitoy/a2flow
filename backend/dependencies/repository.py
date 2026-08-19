@@ -285,14 +285,17 @@ WorkflowTaskTemplateRepositoryDep = Annotated[
 def get_approval_repository(
     db: DBSessionDep,
     execution_repo: WorkflowExecutionRepositoryDep,
+    group_repo: UserGroupRepositoryDep,
     tenant_id: CurrentTenantIdDep,
 ) -> ApprovalRepository:
     """Create an ApprovalRepository backed by the current database session.
 
     The injected WorkflowExecutionRepository is used to validate that the parent
-    session exists when creating an approval.
+    session exists when creating an approval, and the UserGroupRepository that a
+    group destination exists. Both arrive from the same request-cached factories
+    as this one, so all three share the acting ``tenant_id``.
     """
-    return SqlApprovalRepository(db, execution_repo, tenant_id=tenant_id)
+    return SqlApprovalRepository(db, execution_repo, group_repo, tenant_id=tenant_id)
 
 
 ApprovalRepositoryDep = Annotated[ApprovalRepository, Depends(get_approval_repository)]

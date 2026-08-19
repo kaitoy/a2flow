@@ -29,13 +29,15 @@ Once you have everything, summarize the finalized configuration back to the user
 
 This step is mandatory. Before launching anything, get explicit approval from a manager.
 
-Call `list_users` to find users holding the `approver` role. If there's exactly one, treat them as the manager. If there's more than one, ask the user which one is their manager rather than guessing. If there are none, tell the user no eligible approver exists and stop — do not launch.
+Approval can be addressed either to a team or to one named person. Prefer a team, so the launch is not blocked on one manager's availability.
 
-Call `request_approval` with a short `title` (e.g. "Launch EC2 instance: `<name>`") and a `description` containing the finalized configuration from step 1, addressed to the selected approver's id. Then explain the request to the user in plain text and call `render_approval` with the returned `approval_id` so the approver sees Approve/Reject controls in chat. Wait for the decision (re-check with `get_approval` if needed).
+Call `list_user_groups` to find groups that can approve. If there's exactly one, address the request to it. If there's more than one, ask the user which team should approve rather than guessing. If there are none, fall back to `list_users` to find users holding the `approver` role and apply the same rule: exactly one means treat them as the manager, more than one means ask. If neither yields an eligible destination, tell the user no eligible approver exists and stop — do not launch.
+
+Call `request_approval` with a short `title` (e.g. "Launch EC2 instance: `<name>`") and a `description` containing the finalized configuration from step 1, addressed to exactly one destination — `approver_group_id` for a team, or `approver` for one person, never both. Then explain the request to the user in plain text and call `render_approval` with the returned `approval_id` so the approver sees Approve/Reject controls in chat. When the request goes to a team, every eligible member is notified and the first decision from any of them settles it. Wait for the decision (re-check with `get_approval` if needed).
 
 ```
-list_users()
-request_approval(title="Launch EC2 instance: <name>", approver=<approver_id>, description="<finalized configuration>")
+list_user_groups()
+request_approval(title="Launch EC2 instance: <name>", approver_group_id=<group_id>, description="<finalized configuration>")
 render_approval(approval_id=<approval_id>)
 ```
 

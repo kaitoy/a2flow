@@ -149,6 +149,32 @@ class WorkflowNotRunnableError(RepositoryError):
         super().__init__(f"Workflow {workflow_id!r} is not runnable: {reason}")
 
 
+class ApprovalAlreadyResolvedError(RepositoryError):
+    """Raised when a decision is submitted for an approval that already has one.
+
+    A decision is final. This never mattered much while an approval was
+    addressed to a single user -- only they could submit one, and the UI
+    disables the controls once a decision lands -- but a group-addressed
+    approval is genuinely raced: two members can open the same chat and both
+    click Approve. Silently letting the second write win would overwrite the
+    first decision and leave ``decided_by`` naming whoever clicked last, which
+    is not who resolved the request.
+
+    Only a *status* change is blocked. Editing the ``response`` comment of an
+    already-decided approval stays allowed, which
+    :class:`~models.approval.Approval` explicitly contemplates.
+
+    Carries the ``approval_id`` and the ``status`` already recorded so the HTTP
+    layer can surface both in the error envelope's ``details`` block when
+    returning HTTP 409.
+    """
+
+    def __init__(self, approval_id: str, status: str) -> None:
+        self.approval_id = approval_id
+        self.status = status
+        super().__init__(f"Approval {approval_id!r} was already resolved as {status!r}")
+
+
 class WorkflowNotModifiedError(RepositoryError):
     """Raised when a Workflow has no unpublished changes to discard.
 

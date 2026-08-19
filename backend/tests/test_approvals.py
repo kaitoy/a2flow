@@ -22,6 +22,8 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalStatus
+from models.user import User
+from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
@@ -92,6 +94,7 @@ async def _insert_approval(
     status: ApprovalStatus = ApprovalStatus.pending,
     user_id: str = "owner",
     approver: str | None = None,
+    approver_group_id: str | None = None,
 ) -> str:
     """Insert an Approval for the given session and return its id."""
     async with AsyncSession(eng) as db:
@@ -100,6 +103,7 @@ async def _insert_approval(
             title=title,
             status=status,
             approver=approver,
+            approver_group_id=approver_group_id,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,
             updated_by=user_id,
@@ -108,6 +112,37 @@ async def _insert_approval(
         await db.commit()
         await db.refresh(approval)
         return approval.id
+
+
+async def _seed_group(
+    eng: AsyncEngine,
+    *,
+    group_id: str = "group-1",
+    name: str = "Approvers",
+    roles: list[str] | None = None,
+    member_ids: tuple[str, ...] = (),
+) -> str:
+    """Insert a UserGroup with the given members and return its id.
+
+    Rows are written directly rather than through the repository so a test can
+    build a group whose members deliberately hold no ``approver`` role, which
+    the repository's own validation would otherwise be irrelevant to.
+    """
+    async with AsyncSession(eng) as db:
+        db.add(
+            UserGroup(
+                id=group_id,
+                name=name,
+                roles=["approver"] if roles is None else roles,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by="owner",
+                updated_by="owner",
+            )
+        )
+        for member_id in member_ids:
+            db.add(UserGroupMember(group_id=group_id, user_id=member_id))
+        await db.commit()
+    return group_id
 
 
 async def test_list_returns_approvals(
@@ -445,3 +480,245 @@ async def test_resolve_approval_returns_it_for_rework(
 
     assert data["status"] == ApprovalStatus.returned.value
     assert data["decidedAt"] is not None
+
+
+# --- Group-addressed approvals -------------------------------------------
+#
+# An approval may name a UserGroup instead of one user. Any member holding the
+# ``approver`` role may then resolve it, and the first decision settles it.
+# ``bob`` and ``carol`` are seeded with ``approver`` (see tests/_seed.py); the
+# user created by ``_seed_roleless_user`` deliberately holds none.
+
+
+async def _seed_roleless_user(eng: AsyncEngine, user_id: str = "plain") -> str:
+    """Insert an enabled tenant user holding no roles at all, and return its id."""
+    async with AsyncSession(eng) as db:
+        db.add(
+            User(
+                id=user_id,
+                username=user_id,
+                first_name="No",
+                last_name="Role",
+                email=f"{user_id}@example.com",
+                password="x",
+                roles=[],
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by="owner",
+                updated_by="owner",
+            )
+        )
+        await db.commit()
+    return user_id
+
+
+async def test_group_member_can_resolve_group_approval(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    group_id = await _seed_group(eng, member_ids=("bob", "carol"))
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver_group_id=group_id
+    )
+
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved", "response": "fine by me"},
+        headers={"X-User-Id": "carol", "X-User-Roles": "approver"},
+    )
+    data = assert_ok(res)
+    assert data["status"] == "approved"
+    # The point of decidedBy: the group alone does not say who acted.
+    assert data["decidedBy"] == "carol"
+    assert data["decidedAt"] is not None
+
+
+async def test_group_member_without_approver_role_cannot_resolve(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    plain = await _seed_roleless_user(eng)
+    # The group itself grants nothing, so membership alone confers nothing.
+    group_id = await _seed_group(eng, roles=[], member_ids=(plain,))
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver_group_id=group_id
+    )
+
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": plain, "X-User-Roles": ""},
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_group_member_inheriting_approver_role_can_resolve(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    plain = await _seed_roleless_user(eng)
+    # Holds no direct role; the group grants approver, so the union qualifies.
+    group_id = await _seed_group(eng, roles=["approver"], member_ids=(plain,))
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver_group_id=group_id
+    )
+
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": plain, "X-User-Roles": ""},
+    )
+    assert assert_ok(res)["decidedBy"] == plain
+
+
+async def test_non_member_with_approver_role_cannot_resolve_group_approval(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    group_id = await _seed_group(eng, member_ids=("bob",))
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver_group_id=group_id
+    )
+
+    # carol holds approver but is not in the group.
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": "carol", "X-User-Roles": "approver"},
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_super_admin_cannot_resolve_group_approval(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    group_id = await _seed_group(eng, member_ids=("bob",))
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver_group_id=group_id
+    )
+
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": "alice", "X-User-Roles": "super_admin"},
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_second_member_cannot_overwrite_a_recorded_decision(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    group_id = await _seed_group(eng, member_ids=("bob", "carol"))
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver_group_id=group_id
+    )
+
+    first = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": "bob", "X-User-Roles": "approver"},
+    )
+    assert assert_ok(first)["decidedBy"] == "bob"
+
+    second = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "rejected"},
+        headers={"X-User-Id": "carol", "X-User-Roles": "approver"},
+    )
+    assert_err(second, "APPROVAL_ALREADY_RESOLVED", 409)
+
+    after = assert_ok(
+        await client.get(
+            f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "bob"}
+        )
+    )
+    assert after["status"] == "approved"
+    assert after["decidedBy"] == "bob"
+
+
+async def test_comment_can_still_be_edited_after_a_decision(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
+    await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved"},
+        headers={"X-User-Id": "bob"},
+    )
+    decided_at = assert_ok(
+        await client.get(
+            f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "bob"}
+        )
+    )["decidedAt"]
+
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"response": "adding context afterwards"},
+        headers={"X-User-Id": "bob"},
+    )
+    data = assert_ok(res)
+    assert data["response"] == "adding context afterwards"
+    # Neither decision stamp moves on a comment-only edit.
+    assert data["decidedAt"] == decided_at
+    assert data["decidedBy"] == "bob"
+
+
+async def test_group_member_sees_group_approval_in_list(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    group_id = await _seed_group(eng, member_ids=("bob",))
+    await _insert_approval(
+        eng,
+        workflow_execution_id=execution_id,
+        title="For the group",
+        approver_group_id=group_id,
+    )
+
+    visible = assert_ok(
+        await client.get(
+            "/api/v1/approvals",
+            headers={"X-User-Id": "bob", "X-User-Roles": "approver"},
+        )
+    )
+    assert {a["title"] for a in visible} == {"For the group"}
+
+    # carol holds approver but is not a member, and did not initiate the run.
+    hidden = assert_ok(
+        await client.get(
+            "/api/v1/approvals",
+            headers={"X-User-Id": "carol", "X-User-Roles": "approver"},
+        )
+    )
+    assert hidden == []
+
+
+async def test_decided_by_cannot_be_set_through_the_patch_body(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng, workflow_execution_id=execution_id, approver="bob"
+    )
+
+    res = await client.patch(
+        f"/api/v1/approvals/{approval_id}",
+        json={"status": "approved", "decidedBy": "carol"},
+        headers={"X-User-Id": "bob"},
+    )
+    # decidedBy is declared on the table class only, so the payload field is
+    # ignored rather than honoured.
+    assert assert_ok(res)["decidedBy"] == "bob"

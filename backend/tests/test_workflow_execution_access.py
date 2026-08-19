@@ -27,6 +27,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.approval import Approval, ApprovalStatus
+from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
@@ -572,3 +573,146 @@ async def test_admin_cannot_delete_session(
         f"/api/v1/workflow-executions/{execution_id}", headers=ADMIN
     )
     assert_err(res, "FORBIDDEN", 403)
+
+
+# ---------- access through a group-addressed approval ----------
+#
+# An approval addressed to a UserGroup shares the execution's chat with every
+# member holding ``approver``, exactly as a user-addressed one does with its
+# named user. Membership alone is not enough: the role gate in
+# ``ApproverGroupResolver`` is what keeps a group's non-approver members out.
+
+#: Headers modeling a member of the approver group who holds the role.
+GROUP_APPROVER = {"X-User-Id": "carol", "X-User-Roles": "approver"}
+#: Headers modeling a member of the same group who holds no role at all.
+GROUP_MEMBER_NO_ROLE = {"X-User-Id": "bob", "X-User-Roles": ""}
+
+
+async def _insert_group_approval(
+    eng: AsyncEngine,
+    *,
+    workflow_execution_id: str,
+    group_id: str = "approver-team",
+    member_ids: tuple[str, ...] = ("carol", "bob"),
+) -> str:
+    """Insert a group, its members, and an Approval addressed to that group.
+
+    Args:
+        eng: Engine backing the test database.
+        workflow_execution_id: The run the approval belongs to.
+        group_id: Primary key to give the group.
+        member_ids: Users to place in the group.
+
+    Returns:
+        The approval's id.
+    """
+    async with AsyncSession(eng) as db:
+        db.add(
+            UserGroup(
+                id=group_id,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                name="Approver Team",
+                roles=[],
+                created_by="owner",
+                updated_by="owner",
+            )
+        )
+        for member_id in member_ids:
+            db.add(UserGroupMember(group_id=group_id, user_id=member_id))
+        # Commit the group before the approval that references it: SQLite
+        # checks foreign keys immediately, and one flush does not guarantee
+        # the parent row is written first.
+        await db.commit()
+        approval = Approval(
+            workflow_execution_id=workflow_execution_id,
+            title="Approve me",
+            status=ApprovalStatus.pending,
+            approver_group_id=group_id,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by="owner",
+            updated_by="owner",
+        )
+        db.add(approval)
+        await db.commit()
+        await db.refresh(approval)
+        return approval.id
+
+
+async def test_group_approver_can_read_the_execution(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    await _insert_group_approval(eng, workflow_execution_id=execution_id)
+    assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution_id}", headers=GROUP_APPROVER
+        )
+    )
+
+
+async def test_group_approver_can_get_messages(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    await _insert_group_approval(eng, workflow_execution_id=execution_id)
+    assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution_id}/messages",
+            headers=GROUP_APPROVER,
+        )
+    )
+
+
+async def test_group_member_without_the_role_is_denied(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Membership alone must not open the shared chat."""
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    await _insert_group_approval(eng, workflow_execution_id=execution_id)
+    assert_err(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution_id}",
+            headers=GROUP_MEMBER_NO_ROLE,
+        ),
+        "FORBIDDEN",
+        403,
+    )
+
+
+async def test_non_member_approver_is_denied_a_group_execution(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    # carol is the only member; bob holds approver but is left out.
+    await _insert_group_approval(
+        eng, workflow_execution_id=execution_id, member_ids=("carol",)
+    )
+    assert_err(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution_id}",
+            headers={"X-User-Id": "bob", "X-User-Roles": "approver"},
+        ),
+        "FORBIDDEN",
+        403,
+    )
+
+
+async def test_group_approver_sees_the_execution_in_the_list(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    await _insert_group_approval(eng, workflow_execution_id=execution_id)
+    listed = assert_ok(
+        await client.get("/api/v1/workflow-executions", headers=GROUP_APPROVER)
+    )
+    assert execution_id in {row["id"] for row in listed}
+
+    hidden = assert_ok(
+        await client.get("/api/v1/workflow-executions", headers=GROUP_MEMBER_NO_ROLE)
+    )
+    assert hidden == []

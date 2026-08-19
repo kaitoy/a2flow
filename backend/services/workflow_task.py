@@ -10,9 +10,10 @@ super admin -- a plain admin cannot mutate tasks, mirroring
 ``WorkflowExecutionService.resolve_agent``'s exclusion of admins from driving
 an execution's agent. Changing a task's ``status`` is further restricted
 when the task has a linked ``Approval`` (``Approval.workflow_task_id``): only
-the execution initiator or that Approval's designated ``approver`` may do so — not
-merely any approver of the execution — mirroring ``ApprovalService.resolve``'s
-no-bypass rule.
+the execution initiator or an eligible approver of that Approval may do so --
+the named ``approver``, or a member of its ``approver_group_id`` holding the
+``approver`` role -- not merely any approver of the execution, mirroring
+``ApprovalService.resolve``'s no-bypass rule.
 
 Every write that can change the set of unfinished tasks also re-runs the shared
 completion bookkeeping in :mod:`services.workflow_execution_completion`, so a
@@ -39,6 +40,7 @@ from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
 )
+from services.approver_groups import ApproverGroupResolver
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 from services.workflow_execution_completion import evaluate_completion
 
@@ -53,6 +55,7 @@ class WorkflowTaskService:
         access: WorkflowExecutionAccessPolicy,
         approvals: ApprovalRepository,
         notifications: NotificationRepository,
+        approver_groups: ApproverGroupResolver,
     ) -> None:
         """Initialize the service.
 
@@ -68,11 +71,14 @@ class WorkflowTaskService:
                 restrict ``status`` changes on such tasks.
             notifications: Repository the shared completion bookkeeping uses to
                 emit the one-shot ``execution_completed`` notification.
+            approver_groups: Resolver backing the status-change guard when the
+                linked Approval is addressed to a group rather than one user.
         """
         self._repo = repo
         self._execution_repo = execution_repo
         self._access = access
         self._approvals = approvals
+        self._approver_groups = approver_groups
         self._notifications = notifications
 
     async def _evaluate_completion(self, execution_id: str) -> None:
@@ -168,8 +174,10 @@ class WorkflowTaskService:
     ) -> None:
         """Restrict a ``status`` transition on a task with a linked Approval.
 
-        Only applies when the task has a linked Approval with a non-null
-        ``approver``; tasks without one keep the broader rule already enforced
+        Only applies when the task has a linked Approval carrying a
+        destination -- a named ``approver``, or an ``approver_group_id`` whose
+        eligible members stand in for one. Tasks without such an approval keep
+        the broader rule already enforced
         by :meth:`_assert_execution_write_access`. No ``super_admin`` bypass, for
         consistency with ``ApprovalService.resolve``'s no-bypass rule — this
         check protects the same "only the addressee decides" invariant,
@@ -181,20 +189,26 @@ class WorkflowTaskService:
             caller: The authenticated user performing the update.
 
         Raises:
-            ForbiddenError: If the caller is neither the execution initiator nor the
-                linked Approval's designated approver.
+            ForbiddenError: If the caller is neither the execution initiator nor
+                an eligible approver of the linked Approval.
         """
         approval = await self._approvals.get_for_task(task.id)
-        if approval is None or approval.approver is None:
+        if approval is None:
             return
-        if caller.id == approval.approver:
+        if approval.approver is None and approval.approver_group_id is None:
             return
+        if approval.approver is not None and caller.id == approval.approver:
+            return
+        if approval.approver_group_id is not None:
+            eligible = await self._approver_groups.group_ids_for(caller)
+            if approval.approver_group_id in eligible:
+                return
         execution = await self._execution_repo.get(task.workflow_execution_id)
         if execution is not None and caller.id == execution.initiator_id:
             return
         raise ForbiddenError(
-            "Only the execution initiator or the linked approval's designated "
-            "approver can change this task's status"
+            "Only the execution initiator or an eligible approver of the linked "
+            "approval can change this task's status"
         )
 
     async def get(

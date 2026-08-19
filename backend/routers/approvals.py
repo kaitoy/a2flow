@@ -70,12 +70,14 @@ async def approval_backlog_by_approver(
     pagination: PaginationDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[ApprovalBacklogEntry]]:
-    """Return the pending-approval backlog grouped by designated approver.
+    """Return the pending-approval backlog grouped by approval destination.
 
     Entries come back longest-single-wait first, so ``?limit=5`` is the worst
-    five approvers. ``groupId`` is the approver's user id — resolve it to a name
-    through ``POST /users/resolve-names`` — and is ``null`` for approvals with no
-    designated approver.
+    five destinations. ``groupKind`` says what ``groupId`` is: ``"user"`` for an
+    approval addressed to one person — resolve the id to a name through
+    ``POST /users/resolve-names`` — or ``"group"`` for one addressed to a user
+    group, in which case ``groupLabel`` already carries the group's name. Both
+    are ``null`` for approvals with no designated destination.
     """
     entries = await service.approval_backlog_by_approver(
         threshold_hours=threshold.threshold_hours, limit=pagination.limit

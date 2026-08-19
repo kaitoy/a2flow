@@ -28,6 +28,7 @@ from infrastructure.migrations import run_migrations
 from middleware.envelope import RequestContextMiddleware
 from models.user import SYSTEM_USER_ID
 from repositories.exceptions import (
+    ApprovalAlreadyResolvedError,
     AvatarValidationError,
     CsrfError,
     DependencyCycleError,
@@ -55,6 +56,7 @@ from repositories.exceptions import (
 )
 from routers import api_router
 from routers.exception_handlers import (
+    approval_already_resolved_exception_handler,
     avatar_validation_exception_handler,
     csrf_exception_handler,
     dependency_cycle_exception_handler,
@@ -181,6 +183,9 @@ app.add_exception_handler(SkillCloneError, skill_clone_exception_handler)
 app.add_exception_handler(SkillNotReadyError, skill_not_ready_exception_handler)
 app.add_exception_handler(
     WorkflowNotRunnableError, workflow_not_runnable_exception_handler
+)
+app.add_exception_handler(
+    ApprovalAlreadyResolvedError, approval_already_resolved_exception_handler
 )
 app.add_exception_handler(
     WorkflowNotModifiedError, workflow_not_modified_exception_handler

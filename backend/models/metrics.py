@@ -17,6 +17,7 @@ interval format, and ``None`` where no member of the group had one to measure.
 """
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_serializer
 from pydantic.alias_generators import to_camel
@@ -147,11 +148,12 @@ class FailedExecutionEntry(BaseModel):
 
 
 class ApprovalBacklogEntry(BaseModel):
-    """Pending-approval backlog for one approver or one workflow.
+    """Pending-approval backlog for one approver, approver group, or workflow.
 
     The same shape serves both axes of the approval-backlog view — grouped by
-    approver, and grouped by the workflow the approvals belong to — because the
-    measures are identical and only the grouping key differs. Entries come back
+    approval destination, and grouped by the workflow the approvals belong to —
+    because the measures are identical and only the grouping key differs.
+    ``group_kind`` says which kind of key an entry carries. Entries come back
     sorted by ``max_wait_seconds`` descending, so taking the first five gives
     the worst five.
     """
@@ -159,18 +161,32 @@ class ApprovalBacklogEntry(BaseModel):
     model_config = _alias_config
 
     group_id: str | None
-    """The approver's user id or the workflow's id, depending on the endpoint.
+    """The id the entry groups by, whose kind ``group_kind`` names.
 
-    ``None`` covers approvals with no designated approver, and runs whose
+    ``None`` covers approvals with no destination at all, and runs whose
     workflow has been deleted.
     """
 
-    group_label: str | None
-    """The workflow's name on the by-workflow axis; ``None`` on the by-approver axis.
+    group_kind: Literal["user", "group", "workflow"] | None = None
+    """What ``group_id`` refers to, so a client never has to guess.
 
-    Approver names are deliberately not resolved here — visibility of another
-    user's name is ``UserService``'s decision, and clients already resolve ids
-    to names in bulk through ``POST /users/resolve-names``.
+    The by-approver axis mixes two kinds of id, because an approval may be
+    addressed either to one user or to a user group. They are indistinguishable
+    as bare UUIDs, and feeding a group id to ``POST /users/resolve-names``
+    silently resolves to nothing, so the kind is stated outright instead:
+    ``"user"`` means resolve it through that endpoint, ``"group"`` means
+    ``group_label`` already carries the name. ``"workflow"`` is the only value
+    on the by-workflow axis. ``None`` accompanies a ``None`` ``group_id``.
+    """
+
+    group_label: str | None
+    """The workflow's or approver group's name; ``None`` for a user approver.
+
+    Approver *user* names are deliberately not resolved here — visibility of
+    another user's name is ``UserService``'s decision, and clients already
+    resolve ids to names in bulk through ``POST /users/resolve-names``. A
+    group's name carries no such visibility rule, so it is filled in directly
+    and saves the client a second round trip.
     """
 
     pending: int

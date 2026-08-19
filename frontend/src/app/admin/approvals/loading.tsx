@@ -11,7 +11,17 @@ export default function Loading() {
       <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Approvals" }]} />
       <AdminPageHeader title="Approvals" icon={CheckCircle2} />
       <AdminListSkeleton
-        columns={["Title", "Status", "Approver", "Comment", "Session", "Created At"]}
+        columns={[
+          "Title",
+          "Status",
+          "Approver",
+          "Decided By",
+          "Comment",
+          "Session",
+          "Created At",
+          "Description",
+          "Decided At",
+        ]}
       />
     </AdminPageContainer>
   );

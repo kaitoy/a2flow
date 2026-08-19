@@ -8,18 +8,29 @@ agent then continues or aborts the task based on the recorded decision.
 
 ``workflow_execution_id`` links the approval to the workflow execution it belongs to
 (so the GUI can deep-link to the session chat); the optional ``workflow_task_id``
-ties it to the specific task that needs approval. The optional ``approver`` is
-the user the agent addresses the request to (the request's destination), set when
-the agent creates the approval. ``response`` records an optional free-text comment
-supplied when the approver resolves the request.
+ties it to the specific task that needs approval. ``response`` records an optional
+free-text comment supplied when the approver resolves the request.
+
+**A request has exactly one destination**, expressed as one of two mutually
+exclusive fields the agent sets when it creates the approval:
+
+* ``approver`` -- a single user. Only that user may resolve the request.
+* ``approver_group_id`` -- a :class:`~models.user_group.UserGroup`. **Any**
+  member of that group whose *effective* roles include
+  :attr:`~models.user.Role.approver` may resolve it, and the first such
+  decision completes the request. This is what lets a team share an approval
+  queue instead of blocking on one named person's availability.
+
+``decided_by`` records which user actually made the decision -- for a group
+destination that is not knowable from ``approver_group_id`` alone.
 """
 
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import field_serializer
+from pydantic import field_serializer, model_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import ForeignKeyConstraint, Index
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
@@ -79,17 +90,57 @@ class ApprovalCreate(ApprovalUpdate):
     """Creation payload for an Approval.
 
     Adds the required ``workflow_execution_id`` and ``title``, the optional
-    ``description``, ``workflow_task_id`` link, and ``approver`` (the user the
-    request is addressed to), and defaults ``status`` to ``pending`` so a freshly
-    requested approval starts unresolved.
+    ``description`` and ``workflow_task_id`` link, the request's destination,
+    and defaults ``status`` to ``pending`` so a freshly requested approval
+    starts unresolved.
+
+    The destination is one of ``approver`` (a user) or ``approver_group_id`` (a
+    user group), never both -- see the module docstring and
+    :meth:`_reject_two_destinations`. That a destination is *required* is
+    enforced by :func:`infrastructure.approval_tools.request_approval`, the only
+    path that creates an approval, rather than here: :class:`Approval` inherits
+    this schema, and FastAPI validates it on the way *out* too, so a rule
+    rejecting "neither" would make any pre-existing destination-less row
+    unreadable instead of merely uncreatable.
     """
 
     workflow_execution_id: str
     title: ShortText
     description: BodyText | None = None
     workflow_task_id: str | None = None
+    #: Id of the single user the request is addressed to; mutually exclusive
+    #: with :attr:`approver_group_id`.
     approver: str | None = None
+    #: Id of the user group the request is addressed to; mutually exclusive
+    #: with :attr:`approver`. Any member of the group holding the ``approver``
+    #: role may resolve the request.
+    approver_group_id: str | None = None
     status: ApprovalStatus = ApprovalStatus.pending
+
+    @model_validator(mode="after")
+    def _reject_two_destinations(self) -> "ApprovalCreate":
+        """Reject a payload naming both a user and a group destination.
+
+        Mirrors ``ck_approvals_single_destination`` exactly, so the schema and
+        the table agree on what a valid row is. Deliberately does **not** also
+        reject "neither": :class:`Approval` inherits this validator and FastAPI
+        runs it when serializing a response, so the stricter rule would turn a
+        legacy destination-less row from readable into an HTTP 500. "Exactly
+        one" belongs to the creation path and lives in
+        :func:`infrastructure.approval_tools.request_approval`, which can also
+        say *which* tool to use to pick a destination.
+
+        Returns:
+            The payload unchanged when at most one destination is set.
+
+        Raises:
+            ValueError: If both destinations are set.
+        """
+        if self.approver is not None and self.approver_group_id is not None:
+            raise ValueError(
+                "An approval cannot name both approver and approverGroupId"
+            )
+        return self
 
 
 class Approval(ApprovalCreate, TenantScoped, BaseEntity, table=True):
@@ -99,26 +150,42 @@ class Approval(ApprovalCreate, TenantScoped, BaseEntity, table=True):
     (``ON DELETE CASCADE``), so deleting the session removes its approvals. The
     optional ``workflow_task_id`` references the task the approval concerns
     (``ON DELETE SET NULL``), so deleting the task leaves the approval record
-    intact but unlinked. The optional ``approver`` references the user the request
-    is addressed to (``ON DELETE RESTRICT``), matching the audit user FKs.
+    intact but unlinked. Both destination columns -- ``approver`` (a user) and
+    ``approver_group_id`` (a user group) -- and ``decided_by`` use
+    ``ON DELETE RESTRICT``, matching the audit user FKs: a destination that
+    could vanish would leave an approval nobody can resolve.
 
-    ``decided_at`` is server-managed: it is declared on the table class only, so
-    it is absent from ``ApprovalCreate`` / ``ApprovalUpdate`` and cannot be
-    written through the API. It is stamped once, by
-    :meth:`repositories.approval.SqlApprovalRepository.resolve`, when the status
-    first leaves ``pending``. The generic ``update`` never touches it, so a
-    later edit to the ``response`` comment cannot move the recorded decision
-    time. Together with ``created_at`` it gives the approver's turnaround time —
+    ``ck_approvals_single_destination`` enforces only that the two destinations
+    are not *both* set. It is deliberately weaker than the ``XOR`` precedent at
+    ``ck_message_meta_single_parent`` (:mod:`models.message_meta`), which also
+    rejects rows with neither: ``approver`` has always been nullable, so
+    approvals with no destination at all may already exist and must stay
+    readable. "Exactly one" is enforced on the write path instead, by
+    :meth:`ApprovalCreate._exactly_one_destination`.
+
+    ``decided_at`` and ``decided_by`` are server-managed: they are declared on
+    the table class only, so they are absent from ``ApprovalCreate`` /
+    ``ApprovalUpdate`` and cannot be written through the API. Both are stamped
+    once, by :meth:`repositories.approval.SqlApprovalRepository.resolve`, when
+    the status first leaves ``pending``. The generic ``update`` never touches
+    them, so a later edit to the ``response`` comment cannot move the recorded
+    decision time or reassign the decision. ``decided_by`` answers "who
+    decided", which for a group destination the record does not otherwise say.
+    Together with ``created_at``, ``decided_at`` gives the turnaround time —
     the basis of the pending-age and approval-rate metrics
     (``repositories/metrics.py``).
     """
 
     __tablename__ = "approvals"
     decided_at: datetime | None = Field(default=None, sa_type=TZDateTime)
+    #: Id of the user who made the decision, stamped alongside ``decided_at``.
+    #: ``None`` while the request is still ``pending``.
+    decided_by: str | None = None
     __table_args__ = (
         Index("ix_approvals_workflow_execution_id", "workflow_execution_id"),
         Index("ix_approvals_workflow_task_id", "workflow_task_id"),
         Index("ix_approvals_approver", "approver"),
+        Index("ix_approvals_approver_group_id", "approver_group_id"),
         Index("ix_approvals_tenant_id_status", "tenant_id", "status"),
         Index("ix_approvals_tenant_id_decided_at", "tenant_id", "decided_at"),
         ForeignKeyConstraint(
@@ -138,6 +205,22 @@ class Approval(ApprovalCreate, TenantScoped, BaseEntity, table=True):
             ["users.id"],
             ondelete="RESTRICT",
             name="fk_approvals_approver",
+        ),
+        ForeignKeyConstraint(
+            ["approver_group_id"],
+            ["user_groups.id"],
+            ondelete="RESTRICT",
+            name="fk_approvals_approver_group_id",
+        ),
+        ForeignKeyConstraint(
+            ["decided_by"],
+            ["users.id"],
+            ondelete="RESTRICT",
+            name="fk_approvals_decided_by",
+        ),
+        CheckConstraint(
+            "approver IS NULL OR approver_group_id IS NULL",
+            name="ck_approvals_single_destination",
         ),
     )
 

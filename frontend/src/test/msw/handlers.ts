@@ -31,6 +31,7 @@ const USER_1 = {
   tenantId: "tenant-1",
   roles: [],
   groupRoles: [],
+  groupIds: [],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -136,10 +137,24 @@ const APPROVAL_1 = {
   status: "approved",
   response: "Looks good to me",
   approver: "user-1",
+  approverGroupId: null,
+  decidedBy: "user-1",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "owner",
   updatedBy: "owner",
+};
+
+/** An approval addressed to a user group rather than one named user. */
+export const APPROVAL_GROUP = {
+  ...APPROVAL_1,
+  id: "appr-group-1",
+  title: "Restart the cluster",
+  status: "pending",
+  response: null,
+  approver: null,
+  approverGroupId: "group-1",
+  decidedBy: null,
 };
 
 export const MCP_SERVER_1 = {

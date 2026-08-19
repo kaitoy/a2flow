@@ -341,6 +341,7 @@ function reportApiError(error: unknown): void {
 
 /** Backend error code for `ForbiddenError` -- see `backend/repositories/exceptions.py`. */
 const FORBIDDEN_CODE = "FORBIDDEN";
+const APPROVAL_ALREADY_RESOLVED_CODE = "APPROVAL_ALREADY_RESOLVED";
 
 /**
  * True when `error` is the backend's `ForbiddenError` (HTTP 403, envelope
@@ -360,6 +361,25 @@ export function isForbiddenError(error: unknown): boolean {
     const envelopeCode = (error.response.data as { error?: ApiError } | null | undefined)?.error
       ?.code;
     return envelopeCode === undefined || envelopeCode === FORBIDDEN_CODE;
+  }
+  return false;
+}
+
+/**
+ * True when `error` is the backend's `ApprovalAlreadyResolvedError` (HTTP 409,
+ * envelope `error.code === "APPROVAL_ALREADY_RESOLVED"`) -- someone else
+ * decided this approval first. Only reachable for a group-addressed approval,
+ * where several eligible members can hold the controls at the same time, so
+ * the UI reports "already decided" rather than a generic failure.
+ */
+export function isApprovalAlreadyResolvedError(error: unknown): boolean {
+  if (error instanceof ApiClientError) {
+    return error.code === APPROVAL_ALREADY_RESOLVED_CODE;
+  }
+  if (axios.isAxiosError(error) && error.response?.status === 409) {
+    const envelopeCode = (error.response.data as { error?: ApiError } | null | undefined)?.error
+      ?.code;
+    return envelopeCode === APPROVAL_ALREADY_RESOLVED_CODE;
   }
   return false;
 }

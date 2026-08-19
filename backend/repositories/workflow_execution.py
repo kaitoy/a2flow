@@ -34,6 +34,7 @@ class WorkflowExecutionRepository(Protocol):
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
         visible_to_user_id: str | None = None,
+        visible_to_group_ids: Sequence[str] = (),
     ) -> list[WorkflowExecution]: ...
 
     async def create(
@@ -109,6 +110,7 @@ class SqlWorkflowExecutionRepository:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
         visible_to_user_id: str | None = None,
+        visible_to_group_ids: Sequence[str] = (),
     ) -> list[WorkflowExecution]:
         """Return WorkflowExecutions, defaulting to ``created_at`` descending (newest first).
 
@@ -121,6 +123,12 @@ class SqlWorkflowExecutionRepository:
                 user initiated or is a designated approver of (any approval
                 status); ``None`` (the default) returns every execution in the
                 tenant, unscoped.
+            visible_to_group_ids: The groups the caller counts as an eligible
+                approver for, already role-filtered by
+                :class:`services.approver_groups.ApproverGroupResolver`. An
+                execution holding an approval addressed to one of them is
+                visible for the same reason a directly addressed one is.
+                Ignored when ``visible_to_user_id`` is ``None``.
 
         Returns:
             The matching executions.
@@ -129,12 +137,17 @@ class SqlWorkflowExecutionRepository:
             WorkflowExecution.tenant_id == self._tenant_id
         )
         if visible_to_user_id is not None:
+            addressed_to = [col(Approval.approver) == visible_to_user_id]
+            if visible_to_group_ids:
+                addressed_to.append(
+                    col(Approval.approver_group_id).in_(list(visible_to_group_ids))
+                )
             stmt = stmt.where(
                 or_(
                     col(WorkflowExecution.initiator_id) == visible_to_user_id,
                     col(WorkflowExecution.id).in_(
                         select(Approval.workflow_execution_id).where(
-                            col(Approval.approver) == visible_to_user_id,
+                            or_(*addressed_to),
                             Approval.tenant_id == self._tenant_id,
                         )
                     ),

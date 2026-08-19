@@ -18,7 +18,12 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.approval_tools import get_approval, list_users, request_approval
+from infrastructure.approval_tools import (
+    get_approval,
+    list_user_groups,
+    list_users,
+    request_approval,
+)
 from infrastructure.workflow_task_tools import (
     ACTING_USER_STATE_KEY,
     create_workflow_task,
@@ -28,7 +33,12 @@ from models.notification import Notification, NotificationType
 from models.user import SYSTEM_USER_ID, Role
 from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
-from repositories import SqlApprovalRepository, SqlNotificationRepository
+from repositories import (
+    SqlApprovalRepository,
+    SqlNotificationRepository,
+    SqlUserGroupRepository,
+    SqlUserRepository,
+)
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
@@ -211,7 +221,12 @@ async def test_get_approval_reflects_resolution(engine: AsyncEngine) -> None:
     # Resolve directly through the repository (the frontend's PATCH path).
     async with AsyncSession(engine) as db:
         repo = SqlApprovalRepository(
-            db, _execution_repo(db), tenant_id=DEFAULT_TEST_TENANT_ID
+            db,
+            _execution_repo(db),
+            SqlUserGroupRepository(
+                db, SqlUserRepository(db), tenant_id=DEFAULT_TEST_TENANT_ID
+            ),
+            tenant_id=DEFAULT_TEST_TENANT_ID,
         )
         from models.approval import ApprovalUpdate
 
@@ -408,3 +423,193 @@ async def test_a_group_granting_another_role_does_not_make_an_approver(
     result = await request_approval("Approve me", _ctx(), approver="grouped")
     assert "error" in result
     assert "grouped" not in {user["id"] for user in (await list_users(_ctx()))["users"]}
+
+
+# ---------- addressing a request to a user group ----------
+
+
+async def _group_with_members(
+    eng: AsyncEngine,
+    *,
+    members: dict[str, list[str]],
+    group_roles: list[str],
+    group_id: str = "team-1",
+    name: str = "Approver Team",
+) -> str:
+    """Create a group granting ``group_roles`` and seed ``members`` into it.
+
+    Args:
+        eng: The engine backing the test database.
+        members: User id mapped to the roles that user holds *directly*.
+        group_roles: Roles the group itself grants every member.
+        group_id: Primary key to give the group.
+        name: The group's name.
+
+    Returns:
+        The group's id.
+    """
+    for user_id, roles in members.items():
+        await seed_users(
+            eng,
+            ids=(user_id,),
+            roles=tuple(Role(r) for r in roles),
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+        )
+    async with AsyncSession(eng) as db:
+        db.add(
+            UserGroup(
+                id=group_id,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                name=name,
+                roles=group_roles,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        for user_id in members:
+            db.add(UserGroupMember(group_id=group_id, user_id=user_id))
+        await db.commit()
+    return group_id
+
+
+async def test_request_approval_requires_a_destination(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    result = await request_approval("Decide", _ctx())
+    assert "exactly one" in result["error"]
+
+
+async def test_request_approval_rejects_two_destinations(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    group_id = await _group_with_members(
+        engine, members={"m1": []}, group_roles=[Role.approver.value]
+    )
+    result = await request_approval(
+        "Decide", _ctx(), approver="alice", approver_group_id=group_id
+    )
+    assert "exactly one" in result["error"]
+
+
+async def test_request_approval_to_a_group_succeeds(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    group_id = await _group_with_members(
+        engine, members={"m1": [], "m2": []}, group_roles=[Role.approver.value]
+    )
+    result = await request_approval("Decide", _ctx(), approver_group_id=group_id)
+    assert "error" not in result, result
+    assert result["status"] == ApprovalStatus.pending.value
+
+    fetched = await get_approval(result["approval_id"], _ctx())
+    assert fetched["approver"] is None
+    assert fetched["approver_group_id"] == group_id
+    assert fetched["decided_by"] is None
+
+
+async def test_request_approval_to_an_unknown_group_is_rejected(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine)
+    result = await request_approval("Decide", _ctx(), approver_group_id="nope")
+    assert "not found" in result["error"]
+
+
+async def test_request_approval_rejects_a_group_with_no_eligible_member(
+    engine: AsyncEngine,
+) -> None:
+    """A group nobody can approve for would wedge the run, so it is refused."""
+    await _seed_session(engine)
+    group_id = await _group_with_members(
+        engine, members={"m1": [], "m2": []}, group_roles=[Role.developer.value]
+    )
+    result = await request_approval("Decide", _ctx(), approver_group_id=group_id)
+    assert "no member who can approve" in result["error"]
+
+
+async def test_group_request_notifies_every_eligible_member(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine)
+    # m1 and m2 qualify through the group grant; m3 is in no group and must not
+    # be notified even though it holds approver directly.
+    group_id = await _group_with_members(
+        engine, members={"m1": [], "m2": []}, group_roles=[Role.approver.value]
+    )
+    await seed_users(
+        engine,
+        ids=("m3",),
+        roles=(Role.approver,),
+        tenant_id=DEFAULT_TEST_TENANT_ID,
+    )
+
+    result = await request_approval("Decide", _ctx(), approver_group_id=group_id)
+    assert "error" not in result, result
+
+    for member in ("m1", "m2"):
+        notes = await _notifications_for(engine, member)
+        assert [n.type for n in notes] == [NotificationType.approval_request]
+    assert await _notifications_for(engine, "m3") == []
+
+
+async def test_group_request_skips_members_without_the_approver_role(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine)
+    # The group grants nothing; only m1 qualifies, through a direct grant.
+    group_id = await _group_with_members(
+        engine,
+        members={"m1": [Role.approver.value], "m2": []},
+        group_roles=[],
+    )
+    result = await request_approval("Decide", _ctx(), approver_group_id=group_id)
+    assert "error" not in result, result
+    assert len(await _notifications_for(engine, "m1")) == 1
+    assert await _notifications_for(engine, "m2") == []
+
+
+async def test_list_user_groups_returns_groups_with_an_eligible_member(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine)
+    await _group_with_members(
+        engine,
+        members={"m1": [], "m2": []},
+        group_roles=[Role.approver.value],
+        group_id="team-ok",
+        name="Can Approve",
+    )
+    await _group_with_members(
+        engine,
+        members={"m3": []},
+        group_roles=[Role.developer.value],
+        group_id="team-no",
+        name="Cannot Approve",
+    )
+
+    result = await list_user_groups(_ctx())
+    listed = {g["id"]: g for g in result["groups"]}
+    assert set(listed) == {"team-ok"}
+    assert listed["team-ok"]["name"] == "Can Approve"
+    assert listed["team-ok"]["eligible_approver_count"] == 2
+
+
+async def test_list_user_groups_excludes_other_tenants(engine: AsyncEngine) -> None:
+    await _seed_session(engine)
+    await seed_tenant(engine, "other-tenant")
+    await seed_users(
+        engine, ids=("outsider",), roles=(Role.approver,), tenant_id="other-tenant"
+    )
+    async with AsyncSession(engine) as db:
+        db.add(
+            UserGroup(
+                id="foreign-team",
+                tenant_id="other-tenant",
+                name="Foreign",
+                roles=[Role.approver.value],
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        db.add(UserGroupMember(group_id="foreign-team", user_id="outsider"))
+        await db.commit()
+
+    result = await list_user_groups(_ctx())
+    assert result["groups"] == []

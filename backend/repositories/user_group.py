@@ -33,6 +33,7 @@ from repositories._integrity import is_foreign_key_error
 from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
+    ReferencedError,
     UniqueViolationError,
 )
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
@@ -211,17 +212,31 @@ class SqlUserGroupRepository:
     async def delete(self, group_id: str) -> None:
         """Delete a group; its membership rows cascade away with it.
 
+        Membership rows cascade, but an :class:`~models.approval.Approval`
+        addressed to the group references it with ``ON DELETE RESTRICT``, so a
+        group that is still some approval's destination cannot be deleted --
+        dropping it would leave a request nobody could ever resolve. The
+        database refuses that with an ``IntegrityError``, which is translated
+        here so the caller sees 409 ``CONFLICT_REFERENCED`` rather than a 500.
+
         Args:
             group_id: Identifier of the group to delete.
 
         Raises:
             NotFoundError: If no group with that id exists in this tenant.
+            ReferencedError: If an approval is still addressed to the group.
         """
         group = await self._get_scoped(group_id)
         if group is None:
             raise NotFoundError("UserGroup", group_id)
-        await self._db.delete(group)
-        await self._db.commit()
+        try:
+            await self._db.delete(group)
+            await self._db.commit()
+        except IntegrityError as exc:
+            await self._db.rollback()
+            raise ReferencedError(
+                f"UserGroup {group_id} is still referenced by an approval"
+            ) from exc
 
     async def _commit(self, *, user_id: str, name: str) -> None:
         """Commit, translating the two constraint failures a group write can hit.

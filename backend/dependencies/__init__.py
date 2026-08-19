@@ -90,6 +90,7 @@ from .repository import (
 from .service import (
     AgentSkillServiceDep,
     ApprovalServiceDep,
+    ApproverGroupResolverDep,
     MCPRegistryServiceDep,
     MCPServerServiceDep,
     MetricsServiceDep,
@@ -158,6 +159,7 @@ __all__ = [
     "BacklogThresholdDep",
     "ApprovalRepositoryDep",
     "ApprovalServiceDep",
+    "ApproverGroupResolverDep",
     "AuthServiceDep",
     "AuthSessionRepositoryDep",
     "CurrentTenantIdDep",

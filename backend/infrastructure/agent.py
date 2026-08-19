@@ -17,7 +17,12 @@ from google.adk.tools.base_toolset import BaseToolset
 from google.adk.tools.skill_toolset import SkillToolset
 
 from config import get_settings
-from infrastructure.approval_tools import get_approval, list_users, request_approval
+from infrastructure.approval_tools import (
+    get_approval,
+    list_user_groups,
+    list_users,
+    request_approval,
+)
 from infrastructure.design_task_tools import (
     create_design_task,
     delete_design_task,
@@ -309,11 +314,16 @@ EXECUTION_AGENT_INSTRUCTION = (
     "adjust the task list when needed.\n\n"
     "Human approval: when a task requires a person's explicit go-ahead before you "
     "act (for example a destructive or irreversible operation), call "
-    "`request_approval(title, approver, description, workflow_task_id)` to record a "
-    "pending approval and notify the approver. The `approver` is required: first "
-    "call `list_users` to look up the registered users and pass the chosen user's "
-    "`id` as the `approver` argument — only that user is notified and only they can "
-    "approve or reject the request. Then briefly explain the request in plain text "
+    "`request_approval(title, description, workflow_task_id, ...)` to record a "
+    "pending approval and notify whoever can decide it. You must address the "
+    "request to exactly one destination, never both and never neither: pass "
+    "`approver` (one user's `id`, looked up with `list_users`) or "
+    "`approver_group_id` (one group's `id`, looked up with `list_user_groups`). "
+    "Prefer a group when any member of a team may decide, so the request is not "
+    "blocked on one person's availability; name a single user when the Skill "
+    "calls for a specific person. Everyone eligible is notified, but one decision "
+    "from any eligible member completes the request. Then briefly explain the "
+    "request in plain text "
     "and call the `render_approval` tool with the returned `approval_id` to show "
     "approve/reject controls in the UI; do NOT use A2UI buttons for this. The "
     "user's decision is returned as the `render_approval` result (and you can "
@@ -428,6 +438,7 @@ _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
         request_approval,
         get_approval,
         list_users,
+        list_user_groups,
         list_mcp_tools,
         call_mcp_tool,
     ],

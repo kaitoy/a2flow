@@ -50,7 +50,9 @@ async def _to_read(repo: EffectiveRoleRepository, user: User) -> UserRead:
         The read view, carrying both direct and inherited roles.
     """
     return UserRead.from_user(
-        user, group_roles=await repo.group_roles_for_user(user.id)
+        user,
+        group_roles=await repo.group_roles_for_user(user.id),
+        group_ids=(await repo.group_ids_for_users([user.id])).get(user.id, []),
     )
 
 

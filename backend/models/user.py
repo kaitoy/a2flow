@@ -353,6 +353,12 @@ class UserRead(BaseEntity):
     #: roles are ``roles | group_roles``. Never contains ``super_admin``, which
     #: a group can never grant.
     group_roles: list[Role] = []
+    #: Ids of the groups the user belongs to (see :mod:`models.user_group`).
+    #: Read-only and derived, like :attr:`group_roles`, and populated by the
+    #: same :meth:`from_user` call. The client needs it to decide locally
+    #: whether the signed-in user may act on an approval addressed to a group;
+    #: without it every rendered approval would cost a membership request.
+    group_ids: list[str] = []
     deleted_at: datetime | None = None
     #: ISO-8601 timestamp of the last custom-avatar change, or ``None`` when the
     #: user has no uploaded avatar (the client then renders a generated default).
@@ -364,10 +370,17 @@ class UserRead(BaseEntity):
     tenant_id: str | None = None
 
     @classmethod
-    def from_user(cls, user: User, *, group_roles: Iterable[str] = ()) -> "UserRead":
-        """Build the read view of a stored user, attaching their inherited roles.
+    def from_user(
+        cls,
+        user: User,
+        *,
+        group_roles: Iterable[str] = (),
+        group_ids: Iterable[str] = (),
+    ) -> "UserRead":
+        """Build the read view of a stored user, attaching their group context.
 
-        ``group_roles`` is not a column of ``users``: it is derived from the
+        Neither ``group_roles`` nor ``group_ids`` is a column of ``users``:
+        both are derived from the
         user's group memberships (see :mod:`models.user_group`) and must be
         resolved by the caller — normally through
         :meth:`services.user.UserService.group_roles_for`, which batches the
@@ -377,14 +390,17 @@ class UserRead(BaseEntity):
             user: The persisted user to project.
             group_roles: Roles the user inherits from their groups. Defaults to
                 empty, for callers with no membership context to report.
+            group_ids: Ids of the groups the user belongs to. Defaults to empty,
+                same as ``group_roles``.
 
         Returns:
-            A read view carrying the user's fields plus the inherited roles,
+            A read view carrying the user's fields plus their group context,
             and never the password hash.
         """
         return cls(
             **user.model_dump(exclude={"password"}),
             group_roles=sorted(group_roles),
+            group_ids=sorted(group_ids),
         )
 
     @field_serializer("deleted_at", "avatar_updated_at", when_used="json")

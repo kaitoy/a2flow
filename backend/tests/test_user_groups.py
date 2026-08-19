@@ -17,8 +17,10 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_user
+from models.approval import Approval
 from models.user import SYSTEM_USER_ID, Role, User
 from models.user_group import UserGroup, UserGroupMember
+from models.workflow_execution import WorkflowExecution
 from repositories.effective_roles import SqlEffectiveRoleRepository
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
@@ -560,3 +562,55 @@ async def test_groups_for_user_404s_for_a_user_of_another_tenant(
     response = await client.get("/api/v1/users/outsider/groups", headers=ADMIN)
 
     assert_err(response, "NOT_FOUND", 404)
+
+
+async def test_delete_is_refused_while_an_approval_is_addressed_to_the_group(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A group that is still some approval's destination cannot be deleted.
+
+    ``fk_approvals_approver_group_id`` is ``ON DELETE RESTRICT``, because
+    dropping the group would leave a request nobody could ever resolve. The
+    repository translates the resulting IntegrityError, so the caller sees 409
+    rather than a 500.
+    """
+    client, engine = group_env
+    created = await _create(client, memberIds=["alice"])
+    async with AsyncSession(engine) as session:
+        session.add(
+            WorkflowExecution(
+                id="exec-1",
+                session_id="sess-1",
+                name="wf",
+                workflow_prompt="do it",
+                agent_skill_id="skill-1",
+                agent_skill_name="skill",
+                agent_skill_repo_url="https://example.com/repo",
+                agent_skill_repo_path=".",
+                skill_dir="/tmp/skill",
+                initiator_id="alice",
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by="alice",
+                updated_by="alice",
+            )
+        )
+        await session.commit()
+        session.add(
+            Approval(
+                workflow_execution_id="exec-1",
+                title="Approve me",
+                approver_group_id=created["id"],
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by="alice",
+                updated_by="alice",
+            )
+        )
+        await session.commit()
+
+    assert_err(
+        await client.delete(f"/api/v1/user-groups/{created['id']}", headers=ADMIN),
+        "CONFLICT_REFERENCED",
+        409,
+    )
+    async with AsyncSession(engine) as session:
+        assert await session.get(UserGroup, created["id"]) is not None

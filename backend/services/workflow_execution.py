@@ -144,8 +144,9 @@ class WorkflowExecutionService:
         """Return a page of WorkflowExecution records visible to the caller.
 
         A super admin or admin sees every execution in the tenant; anyone
-        else sees only executions they initiated or are a designated
-        approver of (any approval status).
+        else sees only executions they initiated or are a designated approver
+        of (any approval status) -- either named directly on an approval, or a
+        member of a group one is addressed to, holding the ``approver`` role.
 
         Args:
             limit: Maximum number of records to return.
@@ -159,17 +160,21 @@ class WorkflowExecutionService:
         Returns:
             The requested page of executions, newest first by default.
         """
-        visible_to_user_id = (
-            None
-            if has_any_role(caller_roles, Role.super_admin, Role.admin)
-            else caller.id
-        )
+        if has_any_role(caller_roles, Role.super_admin, Role.admin):
+            visible_to_user_id: str | None = None
+            visible_to_group_ids: tuple[str, ...] = ()
+        else:
+            visible_to_user_id = caller.id
+            visible_to_group_ids = await self._access.approver_group_ids(
+                caller, caller_roles
+            )
         return await self._execution_repo.list(
             limit=limit,
             offset=offset,
             sort=sort,
             filters=filters,
             visible_to_user_id=visible_to_user_id,
+            visible_to_group_ids=visible_to_group_ids,
         )
 
     async def list_tasks(

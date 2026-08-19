@@ -22,6 +22,7 @@ somebody's working day.
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from models.approval import ApprovalStatus
@@ -260,6 +261,29 @@ class MetricsService:
             )
         return list(entries.values())
 
+    @staticmethod
+    def _backlog_kind(
+        row: ApprovalRow, *, key: str
+    ) -> Literal["user", "group", "workflow"] | None:
+        """Return what an entry's ``group_id`` refers to, or ``None`` when it has none.
+
+        Args:
+            row: Any approval from the group, since every row in one group
+                shares the same key.
+            key: The grouping axis, ``"approver"`` or ``"workflow"``.
+
+        Returns:
+            ``"workflow"`` on the by-workflow axis, ``"user"`` or ``"group"`` on
+            the by-approver axis, or ``None`` when the key itself is ``None``.
+        """
+        if key != "approver":
+            return "workflow" if row.workflow_id is not None else None
+        if row.approver is not None:
+            return "user"
+        if row.approver_group_id is not None:
+            return "group"
+        return None
+
     def _backlog(
         self,
         rows: list[ApprovalRow],
@@ -272,7 +296,8 @@ class MetricsService:
 
         Args:
             rows: The pending approvals to group.
-            key: ``"approver"`` to group by the designated approver, or
+            key: ``"approver"`` to group by the approval's destination (its
+                designated user, or the group it is addressed to), or
                 ``"workflow"`` to group by the workflow the run belongs to.
             threshold_hours: Waiting time beyond which an approval counts as
                 stalled.
@@ -285,7 +310,13 @@ class MetricsService:
         threshold = timedelta(hours=threshold_hours).total_seconds()
         grouped: dict[str | None, list[ApprovalRow]] = defaultdict(list)
         for row in rows:
-            grouped[row.approver if key == "approver" else row.workflow_id].append(row)
+            if key == "approver":
+                # ck_approvals_single_destination keeps at most one of the two
+                # set; prefer the user so a hypothetical both-set row is still
+                # counted once, under the narrower key.
+                grouped[row.approver or row.approver_group_id].append(row)
+            else:
+                grouped[row.workflow_id].append(row)
 
         entries: list[ApprovalBacklogEntry] = []
         for group_id, group in grouped.items():
@@ -293,7 +324,16 @@ class MetricsService:
             entries.append(
                 ApprovalBacklogEntry(
                     group_id=group_id,
-                    group_label=(None if key == "approver" else group[0].workflow_name),
+                    group_kind=self._backlog_kind(group[0], key=key),
+                    group_label=(
+                        group[0].workflow_name
+                        if key != "approver"
+                        else (
+                            None
+                            if group[0].approver is not None
+                            else group[0].approver_group_name
+                        )
+                    ),
                     pending=len(group),
                     over_threshold=sum(1 for w in waits if w > threshold),
                     avg_wait_seconds=sum(waits) / len(waits),
@@ -306,12 +346,17 @@ class MetricsService:
     async def approval_backlog_by_approver(
         self, *, threshold_hours: float, limit: int
     ) -> list[ApprovalBacklogEntry]:
-        """Return the pending-approval backlog grouped by designated approver.
+        """Return the pending-approval backlog grouped by approval destination.
+
+        One entry per designated user or approver group. ``group_kind`` on each
+        entry says which of the two its ``group_id`` is, since the ids are
+        indistinguishable as bare UUIDs and only user ids resolve through
+        ``POST /users/resolve-names``.
 
         Args:
             threshold_hours: Waiting time beyond which an approval counts as
                 stalled.
-            limit: Maximum number of approvers to return.
+            limit: Maximum number of destinations to return.
 
         Returns:
             The backlog entries, longest single wait first.

@@ -37,6 +37,8 @@ from repositories import (
     SqlMessageMetaRepository,
     SqlNotificationRepository,
     SqlSecretRepository,
+    SqlUserGroupRepository,
+    SqlUserRepository,
     SqlWorkflowExecutionRepository,
     SqlWorkflowPublishedVersionRepository,
     SqlWorkflowRepository,
@@ -149,9 +151,16 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
     )
     rows.workflow_task = task.id
 
-    approvals = SqlApprovalRepository(db, execution_repo, tenant_id=tenant_id)
+    groups = SqlUserGroupRepository(db, SqlUserRepository(db), tenant_id=tenant_id)
+    approvals = SqlApprovalRepository(db, execution_repo, groups, tenant_id=tenant_id)
     approval = await approvals.create(
-        ApprovalCreate(workflow_execution_id=execution.id, title=f"approve-{suffix}"),
+        # An approval needs exactly one destination; "owner" is seeded in both
+        # tenants, so the row stays tenant-local either way.
+        ApprovalCreate(
+            workflow_execution_id=execution.id,
+            title=f"approve-{suffix}",
+            approver="owner",
+        ),
         user_id="owner",
     )
     rows.approval = approval.id
@@ -307,7 +316,10 @@ async def test_approval_isolation(
     a, b = seeded
     async with AsyncSession(engine, expire_on_commit=False) as db:
         execution_repo_a = SqlWorkflowExecutionRepository(db, tenant_id=TENANT_A)
-        repo_a = SqlApprovalRepository(db, execution_repo_a, tenant_id=TENANT_A)
+        groups_a = SqlUserGroupRepository(db, SqlUserRepository(db), tenant_id=TENANT_A)
+        repo_a = SqlApprovalRepository(
+            db, execution_repo_a, groups_a, tenant_id=TENANT_A
+        )
         assert await repo_a.get(b.approval) is None
         assert await repo_a.exists(b.approval) is False
         listed = await repo_a.list(limit=100, offset=0)

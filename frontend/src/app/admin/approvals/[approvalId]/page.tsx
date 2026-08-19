@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { ApprovalStatusLabel } from "@/components/admin/approval-status";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
@@ -17,20 +18,13 @@ import { Button } from "@/components/ui/button";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import {
   type Approval,
-  type ApprovalStatus,
   getApproval,
+  getUserGroup,
   getUserNames,
   isForbiddenError,
   SUPPRESS_FORBIDDEN_TOAST,
 } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
-
-const STATUS_STYLES: Record<ApprovalStatus, string> = {
-  pending: "text-on-surface-variant",
-  approved: "text-accent",
-  rejected: "text-error",
-  returned: "text-alert",
-};
 
 /**
  * Read-only detail page for a single `Approval` request: its status, the
@@ -49,6 +43,8 @@ export default function ApprovalDetailPage() {
   const [forbidden, setForbidden] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
   const [approverName, setApproverName] = useState<string | null>(null);
+  const [approverGroupName, setApproverGroupName] = useState<string | null>(null);
+  const [deciderName, setDeciderName] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
 
   useEffect(() => {
@@ -63,9 +59,18 @@ export default function ApprovalDetailPage() {
           createdAt: a.createdAt,
           updatedAt: a.updatedAt,
         });
-        if (!a.approver) return;
-        const names = await getUserNames([a.approver]);
-        if (active) setApproverName(names.get(a.approver) ?? null);
+        // One batched lookup for both user references the page can show.
+        const userIds = [a.approver, a.decidedBy].filter((id): id is string => !!id);
+        if (userIds.length > 0) {
+          const names = await getUserNames(userIds);
+          if (!active) return;
+          if (a.approver) setApproverName(names.get(a.approver) ?? null);
+          if (a.decidedBy) setDeciderName(names.get(a.decidedBy) ?? null);
+        }
+        if (a.approverGroupId) {
+          const group = await getUserGroup(a.approverGroupId, SUPPRESS_FORBIDDEN_TOAST);
+          if (active) setApproverGroupName(group.name);
+        }
       })
       .catch((err: unknown) => {
         if (!active) return;
@@ -135,12 +140,7 @@ export default function ApprovalDetailPage() {
       >
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
-            <DetailItem
-              label="Status"
-              value={
-                <span className={`font-medium capitalize ${STATUS_STYLES[status]}`}>{status}</span>
-              }
-            />
+            <DetailItem label="Status" value={<ApprovalStatusLabel status={status} />} />
             <DetailItem label="Description" value={approval.description || EMPTY_VALUE} />
             <DetailItem
               label="Approver"
@@ -151,6 +151,28 @@ export default function ApprovalDetailPage() {
                     className="font-medium text-accent transition-colors hover:underline"
                   >
                     {approverName ?? approval.approver}
+                  </Link>
+                ) : approval.approverGroupId ? (
+                  <Link
+                    href={`/admin/user-groups/${approval.approverGroupId}`}
+                    className="font-medium text-accent transition-colors hover:underline"
+                  >
+                    {approverGroupName ?? approval.approverGroupId}
+                  </Link>
+                ) : (
+                  EMPTY_VALUE
+                )
+              }
+            />
+            <DetailItem
+              label="Decided By"
+              value={
+                approval.decidedBy ? (
+                  <Link
+                    href={`/admin/users/${approval.decidedBy}`}
+                    className="font-medium text-accent transition-colors hover:underline"
+                  >
+                    {deciderName ?? approval.decidedBy}
                   </Link>
                 ) : (
                   EMPTY_VALUE
