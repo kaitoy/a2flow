@@ -58,6 +58,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<UserGroup>[] {
     {
       header: "Created At",
       sortField: "createdAt",
+      visibility: "optional",
       cell: (g) => <DateTime value={g.createdAt} className="text-on-surface-variant" />,
     },
     ...auditColumns<UserGroup>(names),

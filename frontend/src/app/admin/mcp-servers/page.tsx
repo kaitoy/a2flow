@@ -90,6 +90,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<McpServer>[] {
     {
       header: "Created At",
       sortField: "createdAt",
+      visibility: "optional",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
     ...auditColumns<McpServer>(names),

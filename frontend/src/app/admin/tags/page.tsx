@@ -68,6 +68,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<Tag>[] {
     {
       header: "Created At",
       sortField: "createdAt",
+      visibility: "optional",
       cell: (tag) => <DateTime value={tag.createdAt} className="text-on-surface-variant" />,
     },
     ...auditColumns<Tag>(names),

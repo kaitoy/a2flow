@@ -83,6 +83,7 @@ function buildColumns(
     {
       header: "Created At",
       sortField: "createdAt",
+      visibility: "optional",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
     {

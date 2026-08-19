@@ -128,6 +128,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<User>[] {
     {
       header: "Created At",
       sortField: "createdAt",
+      visibility: "optional",
       cell: (u) => <DateTime value={u.createdAt} className="text-on-surface-variant" />,
     },
     {
