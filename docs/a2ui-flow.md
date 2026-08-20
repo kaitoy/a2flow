@@ -131,6 +131,15 @@ A2uiRenderer
           TextField / ChoicePicker  (src/components/a2uiCatalog.tsx)
 ```
 
+`ChoicePicker` picks its own presentation, because A2UI v0.9 has no dropdown component and
+its `displayStyle` enum is only `checkbox` | `chips` — an agent cannot ask for one. A
+single-choice picker (`mutuallyExclusive`) that is not explicitly `chips` renders as the
+shared design-system `Select` dropdown (`src/components/ui/select.tsx`) once it offers five
+options or more, and as radio buttons below that; multi-select stays checkboxes. The
+threshold is read off the *unfiltered* option count, so typing in the `filterable` box
+cannot flip the control back to radios mid-interaction, and a selected option filtered out
+of the list is re-added so the trigger keeps its label.
+
 ---
 
 ## 6. Session restore — ActivityMessage synthesis

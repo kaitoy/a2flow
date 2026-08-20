@@ -631,6 +631,9 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
     assert "runnable" in rendered
     assert "A2UI Rules" in rendered
     assert "render_a2ui" in rendered
+    # Known allowed values (e.g. listed in the workflow description) must be
+    # offered as ChoicePicker options rather than typed into a TextField.
+    assert "list every allowed value as an option" in rendered
     assert "register_design_tasks" not in rendered
 
 

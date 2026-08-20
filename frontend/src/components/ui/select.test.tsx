@@ -89,6 +89,36 @@ describe("Select", () => {
     expect(listbox.className).toContain("overflow-y-auto");
   });
 
+  it("shows the placeholder when the value matches no option", () => {
+    render(
+      <Select
+        options={OPTIONS}
+        value=""
+        onChange={vi.fn()}
+        aria-label="Tenant"
+        placeholder="Select an option"
+      />
+    );
+
+    expect(screen.getByRole("combobox", { name: "Tenant" })).toHaveTextContent("Select an option");
+  });
+
+  it("shows the selected label rather than the placeholder once a value matches", () => {
+    render(
+      <Select
+        options={OPTIONS}
+        value="b"
+        onChange={vi.fn()}
+        aria-label="Tenant"
+        placeholder="Select an option"
+      />
+    );
+
+    const trigger = screen.getByRole("combobox", { name: "Tenant" });
+    expect(trigger).toHaveTextContent("Globex");
+    expect(trigger).not.toHaveTextContent("Select an option");
+  });
+
   it("does not open when disabled", async () => {
     const user = userEvent.setup();
     render(<Select options={OPTIONS} value="a" onChange={vi.fn()} aria-label="Tenant" disabled />);

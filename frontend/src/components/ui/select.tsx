@@ -43,6 +43,12 @@ export interface SelectProps {
   id?: string;
   /** Accessible name for the trigger when there is no associated `<label>`. */
   "aria-label"?: string;
+  /**
+   * Muted text shown on the trigger while `value` matches no option — i.e. for
+   * a picker that starts empty. Prefer a leading `{ value: "", label: "…" }`
+   * option instead when the empty state is itself a selectable choice.
+   */
+  placeholder?: string;
   /** Extra classes merged onto the trigger button. */
   className?: string;
 }
@@ -93,6 +99,7 @@ export function Select({
   disabled = false,
   id,
   "aria-label": ariaLabel,
+  placeholder,
   className,
 }: SelectProps) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -102,7 +109,7 @@ export function Select({
   const panelId = `select-listbox-${useId()}`;
 
   const selectedIndex = options.findIndex((o) => o.value === value);
-  const selectedLabel = selectedIndex >= 0 ? options[selectedIndex].label : "";
+  const selectedLabel = selectedIndex >= 0 ? options[selectedIndex].label : (placeholder ?? "");
 
   const coords = useAnchoredPanel({
     open,
@@ -210,7 +217,13 @@ export function Select({
         onKeyDown={onTriggerKeyDown}
         className={triggerClassName}
       >
-        <span className="min-w-0 flex-1 truncate text-left">{selectedLabel}</span>
+        <span
+          className={`min-w-0 flex-1 truncate text-left${
+            selectedIndex >= 0 ? "" : " text-on-surface-variant/70"
+          }`}
+        >
+          {selectedLabel}
+        </span>
         <ChevronDown
           size={16}
           strokeWidth={1.8}
