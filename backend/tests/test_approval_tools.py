@@ -385,7 +385,7 @@ async def _put_in_group(
 async def test_group_inherited_approver_is_eligible(engine: AsyncEngine) -> None:
     """A user whose only ``approver`` grant comes from a group can be designated.
 
-    This is the demo dataset's shape: ``demo-approver`` holds no direct role
+    This is the demo dataset's shape: ``demo-approver-1`` holds no direct role
     and inherits ``approver`` from the ``Demo Approvers`` group.
     """
     await seed_users(

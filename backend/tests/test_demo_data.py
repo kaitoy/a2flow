@@ -26,6 +26,7 @@ from infrastructure.demo_data import (
     DEMO_AGENT_SKILL_NAME,
     DEMO_APPROVAL_TAG_ID,
     DEMO_APPROVAL_TAG_NAME,
+    DEMO_APPROVER_2_USER_ID,
     DEMO_APPROVER_USER_ID,
     DEMO_APPROVERS_GROUP_ID,
     DEMO_AWS_SECRET_ID,
@@ -193,7 +194,7 @@ async def test_sync_demo_data_seeds_the_full_dataset(
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 3
+    assert len(await _demo_users(engine)) == 4
     assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
     assert len(await _rows(engine, AgentSkill)) == 1
@@ -223,7 +224,7 @@ async def test_sync_demo_data_is_idempotent(
     _enable(monkeypatch)
     await _sync(engine)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 3
+    assert len(await _demo_users(engine)) == 4
     assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
     assert len(await _rows(engine, AgentSkill)) == 1
@@ -264,14 +265,16 @@ async def test_demo_users_hold_no_direct_roles(
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
-    approver, developer, requester = await _demo_users(engine)
+    approver, approver_2, developer, requester = await _demo_users(engine)
     assert approver.id == DEMO_APPROVER_USER_ID
-    assert approver.username == "demo-approver"
+    assert approver.username == "demo-approver-1"
+    assert approver_2.id == DEMO_APPROVER_2_USER_ID
+    assert approver_2.username == "demo-approver-2"
     assert developer.id == DEMO_DEVELOPER_USER_ID
     assert developer.username == "demo-developer"
     assert requester.id == DEMO_REQUESTER_USER_ID
     assert requester.username == "demo-requester"
-    for user in (approver, developer, requester):
+    for user in (approver, approver_2, developer, requester):
         assert user.roles == []
         assert user.tenant_id == TENANT_ID
         assert user.enabled is True
@@ -298,7 +301,7 @@ async def test_demo_groups_grant_the_approver_requester_and_developer_roles(
         assert group.created_by == SYSTEM_USER_ID
 
 
-async def test_each_demo_user_is_the_sole_member_of_their_group(
+async def test_demo_approvers_group_holds_both_approvers_the_rest_hold_one(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
@@ -308,6 +311,7 @@ async def test_each_demo_user_is_the_sole_member_of_their_group(
     }
     assert members == {
         (DEMO_APPROVERS_GROUP_ID, DEMO_APPROVER_USER_ID),
+        (DEMO_APPROVERS_GROUP_ID, DEMO_APPROVER_2_USER_ID),
         (DEMO_REQUESTERS_GROUP_ID, DEMO_REQUESTER_USER_ID),
         (DEMO_DEVELOPERS_GROUP_ID, DEMO_DEVELOPER_USER_ID),
     }
@@ -320,10 +324,16 @@ async def test_demo_users_effective_roles_come_from_their_group(
     await _sync(engine)
     async with AsyncSession(engine) as session:
         inherited = await SqlEffectiveRoleRepository(session).group_roles_for_users(
-            [DEMO_APPROVER_USER_ID, DEMO_REQUESTER_USER_ID, DEMO_DEVELOPER_USER_ID]
+            [
+                DEMO_APPROVER_USER_ID,
+                DEMO_APPROVER_2_USER_ID,
+                DEMO_REQUESTER_USER_ID,
+                DEMO_DEVELOPER_USER_ID,
+            ]
         )
     assert inherited == {
         DEMO_APPROVER_USER_ID: frozenset({Role.approver.value}),
+        DEMO_APPROVER_2_USER_ID: frozenset({Role.approver.value}),
         DEMO_REQUESTER_USER_ID: frozenset({Role.requester.value}),
         DEMO_DEVELOPER_USER_ID: frozenset({Role.developer.value}),
     }

@@ -16,16 +16,18 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
   showing that one tag classifies across resource types) and ``Approval
   Required`` (attached to the agent skill alone, calling out its approval
   gate),
-* three Users -- a ``demo-approver`` (the manager the skill asks for approval),
-  a ``demo-requester`` (who runs the workflow), and a ``demo-developer`` (who
-  may build and register the workflow, MCP server, and agent skill in the
-  first place) -- each holding **no direct role at all**,
+* four Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``, either
+  of whom the skill can ask for approval, a ``demo-requester`` (who runs the
+  workflow), and a ``demo-developer`` (who may build and register the
+  workflow, MCP server, and agent skill in the first place) -- each holding
+  **no direct role at all**,
 * three UserGroups -- ``Demo Approvers``, ``Demo Requesters``, and
-  ``Demo Developers`` -- each granting one role and holding the matching user
-  as its only member, so every demo account gets its role purely by
-  inheritance. That makes the group feature visible in the demo dataset
-  itself: remove a user from their group and their access disappears on the
-  next request.
+  ``Demo Developers`` -- each granting one role to its members, so every demo
+  account gets its role purely by inheritance. ``Demo Approvers`` holds both
+  approver accounts, showing that a group's membership need not be a single
+  user; the other two groups hold their matching user alone. That makes the
+  group feature visible in the demo dataset itself: remove a user from their
+  group and their access disappears on the next request.
 
 The Workflow itself is deliberately *not* seeded — these records are the
 ingredients an operator assembles one into. Both tags stay unattached to any
@@ -78,6 +80,10 @@ DEMO_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d002"
 #: Fixed identifier of the demo ``developer`` user (who builds and registers
 #: the workflow, MCP server, and agent skill).
 DEMO_DEVELOPER_USER_ID = "00000000-0000-0000-0000-00000000d003"
+
+#: Fixed identifier of the second demo ``approver`` user, showing that a
+#: ``Demo Approvers`` membership need not be a single account.
+DEMO_APPROVER_2_USER_ID = "00000000-0000-0000-0000-00000000d004"
 
 #: Fixed identifier of the demo ``Demo Approvers`` user group.
 DEMO_APPROVERS_GROUP_ID = "00000000-0000-0000-0000-00000000d401"
@@ -189,21 +195,21 @@ class _DemoUserSpec:
 
 @dataclass(frozen=True)
 class _DemoGroupSpec:
-    """One demo user group: a single role granted to a single member.
+    """One demo user group: a single role granted to one or more members.
 
     Attributes:
         id: Fixed primary key, so the group can be found again for removal.
         name: Group name shown in the admin UI, unique within the tenant.
         description: Sentence shown on the group list and detail pages.
         role: The one role this group grants to its members.
-        member_id: Id of the demo user placed in the group.
+        member_ids: Ids of the demo users placed in the group.
     """
 
     id: str
     name: str
     description: str
     role: Role
-    member_id: str
+    member_ids: tuple[str, ...]
 
 
 #: The demo accounts, in creation order. Each is created with an empty
@@ -211,51 +217,58 @@ class _DemoGroupSpec:
 _DEMO_USERS = (
     _DemoUserSpec(
         id=DEMO_APPROVER_USER_ID,
-        username="demo-approver",
-        first_name="Demo",
-        last_name="Approver",
+        username="demo-approver-1",
+        first_name="Alice",
+        last_name="Anderson",
     ),
     _DemoUserSpec(
         id=DEMO_REQUESTER_USER_ID,
         username="demo-requester",
-        first_name="Demo",
-        last_name="Requester",
+        first_name="Bob",
+        last_name="Martinez",
     ),
     _DemoUserSpec(
         id=DEMO_DEVELOPER_USER_ID,
         username="demo-developer",
-        first_name="Demo",
-        last_name="Developer",
+        first_name="Carol",
+        last_name="Bennett",
+    ),
+    _DemoUserSpec(
+        id=DEMO_APPROVER_2_USER_ID,
+        username="demo-approver-2",
+        first_name="Diana",
+        last_name="Foster",
     ),
 )
 
-#: The demo user groups, one per demo account. The sample skill looks for a
-#: user holding ``approver`` to route its approval request to; ``requester`` is
-#: the role that may execute a workflow; ``developer`` is the role that may
-#: build and register a workflow, MCP server, or agent skill. Granting each
-#: through a group rather than directly is what makes the demo exercise role
-#: inheritance.
+#: The demo user groups, one per role. The sample skill looks for a user
+#: holding ``approver`` to route its approval request to; ``requester`` is the
+#: role that may execute a workflow; ``developer`` is the role that may build
+#: and register a workflow, MCP server, or agent skill. Granting each through
+#: a group rather than directly is what makes the demo exercise role
+#: inheritance. ``Demo Approvers`` holds two members, demonstrating that a
+#: group's role reaches every one of its members, not just a single account.
 _DEMO_GROUPS = (
     _DemoGroupSpec(
         id=DEMO_APPROVERS_GROUP_ID,
         name="Demo Approvers",
         description="Managers who can be designated as workflow approvers.",
         role=Role.approver,
-        member_id=DEMO_APPROVER_USER_ID,
+        member_ids=(DEMO_APPROVER_USER_ID, DEMO_APPROVER_2_USER_ID),
     ),
     _DemoGroupSpec(
         id=DEMO_REQUESTERS_GROUP_ID,
         name="Demo Requesters",
         description="People who can run published workflows.",
         role=Role.requester,
-        member_id=DEMO_REQUESTER_USER_ID,
+        member_ids=(DEMO_REQUESTER_USER_ID,),
     ),
     _DemoGroupSpec(
         id=DEMO_DEVELOPERS_GROUP_ID,
         name="Demo Developers",
         description="People who can build workflows, MCP servers, and agent skills.",
         role=Role.developer,
-        member_id=DEMO_DEVELOPER_USER_ID,
+        member_ids=(DEMO_DEVELOPER_USER_ID,),
     ),
 )
 
@@ -371,7 +384,7 @@ async def _default_tenant_id(session: AsyncSession) -> str | None:
 async def _insert(session: AsyncSession, row: SQLModel, *, label: str) -> bool:
     """Insert one demo row, skipping it when it collides with existing data.
 
-    The demo names (``demo-approver``, ``AWS MCP Server``, ...) are not reserved,
+    The demo names (``demo-approver-1``, ``AWS MCP Server``, ...) are not reserved,
     so an operator may already have a record of their own under one of them.
     The per-tenant unique constraint catches that; the collision is reported
     and the remaining demo records are still registered, rather than the
@@ -518,7 +531,7 @@ async def _delete_demo_user(session: AsyncSession, user_id: str) -> None:
 
 
 async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo user groups and place each demo account in its own.
+    """Create the demo user groups and place each demo account in its group(s).
 
     Must run after :func:`_seed_demo_users`: the membership rows reference
     ``users.id``. A group whose row already exists is left alone, but its
@@ -552,12 +565,13 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
             # The insert collided with an operator's own group of that name;
             # there is nothing to attach a membership to.
             continue
-        if await session.get(UserGroupMember, (spec.id, spec.member_id)) is None:
-            await _insert(
-                session,
-                UserGroupMember(group_id=spec.id, user_id=spec.member_id),
-                label=f"membership of user group '{spec.name}'",
-            )
+        for member_id in spec.member_ids:
+            if await session.get(UserGroupMember, (spec.id, member_id)) is None:
+                await _insert(
+                    session,
+                    UserGroupMember(group_id=spec.id, user_id=member_id),
+                    label=f"membership of user group '{spec.name}'",
+                )
 
 
 async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
