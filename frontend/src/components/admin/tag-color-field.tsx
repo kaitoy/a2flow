@@ -3,9 +3,10 @@
  *
  * Shared so the two forms stay in step, the same way {@link AgentSkillFields}
  * is shared between the agent-skill forms. The choice is a fixed vocabulary
- * rather than a free color value, so it is a select — and it sits beside a live
- * {@link Chip} preview, because the slot names alone say nothing about what the
- * tag will look like on a list row.
+ * rather than a free color value, so it is a select — paired with a live
+ * {@link Chip} preview, centered in a generously padded space below the
+ * select, because the slot names alone say nothing about what the tag will
+ * look like on a list row.
  */
 "use client";
 
@@ -50,23 +51,21 @@ export function TagColorField({
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-label-caps">Color</span>
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          {readOnly ? (
-            <ReadOnlyField>{tagColorLabel(value)}</ReadOnlyField>
-          ) : (
-            <Select
-              aria-label="Color"
-              value={value}
-              onChange={(next) => onChange(next as TagColor)}
-              options={TAG_COLORS.map((color) => ({
-                value: color,
-                label: tagColorLabel(color),
-              }))}
-            />
-          )}
-        </div>
-        <Chip label={label} color={value} />
+      {readOnly ? (
+        <ReadOnlyField>{tagColorLabel(value)}</ReadOnlyField>
+      ) : (
+        <Select
+          aria-label="Color"
+          value={value}
+          onChange={(next) => onChange(next as TagColor)}
+          options={TAG_COLORS.map((color) => ({
+            value: color,
+            label: tagColorLabel(color),
+          }))}
+        />
+      )}
+      <div className="mt-5 flex items-center justify-center py-10">
+        <Chip label={label} color={value} size="lg" />
       </div>
     </div>
   );
