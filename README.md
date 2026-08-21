@@ -4,7 +4,7 @@
 
 A chat application that connects a [Google ADK](https://google.github.io/adk-docs/) agent to a Next.js UI using the [AG-UI protocol](https://docs.ag-ui.com/concepts/events). The agent supports [A2UI](https://a2ui.org/) — when it needs input from the user it renders interactive A2UI input components (text fields, choice pickers, buttons) so the user can see exactly what to provide, while purely informational replies stream token-by-token as Markdown-rendered text so the user never waits on a tool call.
 
-The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference. A **notification center** in the top toolbar surfaces unread workflow events such as generated drafts and approval requests, with the full history available from a dedicated Notifications page reachable from the account menu (see [Notifications](#notifications)).
+The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference. A **notification center** in the top toolbar surfaces unread workflow events such as generated drafts and approval requests, with the full history available from a dedicated Notifications page reachable from the account menu (see [Notifications](#notifications)); once a Super Admin has configured an SMTP server under [System Settings](#system-settings), the same events are also **emailed** to their recipient.
 
 The UI is **responsive**: below the `md` breakpoint every sidebar (chat session list, admin navigation, workflow task timeline) collapses into an off-canvas drawer opened from a hamburger button in the header, layouts use dynamic-viewport heights so mobile URL bars don't clip the chat input, and touch devices get always-visible controls, ~44px tap targets, 16px form fields (no iOS focus zoom), and Enter-as-newline in the chat input.
 
@@ -187,6 +187,8 @@ The initial seeded **`root`** user holds `super_admin` and is platform-scoped (n
 **Impersonating a user.** A Super Admin may act as any user platform-wide; an Admin may act as any user within their own tenant. A `super_admin`-held target can never be impersonated, by anyone. An `admin`-held target can only be impersonated by a Super Admin — a regular Admin still can't impersonate a fellow Admin, whether that Admin role was granted directly or inherited from a group — so impersonation can't be used to gain a privilege the actor doesn't already have (a Super Admin already bypasses every role gate an Admin would, so acting as one grants nothing new). Start it from the **Impersonate** action on the [Users](#users) list; while active, a header chip shows "Acting as `<user>`" with a one-click **Stop**. Every request while impersonating — reads, writes, and the audit `createdBy`/`updatedBy` fields — is attributed to the impersonated user, exactly as if they were signed in themselves; the real actor's own session is untouched underneath, so stopping never requires signing in again. Every impersonation session is recorded in a persistent audit trail (who, whom, and when) for accountability.
 
 **Workflow execution access.** Beyond roles, each operation on a workflow execution — reading it, loading its workflow session's chat history, listing or editing its tasks, and driving its agent — requires the caller to be the execution's **initiator** (the user who ran the workflow) or a **designated approver of one of its approvals** — the named user, or a member holding `approver` of a group one is addressed to (see [Human approval](#human-approval)); unrelated users get HTTP 403. This preserves the approver-sharing design (the approver joins the initiator's chat) while keeping third parties out. **Reading** an execution is broader, though: reading the record, listing its tasks (both the nested list and a single task's own page), and loading its chat history additionally admit any **Admin** in the tenant, so an Admin can review every run without being an initiator or approver — but an Admin still cannot drive the execution's agent, create/update/delete its tasks, or delete the execution itself, and the same `GET /approvals` list additionally shows an Admin every approval in the tenant. **Deleting** an execution is stricter still: initiator (or Super Admin) only. Changing a task's **status** specifically is further restricted when that task has a linked approval: only the execution's initiator or that approval's designated approver may do so — not merely any approver of the execution (see [Human approval](#human-approval)); an Admin gets no exception here either.
+
+**Platform-wide sections.** [Tenants](#tenants) and [System Settings](#system-settings) are the two admin sections **Super Admin** keeps to itself. Unlike everywhere else, reads are gated too: both hold platform-level configuration rather than tenant data, so the sidebar entry, the welcome card, and every endpoint behind them are closed to all other roles.
 
 **Chat session access.** The regular chat (`/sessions`, `/sessions/new`, `/sessions/{id}`, and the `POST /agent` / `GET|DELETE /sessions*` endpoints behind them) is restricted to **Super Admin**: everyone else gets HTTP 403, the welcome page's "Start chat" card is hidden, and the frontend shows an access-denied screen if a non-Super-Admin navigates there directly. This is distinct from the design-session and workflow-session chats below, which stay open along their own access rules.
 
@@ -552,6 +554,27 @@ Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/
 
 **`returned`** is a third decision alongside approve and reject: it sends the work back to be revised and re-submitted rather than settling the request, so a high return rate points at an upstream quality problem rather than at work that should not have been requested at all. Whichever decision is recorded, the transition out of `pending` stamps a server-managed **`decidedAt`**; a later edit to the comment leaves it alone, so the `createdAt` → `decidedAt` turnaround stays the approver's real one.
 
+### System Settings
+
+Navigate to [http://localhost:3000/admin/system-settings](http://localhost:3000/admin/system-settings) to configure the mail server that [notification email](#email-delivery) is sent through. Like [Tenants](#tenants), this section is restricted to **Super Admin** — the settings are platform-wide rather than tenant-scoped, so there is no tenant-admin carve-out, and the backend rejects reads as well as writes from anyone else with HTTP 403 (`FORBIDDEN`).
+
+There is exactly one settings record for the whole deployment. It is seeded on first startup with email delivery **off**, so a fresh install keeps notifications in-app until an operator turns it on.
+
+| Field | Purpose |
+|---|---|
+| `appBaseUrl` | Where notification email links back to, e.g. `https://a2flow.example.com`. Left empty, messages are sent without a link. |
+| `smtpEnabled` | Master switch. While off, notifications stay in-app and nothing is sent. |
+| `smtpHost` / `smtpPort` | The relay to hand messages to. |
+| `smtpSecurity` | `starttls` (default), `ssl` (implicit TLS), or `none`. |
+| `smtpUsername` / `smtpPassword` | SMTP AUTH credentials. Leave the username empty for a relay that needs none. |
+| `smtpFromEmail` / `smtpFromName` | The sender address, and the optional display name shown beside it. |
+
+The password is **write-only**, the same treatment [secrets](#secrets) and user passwords get: it is stored as Fernet ciphertext and never returned by the API. The form therefore shows the field blank with a "Saved" placeholder once one is stored, and saving with it left empty keeps the stored value rather than clearing it. Enabling delivery without a host or a sender address is rejected with HTTP 422 (`INVALID_SYSTEM_SETTINGS`).
+
+A **Send test email** button delivers a fixed test message using the *saved* settings, so a misconfiguration surfaces immediately rather than the next time a workflow raises a notification. The recipient is fixed server-side to the signed-in super admin's own address — it cannot be pointed anywhere else — and a relay failure comes back as HTTP 502 (`EMAIL_SEND_FAILED`) with the underlying reason logged server-side only.
+
+`appBaseUrl` and `smtpHost` deliberately skip the SSRF host check that [Agent Skill](#agent-skills) repository URLs and [MCP server](#mcp-servers) URLs go through: both legitimately name a host inside the deployment's own network, and neither is fetched on a caller's behalf.
+
 ## Operations metrics
 
 Workflow operations data — approval backlog, run volume, failures, and lead time — is exposed for third-party dashboards in two shapes, both scoped to the caller's tenant and both available to any authenticated user.
@@ -626,6 +649,14 @@ Clicking a notification marks it read and deep-links to the relevant place: run-
 The [`/notifications`](http://localhost:3000/notifications) page, reachable from the toolbar profile button's account menu (**Notifications**), lists every notification the signed-in user has received, read ones included, as a sortable and filterable table (title, type, and creation time). An **All / Unread** switch above it toggles the read-state filter, each unread row offers the same **"Mark as read"** action, and every row has a **delete (✕)** button that permanently removes that notification after a confirmation dialog.
 
 `GET /api/v1/notifications` takes the same `limit` / `offset` / `s` / `q` [list query parameters](#list-query-parameters) as every other collection endpoint, so unread-only listing is `?q=read:eq:false` and ordering is e.g. `?s=-createdAt` (the default). `PATCH /api/v1/notifications/{id}` takes a request body and accepts `read` as its only mutable field, so `{"read": true}` marks a notification read and `{"read": false}` returns it to unread. Those endpoints, plus mark-all-read and delete, are documented in the [API reference](http://localhost:3000/api-doc); all are scoped to the authenticated user, so reading, updating, or deleting another user's notification returns HTTP 404 — and a `q` term naming `userId` can only narrow that scope, never escape it. Notifications cascade-delete with their recipient user and their linked `WorkflowExecution` or `Workflow`.
+
+### Email delivery
+
+Once a `super_admin` has configured an SMTP server under [System Settings](#system-settings), the same four events are **also emailed** to the recipient, so an approval request does not have to wait for someone to open the app. The in-app notification is always written first; the email follows as a best-effort side effect, and a relay that is unreachable or rejects the message is logged server-side without failing the workflow operation that raised the notification.
+
+The message carries the notification's title as its subject, its body as the text, and a link back to what it is about — the run for `approval_request` / `execution_completed`, the workflow for `workflow_draft_ready` / `workflow_generation_failed` — built from the configured **Application Base URL**. When no base URL is set the message is sent without a link.
+
+Recipients who cannot be reached are skipped before any relay is contacted: the internal system user, disabled or soft-deleted accounts, and any account without an address. There is no per-user opt-out — email delivery is on or off for the whole platform.
 
 ## Agent activity in the chat
 

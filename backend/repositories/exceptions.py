@@ -327,6 +327,36 @@ class SecretValidationError(RepositoryError):
         super().__init__(reason)
 
 
+class SystemSettingsValidationError(RepositoryError):
+    """Raised when a system-settings update would leave an unusable SMTP configuration.
+
+    Enabling email delivery needs a relay host and a sender address, and a relay
+    that requires a username needs a password to go with it. The rule applies to
+    the merged result of the stored record and the partial update (mirrors
+    :class:`SecretValidationError`), which only the service can compute. Carries
+    a human-readable ``reason`` surfaced in the error envelope's ``details``
+    block when returning HTTP 422.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
+class EmailSendError(Exception):
+    """Raised when a message could not be handed to the configured SMTP relay.
+
+    Carries a ``reason`` string. The HTTP layer logs ``reason`` server-side but
+    never returns it to the client, mirroring :class:`McpConnectionError`: the
+    text echoes the raw ``smtplib`` failure, which can quote relay banners and
+    the configured credentials' username back at the caller.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(f"failed to send email: {reason}")
+
+
 class UserValidationError(RepositoryError):
     """Raised when a User create/update would combine super_admin with a tenant.
 

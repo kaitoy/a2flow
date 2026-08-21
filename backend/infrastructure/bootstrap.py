@@ -3,15 +3,156 @@
 import logging
 import secrets
 
+from pydantic import ValidationError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
 from infrastructure.password import hash_password
+from infrastructure.secret_cipher import get_secret_cipher
+from models.system_settings import (
+    SYSTEM_SETTINGS_ID,
+    SystemSettings,
+    SystemSettingsUpdate,
+)
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
+from repositories.exceptions import SystemSettingsValidationError
+from repositories.system_settings import SqlSystemSettingsRepository
+from services.system_settings import SystemSettingsService
 
 logger = logging.getLogger(__name__)
+
+#: Attribute names on config.Settings that apply_system_settings_env_overrides
+#: may apply, exactly as SystemSettingsUpdate's fields expect (snake_case;
+#: populate_by_name=True accepts these directly without the camelCase alias).
+_SYSTEM_SETTINGS_ENV_FIELDS = (
+    "app_base_url",
+    "smtp_enabled",
+    "smtp_host",
+    "smtp_port",
+    "smtp_security",
+    "smtp_username",
+    "smtp_password",
+    "smtp_from_email",
+    "smtp_from_name",
+)
+
+
+async def seed_system_settings(session: AsyncSession) -> None:
+    """Insert the singleton system-settings row if it does not already exist.
+
+    Seeding it up front rather than creating it lazily on first write means
+    every reader can assume the row exists: ``GET /system-settings`` returns the
+    defaults without a special case, and the notification dispatcher's SMTP
+    lookup is a plain read. The row is owned by the system user, so this must
+    run after :func:`seed_system_user`.
+
+    The seeded defaults leave email delivery switched off, so a fresh
+    deployment behaves exactly as it did before it had this table.
+
+    Args:
+        session: Database session used to read and insert the row.
+    """
+    if await session.get(SystemSettings, SYSTEM_SETTINGS_ID) is not None:
+        return
+    session.add(
+        SystemSettings(
+            id=SYSTEM_SETTINGS_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+    )
+    await session.commit()
+
+
+async def apply_system_settings_env_overrides(session: AsyncSession) -> None:
+    """Apply whichever ``APP_BASE_URL``/``SMTP_*`` env vars are set onto the settings row.
+
+    Runs on every startup, not just the first: an operator may add or rotate
+    ``APP_BASE_URL`` or a ``SMTP_*`` variable on a later deploy (e.g. changing
+    ``SMTP_PASSWORD``), and that should reach the database without a manual
+    admin-UI edit. Only fields whose environment variable is actually set are
+    touched — this is built by constructing a real
+    :class:`~models.system_settings.SystemSettingsUpdate` from just those
+    fields, not ``model_construct`` (which would skip validation entirely),
+    so pydantic's ``model_fields_set`` records exactly the env-sourced fields
+    as "set", and
+    :meth:`~services.system_settings.SystemSettingsService.update` /
+    :meth:`~repositories.system_settings.SqlSystemSettingsRepository.update`'s
+    ``exclude_unset=True`` handling — the same mechanism the admin UI's
+    partial PATCH already relies on — leaves every other field, including
+    anything configured by hand through the admin UI, untouched.
+
+    ``SMTP_ENABLED`` is never inferred from the presence of the other
+    ``SMTP_*`` variables; it must be set explicitly, matching the opt-in
+    default the row itself is seeded with (see :func:`seed_system_settings`).
+    The other SMTP fields, when set, are still applied even while
+    ``SMTP_ENABLED`` is absent or false: :func:`services.system_settings._assert_usable`
+    only requires a host and sender address once the *merged* ``smtp_enabled``
+    ends up true, so staging a relay's host/username/password ahead of
+    flipping the flag on is harmless — it lets "configure the relay" and
+    "turn delivery on" ship as two separate deploys. ``APP_BASE_URL`` has no
+    such enable flag; when set, it is applied unconditionally.
+
+    A malformed value — a pydantic field-level failure (an out-of-range
+    ``SMTP_PORT``, a malformed ``SMTP_FROM_EMAIL``, an unrecognized
+    ``SMTP_SECURITY``, an ``APP_BASE_URL`` not starting with
+    ``http://``/``https://``) or the service's business-rule check (e.g.
+    ``SMTP_ENABLED=true`` with no ``SMTP_HOST``) — is logged as a
+    ``WARNING`` (naming only the offending field(s), never their value, so a
+    bad ``SMTP_PASSWORD`` is never written to the log) and the entire apply
+    is skipped: the row keeps whatever configuration it already had, and
+    startup continues normally.
+
+    Must run after :func:`seed_system_settings` — the row has to exist,
+    since :meth:`~services.system_settings.SystemSettingsService.update`
+    raises ``NotFoundError`` on a missing row rather than creating one — and
+    after :func:`seed_system_user`, since the update stamps ``updated_by``
+    with :data:`SYSTEM_USER_ID`, which must already satisfy the ``users``
+    foreign key.
+
+    Args:
+        session: Database session used to read and write the settings row.
+    """
+    settings = get_settings()
+    set_fields = {
+        field: getattr(settings, field)
+        for field in _SYSTEM_SETTINGS_ENV_FIELDS
+        if getattr(settings, field) is not None
+    }
+    if not set_fields:
+        return
+
+    try:
+        update = SystemSettingsUpdate(**set_fields)
+    except ValidationError as exc:
+        bad_fields = ", ".join(
+            str(err["loc"][0])
+            for err in exc.errors(
+                include_url=False, include_input=False, include_context=False
+            )
+        )
+        logger.warning(
+            "Invalid APP_BASE_URL/SMTP_* environment configuration for "
+            "field(s) %s; leaving the stored system settings unchanged. "
+            "(Values are never logged here, including SMTP_PASSWORD.)",
+            bad_fields,
+        )
+        return
+
+    service = SystemSettingsService(
+        SqlSystemSettingsRepository(session), get_secret_cipher()
+    )
+    try:
+        await service.update(update, user_id=SYSTEM_USER_ID)
+    except SystemSettingsValidationError as exc:
+        logger.warning(
+            "SMTP_* environment configuration would leave email delivery "
+            "unusable (%s); leaving the stored system settings unchanged.",
+            exc.reason,
+        )
+
 
 #: Bytes of entropy for a generated seed password (used when ``ROOT_PASSWORD``
 #: or ``ADMIN_PASSWORD`` is unset). ``token_urlsafe`` renders ~1.3 chars/byte,

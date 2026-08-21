@@ -8,7 +8,12 @@ from .mcp_registry import MCPRegistryService
 from .mcp_server import MCPServerService
 from .metrics import MetricsService, MetricsWindow
 from .notification import NotificationService
+from .notification_dispatch import (
+    NotificationDispatcher,
+    build_notification_dispatcher,
+)
 from .secret import SecretService
+from .system_settings import SystemSettingsService
 from .tag import TagService
 from .tenant import TenantService
 from .user import UserService
@@ -32,8 +37,10 @@ __all__ = [
     "MCPServerService",
     "MetricsService",
     "MetricsWindow",
+    "NotificationDispatcher",
     "NotificationService",
     "SecretService",
+    "SystemSettingsService",
     "TagService",
     "TenantService",
     "UserAvatarService",
@@ -45,6 +52,7 @@ __all__ = [
     "WorkflowExecutionService",
     "WorkflowTaskService",
     "WorkflowTaskTemplateService",
+    "build_notification_dispatcher",
     "generate_workflow_design",
     "sync_agent_skill",
 ]

@@ -118,6 +118,12 @@ async def _override_get_current_user(request: Request) -> User:
     tenant-scoped routes work out of the box; passing an explicit empty value
     opts a test into a platform-scoped (``tenant_id=None``) caller, mirroring
     the ``X-User-Roles`` absent-vs-empty convention above.
+
+    ``email`` comes from the ``X-User-Email`` header and is *always* set,
+    defaulting to an address derived from the acting id. ``model_construct``
+    leaves a required field without a default unset, so any route reading
+    ``user.email`` (the SMTP test-send endpoint) would otherwise raise
+    ``AttributeError`` instead of exercising its own logic.
     """
     roles_header = request.headers.get("X-User-Roles")
     if roles_header is None:
@@ -128,8 +134,14 @@ async def _override_get_current_user(request: Request) -> User:
     tenant_id = (
         DEFAULT_TEST_TENANT_ID if tenant_header is None else (tenant_header or None)
     )
+    user_id = request.headers.get("X-User-Id", "")
     return User.model_construct(
-        id=request.headers.get("X-User-Id", ""), roles=roles, tenant_id=tenant_id
+        id=user_id,
+        roles=roles,
+        tenant_id=tenant_id,
+        email=request.headers.get(
+            "X-User-Email", f"{user_id or 'anonymous'}@test.local"
+        ),
     )
 
 

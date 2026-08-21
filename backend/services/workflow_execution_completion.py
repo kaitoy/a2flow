@@ -23,10 +23,10 @@ from models.notification import NotificationCreate, NotificationType
 from models.workflow_execution import WorkflowExecutionStatus
 from models.workflow_task import WorkflowTaskStatus
 from repositories import (
-    NotificationRepository,
     WorkflowExecutionRepository,
     WorkflowTaskRepository,
 )
+from services.notification_dispatch import NotificationDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ async def evaluate_completion(
     *,
     executions: WorkflowExecutionRepository,
     tasks: WorkflowTaskRepository,
-    notifications: NotificationRepository,
+    notifications: NotificationDispatcher,
     execution_id: str,
 ) -> None:
     """Finish a run whose tasks have all reached a terminal state.
@@ -74,8 +74,8 @@ async def evaluate_completion(
     Args:
         executions: Repository used to resolve and stamp the execution.
         tasks: Repository used to read the run's tasks.
-        notifications: Repository used to check for and persist the one-shot
-            completion notification.
+        notifications: Dispatcher used to check for, persist, and email the
+            one-shot completion notification.
         execution_id: Primary key of the workflow execution to evaluate.
     """
     try:

@@ -31,7 +31,6 @@ from models.workflow_task import (
 )
 from repositories import (
     ApprovalRepository,
-    NotificationRepository,
     WorkflowExecutionRepository,
     WorkflowTaskRepository,
 )
@@ -41,6 +40,7 @@ from repositories.exceptions import (
     NotFoundError,
 )
 from services.approver_groups import ApproverGroupResolver
+from services.notification_dispatch import NotificationDispatcher
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 from services.workflow_execution_completion import evaluate_completion
 
@@ -54,7 +54,7 @@ class WorkflowTaskService:
         execution_repo: WorkflowExecutionRepository,
         access: WorkflowExecutionAccessPolicy,
         approvals: ApprovalRepository,
-        notifications: NotificationRepository,
+        notifications: NotificationDispatcher,
         approver_groups: ApproverGroupResolver,
     ) -> None:
         """Initialize the service.
@@ -69,7 +69,7 @@ class WorkflowTaskService:
             approvals: Repository used to look up whether a task being updated
                 has a linked Approval and, if so, its designated approver, to
                 restrict ``status`` changes on such tasks.
-            notifications: Repository the shared completion bookkeeping uses to
+            notifications: Dispatcher the shared completion bookkeeping uses to
                 emit the one-shot ``execution_completed`` notification.
             approver_groups: Resolver backing the status-change guard when the
                 linked Approval is addressed to a group rather than one user.

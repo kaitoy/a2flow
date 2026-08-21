@@ -6,6 +6,7 @@ import {
   ListChecks,
   type LucideIcon,
   Server,
+  Settings2,
   Tags,
   Users,
   UsersRound,
@@ -112,6 +113,13 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Approvals",
     icon: CheckCircle2,
     description: "Review pending approvals",
+  },
+  {
+    href: "/admin/system-settings",
+    label: "System Settings",
+    icon: Settings2,
+    description: "Configure the mail server notifications are sent through",
+    roles: [Role.SUPER_ADMIN],
   },
 ];
 

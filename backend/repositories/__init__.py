@@ -20,6 +20,10 @@ from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
 from .metrics import MetricsRepository, SqlMetricsRepository
 from .notification import NotificationRepository, SqlNotificationRepository
 from .secret import SecretRepository, SqlSecretRepository
+from .system_settings import (
+    SqlSystemSettingsRepository,
+    SystemSettingsRepository,
+)
 from .tag import SqlTagRepository, TagRepository
 from .tags import TagLinks
 from .tenant import SqlTenantRepository, TenantRepository
@@ -69,6 +73,7 @@ __all__ = [
     "SqlMetricsRepository",
     "SqlNotificationRepository",
     "SqlSecretRepository",
+    "SqlSystemSettingsRepository",
     "SqlTagRepository",
     "SqlTenantRepository",
     "SqlUserAvatarRepository",
@@ -79,6 +84,7 @@ __all__ = [
     "SqlWorkflowExecutionRepository",
     "SqlWorkflowTaskRepository",
     "SqlWorkflowTaskTemplateRepository",
+    "SystemSettingsRepository",
     "TagLinks",
     "TagRepository",
     "TenantRepository",

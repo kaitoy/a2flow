@@ -30,7 +30,7 @@ import logging
 from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from google.adk.tools.tool_context import ToolContext
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -48,11 +48,9 @@ from models.user import Role, User, has_any_role
 from repositories import (
     ApprovalRepository,
     EffectiveRoleRepository,
-    NotificationRepository,
     SqlApprovalRepository,
     SqlEffectiveRoleRepository,
     SqlMCPServerRepository,
-    SqlNotificationRepository,
     SqlUserGroupRepository,
     SqlUserRepository,
     SqlWorkflowExecutionRepository,
@@ -65,6 +63,13 @@ from repositories import (
 from repositories.exceptions import ForeignKeyViolationError
 from repositories.query import FilterSpec
 from repositories.tenant_bootstrap import NoTenantSessionError
+
+if TYPE_CHECKING:
+    # Type-only for the same reason as in ``infrastructure.workflow_task_tools``:
+    # importing a ``services`` submodule at runtime closes an import cycle back
+    # through ``infrastructure.agent``. The runtime import lives in
+    # :func:`_repos`.
+    from services.notification_dispatch import NotificationDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +88,9 @@ class _Scope:
     execution_repo: WorkflowExecutionRepository
     approval_repo: ApprovalRepository
     task_repo: WorkflowTaskRepository
-    notif_repo: NotificationRepository
+    # Quoted for the same reason as ``_Scope.notifications`` in
+    # ``workflow_task_tools``: the name only exists under TYPE_CHECKING.
+    notifications: "NotificationDispatcher"
     user_repo: UserRepository
     effective_role_repo: EffectiveRoleRepository
     group_repo: UserGroupRepository
@@ -96,9 +103,12 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
     Opens a fresh ``AsyncSession`` on the module-level engine (referenced through
     the ``database`` module so tests can monkeypatch ``database.engine``),
     resolves the current run's WorkflowExecution id and tenant id, and wires the
-    WorkflowExecution, Approval, WorkflowTask, and Notification repositories to
-    it, all scoped to the resolved tenant. The User repository is not tenant
-    scoped -- ``User`` is not a ``TenantScoped`` entity.
+    WorkflowExecution, Approval, and WorkflowTask repositories plus the
+    notification dispatcher to it, all scoped to the resolved tenant. The User
+    repository is not tenant scoped -- ``User`` is not a ``TenantScoped`` entity.
+
+    The dispatcher's import is deferred to call time to avoid the ``services``
+    import cycle described on the TYPE_CHECKING block above.
 
     Args:
         tool_context: The ADK tool context for the current invocation.
@@ -109,6 +119,8 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
     Raises:
         NoTenantSessionError: If no WorkflowExecution is bound to the current run.
     """
+    from services.notification_dispatch import build_notification_dispatcher
+
     async with AsyncSession(database.engine) as db:
         execution_id, tenant_id = await _resolve_scope(tool_context, db)
         execution_repo = SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
@@ -127,7 +139,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
                 SqlMCPServerRepository(db, tenant_id=tenant_id),
                 tenant_id=tenant_id,
             ),
-            notif_repo=SqlNotificationRepository(db, tenant_id=tenant_id),
+            notifications=build_notification_dispatcher(db, tenant_id=tenant_id),
             user_repo=user_repo,
             effective_role_repo=SqlEffectiveRoleRepository(db),
             group_repo=group_repo,
@@ -368,7 +380,7 @@ async def request_approval(
             for recipient in recipients:
                 await _notify(
                     s.execution_repo,
-                    s.notif_repo,
+                    s.notifications,
                     s.execution_id,
                     NotificationType.approval_request,
                     title,

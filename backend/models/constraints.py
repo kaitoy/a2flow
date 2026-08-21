@@ -310,6 +310,27 @@ PromptText = Annotated[str, StringConstraints(min_length=1, max_length=20000)]
 #: MCP tool name: 1–255 characters.
 ToolName = Annotated[str, StringConstraints(min_length=1, max_length=255)]
 
+#: Hostname or IP literal of a mail relay: 1–255 characters, no whitespace or
+#: control characters. Deliberately **not** :data:`HttpUrl`: this value is a bare
+#: host handed to ``smtplib``, not a URL, and a relay legitimately lives inside
+#: the deployment's own network (``localhost``, a private subnet, a Kubernetes
+#: service name) — exactly what :func:`_reject_unsafe_url`'s SSRF guard rejects.
+#: Nothing here is fetched on a caller's behalf, so that guard would only block
+#: valid configurations.
+SmtpHost = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=255, pattern=r"^[^\s\x00-\x1f\x7f]+$"),
+]
+
+#: Base URL at which users reach this A2Flow deployment in a browser, used to
+#: build the deep links embedded in outgoing notification email. Also
+#: deliberately not :data:`HttpUrl`, for the same reason as :data:`SmtpHost`:
+#: the app's own address is ``http://localhost:3000`` in development and often a
+#: private hostname on an internal deployment, and the server never fetches it.
+AppBaseUrl = Annotated[
+    str, StringConstraints(min_length=1, max_length=2048, pattern=r"^https?://.+")
+]
+
 #: One ``argv`` entry for a stdio MCP server: up to 4096 characters, anything
 #: except NUL (which ``execve`` cannot carry). Deliberately permissive — an
 #: argument legitimately holds JSON, paths, or free text.

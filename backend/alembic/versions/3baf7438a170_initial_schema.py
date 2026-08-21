@@ -133,6 +133,37 @@ def upgrade() -> None:
             ondelete="RESTRICT",
         )
     op.create_table(
+        "system_settings",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("app_base_url", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("smtp_enabled", sa.Boolean(), nullable=False),
+        sa.Column("smtp_host", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("smtp_port", sa.Integer(), nullable=False),
+        sa.Column(
+            "smtp_security",
+            sa.Enum("none", "starttls", "ssl", name="smtpsecurity"),
+            nullable=False,
+        ),
+        sa.Column("smtp_username", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("smtp_password", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("smtp_from_email", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("smtp_from_name", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint("id"),
+        # Makes "exactly one row" a database invariant rather than a
+        # convention: the id is pinned to models.system_settings's
+        # SYSTEM_SETTINGS_ID, so a second row cannot be inserted.
+        sa.CheckConstraint(
+            "id = '00000000-0000-0000-0000-000000000001'",
+            name="ck_system_settings_singleton",
+        ),
+    )
+    op.create_table(
         "agent_skills",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -1081,6 +1112,7 @@ def downgrade() -> None:
     op.drop_table("auth_sessions")
     op.drop_index("ix_agent_skills_tenant_id_name", table_name="agent_skills")
     op.drop_table("agent_skills")
+    op.drop_table("system_settings")
     with op.batch_alter_table("users", schema=None) as batch_op:
         batch_op.drop_constraint("fk_users_tenant_id", type_="foreignkey")
         batch_op.drop_constraint("uq_users_tenant_id_username", type_="unique")

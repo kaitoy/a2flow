@@ -34,6 +34,9 @@ import type {
   SecretUpdate,
   Session as SessionModel,
   SkillSyncStatus,
+  SmtpSecurity,
+  SystemSettingsRead as SystemSettingsModel,
+  SystemSettingsUpdate,
   TagColor,
   TagCreate,
   Tag as TagModel,
@@ -97,6 +100,7 @@ import {
   zGetSecretApiV1SecretsSecretIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
+  zGetSystemSettingsApiV1SystemSettingsGetResponse,
   zGetTagApiV1TagsTagIdGetResponse,
   zGetTenantApiV1TenantsTenantIdGetResponse,
   zGetUserApiV1UsersUserIdGetResponse,
@@ -132,6 +136,7 @@ import {
   zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
   zResolveUserNamesApiV1UsersResolveNamesPostResponse,
   zSearchMcpRegistryApiV1McpRegistryGetResponse,
+  zSendSmtpTestEmailApiV1SystemSettingsSmtpTestPostResponse,
   zSetAgentSkillTagsApiV1AgentSkillsSkillIdTagsPutResponse,
   zSetMcpServerTagsApiV1McpServersServerIdTagsPutResponse,
   zSetSecretTagsApiV1SecretsSecretIdTagsPutResponse,
@@ -143,6 +148,7 @@ import {
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
   zUpdateNotificationApiV1NotificationsNotificationIdPatchResponse,
   zUpdateSecretApiV1SecretsSecretIdPatchResponse,
+  zUpdateSystemSettingsApiV1SystemSettingsPatchResponse,
   zUpdateTagApiV1TagsTagIdPatchResponse,
   zUpdateTenantApiV1TenantsTenantIdPatchResponse,
   zUpdateUserApiV1UsersUserIdPatchResponse,
@@ -440,6 +446,7 @@ export type Approval = WithAudit<ApprovalModel>;
 export type McpServer = WithAudit<McpServerModel>;
 export type Notification = WithAudit<NotificationModel>;
 export type Secret = WithAudit<SecretModel>;
+export type SystemSettings = WithAudit<SystemSettingsModel>;
 export type Tag = WithAudit<TagModel>;
 export type Tenant = WithAudit<TenantModel>;
 export type User = WithAudit<UserReadModel>;
@@ -471,6 +478,8 @@ export type {
   SecretType,
   SecretUpdate,
   SkillSyncStatus,
+  SmtpSecurity,
+  SystemSettingsUpdate,
   TagColor,
   TagCreate,
   TagUpdate,
@@ -933,6 +942,45 @@ export async function deleteTenant(id: string): Promise<void> {
   await fetchEnvelope(
     apiClient.delete(`/api/v1/tenants/${encodeURIComponent(id)}`),
     zDeleteTenantApiV1TenantsTenantIdDeleteResponse
+  );
+}
+
+/**
+ * Fetch the platform-wide system settings. `super_admin` only.
+ *
+ * The SMTP password is never part of the response; `smtpPasswordSet` reports
+ * only whether one is stored.
+ */
+export async function getSystemSettings(config?: AxiosRequestConfig): Promise<SystemSettings> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/system-settings", config),
+    zGetSystemSettingsApiV1SystemSettingsGetResponse
+  ) as Promise<SystemSettings>;
+}
+
+/**
+ * Apply a partial update to the system settings. `super_admin` only.
+ *
+ * Omitting `smtpPassword` — or sending it as an empty string — keeps the stored
+ * password, so a blank field in the form is non-destructive.
+ */
+export async function updateSystemSettings(body: SystemSettingsUpdate): Promise<SystemSettings> {
+  return fetchEnvelope(
+    apiClient.patch("/api/v1/system-settings", body),
+    zUpdateSystemSettingsApiV1SystemSettingsPatchResponse
+  ) as Promise<SystemSettings>;
+}
+
+/**
+ * Send a test message with the stored SMTP settings to the caller's own address.
+ *
+ * The recipient is fixed server-side, so this cannot be used to relay mail
+ * anywhere else.
+ */
+export async function sendSmtpTestEmail(): Promise<void> {
+  await fetchEnvelope(
+    apiClient.post("/api/v1/system-settings/smtp/test"),
+    zSendSmtpTestEmailApiV1SystemSettingsSmtpTestPostResponse
   );
 }
 

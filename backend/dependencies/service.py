@@ -19,8 +19,10 @@ from services import (
     MCPRegistryService,
     MCPServerService,
     MetricsService,
+    NotificationDispatcher,
     NotificationService,
     SecretService,
+    SystemSettingsService,
     TagService,
     TenantService,
     UserAvatarService,
@@ -46,6 +48,7 @@ from .repository import (
     MetricsRepositoryDep,
     NotificationRepositoryDep,
     SecretRepositoryDep,
+    SystemSettingsRepositoryDep,
     TagRepositoryDep,
     TenantRepositoryDep,
     UserAvatarRepositoryDep,
@@ -59,6 +62,7 @@ from .repository import (
 )
 from .singletons import (
     AgentRegistryDep,
+    EmailSenderDep,
     SecretCipherDep,
     SessionServiceDep,
     SkillManagerDep,
@@ -162,6 +166,39 @@ def get_notification_service(repo: NotificationRepositoryDep) -> NotificationSer
 
 NotificationServiceDep = Annotated[
     NotificationService, Depends(get_notification_service)
+]
+
+
+def get_system_settings_service(
+    repo: SystemSettingsRepositoryDep, cipher: SecretCipherDep
+) -> SystemSettingsService:
+    """Create a SystemSettingsService backed by the request's repository."""
+    return SystemSettingsService(repo, cipher)
+
+
+SystemSettingsServiceDep = Annotated[
+    SystemSettingsService, Depends(get_system_settings_service)
+]
+
+
+def get_notification_dispatcher(
+    notifications: NotificationRepositoryDep,
+    users: UserRepositoryDep,
+    settings: SystemSettingsServiceDep,
+    sender: EmailSenderDep,
+) -> NotificationDispatcher:
+    """Create a NotificationDispatcher backed by the request's collaborators.
+
+    Request-scoped counterpart of
+    :func:`services.notification_dispatch.build_notification_dispatcher`, which
+    the agent tools and background jobs use because they run outside request
+    scope.
+    """
+    return NotificationDispatcher(notifications, users, settings, sender)
+
+
+NotificationDispatcherDep = Annotated[
+    NotificationDispatcher, Depends(get_notification_dispatcher)
 ]
 
 
@@ -358,10 +395,10 @@ def get_workflow_task_service(
     execution_repo: WorkflowExecutionRepositoryDep,
     access: WorkflowExecutionAccessPolicyDep,
     approvals: ApprovalRepositoryDep,
-    notifications: NotificationRepositoryDep,
+    notifications: NotificationDispatcherDep,
     approver_groups: ApproverGroupResolverDep,
 ) -> WorkflowTaskService:
-    """Create a WorkflowTaskService wiring the task, session, approval, and notification repositories, the access policy, and the approver-group resolver."""
+    """Create a WorkflowTaskService wiring the task, session, and approval repositories, the notification dispatcher, the access policy, and the approver-group resolver."""
     return WorkflowTaskService(
         repo, execution_repo, access, approvals, notifications, approver_groups
     )

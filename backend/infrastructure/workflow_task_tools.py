@@ -31,7 +31,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from google.adk.tools.tool_context import ToolContext
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -47,9 +47,7 @@ from models.workflow_task import (
     WorkflowTaskUpdate,
 )
 from repositories import (
-    NotificationRepository,
     SqlMCPServerRepository,
-    SqlNotificationRepository,
     SqlWorkflowExecutionRepository,
     SqlWorkflowTaskRepository,
     WorkflowExecutionRepository,
@@ -64,6 +62,14 @@ from repositories.tenant_bootstrap import (
     NoTenantSessionError,
     resolve_workflow_execution_tenant,
 )
+
+if TYPE_CHECKING:
+    # Type-only: importing any ``services`` submodule at runtime executes
+    # ``services/__init__``, which pulls in ``services.workflow_execution`` ->
+    # ``infrastructure.agent`` -> this module, a cycle at import time. The
+    # runtime import is deferred into :func:`_scope`, the same way
+    # :func:`_evaluate_completion` defers its own.
+    from services.notification_dispatch import NotificationDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +97,9 @@ class _Scope:
     tenant_id: str
     execution_repo: WorkflowExecutionRepository
     task_repo: WorkflowTaskRepository
-    notif_repo: NotificationRepository
+    # Quoted so the dataclass does not evaluate the name at class-creation
+    # time -- it only exists under TYPE_CHECKING (see the import above).
+    notifications: "NotificationDispatcher"
 
 
 async def _resolve_scope(
@@ -132,9 +140,13 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
     Opens a fresh ``AsyncSession`` on the module-level engine (the tools run
     outside FastAPI's request scope), resolves the current run's
     WorkflowExecution id and tenant id, and wires a WorkflowExecution repository, a
-    WorkflowTask repository, and a Notification repository to it, all scoped
+    WorkflowTask repository, and a notification dispatcher to it, all scoped
     to the resolved tenant. The engine is referenced through the ``database``
     module so tests can monkeypatch ``database.engine``.
+
+    The dispatcher's import is deferred to call time for the same reason
+    :func:`_evaluate_completion` defers its own: reaching into ``services`` at
+    module import time closes a cycle back through ``infrastructure.agent``.
 
     Args:
         tool_context: The ADK tool context for the current invocation.
@@ -145,6 +157,8 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
     Raises:
         NoTenantSessionError: If no WorkflowExecution is bound to the current run.
     """
+    from services.notification_dispatch import build_notification_dispatcher
+
     async with AsyncSession(database.engine) as db:
         execution_id, tenant_id = await _resolve_scope(tool_context, db)
         execution_repo = SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
@@ -158,7 +172,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
                 SqlMCPServerRepository(db, tenant_id=tenant_id),
                 tenant_id=tenant_id,
             ),
-            notif_repo=SqlNotificationRepository(db, tenant_id=tenant_id),
+            notifications=build_notification_dispatcher(db, tenant_id=tenant_id),
         )
 
 
@@ -181,7 +195,7 @@ def _user_id(tool_context: ToolContext) -> str:
 
 async def _notify(
     execution_repo: WorkflowExecutionRepository,
-    notif_repo: NotificationRepository,
+    notifications: "NotificationDispatcher",
     execution_id: str,
     notification_type: NotificationType,
     title: str,
@@ -201,7 +215,8 @@ async def _notify(
 
     Args:
         execution_repo: Repository used to resolve the session and its owner.
-        notif_repo: Repository used to persist the notification.
+        notifications: Dispatcher that persists the notification and, when a
+            relay is configured, emails it to the recipient.
         execution_id: Primary key of the workflow execution the notification concerns.
         notification_type: The kind of event being announced.
         title: Short headline shown in the notification panel.
@@ -220,7 +235,7 @@ async def _notify(
             body=body,
             workflow_execution_id=execution_id,
         )
-        await notif_repo.create(data, user_id=execution.created_by)
+        await notifications.create(data, user_id=execution.created_by)
     except Exception:
         logger.exception(
             "failed to create %s notification for workflow execution %s",
@@ -247,7 +262,7 @@ async def _evaluate_completion(scope: _Scope) -> None:
     await evaluate_completion(
         executions=scope.execution_repo,
         tasks=scope.task_repo,
-        notifications=scope.notif_repo,
+        notifications=scope.notifications,
         execution_id=scope.execution_id,
     )
 

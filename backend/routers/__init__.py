@@ -13,6 +13,7 @@ from routers import (
     notifications,
     secrets,
     sessions,
+    system_settings,
     tags,
     tenant,
     user,
@@ -45,6 +46,7 @@ api_router.include_router(metrics.router, dependencies=_protected)
 api_router.include_router(notifications.router, dependencies=_protected)
 api_router.include_router(secrets.router, dependencies=_protected)
 api_router.include_router(sessions.router, dependencies=_protected)
+api_router.include_router(system_settings.router, dependencies=_protected)
 api_router.include_router(tags.router, dependencies=_protected)
 api_router.include_router(tenant.router, dependencies=_protected)
 api_router.include_router(user.router, dependencies=_protected)

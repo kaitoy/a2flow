@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.bootstrap import seed_system_user
+from infrastructure.bootstrap import seed_system_settings, seed_system_user
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 
@@ -79,6 +79,9 @@ async def seed_users(
         tenant_id = None if Role.super_admin in roles else DEFAULT_TEST_TENANT_ID
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
+        # Mirrors main.py's lifespan: every reader of the settings row assumes
+        # the startup seed created it, so tests need it too.
+        await seed_system_settings(session)
     if tenant_id is not None:
         await seed_tenant(engine, tenant_id)
     async with AsyncSession(engine) as session:

@@ -8,6 +8,11 @@ random password exactly once when unset, and each is independently
 idempotent. Also covers the ordering contract between the two — ``root`` must
 be seeded first, or its "any real user exists" skip check would wrongly fire
 once the Default-tenant admin exists.
+
+Also covers :func:`apply_system_settings_env_overrides`: applying whichever
+``APP_BASE_URL``/``SMTP_*`` environment variables are set onto the singleton
+system-settings row on every startup, leaving unset fields (and, on any
+validation failure, the whole row) untouched.
 """
 
 import logging
@@ -22,14 +27,19 @@ from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import (
+    apply_system_settings_env_overrides,
     seed_default_tenant_and_admin_user,
     seed_root_user,
+    seed_system_settings,
     seed_system_user,
 )
 from infrastructure.password import verify_password
+from infrastructure.secret_cipher import get_secret_cipher
 from models.constraints import Password
+from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
+from repositories.exceptions import NotFoundError
 
 _PASSWORD_CONSTRAINTS = get_args(Password)[1]
 
@@ -59,6 +69,14 @@ async def engine() -> AsyncGenerator[AsyncEngine, None]:
         yield mem_engine
     finally:
         await mem_engine.dispose()
+
+
+@pytest_asyncio.fixture()
+async def settings_engine(engine: AsyncEngine) -> AsyncEngine:
+    """The shared ``engine`` fixture, with the system_settings row also seeded."""
+    async with AsyncSession(engine) as session:
+        await seed_system_settings(session)
+    return engine
 
 
 async def _real_users(session: AsyncSession) -> list[User]:
@@ -449,3 +467,197 @@ async def test_seed_default_tenant_admin_user_before_root_user_prevents_root(
     usernames = {user.username for user in users}
     assert usernames == {"admin"}
     assert "root" not in usernames
+
+
+# ---------- apply_system_settings_env_overrides ----------
+
+
+async def _settings_row(engine: AsyncEngine) -> SystemSettings:
+    async with AsyncSession(engine) as session:
+        row = await session.get(SystemSettings, SYSTEM_SETTINGS_ID)
+    assert row is not None
+    return row
+
+
+@pytest.fixture(autouse=True)
+def _blank_system_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force every ``APP_BASE_URL``/``SMTP_*`` env var blank before each test below.
+
+    ``config.get_settings`` always reads real ``os.environ`` regardless of
+    the conftest-level ``_reset_settings_cache`` fixture blocking
+    ``Settings``'s ``env_file`` — and ``main.py``'s module-level
+    ``load_dotenv()`` call writes ``backend/.env``'s contents straight into
+    ``os.environ`` the first time anything in the same pytest-xdist worker
+    imports ``main`` (e.g. a router test's ``TestClient`` fixture), which
+    then persists for the rest of that worker's test run. Without this, a
+    developer with real SMTP credentials configured in their local
+    ``backend/.env`` would see these tests fail depending on test order.
+    A blank value is treated as unset by :class:`config.Settings`'s own
+    validator, so this only establishes a clean baseline; each test below
+    still layers its own ``monkeypatch.setenv(...)`` calls on top for the
+    fields it cares about.
+    """
+    for name in (
+        "APP_BASE_URL",
+        "SMTP_ENABLED",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_SECURITY",
+        "SMTP_USERNAME",
+        "SMTP_PASSWORD",
+        "SMTP_FROM_EMAIL",
+        "SMTP_FROM_NAME",
+    ):
+        monkeypatch.setenv(name, "")
+
+
+async def test_apply_system_settings_env_overrides_does_nothing_when_unset(
+    settings_engine: AsyncEngine,
+) -> None:
+    async with AsyncSession(settings_engine) as session:
+        await apply_system_settings_env_overrides(session)
+    row = await _settings_row(settings_engine)
+    assert row.app_base_url is None
+    assert row.smtp_enabled is False
+    assert row.smtp_host is None
+    assert row.smtp_port == 587
+
+
+async def test_apply_system_settings_env_overrides_applies_app_base_url(
+    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("APP_BASE_URL", "https://a2flow.example.com")
+
+    async with AsyncSession(settings_engine) as session:
+        await apply_system_settings_env_overrides(session)
+
+    row = await _settings_row(settings_engine)
+    assert row.app_base_url == "https://a2flow.example.com"
+    # Applied independently of SMTP — no enable flag gates it.
+    assert row.smtp_enabled is False
+
+
+async def test_apply_system_settings_env_overrides_skips_on_invalid_app_base_url(
+    settings_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("APP_BASE_URL", "not-a-url")
+    with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
+        async with AsyncSession(settings_engine) as session:
+            await apply_system_settings_env_overrides(session)
+    row = await _settings_row(settings_engine)
+    assert row.app_base_url is None
+    bootstrap_records = [r for r in caplog.records if r.name == _BOOTSTRAP_LOGGER]
+    assert len(bootstrap_records) == 1
+    assert "app_base_url" in bootstrap_records[0].getMessage()
+
+
+async def test_apply_system_settings_env_overrides_applies_a_full_valid_configuration(
+    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SMTP_ENABLED", "true")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_PORT", "2525")
+    monkeypatch.setenv("SMTP_SECURITY", "starttls")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "a2flow@example.com")
+    monkeypatch.setenv("SMTP_FROM_NAME", "A2Flow")
+    monkeypatch.setenv("SMTP_USERNAME", "mailer")
+    monkeypatch.setenv("SMTP_PASSWORD", "hunter2hunter2")
+
+    async with AsyncSession(settings_engine) as session:
+        await apply_system_settings_env_overrides(session)
+
+    row = await _settings_row(settings_engine)
+    assert row.smtp_enabled is True
+    assert row.smtp_host == "smtp.example.com"
+    assert row.smtp_port == 2525
+    assert row.smtp_from_email == "a2flow@example.com"
+    assert row.smtp_from_name == "A2Flow"
+    assert row.smtp_username == "mailer"
+    assert row.smtp_password is not None
+    assert row.smtp_password != "hunter2hunter2"
+    assert get_secret_cipher().decrypt(row.smtp_password) == "hunter2hunter2"
+    assert row.updated_by == SYSTEM_USER_ID
+
+
+async def test_apply_system_settings_env_overrides_skips_on_unusable_configuration(
+    settings_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("SMTP_ENABLED", "true")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "a2flow@example.com")
+    with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
+        async with AsyncSession(settings_engine) as session:
+            await apply_system_settings_env_overrides(session)
+    row = await _settings_row(settings_engine)
+    assert row.smtp_enabled is False
+    assert row.smtp_host is None
+    # Filtered by logger name: get_secret_cipher() may also log its own
+    # one-time "generated a new secret encryption key" WARNING on this
+    # worker's first use, which is unrelated to this function's own warning.
+    bootstrap_records = [r for r in caplog.records if r.name == _BOOTSTRAP_LOGGER]
+    assert len(bootstrap_records) == 1
+    assert "smtpHost" in bootstrap_records[0].getMessage()
+
+
+async def test_apply_system_settings_env_overrides_applies_partial_config_without_enabling(
+    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    async with AsyncSession(settings_engine) as session:
+        await apply_system_settings_env_overrides(session)
+    row = await _settings_row(settings_engine)
+    assert row.smtp_host == "smtp.example.com"
+    assert row.smtp_enabled is False
+
+
+async def test_apply_system_settings_env_overrides_skips_on_invalid_port(
+    settings_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("SMTP_PORT", "70000")
+    with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
+        async with AsyncSession(settings_engine) as session:
+            await apply_system_settings_env_overrides(session)
+    row = await _settings_row(settings_engine)
+    assert row.smtp_port == 587
+    assert "smtp_port" in caplog.records[-1].getMessage()
+
+
+async def test_apply_system_settings_env_overrides_never_logs_the_password(
+    settings_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("SMTP_PASSWORD", "super-secret-value")
+    monkeypatch.setenv("SMTP_PORT", "70000")  # forces the whole apply to fail
+    with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
+        async with AsyncSession(settings_engine) as session:
+            await apply_system_settings_env_overrides(session)
+    assert "super-secret-value" not in caplog.text
+
+
+async def test_apply_system_settings_env_overrides_is_idempotent_across_reboots(
+    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SMTP_ENABLED", "true")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "a2flow@example.com")
+    async with AsyncSession(settings_engine) as session:
+        await apply_system_settings_env_overrides(session)
+        await apply_system_settings_env_overrides(session)
+    row = await _settings_row(settings_engine)
+    assert row.smtp_enabled is True
+    assert row.smtp_host == "smtp.example.com"
+
+
+async def test_apply_system_settings_env_overrides_requires_the_row_to_exist(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    async with AsyncSession(engine) as session:  # note: settings row NOT seeded
+        with pytest.raises(NotFoundError):
+            await apply_system_settings_env_overrides(session)

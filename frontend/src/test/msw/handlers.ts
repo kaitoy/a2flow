@@ -62,6 +62,23 @@ const TENANT_1 = {
   updatedBy: "",
 };
 
+const SYSTEM_SETTINGS = {
+  id: "00000000-0000-0000-0000-000000000001",
+  appBaseUrl: null,
+  smtpEnabled: false,
+  smtpHost: null,
+  smtpPort: 587,
+  smtpSecurity: "starttls",
+  smtpUsername: null,
+  smtpFromEmail: null,
+  smtpFromName: null,
+  smtpPasswordSet: false,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 const WORKFLOW_1 = {
   id: "wf-1",
   tenantId: "tenant-1",
@@ -302,6 +319,12 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/tenants/:tenantId`, () => envelope(TENANT_1)),
 
   http.delete(`${BASE}/api/v1/tenants/:tenantId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/system-settings`, () => envelope(SYSTEM_SETTINGS)),
+
+  http.patch(`${BASE}/api/v1/system-settings`, () => envelope(SYSTEM_SETTINGS)),
+
+  http.post(`${BASE}/api/v1/system-settings/smtp/test`, () => envelope(null)),
 
   http.get(`${BASE}/api/v1/users`, () => envelope([USER_1])),
 

@@ -511,6 +511,24 @@ Per-user notifications surfaced in the frontend's toolbar bell. Notifications ar
 
 Each notification stores a `type` (`workflow_draft_ready` / `workflow_generation_failed` / `approval_request` / `execution_completed`), `title`, optional `body`, the linked `workflowExecutionId` or `workflowId`, and a `read` flag. Rows cascade-delete with their recipient user and their linked `WorkflowExecution` or `Workflow`.
 
+Every one of those producers writes through `services/notification_dispatch.py::NotificationDispatcher` rather than calling `NotificationRepository.create` directly. The dispatcher persists the row first and then, when [system settings](#system-settings) have SMTP enabled, emails the recipient. That second step is strictly best-effort: it is wrapped in a blanket `except Exception` and logged, so a misconfigured relay degrades the feature to in-app notifications instead of breaking the workflow operation that raised one. It also skips recipients there is no point mailing — the seeded system user, disabled or soft-deleted accounts, and accounts with no address — before a relay is contacted.
+
+The dispatcher also exposes `exists_for_session` as a pass-through, which is what lets it stand in for the repository inside `services/workflow_execution_completion.py::evaluate_completion`. Callers running outside FastAPI's request scope (the ADK tools in `infrastructure/workflow_task_tools.py` and `infrastructure/approval_tools.py`, and the design job in `services/workflow_design.py`) build one with `build_notification_dispatcher(db, tenant_id=...)`; request-scoped callers inject `NotificationDispatcherDep`. The two `infrastructure/*_tools.py` modules import it lazily, for the same reason they already defer `evaluate_completion`: touching `services` at import time closes a cycle back through `infrastructure.agent`.
+
+---
+
+### System settings
+
+`GET` / `PATCH /api/v1/system-settings` plus `POST /api/v1/system-settings/smtp/test`, all gated behind `super_admin` — reads included, like [tenants](#tenants). The routes deliberately do **not** depend on `CurrentTenantIdDep`: a super admin is platform-scoped, so that dependency would raise `ForbiddenError` unless a tenant happened to be selected, locking out the only callers allowed here.
+
+`SystemSettings` is a singleton table (`BaseEntity` only, no `TenantScoped`) whose primary key is pinned to `SYSTEM_SETTINGS_ID` by `ck_system_settings_singleton`, and whose row is seeded at startup by `infrastructure/bootstrap.py::seed_system_settings`. Seeding it up front rather than lazily is what lets every reader assume it exists.
+
+`smtp_password` is write-only: `SystemSettingsService` encrypts it with the shared `SecretCipher` before it reaches the repository, and responses use `SystemSettingsRead`, which drops it in favor of a `smtpPasswordSet` flag — the same pattern as `SecretRead.keys` and `User.password`. An empty submitted value means "keep the stored ciphertext", so a blank field in the admin form is non-destructive. The cross-field rules (a host and sender address are required once `smtp_enabled` is true; a username needs a password) are checked against the *merged* result in the service and raise `422 INVALID_SYSTEM_SETTINGS`, since a PATCH body alone cannot know the effective configuration.
+
+`infrastructure/email_sender.py` is the adapter. It uses the standard library's blocking `smtplib` on a worker thread (`asyncio.to_thread`) rather than adding an async SMTP dependency, selects `SMTP_SSL` / `SMTP` + `STARTTLS` / plain per `smtp_security`, and wraps every transport failure in `EmailSendError` — whose reason is logged server-side and never returned to a client, mirroring `McpConnectionError`.
+
+`smtp_host` and `app_base_url` use their own constraint aliases rather than `HttpUrl`, whose `assert_public_http_url` SSRF guard would reject exactly the values these fields legitimately hold: a relay on `localhost` or a private subnet, and the app's own address in development. Neither is fetched server-side on a caller's behalf.
+
 ---
 
 ### Approvals

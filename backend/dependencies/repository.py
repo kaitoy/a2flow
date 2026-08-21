@@ -30,6 +30,7 @@ from repositories import (
     SqlMetricsRepository,
     SqlNotificationRepository,
     SqlSecretRepository,
+    SqlSystemSettingsRepository,
     SqlTagRepository,
     SqlTenantRepository,
     SqlUserAvatarRepository,
@@ -40,6 +41,7 @@ from repositories import (
     SqlWorkflowRepository,
     SqlWorkflowTaskRepository,
     SqlWorkflowTaskTemplateRepository,
+    SystemSettingsRepository,
     TagRepository,
     TenantRepository,
     UserAvatarRepository,
@@ -121,6 +123,23 @@ def get_secret_repository(
 
 
 SecretRepositoryDep = Annotated[SecretRepository, Depends(get_secret_repository)]
+
+
+def get_system_settings_repository(db: DBSessionDep) -> SystemSettingsRepository:
+    """Create a SystemSettingsRepository backed by the current database session.
+
+    Not tenant-scoped: the settings apply to the whole platform, and only a
+    ``super_admin`` — who carries no ``tenant_id`` — may reach them (see
+    "Tenant Isolation" in ``.claude/rules/backend-patterns.md``). Pulling in
+    ``CurrentTenantIdDep`` here would make every route 403 for exactly the
+    callers they exist for.
+    """
+    return SqlSystemSettingsRepository(db)
+
+
+SystemSettingsRepositoryDep = Annotated[
+    SystemSettingsRepository, Depends(get_system_settings_repository)
+]
 
 
 def get_tag_repository(

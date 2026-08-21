@@ -17,8 +17,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import get_settings
 from dependencies import APP_NAME
 from infrastructure.bootstrap import (
+    apply_system_settings_env_overrides,
     seed_default_tenant_and_admin_user,
     seed_root_user,
+    seed_system_settings,
     seed_system_user,
 )
 from infrastructure.database import engine
@@ -32,6 +34,7 @@ from repositories.exceptions import (
     AvatarValidationError,
     CsrfError,
     DependencyCycleError,
+    EmailSendError,
     ForbiddenError,
     ForeignKeyViolationError,
     McpConnectionError,
@@ -46,6 +49,7 @@ from repositories.exceptions import (
     SkillCloneError,
     SkillNotReadyError,
     SummarizationFailedError,
+    SystemSettingsValidationError,
     UnauthorizedError,
     UniqueViolationError,
     UserValidationError,
@@ -60,6 +64,7 @@ from routers.exception_handlers import (
     avatar_validation_exception_handler,
     csrf_exception_handler,
     dependency_cycle_exception_handler,
+    email_send_exception_handler,
     forbidden_exception_handler,
     foreign_key_violation_exception_handler,
     http_exception_handler,
@@ -75,6 +80,7 @@ from routers.exception_handlers import (
     skill_clone_exception_handler,
     skill_not_ready_exception_handler,
     summarization_failed_exception_handler,
+    system_settings_validation_exception_handler,
     unauthorized_exception_handler,
     unhandled_exception_handler,
     unique_violation_exception_handler,
@@ -100,14 +106,15 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Apply pending migrations, seed the baseline users, and sync the demo data.
+    """Apply pending migrations, seed the baseline users and settings, and sync the demo data.
 
-    Seeds the system, root, and Default-tenant admin users, then registers or
-    removes the optional demo dataset depending on ``DEMO_DATA``. A demo agent
-    skill registered by this run still needs its repository cloned; that runs
-    as a background task rather than inline, so a slow or unreachable remote
-    delays nothing (``sync_agent_skill`` records every failure on the skill
-    row itself).
+    Seeds the system, root, and Default-tenant admin users and the singleton
+    system-settings row, applies any ``APP_BASE_URL``/``SMTP_*`` environment
+    overrides onto that row, then registers or removes the optional demo
+    dataset depending on ``DEMO_DATA``. A demo agent skill registered by this
+    run still needs its repository cloned; that runs as a background task
+    rather than inline, so a slow or unreachable remote delays nothing
+    (``sync_agent_skill`` records every failure on the skill row itself).
     """
     await run_migrations()
     # Holds a strong reference to the clone task for as long as the
@@ -115,6 +122,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     background: set[asyncio.Task[None]] = set()
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
+        await seed_system_settings(session)
+        await apply_system_settings_env_overrides(session)
         # seed_root_user's skip check ("any real user exists") must run
         # before seed_default_tenant_and_admin_user creates its own real
         # user, or root would never be seeded on a fresh database. The demo
@@ -210,6 +219,10 @@ app.add_exception_handler(
     McpServerValidationError, mcp_server_validation_exception_handler
 )
 app.add_exception_handler(UserValidationError, user_validation_exception_handler)
+app.add_exception_handler(
+    SystemSettingsValidationError, system_settings_validation_exception_handler
+)
+app.add_exception_handler(EmailSendError, email_send_exception_handler)
 app.add_exception_handler(SecretResolutionError, secret_resolution_exception_handler)
 app.add_exception_handler(UnauthorizedError, unauthorized_exception_handler)
 app.add_exception_handler(CsrfError, csrf_exception_handler)

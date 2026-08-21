@@ -2,12 +2,12 @@
 
 Collects every environment variable the running application reads (server
 bind settings, CORS, database, agent skill store, LLM selection, admin
-bootstrap, demo data, secret encryption, HashiCorp Vault, MCP registry, and
-session auth) into a single :class:`Settings` model instead of scattered
-``os.getenv`` calls. Values with side-effecting fallback behavior (random
-admin password generation, Fernet key generation/persistence) are left to
-the modules that own that behavior; this model only resolves the plain
-configuration value.
+bootstrap, demo data, secret encryption, HashiCorp Vault, MCP registry,
+platform SMTP bootstrap, and session auth) into a single :class:`Settings`
+model instead of scattered ``os.getenv`` calls. Values with side-effecting
+fallback behavior (random admin password generation, Fernet key
+generation/persistence) are left to the modules that own that behavior; this
+model only resolves the plain configuration value.
 
 ``scripts/export_openapi.py``'s ``OPENAPI_OUTPUT`` is intentionally excluded:
 that script is a standalone dev-time CLI tool outside the running
@@ -120,6 +120,25 @@ class Settings(BaseSettings):
             login session.
         metrics_timezone: IANA timezone name deciding where a calendar day
             starts for the operations metrics.
+        app_base_url: Base URL at which users reach this deployment in a
+            browser, used to build the deep links embedded in outgoing
+            notification email. Applied to the ``system_settings`` row on
+            every startup by
+            ``infrastructure.bootstrap.apply_system_settings_env_overrides``;
+            left unset, the stored value is untouched. See that function's
+            docstring for the full env-loading contract covering this and the
+            ``smtp_*`` fields below.
+        smtp_enabled: Whether outbound notification email is enabled. Applied
+            to the ``system_settings`` row the same way as ``app_base_url``
+            above; left unset, the stored value is untouched.
+        smtp_host: SMTP relay hostname or IP.
+        smtp_port: SMTP relay submission port.
+        smtp_security: How the connection to the relay is secured (``none``,
+            ``starttls``, or ``ssl``).
+        smtp_username: SMTP relay username, if the relay requires authentication.
+        smtp_password: SMTP relay password.
+        smtp_from_email: "From" address on outgoing notification email.
+        smtp_from_name: "From" display name on outgoing notification email.
     """
 
     model_config = SettingsConfigDict(
@@ -172,6 +191,17 @@ class Settings(BaseSettings):
 
     metrics_timezone: str = _DEFAULT_METRICS_TIMEZONE
 
+    app_base_url: str | None = None
+
+    smtp_enabled: bool | None = None
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_security: str | None = None
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    smtp_from_name: str | None = None
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_cors_origins(cls, value: Any) -> Any:
@@ -212,6 +242,38 @@ class Settings(BaseSettings):
             ZoneInfo(value)
         except (ZoneInfoNotFoundError, ValueError):
             return _DEFAULT_METRICS_TIMEZONE
+        return value
+
+    @field_validator(
+        "app_base_url",
+        "smtp_enabled",
+        "smtp_host",
+        "smtp_port",
+        "smtp_security",
+        "smtp_username",
+        "smtp_password",
+        "smtp_from_email",
+        "smtp_from_name",
+        mode="before",
+    )
+    @classmethod
+    def _blank_system_settings_env_is_unset(cls, value: Any) -> Any:
+        """Treat an empty ``APP_BASE_URL``/``SMTP_*`` value as unset, not a parse/shape error.
+
+        A deploy template (docker-compose, a Kubernetes ConfigMap) commonly
+        emits every declared env var, blank, when a feature exists but isn't
+        configured yet. Without this, an empty ``SMTP_PORT`` or
+        ``SMTP_ENABLED`` would fail int/bool coercion right here and crash the
+        whole application at startup — before
+        ``infrastructure.bootstrap.apply_system_settings_env_overrides`` ever
+        gets a chance to log a warning and skip just the offending env load —
+        and a blank ``SMTP_HOST`` or ``APP_BASE_URL`` would be treated as
+        "explicitly set to an invalid empty value" instead of "not
+        configured". Mirrors :meth:`_fallback_idle_timeout`'s reasoning for
+        the same class of problem.
+        """
+        if value == "":
+            return None
         return value
 
 

@@ -92,4 +92,21 @@ describe("AdminPage (welcome)", () => {
     // Tenants stays super_admin-only.
     expect(screen.queryByRole("link", { name: /Tenants/ })).not.toBeInTheDocument();
   });
+
+  it("renders a System Settings card for a super admin only", () => {
+    render(<AdminPage />, { preloadedState: authState(["super_admin"]) });
+    expect(screen.getByRole("link", { name: /System Settings/ })).toHaveAttribute(
+      "href",
+      "/admin/system-settings"
+    );
+  });
+
+  it.each([
+    ["admin"],
+    ["developer"],
+    ["requester"],
+  ] as const)("hides the System Settings card from a %s", (role) => {
+    render(<AdminPage />, { preloadedState: authState([role]) });
+    expect(screen.queryByRole("link", { name: /System Settings/ })).not.toBeInTheDocument();
+  });
 });

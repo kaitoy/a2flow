@@ -440,11 +440,11 @@ async def generate_workflow_design(
     from repositories import (
         SqlAgentSkillRepository,
         SqlMCPServerRepository,
-        SqlNotificationRepository,
         SqlWorkflowRepository,
         SqlWorkflowTaskTemplateRepository,
     )
     from repositories.tenant_bootstrap import resolve_workflow_tenant
+    from services.notification_dispatch import build_notification_dispatcher
 
     async with AsyncSession(database.engine, expire_on_commit=False) as db:
         tenant_id = await resolve_workflow_tenant(db, workflow_id)
@@ -480,7 +480,7 @@ async def generate_workflow_design(
                 user_id=user_id,
             )
             try:
-                await SqlNotificationRepository(db, tenant_id=tenant_id).create(
+                await build_notification_dispatcher(db, tenant_id=tenant_id).create(
                     NotificationCreate(
                         user_id=user_id,
                         type=NotificationType.workflow_generation_failed,
@@ -603,7 +603,7 @@ async def generate_workflow_design(
                 user_id=user_id,
             )
             try:
-                await SqlNotificationRepository(db, tenant_id=tenant_id).create(
+                await build_notification_dispatcher(db, tenant_id=tenant_id).create(
                     NotificationCreate(
                         user_id=owner_id,
                         type=NotificationType.workflow_draft_ready,

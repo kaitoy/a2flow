@@ -20,6 +20,7 @@ from repositories.exceptions import (
     AvatarValidationError,
     CsrfError,
     DependencyCycleError,
+    EmailSendError,
     ForbiddenError,
     ForeignKeyViolationError,
     McpConnectionError,
@@ -34,6 +35,7 @@ from repositories.exceptions import (
     SkillCloneError,
     SkillNotReadyError,
     SummarizationFailedError,
+    SystemSettingsValidationError,
     UnauthorizedError,
     UniqueViolationError,
     UserValidationError,
@@ -181,6 +183,38 @@ async def secret_validation_exception_handler(
         message=str(exc),
         status_code=422,
         details={"reason": exc.reason},
+    )
+
+
+async def system_settings_validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 422 with INVALID_SYSTEM_SETTINGS when the merged SMTP config is unusable."""
+    assert isinstance(exc, SystemSettingsValidationError)
+    return _envelope_error(
+        request,
+        code="INVALID_SYSTEM_SETTINGS",
+        message=str(exc),
+        status_code=422,
+        details={"reason": exc.reason},
+    )
+
+
+async def email_send_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 502 with EMAIL_SEND_FAILED when the SMTP relay rejected a message.
+
+    The raw ``smtplib`` reason is logged server-side only: it can quote the
+    relay's banner and the configured AUTH username back at the caller.
+    """
+    assert isinstance(exc, EmailSendError)
+    logger.warning("SMTP delivery failed: %s", exc.reason)
+    return _envelope_error(
+        request,
+        code="EMAIL_SEND_FAILED",
+        message="Failed to send the message through the configured SMTP server",
+        status_code=502,
     )
 
 
