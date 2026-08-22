@@ -29,12 +29,18 @@ const POLL_INTERVAL_MS = 30_000;
  * no tenant selected yet has nothing to fetch -- polling is held off until the
  * tenant switcher (`components/admin/tenant-switcher.tsx`) resolves a selection,
  * avoiding a spurious 403 on first login before its auto-select effect has run.
+ *
+ * The polling loop also resets and fetches immediately whenever the effective
+ * user id changes -- notably when an admin starts or stops impersonating
+ * another user (`ImpersonationIndicator`) -- so the unread badge reflects the
+ * new effective user right away instead of waiting up to {@link POLL_INTERVAL_MS}.
  */
 export function useNotifications(): { refresh: () => Promise<void> } {
   const dispatch = useAppDispatch();
   const user = useAppSelector((s) => s.auth.user);
   const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
   const tenantReady = user == null || user.tenantId != null || selectedTenantId != null;
+  const userId = user?.id ?? null;
 
   const refresh = useCallback(async () => {
     dispatch(notificationsLoading());
@@ -47,6 +53,7 @@ export function useNotifications(): { refresh: () => Promise<void> } {
     }
   }, [dispatch]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: userId re-triggers an immediate fetch when the effective user changes (e.g. impersonation start/stop)
   useEffect(() => {
     if (!tenantReady) return;
     let active = true;
@@ -59,7 +66,7 @@ export function useNotifications(): { refresh: () => Promise<void> } {
       active = false;
       clearInterval(id);
     };
-  }, [refresh, tenantReady]);
+  }, [refresh, tenantReady, userId]);
 
   return { refresh };
 }

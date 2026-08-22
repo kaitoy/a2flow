@@ -2,7 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
-import { setSelectedTenantId } from "@/store/authSlice";
+import { setMe, setSelectedTenantId } from "@/store/authSlice";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
@@ -118,5 +118,34 @@ describe("NotificationBell", () => {
     });
     store.dispatch(setSelectedTenantId("tenant-1"));
     await waitFor(() => expect(screen.getByText("1")).toBeInTheDocument());
+  });
+
+  it("refetches immediately when the effective user changes, e.g. impersonation start", async () => {
+    let calls = 0;
+    server.use(
+      http.get(`${BASE}/api/v1/notifications`, () => {
+        calls++;
+        return envelope(calls === 1 ? [row("a", false)] : [row("a", false), row("b", false)]);
+      })
+    );
+    const admin = { id: "admin-1", roles: ["admin"], tenantId: "tenant-1" } as User;
+    const target = { id: "target-1", roles: ["viewer"], tenantId: "tenant-1" } as User;
+    const { store } = render(<NotificationBell />, {
+      preloadedState: {
+        auth: {
+          user: admin,
+          status: "authenticated",
+          selectedTenantId: null,
+          impersonatedUserId: null,
+          impersonatedBy: null,
+        },
+      },
+    });
+    await waitFor(() => expect(screen.getByText("1")).toBeInTheDocument());
+
+    store.dispatch(setMe({ user: target, impersonatedBy: admin }));
+
+    await waitFor(() => expect(screen.getByText("2")).toBeInTheDocument());
+    expect(calls).toBe(2);
   });
 });
