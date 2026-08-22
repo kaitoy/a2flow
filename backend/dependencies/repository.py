@@ -13,18 +13,22 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.database import get_session
 from repositories import (
     AgentSkillRepository,
+    ApprovalCertificateRepository,
     ApprovalRepository,
     AuthSessionRepository,
     EffectiveRoleRepository,
+    McpCertificateAuthorityRepository,
     MCPServerRepository,
     MessageMetaRepository,
     MetricsRepository,
     NotificationRepository,
     SecretRepository,
     SqlAgentSkillRepository,
+    SqlApprovalCertificateRepository,
     SqlApprovalRepository,
     SqlAuthSessionRepository,
     SqlEffectiveRoleRepository,
+    SqlMcpCertificateAuthorityRepository,
     SqlMCPServerRepository,
     SqlMessageMetaRepository,
     SqlMetricsRepository,
@@ -112,6 +116,35 @@ def get_notification_repository(
 
 NotificationRepositoryDep = Annotated[
     NotificationRepository, Depends(get_notification_repository)
+]
+
+
+def get_approval_certificate_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> ApprovalCertificateRepository:
+    """Create an ApprovalCertificateRepository backed by the current session."""
+    return SqlApprovalCertificateRepository(db, tenant_id=tenant_id)
+
+
+ApprovalCertificateRepositoryDep = Annotated[
+    ApprovalCertificateRepository, Depends(get_approval_certificate_repository)
+]
+
+
+def get_mcp_certificate_authority_repository(
+    db: DBSessionDep,
+) -> McpCertificateAuthorityRepository:
+    """Create an McpCertificateAuthorityRepository backed by the current session.
+
+    Not tenant-scoped: one root CA signs for the whole platform (see
+    :mod:`models.mcp_ca` for why a per-tenant root would add key material
+    without adding a boundary).
+    """
+    return SqlMcpCertificateAuthorityRepository(db)
+
+
+McpCertificateAuthorityRepositoryDep = Annotated[
+    McpCertificateAuthorityRepository, Depends(get_mcp_certificate_authority_repository)
 ]
 
 

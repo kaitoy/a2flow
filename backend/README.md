@@ -509,12 +509,44 @@ The task CRUD endpoints — create, list-for-an-execution (ordered `created_at` 
 
 It is an internal layer — no endpoint, no container of its own — but everything on its public surface is a plain serializable value object or an MCP wire type, with no `ToolContext`, `AsyncSession`, or ORM row crossing it. Re-exposing it as an MCP/HTTP endpoint therefore means parsing a request body into a `CallToolRequest` and replacing the authenticator's body; that is also when the `McpProxyError` hierarchy earns rows in `routers/exception_handlers.py`.
 
-- **Authentication** is the `McpAuthenticator` protocol. The only implementation, `AgentRunAuthenticator`, is a pass-through: the caller is a run this very process is driving, so its ADK session id has no channel to be forged over, and all the authenticator does is map that id to a tenant (and, for an execution run rather than a design session, to a `WorkflowExecution`) through `repositories/tenant_bootstrap.py`. This is the seam a real bearer-token or mTLS check lands in.
+- **Authentication** is the `McpAuthenticator` protocol. The only implementation, `AgentRunAuthenticator`, trusts the caller's ADK session id without verification — the caller is a run this very process is driving, so the id has no channel to be forged over — and maps it to a tenant (and, for an execution run rather than a design session, to a `WorkflowExecution`) through `repositories/tenant_bootstrap.py`. What it *does* verify is the [approval certificate](#approval-certificates), when one is presented: the chain back to this deployment's root, the validity window, and the certificate's shape. This is still the seam a transport-level mTLS check lands in; the certificate handling already produces the same verified credential either way.
 - **Authorization** is the `McpPolicy` protocol: veto-only (allow by returning, refuse by raising `McpPolicyDeniedError`), consulted in registration order, short-circuiting on the first denial. Policies live in `infrastructure/mcp_policies.py` and are registered in `default_policies()`. There is one `authorize` method rather than one per operation so that a policy cannot accidentally guard only half the surface — skipping an operation is an explicit early return.
 - **The first policy** is `InProgressToolBindingPolicy`, which carries the rule described above: a call may only target a tool bound to a task currently `in_progress` in the run. It deliberately does not restrict *listing*, since design is where bindings are decided. It runs **before** the server row is loaded, so a call naming an unregistered and unbound server is reported as unbound rather than as unregistered.
+- **The second policy** is `ApprovedTaskCertificatePolicy`, the [approval gate](#approval-certificates): when every `in_progress` task binding the target tool has an `Approval` attached, the call must present that approval's certificate and the certificate's own signed grant must cover the tool. Registered after the binding policy so the cheaper denial short-circuits first.
+- **Every decided call is audited.** The `McpAuditSink` protocol receives each `call_tool` verdict, allowed or refused; `infrastructure/mcp_audit.py` appends it to `mcp_tool_invocations`. Listings are not recorded — they have no side effect and would bury the calls that do. A sink that raises is logged and swallowed: auditing must never turn an allowed call into a refused one.
 - **The proxy owns the database session** and closes it before any network or subprocess call — a stdio spawn can hold the caller for two minutes, which must not pin a database connection. A policy's `db` is valid only while its `authorize` runs.
 
 `GET /api/v1/mcp-servers/{id}/tools` — the admin tool catalog — is deliberately **not** proxied yet and still calls `mcp_client.py` directly.
+
+---
+
+### Approval certificates
+
+Requesting an approval on a task now **closes** that task's access to its bound MCP tools until the approval is granted. Granting it issues a short-lived X.509 certificate; `ApprovedTaskCertificatePolicy` requires that certificate on every subsequent `call_tool` belonging to the task. Tasks with no approval attached are untouched and keep running under the plain tool-binding rule alone.
+
+The point is not the transport. The proxy is still in-process, so the presenter (`infrastructure/mcp_credentials.py`) and the verifier (`infrastructure/mcp_proxy.py`) share a process and a database, and the proof-of-possession signature proves nothing an attacker who already owns the backend could not forge. What it buys today is three concrete things, plus the shape the system needs later:
+
+1. **A fail-closed enforcement point.** The approval gate used to consist of the LLM's system instruction and the frontend declining to resume the run. Neither is a server rule. This is.
+2. **A frozen grant.** The certificate's `subjectAltName` carries the tools the task had bound *at the moment the approver decided*. The execution agent can rewrite its own task's `tool_bindings` mid-run through `update_workflow_task`, so a rule that reads bindings at call time is a rule the agent can widen — it cannot re-sign a certificate. This closes a real escalation path.
+3. **A verifiable audit trail.** Each decided call records the certificate serial together with the exact bytes signed for it, so `mcp_tool_invocations` can be re-verified later against the root's public half alone.
+4. **The mTLS seam.** Certificates carry `clientAuth`, so the same material works unchanged as TLS client certificates once the proxy becomes an HTTP endpoint; only the authenticator changes.
+
+| Piece | Where |
+|---|---|
+| Root CA — generation, loading, leaf signing | `infrastructure/mcp_ca.py`, table `mcp_certificate_authorities` |
+| Certificate grammar, digest, verification (all pure) | `infrastructure/mcp_certificate.py` |
+| Issuing and revoking | `services/approval_certificate.py`, table `approval_certificates` |
+| Presenting (the caller side) | `infrastructure/mcp_credentials.py` |
+| Enforcing | `ApprovedTaskCertificatePolicy` in `infrastructure/mcp_policies.py` |
+| Auditing | `infrastructure/mcp_audit.py`, table `mcp_tool_invocations` |
+
+**One root for the whole platform.** A per-tenant CA would add key material without adding a boundary: verification compares the tenant in the certificate's binding URN against the tenant the proxy derived independently from the session id, so a certificate minted for tenant A is refused in tenant B regardless of which key signed it. The root's private key is stored as Fernet ciphertext under the same key as [local secrets](#secrets); losing that key stops new certificates from being issued.
+
+**What a certificate claims** is carried entirely in `subjectAltName` URI entries — A2Flow holds no private enterprise OID arc, and inventing one would be indistinguishable from someone else's. Exactly one binding URN (`urn:a2flow:binding:tenant/T/execution/E/task/K/approval/A`) plus one grant URN per tool (`urn:a2flow:tool:SERVER/TOOL`). Both are percent-encoded, because `ToolName` places no character restriction on a tool name.
+
+**Revocation is not the only stop.** Verification also re-reads the approval's current status and the certificate row on every call, so an approval reversed after issuance is refused even if nothing stamped `revoked_at`. There is no scheduler in this codebase, so nothing here depends on a timer.
+
+`GET /api/v1/approvals/{id}/certificate` reports what an approval authorized — serial, validity window, revocation state, and the granted tools parsed back out of the signed certificate. The private key and the certificate body are never serialized.
 
 ---
 

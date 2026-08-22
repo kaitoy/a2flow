@@ -53,10 +53,12 @@ from .context import (
 )
 from .repository import (
     AgentSkillRepositoryDep,
+    ApprovalCertificateRepositoryDep,
     ApprovalRepositoryDep,
     AuthSessionRepositoryDep,
     DBSessionDep,
     EffectiveRoleRepositoryDep,
+    McpCertificateAuthorityRepositoryDep,
     MCPServerRepositoryDep,
     MetricsRepositoryDep,
     NotificationRepositoryDep,
@@ -91,6 +93,7 @@ from .repository import (
 )
 from .service import (
     AgentSkillServiceDep,
+    ApprovalCertificateServiceDep,
     ApprovalServiceDep,
     ApproverGroupResolverDep,
     MCPRegistryServiceDep,
@@ -165,7 +168,9 @@ __all__ = [
     "AgentSkillServiceDep",
     "ApiMetaDep",
     "BacklogThresholdDep",
+    "ApprovalCertificateRepositoryDep",
     "ApprovalRepositoryDep",
+    "ApprovalCertificateServiceDep",
     "ApprovalServiceDep",
     "ApproverGroupResolverDep",
     "AuthServiceDep",
@@ -183,6 +188,7 @@ __all__ = [
     "ImpersonationServiceDep",
     "MCPRegistryServiceDep",
     "MCPServerRepositoryDep",
+    "McpCertificateAuthorityRepositoryDep",
     "MCPServerServiceDep",
     "MetricsRepositoryDep",
     "MetricsServiceDep",

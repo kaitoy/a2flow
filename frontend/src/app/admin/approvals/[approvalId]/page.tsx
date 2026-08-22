@@ -1,7 +1,7 @@
 /** @module ApprovalDetailPage — Read-only admin detail page for a single Approval request. */
 "use client";
 
-import { CheckCircle2, MessageSquareText } from "lucide-react";
+import { CheckCircle2, MessageSquareText, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -18,10 +18,13 @@ import { Button } from "@/components/ui/button";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import {
   type Approval,
+  type ApprovalCertificateRead,
   getApproval,
+  getApprovalCertificate,
   getUserGroup,
   getUserNames,
   isForbiddenError,
+  listMcpServers,
   SUPPRESS_FORBIDDEN_TOAST,
 } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
@@ -46,6 +49,8 @@ export default function ApprovalDetailPage() {
   const [approverGroupName, setApproverGroupName] = useState<string | null>(null);
   const [deciderName, setDeciderName] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
+  const [certificate, setCertificate] = useState<ApprovalCertificateRead | null>(null);
+  const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     let active = true;
@@ -70,6 +75,19 @@ export default function ApprovalDetailPage() {
         if (a.approverGroupId) {
           const group = await getUserGroup(a.approverGroupId, SUPPRESS_FORBIDDEN_TOAST);
           if (active) setApproverGroupName(group.name);
+        }
+        // Only fetched when one can exist: the endpoint 404s for an approval
+        // that was never granted or that named no task, and a 404 here would
+        // raise a failure toast for what is an ordinary state.
+        if (a.status === "approved" && a.workflowTaskId) {
+          const issued = await getApprovalCertificate(approvalId);
+          if (!active) return;
+          setCertificate(issued);
+          if (issued.allowedTools.length > 0) {
+            const servers = await listMcpServers({ limit: 1000 });
+            if (!active) return;
+            setServerNames(new Map(servers.map((s) => [s.id, s.name])));
+          }
         }
       })
       .catch((err: unknown) => {
@@ -205,6 +223,60 @@ export default function ApprovalDetailPage() {
             </Button>
           </div>
         </div>
+
+        {certificate && (
+          <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={18} strokeWidth={1.8} aria-hidden="true" className="text-accent" />
+              <h2 className="font-semibold text-base">Authorized MCP tools</h2>
+            </div>
+            <p className="text-muted-foreground text-sm">
+              Granting this approval issued a certificate the task must present to call an MCP tool.
+              The tools below were frozen at the moment of the decision — changing the task&apos;s
+              bindings afterwards does not widen them.
+            </p>
+            <DetailList singleColumn>
+              <DetailItem
+                label="Certificate Status"
+                value={
+                  certificate.revokedAt
+                    ? `Revoked${certificate.revocationReason ? ` (${certificate.revocationReason})` : ""}`
+                    : "Active"
+                }
+              />
+              <DetailItem
+                label="Serial Number"
+                value={
+                  <span className="break-all font-mono text-xs">{certificate.serialNumber}</span>
+                }
+              />
+              <DetailItem
+                label="Valid Until"
+                value={new Date(certificate.notAfter).toLocaleString()}
+              />
+              <DetailItem
+                label="Granted Tools"
+                value={
+                  certificate.allowedTools.length === 0 ? (
+                    EMPTY_VALUE
+                  ) : (
+                    <ul className="flex flex-col gap-1">
+                      {certificate.allowedTools.map((tool) => (
+                        <li key={`${tool.mcpServerId}/${tool.toolName}`} className="text-sm">
+                          <span className="font-mono text-xs">{tool.toolName}</span>
+                          <span className="text-muted-foreground">
+                            {" · "}
+                            {serverNames.get(tool.mcpServerId) ?? tool.mcpServerId}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                }
+              />
+            </DetailList>
+          </div>
+        )}
       </FormLayout>
     </AdminPageContainer>
   );

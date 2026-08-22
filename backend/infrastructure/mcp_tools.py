@@ -36,11 +36,13 @@ may bind tools, but only a run may invoke them.
 
 import json
 import logging
+from dataclasses import replace
 from typing import Any
 
 from google.adk.tools.tool_context import ToolContext
 from mcp import types
 
+from infrastructure.mcp_credentials import get_approval_credential_provider
 from infrastructure.mcp_proxy import (
     CallToolRequest,
     ListToolsRequest,
@@ -200,6 +202,11 @@ async def call_mcp_tool(
     allowed tools. When several tasks are in progress at once, the union of
     their bindings is allowed.
 
+    A task that has an approval attached must additionally present that
+    approval's certificate. The certificate and its signature are attached here,
+    beneath the model: they never appear in an argument or a result, so the
+    model can ask for a call but cannot manufacture the authority for one.
+
     Args:
         server_id: Id of the registered MCP server (as bound to the task).
         tool_name: Name of the tool on that server.
@@ -217,10 +224,17 @@ async def call_mcp_tool(
     args = _coerce_arguments(arguments)
     if args is None:
         return {"error": "arguments must be an object matching the tool's input schema"}
+    principal = _principal(tool_context)
     try:
+        credential = await get_approval_credential_provider().credential_for(
+            session_id=principal.session_id,
+            mcp_server_id=server_id,
+            tool_name=tool_name,
+            arguments=args,
+        )
         result = await get_mcp_proxy().call_tool(
             CallToolRequest(
-                principal=_principal(tool_context),
+                principal=replace(principal, credential=credential),
                 server_id=server_id,
                 tool_name=tool_name,
                 arguments=args,

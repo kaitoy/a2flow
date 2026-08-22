@@ -14,6 +14,7 @@ from config import get_settings
 from infrastructure.secret_resolver import SecretResolver
 from services import (
     AgentSkillService,
+    ApprovalCertificateService,
     ApprovalService,
     ApproverGroupResolver,
     MCPRegistryService,
@@ -41,8 +42,10 @@ from services import (
 from .context import APP_NAME
 from .repository import (
     AgentSkillRepositoryDep,
+    ApprovalCertificateRepositoryDep,
     ApprovalRepositoryDep,
     EffectiveRoleRepositoryDep,
+    McpCertificateAuthorityRepositoryDep,
     MCPServerRepositoryDep,
     MessageMetaRepositoryDep,
     MetricsRepositoryDep,
@@ -397,10 +400,17 @@ def get_workflow_task_service(
     approvals: ApprovalRepositoryDep,
     notifications: NotificationDispatcherDep,
     approver_groups: ApproverGroupResolverDep,
+    certificates: ApprovalCertificateRepositoryDep,
 ) -> WorkflowTaskService:
     """Create a WorkflowTaskService wiring the task, session, and approval repositories, the notification dispatcher, the access policy, and the approver-group resolver."""
     return WorkflowTaskService(
-        repo, execution_repo, access, approvals, notifications, approver_groups
+        repo,
+        execution_repo,
+        access,
+        approvals,
+        notifications,
+        approver_groups,
+        certificates,
     )
 
 
@@ -422,11 +432,28 @@ WorkflowTaskTemplateServiceDep = Annotated[
 ]
 
 
+def get_approval_certificate_service(
+    certificates: ApprovalCertificateRepositoryDep,
+    tasks: WorkflowTaskRepositoryDep,
+    authorities: McpCertificateAuthorityRepositoryDep,
+    cipher: SecretCipherDep,
+) -> ApprovalCertificateService:
+    """Create an ApprovalCertificateService backed by the request's repositories."""
+    return ApprovalCertificateService(certificates, tasks, authorities, cipher)
+
+
+ApprovalCertificateServiceDep = Annotated[
+    ApprovalCertificateService, Depends(get_approval_certificate_service)
+]
+
+
 def get_approval_service(
-    repo: ApprovalRepositoryDep, approver_groups: ApproverGroupResolverDep
+    repo: ApprovalRepositoryDep,
+    approver_groups: ApproverGroupResolverDep,
+    certificates: ApprovalCertificateServiceDep,
 ) -> ApprovalService:
     """Create an ApprovalService backed by the request's repository."""
-    return ApprovalService(repo, approver_groups)
+    return ApprovalService(repo, approver_groups, certificates)
 
 
 ApprovalServiceDep = Annotated[ApprovalService, Depends(get_approval_service)]

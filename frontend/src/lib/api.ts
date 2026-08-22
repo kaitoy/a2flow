@@ -9,6 +9,7 @@ import type {
   AgentSkillUpdate,
   ApiError,
   ApiMeta,
+  ApprovalCertificateRead,
   Approval as ApprovalModel,
   ApprovalStatus,
   ApprovalUpdate,
@@ -95,6 +96,7 @@ import {
   zGenerateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
+  zGetApprovalCertificateApiV1ApprovalsApprovalIdCertificateGetResponse,
   zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
   zGetSecretApiV1SecretsSecretIdGetResponse,
@@ -459,6 +461,7 @@ export type Session = SessionModel;
 export type {
   AgentSkillCreate,
   AgentSkillUpdate,
+  ApprovalCertificateRead,
   ApprovalStatus,
   ApprovalUpdate,
   AvatarConfig,
@@ -1622,6 +1625,23 @@ export async function getApproval(id: string, config?: AxiosRequestConfig): Prom
     apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}`, config),
     zGetApprovalApiV1ApprovalsApprovalIdGetResponse
   ) as Promise<Approval>;
+}
+
+/**
+ * Fetch the certificate issued when an approval was granted.
+ *
+ * Reports what the approval actually authorized -- which MCP tools, until when,
+ * and whether it has since been revoked. Rejects with a 404 when the approval
+ * granted no tool authority: it was never approved, or it named no task.
+ */
+export async function getApprovalCertificate(
+  id: string,
+  config?: AxiosRequestConfig
+): Promise<ApprovalCertificateRead> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}/certificate`, config),
+    zGetApprovalCertificateApiV1ApprovalsApprovalIdCertificateGetResponse
+  ) as Promise<ApprovalCertificateRead>;
 }
 
 /**

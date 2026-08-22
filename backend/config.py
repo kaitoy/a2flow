@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 #: Fallback sliding idle timeout (8 hours) used when
@@ -56,6 +56,34 @@ _DEFAULT_CLONE_TIMEOUT_SECONDS = 120
 #: UTC is the safe default; an operations team reading these numbers against
 #: their own working day will want their local zone instead.
 _DEFAULT_METRICS_TIMEZONE = "UTC"
+
+#: How long (1 hour) an MCP approval certificate stays valid after the approval
+#: is granted. It bounds the window in which an approved task may call its bound
+#: MCP tools: long enough for a task that waits on a slow upstream, short enough
+#: that a leaked certificate stops being useful the same working hour.
+_DEFAULT_APPROVAL_CERT_TTL_SECONDS = 3600
+
+#: Clock-skew tolerance (60 seconds) for the proof-of-possession signature that
+#: accompanies each proxied tool call. The signature covers a timestamp; a
+#: signature older or newer than this is rejected.
+_DEFAULT_POP_SIGNATURE_WINDOW_SECONDS = 60
+
+#: Validity of the self-signed root CA that signs approval certificates. Ten
+#: years, because rotation is not implemented yet and an expired root would
+#: silently stop every approved task from calling its tools.
+_DEFAULT_MCP_CA_VALIDITY_DAYS = 3650
+
+#: Subject/issuer common name of the generated root CA.
+_DEFAULT_MCP_CA_COMMON_NAME = "A2Flow MCP Approval CA"
+
+#: Defaults keyed by field name for :meth:`Settings._fallback_positive_int`.
+#: A validator shared across fields cannot read each field's own default, so
+#: the mapping supplies it.
+_POSITIVE_INT_DEFAULTS = {
+    "mcp_approval_cert_ttl_seconds": _DEFAULT_APPROVAL_CERT_TTL_SECONDS,
+    "mcp_approval_cert_signature_window_seconds": _DEFAULT_POP_SIGNATURE_WINDOW_SECONDS,
+    "mcp_ca_validity_days": _DEFAULT_MCP_CA_VALIDITY_DAYS,
+}
 
 
 class Settings(BaseSettings):
@@ -186,6 +214,13 @@ class Settings(BaseSettings):
 
     mcp_registry_url: str = "https://registry.modelcontextprotocol.io"
 
+    mcp_approval_cert_ttl_seconds: int = _DEFAULT_APPROVAL_CERT_TTL_SECONDS
+    mcp_approval_cert_signature_window_seconds: int = (
+        _DEFAULT_POP_SIGNATURE_WINDOW_SECONDS
+    )
+    mcp_ca_common_name: str = _DEFAULT_MCP_CA_COMMON_NAME
+    mcp_ca_validity_days: int = _DEFAULT_MCP_CA_VALIDITY_DAYS
+
     session_cookie_secure: bool = False
     session_idle_timeout_seconds: int = _DEFAULT_IDLE_TIMEOUT_SECONDS
 
@@ -243,6 +278,31 @@ class Settings(BaseSettings):
         except (ZoneInfoNotFoundError, ValueError):
             return _DEFAULT_METRICS_TIMEZONE
         return value
+
+    @field_validator(
+        "mcp_approval_cert_ttl_seconds",
+        "mcp_approval_cert_signature_window_seconds",
+        "mcp_ca_validity_days",
+        mode="before",
+    )
+    @classmethod
+    def _fallback_positive_int(cls, value: Any, info: ValidationInfo) -> Any:
+        """Fall back to the field's default on an unset or unusable value.
+
+        Follows :meth:`_fallback_idle_timeout`: an empty value from a compose or
+        ConfigMap template, a typo, or a non-positive number falls back to the
+        default rather than stopping the application from starting. A zero or
+        negative certificate lifetime would make every approved task unable to
+        call its tools, which is a worse failure than ignoring the setting.
+        """
+        default = _POSITIVE_INT_DEFAULTS[info.field_name or ""]
+        if value is None or value == "":
+            return default
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return default
+        return parsed if parsed > 0 else default
 
     @field_validator(
         "app_base_url",

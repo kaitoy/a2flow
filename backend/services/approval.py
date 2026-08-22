@@ -16,6 +16,7 @@ from repositories.exceptions import (
     NotFoundError,
 )
 from repositories.query import FilterSpec, SortSpec
+from services.approval_certificate import ApprovalCertificateService
 from services.approver_groups import ApproverGroupResolver
 
 
@@ -23,7 +24,10 @@ class ApprovalService:
     """Application service orchestrating Approval operations."""
 
     def __init__(
-        self, repo: ApprovalRepository, approver_groups: ApproverGroupResolver
+        self,
+        repo: ApprovalRepository,
+        approver_groups: ApproverGroupResolver,
+        certificates: ApprovalCertificateService,
     ) -> None:
         """Initialize the service.
 
@@ -31,9 +35,12 @@ class ApprovalService:
             repo: Repository providing Approval persistence.
             approver_groups: Resolver for the groups the caller counts as an
                 eligible approver for, backing group-addressed approvals.
+            certificates: Issues the certificate that carries a granted
+                approval's authority over the task's bound MCP tools.
         """
         self._repo = repo
         self._approver_groups = approver_groups
+        self._certificates = certificates
 
     async def list(
         self,
@@ -123,6 +130,14 @@ class ApprovalService:
         ``update`` so the decision also stamps the server-managed ``decided_at``
         and ``decided_by``.
 
+        Granting an approval that names a task also issues that task's MCP
+        approval certificate (see
+        :class:`services.approval_certificate.ApprovalCertificateService`).
+        Until it exists the task cannot call any of its bound MCP tools, so this
+        is the step that actually turns the decision into authority. Issuing is
+        idempotent: editing the comment on an already-granted approval returns
+        the standing certificate rather than rotating it.
+
         Args:
             approval_id: Identifier of the approval to update.
             data: The new status and optional response comment.
@@ -147,7 +162,9 @@ class ApprovalService:
             and approval.status != ApprovalStatus.pending
         ):
             raise ApprovalAlreadyResolvedError(approval_id, approval.status.value)
-        return await self._repo.resolve(approval_id, data, user_id=acting_user.id)
+        resolved = await self._repo.resolve(approval_id, data, user_id=acting_user.id)
+        await self._certificates.issue(resolved, user_id=acting_user.id)
+        return resolved
 
     async def _assert_may_resolve(self, approval: Approval, caller: User) -> None:
         """Reject a caller who is not the approval's designated approver.

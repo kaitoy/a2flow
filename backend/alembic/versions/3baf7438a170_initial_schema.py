@@ -164,6 +164,36 @@ def upgrade() -> None:
         ),
     )
     op.create_table(
+        "mcp_certificate_authorities",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("common_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("certificate_pem", Text(), nullable=False),
+        sa.Column("private_key_encrypted", Text(), nullable=False),
+        sa.Column("not_before", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("not_after", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("active", sa.Boolean(), nullable=False),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    # Partial unique index rather than a plain one: retired roots keep their
+    # rows (the certificates they signed must stay verifiable) but only one may
+    # be active. This is also what makes generate-the-root-on-first-use safe on
+    # multiple replicas -- the loser of the race gets an IntegrityError and
+    # re-reads instead of minting a second root.
+    op.create_index(
+        "uq_mcp_certificate_authorities_active",
+        "mcp_certificate_authorities",
+        ["active"],
+        unique=True,
+        postgresql_where=sa.text("active"),
+        sqlite_where=sa.text("active"),
+    )
+    op.create_table(
         "agent_skills",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -1005,12 +1035,175 @@ def upgrade() -> None:
             ["tag_id"],
             unique=False,
         )
+    # Created last: it references approvals, workflow_tasks,
+    # workflow_executions, tenants, and mcp_certificate_authorities, so every
+    # one of those tables has to exist first.
+    op.create_table(
+        "approval_certificates",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("approval_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+        ),
+        sa.Column(
+            "workflow_task_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+        ),
+        sa.Column("ca_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("serial_number", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("certificate_pem", Text(), nullable=False),
+        sa.Column("private_key_encrypted", Text(), nullable=False),
+        sa.Column("not_before", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("not_after", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "revocation_reason",
+            sa.Enum("task_finished", name="revocationreason"),
+            nullable=True,
+        ),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["approval_id"], ["approvals.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["workflow_execution_id"], ["workflow_executions.id"], ondelete="CASCADE"
+        ),
+        sa.ForeignKeyConstraint(
+            ["workflow_task_id"], ["workflow_tasks.id"], ondelete="CASCADE"
+        ),
+        # RESTRICT: a root that signed a certificate must stay readable, or the
+        # certificate it signed can no longer be verified.
+        sa.ForeignKeyConstraint(
+            ["ca_id"], ["mcp_certificate_authorities.id"], ondelete="RESTRICT"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    # One *live* certificate per approval. Partial rather than a plain unique
+    # constraint so a revoked certificate stays in the table: the audit trail
+    # has to keep showing that authority was granted and when it stopped
+    # counting, and a re-issue after revocation must still be possible.
+    op.create_index(
+        "uq_approval_certificates_live",
+        "approval_certificates",
+        ["approval_id"],
+        unique=True,
+        postgresql_where=sa.text("revoked_at IS NULL"),
+        sqlite_where=sa.text("revoked_at IS NULL"),
+    )
+    op.create_index(
+        "ix_approval_certificates_tenant_id", "approval_certificates", ["tenant_id"]
+    )
+    op.create_index(
+        "ix_approval_certificates_workflow_execution_id",
+        "approval_certificates",
+        ["workflow_execution_id"],
+    )
+    op.create_index(
+        "ix_approval_certificates_workflow_task_id",
+        "approval_certificates",
+        ["workflow_task_id"],
+    )
+    op.create_index(
+        "ix_approval_certificates_serial_number",
+        "approval_certificates",
+        ["serial_number"],
+        unique=True,
+    )
+    # Audit of MCP tool-call decisions. Deliberately carries no foreign key to
+    # workflow_executions / workflow_tasks: CASCADE would delete the evidence
+    # with the run and RESTRICT would make an audited run undeletable. See
+    # models/mcp_tool_invocation.py.
+    op.create_table(
+        "mcp_tool_invocations",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
+        sa.Column(
+            "workflow_task_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
+        sa.Column(
+            "certificate_serial", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
+        sa.Column("approval_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("mcp_server_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tool_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "decision",
+            sa.Enum("allowed", "denied", name="mcpauditdecision"),
+            nullable=False,
+        ),
+        sa.Column("denial_reason", Text(), nullable=True),
+        sa.Column(
+            "arguments_digest", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+        ),
+        sa.Column("signature", Text(), nullable=True),
+        sa.Column("nonce", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("signed_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_mcp_tool_invocations_tenant_id_created_at",
+        "mcp_tool_invocations",
+        ["tenant_id", "created_at"],
+    )
+    op.create_index(
+        "ix_mcp_tool_invocations_workflow_execution_id",
+        "mcp_tool_invocations",
+        ["workflow_execution_id"],
+    )
+    op.create_index(
+        "ix_mcp_tool_invocations_certificate_serial",
+        "mcp_tool_invocations",
+        ["certificate_serial"],
+    )
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index(
+        "ix_mcp_tool_invocations_certificate_serial",
+        table_name="mcp_tool_invocations",
+    )
+    op.drop_index(
+        "ix_mcp_tool_invocations_workflow_execution_id",
+        table_name="mcp_tool_invocations",
+    )
+    op.drop_index(
+        "ix_mcp_tool_invocations_tenant_id_created_at",
+        table_name="mcp_tool_invocations",
+    )
+    op.drop_table("mcp_tool_invocations")
+    op.drop_index("uq_approval_certificates_live", table_name="approval_certificates")
+    op.drop_index(
+        "ix_approval_certificates_serial_number", table_name="approval_certificates"
+    )
+    op.drop_index(
+        "ix_approval_certificates_workflow_task_id", table_name="approval_certificates"
+    )
+    op.drop_index(
+        "ix_approval_certificates_workflow_execution_id",
+        table_name="approval_certificates",
+    )
+    op.drop_index(
+        "ix_approval_certificates_tenant_id", table_name="approval_certificates"
+    )
+    op.drop_table("approval_certificates")
     for link_table in (
         "agent_skill_tags",
         "mcp_server_tags",
@@ -1112,6 +1305,11 @@ def downgrade() -> None:
     op.drop_table("auth_sessions")
     op.drop_index("ix_agent_skills_tenant_id_name", table_name="agent_skills")
     op.drop_table("agent_skills")
+    op.drop_index(
+        "uq_mcp_certificate_authorities_active",
+        table_name="mcp_certificate_authorities",
+    )
+    op.drop_table("mcp_certificate_authorities")
     op.drop_table("system_settings")
     with op.batch_alter_table("users", schema=None) as batch_op:
         batch_op.drop_constraint("fk_users_tenant_id", type_="foreignkey")

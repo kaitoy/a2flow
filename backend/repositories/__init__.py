@@ -1,5 +1,9 @@
 from .agent_skill import AgentSkillRepository, SqlAgentSkillRepository
 from .approval import ApprovalRepository, SqlApprovalRepository
+from .approval_certificate import (
+    ApprovalCertificateRepository,
+    SqlApprovalCertificateRepository,
+)
 from .auth_session import AuthSessionRepository, SqlAuthSessionRepository
 from .effective_roles import EffectiveRoleRepository, SqlEffectiveRoleRepository
 from .exceptions import (
@@ -14,6 +18,10 @@ from .exceptions import (
 from .impersonation_event import (
     ImpersonationEventRepository,
     SqlImpersonationEventRepository,
+)
+from .mcp_ca import (
+    McpCertificateAuthorityRepository,
+    SqlMcpCertificateAuthorityRepository,
 )
 from .mcp_server import MCPServerRepository, SqlMCPServerRepository
 from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
@@ -48,6 +56,7 @@ from .workflow_task_template import (
 
 __all__ = [
     "AgentSkillRepository",
+    "ApprovalCertificateRepository",
     "ApprovalRepository",
     "AuthSessionRepository",
     "CsrfError",
@@ -56,6 +65,7 @@ __all__ = [
     "MAX_TASK_TEMPLATES",
     "ImpersonationEventRepository",
     "MCPServerRepository",
+    "McpCertificateAuthorityRepository",
     "MessageMetaRepository",
     "MetricsRepository",
     "NotFoundError",
@@ -64,11 +74,13 @@ __all__ = [
     "RepositoryError",
     "SecretRepository",
     "SqlAgentSkillRepository",
+    "SqlApprovalCertificateRepository",
     "SqlApprovalRepository",
     "SqlAuthSessionRepository",
     "SqlEffectiveRoleRepository",
     "SqlImpersonationEventRepository",
     "SqlMCPServerRepository",
+    "SqlMcpCertificateAuthorityRepository",
     "SqlMessageMetaRepository",
     "SqlMetricsRepository",
     "SqlNotificationRepository",

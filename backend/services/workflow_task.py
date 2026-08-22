@@ -34,11 +34,13 @@ from repositories import (
     WorkflowExecutionRepository,
     WorkflowTaskRepository,
 )
+from repositories.approval_certificate import ApprovalCertificateRepository
 from repositories.exceptions import (
     ForbiddenError,
     ForeignKeyViolationError,
     NotFoundError,
 )
+from services.approval_certificate import revoke_if_task_finished
 from services.approver_groups import ApproverGroupResolver
 from services.notification_dispatch import NotificationDispatcher
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
@@ -56,6 +58,7 @@ class WorkflowTaskService:
         approvals: ApprovalRepository,
         notifications: NotificationDispatcher,
         approver_groups: ApproverGroupResolver,
+        certificates: ApprovalCertificateRepository,
     ) -> None:
         """Initialize the service.
 
@@ -80,6 +83,7 @@ class WorkflowTaskService:
         self._approvals = approvals
         self._approver_groups = approver_groups
         self._notifications = notifications
+        self._certificates = certificates
 
     async def _evaluate_completion(self, execution_id: str) -> None:
         """Re-evaluate whether the parent run has finished after a task write.
@@ -305,6 +309,8 @@ class WorkflowTaskService:
         if data.status is not None and data.status != task.status:
             await self._assert_status_change_allowed(task, caller)
         updated = await self._repo.update(task_id, data, user_id=caller.id)
+        # A finished task's approval certificate has outlived its purpose.
+        await revoke_if_task_finished(self._certificates, updated, user_id=caller.id)
         await self._evaluate_completion(updated.workflow_execution_id)
         return updated
 

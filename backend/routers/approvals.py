@@ -14,12 +14,17 @@ authenticated user may fetch any single approval by id.
 same records into approval-backlog breakdowns for operational dashboards. Both
 are declared before ``/{approval_id}`` so their literal path segment is matched
 first.
+
+``GET /approvals/{id}/certificate`` returns the X.509 certificate issued when
+the approval was granted -- the thing that actually lets the approved task call
+its bound MCP tools (see :mod:`models.approval_certificate`).
 """
 
 from fastapi import APIRouter
 
 from dependencies import (
     ApiMetaDep,
+    ApprovalCertificateServiceDep,
     ApprovalServiceDep,
     BacklogThresholdDep,
     CurrentUserDep,
@@ -30,6 +35,7 @@ from dependencies import (
     SortDep,
 )
 from models.approval import Approval, ApprovalUpdate
+from models.approval_certificate import ApprovalCertificateRead
 from models.metrics import ApprovalBacklogEntry
 from models.response import ApiResponse
 
@@ -113,6 +119,34 @@ async def get_approval(
     """Return the Approval record for the given ID."""
     approval = await service.get(approval_id)
     return ApiResponse(meta=meta, data=approval)
+
+
+@router.get(
+    "/{approval_id}/certificate", response_model=ApiResponse[ApprovalCertificateRead]
+)
+async def get_approval_certificate(
+    approval_id: str,
+    service: ApprovalCertificateServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[ApprovalCertificateRead]:
+    """Return the certificate issued when this approval was granted.
+
+    Reports what the approval actually authorized: which tools, until when, and
+    whether the certificate has since been revoked. The granted tools are parsed
+    back out of the signed certificate rather than read from a column, so this
+    can never disagree with what the certificate says. The private key is never
+    part of the response.
+
+    Scoped like ``GET /approvals/{id}``: any authenticated user may fetch it,
+    since it discloses nothing the approval record does not already.
+
+    Raises:
+        NotFoundError: If the approval has no certificate -- because it was
+            never granted, or because it named no task and so granted no tool
+            authority.
+    """
+    certificate = await service.read_for_approval(approval_id)
+    return ApiResponse(meta=meta, data=certificate)
 
 
 @router.patch("/{approval_id}", response_model=ApiResponse[Approval])

@@ -1,6 +1,7 @@
 from .agent_skill import AgentSkillService
 from .agent_skill_sync import AgentSkillSyncService, sync_agent_skill
 from .approval import ApprovalService
+from .approval_certificate import ApprovalCertificateService
 from .approver_groups import ApproverGroupResolver
 from .auth import AuthService
 from .impersonation import ImpersonationService
@@ -29,6 +30,7 @@ from .workflow_task_template import WorkflowTaskTemplateService
 __all__ = [
     "AgentSkillService",
     "AgentSkillSyncService",
+    "ApprovalCertificateService",
     "ApprovalService",
     "ApproverGroupResolver",
     "AuthService",

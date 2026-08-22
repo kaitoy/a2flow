@@ -41,6 +41,7 @@ import logging
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import StrEnum
 from functools import lru_cache
 from typing import Any, Protocol
@@ -49,12 +50,25 @@ from mcp import types
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database, mcp_client
+from infrastructure.mcp_ca import (
+    McpCaError,
+    certificate_from_pem,
+    load_or_create_root_ca,
+)
+from infrastructure.mcp_certificate import (
+    CertificateClaims,
+    CertificateVerificationError,
+    extract_claims,
+    verify_certificate,
+)
 from infrastructure.mcp_client import McpConnection
 from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.secret_resolver import SecretResolver
 from infrastructure.vault_client import get_vault_client
 from models.mcp_server import MCPServer
+from models.mcp_tool_invocation import McpAuditDecision
 from repositories.exceptions import McpConnectionError, SecretResolutionError
+from repositories.mcp_ca import SqlMcpCertificateAuthorityRepository
 from repositories.mcp_server import SqlMCPServerRepository
 from repositories.secret import SqlSecretRepository
 from repositories.tenant_bootstrap import (
@@ -91,6 +105,51 @@ class McpOperation(StrEnum):
 
 
 @dataclass(frozen=True)
+class McpClientCredential:
+    """An approval certificate and proof of possession, as *presented*.
+
+    Deliberately unverified, exactly like :class:`McpPrincipal`: this is what a
+    TLS client certificate plus a signed request header would carry once the
+    proxy speaks HTTP. :meth:`McpAuthenticator.authenticate` turns it into a
+    :class:`VerifiedCredential`.
+
+    Attributes:
+        certificate_pem: The leaf certificate the caller presents.
+        signature: DER-encoded ECDSA signature over
+            :func:`infrastructure.mcp_certificate.pop_digest`.
+        nonce: The per-call random value that went into the digest.
+        timestamp: When the signature was made; bounds replay.
+    """
+
+    certificate_pem: str
+    signature: bytes
+    nonce: str
+    timestamp: datetime
+
+
+@dataclass(frozen=True)
+class VerifiedCredential:
+    """A presented credential whose chain and validity window checked out.
+
+    Carries the PEM rather than a parsed ``x509.Certificate`` so the proxy's
+    public surface stays plainly serializable; a policy that needs the public
+    key re-parses it, which costs far less than the signature check it is about
+    to do anyway.
+
+    Proof of possession is **not** checked here. It covers the specific call
+    being made, which authentication does not see, so it is verified in the
+    policy layer alongside the binding and grant checks.
+
+    Attributes:
+        certificate_pem: The verified leaf certificate.
+        claims: The binding and tool grants read out of it.
+    """
+
+    certificate_pem: str
+    claims: CertificateClaims
+
+
+@dataclass(frozen=True)
 class McpPrincipal:
     """The caller's *claimed* identity, as the caller knows itself.
 
@@ -104,11 +163,16 @@ class McpPrincipal:
             also the AG-UI thread id. Empty when the caller could not determine
             one.
         user_id: The acting user, when the caller knows it.
+        credential: The approval certificate and proof of possession backing
+            this call, when the caller holds one. ``None`` for a call that
+            claims no approval authority -- which the policy layer accepts only
+            for tasks that have no approval attached.
     """
 
     kind: PrincipalKind
     session_id: str
     user_id: str | None = None
+    credential: McpClientCredential | None = None
 
 
 @dataclass(frozen=True)
@@ -121,11 +185,14 @@ class McpIdentity:
             the run is a workflow *design* session (which may list tools but
             has no tasks to invoke them from).
         user_id: The acting user, carried through from the principal.
+        credential: The caller's approval certificate once verified, or
+            ``None`` when none was presented.
     """
 
     tenant_id: str
     execution_id: str | None
     user_id: str | None = None
+    credential: VerifiedCredential | None = None
 
 
 @dataclass(frozen=True)
@@ -230,6 +297,15 @@ class McpAuthenticationError(McpProxyError):
     """Raised when a principal cannot be verified or maps to no known run."""
 
 
+class McpCredentialError(McpProxyError):
+    """Raised when a presented approval certificate does not verify.
+
+    Separate from :class:`McpAuthenticationError`, which means "this caller maps
+    to no run at all": here the caller is a known run that presented a
+    credential this deployment refuses.
+    """
+
+
 class McpPolicyDeniedError(McpProxyError):
     """Raised by a policy to veto an operation."""
 
@@ -278,10 +354,53 @@ class AgentRunAuthenticator:
     tenant (and, when the run is an execution rather than a design session, to a
     WorkflowExecution) through :mod:`repositories.tenant_bootstrap`.
 
-    This is the seam the real security layer lands in: when the proxy is lifted
-    to an MCP/HTTP endpoint, the bearer-token or mTLS check replaces the body of
-    :meth:`authenticate` and nothing downstream changes.
+    What it does verify is the **approval certificate**, when one is presented:
+    the chain back to this deployment's root, the validity window, and the
+    certificate's shape. Proof of possession is left to the policy layer,
+    because the signature covers the specific call and authentication does not
+    see it.
+
+    This is still the seam the transport-level security layer lands in: when the
+    proxy is lifted to an MCP/HTTP endpoint, the mTLS check replaces the session
+    id's unconditional trust and nothing downstream changes -- the certificate
+    handling here already produces the same :class:`VerifiedCredential`.
     """
+
+    async def _verify_credential(
+        self, credential: McpClientCredential | None, db: AsyncSession
+    ) -> VerifiedCredential | None:
+        """Verify a presented certificate's chain, window, and claim shape.
+
+        Args:
+            credential: What the caller presented, or ``None``.
+            db: The proxy's open database session, used to load the root CA.
+
+        Returns:
+            The verified credential, or ``None`` when none was presented.
+            Presenting nothing is not an error here -- the policy layer decides
+            whether this particular call needed one.
+
+        Raises:
+            McpCredentialError: If a credential was presented but does not
+                verify.
+        """
+        if credential is None:
+            return None
+        try:
+            certificate = certificate_from_pem(credential.certificate_pem)
+            ca = await load_or_create_root_ca(SqlMcpCertificateAuthorityRepository(db))
+            verify_certificate(
+                certificate, ca_certificate=ca.certificate, now=datetime.now(UTC)
+            )
+            claims = extract_claims(certificate)
+        except (McpCaError, CertificateVerificationError) as exc:
+            logger.warning("Rejected a presented MCP approval certificate: %s", exc)
+            raise McpCredentialError(
+                f"the presented approval certificate is not valid: {exc}"
+            ) from exc
+        return VerifiedCredential(
+            certificate_pem=credential.certificate_pem, claims=claims
+        )
 
     async def authenticate(
         self, principal: McpPrincipal, db: AsyncSession
@@ -303,9 +422,12 @@ class AgentRunAuthenticator:
         Raises:
             McpAuthenticationError: If the session id is empty or matches
                 neither a WorkflowExecution nor a Workflow.
+            McpCredentialError: If a credential was presented but does not
+                verify.
         """
         if not principal.session_id:
             raise McpAuthenticationError("no session is bound to the current run")
+        credential = await self._verify_credential(principal.credential, db)
         resolved = await resolve_workflow_execution_tenant(db, principal.session_id)
         if resolved is not None:
             execution_id, tenant_id = resolved
@@ -313,13 +435,74 @@ class AgentRunAuthenticator:
                 tenant_id=tenant_id,
                 execution_id=execution_id,
                 user_id=principal.user_id,
+                credential=credential,
             )
         design_tenant_id = await resolve_agent_run_tenant(db, principal.session_id)
         if design_tenant_id is None:
             raise McpAuthenticationError("the session maps to no known tenant")
         return McpIdentity(
-            tenant_id=design_tenant_id, execution_id=None, user_id=principal.user_id
+            tenant_id=design_tenant_id,
+            execution_id=None,
+            user_id=principal.user_id,
+            credential=credential,
         )
+
+
+class McpAuditSink(Protocol):
+    """Receives every ``call_tool`` decision the proxy makes.
+
+    Called once per call, after authentication and either side of the policy
+    chain's verdict, while the proxy's session is still open. Implementations
+    must not raise: an audit failure has to be visible in the logs without
+    turning an allowed call into a refused one, or a refusal into a crash.
+
+    Listings are not audited. They have no side effect, and recording them would
+    bury the calls that do.
+    """
+
+    async def record(
+        self,
+        ctx: McpCallContext,
+        db: AsyncSession,
+        *,
+        decision: McpAuditDecision,
+        reason: str | None,
+    ) -> None:
+        """Record one decision.
+
+        Args:
+            ctx: The operation that was decided on.
+            db: The proxy's open database session.
+            decision: Whether the call was allowed.
+            reason: The refusal message when denied, else ``None``.
+        """
+        ...
+
+
+class NullAuditSink:
+    """Discards every decision.
+
+    The default, so a directly constructed :class:`McpProxy` (as in tests) does
+    not need a database table. The process-wide proxy from
+    :func:`get_mcp_proxy` is built with the SQL sink instead.
+    """
+
+    async def record(
+        self,
+        ctx: McpCallContext,
+        db: AsyncSession,
+        *,
+        decision: McpAuditDecision,
+        reason: str | None,
+    ) -> None:
+        """Do nothing.
+
+        Args:
+            ctx: The operation that was decided on.
+            db: The proxy's open database session.
+            decision: Whether the call was allowed.
+            reason: The refusal message when denied, else ``None``.
+        """
 
 
 class McpPolicy(Protocol):
@@ -395,6 +578,7 @@ class McpProxy:
         *,
         authenticator: McpAuthenticator | None = None,
         policies: Sequence[McpPolicy] | None = None,
+        audit: McpAuditSink | None = None,
         session_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]]
         | None = None,
     ) -> None:
@@ -407,9 +591,13 @@ class McpProxy:
                 an empty chain, which allows everything -- the process-wide
                 proxy built by :func:`get_mcp_proxy` passes
                 :func:`infrastructure.mcp_policies.default_policies` instead.
+            audit: Receives every ``call_tool`` decision. Defaults to
+                :class:`NullAuditSink`; the process-wide proxy built by
+                :func:`get_mcp_proxy` passes the SQL-backed sink instead.
             session_factory: Opens the database session each operation runs
                 against. Defaults to a session on the module-level engine.
         """
+        self._audit: McpAuditSink = audit or NullAuditSink()
         self._authenticator: McpAuthenticator = authenticator or AgentRunAuthenticator()
         self._policies: tuple[McpPolicy, ...] = tuple(policies or ())
         self._session_factory = session_factory or _default_session
@@ -491,17 +679,23 @@ class McpProxy:
             # naming an unregistered *and* unbound server is reported as unbound
             # rather than as unregistered. That ordering is the pre-proxy
             # behavior and is deliberately preserved.
-            await self._authorize(
-                McpCallContext(
-                    operation=McpOperation.call_tool,
-                    principal=request.principal,
-                    identity=identity,
-                    server_id=request.server_id,
-                    tool_name=request.tool_name,
-                    arguments=request.arguments,
-                ),
-                db,
+            ctx = McpCallContext(
+                operation=McpOperation.call_tool,
+                principal=request.principal,
+                identity=identity,
+                server_id=request.server_id,
+                tool_name=request.tool_name,
+                arguments=request.arguments,
             )
+            try:
+                await self._authorize(ctx, db)
+            except McpProxyError as exc:
+                await self._record(ctx, db, McpAuditDecision.denied, exc.message)
+                raise
+            # Recorded before the upstream call, not after: what is being
+            # audited is the authorization decision, and the session that owns
+            # the write is closed before the call goes out.
+            await self._record(ctx, db, McpAuditDecision.allowed, None)
             server = await SqlMCPServerRepository(db, tenant_id=identity.tenant_id).get(
                 request.server_id
             )
@@ -588,6 +782,31 @@ class McpProxy:
         for policy in self._policies:
             await policy.authorize(ctx, db)
 
+    async def _record(
+        self,
+        ctx: McpCallContext,
+        db: AsyncSession,
+        decision: McpAuditDecision,
+        reason: str | None,
+    ) -> None:
+        """Hand one decision to the audit sink, swallowing sink failures.
+
+        An audit sink that raises must not change the outcome of the call it was
+        recording -- neither turning an allowed call into a refused one nor
+        replacing a policy's refusal with an unrelated error. The failure is
+        logged with a traceback instead.
+
+        Args:
+            ctx: The operation that was decided on.
+            db: The proxy's open database session.
+            decision: Whether the call was allowed.
+            reason: The refusal message when denied, else ``None``.
+        """
+        try:
+            await self._audit.record(ctx, db, decision=decision, reason=reason)
+        except Exception:  # noqa: BLE001 -- auditing must never break the call
+            logger.exception("Failed to record an MCP tool-call decision")
+
     def _build_resolver(self, db: AsyncSession, tenant_id: str) -> SecretResolver:
         """Build the secret resolver a connection's placeholders expand through.
 
@@ -669,8 +888,10 @@ def get_mcp_proxy() -> McpProxy:
     reason -- :mod:`infrastructure.mcp_policies` imports this module.
 
     Returns:
-        The shared proxy, built with the default policy chain.
+        The shared proxy, built with the default policy chain and the
+        database-backed audit sink.
     """
+    from infrastructure.mcp_audit import SqlMcpAuditSink
     from infrastructure.mcp_policies import default_policies
 
-    return McpProxy(policies=default_policies())
+    return McpProxy(policies=default_policies(), audit=SqlMcpAuditSink())
