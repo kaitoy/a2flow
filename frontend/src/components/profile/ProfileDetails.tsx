@@ -1,10 +1,17 @@
-/** @module ProfileDetails — Read-only display of the signed-in user's own attributes. */
+/**
+ * @module ProfileDetails — Read-only display of the signed-in user's own
+ * attributes, including their group memberships and the roles those groups
+ * grant.
+ */
 "use client";
 
+import { InheritedRoles } from "@/components/admin/inherited-roles";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Chip } from "@/components/ui/chip";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
-import { formatUserName, type User } from "@/lib/api";
+import { Spinner } from "@/components/ui/spinner";
+import { formatUserName, type User, type UserGroup } from "@/lib/api";
 import { ROLE_LABELS } from "@/lib/roles";
 
 /** Placeholder shown in place of an attribute that has no value. */
@@ -14,11 +21,18 @@ const EMPTY = "—";
 export interface ProfileDetailsProps {
   /** The signed-in user whose attributes are displayed. */
   user: User;
+  /**
+   * The tenant's groups the user belongs to. `null` while still loading —
+   * rendered as a small spinner rather than a placeholder so an empty result
+   * isn't shown prematurely.
+   */
+  groups: UserGroup[] | null;
 }
 
 /**
  * Read-only card showing the signed-in user's own profile: the avatar and
- * display name, followed by the basic account attributes as a definition list.
+ * display name, followed by the basic account attributes, group memberships,
+ * and group-inherited roles as a definition list.
  *
  * Nothing here is editable — the backend only lets a non-admin user update
  * their own `avatarConfig` (see `_SELF_SERVICE_FIELDS` in
@@ -26,9 +40,10 @@ export interface ProfileDetailsProps {
  * text rather than a disabled input. Avatar customization lives in its own
  * editable section on the same page.
  */
-export function ProfileDetails({ user }: ProfileDetailsProps) {
+export function ProfileDetails({ user, groups }: ProfileDetailsProps) {
   const fullName = formatUserName(user);
   const roles = user.roles ?? [];
+  const groupRoles = user.groupRoles ?? [];
 
   return (
     <div className="flex flex-col gap-6 rounded-2xl glass-panel-strong p-6">
@@ -56,6 +71,26 @@ export function ProfileDetails({ user }: ProfileDetailsProps) {
               <span className="flex flex-wrap gap-1.5">
                 {roles.map((role) => (
                   <Badge key={role}>{ROLE_LABELS[role]}</Badge>
+                ))}
+              </span>
+            ) : (
+              EMPTY
+            )
+          }
+        />
+        <DetailItem
+          label="Roles from Groups"
+          value={groupRoles.length > 0 ? <InheritedRoles roles={groupRoles} /> : EMPTY}
+        />
+        <DetailItem
+          label="Groups"
+          value={
+            groups === null ? (
+              <Spinner size="sm" />
+            ) : groups.length > 0 ? (
+              <span className="flex flex-wrap gap-1.5">
+                {groups.map((group) => (
+                  <Chip key={group.id} label={group.name} />
                 ))}
               </span>
             ) : (

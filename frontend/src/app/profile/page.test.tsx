@@ -20,6 +20,7 @@ const USER: User = {
   enabled: true,
   emailVerified: true,
   roles: [Role.DEVELOPER],
+  groupRoles: [Role.APPROVER],
   tenantId: "tenant-1",
   avatarUpdatedAt: null,
   avatarConfig: null,
@@ -48,6 +49,25 @@ describe("ProfilePage", () => {
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Avatar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
+  it("loads and shows the user's groups and their group-inherited roles", async () => {
+    render(<ProfilePage />, {
+      preloadedState: {
+        auth: {
+          user: USER,
+          status: "authenticated",
+          selectedTenantId: null,
+          impersonatedUserId: null,
+          impersonatedBy: null,
+        },
+      },
+    });
+
+    // The default MSW handler for GET /api/v1/users/:userId/groups returns
+    // USER_GROUP_1 ("Developers"); the chip only appears once that resolves.
+    expect(await screen.findByText("Developers")).toBeInTheDocument();
+    expect(screen.getByText("Approver")).toBeInTheDocument();
   });
 
   it("shows a spinner until the auth slice is populated", () => {
