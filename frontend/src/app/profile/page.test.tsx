@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import { Role } from "@/lib/roles";
@@ -5,8 +6,8 @@ import { render, screen } from "@/test/test-utils";
 import ProfilePage from "./page";
 
 beforeAll(() => {
-  // The embedded AvatarField turns the picked file into an object URL for the
-  // selected-file preview; pin it to a fixed value so the src is assertable.
+  // The avatar dialog's AvatarField turns the picked file into an object URL for
+  // the selected-file preview; pin it to a fixed value so the src is assertable.
   URL.createObjectURL = vi.fn(() => "blob:preview");
   URL.revokeObjectURL = vi.fn();
 });
@@ -31,38 +32,36 @@ const USER: User = {
   updatedBy: "user-1",
 };
 
-describe("ProfilePage", () => {
-  it("renders the read-only details above the editable avatar section", () => {
-    render(<ProfilePage />, {
-      preloadedState: {
-        auth: {
-          user: USER,
-          status: "authenticated",
-          selectedTenantId: null,
-          impersonatedUserId: null,
-          impersonatedBy: null,
-        },
-      },
-    });
+const AUTHENTICATED = {
+  auth: {
+    user: USER,
+    status: "authenticated" as const,
+    selectedTenantId: null,
+    impersonatedUserId: null,
+    impersonatedBy: null,
+  },
+};
 
-    expect(screen.getByRole("heading", { level: 1, name: "Profile" })).toBeInTheDocument();
+describe("ProfilePage", () => {
+  it("titles the page with the user's name and shows the read-only detail cards", () => {
+    render(<ProfilePage />, { preloadedState: AUTHENTICATED });
+
+    expect(screen.getByRole("heading", { level: 1, name: "Alice Smith" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Account" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Access" })).toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "Avatar" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
+  it("keeps the avatar editor closed until the avatar is clicked", async () => {
+    render(<ProfilePage />, { preloadedState: AUTHENTICATED });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Edit avatar" }));
+    expect(screen.getByRole("dialog", { name: "Edit avatar" })).toBeInTheDocument();
   });
 
   it("loads and shows the user's groups and their group-inherited roles", async () => {
-    render(<ProfilePage />, {
-      preloadedState: {
-        auth: {
-          user: USER,
-          status: "authenticated",
-          selectedTenantId: null,
-          impersonatedUserId: null,
-          impersonatedBy: null,
-        },
-      },
-    });
+    render(<ProfilePage />, { preloadedState: AUTHENTICATED });
 
     // The default MSW handler for GET /api/v1/users/:userId/groups returns
     // USER_GROUP_1 ("Developers"); the chip only appears once that resolves.

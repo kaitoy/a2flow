@@ -38,16 +38,10 @@ const GROUP: UserGroup = {
 };
 
 describe("ProfileDetails", () => {
-  it("shows the display name and username header", () => {
+  it("splits the attributes into an Account and an Access section", () => {
     render(<ProfileDetails user={USER} groups={[GROUP]} />);
-    expect(screen.getByText("Alice Smith")).toBeInTheDocument();
-    expect(screen.getByText("@alice")).toBeInTheDocument();
-  });
-
-  it("falls back to the username when the user has no full name", () => {
-    render(<ProfileDetails user={{ ...USER, firstName: "", lastName: "" }} groups={[GROUP]} />);
-    // Once as the heading fallback, once as the Username value.
-    expect(screen.getAllByText("alice")).toHaveLength(2);
+    expect(screen.getByRole("heading", { level: 2, name: "Account" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Access" })).toBeInTheDocument();
   });
 
   it("lists every basic attribute", () => {
@@ -60,14 +54,18 @@ describe("ProfileDetails", () => {
       "Roles",
       "Roles from Groups",
       "Groups",
-      "Enabled",
-      "Email Verified",
     ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("Smith")).toBeInTheDocument();
+  });
+
+  it("leaves the boolean account flags to the hero's status pills", () => {
+    render(<ProfileDetails user={USER} groups={[GROUP]} />);
+    expect(screen.queryByText("Enabled")).not.toBeInTheDocument();
+    expect(screen.queryByText("Email Verified")).not.toBeInTheDocument();
   });
 
   it("renders each role as a labelled badge", () => {
@@ -79,14 +77,6 @@ describe("ProfileDetails", () => {
   it("shows a placeholder when the user holds no roles", () => {
     render(<ProfileDetails user={{ ...USER, roles: [] }} groups={[GROUP]} />);
     expect(screen.getByText("—")).toBeInTheDocument();
-  });
-
-  it("renders the boolean flags as Yes / No", () => {
-    render(
-      <ProfileDetails user={{ ...USER, enabled: false, emailVerified: true }} groups={[GROUP]} />
-    );
-    expect(screen.getByText("No")).toBeInTheDocument();
-    expect(screen.getByText("Yes")).toBeInTheDocument();
   });
 
   it("renders each group the user belongs to as a chip", () => {

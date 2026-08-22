@@ -33,6 +33,17 @@ beforeAll(() => {
 });
 
 describe("AvatarField", () => {
+  it("labels itself 'Avatar' by default", () => {
+    render(<AvatarField user={AVATAR_USER} onChange={() => {}} />);
+    expect(screen.getByText("Avatar")).toBeInTheDocument();
+  });
+
+  it("takes a caller-supplied label where the surrounding heading already says 'avatar'", () => {
+    render(<AvatarField user={AVATAR_USER} onChange={() => {}} label="Uploaded image" />);
+    expect(screen.getByText("Uploaded image")).toBeInTheDocument();
+    expect(screen.queryByText("Avatar")).toBeNull();
+  });
+
   it("offers a choose-image button and hides remove without a custom avatar", () => {
     render(<AvatarField user={AVATAR_USER} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: /choose image/i })).toBeInTheDocument();
@@ -61,6 +72,35 @@ describe("AvatarField", () => {
     await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
     await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
     expect(onChange.mock.calls[0][0].avatarUpdatedAt).toBe(FULL_USER.avatarUpdatedAt);
+  });
+
+  it("celebrates a finished upload by default, holding the button on screen for the wiggle", async () => {
+    server.use(http.put(`${BASE}/api/v1/users/:id/avatar`, () => envelope(FULL_USER)));
+
+    const { container } = render(<AvatarField user={AVATAR_USER} onChange={() => {}} />);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, new File(["b"], "a.png", { type: "image/png" }));
+    await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
+
+    expect(await screen.findByRole("button", { name: /uploaded!/i })).toBeInTheDocument();
+  });
+
+  it("hands off to onUploaded instead of celebrating when the caller supplies one", async () => {
+    const onUploaded = vi.fn();
+    server.use(http.put(`${BASE}/api/v1/users/:id/avatar`, () => envelope(FULL_USER)));
+
+    const { container } = render(
+      <AvatarField user={AVATAR_USER} onChange={() => {}} onUploaded={onUploaded} />
+    );
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, new File(["b"], "a.png", { type: "image/png" }));
+    await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
+
+    await waitFor(() => expect(onUploaded).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("button", { name: /uploaded!/i })).toBeNull();
+    // The picked file is dropped straight away, so the field is back to its
+    // resting state rather than waiting out a wiggle that never plays.
+    expect(screen.getByRole("button", { name: /choose image/i })).toBeInTheDocument();
   });
 
   it("removes a custom avatar and reports the updated user", async () => {

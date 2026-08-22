@@ -13,26 +13,44 @@ interface AvatarFieldProps {
   user: AvatarUser;
   /** Called with the updated user after a successful upload or removal. */
   onChange: (user: User) => void;
+  /**
+   * Field label above the preview. Defaults to `"Avatar"` — override it where
+   * the surrounding heading already says "avatar" and the label would only
+   * repeat it (the profile page's avatar dialog passes `"Uploaded image"`).
+   */
+  label?: string;
+  /**
+   * Called after a successful upload, on top of {@link AvatarFieldProps.onChange}.
+   *
+   * Supplying it means the surrounding UI takes over once the image lands — the
+   * profile page's dialog closes itself — so the Upload button also skips its
+   * celebratory `done` stage, for the same reason Remove does: there is nothing
+   * left on screen for it to celebrate on. Omit it to keep the standard
+   * "Uploaded!" wiggle, which is what the admin user form wants.
+   */
+  onUploaded?: () => void;
 }
 
 /** Diameter, in pixels, of the avatar preview shown in the field. */
 const PREVIEW_SIZE = 96;
 
 /**
- * Avatar editor for the admin user form: shows the current (or generated)
- * avatar, lets an admin pick an image file to preview and upload, and removes a
- * custom avatar to revert to the generated default.
+ * Avatar image editor: shows the current (or generated) avatar, lets the
+ * operator pick an image file to preview and upload, and removes a custom
+ * avatar to revert to the generated default. Used by the admin user form and by
+ * the profile page's avatar dialog.
  */
-export function AvatarField({ user, onChange }: AvatarFieldProps) {
+export function AvatarField({ user, onChange, label = "Avatar", onUploaded }: AvatarFieldProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Upload gets the full three-stage feedback (incl. the "done" wiggle); remove
-  // skips the done stage because its button unmounts as soon as the avatar is
-  // gone, so there is nothing left to celebrate on.
-  const upload = useAsyncAction();
+  // Upload gets the full three-stage feedback (incl. the "done" wiggle) unless
+  // the caller is taking over afterwards; remove always skips the done stage
+  // because its button unmounts as soon as the avatar is gone, so there is
+  // nothing left to celebrate on.
+  const upload = useAsyncAction({ showDone: onUploaded === undefined });
   const remove = useAsyncAction({ showDone: false });
   // Defer clearing the picked file until the upload's "done" wiggle has finished
   // (see the effect below): clearing immediately would unmount the Upload button
@@ -74,8 +92,15 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
       await upload.run(async () => {
         onChange(await uploadUserAvatar(user.id, file));
       });
-      // Selection is cleared by the effect above once the wiggle has played.
-      uploadedRef.current = true;
+      if (onUploaded) {
+        // No wiggle to wait on, and the caller is about to take the field off
+        // screen — clear the selection now so a reopened field starts fresh.
+        clearSelection();
+        onUploaded();
+      } else {
+        // Selection is cleared by the effect above once the wiggle has played.
+        uploadedRef.current = true;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to upload avatar");
     }
@@ -94,7 +119,7 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">Avatar</span>
+      <span className="text-label-caps">{label}</span>
       <div className="flex items-center gap-4">
         {previewUrl ? (
           // biome-ignore lint/performance/noImgElement: a local object-URL preview of the chosen file; next/image cannot optimize an in-memory blob.
@@ -126,7 +151,10 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
                 disabled={upload.inFlight}
                 status={upload.status}
                 pendingLabel="Uploading…"
-                doneLabel="Uploaded!"
+                // Omitted when the caller takes over: the done stage never
+                // runs, and a label the button can't reach would still make it
+                // reserve width for "Uploaded!".
+                doneLabel={onUploaded ? undefined : "Uploaded!"}
               >
                 Upload
               </Button>
