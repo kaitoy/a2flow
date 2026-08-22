@@ -20,6 +20,13 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
+from infrastructure.mcp_proxy import (
+    CallToolRequest,
+    McpPolicyDeniedError,
+    McpPrincipal,
+    McpProxyError,
+    PrincipalKind,
+)
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
@@ -629,4 +636,59 @@ async def test_list_mcp_tools_isolates_secret_resolution_failure(
         "https://good/mcp": HttpConnection(
             url="https://good/mcp", headers={"Authorization": "Bearer tok-1"}
         )
+    }
+
+
+# ---------- delegation to the proxy ----------
+
+
+class _StubProxy:
+    """Records the request it is handed and returns a canned outcome."""
+
+    def __init__(
+        self,
+        *,
+        result: types.CallToolResult | None = None,
+        error: McpProxyError | None = None,
+    ) -> None:
+        self.requests: list[CallToolRequest] = []
+        self.result = result
+        self.error = error
+
+    async def call_tool(self, request: CallToolRequest) -> types.CallToolResult:
+        """Record the request, then raise or return as configured."""
+        self.requests.append(request)
+        if self.error is not None:
+            raise self.error
+        assert self.result is not None
+        return self.result
+
+
+async def test_call_mcp_tool_delegates_to_the_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The tool's only job on the way in is ADK context -> plain principal."""
+    proxy = _StubProxy(result=_tool_result("done"))
+    monkeypatch.setattr("infrastructure.mcp_tools.get_mcp_proxy", lambda: proxy)
+
+    result = await call_mcp_tool("srv-1", "search", '{"q": "x"}', _ctx("sess-9", "amy"))  # type: ignore[arg-type]
+
+    assert result == {"result": {"content": ["done"], "structured": None}}
+    (request,) = proxy.requests
+    assert request.principal == McpPrincipal(
+        kind=PrincipalKind.agent_run, session_id="sess-9", user_id="amy"
+    )
+    assert request.server_id == "srv-1"
+    assert request.tool_name == "search"
+    assert request.arguments == {"q": "x"}
+
+
+async def test_proxy_errors_surface_as_the_agent_error_dict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proxy = _StubProxy(error=McpPolicyDeniedError("nope, not bound"))
+    monkeypatch.setattr("infrastructure.mcp_tools.get_mcp_proxy", lambda: proxy)
+
+    assert await call_mcp_tool("srv-1", "search", {}, _ctx()) == {
+        "error": "nope, not bound"
     }
