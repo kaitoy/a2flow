@@ -117,5 +117,5 @@ Test file placement, the shared `src/test/` infrastructure, and the per-boundary
 
 | Variable | Default | Description |
 |---|---|---|
-| `BACKEND_BASE_URL` | `http://localhost:8000` | Backend base URL |
+| `BACKEND_BASE_URL` | `http://localhost:8000` | Backend base URL, read by `src/proxy.ts` at server startup — not baked in at `docker build` time, so it can be set in `compose.yml`'s `frontend.environment` without rebuilding the image. |
 | `PORT` | `3000` | Dev/start server port, read natively by Next.js. Must be set as a real environment variable — `.env.local` doesn't work (see [Changing the port](#changing-the-port)). |

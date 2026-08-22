@@ -19,10 +19,6 @@ RUN uv sync --frozen --no-install-project \
 # --- Stage 2: build the Next.js app -----------------------------------------
 FROM node:24-slim AS build
 
-# Backend origin baked into the Next.js rewrites at build time.
-ARG BACKEND_BASE_URL=http://backend:8000
-ENV BACKEND_BASE_URL=${BACKEND_BASE_URL}
-
 RUN corepack enable
 
 WORKDIR /app/frontend

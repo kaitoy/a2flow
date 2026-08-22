@@ -13,10 +13,11 @@
 #   docker compose up --build
 #
 # The app is served at http://localhost:3000 by default. The browser talks
-# only to the frontend; Next.js rewrites proxy /api/* server-side to the
-# backend, keeping the auth cookies same-origin. Set FRONTEND_PORT in .env to
-# publish the frontend on a different host port (the container keeps
-# listening on 3000 internally); CORS_ORIGINS below follows it automatically.
+# only to the frontend; its server-side proxy (frontend/src/proxy.ts) forwards
+# /api/* to the backend, keeping the auth cookies same-origin. Set
+# FRONTEND_PORT in .env to publish the frontend on a different host port (the
+# container keeps listening on 3000 internally); CORS_ORIGINS below follows
+# it automatically.
 services:
   db:
     image: postgres:17
@@ -83,8 +84,12 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-      args:
-        BACKEND_BASE_URL: http://backend:8000
+    environment:
+      # Internal Docker network address of the backend service above, on its
+      # Dockerfile-hardcoded port 8000. Unlike FRONTEND_PORT this never varies
+      # by deployment, so it's a plain literal rather than a ${VAR:-default}
+      # host override -- same style as DB_URL.
+      BACKEND_BASE_URL: http://backend:8000
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:

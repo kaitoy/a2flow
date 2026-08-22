@@ -155,7 +155,7 @@ The app requires sign-in. Visiting any page while logged out redirects to `/logi
 
 - **Session** — login creates a server-side session (`auth_sessions` table) and sets an HttpOnly `a2flow_session` cookie holding an opaque token (only its hash is stored). Sessions use a sliding **idle timeout** (`SESSION_IDLE_TIMEOUT_SECONDS`, default 8 hours).
 - **CSRF** — login also sets a readable `a2flow_csrf` cookie; the frontend echoes it in the `X-CSRF-Token` header on every state-changing request (double-submit cookie). The backend rejects mismatches with `403`.
-- **Same-origin proxy** — the browser calls the frontend origin (`:3000`); Next.js rewrites `/api/*` to the backend (`:8000`), so the auth cookies are first-party and `SameSite=Lax` works. Point the proxy elsewhere with `BACKEND_BASE_URL`.
+- **Same-origin proxy** — the browser calls the frontend origin (`:3000`); the frontend's proxy (`frontend/src/proxy.ts`) forwards `/api/*` to the backend (`:8000`), so the auth cookies are first-party and `SameSite=Lax` works. Point the proxy elsewhere with `BACKEND_BASE_URL`.
 
 See [backend/README.md](backend/README.md#authentication) for the endpoint and cookie details.
 
