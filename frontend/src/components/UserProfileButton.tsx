@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { userDisplayName } from "@/lib/api";
 import { useAppSelector } from "@/store/hooks";
 import { UserMenu } from "./UserMenu";
 import { Avatar } from "./ui/avatar";
@@ -40,7 +41,7 @@ export function UserProfileButton({ className }: UserProfileButtonProps) {
 
   return (
     <>
-      <Tooltip label="Profile" placement="bottom">
+      <Tooltip label={user ? userDisplayName(user) : "Profile"} placement="bottom">
         <button
           ref={buttonRef}
           type="button"

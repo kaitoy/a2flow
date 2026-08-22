@@ -1106,6 +1106,16 @@ export function formatUserName(user: Pick<User, "firstName" | "lastName">): stri
 }
 
 /**
+ * Resolve a user's primary display name: the full name ("First Last") when
+ * present, falling back to the username and finally the email.
+ */
+export function userDisplayName(
+  user: Pick<User, "firstName" | "lastName" | "username" | "email">
+): string {
+  return formatUserName(user) || user.username || user.email;
+}
+
+/**
  * Build the URL serving a user's uploaded avatar image, or `null` when the user
  * has no custom avatar (callers then render a generated default).
  *

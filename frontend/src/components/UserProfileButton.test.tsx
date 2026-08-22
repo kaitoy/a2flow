@@ -46,4 +46,23 @@ describe("UserProfileButton", () => {
     await waitFor(() => expect(screen.getByRole("menu")).toBeInTheDocument());
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
   });
+
+  it("shows the user's name in a tooltip on hover", async () => {
+    const user = userEvent.setup();
+    render(<UserProfileButton />, {
+      preloadedState: {
+        auth: {
+          user: makeUser(),
+          status: "authenticated",
+          selectedTenantId: null,
+          impersonatedUserId: null,
+          impersonatedBy: null,
+        },
+      },
+    });
+
+    await user.hover(screen.getByRole("button", { name: "Profile" }));
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Alice Smith");
+  });
 });

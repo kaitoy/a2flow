@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { type RefObject, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
-import { formatUserName, logout, type User } from "@/lib/api";
+import { formatUserName, logout, type User, userDisplayName } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 import { clearUser } from "@/store/authSlice";
 import { useAppDispatch } from "@/store/hooks";
@@ -34,17 +34,6 @@ interface Coords {
   left: number;
   /** Rendered panel width, clamped to the viewport. */
   width: number;
-}
-
-/**
- * Resolve the user's primary display name: the full name ("First Last") when
- * present, falling back to the username and finally the email.
- *
- * @param user - The signed-in user.
- * @returns The best available display name.
- */
-function displayName(user: User): string {
-  return formatUserName(user) || user.username || user.email;
 }
 
 /**
@@ -139,7 +128,7 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
                 {user ? (
                   <>
                     <span className="truncate text-sm font-medium text-on-surface">
-                      {displayName(user)}
+                      {userDisplayName(user)}
                     </span>
                     {fullName && (
                       <span className="truncate text-xs text-on-surface-variant">
