@@ -19,10 +19,10 @@ interface Props {
 }
 
 /**
- * Auto-resizing textarea input that sends on Enter and inserts a newline on
- * Shift+Enter. On coarse-pointer (touch) devices Enter inserts a newline
- * instead — soft keyboards have no Shift+Enter, so Enter must stay usable
- * for line breaks and sending happens through the Send button.
+ * Auto-resizing textarea input that sends on Ctrl+Enter (or Cmd+Enter on
+ * Mac) and inserts a newline on Enter or Shift+Enter. On coarse-pointer
+ * (touch) devices no key combination sends — soft keyboards have no
+ * reliable modifier keys, so sending happens through the Send button.
  */
 export function ChatInput({ onSend, disabled, leading }: Props) {
   const coarsePointer = useMediaQuery("(pointer: coarse)");
@@ -50,7 +50,7 @@ export function ChatInput({ onSend, disabled, leading }: Props) {
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !coarsePointer) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !coarsePointer) {
       e.preventDefault();
       handleSend();
     }
@@ -82,7 +82,7 @@ export function ChatInput({ onSend, disabled, leading }: Props) {
           onKeyDown={handleKeyDown}
           onInput={handleInput}
           placeholder={
-            coarsePointer ? "Message…" : "Message…  (Enter to send · Shift+Enter for newline)"
+            coarsePointer ? "Message…" : "Message…  (Ctrl/⌘+Enter to send · Enter for newline)"
           }
           disabled={disabled}
           rows={1}

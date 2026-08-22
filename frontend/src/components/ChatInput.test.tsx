@@ -61,10 +61,25 @@ describe("ChatInput", () => {
     expect(screen.getByRole("textbox")).toHaveValue("");
   });
 
-  it("pressing Enter calls onSend", async () => {
+  it("pressing Enter alone inserts a newline instead of sending", async () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} disabled={false} />);
-    await userEvent.type(screen.getByRole("textbox"), "hello{Enter}");
+    await userEvent.type(screen.getByRole("textbox"), "hello{Enter}world");
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox")).toHaveValue("hello\nworld");
+  });
+
+  it("pressing Ctrl+Enter calls onSend", async () => {
+    const onSend = vi.fn();
+    render(<ChatInput onSend={onSend} disabled={false} />);
+    await userEvent.type(screen.getByRole("textbox"), "hello{Control>}{Enter}{/Control}");
+    expect(onSend).toHaveBeenCalledWith("hello");
+  });
+
+  it("pressing Cmd+Enter (Meta) calls onSend", async () => {
+    const onSend = vi.fn();
+    render(<ChatInput onSend={onSend} disabled={false} />);
+    await userEvent.type(screen.getByRole("textbox"), "hello{Meta>}{Enter}{/Meta}");
     expect(onSend).toHaveBeenCalledWith("hello");
   });
 
@@ -75,10 +90,10 @@ describe("ChatInput", () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it("pressing Enter with only whitespace does NOT call onSend", async () => {
+  it("pressing Ctrl+Enter with only whitespace does NOT call onSend", async () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} disabled={false} />);
-    await userEvent.type(screen.getByRole("textbox"), "   {Enter}");
+    await userEvent.type(screen.getByRole("textbox"), "   {Control>}{Enter}{/Control}");
     expect(onSend).not.toHaveBeenCalled();
   });
 
@@ -90,6 +105,18 @@ describe("ChatInput", () => {
       await userEvent.type(screen.getByRole("textbox"), "hello{Enter}world");
       expect(onSend).not.toHaveBeenCalled();
       expect(screen.getByRole("textbox")).toHaveValue("hello\nworld");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("on a touch device, Ctrl+Enter does not send", async () => {
+    const spy = stubCoarsePointer();
+    try {
+      const onSend = vi.fn();
+      render(<ChatInput onSend={onSend} disabled={false} />);
+      await userEvent.type(screen.getByRole("textbox"), "hello{Control>}{Enter}{/Control}");
+      expect(onSend).not.toHaveBeenCalled();
     } finally {
       spy.mockRestore();
     }
