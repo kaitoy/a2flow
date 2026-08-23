@@ -26,6 +26,7 @@ import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { StatusDot } from "@/components/ui/status-dot";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
   formatRevision,
@@ -298,13 +299,10 @@ export default function AgentSkillDetailPage() {
             aria-label="Repository sync"
             className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4"
           >
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-block size-2 rounded-full ${SYNC_STATUS_DOT_CLASS[sync.status]}`}
-                aria-hidden
-              />
-              <span className="capitalize">{formatSyncStatusLabel(sync.status)}</span>
-            </div>
+            <StatusDot
+              dotClass={SYNC_STATUS_DOT_CLASS[sync.status]}
+              label={formatSyncStatusLabel(sync.status)}
+            />
             <div className="flex items-center gap-2 text-sm text-on-surface-variant">
               <span>Revision</span>
               <span className="font-mono">{formatRevision(sync.commitSha)}</span>

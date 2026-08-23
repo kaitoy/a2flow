@@ -12,6 +12,7 @@ import { ColumnPicker } from "@/components/admin/column-picker";
 import { Chip } from "@/components/ui/chip";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { StatusDot } from "@/components/ui/status-dot";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useUserNames } from "@/hooks/useUserNames";
@@ -22,7 +23,6 @@ import {
   listWorkflowTasks,
   type SortSpec,
   type WorkflowTask,
-  type WorkflowTaskStatus,
 } from "@/lib/api";
 import {
   formatStatusLabel,
@@ -48,13 +48,6 @@ const VIEW_OPTIONS = [
   { value: "table" as const, label: "Table" },
   { value: "graph" as const, label: "Graph" },
 ];
-
-/** Small colored dot shown next to the status label for quick visual scanning. */
-function StatusDot({ status }: { status: WorkflowTaskStatus }) {
-  return (
-    <span className={`inline-block size-2 rounded-full ${STATUS_DOT_CLASS[status]}`} aria-hidden />
-  );
-}
 
 function buildColumns(
   titleById: Map<string, string>,
@@ -139,12 +132,7 @@ function buildColumns(
       })),
       cell: (t) => {
         const status = t.status ?? "pending";
-        return (
-          <div className="flex items-center gap-2">
-            <StatusDot status={status} />
-            <span className="capitalize">{formatStatusLabel(status)}</span>
-          </div>
-        );
+        return <StatusDot dotClass={STATUS_DOT_CLASS[status]} label={formatStatusLabel(status)} />;
       },
     },
     {

@@ -35,6 +35,7 @@ import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip } from "@/components/ui/tooltip";
 import { zGenerateWorkflowRequest } from "@/generated/api/zod.gen";
@@ -87,13 +88,10 @@ type FormValues = z.infer<typeof schema>;
 function StatusLine({ workflow }: { workflow: Workflow }) {
   const status = (workflow.status ?? "draft") as WorkflowStatus;
   return (
-    <span className="flex items-center gap-2">
-      <span
-        className={`inline-block size-2 rounded-full ${WORKFLOW_STATUS_DOT_CLASS[status]}`}
-        aria-hidden
-      />
-      <span className="capitalize">{formatWorkflowStatusLabel(status)}</span>
-    </span>
+    <StatusDot
+      dotClass={WORKFLOW_STATUS_DOT_CLASS[status]}
+      label={formatWorkflowStatusLabel(status)}
+    />
   );
 }
 

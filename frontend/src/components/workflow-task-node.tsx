@@ -1,6 +1,7 @@
 "use client";
 
 import { Handle, type NodeProps, Position } from "@xyflow/react";
+import { StatusDot } from "@/components/ui/status-dot";
 import {
   TASK_DEP_SOURCE_HANDLE,
   TASK_DEP_TARGET_HANDLE,
@@ -58,13 +59,12 @@ export function WorkflowTaskNode({ data }: NodeProps<WorkflowTaskFlowNode>) {
         <span className="line-clamp-2 flex-1 font-medium text-sm leading-snug">{task.title}</span>
       </div>
       {status !== null && (
-        <div className="mt-1.5 flex items-center gap-1.5 pl-7">
-          <span
-            className={`inline-block size-2 rounded-full ${STATUS_DOT_CLASS[status]}`}
-            aria-hidden
-          />
-          <span className="text-on-surface-variant text-xs">{formatStatusLabel(status)}</span>
-        </div>
+        <StatusDot
+          dotClass={STATUS_DOT_CLASS[status]}
+          label={formatStatusLabel(status)}
+          labelClassName="text-on-surface-variant text-xs"
+          className="mt-1.5 pl-7"
+        />
       )}
       <Handle
         type="source"

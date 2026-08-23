@@ -17,6 +17,7 @@ import { tagsColumn } from "@/components/admin/tag-columns";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
@@ -54,18 +55,19 @@ const POLL_INTERVAL_MS = 2000;
 function StatusCell({ workflow }: { workflow: Workflow }) {
   const status = (workflow.status ?? "draft") as WorkflowStatus;
   const label = (
-    <span className="flex items-center gap-2">
-      <span
-        className={`inline-block size-2 rounded-full ${WORKFLOW_STATUS_DOT_CLASS[status]}`}
-        aria-hidden
-      />
-      <span className="capitalize">{formatWorkflowStatusLabel(status)}</span>
-    </span>
+    <StatusDot
+      dotClass={WORKFLOW_STATUS_DOT_CLASS[status]}
+      label={formatWorkflowStatusLabel(status)}
+    />
   );
   // The failure reason is the whole point of the failed state, but it is a raw
-  // error message — too long for a cell, so it lives in the tooltip.
+  // error message — too long for a cell, so it lives in the tooltip. The trigger
+  // has to be a DOM element: Tooltip clones its child to attach a ref and mouse
+  // handlers, which a component would silently drop.
   return workflow.generationError ? (
-    <Tooltip label={workflow.generationError}>{label}</Tooltip>
+    <Tooltip label={workflow.generationError}>
+      <span className="inline-flex">{label}</span>
+    </Tooltip>
   ) : (
     label
   );

@@ -66,6 +66,7 @@ export default function ApprovalsPage() {
         header: "Status",
         sortField: "status",
         filterField: "status",
+        noTruncate: true,
         cell: (a) => <ApprovalStatusLabel status={a.status} />,
       },
       {
