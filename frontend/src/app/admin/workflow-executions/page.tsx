@@ -119,7 +119,7 @@ function buildColumns(
       cell: (s) => s.agentSkillRepoPath || "—",
     },
     {
-      header: "Agent Skill Commit SHA",
+      header: "Agent Skill Commit",
       visibility: "optional",
       className: "font-mono",
       cell: (s) => formatRevision(s.agentSkillCommitSha),

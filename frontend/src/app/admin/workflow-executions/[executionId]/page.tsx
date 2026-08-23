@@ -179,7 +179,7 @@ export default function WorkflowExecutionDetailPage() {
               }
             />
             <DetailItem
-              label="Repository"
+              label="Agent Skill Repo URL"
               value={
                 <a
                   href={session.agentSkillRepoUrl}
@@ -191,9 +191,12 @@ export default function WorkflowExecutionDetailPage() {
                 </a>
               }
             />
-            <DetailItem label="Repository Path" value={session.agentSkillRepoPath || EMPTY_VALUE} />
             <DetailItem
-              label="Commit"
+              label="Agent Skill Repo Path"
+              value={session.agentSkillRepoPath || EMPTY_VALUE}
+            />
+            <DetailItem
+              label="Agent Skill Commit"
               value={
                 <span className="font-mono text-xs">
                   {session.agentSkillCommitSha ?? EMPTY_VALUE}
@@ -210,10 +213,6 @@ export default function WorkflowExecutionDetailPage() {
                   {userName ?? session.initiatorId}
                 </Link>
               }
-            />
-            <DetailItem
-              label="Session ID"
-              value={<span className="font-mono text-xs">{session.sessionId}</span>}
             />
           </DetailList>
 

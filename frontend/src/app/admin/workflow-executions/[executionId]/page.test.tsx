@@ -50,11 +50,6 @@ describe("WorkflowExecutionDetailPage", () => {
     expect(link).toHaveAttribute("href", "/admin/users/user");
   });
 
-  it("shows the session's own identifier", async () => {
-    render(<WorkflowExecutionDetailPage />);
-    expect(await screen.findByText("executed-session-id")).toBeInTheDocument();
-  });
-
   it("shows the execution's status", async () => {
     render(<WorkflowExecutionDetailPage />);
     expect(await screen.findByText("completed")).toBeInTheDocument();
