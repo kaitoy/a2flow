@@ -39,7 +39,13 @@ describe("WorkflowExecutionsPage", () => {
   });
 
   it("links the Agent Skill cell to the skill's detail page", async () => {
+    const user = userEvent.setup();
     render(<WorkflowExecutionsPage />);
+    await waitFor(() => screen.getByText("My Workflow"));
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Agent Skill" }));
+
     const link = await screen.findByRole("link", { name: "My Skill" });
     expect(link).toHaveAttribute("href", "/admin/agent-skills/skill-1");
   });
@@ -86,11 +92,13 @@ describe("WorkflowExecutionsPage", () => {
     expect(requests).toEqual([["ann", "bob", "cal"]]);
   });
 
-  it("shows the Status and Created At columns by default, but not Finished At", async () => {
+  it("shows Name, Status, Initiator and Created At by default, but not Agent Skill or Finished At", async () => {
     render(<WorkflowExecutionsPage />);
     await waitFor(() => screen.getByText("My Workflow"));
     expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Initiator" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Created At" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Agent Skill" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Finished At" })).not.toBeInTheDocument();
     expect(screen.getByText("completed")).toBeInTheDocument();
   });

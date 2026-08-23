@@ -49,17 +49,17 @@ function buildColumns(
       ),
     },
     {
-      header: "Agent Skill",
-      sortField: "agentSkillName",
-      filterField: "agentSkillName",
-      cell: (s) => (
-        <Link
-          href={`/admin/agent-skills/${s.agentSkillId}`}
-          className="font-medium text-accent transition-colors hover:underline"
-        >
-          {s.agentSkillName}
-        </Link>
-      ),
+      header: "Status",
+      sortField: "status",
+      filterField: "status",
+      filterOp: "eq",
+      filterOptions: [
+        { label: "Running", value: "running" },
+        { label: "Completed", value: "completed" },
+        { label: "Failed", value: "failed" },
+      ],
+      noTruncate: true,
+      cell: (s) => <WorkflowExecutionStatusLabel status={s.status} />,
     },
     {
       // Resolved from initiatorId to a display name; not sorted/filtered by raw id.
@@ -82,19 +82,6 @@ function buildColumns(
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
     {
-      header: "Status",
-      sortField: "status",
-      filterField: "status",
-      filterOp: "eq",
-      filterOptions: [
-        { label: "Running", value: "running" },
-        { label: "Completed", value: "completed" },
-        { label: "Failed", value: "failed" },
-      ],
-      noTruncate: true,
-      cell: (s) => <WorkflowExecutionStatusLabel status={s.status} />,
-    },
-    {
       header: "Finished At",
       visibility: "optional",
       cell: (s) =>
@@ -104,6 +91,20 @@ function buildColumns(
       header: "Description",
       visibility: "optional",
       cell: (s) => s.description || "—",
+    },
+    {
+      header: "Agent Skill",
+      sortField: "agentSkillName",
+      filterField: "agentSkillName",
+      visibility: "optional",
+      cell: (s) => (
+        <Link
+          href={`/admin/agent-skills/${s.agentSkillId}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {s.agentSkillName}
+        </Link>
+      ),
     },
     {
       header: "Agent Skill Repo URL",
