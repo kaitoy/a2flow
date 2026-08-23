@@ -86,11 +86,12 @@ describe("WorkflowExecutionsPage", () => {
     expect(requests).toEqual([["ann", "bob", "cal"]]);
   });
 
-  it("shows the Status and Finished At columns by default", async () => {
+  it("shows the Status and Created At columns by default, but not Finished At", async () => {
     render(<WorkflowExecutionsPage />);
     await waitFor(() => screen.getByText("My Workflow"));
     expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Finished At" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Created At" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Finished At" })).not.toBeInTheDocument();
     expect(screen.getByText("completed")).toBeInTheDocument();
   });
 
