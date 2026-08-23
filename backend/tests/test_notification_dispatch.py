@@ -20,7 +20,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
 from infrastructure.email_sender import SmtpConfig
 from infrastructure.secret_cipher import get_secret_cipher
-from models.notification import Notification, NotificationCreate, NotificationType
+from models.notification import (
+    Notification,
+    NotificationCreate,
+    NotificationType,
+    build_notification_link,
+)
 from models.system_settings import (
     SYSTEM_SETTINGS_ID,
     SmtpSecurity,
@@ -28,6 +33,7 @@ from models.system_settings import (
 )
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, User
+from models.workflow_execution import WorkflowExecution
 from repositories import (
     SqlNotificationRepository,
     SqlSystemSettingsRepository,
@@ -86,6 +92,29 @@ async def _seed(session: AsyncSession, **user_overrides: Any) -> None:
     fields.update(user_overrides)
     session.add(User(**fields))
     await session.commit()
+
+
+async def _seed_execution(session: AsyncSession, *, execution_id: str = "run-1") -> str:
+    """Insert a WorkflowExecution owned by the seeded recipient and return its id."""
+    execution = WorkflowExecution(
+        id=execution_id,
+        session_id=f"session-for-{execution_id}",
+        name="wf",
+        workflow_prompt="do it",
+        agent_skill_id="skill-1",
+        agent_skill_name="skill",
+        agent_skill_repo_url="https://example.com/repo",
+        agent_skill_repo_path=".",
+        skill_dir="/tmp/skill",
+        initiator_id=_RECIPIENT_ID,
+        tenant_id=_TENANT_ID,
+        created_by=_RECIPIENT_ID,
+        updated_by=_RECIPIENT_ID,
+    )
+    session.add(execution)
+    await session.commit()
+    await session.refresh(execution)
+    return execution.id
 
 
 async def _enable_smtp(session: AsyncSession, **overrides: Any) -> None:
@@ -177,43 +206,89 @@ async def test_body_deep_links_to_the_notification_centre_without_a_target(
     assert "http://localhost:3000/notifications" in sender.sent[0]["body"]
 
 
+async def test_body_deep_links_an_approval_request_to_the_session_chat(
+    session: AsyncSession, sender: _RecordingSender
+) -> None:
+    """The email link for a run-scoped notification is the chat, not the admin record."""
+    await _seed(session)
+    await _enable_smtp(session)
+    execution_id = await _seed_execution(session)
+    notification = await _dispatcher(session, sender).create(
+        _payload(workflow_execution_id=execution_id), user_id=_RECIPIENT_ID
+    )
+    assert notification.link == f"/workflow-executions/{execution_id}/session"
+    assert (
+        f"http://localhost:3000/workflow-executions/{execution_id}/session"
+        in sender.sent[0]["body"]
+    )
+
+
 @pytest.mark.parametrize(
     ("notification_type", "field", "expected"),
     [
         (
             NotificationType.approval_request,
             "workflow_execution_id",
-            "http://localhost:3000/admin/workflow-executions/run-1",
+            "/workflow-executions/run-1/session",
         ),
         (
             NotificationType.execution_completed,
             "workflow_execution_id",
-            "http://localhost:3000/admin/workflow-executions/run-1",
+            "/workflow-executions/run-1/session",
         ),
         (
             NotificationType.workflow_draft_ready,
             "workflow_id",
-            "http://localhost:3000/admin/workflows/wf-1",
+            "/admin/workflows/wf-1",
         ),
         (
             NotificationType.workflow_generation_failed,
             "workflow_id",
-            "http://localhost:3000/admin/workflows/wf-1",
+            "/admin/workflows/wf-1",
         ),
     ],
 )
-def test_deep_link_routes_each_kind_to_what_it_is_about(
+def test_build_notification_link_routes_each_kind_to_what_it_is_about(
     notification_type: NotificationType, field: str, expected: str
 ) -> None:
-    """Checked on the model directly: the real ids carry foreign keys a unit test has no reason to satisfy."""
-    notification = Notification.model_construct(
-        id="n-1",
-        type=notification_type,
-        title="t",
+    link = build_notification_link(
+        notification_type,
         workflow_execution_id="run-1" if field == "workflow_execution_id" else None,
         workflow_id="wf-1" if field == "workflow_id" else None,
     )
-    assert _deep_link(notification, base_url="http://localhost:3000/") == expected
+    assert link == expected
+
+
+def test_build_notification_link_is_none_without_the_relevant_id() -> None:
+    assert (
+        build_notification_link(
+            NotificationType.approval_request,
+            workflow_execution_id=None,
+            workflow_id=None,
+        )
+        is None
+    )
+
+
+def test_deep_link_prefixes_the_stored_link_with_the_base_url() -> None:
+    """Checked on the model directly: `_deep_link` only concatenates, it no longer branches."""
+    notification = Notification.model_construct(
+        id="n-1", type=NotificationType.approval_request, title="t", link="/foo/bar"
+    )
+    assert (
+        _deep_link(notification, base_url="http://localhost:3000/")
+        == "http://localhost:3000/foo/bar"
+    )
+
+
+def test_deep_link_falls_back_to_the_notification_centre_without_a_link() -> None:
+    notification = Notification.model_construct(
+        id="n-1", type=NotificationType.approval_request, title="t", link=None
+    )
+    assert (
+        _deep_link(notification, base_url="http://localhost:3000/")
+        == "http://localhost:3000/notifications"
+    )
 
 
 async def test_body_omits_the_link_when_no_base_url_is_configured(

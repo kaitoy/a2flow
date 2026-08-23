@@ -40,12 +40,13 @@ interface Coords {
 
 /**
  * Floating dropdown listing the current user's **unread** notifications, anchored
- * beneath the toolbar bell. Each row deep-links to the workflow execution it
- * concerns and is marked read on click; a trailing action marks it read without
- * navigating. Marking read is the only way to clear a row here — deleting a
- * notification for good is done from the profile page, where the full history is
- * visible. Rendered via a portal so it is never clipped by the header, and
- * animated in/out with the project's motion preset.
+ * beneath the toolbar bell. Each row navigates to its backend-resolved `link`
+ * (the session chat for a run-scoped notification, the workflow for a
+ * workflow-scoped one) and is marked read on click; a trailing action marks it
+ * read without navigating. Marking read is the only way to clear a row here —
+ * deleting a notification for good is done from the profile page, where the
+ * full history is visible. Rendered via a portal so it is never clipped by the
+ * header, and animated in/out with the project's motion preset.
  */
 export function NotificationPanel({ anchorRef, open, onClose }: NotificationPanelProps) {
   const dispatch = useAppDispatch();
@@ -96,23 +97,13 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
   });
 
   const onSelect = useCallback(
-    (
-      id: string,
-      workflowExecutionId: string | null | undefined,
-      workflowId: string | null | undefined
-    ) => {
+    (id: string, link: string | null | undefined) => {
       dispatch(markReadLocal(id));
       updateNotification(id, { read: true }).catch((err) => {
         logger.error({ err, id }, "failed to mark notification read");
       });
       onClose();
-      // Run-scoped notifications (approvals, completion) deep-link to the
-      // session chat; workflow-scoped ones (a generated draft) to the workflow.
-      if (workflowExecutionId) {
-        router.push(`/workflow-executions/${encodeURIComponent(workflowExecutionId)}/session`);
-      } else if (workflowId) {
-        router.push(`/admin/workflows/${encodeURIComponent(workflowId)}`);
-      }
+      if (link) router.push(link);
     },
     [dispatch, router, onClose]
   );
@@ -185,7 +176,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                   <li key={n.id} className="flex items-start gap-1">
                     <button
                       type="button"
-                      onClick={() => onSelect(n.id, n.workflowExecutionId, n.workflowId)}
+                      onClick={() => onSelect(n.id, n.link)}
                       className="flex min-w-0 flex-1 items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                     >
                       <span

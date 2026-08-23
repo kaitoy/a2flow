@@ -8,8 +8,11 @@ a terminal state (``execution_completed``).
 
 The ``user_id`` column is the **recipient** of the notification and is distinct
 from the inherited ``created_by`` / ``updated_by`` audit fields (which record the
-actor that produced the record). ``workflow_execution_id`` links the notification
-to the workflow execution it concerns so the UI can deep-link to it.
+actor that produced the record). ``workflow_execution_id`` / ``workflow_id`` link
+the notification to the workflow execution or workflow it concerns; ``link`` is
+the relative in-app path resolved from those ids once, at creation time, by
+:func:`build_notification_link` — the single place that decides where each
+notification kind deep-links to, shared by the email dispatcher and the web UI.
 """
 
 from enum import StrEnum
@@ -72,10 +75,13 @@ class Notification(NotificationCreate, TenantScoped, BaseEntity, table=True):
     ``user_id`` references the recipient (``ON DELETE CASCADE``); the optional
     ``workflow_execution_id`` / ``workflow_id`` reference the workflow execution or
     workflow the notification is about (``ON DELETE CASCADE``), so deleting any
-    of them removes the notification.
+    of them removes the notification. ``link`` is computed by the repository at
+    creation time (see :func:`build_notification_link`), not supplied by callers,
+    so it lives here rather than on ``NotificationCreate``.
     """
 
     __tablename__ = "notifications"
+    link: str | None = None
     __table_args__ = (
         Index("ix_notifications_user_id", "user_id"),
         Index("ix_notifications_workflow_execution_id", "workflow_execution_id"),
@@ -99,3 +105,45 @@ class Notification(NotificationCreate, TenantScoped, BaseEntity, table=True):
             name="fk_notifications_workflow_id",
         ),
     )
+
+
+#: Notification kinds that concern a single workflow execution and deep-link to
+#: its session chat (see :func:`build_notification_link`).
+_EXECUTION_KINDS = frozenset(
+    {NotificationType.approval_request, NotificationType.execution_completed}
+)
+#: Notification kinds that concern a workflow (not a specific run) and deep-link
+#: to the workflow's admin page.
+_WORKFLOW_KINDS = frozenset(
+    {NotificationType.workflow_draft_ready, NotificationType.workflow_generation_failed}
+)
+
+
+def build_notification_link(
+    notification_type: NotificationType,
+    *,
+    workflow_execution_id: str | None,
+    workflow_id: str | None,
+) -> str | None:
+    """Resolve the relative in-app path this notification deep-links to.
+
+    Run-scoped kinds (``approval_request``, ``execution_completed``) point at the
+    execution's session chat; workflow-scoped kinds (``workflow_draft_ready``,
+    ``workflow_generation_failed``) point at the workflow. This is the single
+    place that decides the target path; the email dispatcher and the web UI both
+    read the ``link`` this produces rather than re-deriving it.
+
+    Args:
+        notification_type: The kind of event the notification represents.
+        workflow_execution_id: The execution the notification concerns, if any.
+        workflow_id: The workflow the notification concerns, if any.
+
+    Returns:
+        The relative path, or ``None`` when the relevant id is missing —
+        callers pick their own fallback (e.g. the notification centre).
+    """
+    if notification_type in _EXECUTION_KINDS and workflow_execution_id:
+        return f"/workflow-executions/{workflow_execution_id}/session"
+    if notification_type in _WORKFLOW_KINDS and workflow_id:
+        return f"/admin/workflows/{workflow_id}"
+    return None

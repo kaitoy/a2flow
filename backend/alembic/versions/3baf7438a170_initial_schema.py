@@ -621,6 +621,7 @@ def upgrade() -> None:
             "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("link", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),

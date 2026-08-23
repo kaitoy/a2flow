@@ -148,20 +148,6 @@ class NotificationDispatcher:
         return user.email or None
 
 
-#: Route each notification kind deep-links to, relative to the configured base
-#: URL. Run-scoped kinds point at the execution; workflow-scoped ones at the
-#: workflow. Anything else falls back to the notification centre.
-_EXECUTION_KINDS = frozenset(
-    {NotificationType.approval_request, NotificationType.execution_completed}
-)
-_WORKFLOW_KINDS = frozenset(
-    {
-        NotificationType.workflow_draft_ready,
-        NotificationType.workflow_generation_failed,
-    }
-)
-
-
 def _deep_link(notification: Notification, *, base_url: str) -> str:
     """Build the URL that takes the recipient to what the notification is about.
 
@@ -170,13 +156,14 @@ def _deep_link(notification: Notification, *, base_url: str) -> str:
         base_url: Base URL of the deployment, without a trailing slash.
 
     Returns:
-        An absolute URL into the web UI.
+        An absolute URL into the web UI, built from the notification's own
+        ``link`` (resolved once at creation time by
+        :func:`models.notification.build_notification_link`), or the
+        notification centre when it has none.
     """
     root = base_url.rstrip("/")
-    if notification.type in _EXECUTION_KINDS and notification.workflow_execution_id:
-        return f"{root}/admin/workflow-executions/{notification.workflow_execution_id}"
-    if notification.type in _WORKFLOW_KINDS and notification.workflow_id:
-        return f"{root}/admin/workflows/{notification.workflow_id}"
+    if notification.link:
+        return f"{root}{notification.link}"
     return f"{root}/notifications"
 
 

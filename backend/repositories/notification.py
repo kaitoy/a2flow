@@ -16,6 +16,7 @@ from models.notification import (
     NotificationCreate,
     NotificationType,
     NotificationUpdate,
+    build_notification_link,
 )
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import NotFoundError
@@ -119,13 +120,18 @@ class SqlNotificationRepository:
         return list(result.all())
 
     async def create(self, data: NotificationCreate, *, user_id: str) -> Notification:
-        """Persist a new Notification with audit fields populated."""
+        """Persist a new Notification with audit fields and its deep link populated."""
         notification = Notification.model_validate(
             {
                 **data.model_dump(),
                 "tenant_id": self._tenant_id,
                 "created_by": user_id,
                 "updated_by": user_id,
+                "link": build_notification_link(
+                    data.type,
+                    workflow_execution_id=data.workflow_execution_id,
+                    workflow_id=data.workflow_id,
+                ),
             }
         )
         self._db.add(notification)
