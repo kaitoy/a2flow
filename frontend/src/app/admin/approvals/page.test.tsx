@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { store as appStore } from "@/store";
@@ -7,8 +8,17 @@ import { server } from "@/test/msw/server";
 import ApprovalsPage from "./page";
 
 vi.mock("next/link", () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
+  default: ({
+    href,
+    children,
+    ...props
+  }: {
+    href: string;
+    children: React.ReactNode;
+  } & React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
   ),
 }));
 
@@ -26,14 +36,6 @@ describe("ApprovalsPage", () => {
     render(<ApprovalsPage />);
     const link = await screen.findByRole("link", { name: "Deploy to production" });
     expect(link).toHaveAttribute("href", "/admin/approvals/appr-1");
-  });
-
-  it("shows the resolved approver name and comment", async () => {
-    render(<ApprovalsPage />);
-    await waitFor(() => screen.getByText("Deploy to production"));
-    // The name lands in both the Approver and the Decided By cell.
-    await waitFor(() => expect(screen.getAllByText("Alice Smith")).toHaveLength(2));
-    expect(screen.getByText("Looks good to me")).toBeInTheDocument();
   });
 
   it("resolves every row's approver, creator, and updater in a single request", async () => {
@@ -66,13 +68,13 @@ describe("ApprovalsPage", () => {
     );
 
     render(<ApprovalsPage />);
+    await waitFor(() => screen.getByText("Approve 0"));
 
-    await waitFor(() => expect(screen.getByText("ANN")).toBeInTheDocument());
     // "owner" is every row's createdBy/updatedBy, deduplicated with the approvers.
-    expect(requests).toEqual([["ann", "owner", "bob", "cal"]]);
+    await waitFor(() => expect(requests).toEqual([["ann", "owner", "bob", "cal"]]));
   });
 
-  it("shows the Description and Decided At columns by default", async () => {
+  it("shows the Description column by default", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/approvals", () =>
         envelope([
@@ -99,13 +101,18 @@ describe("ApprovalsPage", () => {
     await waitFor(() =>
       expect(screen.getByText("Ship the release build to prod")).toBeInTheDocument()
     );
-    expect(screen.getByRole("columnheader", { name: "Decided At" })).toBeInTheDocument();
   });
 
-  it("links to the workflow execution chat", async () => {
+  it("links the Workflow Execution cell to the execution's detail page, resolving its name", async () => {
+    render(<ApprovalsPage />);
+    const link = await screen.findByRole("link", { name: "My Workflow" });
+    expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1");
+  });
+
+  it("links the Open Workflow Session action to the chat page", async () => {
     render(<ApprovalsPage />);
     await waitFor(() => screen.getByText("Deploy to production"));
-    const link = screen.getByRole("link", { name: "Open chat" });
+    const link = screen.getByRole("link", { name: "Open workflow session" });
     expect(link).toHaveAttribute("href", "/workflow-executions/execution-1/session");
   });
 
@@ -131,6 +138,7 @@ describe("ApprovalsPage", () => {
   });
 
   it("shows the approver group's name, linked to the group, for a group-addressed row", async () => {
+    const user = userEvent.setup();
     server.use(
       http.get("http://localhost:8000/api/v1/approvals", () =>
         envelope([
@@ -156,6 +164,10 @@ describe("ApprovalsPage", () => {
     );
 
     render(<ApprovalsPage />);
+    await waitFor(() => screen.getByText("Restart the cluster"));
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Approver" }));
 
     // "Developers" is USER_GROUP_1's name in the default MSW fixtures.
     const link = await screen.findByRole("link", { name: "Developers" });

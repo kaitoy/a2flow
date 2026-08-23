@@ -1,9 +1,10 @@
 /** @module ApprovalsPage — Admin list page for browsing approval requests. */
 "use client";
 
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
+import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ApprovalStatusLabel } from "@/components/admin/approval-status";
@@ -17,6 +18,7 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useGroupNames } from "@/hooks/useGroupNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useUserNames } from "@/hooks/useUserNames";
+import { useWorkflowExecutionNames } from "@/hooks/useWorkflowExecutionNames";
 import { type Approval, listApprovals } from "@/lib/api";
 
 const LIMIT = 20;
@@ -44,6 +46,7 @@ export default function ApprovalsPage() {
     rows.flatMap((a) => [a.approver, a.decidedBy, a.createdBy, a.updatedBy])
   );
   const groupNames = useGroupNames(rows.map((a) => a.approverGroupId));
+  const executionNames = useWorkflowExecutionNames(rows.map((a) => a.workflowExecutionId));
 
   const columns = useMemo<ColumnDef<Approval>[]>(
     () => [
@@ -63,6 +66,17 @@ export default function ApprovalsPage() {
         ),
       },
       {
+        header: "Workflow Execution",
+        cell: (a) => (
+          <Link
+            href={`/admin/workflow-executions/${a.workflowExecutionId}`}
+            className="font-medium text-accent transition-colors hover:underline"
+          >
+            {executionNames.get(a.workflowExecutionId) ?? a.workflowExecutionId}
+          </Link>
+        ),
+      },
+      {
         header: "Status",
         sortField: "status",
         filterField: "status",
@@ -70,7 +84,17 @@ export default function ApprovalsPage() {
         cell: (a) => <ApprovalStatusLabel status={a.status} />,
       },
       {
+        header: "Description",
+        cell: (a) => a.description || "—",
+      },
+      {
+        header: "Created At",
+        sortField: "createdAt",
+        cell: (a) => <DateTime value={a.createdAt} className="text-on-surface-variant" />,
+      },
+      {
         header: "Approver",
+        visibility: "optional",
         cell: (a) => {
           if (a.approver) return names.get(a.approver) ?? a.approver;
           if (a.approverGroupId) {
@@ -88,44 +112,37 @@ export default function ApprovalsPage() {
       },
       {
         header: "Decided By",
+        visibility: "optional",
         cell: (a) => (a.decidedBy ? (names.get(a.decidedBy) ?? a.decidedBy) : "—"),
       },
       {
         header: "Comment",
+        visibility: "optional",
         cell: (a) => a.response ?? "—",
       },
       {
-        header: "Session",
-        noTruncate: true,
-        cell: (a) =>
-          a.workflowExecutionId ? (
-            <Link
-              href={`/workflow-executions/${a.workflowExecutionId}/session`}
-              className="text-accent transition-colors hover:underline"
-            >
-              Open chat
-            </Link>
-          ) : (
-            "—"
-          ),
-      },
-      {
-        header: "Created At",
-        sortField: "createdAt",
-        cell: (a) => <DateTime value={a.createdAt} className="text-on-surface-variant" />,
-      },
-      {
-        header: "Description",
-        cell: (a) => a.description || "—",
-      },
-      {
         header: "Decided At",
+        visibility: "optional",
         cell: (a) =>
           a.decidedAt ? <DateTime value={a.decidedAt} className="text-on-surface-variant" /> : "—",
       },
       ...auditColumns<Approval>(names),
+      {
+        header: "Actions",
+        noTruncate: true,
+        visibility: "always",
+        cell: (a) => (
+          <div className="flex justify-center gap-2">
+            <ActionIconButton
+              icon={MessageSquareText}
+              label="Open workflow session"
+              href={`/workflow-executions/${a.workflowExecutionId}/session`}
+            />
+          </div>
+        ),
+      },
     ],
-    [names, groupNames]
+    [names, groupNames, executionNames]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
