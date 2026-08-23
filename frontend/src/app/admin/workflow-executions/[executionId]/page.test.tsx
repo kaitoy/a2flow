@@ -3,6 +3,7 @@ import { http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
+import { ADMIN, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -18,16 +19,21 @@ beforeEach(() => {
   vi.mocked(useParams).mockReturnValue({ executionId: "execution-1" });
 });
 
+/** Render the detail page as an admin — the role deletion requires. */
+function renderPage(preloadedState = ADMIN) {
+  return render(<WorkflowExecutionDetailPage />, { preloadedState });
+}
+
 describe("WorkflowExecutionDetailPage", () => {
   it("titles the page and ends the breadcrumb trail with the workflow's name", async () => {
-    render(<WorkflowExecutionDetailPage />);
+    renderPage();
     expect(await screen.findByRole("heading", { name: "My Workflow" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByText("My Workflow")).toHaveAttribute("aria-current", "page");
   });
 
   it("links the Name field to its detail page", async () => {
-    render(<WorkflowExecutionDetailPage />);
+    renderPage();
     await waitFor(() =>
       expect(screen.getAllByRole("link", { name: "My Workflow" })[0]).toHaveAttribute(
         "href",
@@ -37,7 +43,7 @@ describe("WorkflowExecutionDetailPage", () => {
   });
 
   it("links the Agent Skill field to its detail page", async () => {
-    render(<WorkflowExecutionDetailPage />);
+    renderPage();
     expect(await screen.findByRole("link", { name: "My Skill" })).toHaveAttribute(
       "href",
       "/admin/agent-skills/skill-1"
@@ -45,13 +51,13 @@ describe("WorkflowExecutionDetailPage", () => {
   });
 
   it("resolves and links the Initiator field to the user's edit page", async () => {
-    render(<WorkflowExecutionDetailPage />);
+    renderPage();
     const link = await screen.findByRole("link", { name: "Alice Smith" });
     expect(link).toHaveAttribute("href", "/admin/users/user");
   });
 
   it("shows the execution's status", async () => {
-    render(<WorkflowExecutionDetailPage />);
+    renderPage();
     expect(await screen.findByText("completed")).toBeInTheDocument();
   });
 
@@ -74,7 +80,7 @@ describe("WorkflowExecutionDetailPage", () => {
       forward: vi.fn(),
     });
 
-    render(<WorkflowExecutionDetailPage />);
+    renderPage();
     await screen.findByRole("heading", { name: "My Workflow" });
     await user.click(screen.getByRole("button", { name: "View tasks" }));
     expect(pushMock).toHaveBeenCalledWith("/admin/workflow-executions/execution-1/workflow-tasks");
@@ -92,7 +98,7 @@ describe("WorkflowExecutionDetailPage", () => {
       forward: vi.fn(),
     });
 
-    render(<WorkflowExecutionDetailPage />);
+    renderPage();
     await screen.findByRole("heading", { name: "My Workflow" });
     await user.click(screen.getByRole("button", { name: "Open workflow session" }));
     expect(pushMock).toHaveBeenCalledWith("/workflow-executions/execution-1/session");
@@ -112,7 +118,7 @@ describe("WorkflowExecutionDetailPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/workflow-executions/:id", deleteSpy));
 
-    render(<WorkflowExecutionDetailPage />);
+    renderPage();
     await screen.findByRole("heading", { name: "My Workflow" });
     await user.click(screen.getByRole("button", { name: "Delete" }));
     const dialog = await screen.findByRole("dialog");
@@ -120,6 +126,12 @@ describe("WorkflowExecutionDetailPage", () => {
 
     await waitFor(() => expect(deleteSpy).toHaveBeenCalled());
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflow-executions"));
+  });
+
+  it("hides the Delete button from a non-admin", async () => {
+    renderPage(REQUESTER);
+    await screen.findByRole("heading", { name: "My Workflow" });
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
   it("shows the access-denied state and no toast on a FORBIDDEN load failure", async () => {
@@ -130,7 +142,7 @@ describe("WorkflowExecutionDetailPage", () => {
     );
     const beforeCount = store.getState().toast.items.length;
 
-    render(<WorkflowExecutionDetailPage />);
+    renderPage();
 
     expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     expect(store.getState().toast.items.length).toBe(beforeCount);

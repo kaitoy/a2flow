@@ -27,6 +27,7 @@ import {
   type WorkflowExecution,
 } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
+import { Role, useHasRole } from "@/lib/roles";
 
 /**
  * Read-only detail page for a single executed `WorkflowExecution`: the workflow
@@ -37,7 +38,8 @@ import { EMPTY_VALUE } from "@/lib/read-only-display";
  * author-managed entity. The header offers quick jumps to the session's task
  * list and its live chat, mirroring the icon actions already on the
  * `workflow-executions` list page. Delete is offered for the same reason the
- * list page offers it there.
+ * list page offers it there, restricted to admins and super admins to match
+ * the backend's `require_roles(Role.admin)` gate on the delete endpoint.
  */
 export default function WorkflowExecutionDetailPage() {
   const { executionId } = useParams<{ executionId: string }>();
@@ -48,6 +50,7 @@ export default function WorkflowExecutionDetailPage() {
   const [userName, setUserName] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const isAdmin = useHasRole(Role.ADMIN);
 
   useEffect(() => {
     let active = true;
@@ -224,14 +227,16 @@ export default function WorkflowExecutionDetailPage() {
             >
               Back
             </Button>
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => setConfirmOpen(true)}
-              className="ml-auto"
-            >
-              Delete
-            </Button>
+            {isAdmin && (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => setConfirmOpen(true)}
+                className="ml-auto"
+              >
+                Delete
+              </Button>
+            )}
           </div>
         </div>
       </FormLayout>

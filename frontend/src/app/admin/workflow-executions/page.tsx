@@ -21,16 +21,20 @@ import { useTableQuery } from "@/hooks/useTableQuery";
 import { useUserNames } from "@/hooks/useUserNames";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import { deleteWorkflowExecution, listWorkflowExecutions, type WorkflowExecution } from "@/lib/api";
+import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
 
 /**
  * Build the table columns, resolving user ids to display names via `userMap`
- * and wiring the Actions column's Delete button to `onDelete`.
+ * and wiring the Actions column's Delete button to `onDelete`. The Delete
+ * button only renders when `isAdmin` is true — the backend restricts
+ * deletion to admins and super admins.
  */
 function buildColumns(
   userMap: Map<string, string>,
-  onDelete: (id: string, name: string) => void
+  onDelete: (id: string, name: string) => void,
+  isAdmin: boolean
 ): ColumnDef<WorkflowExecution>[] {
   return [
     idColumn<WorkflowExecution>(),
@@ -141,7 +145,7 @@ function buildColumns(
             label="Open workflow session"
             href={`/workflow-executions/${s.id}/session`}
           />
-          <DeleteIconButton onClick={() => onDelete(s.id, s.name)} />
+          {isAdmin && <DeleteIconButton onClick={() => onDelete(s.id, s.name)} />}
         </div>
       ),
     },
@@ -163,6 +167,7 @@ export default function WorkflowExecutionsPage() {
     reload,
   } = useTableQuery<WorkflowExecution>(listWorkflowExecutions, { limit: LIMIT });
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
+  const isAdmin = useHasRole(Role.ADMIN);
 
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
@@ -185,7 +190,7 @@ export default function WorkflowExecutionsPage() {
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowExecutions",
-    buildColumns(userMap, handleDelete)
+    buildColumns(userMap, handleDelete, isAdmin)
   );
 
   return (

@@ -1,10 +1,11 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { store as appStore } from "@/store";
+import { ADMIN, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import WorkflowExecutionsPage from "./page";
 
 vi.mock("next/link", () => ({
@@ -26,21 +27,26 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+/** Render the list as an admin — the role deletion requires. */
+function renderPage(preloadedState = ADMIN) {
+  return render(<WorkflowExecutionsPage />, { preloadedState });
+}
+
 describe("WorkflowExecutionsPage", () => {
   it("renders session row after load", async () => {
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     await waitFor(() => expect(screen.getByText("My Workflow")).toBeInTheDocument());
   });
 
   it("links the Name cell to the session's detail page", async () => {
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     const link = await screen.findByRole("link", { name: "My Workflow" });
     expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1");
   });
 
   it("links the Agent Skill cell to the skill's detail page", async () => {
     const user = userEvent.setup();
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     await waitFor(() => screen.getByText("My Workflow"));
 
     await user.click(screen.getByRole("button", { name: "Columns" }));
@@ -51,7 +57,7 @@ describe("WorkflowExecutionsPage", () => {
   });
 
   it("resolves the session user ID to the user's name", async () => {
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
   });
 
@@ -86,14 +92,14 @@ describe("WorkflowExecutionsPage", () => {
       })
     );
 
-    render(<WorkflowExecutionsPage />);
+    renderPage();
 
     await waitFor(() => expect(screen.getByText("ANN")).toBeInTheDocument());
     expect(requests).toEqual([["ann", "bob", "cal"]]);
   });
 
   it("shows Name, Status, Initiator and Created At by default, but not Agent Skill or Finished At", async () => {
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     await waitFor(() => screen.getByText("My Workflow"));
     expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Initiator" })).toBeInTheDocument();
@@ -104,20 +110,20 @@ describe("WorkflowExecutionsPage", () => {
   });
 
   it("links the user name to the user's edit page", async () => {
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     const link = await screen.findByRole("link", { name: "Alice Smith" });
     expect(link).toHaveAttribute("href", "/admin/users/user");
   });
 
   it("renders View tasks link to nested admin route", async () => {
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     await waitFor(() => screen.getByText("My Workflow"));
     const link = screen.getByRole("link", { name: "View tasks" });
     expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1/workflow-tasks");
   });
 
   it("renders Open workflow session link to the chat page", async () => {
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     await waitFor(() => screen.getByText("My Workflow"));
     const link = screen.getByRole("link", { name: "Open workflow session" });
     expect(link).toHaveAttribute("href", "/workflow-executions/execution-1/session");
@@ -125,7 +131,7 @@ describe("WorkflowExecutionsPage", () => {
 
   it("shows empty-state message when no sessions exist", async () => {
     server.use(http.get("http://localhost:8000/api/v1/workflow-executions", () => envelope([])));
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     await waitFor(() =>
       expect(
         screen.getByText("No workflow executions yet. Run a workflow to create one.")
@@ -139,7 +145,7 @@ describe("WorkflowExecutionsPage", () => {
         envelopeErr("INTERNAL_ERROR", "Internal server error", 500)
       )
     );
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     await waitFor(() =>
       expect(appStore.getState().toast.items.at(-1)).toMatchObject({
         message: "Internal server error",
@@ -153,11 +159,19 @@ describe("WorkflowExecutionsPage", () => {
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/workflow-executions/:id", deleteSpy));
 
-    render(<WorkflowExecutionsPage />);
+    renderPage();
     await waitFor(() => screen.getByText("My Workflow"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));
     expect(deleteSpy).toHaveBeenCalled();
+  });
+
+  it("hides the Delete button from a non-admin, but keeps the other row actions", async () => {
+    renderPage(REQUESTER);
+    await waitFor(() => screen.getByText("My Workflow"));
+    expect(screen.getByRole("link", { name: "View tasks" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open workflow session" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 });

@@ -23,7 +23,7 @@ from typing import Any
 import anyio
 from ag_ui.core import Context, RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from dependencies import (
@@ -37,6 +37,7 @@ from dependencies import (
     PaginationDep,
     SortDep,
     WorkflowExecutionServiceDep,
+    require_roles,
 )
 from infrastructure.agent import keep_a2ui_context, tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
@@ -46,12 +47,16 @@ from models.metrics import (
     WorkflowVolumeEntry,
 )
 from models.response import ApiResponse
+from models.user import Role
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
 from repositories.exceptions import SessionRunInProgressError
 from services import MetricsWindow
 
 router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
+
+#: Route dependency gating workflow-execution deletion behind the ``admin`` role.
+_requires_admin = [Depends(require_roles(Role.admin))]
 
 
 @router.get("", response_model=ApiResponse[list[WorkflowExecution]])
@@ -190,20 +195,22 @@ async def list_workflow_execution_tasks(
     return ApiResponse(meta=meta, data=items)
 
 
-@router.delete("/{execution_id}", response_model=ApiResponse[None])
+@router.delete(
+    "/{execution_id}",
+    response_model=ApiResponse[None],
+    dependencies=_requires_admin,
+)
 async def delete_workflow_execution(
     execution_id: str,
     service: WorkflowExecutionServiceDep,
-    caller: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
     """Delete a WorkflowExecution, its WorkflowTasks, and its workflow session.
 
-    Restricted to the execution's initiator and super admins (stricter than the
-    shared-chat access rule). Raises HTTP 404 (``NotFoundError``) if no
-    execution exists with the given ID.
+    Restricted to admins and super admins. Raises HTTP 404 (``NotFoundError``)
+    if no execution exists with the given ID.
     """
-    await service.delete(execution_id, caller=caller)
+    await service.delete(execution_id)
     return ApiResponse(meta=meta, data=None)
 
 

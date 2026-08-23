@@ -524,7 +524,11 @@ async def test_admin_can_read_but_not_update_or_delete_task(
     assert_err(res, "FORBIDDEN", 403)
 
 
-# ---------- deletion is owner-or-super-admin only ----------
+# ---------- deletion is admin-or-super-admin only ----------
+#
+# Gated by the router's `require_roles(Role.admin)` dependency rather than by
+# `WorkflowExecutionAccessPolicy`, so it is a flat role check with no
+# ownership component: the initiator gets no special treatment.
 
 
 async def test_approver_cannot_delete_session(
@@ -539,16 +543,16 @@ async def test_approver_cannot_delete_session(
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_owner_can_delete_session(
+async def test_owner_cannot_delete_session_without_admin_role(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
+    """Being the execution's own initiator is no longer sufficient to delete it."""
     client, eng = access_env
     execution_id = await _seed_session(eng)
-    assert_ok(
-        await client.delete(
-            f"/api/v1/workflow-executions/{execution_id}", headers=OWNER
-        )
+    res = await client.delete(
+        f"/api/v1/workflow-executions/{execution_id}", headers=OWNER
     )
+    assert_err(res, "FORBIDDEN", 403)
 
 
 async def test_super_admin_can_delete_session(
@@ -563,16 +567,17 @@ async def test_super_admin_can_delete_session(
     )
 
 
-async def test_admin_cannot_delete_session(
+async def test_admin_can_delete_session_even_when_not_initiator(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """A plain admin can view an execution but must not be able to delete it."""
+    """A plain admin may delete an execution they did not initiate."""
     client, eng = access_env
     execution_id = await _seed_session(eng)
-    res = await client.delete(
-        f"/api/v1/workflow-executions/{execution_id}", headers=ADMIN
+    assert_ok(
+        await client.delete(
+            f"/api/v1/workflow-executions/{execution_id}", headers=ADMIN
+        )
     )
-    assert_err(res, "FORBIDDEN", 403)
 
 
 # ---------- access through a group-addressed approval ----------

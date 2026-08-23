@@ -461,13 +461,12 @@ class WorkflowExecutionService:
                     user_id=owner_id,
                 )
 
-    async def delete(self, execution_id: str, *, caller: User) -> None:
+    async def delete(self, execution_id: str) -> None:
         """Delete a WorkflowExecution and its workflow session.
 
-        Deletion is stricter than the shared-session access rule: only the
-        execution initiator or a super admin may delete an execution — a
-        designated approver may participate in the chat but not destroy it,
-        and neither may a plain ``admin``.
+        Authorization (admin or super admin) is enforced by the router's
+        ``require_roles(Role.admin)`` route dependency, so this method does no
+        access check of its own.
 
         Removes, in order: the ADK session keyed by the record's
         ``session_id`` (best effort — skipped if it no longer exists), then the
@@ -477,15 +476,11 @@ class WorkflowExecutionService:
 
         Args:
             execution_id: Identifier of the execution to delete.
-            caller: The authenticated user requesting the deletion.
 
         Raises:
             NotFoundError: If no WorkflowExecution exists with the given ID.
-            ForbiddenError: If the caller is neither the execution initiator nor a
-                super admin.
         """
         execution = await self._get(execution_id)
-        self._access.assert_owner(execution.initiator_id, caller)
         scoped_app_name = tenant_app_name(self._app_name, execution.tenant_id)
         existing = await self._session_service.get_session(
             app_name=scoped_app_name,

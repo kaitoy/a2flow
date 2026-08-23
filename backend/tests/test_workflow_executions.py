@@ -904,6 +904,43 @@ async def test_delete_workflow_execution_unknown_id_returns_404(
     assert_err(response, code="NOT_FOUND", status=404)
 
 
+async def test_delete_workflow_execution_requires_admin_role(
+    workflow_client: AsyncClient,
+) -> None:
+    """Even the execution's own initiator cannot delete it without admin/super_admin.
+
+    This is the behavior change from the previous initiator-or-super-admin rule:
+    deletion is now admin-or-super-admin only, regardless of who started the run.
+    """
+    skill = await _create_skill(workflow_client)
+    workflow = await create_published_workflow(workflow_client, skill["id"])
+    execution = assert_ok(
+        await workflow_client.post(
+            f"/api/v1/workflows/{workflow['id']}/execute",
+            headers={"X-User-Id": "alice", "X-User-Roles": "requester"},
+        ),
+        status=201,
+    )
+    response = await workflow_client.delete(
+        f"/api/v1/workflow-executions/{execution['id']}",
+        headers={"X-User-Id": "alice", "X-User-Roles": "requester"},
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
+
+
+async def test_delete_workflow_execution_allows_admin_who_is_not_initiator(
+    workflow_client: AsyncClient,
+) -> None:
+    """A plain ``admin`` may delete an execution they did not initiate."""
+    skill = await _create_skill(workflow_client)
+    execution = await _execute_workflow(workflow_client, skill["id"])
+    response = await workflow_client.delete(
+        f"/api/v1/workflow-executions/{execution['id']}",
+        headers={"X-User-Id": "carol", "X-User-Roles": "admin"},
+    )
+    assert assert_ok(response, status=200) is None
+
+
 async def test_initiator_id_must_reference_an_existing_user(
     workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
 ) -> None:

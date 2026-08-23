@@ -17,7 +17,7 @@ approve, and removing them revokes it, both on the next request. That follows
 directly from "any member of the group can resolve it" -- resolving is what the
 chat access exists to enable.
 
-This policy exposes three methods, from broadest to narrowest:
+This policy exposes two methods, from broadest to narrowest:
 
 - :meth:`assert_read_access` — participants (initiator, designated
   approvers), super admins, **and plain admins** (tenant-scoped, read-only).
@@ -27,17 +27,19 @@ This policy exposes three methods, from broadest to narrowest:
   admins. Backs the operations that act on the execution: driving its
   agent, and creating/updating/deleting its tasks. An admin can see
   everything :meth:`assert_read_access` allows but cannot act on any of it.
-- :meth:`assert_owner` — the execution's initiator or a super admin only.
-  Backs deletion, deliberately stricter than either of the above.
 
-All three reject unrelated third parties with :class:`ForbiddenError` (HTTP
+Deletion is authorized separately, by the router's
+``require_roles(Role.admin)`` route dependency rather than by this policy —
+see ``routers/workflow_executions.py``.
+
+Both reject unrelated third parties with :class:`ForbiddenError` (HTTP
 403 ``FORBIDDEN``).
 
-:meth:`assert_access` and :meth:`assert_owner` read the caller's **direct**
-roles (``caller.roles``) rather than their effective ones. They only ever ask
-about ``super_admin``, and a :class:`~models.user_group.UserGroup` can never
-grant that role, so the two are equivalent here — and reading the column
-keeps them correct even if that invariant were ever weakened.
+:meth:`assert_access` reads the caller's **direct** roles (``caller.roles``)
+rather than their effective ones. It only ever asks about ``super_admin``,
+and a :class:`~models.user_group.UserGroup` can never grant that role, so the
+two are equivalent here — and reading the column keeps it correct even if
+that invariant were ever weakened.
 :meth:`assert_read_access` additionally asks about ``admin``, which *can* be
 granted through a group, so it takes the caller's **effective** roles
 (``caller_roles``, see ``dependencies.auth.EffectiveRolesDep``) as an explicit
@@ -188,25 +190,4 @@ class WorkflowExecutionAccessPolicy:
         raise ForbiddenError(
             "Only the execution initiator, a designated approver, or an admin "
             "can access this workflow execution"
-        )
-
-    def assert_owner(self, owner_id: str, caller: User) -> None:
-        """Reject callers who are neither the initiator nor a super admin.
-
-        Used for destructive operations (deleting an execution), which are
-        deliberately stricter than the shared-session access rule: a designated
-        approver may participate in the chat but not delete it.
-
-        Args:
-            owner_id: The execution initiator's user ID (``WorkflowExecution.initiator_id``).
-            caller: The authenticated user performing the operation.
-
-        Raises:
-            ForbiddenError: If the caller is not the execution's initiator
-                and not a super admin.
-        """
-        if caller.id == owner_id or has_any_role(caller.roles, Role.super_admin):
-            return
-        raise ForbiddenError(
-            "Only the execution initiator can delete this workflow execution"
         )
