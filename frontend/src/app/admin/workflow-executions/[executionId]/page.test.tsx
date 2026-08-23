@@ -55,6 +55,11 @@ describe("WorkflowExecutionDetailPage", () => {
     expect(await screen.findByText("executed-session-id")).toBeInTheDocument();
   });
 
+  it("shows the execution's status", async () => {
+    render(<WorkflowExecutionDetailPage />);
+    expect(await screen.findByText("completed")).toBeInTheDocument();
+  });
+
   it("navigates to the task list from the header action", async () => {
     const user = userEvent.setup();
     const pushMock = vi.fn();

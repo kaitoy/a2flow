@@ -12,6 +12,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { WorkflowExecutionStatusLabel } from "@/components/admin/workflow-execution-status";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -160,6 +161,10 @@ export default function WorkflowExecutionDetailPage() {
                   session.name
                 )
               }
+            />
+            <DetailItem
+              label="Status"
+              value={<WorkflowExecutionStatusLabel status={session.status} />}
             />
             <DetailItem label="Description" value={session.description || EMPTY_VALUE} />
             <DetailItem

@@ -12,6 +12,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { WorkflowExecutionStatusLabel } from "@/components/admin/workflow-execution-status";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
@@ -19,21 +20,9 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useUserNames } from "@/hooks/useUserNames";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
-import {
-  deleteWorkflowExecution,
-  listWorkflowExecutions,
-  type WorkflowExecution,
-  type WorkflowExecutionStatus,
-} from "@/lib/api";
+import { deleteWorkflowExecution, listWorkflowExecutions, type WorkflowExecution } from "@/lib/api";
 
 const LIMIT = 20;
-
-/** Muted-to-vivid color per lifecycle state, matching the Approvals status treatment. */
-const STATUS_STYLES: Record<WorkflowExecutionStatus, string> = {
-  running: "text-on-surface-variant",
-  completed: "text-accent",
-  failed: "text-error",
-};
 
 /**
  * Build the table columns, resolving user ids to display names via `userMap`
@@ -96,11 +85,8 @@ function buildColumns(
         { label: "Completed", value: "completed" },
         { label: "Failed", value: "failed" },
       ],
-      cell: (s) => (
-        <span className={`font-medium capitalize ${STATUS_STYLES[s.status ?? "running"]}`}>
-          {s.status ?? "running"}
-        </span>
-      ),
+      noTruncate: true,
+      cell: (s) => <WorkflowExecutionStatusLabel status={s.status} />,
     },
     {
       header: "Finished At",
