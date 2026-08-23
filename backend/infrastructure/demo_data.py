@@ -16,18 +16,20 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
   showing that one tag classifies across resource types) and ``Approval
   Required`` (attached to the agent skill alone, calling out its approval
   gate),
-* four Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``, either
-  of whom the skill can ask for approval, a ``demo-requester`` (who runs the
-  workflow), and a ``demo-developer`` (who may build and register the
+* five Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
+  either of whom the skill can ask for approval, two requesters,
+  ``demo-requester-1`` and ``demo-requester-2``, either of whom may run the
+  workflow, and a ``demo-developer`` (who may build and register the
   workflow, MCP server, and agent skill in the first place) -- each holding
   **no direct role at all**,
 * three UserGroups -- ``Demo Approvers``, ``Demo Requesters``, and
   ``Demo Developers`` -- each granting one role to its members, so every demo
-  account gets its role purely by inheritance. ``Demo Approvers`` holds both
-  approver accounts, showing that a group's membership need not be a single
-  user; the other two groups hold their matching user alone. That makes the
-  group feature visible in the demo dataset itself: remove a user from their
-  group and their access disappears on the next request.
+  account gets its role purely by inheritance. ``Demo Approvers`` and
+  ``Demo Requesters`` each hold two accounts, showing that a group's
+  membership need not be a single user; ``Demo Developers`` holds its one
+  matching user alone. That makes the group feature visible in the demo
+  dataset itself: remove a user from their group and their access disappears
+  on the next request.
 
 The Workflow itself is deliberately *not* seeded — these records are the
 ingredients an operator assembles one into. Both tags stay unattached to any
@@ -84,6 +86,10 @@ DEMO_DEVELOPER_USER_ID = "00000000-0000-0000-0000-00000000d003"
 #: Fixed identifier of the second demo ``approver`` user, showing that a
 #: ``Demo Approvers`` membership need not be a single account.
 DEMO_APPROVER_2_USER_ID = "00000000-0000-0000-0000-00000000d004"
+
+#: Fixed identifier of the second demo ``requester`` user, showing that a
+#: ``Demo Requesters`` membership need not be a single account.
+DEMO_REQUESTER_2_USER_ID = "00000000-0000-0000-0000-00000000d005"
 
 #: Fixed identifier of the demo ``Demo Approvers`` user group.
 DEMO_APPROVERS_GROUP_ID = "00000000-0000-0000-0000-00000000d401"
@@ -223,7 +229,7 @@ _DEMO_USERS = (
     ),
     _DemoUserSpec(
         id=DEMO_REQUESTER_USER_ID,
-        username="demo-requester",
+        username="demo-requester-1",
         first_name="Bob",
         last_name="Martinez",
     ),
@@ -239,6 +245,12 @@ _DEMO_USERS = (
         first_name="Diana",
         last_name="Foster",
     ),
+    _DemoUserSpec(
+        id=DEMO_REQUESTER_2_USER_ID,
+        username="demo-requester-2",
+        first_name="Ethan",
+        last_name="Cole",
+    ),
 )
 
 #: The demo user groups, one per role. The sample skill looks for a user
@@ -246,8 +258,9 @@ _DEMO_USERS = (
 #: role that may execute a workflow; ``developer`` is the role that may build
 #: and register a workflow, MCP server, or agent skill. Granting each through
 #: a group rather than directly is what makes the demo exercise role
-#: inheritance. ``Demo Approvers`` holds two members, demonstrating that a
-#: group's role reaches every one of its members, not just a single account.
+#: inheritance. ``Demo Approvers`` and ``Demo Requesters`` each hold two
+#: members, demonstrating that a group's role reaches every one of its
+#: members, not just a single account.
 _DEMO_GROUPS = (
     _DemoGroupSpec(
         id=DEMO_APPROVERS_GROUP_ID,
@@ -261,7 +274,7 @@ _DEMO_GROUPS = (
         name="Demo Requesters",
         description="People who can run published workflows.",
         role=Role.requester,
-        member_ids=(DEMO_REQUESTER_USER_ID,),
+        member_ids=(DEMO_REQUESTER_USER_ID, DEMO_REQUESTER_2_USER_ID),
     ),
     _DemoGroupSpec(
         id=DEMO_DEVELOPERS_GROUP_ID,

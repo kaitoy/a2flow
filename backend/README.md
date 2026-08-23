@@ -216,10 +216,11 @@ If either is unset (or empty), a random password is generated instead and logged
 | Agent skill | `Demo AWS EC2 Launch` | `sample_skills/aws-ec2-launch` in this repository (see [Agent skills](#agent-skills)) |
 | User | `demo-approver-1` | holds **no direct role**; inherits `approver` from `Demo Approvers` — a manager the sample skill can route its approval request to |
 | User | `demo-approver-2` | holds **no direct role**; inherits `approver` from `Demo Approvers` — a second manager, showing a group can have more than one member |
-| User | `demo-requester` | holds **no direct role**; inherits `requester` from `Demo Requesters` — may execute the workflow |
+| User | `demo-requester-1` | holds **no direct role**; inherits `requester` from `Demo Requesters` — may execute the workflow |
+| User | `demo-requester-2` | holds **no direct role**; inherits `requester` from `Demo Requesters` — a second requester, showing a group can have more than one member |
 | User | `demo-developer` | holds **no direct role**; inherits `developer` from `Demo Developers` — may build and register the workflow, MCP server, and agent skill |
 | User group | `Demo Approvers` | grants `approver`; members `demo-approver-1` and `demo-approver-2` |
-| User group | `Demo Requesters` | grants `requester`; sole member `demo-requester` |
+| User group | `Demo Requesters` | grants `requester`; members `demo-requester-1` and `demo-requester-2` |
 | User group | `Demo Developers` | grants `developer`; sole member `demo-developer` |
 
 Granting each demo account its role through a group rather than directly is deliberate: it makes the demo exercise [role inheritance](#authorization-roles) end to end, so removing a user from their group visibly revokes their access. A database seeded by an older version — where the roles were granted directly — is normalized on the next startup, so the grant never ends up duplicated.
@@ -234,7 +235,7 @@ DEMO_AWS_SECRET_ACCESS_KEY=...
 DEMO_AWS_REGION=us-east-1
 ```
 
-- `DEMO_PASSWORD` is shared by all four demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
+- `DEMO_PASSWORD` is shared by all five demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
 - **AWS MCP Server** is a managed remote server AWS hosts, not something this project runs, so the registered `stdio` server actually launches [`mcp-proxy-for-aws`](https://github.com/aws/mcp-proxy-for-aws) — a thin bridge that SigV4-signs each request with the credentials it finds in its environment and forwards it to the endpoint. It supersedes the deprecated self-hosted `awslabs.aws-api-mcp-server`; see the upstream [migration guide](https://github.com/awslabs/mcp/blob/main/src/aws-api-mcp-server/MIGRATION.md).
 
   The two regions in the arguments are not the same knob. `--region us-east-1` is the region the *signature* is computed for and is fixed to wherever the endpoint lives, while `--metadata AWS_REGION=${env:AWS_REGION}` (which expands to `DEMO_AWS_REGION`, carried in the row's own `env` — see [`${env:NAME}`](#mcp-servers)) is the region the server's *tools* act on. The proxy does not infer the signing region from the endpoint URL, so it stays explicit.

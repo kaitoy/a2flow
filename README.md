@@ -206,8 +206,8 @@ Setting `DEMO_DATA=true` on the backend registers a ready-made example of the ap
 - two [secrets](#secrets) holding an AWS access key id and secret access key,
 - an [MCP server](#mcp-servers) (`AWS MCP Server`) that reaches AWS's managed AWS MCP Server over `stdio`, through the `mcp-proxy-for-aws` bridge launched with `uvx`, reading those secrets through `${secret:…}` references,
 - an [agent skill](#agent-skills) pointing at `sample_skills/aws-ec2-launch` in this repository,
-- two approver [users](#users), `demo-approver-1` and `demo-approver-2`, plus a `demo-requester` and a `demo-developer`, each holding **no direct role at all**,
-- three [user groups](#user-groups) — `Demo Approvers`, `Demo Requesters`, and `Demo Developers` — granting `approver`, `requester`, and `developer` respectively. `Demo Approvers` holds both approver accounts; the other two groups hold their matching demo user alone. Every demo account therefore gets its role purely by inheritance, so the demo exercises the group feature itself: take a user out of their group and their access disappears on the next request.
+- two approver [users](#users), `demo-approver-1` and `demo-approver-2`, two requester users, `demo-requester-1` and `demo-requester-2`, plus a `demo-developer`, each holding **no direct role at all**,
+- three [user groups](#user-groups) — `Demo Approvers`, `Demo Requesters`, and `Demo Developers` — granting `approver`, `requester`, and `developer` respectively. `Demo Approvers` and `Demo Requesters` each hold both matching accounts; `Demo Developers` holds its one matching user alone. Every demo account therefore gets its role purely by inheritance, so the demo exercises the group feature itself: take a user out of their group and their access disappears on the next request.
 
 The [workflow](#workflows) itself is not seeded — these are the ingredients you generate one from. Turning the flag off and restarting **removes** the same records again, so it is a genuine on/off switch. Records that other data has come to depend on are kept (and logged) rather than deleted, and a demo user who has created records is soft-deleted so their name still resolves.
 
