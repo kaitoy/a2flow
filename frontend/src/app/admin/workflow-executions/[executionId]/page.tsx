@@ -148,7 +148,7 @@ export default function WorkflowExecutionDetailPage() {
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
             <DetailItem
-              label="Workflow"
+              label="Name"
               value={
                 session.workflowId ? (
                   <Link

@@ -35,7 +35,7 @@ function buildColumns(
   return [
     idColumn<WorkflowExecution>(),
     {
-      header: "Workflow",
+      header: "Name",
       sortField: "name",
       filterField: "name",
       visibility: "always",

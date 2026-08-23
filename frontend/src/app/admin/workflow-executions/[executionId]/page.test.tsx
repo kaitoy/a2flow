@@ -26,7 +26,7 @@ describe("WorkflowExecutionDetailPage", () => {
     expect(within(nav).getByText("My Workflow")).toHaveAttribute("aria-current", "page");
   });
 
-  it("links the Workflow field to its detail page", async () => {
+  it("links the Name field to its detail page", async () => {
     render(<WorkflowExecutionDetailPage />);
     await waitFor(() =>
       expect(screen.getAllByRole("link", { name: "My Workflow" })[0]).toHaveAttribute(

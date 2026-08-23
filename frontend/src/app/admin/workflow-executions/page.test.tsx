@@ -32,7 +32,7 @@ describe("WorkflowExecutionsPage", () => {
     await waitFor(() => expect(screen.getByText("My Workflow")).toBeInTheDocument());
   });
 
-  it("links the Workflow cell to the session's detail page", async () => {
+  it("links the Name cell to the session's detail page", async () => {
     render(<WorkflowExecutionsPage />);
     const link = await screen.findByRole("link", { name: "My Workflow" });
     expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1");
