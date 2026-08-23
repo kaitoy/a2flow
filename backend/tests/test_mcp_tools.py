@@ -666,6 +666,7 @@ class _StubProxy:
 
 async def test_call_mcp_tool_delegates_to_the_proxy(
     monkeypatch: pytest.MonkeyPatch,
+    engine: AsyncEngine,
 ) -> None:
     """The tool's only job on the way in is ADK context -> plain principal."""
     proxy = _StubProxy(result=_tool_result("done"))
@@ -685,6 +686,7 @@ async def test_call_mcp_tool_delegates_to_the_proxy(
 
 async def test_proxy_errors_surface_as_the_agent_error_dict(
     monkeypatch: pytest.MonkeyPatch,
+    engine: AsyncEngine,
 ) -> None:
     proxy = _StubProxy(error=McpPolicyDeniedError("nope, not bound"))
     monkeypatch.setattr("infrastructure.mcp_tools.get_mcp_proxy", lambda: proxy)
