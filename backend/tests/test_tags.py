@@ -132,6 +132,7 @@ async def test_create_returns_the_tag_with_its_defaults(
     assert tag["name"] == "production"
     assert tag["color"] == "slate"
     assert tag["tenantId"] == DEFAULT_TEST_TENANT_ID
+    assert tag["description"] is None
 
 
 async def test_create_accepts_a_palette_slot(
@@ -140,6 +141,16 @@ async def test_create_accepts_a_palette_slot(
     client, _ = tag_env
     tag = await _create_tag(client, color="violet")
     assert tag["color"] == "violet"
+
+
+async def test_create_accepts_a_description(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    tag = await _create_tag(client, description="Live customer-facing environment.")
+    assert tag["description"] == "Live customer-facing environment."
+    fetched = assert_ok(await client.get(f"/api/v1/tags/{tag['id']}", headers=NOBODY))
+    assert fetched["description"] == "Live customer-facing environment."
 
 
 async def test_create_rejects_a_color_outside_the_palette(
@@ -377,6 +388,34 @@ async def test_renaming_a_tag_keeps_every_attachment(
         await client.get(f"/api/v1/secrets/{secret['id']}", headers=ADMIN)
     )
     assert fetched["tagIds"] == [tag["id"]]
+
+
+async def test_updating_a_tag_sets_its_description(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    tag = await _create_tag(client)
+    updated = assert_ok(
+        await client.patch(
+            f"/api/v1/tags/{tag['id']}",
+            json={"description": "Live customer-facing environment."},
+            headers=ADMIN,
+        )
+    )
+    assert updated["description"] == "Live customer-facing environment."
+
+
+async def test_updating_a_tag_clears_its_description(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    tag = await _create_tag(client, description="Live customer-facing environment.")
+    updated = assert_ok(
+        await client.patch(
+            f"/api/v1/tags/{tag['id']}", json={"description": None}, headers=ADMIN
+        )
+    )
+    assert updated["description"] is None
 
 
 async def test_deleting_a_tag_detaches_it_everywhere(

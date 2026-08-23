@@ -51,6 +51,10 @@ function buildColumns(names: Map<string, string>): ColumnDef<Tag>[] {
       ),
     },
     {
+      header: "Description",
+      cell: (tag) => tag.description || "—",
+    },
+    {
       header: "Preview",
       // The chip is what a tag looks like everywhere else, so the list shows the
       // real thing rather than naming a color the reader has to imagine.

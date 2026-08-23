@@ -52,6 +52,7 @@ export function tagsColumn<T>(
               key={id}
               label={byId.get(id)?.name ?? id}
               color={resolveTagColor(byId.get(id)?.color)}
+              description={byId.get(id)?.description ?? undefined}
             />
           ))}
         </div>

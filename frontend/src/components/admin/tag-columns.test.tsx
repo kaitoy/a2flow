@@ -16,6 +16,7 @@ const TAGS: Tag[] = [
     tenantId: "tenant-1",
     name: "production",
     color: "rose",
+    description: "Live customer-facing environment.",
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     createdBy: "",
@@ -66,6 +67,16 @@ describe("tagsColumn", () => {
   it("falls back to the raw id when the tag is not in the lookup", () => {
     renderTable([{ id: "r1", tagIds: ["tag-gone"] }]);
     expect(screen.getByText("tag-gone")).toBeInTheDocument();
+  });
+
+  it("shows the tag's description in the chip's tooltip", async () => {
+    const user = userEvent.setup();
+    renderTable([{ id: "r1", tagIds: ["tag-1"] }]);
+
+    await user.hover(screen.getByText("production"));
+    expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
+      "Live customer-facing environment."
+    );
   });
 
   it("offers a conjunctive multi-select in its header menu", async () => {

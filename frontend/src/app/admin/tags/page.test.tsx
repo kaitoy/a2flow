@@ -38,6 +38,12 @@ describe("TagsPage", () => {
     expect(link).toHaveAttribute("href", "/admin/tags/tag-1");
   });
 
+  it("shows each tag's description, falling back to an em dash when absent", async () => {
+    renderPage();
+    expect(await screen.findByText("Live customer-facing environment.")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
   it("hides the color name column by default", async () => {
     renderPage();
     await screen.findByRole("link", { name: "production" });

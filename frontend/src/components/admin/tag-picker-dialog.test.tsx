@@ -6,12 +6,13 @@ import type { Tag, TagColor } from "@/lib/api";
 import { TagPickerDialog } from "./tag-picker-dialog";
 
 /** Build a tag with the audit fields every `Tag` carries. */
-function tag(id: string, name: string, color: TagColor): Tag {
+function tag(id: string, name: string, color: TagColor, description?: string): Tag {
   return {
     id,
     tenantId: "tenant-1",
     name,
     color,
+    description,
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     createdBy: "",
@@ -20,7 +21,7 @@ function tag(id: string, name: string, color: TagColor): Tag {
 }
 
 const TAGS: Tag[] = [
-  tag("t-prod", "production", "rose"),
+  tag("t-prod", "production", "rose", "Live customer-facing environment."),
   tag("t-stage", "staging", "rose"),
   tag("t-aws", "aws", "amber"),
   tag("t-db", "database", "indigo"),
@@ -68,6 +69,17 @@ describe("TagPickerDialog", () => {
     for (const name of ["production", "staging", "aws", "database"]) {
       expect(within(dialog).getByRole("button", { name })).toHaveAttribute("aria-pressed", "false");
     }
+  });
+
+  it("shows a tag's description in its chip's tooltip", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const dialog = await openDialog(user);
+
+    await user.hover(within(dialog).getByText("production"));
+    expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
+      "Live customer-facing environment."
+    );
   });
 
   it("marks the tags already attached as pressed", async () => {

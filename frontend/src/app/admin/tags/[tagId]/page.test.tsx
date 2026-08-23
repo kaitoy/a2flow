@@ -20,6 +20,7 @@ describe("TagDetailPage", () => {
     render(<TagDetailPage />, { preloadedState: ADMIN });
     expect(await screen.findByRole("heading", { name: "production" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Name/)).toHaveValue("production");
+    expect(screen.getByLabelText(/Description/)).toHaveValue("Live customer-facing environment.");
   });
 
   it("submits the renamed tag", async () => {
@@ -39,6 +40,25 @@ describe("TagDetailPage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(body?.name).toBe("prod"));
+  });
+
+  it("keeps the loaded description in the submitted body when only the name changes", async () => {
+    const user = userEvent.setup();
+    let body: { name?: string; description?: string | null } | undefined;
+    server.use(
+      http.patch(`${BASE}/api/v1/tags/:tagId`, async ({ request }) => {
+        body = (await request.json()) as { name?: string; description?: string | null };
+        return envelope({ id: "tag-1" });
+      })
+    );
+
+    render(<TagDetailPage />, { preloadedState: ADMIN });
+    const name = await screen.findByLabelText(/Name/);
+    await user.clear(name);
+    await user.type(name, "prod");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(body?.description).toBe("Live customer-facing environment."));
   });
 
   it("keeps the loaded color in the submitted body", async () => {
@@ -76,6 +96,7 @@ describe("TagDetailPage", () => {
     expect(screen.queryByLabelText(/Name/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(screen.getByText("Live customer-facing environment.")).toBeInTheDocument();
   });
 
   it("shows the access-denied screen when the tag is forbidden", async () => {

@@ -190,6 +190,7 @@ export function TagPickerDialog({
                 key={tag.id}
                 label={tag.name}
                 color={resolveTagColor(tag.color)}
+                description={tag.description ?? undefined}
                 selected={draft.includes(tag.id)}
                 onToggle={() =>
                   setDraft((prev) =>

@@ -63,6 +63,7 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
         id,
         name: byId.get(id)?.name ?? id,
         color: resolveTagColor(byId.get(id)?.color),
+        description: byId.get(id)?.description ?? undefined,
       })),
     [value, byId]
   );
@@ -77,6 +78,7 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
             key={tag.id}
             label={tag.name}
             color={tag.color}
+            description={tag.description}
             onRemove={readOnly ? undefined : () => onChange(value.filter((id) => id !== tag.id))}
           />
         ))}

@@ -6,21 +6,23 @@ import { Tags } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import type { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
-import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { TagColorField } from "@/components/admin/tag-color-field";
+import {
+  emptyTagFormValues,
+  TagFields,
+  type TagFormValues,
+  tagFormSchema,
+  toTagUpdateBody,
+} from "@/components/admin/tag-fields";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { zTagCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
   deleteTag,
@@ -30,17 +32,10 @@ import {
   type TagColor,
   updateTag,
 } from "@/lib/api";
-import { EMPTY_VALUE } from "@/lib/read-only-display";
 import { Role, useHasRole } from "@/lib/roles";
 import { DEFAULT_TAG_COLOR, resolveTagColor } from "@/lib/tag-palette";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
-
-// `color` is a controlled select with a live preview rather than a registered
-// input, so it is kept out of the form schema and merged at submit.
-const schema = zTagCreate.omit({ color: true });
-
-type FormValues = z.input<typeof schema>;
 
 /**
  * Detail page of a tag: its name and its palette slot.
@@ -74,11 +69,12 @@ export default function TagDetailPage() {
     handleSubmit,
     reset,
     watch,
+    getValues,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(tagFormSchema),
     mode: "onBlur",
-    defaultValues: { name: "" },
+    defaultValues: emptyTagFormValues(),
   });
 
   useEffect(() => {
@@ -86,7 +82,7 @@ export default function TagDetailPage() {
       .then((tag) => {
         setName(tag.name);
         setColor(resolveTagColor(tag.color));
-        reset({ name: tag.name });
+        reset({ name: tag.name, description: tag.description ?? "" });
         setAudit({
           createdBy: tag.createdBy,
           updatedBy: tag.updatedBy,
@@ -104,10 +100,10 @@ export default function TagDetailPage() {
       .finally(() => setLoading(false));
   }, [tagId, reset]);
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: TagFormValues) {
     try {
       await save.run(async () => {
-        await updateTag(tagId, { name: values.name, color });
+        await updateTag(tagId, { ...toTagUpdateBody(values), color });
         dispatch(showToast({ message: "Tag updated" }));
         router.push("/admin/tags");
       });
@@ -165,13 +161,11 @@ export default function TagDetailPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            {canEdit ? (
-              <Input id="name" {...register("name")} />
-            ) : (
-              <ReadOnlyField>{name || EMPTY_VALUE}</ReadOnlyField>
-            )}
-          </FormField>
+          {canEdit ? (
+            <TagFields register={register} errors={errors} />
+          ) : (
+            <TagFields readOnly values={getValues()} />
+          )}
 
           <TagColorField
             value={color}

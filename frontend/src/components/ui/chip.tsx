@@ -1,4 +1,8 @@
-/** @module Chip — single-line data pill for variable-length labels, with an overflow tooltip. */
+/**
+ * @module Chip — single-line data pill for variable-length labels, with a
+ * tooltip that reveals the clipped label on overflow or a supplied
+ * {@link ChipProps.description} regardless of overflow.
+ */
 "use client";
 
 import { Check, X } from "lucide-react";
@@ -17,6 +21,13 @@ interface ChipProps {
    * its fill, border, and text from that slot's hue instead.
    */
   color?: TagColor;
+  /**
+   * Longer free text shown in a hover tooltip regardless of label
+   * truncation. When present, the tooltip becomes a content affordance
+   * rather than a purely overflow-triggered one — it surfaces on hover even
+   * if the label itself isn't clipped.
+   */
+  description?: string;
   /** Called when the pointer enters the chip. */
   onMouseEnter?: () => void;
   /** Called when the pointer leaves the chip. */
@@ -138,10 +149,13 @@ const TOGGLE_CLASS = [
  * pill — keeps the button reachable at any label length while the label alone
  * still clips to the space the pill's `max-w-64` leaves it.
  *
- * The full label text is revealed in a tooltip, and only when it is actually
- * clipped: overflow is measured from the DOM (`scrollWidth > clientWidth`) on
- * the same inner label span that truncates, re-measured on resize, the same
- * way {@link TruncatedCell} does it.
+ * The full label text is revealed in a tooltip when it is actually clipped:
+ * overflow is measured from the DOM (`scrollWidth > clientWidth`) on the same
+ * inner label span that truncates, re-measured on resize, the same way
+ * {@link TruncatedCell} does it. Passing {@link ChipProps.description}
+ * overrides that overflow-only gating — the tooltip then shows the
+ * description on hover unconditionally, since it is content the label itself
+ * never carries.
  *
  * `Tooltip` composes its own ref and hover handlers onto the child element, so
  * it wraps the inner label `<span>` here rather than the caller wrapping
@@ -166,6 +180,7 @@ const TOGGLE_CLASS = [
 export function Chip({
   label,
   color,
+  description,
   onMouseEnter,
   onMouseLeave,
   onRemove,
@@ -201,7 +216,7 @@ export function Chip({
         // remove icon raises it: at 14px the lighter stroke reads as a hairline.
         <Check size={14} strokeWidth={2} aria-hidden="true" className="-ml-0.5 mr-1 shrink-0" />
       )}
-      <Tooltip label={label} disabled={!overflowing}>
+      <Tooltip label={description || label} disabled={!description && !overflowing}>
         <span ref={ref} className="min-w-0 truncate">
           {label}
         </span>

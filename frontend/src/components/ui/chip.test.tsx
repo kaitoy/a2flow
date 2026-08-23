@@ -107,6 +107,36 @@ describe("Chip", () => {
     }
   });
 
+  it("shows the description in a tooltip even when the label fits", async () => {
+    const user = userEvent.setup();
+    render(<Chip label="production" description="Live customer-facing environment." />);
+
+    await user.hover(screen.getByText("production"));
+    expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
+      "Live customer-facing environment."
+    );
+  });
+
+  it("prefers the description over the label in the tooltip when the label also clips", async () => {
+    const restore = stubOverflow(400, 224);
+    try {
+      const user = userEvent.setup();
+      render(
+        <Chip
+          label="Validate the uploaded CSV schema against the contract"
+          description="Live customer-facing environment."
+        />
+      );
+
+      await user.hover(screen.getByText("Validate the uploaded CSV schema against the contract"));
+      expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
+        "Live customer-facing environment."
+      );
+    } finally {
+      restore();
+    }
+  });
+
   it("stays hover-inert when the label fits", async () => {
     const user = userEvent.setup();
     const onMouseEnter = vi.fn();

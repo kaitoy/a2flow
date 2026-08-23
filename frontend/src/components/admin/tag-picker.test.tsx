@@ -73,6 +73,15 @@ describe("TagPicker", () => {
     expect(await screen.findByRole("button", { name: "Remove production" })).toBeInTheDocument();
   });
 
+  it("shows the tag's description in its chip's tooltip", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={["tag-1"]} />);
+    await user.hover(await screen.findByText("production"));
+    expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
+      "Live customer-facing environment."
+    );
+  });
+
   it("drops a tag when its chip's remove button is pressed", async () => {
     const user = userEvent.setup();
     render(<Harness initial={["tag-1"]} />);

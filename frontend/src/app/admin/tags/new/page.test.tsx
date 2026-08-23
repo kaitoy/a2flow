@@ -29,7 +29,27 @@ describe("NewTagPage", () => {
     await user.type(screen.getByLabelText(/Name/), "production");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(body).toEqual({ name: "production", color: "slate" }));
+    await waitFor(() =>
+      expect(body).toEqual({ name: "production", color: "slate", description: null })
+    );
+  });
+
+  it("submits the typed description", async () => {
+    const user = userEvent.setup();
+    let body: { description?: string | null } | undefined;
+    server.use(
+      http.post(`${BASE}/api/v1/tags`, async ({ request }) => {
+        body = (await request.json()) as { description?: string | null };
+        return envelope({ id: "new-tag-id" }, 201);
+      })
+    );
+
+    render(<NewTagPage />, { preloadedState: DEVELOPER });
+    await user.type(screen.getByLabelText(/Name/), "production");
+    await user.type(screen.getByLabelText(/Description/), "Live customer-facing environment.");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(body?.description).toBe("Live customer-facing environment."));
   });
 
   it("submits the color picked from the palette", async () => {
