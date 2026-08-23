@@ -13,6 +13,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { StatusCard } from "@/components/admin/status-card";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
@@ -175,9 +176,12 @@ export default function ApprovalDetailPage() {
         }
         aside={audit && <AuditMeta {...audit} />}
       >
+        <StatusCard ariaLabel="Approval status">
+          <ApprovalStatusLabel status={status} />
+        </StatusCard>
+
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
-            <DetailItem label="Status" value={<ApprovalStatusLabel status={status} />} />
             <DetailItem label="Description" value={approval.description || EMPTY_VALUE} />
             <DetailItem
               label="Approver"

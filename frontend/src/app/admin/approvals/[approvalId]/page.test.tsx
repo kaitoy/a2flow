@@ -28,6 +28,13 @@ describe("ApprovalDetailPage", () => {
     expect(within(nav).getByText("Deploy to production")).toHaveAttribute("aria-current", "page");
   });
 
+  it("shows the status in its own status card", async () => {
+    render(<ApprovalDetailPage />);
+    await screen.findByRole("heading", { name: "Deploy to production" });
+    const card = screen.getByRole("region", { name: "Approval status" });
+    expect(within(card).getByText("approved")).toBeInTheDocument();
+  });
+
   it("shows the status, comment, and resolved approver name", async () => {
     render(<ApprovalDetailPage />);
     await screen.findByRole("heading", { name: "Deploy to production" });

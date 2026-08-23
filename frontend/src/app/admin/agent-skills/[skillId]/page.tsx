@@ -22,6 +22,7 @@ import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { GenerateWorkflowDialog } from "@/components/admin/generate-workflow-dialog";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { StatusCard } from "@/components/admin/status-card";
 import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
@@ -295,9 +296,20 @@ export default function AgentSkillDetailPage() {
         aside={audit && <AuditMeta {...audit} />}
       >
         {sync && (
-          <section
-            aria-label="Repository sync"
-            className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl glass-panel p-4"
+          <StatusCard
+            ariaLabel="Repository sync"
+            actions={
+              canEdit ? (
+                <ActionIconButton
+                  icon={RefreshCw}
+                  label="Pull"
+                  onClick={handlePull}
+                  disabled={pull.inFlight || sync.status === "pending"}
+                  spinning={pull.inFlight || sync.status === "pending"}
+                />
+              ) : undefined
+            }
+            error={sync.error}
           >
             <StatusDot
               dotClass={SYNC_STATUS_DOT_CLASS[sync.status]}
@@ -307,21 +319,7 @@ export default function AgentSkillDetailPage() {
               <span>Revision</span>
               <span className="font-mono">{formatRevision(sync.commitSha)}</span>
             </div>
-            {canEdit && (
-              <div className="ml-auto">
-                <ActionIconButton
-                  icon={RefreshCw}
-                  label="Pull"
-                  onClick={handlePull}
-                  disabled={pull.inFlight || sync.status === "pending"}
-                  spinning={pull.inFlight || sync.status === "pending"}
-                />
-              </div>
-            )}
-            {sync.error && (
-              <p className="w-full break-words font-mono text-error text-xs">{sync.error}</p>
-            )}
-          </section>
+          </StatusCard>
         )}
 
         <form
