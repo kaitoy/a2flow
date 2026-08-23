@@ -757,12 +757,22 @@ def upgrade() -> None:
             "workflow_task_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
         sa.Column("approver", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column(
+            "approver_group_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
         sa.Column("decided_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("decided_by", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(
             ["approver"],
             ["users.id"],
             name="fk_approvals_approver",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["decided_by"],
+            ["users.id"],
+            name="fk_approvals_decided_by",
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
@@ -781,8 +791,23 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
+        # approver_group_id -> user_groups.id is added later, once
+        # "user_groups" exists (see the batch_alter_table call right after
+        # that table is created below): user_groups is created after
+        # approvals in this file, and a plain CREATE TABLE FK cannot
+        # forward-reference a table that doesn't exist yet.
+        sa.CheckConstraint(
+            "approver IS NULL OR approver_group_id IS NULL",
+            name="ck_approvals_single_destination",
+        ),
     )
     op.create_index("ix_approvals_approver", "approvals", ["approver"], unique=False)
+    op.create_index(
+        "ix_approvals_approver_group_id",
+        "approvals",
+        ["approver_group_id"],
+        unique=False,
+    )
     op.create_index(
         "ix_approvals_workflow_execution_id",
         "approvals",
@@ -962,6 +987,17 @@ def upgrade() -> None:
         ["tenant_id", "name"],
         unique=False,
     )
+    with op.batch_alter_table("approvals", schema=None) as batch_op:
+        # Deferred for the same reason as the tenants/users circular FK
+        # above: user_groups now exists, so approver_group_id can finally
+        # get its foreign key.
+        batch_op.create_foreign_key(
+            "fk_approvals_approver_group_id",
+            "user_groups",
+            ["approver_group_id"],
+            ["id"],
+            ondelete="RESTRICT",
+        )
     op.create_table(
         "user_group_members",
         sa.Column("group_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
@@ -985,6 +1021,7 @@ def upgrade() -> None:
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
             "color",
             sa.Enum(
@@ -1217,6 +1254,9 @@ def downgrade() -> None:
     op.drop_table("tags")
     op.drop_index("ix_user_group_members_user_id", table_name="user_group_members")
     op.drop_table("user_group_members")
+    with op.batch_alter_table("approvals", schema=None) as batch_op:
+        # Must go before user_groups is dropped below: this FK references it.
+        batch_op.drop_constraint("fk_approvals_approver_group_id", type_="foreignkey")
     op.drop_index("ix_user_groups_tenant_id_name", table_name="user_groups")
     op.drop_table("user_groups")
     op.drop_index(
