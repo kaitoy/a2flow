@@ -42,4 +42,22 @@ describe("Toaster", () => {
     await user.click(screen.getByRole("button", { name: /dismiss/i }));
     await waitFor(() => expect(store.getState().toast.items).toHaveLength(0));
   });
+
+  it("shows a count badge on a merged error toast", () => {
+    render(<Toaster />, {
+      preloadedState: {
+        toast: { items: [{ id: "t1", message: "Something broke", variant: "error", count: 3 }] },
+      },
+    });
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("does not show a count badge for a single occurrence", () => {
+    render(<Toaster />, {
+      preloadedState: {
+        toast: { items: [{ id: "t1", message: "Something broke", variant: "error" }] },
+      },
+    });
+    expect(screen.queryByText("1")).not.toBeInTheDocument();
+  });
 });

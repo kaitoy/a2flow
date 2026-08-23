@@ -34,4 +34,26 @@ describe("toastSlice", () => {
     const state = reducer(seeded, dismissToast("does-not-exist"));
     expect(state.items).toHaveLength(1);
   });
+
+  it("merges a repeated error toast into the existing one instead of stacking a duplicate", () => {
+    let state = reducer(undefined, showToast({ message: "Failed to load", variant: "error" }));
+    state = reducer(state, showToast({ message: "Failed to load", variant: "error" }));
+    state = reducer(state, showToast({ message: "Failed to load", variant: "error" }));
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0].count).toBe(3);
+  });
+
+  it("keeps error toasts with different messages separate", () => {
+    let state = reducer(undefined, showToast({ message: "Failed to load", variant: "error" }));
+    state = reducer(state, showToast({ message: "Failed to save", variant: "error" }));
+    expect(state.items).toHaveLength(2);
+    expect(state.items[0].count).toBeUndefined();
+    expect(state.items[1].count).toBeUndefined();
+  });
+
+  it("does not merge repeated success toasts with the same message", () => {
+    let state = reducer(undefined, showToast({ message: "Saved" }));
+    state = reducer(state, showToast({ message: "Saved" }));
+    expect(state.items).toHaveLength(2);
+  });
 });

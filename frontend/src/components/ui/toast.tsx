@@ -15,7 +15,9 @@ const AUTO_DISMISS_MS = 3500;
 /**
  * A single toast card. A success toast owns its own auto-dismiss timer so it
  * disappears independently {@link AUTO_DISMISS_MS} after it mounts; an error
- * toast has no timer and stays until the user clicks its dismiss button.
+ * toast has no timer and stays until the user clicks its dismiss button. When
+ * the same error message recurs, `toast.count` (set by the `toast` slice's
+ * merge logic) is shown as a small round badge instead of stacking a new card.
  */
 function ToastCard({ toast }: { toast: Toast }) {
   const dispatch = useAppDispatch();
@@ -45,6 +47,14 @@ function ToastCard({ toast }: { toast: Toast }) {
           <Check className="size-4 shrink-0 text-success" aria-hidden="true" />
         )}
         <span>{toast.message}</span>
+        {toast.count && toast.count > 1 && (
+          <span
+            aria-hidden="true"
+            className="flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-badge text-on-error"
+          >
+            {toast.count > 99 ? "99+" : toast.count}
+          </span>
+        )}
       </span>
       {isError && (
         <button

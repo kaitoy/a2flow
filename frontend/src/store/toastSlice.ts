@@ -12,6 +12,12 @@ export interface Toast {
   message: string;
   /** Controls icon and color treatment. Defaults to `"success"`. */
   variant: ToastVariant;
+  /**
+   * How many times this exact error message has been shown since it first
+   * appeared. Only tracked for merged error toasts; `undefined` means one
+   * occurrence (no badge).
+   */
+  count?: number;
 }
 
 /** Redux state shape for the toast queue. */
@@ -31,10 +37,25 @@ const toastSlice = createSlice({
     /**
      * Enqueue a new toast. The id is generated automatically; callers pass only
      * the message and (optionally) a variant that defaults to `"success"`.
+     * A repeated error toast (same message, same `"error"` variant, already
+     * visible) is merged into the existing one by incrementing its `count`
+     * instead of stacking a duplicate — repeated failures from things like
+     * notification polling would otherwise pile up indefinitely since error
+     * toasts never auto-dismiss.
      */
     showToast: {
       reducer(state, action: PayloadAction<Toast>) {
-        state.items.push(action.payload);
+        const incoming = action.payload;
+        if (incoming.variant === "error") {
+          const existing = state.items.find(
+            (t) => t.variant === "error" && t.message === incoming.message
+          );
+          if (existing) {
+            existing.count = (existing.count ?? 1) + 1;
+            return;
+          }
+        }
+        state.items.push(incoming);
       },
       prepare(payload: { message: string; variant?: ToastVariant }) {
         return {
