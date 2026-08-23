@@ -176,6 +176,18 @@ _DEMO_MCP_SERVER_DESCRIPTION = (
     "instances."
 )
 
+#: Description shown on the demo ``AWS`` tag in the admin UI.
+_DEMO_AWS_TAG_DESCRIPTION = (
+    "Resources that talk to AWS: credentials, MCP servers, and agent skills "
+    "scoped to the AWS provider."
+)
+
+#: Description shown on the demo ``Approval Required`` tag in the admin UI.
+_DEMO_APPROVAL_TAG_DESCRIPTION = (
+    "Marks an agent skill whose workflow must pause for a manager's approval "
+    "before it proceeds."
+)
+
 _RowT = TypeVar("_RowT", bound=SQLModel)
 
 
@@ -739,7 +751,12 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         tenant_id: Id of the ``Default`` tenant the tags belong to.
     """
     if await _ensure_demo_tag(
-        session, tenant_id, DEMO_AWS_TAG_ID, DEMO_AWS_TAG_NAME, TagColor.cyan
+        session,
+        tenant_id,
+        DEMO_AWS_TAG_ID,
+        DEMO_AWS_TAG_NAME,
+        TagColor.cyan,
+        _DEMO_AWS_TAG_DESCRIPTION,
     ):
         await _link_tag(
             session,
@@ -771,6 +788,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         DEMO_APPROVAL_TAG_ID,
         DEMO_APPROVAL_TAG_NAME,
         TagColor.amber,
+        _DEMO_APPROVAL_TAG_DESCRIPTION,
     ):
         await _link_tag(
             session,
@@ -786,7 +804,12 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
 
 
 async def _ensure_demo_tag(
-    session: AsyncSession, tenant_id: str, tag_id: str, name: str, color: TagColor
+    session: AsyncSession,
+    tenant_id: str,
+    tag_id: str,
+    name: str,
+    color: TagColor,
+    description: str,
 ) -> bool:
     """Create one demo tag if missing, and report whether it now exists.
 
@@ -796,6 +819,7 @@ async def _ensure_demo_tag(
         tag_id: Fixed identifier of the demo tag.
         name: Name shown in the admin UI.
         color: Palette slot the tag's chip is drawn in.
+        description: Sentence shown on the tag in the admin UI.
 
     Returns:
         ``True`` when the tag is present after this call (already existed or
@@ -811,6 +835,7 @@ async def _ensure_demo_tag(
             tenant_id=tenant_id,
             name=name,
             color=color,
+            description=description,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         ),
