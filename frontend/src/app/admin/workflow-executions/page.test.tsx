@@ -38,6 +38,12 @@ describe("WorkflowExecutionsPage", () => {
     expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1");
   });
 
+  it("links the Agent Skill cell to the skill's detail page", async () => {
+    render(<WorkflowExecutionsPage />);
+    const link = await screen.findByRole("link", { name: "My Skill" });
+    expect(link).toHaveAttribute("href", "/admin/agent-skills/skill-1");
+  });
+
   it("resolves the session user ID to the user's name", async () => {
     render(<WorkflowExecutionsPage />);
     await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());

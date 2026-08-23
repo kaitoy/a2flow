@@ -52,7 +52,14 @@ function buildColumns(
       header: "Agent Skill",
       sortField: "agentSkillName",
       filterField: "agentSkillName",
-      cell: (s) => s.agentSkillName,
+      cell: (s) => (
+        <Link
+          href={`/admin/agent-skills/${s.agentSkillId}`}
+          className="font-medium text-accent transition-colors hover:underline"
+        >
+          {s.agentSkillName}
+        </Link>
+      ),
     },
     {
       // Resolved from initiatorId to a display name; not sorted/filtered by raw id.
