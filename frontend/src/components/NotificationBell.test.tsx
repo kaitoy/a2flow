@@ -8,6 +8,24 @@ import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import { NotificationBell } from "./NotificationBell";
 
+/** Build a User fixture with overridable fields. */
+function makeUser(overrides: Partial<User> = {}): User {
+  return {
+    id: "user-1",
+    username: "user-1",
+    firstName: "Test",
+    lastName: "User",
+    email: "user-1@example.com",
+    enabled: true,
+    emailVerified: false,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    createdBy: "",
+    updatedBy: "",
+    ...overrides,
+  };
+}
+
 const pushMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -91,7 +109,7 @@ describe("NotificationBell", () => {
     render(<NotificationBell />, {
       preloadedState: {
         auth: {
-          user: { id: "u1", roles: ["super_admin"], tenantId: null } as User,
+          user: makeUser({ id: "u1", roles: ["super_admin"], tenantId: null }),
           status: "authenticated",
           selectedTenantId: null,
           impersonatedUserId: null,
@@ -108,7 +126,7 @@ describe("NotificationBell", () => {
     const { store } = render(<NotificationBell />, {
       preloadedState: {
         auth: {
-          user: { id: "u1", roles: ["super_admin"], tenantId: null } as User,
+          user: makeUser({ id: "u1", roles: ["super_admin"], tenantId: null }),
           status: "authenticated",
           selectedTenantId: null,
           impersonatedUserId: null,
@@ -128,8 +146,8 @@ describe("NotificationBell", () => {
         return envelope(calls === 1 ? [row("a", false)] : [row("a", false), row("b", false)]);
       })
     );
-    const admin = { id: "admin-1", roles: ["admin"], tenantId: "tenant-1" } as User;
-    const target = { id: "target-1", roles: ["viewer"], tenantId: "tenant-1" } as User;
+    const admin = makeUser({ id: "admin-1", roles: ["admin"], tenantId: "tenant-1" });
+    const target = makeUser({ id: "target-1", roles: ["requester"], tenantId: "tenant-1" });
     const { store } = render(<NotificationBell />, {
       preloadedState: {
         auth: {
