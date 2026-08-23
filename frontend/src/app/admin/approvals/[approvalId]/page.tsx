@@ -23,6 +23,8 @@ import {
   getApprovalCertificate,
   getUserGroup,
   getUserNames,
+  getWorkflowExecution,
+  getWorkflowTask,
   isForbiddenError,
   listMcpServers,
   SUPPRESS_FORBIDDEN_TOAST,
@@ -48,6 +50,8 @@ export default function ApprovalDetailPage() {
   const [approverName, setApproverName] = useState<string | null>(null);
   const [approverGroupName, setApproverGroupName] = useState<string | null>(null);
   const [deciderName, setDeciderName] = useState<string | null>(null);
+  const [executionName, setExecutionName] = useState<string | null>(null);
+  const [taskTitle, setTaskTitle] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [certificate, setCertificate] = useState<ApprovalCertificateRead | null>(null);
   const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
@@ -75,6 +79,21 @@ export default function ApprovalDetailPage() {
         if (a.approverGroupId) {
           const group = await getUserGroup(a.approverGroupId, SUPPRESS_FORBIDDEN_TOAST);
           if (active) setApproverGroupName(group.name);
+        }
+        // The workflow execution always exists; the task only when this approval
+        // named one. Both use SUPPRESS_FORBIDDEN_TOAST like every other lookup here,
+        // so a permission failure on either folds into the same access-denied state
+        // instead of a second toast.
+        const execution = await getWorkflowExecution(
+          a.workflowExecutionId,
+          SUPPRESS_FORBIDDEN_TOAST
+        );
+        if (!active) return;
+        setExecutionName(execution.name);
+        if (a.workflowTaskId) {
+          const task = await getWorkflowTask(a.workflowTaskId, SUPPRESS_FORBIDDEN_TOAST);
+          if (!active) return;
+          setTaskTitle(task.title);
         }
         // Only fetched when one can exist: the endpoint 404s for an approval
         // that was never granted or that named no task, and a 404 here would
@@ -205,14 +224,23 @@ export default function ApprovalDetailPage() {
                   href={`/admin/workflow-executions/${approval.workflowExecutionId}`}
                   className="font-medium text-accent transition-colors hover:underline"
                 >
-                  Open session
+                  {executionName ?? approval.workflowExecutionId}
                 </Link>
               }
             />
             <DetailItem
               label="Related Task"
               value={
-                <span className="font-mono text-xs">{approval.workflowTaskId ?? EMPTY_VALUE}</span>
+                approval.workflowTaskId ? (
+                  <Link
+                    href={`/admin/workflow-executions/${approval.workflowExecutionId}/workflow-tasks/${approval.workflowTaskId}`}
+                    className="font-medium text-accent transition-colors hover:underline"
+                  >
+                    {taskTitle ?? approval.workflowTaskId}
+                  </Link>
+                ) : (
+                  EMPTY_VALUE
+                )
               }
             />
           </DetailList>

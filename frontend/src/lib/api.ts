@@ -1540,9 +1540,12 @@ export async function listWorkflowTasks(
 }
 
 /** Fetch a single WorkflowTask by ID. */
-export async function getWorkflowTask(taskId: string): Promise<WorkflowTask> {
+export async function getWorkflowTask(
+  taskId: string,
+  config?: AxiosRequestConfig
+): Promise<WorkflowTask> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`),
+    apiClient.get(`/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`, config),
     zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse
   ) as Promise<WorkflowTask>;
 }

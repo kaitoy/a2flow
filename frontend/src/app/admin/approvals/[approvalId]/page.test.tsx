@@ -42,10 +42,51 @@ describe("ApprovalDetailPage", () => {
     }
   });
 
-  it("links to the workflow execution", async () => {
+  it("links the Workflow Execution field to its resolved name", async () => {
     render(<ApprovalDetailPage />);
-    const link = await screen.findByRole("link", { name: "Open session" });
+    // "My Workflow" is WORKFLOW_EXECUTION_1's name in the default MSW fixtures.
+    const link = await screen.findByRole("link", { name: "My Workflow" });
     expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1");
+  });
+
+  it("shows an empty placeholder for a Related Task when the approval names none", async () => {
+    render(<ApprovalDetailPage />);
+    await screen.findByRole("heading", { name: "Deploy to production" });
+    // APPROVAL_1's workflowTaskId is null in the default MSW fixtures.
+    const dt = screen.getByText("Related Task");
+    expect(dt.nextElementSibling).toHaveTextContent("—");
+  });
+
+  it("links the Related Task field to its resolved title", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/approvals/appr-1", () =>
+        envelope({
+          id: "appr-1",
+          tenantId: "tenant-1",
+          workflowExecutionId: "execution-1",
+          workflowTaskId: "task-1",
+          title: "Deploy to production",
+          description: "The agent wants to deploy. Approve?",
+          status: "approved",
+          response: "Looks good to me",
+          approver: "user-1",
+          approverGroupId: null,
+          decidedBy: "user-1",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "owner",
+          updatedBy: "owner",
+        })
+      )
+    );
+
+    render(<ApprovalDetailPage />);
+    // "Step 1" is WORKFLOW_TASK_1's title in the default MSW fixtures.
+    const link = await screen.findByRole("link", { name: "Step 1" });
+    expect(link).toHaveAttribute(
+      "href",
+      "/admin/workflow-executions/execution-1/workflow-tasks/task-1"
+    );
   });
 
   it("navigates to the chat page from the header action", async () => {
