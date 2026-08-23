@@ -27,7 +27,7 @@ import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useSessionAvatarRenderer } from "@/hooks/useSessionAvatarRenderer";
+import { useSessionSenderRenderer } from "@/hooks/useSessionSenderRenderer";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import {
   generateWorkflowDescription,
@@ -94,10 +94,11 @@ function DesignSessionView({
   } = useWorkflowSessionChat(workflow.id, workflow.sessionId, null, workflow.createdBy, "design");
 
   // The design chat is shared by the tenant's developers, so each message shows
-  // who sent it — the same resolution the workflow session uses. Messages with
-  // no attribution (the background generation run's) fall back to the
-  // workflow's creator, who the ADK session is keyed by.
-  const renderAvatar = useSessionAvatarRenderer({
+  // who sent it and takes their side of the thread — the same resolution the
+  // workflow session uses. Messages with no attribution (the background
+  // generation run's) fall back to the workflow's creator, who the ADK session
+  // is keyed by.
+  const { renderAvatar, isOwnMessage } = useSessionSenderRenderer({
     agentLabel: workflow.name,
     ownerUserId: workflow.createdBy,
     messageSenders,
@@ -246,6 +247,7 @@ function DesignSessionView({
           isStreaming={isStreaming}
           isRunning={isRunning}
           renderAvatar={renderAvatar}
+          isOwnMessage={isOwnMessage}
           onAction={sendA2uiAction}
           onApprovalResolved={sendApprovalResult}
           pendingRenderCalls={pendingRenderCalls}

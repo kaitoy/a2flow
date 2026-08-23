@@ -101,6 +101,7 @@ export function MessageList({
   isStreaming = false,
   isRunning = false,
   renderAvatar,
+  isOwnMessage,
   messageTasks,
   tasksById,
   taskIndexById,
@@ -120,6 +121,14 @@ export function MessageList({
    * single-user chat, which renders no avatars.
    */
   renderAvatar?: (message: Message) => ReactNode;
+  /**
+   * Optional predicate saying whether the signed-in viewer sent a message.
+   * Provided alongside `renderAvatar` by the session chats, where it puts the
+   * viewer's own bubbles and surfaces on the right and everyone else's on the
+   * left. Omitted for the single-user chat, whose every user message is the
+   * viewer's own — hence the `true` default below.
+   */
+  isOwnMessage?: (message: Message) => boolean;
   /**
    * Optional message id -> WorkflowTask id map. When provided (workflow
    * sessions) each run of consecutive same-task messages is wrapped in a
@@ -319,6 +328,7 @@ export function MessageList({
       isStreaming={isStreaming && msg.id === lastMessageId}
       isThinking={isRunning && !isStreaming && msg.id === lastMessageId}
       avatar={renderAvatar?.(msg)}
+      isOwn={isOwnMessage?.(msg) ?? true}
       onAction={onAction}
       onApprovalResolved={onApprovalResolved}
       pendingToolCallIds={pendingToolCallIds}

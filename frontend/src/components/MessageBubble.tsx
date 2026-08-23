@@ -14,6 +14,10 @@ import { UserMessageBubble } from "./UserMessageBubble";
  * `assistant`) bubbles in workflow executions. It is also forwarded to
  * `ActivityMessageBubble`, which shows it only next to a resolved A2UI
  * surface (the user who acted on it); other activity types ignore it.
+ * `isOwn` says whether the signed-in viewer is that sender, which puts the
+ * bubble on the right side of the thread; it goes to the branches that can sit
+ * on either side (`user` and the A2UI / approval surfaces) but not to
+ * `AssistantMessageBubble`, since the agent is always on the left.
  * `isThinking` is likewise forwarded to `ActivityMessageBubble`, which uses it
  * only for the reasoning branch (live edge while the agent is still
  * reasoning). `pendingToolCallIds` and `toolResultContentByCallId` are
@@ -25,6 +29,7 @@ export function MessageBubble({
   isStreaming = false,
   isThinking = false,
   avatar,
+  isOwn = true,
   onAction,
   onApprovalResolved,
   pendingToolCallIds,
@@ -34,12 +39,15 @@ export function MessageBubble({
   isStreaming?: boolean;
   isThinking?: boolean;
   avatar?: ReactNode;
+  /** Whether the signed-in viewer is this message's sender. */
+  isOwn?: boolean;
   onAction?: (action: A2UIUserAction, values: Record<string, unknown>) => void;
   onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected" | "returned") => void;
   pendingToolCallIds?: Set<string>;
   toolResultContentByCallId?: Map<string, string>;
 }) {
-  if (message.role === "user") return <UserMessageBubble message={message} avatar={avatar} />;
+  if (message.role === "user")
+    return <UserMessageBubble message={message} avatar={avatar} isOwn={isOwn} />;
   if (message.role === "assistant")
     return <AssistantMessageBubble message={message} isStreaming={isStreaming} avatar={avatar} />;
   if (message.role === "activity")
@@ -47,6 +55,7 @@ export function MessageBubble({
       <ActivityMessageBubble
         message={message}
         avatar={avatar}
+        isOwn={isOwn}
         isThinking={isThinking}
         onAction={onAction}
         onApprovalResolved={onApprovalResolved}

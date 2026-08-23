@@ -25,6 +25,16 @@ import { ToolActivityBubble } from "./ToolActivityBubble";
 type Decision = "approved" | "rejected" | "returned";
 
 /**
+ * Row class for a surface that carries a sender avatar (an answered A2UI form,
+ * a decided approval): the viewer's own goes to the right edge, everyone else's
+ * to the left. A surface nobody has acted on has no avatar and stays left.
+ */
+function surfaceRowClass(avatar: ReactNode, isOwn: boolean): string {
+  if (!avatar) return "mb-3 flex justify-start";
+  return `mb-3 flex items-end gap-2 ${isOwn ? "justify-end" : "justify-start"}`;
+}
+
+/**
  * Render an activity message by delegating to the renderer for its type: A2UI
  * surfaces to {@link A2uiRenderer}, approval requests to {@link ApprovalControls},
  * tool-call status lines to {@link ToolActivityBubble}, and streamed reasoning to
@@ -32,8 +42,11 @@ type Decision = "approved" | "rejected" | "returned";
  *
  * `avatar` is used by the A2UI branch (the user who resolved the surface's
  * pending action) and the approval branch (the user who decided the approval);
- * other branches ignore it. `isThinking` is used only by the reasoning branch,
- * to drive its live edge while the agent is still actively reasoning.
+ * other branches ignore it. `isOwn` puts that avatar — and the surface it
+ * belongs to — on the viewer's own (right) side of the thread, matching where
+ * their text messages sit; the same branches ignore it while no avatar is shown.
+ * `isThinking` is used only by the reasoning branch, to drive its live edge
+ * while the agent is still actively reasoning.
  *
  * `pendingToolCallIds` and `toolResultContentByCallId` (both derived from the full
  * session history by `MessageList`) drive the A2UI branch: a surface whose
@@ -45,6 +58,7 @@ type Decision = "approved" | "rejected" | "returned";
 export function ActivityMessageBubble({
   message,
   avatar,
+  isOwn = true,
   isThinking,
   onAction,
   onApprovalResolved,
@@ -53,6 +67,8 @@ export function ActivityMessageBubble({
 }: {
   message: ActivityMessage;
   avatar?: ReactNode;
+  /** Whether the signed-in viewer is the one who acted on this surface. */
+  isOwn?: boolean;
   isThinking?: boolean;
   onAction?: (action: A2UIUserAction, values: Record<string, unknown>) => void;
   onApprovalResolved?: (toolCallId: string, decision: Decision) => void;
@@ -96,9 +112,8 @@ export function ActivityMessageBubble({
     // under the same activity type; only snapshots carrying operations are renderable.
     if (payload == null) return null;
     return (
-      <div
-        className={avatar ? "mb-3 flex justify-start items-end gap-2" : "mb-3 flex justify-start"}
-      >
+      <div className={surfaceRowClass(avatar, isOwn)}>
+        {!isOwn && avatar}
         <div className="max-w-[85%] w-full">
           <A2uiRenderer
             payload={displayPayload}
@@ -106,7 +121,7 @@ export function ActivityMessageBubble({
             resolved={isResolved}
           />
         </div>
-        {avatar}
+        {isOwn && avatar}
       </div>
     );
   }
@@ -118,9 +133,8 @@ export function ActivityMessageBubble({
     };
     if (!content.approvalId) return null;
     return (
-      <div
-        className={avatar ? "mb-3 flex justify-start items-end gap-2" : "mb-3 flex justify-start"}
-      >
+      <div className={surfaceRowClass(avatar, isOwn)}>
+        {!isOwn && avatar}
         <div className="max-w-[85%] w-full">
           <ApprovalControls
             approvalId={content.approvalId}
@@ -130,7 +144,7 @@ export function ActivityMessageBubble({
             onResolved={onApprovalResolved}
           />
         </div>
-        {avatar}
+        {isOwn && avatar}
       </div>
     );
   }

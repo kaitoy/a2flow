@@ -23,7 +23,7 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
-import { useSessionAvatarRenderer } from "@/hooks/useSessionAvatarRenderer";
+import { useSessionSenderRenderer } from "@/hooks/useSessionSenderRenderer";
 import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import {
   getWorkflowExecution,
@@ -87,10 +87,11 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // The sender avatar shown beside each message: the workflow agent for its own
-  // messages, and the resolved human (applicant or approver) for everything a
-  // person said or acted on. Shared with the design session — see the hook.
-  const renderAvatar = useSessionAvatarRenderer({
+  // Who sent each message: the workflow agent for its own messages, and the
+  // resolved human (applicant or approver) for everything a person said or acted
+  // on. Drives both the avatar beside the message and which side of the thread
+  // it takes. Shared with the design session — see the hook.
+  const { renderAvatar, isOwnMessage } = useSessionSenderRenderer({
     agentLabel: execution.name,
     ownerUserId: execution.initiatorId,
     messageSenders,
@@ -162,6 +163,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
           isStreaming={isStreaming}
           isRunning={isRunning}
           renderAvatar={renderAvatar}
+          isOwnMessage={isOwnMessage}
           messageTasks={messageTasks}
           tasksById={tasksById}
           taskIndexById={taskIndexById}

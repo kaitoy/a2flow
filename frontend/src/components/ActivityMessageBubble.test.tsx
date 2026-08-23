@@ -104,6 +104,58 @@ describe("ActivityMessageBubble", () => {
     expect(screen.getByTestId("mock-avatar")).toBeInTheDocument();
   });
 
+  it("puts an A2UI surface the viewer answered on the right, avatar trailing", () => {
+    const { container } = render(
+      <ActivityMessageBubble
+        message={{
+          id: "1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { a2ui_operations: [] },
+        }}
+        avatar={<div data-testid="mock-avatar" />}
+        isOwn
+      />
+    );
+    const row = container.firstChild as HTMLElement;
+    expect(row).toHaveClass("justify-end");
+    expect(row.lastChild).toBe(screen.getByTestId("mock-avatar"));
+  });
+
+  it("puts an A2UI surface someone else answered on the left, avatar leading", () => {
+    const { container } = render(
+      <ActivityMessageBubble
+        message={{
+          id: "1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { a2ui_operations: [] },
+        }}
+        avatar={<div data-testid="mock-avatar" />}
+        isOwn={false}
+      />
+    );
+    const row = container.firstChild as HTMLElement;
+    expect(row).toHaveClass("justify-start");
+    expect(row.firstChild).toBe(screen.getByTestId("mock-avatar"));
+  });
+
+  it("keeps an unanswered A2UI surface on the left", () => {
+    const { container } = render(
+      <ActivityMessageBubble
+        message={{
+          id: "1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { a2ui_operations: [] },
+        }}
+      />
+    );
+    // No avatar means nobody has acted on it, so ownership never applies.
+    expect(container.firstChild).toHaveClass("justify-start");
+    expect(container.firstChild).not.toHaveClass("items-end");
+  });
+
   it("ignores the avatar for the tool_call activity type", () => {
     render(
       <ActivityMessageBubble
@@ -150,6 +202,42 @@ describe("ActivityMessageBubble", () => {
     );
     expect(screen.getByTestId("approval-controls-mock")).toBeInTheDocument();
     expect(screen.getByTestId("mock-avatar")).toBeInTheDocument();
+  });
+
+  it("puts an approval the viewer decided on the right, avatar trailing", () => {
+    const { container } = render(
+      <ActivityMessageBubble
+        message={{
+          id: "tc-1",
+          role: "activity",
+          activityType: APPROVAL_ACTIVITY_TYPE,
+          content: { approvalId: "appr-1", title: "Deploy?" },
+        }}
+        avatar={<div data-testid="mock-avatar" />}
+        isOwn
+      />
+    );
+    const row = container.firstChild as HTMLElement;
+    expect(row).toHaveClass("justify-end");
+    expect(row.lastChild).toBe(screen.getByTestId("mock-avatar"));
+  });
+
+  it("puts an approval someone else decided on the left, avatar leading", () => {
+    const { container } = render(
+      <ActivityMessageBubble
+        message={{
+          id: "tc-1",
+          role: "activity",
+          activityType: APPROVAL_ACTIVITY_TYPE,
+          content: { approvalId: "appr-1", title: "Deploy?" },
+        }}
+        avatar={<div data-testid="mock-avatar" />}
+        isOwn={false}
+      />
+    );
+    const row = container.firstChild as HTMLElement;
+    expect(row).toHaveClass("justify-start");
+    expect(row.firstChild).toBe(screen.getByTestId("mock-avatar"));
   });
 
   it("renders a tool-call status line for the tool_call activity type", () => {

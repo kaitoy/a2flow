@@ -27,6 +27,7 @@ vi.mock("./MessageBubble", () => ({
     isStreaming,
     isThinking,
     avatar,
+    isOwn,
     pendingToolCallIds,
     toolResultContentByCallId,
   }: {
@@ -34,6 +35,7 @@ vi.mock("./MessageBubble", () => ({
     isStreaming: boolean;
     isThinking?: boolean;
     avatar?: ReactNode;
+    isOwn?: boolean;
     pendingToolCallIds?: Set<string>;
     toolResultContentByCallId?: Map<string, string>;
   }) => {
@@ -48,6 +50,7 @@ vi.mock("./MessageBubble", () => ({
         data-testid={`bubble-${message.id}`}
         data-streaming={String(isStreaming)}
         data-thinking={String(isThinking)}
+        data-own={String(isOwn)}
         data-pending={pendingToolCallIds ? Array.from(pendingToolCallIds).join(",") : ""}
         data-tool-content={toolResultContentByCallId?.get("tc-1") ?? ""}
       >
@@ -128,6 +131,22 @@ describe("MessageList", () => {
     );
     expect(screen.getByTestId("avatar-m1")).toHaveTextContent("user");
     expect(screen.getByTestId("avatar-m2")).toHaveTextContent("assistant");
+  });
+
+  it("passes the isOwnMessage verdict to each bubble when provided", () => {
+    const messages: Message[] = [
+      { id: "m1", role: "user", content: "hi" },
+      { id: "m2", role: "user", content: "hello" },
+    ];
+    render(<MessageList messages={messages} isOwnMessage={(m) => m.id === "m1"} />);
+    expect(screen.getByTestId("bubble-m1")).toHaveAttribute("data-own", "true");
+    expect(screen.getByTestId("bubble-m2")).toHaveAttribute("data-own", "false");
+  });
+
+  it("treats every message as the viewer's own when no predicate is given", () => {
+    // The single-user chat passes neither avatars nor ownership.
+    render(<MessageList messages={[{ id: "m1", role: "user", content: "hi" }]} />);
+    expect(screen.getByTestId("bubble-m1")).toHaveAttribute("data-own", "true");
   });
 
   it("only the last bubble receives isStreaming=true when list isStreaming", () => {

@@ -59,4 +59,57 @@ describe("UserMessageBubble", () => {
     );
     expect(container.firstChild).not.toHaveClass("items-end");
   });
+
+  it("moves another participant's message to the left with the avatar leading", () => {
+    const { container } = render(
+      <UserMessageBubble
+        message={{ id: "1", role: "user", content: "hello" }}
+        avatar={<span data-testid="sender-avatar">A</span>}
+        isOwn={false}
+      />
+    );
+    const row = container.firstChild as HTMLElement;
+    expect(row).toHaveClass("justify-start");
+    expect(row).not.toHaveClass("justify-end");
+    // The avatar sits on the outer (left) edge, before the bubble.
+    expect(row.firstChild).toBe(screen.getByTestId("sender-avatar"));
+  });
+
+  it("tints another participant's bubble apart from the agent's glass panel", () => {
+    render(
+      <UserMessageBubble
+        message={{ id: "1", role: "user", content: "hello" }}
+        avatar={<span data-testid="sender-avatar">A</span>}
+        isOwn={false}
+      />
+    );
+    const bubble = screen.getByText("hello");
+    expect(bubble).toHaveClass("bg-secondary/12");
+    expect(bubble).toHaveClass("border-secondary/25");
+    expect(bubble).not.toHaveClass("bg-gradient-to-br");
+  });
+
+  it("keeps the viewer's own message right-aligned with the avatar trailing", () => {
+    const { container } = render(
+      <UserMessageBubble
+        message={{ id: "1", role: "user", content: "hello" }}
+        avatar={<span data-testid="sender-avatar">A</span>}
+        isOwn
+      />
+    );
+    const row = container.firstChild as HTMLElement;
+    expect(row).toHaveClass("justify-end");
+    expect(row.lastChild).toBe(screen.getByTestId("sender-avatar"));
+    expect(screen.getByText("hello")).toHaveClass("bg-gradient-to-br");
+  });
+
+  it("stays right-aligned without an avatar even when it is not the viewer's own", () => {
+    // The single-user chat passes no avatar and no ownership; a lone sender's
+    // messages belong on their own side regardless.
+    const { container } = render(
+      <UserMessageBubble message={{ id: "1", role: "user", content: "hello" }} isOwn={false} />
+    );
+    expect(container.firstChild).toHaveClass("justify-end");
+    expect(screen.getByText("hello")).toHaveClass("bg-gradient-to-br");
+  });
 });
