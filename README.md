@@ -125,7 +125,7 @@ Pre-commit / pre-push hooks (lefthook) run linters, formatters, type checkers, a
 
 ## Run with Docker Compose
 
-Alternatively, the whole stack — PostgreSQL 17, the backend, and the frontend — can be built and started with Docker Compose ([compose.yml](compose.yml)):
+Alternatively, the whole stack — PostgreSQL 17, the backend, the [outgoing-email worker](#the-delivery-queue), and the frontend — can be built and started with Docker Compose ([compose.yml](compose.yml)):
 
 ```bash
 echo GOOGLE_API_KEY=your_google_api_key_here > .env
@@ -609,6 +609,8 @@ Workflow operations data — approval backlog, run volume, failures, and lead ti
 | `a2flow_workflow_tasks_failed_recently{window,error_kind}` | Tasks that failed in the last 24h, by cause |
 | `a2flow_workflow_executions_started_recently{window,workflow}` | Runs started in the last 24h, by workflow |
 | `a2flow_workflow_execution_lead_time_seconds_avg{window,workflow}` | Mean start-to-finish duration of runs finishing in the last 24h |
+| `a2flow_email_queue_depth{status}` | Notification emails in the [outgoing queue](#the-delivery-queue), by `pending` / `sending` / `sent` / `failed` |
+| `a2flow_email_queue_oldest_pending_age_seconds` | How long the longest-waiting undelivered email has waited — rises when the relay is unreachable |
 
 `?thresholdHours=` overrides the stalled-approval cutoff. `METRICS_TIMEZONE` (an IANA name, default `UTC`) decides where "today" starts; an unrecognized name falls back to UTC rather than failing startup.
 
@@ -666,11 +668,25 @@ The [`/notifications`](http://localhost:3000/notifications) page, reachable from
 
 ### Email delivery
 
-Once a `super_admin` has configured an SMTP server under [System Settings](#system-settings), the same four events are **also emailed** to the recipient, so an approval request does not have to wait for someone to open the app. The in-app notification is always written first; the email follows as a best-effort side effect, and a relay that is unreachable or rejects the message is logged server-side without failing the workflow operation that raised the notification.
+Once a `super_admin` has configured an SMTP server under [System Settings](#system-settings), the same four events are **also emailed** to the recipient, so an approval request does not have to wait for someone to open the app.
 
 The message carries the notification's title as its subject, its body as the text, and a link back to what it is about — the run for `approval_request` / `execution_completed`, the workflow for `workflow_draft_ready` / `workflow_generation_failed` — built from the configured **Application Base URL**. When no base URL is set the message is sent without a link.
 
-Recipients who cannot be reached are skipped before any relay is contacted: the internal system user, disabled or soft-deleted accounts, and any account without an address. There is no per-user opt-out — email delivery is on or off for the whole platform.
+Recipients who cannot be reached are skipped before any relay is contacted: the internal system user, disabled or soft-deleted accounts, accounts whose address is unverified, and any account without an address. There is no per-user opt-out — email delivery is on or off for the whole platform.
+
+#### The delivery queue
+
+Nothing is sent while a workflow operation is in flight. The notification row and a row in `outbound_emails` — the fully rendered message, recipient and all — are written in **one transaction**, so a crash can never leave a notification whose email was never queued. A worker then drains that queue:
+
+- **Paced.** A token bucket holds the relay to a sustained rate (5/s by default, with a burst of 10), and a whole batch goes out over one reused SMTP connection.
+- **Retried.** A transient failure — the relay is down, returns a 4xx, or rejects the credentials — schedules another attempt with exponential backoff and jitter: 15s, 30s, 1m, 2m, doubling to a one-hour ceiling. The default budget of 9 attempts rides out roughly an hour of downtime.
+- **Written off when hopeless.** A failure the relay reports as permanent (an unknown recipient, say) is not retried at all. Once a message is out of attempts, or fails permanently, it stays as `status=failed` with the last error on the row — a dead letter to look at, not a silent loss. Delivered messages are purged after 30 days; dead letters are kept.
+
+Exactly **one process sends at a time**, elected by a PostgreSQL advisory lock, which is what makes the rate limit exact rather than approximate. Scaling the worker past one replica buys failover, not throughput. A sender that dies mid-batch leaves its claims leased; the next pass reclaims them without spending an attempt.
+
+The API process runs the worker itself by default, so `uvicorn main:app` alone delivers mail. `compose.yml` instead runs a dedicated `worker` service and sets `EMAIL_WORKER_IN_PROCESS=false` on the API, keeping SMTP work off the process serving requests. Every tunable is listed under **Outgoing email queue** in [`backend/.env.example`](backend/.env.example).
+
+Backlog and stuck-relay symptoms are visible on the [metrics endpoint](#operations-metrics) as `a2flow_email_queue_depth{tenant,status}` and `a2flow_email_queue_oldest_pending_age_seconds{tenant}`.
 
 ## Agent activity in the chat
 

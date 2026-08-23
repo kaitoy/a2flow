@@ -68,6 +68,11 @@ services:
       # revision it started with. Scaling the backend past one replica requires
       # every replica to mount this same volume (ReadWriteMany).
       SKILLS_DIR: /var/lib/a2flow/skills
+      # The `worker` service below drains the outgoing-email queue, so the API
+      # process does not. Leaving this on would be harmless -- the `email-queue`
+      # advisory lock still elects one sender -- but it would put SMTP work in
+      # the process serving requests.
+      EMAIL_WORKER_IN_PROCESS: "false"
     volumes:
       - skills:/var/lib/a2flow/skills
     healthcheck:
@@ -78,6 +83,27 @@ services:
       start_period: 10s
     depends_on:
       db:
+        condition: service_healthy
+
+  # Delivers notification email: reads the `outbound_emails` queue the API
+  # writes to, paces itself against the configured SMTP relay, and retries what
+  # is worth retrying. Deliberately a separate process rather than a thread in
+  # the API -- a hung relay then costs nothing that serves requests.
+  #
+  # Do not scale this past one replica expecting more throughput: they contend
+  # on the `email-queue` advisory lock and all but one sit idle by design, which
+  # is what keeps the rate limit exact. A second replica buys failover, not
+  # capacity.
+  worker:
+    build: ./backend
+    command: ["uv", "run", "--no-sync", "python", "-m", "worker"]
+    environment:
+      DB_URL: postgresql://a2flow:a2flow@db:5432/a2flow
+    depends_on:
+      # Not just for the database: the API applies the Alembic migrations and
+      # seeds the settings row on startup, and the worker does neither. Waiting
+      # for it to report healthy is what guarantees the schema is there.
+      backend:
         condition: service_healthy
 
   frontend:

@@ -350,10 +350,18 @@ class EmailSendError(Exception):
     never returns it to the client, mirroring :class:`McpConnectionError`: the
     text echoes the raw ``smtplib`` failure, which can quote relay banners and
     the configured credentials' username back at the caller.
+
+    ``permanent`` says whether retrying could ever help. Only
+    :mod:`infrastructure.email_sender` sets it, because only there is the
+    ``smtplib`` exception type still in hand; the email queue worker reads it to
+    decide between scheduling another attempt and writing the message off. The
+    HTTP layer ignores it — a caller who asked for a test send gets the same 502
+    either way.
     """
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, *, permanent: bool = False) -> None:
         self.reason = reason
+        self.permanent = permanent
         super().__init__(f"failed to send email: {reason}")
 
 

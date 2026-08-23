@@ -107,6 +107,21 @@ def skill_sync_key(skill_id: str) -> str:
     return f"skill-sync:{skill_id}"
 
 
+def email_queue_key() -> str:
+    """Return the lock key electing the one process that drains outgoing email.
+
+    Unlike the two keys above this one is a constant, because what it protects
+    is a singleton: the deployment has exactly one SMTP relay, so exactly one
+    sender may run. Holding this is also what lets the sender keep its rate
+    limiter in memory and its SMTP connection open — see
+    :mod:`services.email_queue_worker`.
+
+    Returns:
+        The key to pass to :func:`advisory_lock`.
+    """
+    return "email-queue"
+
+
 def lock_id(key: str) -> int:
     """Hash a lock key into the signed 64-bit integer ``pg_advisory_lock`` takes.
 

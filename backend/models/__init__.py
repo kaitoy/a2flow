@@ -17,6 +17,7 @@ from .notification import (
     NotificationType,
     NotificationUpdate,
 )
+from .outbound_email import OutboundEmail, OutboundEmailCreate, OutboundEmailStatus
 from .session import Session
 from .tag import (
     MAX_RECORD_TAGS,
@@ -103,6 +104,9 @@ __all__ = [
     "NotificationCreate",
     "NotificationType",
     "NotificationUpdate",
+    "OutboundEmail",
+    "OutboundEmailCreate",
+    "OutboundEmailStatus",
     "SecretTag",
     "Session",
     "Tag",

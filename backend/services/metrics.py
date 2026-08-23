@@ -35,6 +35,7 @@ from models.metrics import (
 )
 from models.workflow_execution import WorkflowExecutionStatus
 from repositories.metrics import ApprovalRow, ExecutionRow, MetricsRepository
+from repositories.outbound_email import OutboundEmailRepository
 
 #: Label used in place of a missing failure classification, so a Prometheus
 #: series never carries an empty label value.
@@ -76,6 +77,13 @@ class MetricsSnapshot:
     tasks_failed_recently: dict[str, int] = field(default_factory=dict)
     executions_started_recently: dict[str, int] = field(default_factory=dict)
     lead_time_seconds_avg_recently: dict[str, float] = field(default_factory=dict)
+    #: Queued notification emails per ``OutboundEmailStatus`` value. Always
+    #: carries every status, zeros included, so a drained queue keeps exporting
+    #: a series instead of making one vanish from the exposition.
+    email_queue_depth: dict[str, int] = field(default_factory=dict)
+    #: Age of the tenant's longest-waiting undelivered email, or zero when
+    #: nothing is waiting. Rises when the relay is unreachable.
+    email_queue_oldest_pending_age_seconds: float = 0.0
 
 
 def _mean(values: list[float]) -> float | None:
@@ -93,16 +101,27 @@ def _lead_time_seconds(execution: ExecutionRow) -> float | None:
 class MetricsService:
     """Application service producing the workflow operations metrics."""
 
-    def __init__(self, repo: MetricsRepository, *, timezone: str) -> None:
+    def __init__(
+        self,
+        repo: MetricsRepository,
+        emails: OutboundEmailRepository,
+        *,
+        timezone: str,
+    ) -> None:
         """Initialize the service.
 
         Args:
             repo: Repository providing the tenant-scoped aggregate reads.
+            emails: Repository reporting the tenant's outgoing-email backlog.
+                Notification email is delivered asynchronously, so how far
+                behind that queue is running is an operational number like any
+                other here.
             timezone: IANA timezone name deciding where a calendar day starts.
                 Already validated by ``Settings``, which falls back to UTC on an
                 unrecognized name.
         """
         self._repo = repo
+        self._emails = emails
         self._tz = ZoneInfo(timezone)
 
     def _now(self) -> datetime:
@@ -415,6 +434,9 @@ class MetricsService:
         )
         failed_tasks = await self._repo.failed_tasks_between(recent_start, now)
 
+        email_depth = await self._emails.counts_by_status()
+        email_oldest = await self._emails.oldest_pending_age_seconds(now=now)
+
         finished_today_counts: dict[str, int] = defaultdict(int)
         for row in finished_today:
             finished_today_counts[row.status.value] += 1
@@ -462,4 +484,8 @@ class MetricsService:
             lead_time_seconds_avg_recently={
                 name: sum(values) / len(values) for name, values in lead_times.items()
             },
+            email_queue_depth={
+                status.value: count for status, count in email_depth.items()
+            },
+            email_queue_oldest_pending_age_seconds=email_oldest or 0.0,
         )

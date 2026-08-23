@@ -27,6 +27,8 @@ from .mcp_server import MCPServerRepository, SqlMCPServerRepository
 from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
 from .metrics import MetricsRepository, SqlMetricsRepository
 from .notification import NotificationRepository, SqlNotificationRepository
+from .outbound_email import OutboundEmailRepository, SqlOutboundEmailRepository
+from .outbound_email_queue import ClaimedEmail, SqlOutboundEmailQueue
 from .secret import SecretRepository, SqlSecretRepository
 from .system_settings import (
     SqlSystemSettingsRepository,
@@ -59,6 +61,7 @@ __all__ = [
     "ApprovalCertificateRepository",
     "ApprovalRepository",
     "AuthSessionRepository",
+    "ClaimedEmail",
     "CsrfError",
     "EffectiveRoleRepository",
     "ForeignKeyViolationError",
@@ -70,6 +73,7 @@ __all__ = [
     "MetricsRepository",
     "NotFoundError",
     "NotificationRepository",
+    "OutboundEmailRepository",
     "ReferencedError",
     "RepositoryError",
     "SecretRepository",
@@ -84,6 +88,8 @@ __all__ = [
     "SqlMessageMetaRepository",
     "SqlMetricsRepository",
     "SqlNotificationRepository",
+    "SqlOutboundEmailQueue",
+    "SqlOutboundEmailRepository",
     "SqlSecretRepository",
     "SqlSystemSettingsRepository",
     "SqlTagRepository",

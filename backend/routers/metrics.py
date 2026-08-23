@@ -169,6 +169,20 @@ def _render(snapshot: MetricsSnapshot, tenant_id: str, threshold_hours: float) -
     for workflow, seconds in snapshot.lead_time_seconds_avg_recently.items():
         lead_time.add_metric([tenant_id, recent, workflow], seconds)
 
+    email_depth = gauge(
+        "email_queue_depth",
+        "Notification emails in the outgoing queue, by delivery status.",
+        ("status",),
+    )
+    for status, count in snapshot.email_queue_depth.items():
+        email_depth.add_metric([tenant_id, status], count)
+
+    email_age = gauge(
+        "email_queue_oldest_pending_age_seconds",
+        "How long the longest-waiting undelivered notification email has waited.",
+    )
+    email_age.add_metric([tenant_id], snapshot.email_queue_oldest_pending_age_seconds)
+
     registry = CollectorRegistry()
     registry.register(_SnapshotCollector(families))
     return generate_latest(registry).decode("utf-8")

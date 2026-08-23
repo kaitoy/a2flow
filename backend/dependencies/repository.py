@@ -22,6 +22,7 @@ from repositories import (
     MessageMetaRepository,
     MetricsRepository,
     NotificationRepository,
+    OutboundEmailRepository,
     SecretRepository,
     SqlAgentSkillRepository,
     SqlApprovalCertificateRepository,
@@ -33,6 +34,7 @@ from repositories import (
     SqlMessageMetaRepository,
     SqlMetricsRepository,
     SqlNotificationRepository,
+    SqlOutboundEmailRepository,
     SqlSecretRepository,
     SqlSystemSettingsRepository,
     SqlTagRepository,
@@ -116,6 +118,18 @@ def get_notification_repository(
 
 NotificationRepositoryDep = Annotated[
     NotificationRepository, Depends(get_notification_repository)
+]
+
+
+def get_outbound_email_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> OutboundEmailRepository:
+    """Create an OutboundEmailRepository backed by the current database session."""
+    return SqlOutboundEmailRepository(db, tenant_id=tenant_id)
+
+
+OutboundEmailRepositoryDep = Annotated[
+    OutboundEmailRepository, Depends(get_outbound_email_repository)
 ]
 
 

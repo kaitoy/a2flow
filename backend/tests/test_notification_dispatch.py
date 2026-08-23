@@ -1,9 +1,10 @@
 """Tests for the notification dispatcher's email side effect.
 
-The dispatcher's contract is narrow but load-bearing: the row is written first
-and its failure propagates, the email is best-effort and never propagates, and
-recipients who cannot or should not receive mail are skipped before a relay is
-ever contacted.
+The dispatcher's contract is narrow but load-bearing: the notification row and
+the queued email are written in one transaction, the message is rendered from
+what was true when the notification was produced, recipients who cannot or
+should not receive mail are skipped before anything is queued, and a failure on
+the email side never costs the notification.
 """
 
 from collections.abc import AsyncGenerator
@@ -14,17 +15,21 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
-from infrastructure.email_sender import SmtpConfig
 from infrastructure.secret_cipher import get_secret_cipher
 from models.notification import (
     Notification,
     NotificationCreate,
     NotificationType,
     build_notification_link,
+)
+from models.outbound_email import (
+    OutboundEmail,
+    OutboundEmailCreate,
+    OutboundEmailStatus,
 )
 from models.system_settings import (
     SYSTEM_SETTINGS_ID,
@@ -39,28 +44,15 @@ from repositories import (
     SqlSystemSettingsRepository,
     SqlUserRepository,
 )
-from repositories.exceptions import EmailSendError
-from services.notification_dispatch import NotificationDispatcher, _deep_link
+from services.notification_dispatch import (
+    NotificationDispatcher,
+    _deep_link,
+    build_notification_dispatcher,
+)
 from services.system_settings import SystemSettingsService
 
 _TENANT_ID = "tenant-dispatch"
 _RECIPIENT_ID = "recipient"
-
-
-class _RecordingSender:
-    """Records sends instead of opening a socket; can be told to fail."""
-
-    def __init__(self) -> None:
-        self.sent: list[dict[str, Any]] = []
-        self.error: Exception | None = None
-
-    async def send(
-        self, config: SmtpConfig, *, to: str, subject: str, body: str
-    ) -> None:
-        """Record the message, or raise the configured failure."""
-        if self.error is not None:
-            raise self.error
-        self.sent.append({"to": to, "subject": subject, "body": body})
 
 
 async def _seed(session: AsyncSession, **user_overrides: Any) -> None:
@@ -149,20 +141,17 @@ async def session() -> AsyncGenerator[AsyncSession, None]:
     await mem_engine.dispose()
 
 
-@pytest.fixture()
-def sender() -> _RecordingSender:
-    """Return a fresh recording sender."""
-    return _RecordingSender()
+def _dispatcher(db: AsyncSession) -> NotificationDispatcher:
+    """Build a dispatcher wired to the test session."""
+    return build_notification_dispatcher(db, tenant_id=_TENANT_ID)
 
 
-def _dispatcher(db: AsyncSession, sender: _RecordingSender) -> NotificationDispatcher:
-    """Build a dispatcher wired to the test session and recording sender."""
-    return NotificationDispatcher(
-        SqlNotificationRepository(db, tenant_id=_TENANT_ID),
-        SqlUserRepository(db),
-        SystemSettingsService(SqlSystemSettingsRepository(db), get_secret_cipher()),
-        sender,  # type: ignore[arg-type]
+async def _queued(session: AsyncSession) -> list[OutboundEmail]:
+    """Return every message sitting in the outgoing queue, oldest first."""
+    result = await session.exec(
+        select(OutboundEmail).order_by(col(OutboundEmail.created_at))
     )
+    return list(result.all())
 
 
 def _payload(**overrides: Any) -> NotificationCreate:
@@ -177,49 +166,82 @@ def _payload(**overrides: Any) -> NotificationCreate:
     return NotificationCreate(**fields)
 
 
-async def test_email_is_sent_when_smtp_is_configured(
-    session: AsyncSession, sender: _RecordingSender
-) -> None:
+async def test_email_is_queued_when_smtp_is_configured(session: AsyncSession) -> None:
     await _seed(session)
     await _enable_smtp(session)
-    await _dispatcher(session, sender).create(_payload(), user_id=_RECIPIENT_ID)
-    assert len(sender.sent) == 1
-    assert sender.sent[0]["to"] == "recipient@example.com"
-    assert sender.sent[0]["subject"] == "Approval requested"
+    notification = await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+
+    queued = await _queued(session)
+
+    assert len(queued) == 1
+    assert queued[0].to_email == "recipient@example.com"
+    assert queued[0].subject == "Approval requested"
+    assert queued[0].notification_id == notification.id
+    assert queued[0].tenant_id == _TENANT_ID
 
 
-async def test_body_carries_the_notification_text(
-    session: AsyncSession, sender: _RecordingSender
-) -> None:
+async def test_nothing_is_sent_inline(session: AsyncSession) -> None:
+    """The whole point of the queue: `create` must not touch a relay itself."""
     await _seed(session)
     await _enable_smtp(session)
-    await _dispatcher(session, sender).create(_payload(), user_id=_RECIPIENT_ID)
-    assert "Please review the deployment plan." in sender.sent[0]["body"]
+
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+
+    assert (await _queued(session))[0].sent_at is None
+
+
+async def test_the_notification_and_its_email_commit_together(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Neither row may survive alone; that window is what the queue exists to close."""
+    await _seed(session)
+    await _enable_smtp(session)
+
+    async def _boom(*_: Any, **__: Any) -> None:
+        raise RuntimeError("commit failed")
+
+    monkeypatch.setattr(
+        "services.notification_dispatch.commit_or_translate_user_fk", _boom
+    )
+    with pytest.raises(RuntimeError):
+        await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    await session.rollback()
+
+    assert await _queued(session) == []
+    result = await session.exec(select(Notification))
+    assert result.all() == []
+
+
+async def test_body_carries_the_notification_text(session: AsyncSession) -> None:
+    await _seed(session)
+    await _enable_smtp(session)
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    assert "Please review the deployment plan." in (await _queued(session))[0].body
 
 
 async def test_body_deep_links_to_the_notification_centre_without_a_target(
-    session: AsyncSession, sender: _RecordingSender
+    session: AsyncSession,
 ) -> None:
     await _seed(session)
     await _enable_smtp(session)
-    await _dispatcher(session, sender).create(_payload(), user_id=_RECIPIENT_ID)
-    assert "http://localhost:3000/notifications" in sender.sent[0]["body"]
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    assert "http://localhost:3000/notifications" in (await _queued(session))[0].body
 
 
 async def test_body_deep_links_an_approval_request_to_the_session_chat(
-    session: AsyncSession, sender: _RecordingSender
+    session: AsyncSession,
 ) -> None:
     """The email link for a run-scoped notification is the chat, not the admin record."""
     await _seed(session)
     await _enable_smtp(session)
     execution_id = await _seed_execution(session)
-    notification = await _dispatcher(session, sender).create(
+    notification = await _dispatcher(session).create(
         _payload(workflow_execution_id=execution_id), user_id=_RECIPIENT_ID
     )
     assert notification.link == f"/workflow-executions/{execution_id}/session"
     assert (
         f"http://localhost:3000/workflow-executions/{execution_id}/session"
-        in sender.sent[0]["body"]
+        in (await _queued(session))[0].body
     )
 
 
@@ -292,87 +314,107 @@ def test_deep_link_falls_back_to_the_notification_centre_without_a_link() -> Non
 
 
 async def test_body_omits_the_link_when_no_base_url_is_configured(
-    session: AsyncSession, sender: _RecordingSender
+    session: AsyncSession,
 ) -> None:
     await _seed(session)
     await _enable_smtp(session, app_base_url=None)
-    await _dispatcher(session, sender).create(_payload(), user_id=_RECIPIENT_ID)
-    assert "http" not in sender.sent[0]["body"]
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    assert "http" not in (await _queued(session))[0].body
 
 
-async def test_no_email_when_delivery_is_disabled(
-    session: AsyncSession, sender: _RecordingSender
+async def test_nothing_is_queued_when_delivery_is_disabled(
+    session: AsyncSession,
 ) -> None:
+    """Delivery off means no rows accumulate, not a queue nobody drains."""
     await _seed(session)
-    await _dispatcher(session, sender).create(_payload(), user_id=_RECIPIENT_ID)
-    assert sender.sent == []
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    assert await _queued(session) == []
 
 
-async def test_no_email_for_the_system_user(
-    session: AsyncSession, sender: _RecordingSender
-) -> None:
+async def test_nothing_is_queued_for_the_system_user(session: AsyncSession) -> None:
     await _seed(session)
     await _enable_smtp(session)
-    await _dispatcher(session, sender).create(
+    await _dispatcher(session).create(
         _payload(user_id=SYSTEM_USER_ID), user_id=_RECIPIENT_ID
     )
-    assert sender.sent == []
+    assert await _queued(session) == []
 
 
-async def test_no_email_for_a_disabled_recipient(
-    session: AsyncSession, sender: _RecordingSender
+async def test_nothing_is_queued_for_a_disabled_recipient(
+    session: AsyncSession,
 ) -> None:
     await _seed(session, enabled=False)
     await _enable_smtp(session)
-    await _dispatcher(session, sender).create(_payload(), user_id=_RECIPIENT_ID)
-    assert sender.sent == []
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    assert await _queued(session) == []
 
 
-async def test_no_email_for_a_soft_deleted_recipient(
-    session: AsyncSession, sender: _RecordingSender
+async def test_nothing_is_queued_for_a_soft_deleted_recipient(
+    session: AsyncSession,
 ) -> None:
     await _seed(session, deleted_at=datetime.now(UTC))
     await _enable_smtp(session)
-    await _dispatcher(session, sender).create(_payload(), user_id=_RECIPIENT_ID)
-    assert sender.sent == []
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    assert await _queued(session) == []
 
 
-async def test_no_email_for_an_unverified_recipient(
-    session: AsyncSession, sender: _RecordingSender
+async def test_nothing_is_queued_for_an_unverified_recipient(
+    session: AsyncSession,
 ) -> None:
     await _seed(session, email_verified=False)
     await _enable_smtp(session)
-    await _dispatcher(session, sender).create(_payload(), user_id=_RECIPIENT_ID)
-    assert sender.sent == []
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    assert await _queued(session) == []
 
 
-async def test_notification_survives_a_send_failure(
-    session: AsyncSession, sender: _RecordingSender
+async def test_notification_survives_a_failure_on_the_email_side(
+    session: AsyncSession,
 ) -> None:
-    """A broken relay degrades the feature to in-app only; it never breaks the write."""
+    """Queuing is best-effort; a broken email path never costs the notification."""
+
+    class _ExplodingEmails:
+        """An OutboundEmailRepository whose only job is to fail on stage."""
+
+        def stage(self, data: OutboundEmailCreate, *, user_id: str) -> OutboundEmail:
+            raise RuntimeError("cannot render")
+
+        async def counts_by_status(self) -> dict[OutboundEmailStatus, int]:
+            raise AssertionError("the dispatcher never reports on the queue")
+
+        async def oldest_pending_age_seconds(self, *, now: datetime) -> float | None:
+            raise AssertionError("the dispatcher never reports on the queue")
+
     await _seed(session)
     await _enable_smtp(session)
-    sender.error = EmailSendError("Connection refused")
-    notification = await _dispatcher(session, sender).create(
-        _payload(), user_id=_RECIPIENT_ID
+    dispatcher = NotificationDispatcher(
+        session,
+        SqlNotificationRepository(session, tenant_id=_TENANT_ID),
+        SqlUserRepository(session),
+        SystemSettingsService(
+            SqlSystemSettingsRepository(session), get_secret_cipher()
+        ),
+        _ExplodingEmails(),
     )
-    assert notification.id
+
+    notification = await dispatcher.create(_payload(), user_id=_RECIPIENT_ID)
+
     repo = SqlNotificationRepository(session, tenant_id=_TENANT_ID)
     assert await repo.get(notification.id) is not None
+    assert await _queued(session) == []
 
 
 async def test_an_undecryptable_password_disables_delivery(
-    session: AsyncSession, sender: _RecordingSender
+    session: AsyncSession,
 ) -> None:
     """A password encrypted under a different Fernet key must not be sent as-is."""
     await _seed(session)
     await _enable_smtp(session, smtp_username="mailer", smtp_password="not-a-token")
-    await _dispatcher(session, sender).create(_payload(), user_id=_RECIPIENT_ID)
-    assert sender.sent == []
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    assert await _queued(session) == []
 
 
 async def test_stored_password_is_decrypted_before_sending(
-    session: AsyncSession, sender: _RecordingSender
+    session: AsyncSession,
 ) -> None:
     await _seed(session)
     await _enable_smtp(
@@ -388,12 +430,10 @@ async def test_stored_password_is_decrypted_before_sending(
     assert config.password == "hunter2hunter2"
 
 
-async def test_exists_for_session_passes_through(
-    session: AsyncSession, sender: _RecordingSender
-) -> None:
+async def test_exists_for_session_passes_through(session: AsyncSession) -> None:
     """The pass-through is what lets the dispatcher stand in for the repository."""
     await _seed(session)
-    dispatcher = _dispatcher(session, sender)
+    dispatcher = _dispatcher(session)
     assert not await dispatcher.exists_for_session(
         "run-1", NotificationType.execution_completed
     )

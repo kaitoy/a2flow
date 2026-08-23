@@ -20,6 +20,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
 from models.approval import Approval, ApprovalStatus
+from models.outbound_email import OutboundEmail, OutboundEmailStatus
 from models.user_group import UserGroup
 from models.workflow import Workflow, WorkflowStatus
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
@@ -203,6 +204,30 @@ async def _seed_approval(
         return approval.id
 
 
+async def _seed_outbound_email(
+    eng: AsyncEngine,
+    *,
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
+    status: OutboundEmailStatus = OutboundEmailStatus.pending,
+) -> str:
+    """Insert one queued notification email and return its id."""
+    async with AsyncSession(eng) as db:
+        email = OutboundEmail(
+            to_email="recipient@example.com",
+            subject="Approval requested",
+            body="Please review.",
+            status=status,
+            created_at=datetime.now(UTC) - timedelta(minutes=5),
+            tenant_id=tenant_id,
+            created_by="owner",
+            updated_by="owner",
+        )
+        db.add(email)
+        await db.commit()
+        await db.refresh(email)
+        return str(email.id)
+
+
 def _samples(body: str, metric: str) -> dict[frozenset[tuple[str, str]], float]:
     """Parse an exposition body into ``{label set: value}`` for one metric name.
 
@@ -256,6 +281,41 @@ async def test_metrics_exposes_pending_approvals_and_active_runs(
     body = res.text
     assert _samples(body, "a2flow_approvals_pending") == {_labels(): 1.0}
     assert _samples(body, "a2flow_workflow_executions_active") == {_labels(): 1.0}
+
+
+async def test_metrics_exposes_the_outgoing_email_backlog(
+    metrics_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Notification email is delivered asynchronously, so its backlog is a KPI."""
+    client, eng = metrics_env
+    await _seed_outbound_email(eng, status=OutboundEmailStatus.pending)
+    await _seed_outbound_email(eng, status=OutboundEmailStatus.failed)
+
+    res = await client.get("/api/v1/metrics", headers={"X-User-Id": "owner"})
+
+    depth = _samples(res.text, "a2flow_email_queue_depth")
+    assert depth[_labels(status="pending")] == 1.0
+    assert depth[_labels(status="failed")] == 1.0
+    # Statuses with nothing in them still report, so an alerting rule watching a
+    # queue that drains does not lose its series.
+    assert depth[_labels(status="sent")] == 0.0
+    assert (
+        _samples(res.text, "a2flow_email_queue_oldest_pending_age_seconds")[_labels()]
+        > 0.0
+    )
+
+
+async def test_email_backlog_does_not_leak_across_tenants(
+    metrics_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = metrics_env
+    await _seed_outbound_email(eng, tenant_id=OTHER_TENANT_ID)
+
+    res = await client.get("/api/v1/metrics", headers={"X-User-Id": "owner"})
+
+    assert (
+        _samples(res.text, "a2flow_email_queue_depth")[_labels(status="pending")] == 0.0
+    )
 
 
 async def test_metrics_counts_stalled_approvals_against_the_threshold(

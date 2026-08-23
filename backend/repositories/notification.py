@@ -38,6 +38,8 @@ class NotificationRepository(Protocol):
         filters: Sequence[FilterSpec] = (),
     ) -> list[Notification]: ...
 
+    def stage(self, data: NotificationCreate, *, user_id: str) -> Notification: ...
+
     async def create(
         self, data: NotificationCreate, *, user_id: str
     ) -> Notification: ...
@@ -119,8 +121,24 @@ class SqlNotificationRepository:
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 
-    async def create(self, data: NotificationCreate, *, user_id: str) -> Notification:
-        """Persist a new Notification with audit fields and its deep link populated."""
+    def stage(self, data: NotificationCreate, *, user_id: str) -> Notification:
+        """Add a new Notification to the session **without committing** it.
+
+        Exists so a caller can write a notification and something else in one
+        transaction — :class:`services.notification_dispatch.NotificationDispatcher`
+        stages the notification and its outgoing email together, so a crash can
+        never leave a notification whose email was never queued. :meth:`create`
+        is this plus the commit, which is what every other caller wants.
+
+        Args:
+            data: The notification to create; ``user_id`` on it is the recipient.
+            user_id: The acting user recorded in the audit fields.
+
+        Returns:
+            The pending instance, already populated with its id and deep link.
+            It is not refreshed from the database, since it has not been
+            written yet.
+        """
         notification = Notification.model_validate(
             {
                 **data.model_dump(),
@@ -135,6 +153,11 @@ class SqlNotificationRepository:
             }
         )
         self._db.add(notification)
+        return notification
+
+    async def create(self, data: NotificationCreate, *, user_id: str) -> Notification:
+        """Persist a new Notification with audit fields and its deep link populated."""
+        notification = self.stage(data, user_id=user_id)
         await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(notification)
         return notification

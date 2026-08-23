@@ -57,6 +57,32 @@ _DEFAULT_CLONE_TIMEOUT_SECONDS = 120
 #: their own working day will want their local zone instead.
 _DEFAULT_METRICS_TIMEZONE = "UTC"
 
+#: Sustained rate, in messages per second, at which the email queue worker hands
+#: messages to the SMTP relay. Five a second is comfortably below what a typical
+#: relay throttles at while still clearing thousands of messages an hour.
+_DEFAULT_EMAIL_RATE_PER_SECOND = 5.0
+
+#: How many messages the rate limiter lets go out back-to-back after an idle
+#: period, before the sustained rate takes over.
+_DEFAULT_EMAIL_BURST = 10
+
+#: How many messages one drain pass claims at a time. Also bounds how many
+#: messages a sender that dies mid-pass leaves waiting on their lease.
+_DEFAULT_EMAIL_BATCH_SIZE = 20
+
+#: How long the worker waits before looking again once the queue comes up empty.
+#: The floor on delivery latency for a notification produced while it sleeps.
+_DEFAULT_EMAIL_POLL_INTERVAL_SECONDS = 5.0
+
+#: How many delivery attempts a message gets before it becomes a dead letter.
+#: With the backoff in ``services.email_queue_worker`` this covers roughly an
+#: hour of relay downtime; raise it for a deployment that wants to ride out more.
+_DEFAULT_EMAIL_MAX_ATTEMPTS = 9
+
+#: How long delivered messages are kept before the worker purges them. They are
+#: an audit trail of what went out, not queue state, so this is generous.
+_DEFAULT_EMAIL_SENT_RETENTION_DAYS = 30
+
 #: How long (1 hour) an MCP approval certificate stays valid after the approval
 #: is granted. It bounds the window in which an approved task may call its bound
 #: MCP tools: long enough for a task that waits on a slow upstream, short enough
@@ -167,6 +193,23 @@ class Settings(BaseSettings):
         smtp_password: SMTP relay password.
         smtp_from_email: "From" address on outgoing notification email.
         smtp_from_name: "From" display name on outgoing notification email.
+        email_worker_in_process: Whether the API process also drains the
+            outgoing-email queue. True by default so a plain ``uvicorn main:app``
+            delivers mail with nothing else running; a deployment that runs the
+            dedicated ``worker`` process (see ``compose.yml``) sets it false.
+            Leaving both on is safe — the ``email-queue`` advisory lock still
+            elects exactly one sender — just pointless.
+        email_send_rate_per_second: Sustained messages per second handed to the
+            SMTP relay.
+        email_send_burst: How many messages may go out back-to-back after an
+            idle period before that sustained rate applies.
+        email_queue_batch_size: How many messages one drain pass claims.
+        email_queue_poll_interval_seconds: How long the worker sleeps when the
+            queue is empty.
+        email_max_attempts: Delivery attempts a message gets before it is kept
+            as a dead letter.
+        email_sent_retention_days: How long delivered messages are kept before
+            the worker purges them.
     """
 
     model_config = SettingsConfigDict(
@@ -236,6 +279,14 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from_email: str | None = None
     smtp_from_name: str | None = None
+
+    email_worker_in_process: bool = True
+    email_send_rate_per_second: float = _DEFAULT_EMAIL_RATE_PER_SECOND
+    email_send_burst: int = _DEFAULT_EMAIL_BURST
+    email_queue_batch_size: int = _DEFAULT_EMAIL_BATCH_SIZE
+    email_queue_poll_interval_seconds: float = _DEFAULT_EMAIL_POLL_INTERVAL_SECONDS
+    email_max_attempts: int = _DEFAULT_EMAIL_MAX_ATTEMPTS
+    email_sent_retention_days: int = _DEFAULT_EMAIL_SENT_RETENTION_DAYS
 
     @field_validator("cors_origins", mode="before")
     @classmethod

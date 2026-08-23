@@ -668,6 +668,63 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
+        "outbound_emails",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("notification_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("to_email", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("subject", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("body", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "pending",
+                "sending",
+                "sent",
+                "failed",
+                name="outboundemailstatus",
+            ),
+            nullable=False,
+        ),
+        sa.Column("attempts", sa.Integer(), nullable=False),
+        sa.Column("next_attempt_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("last_error", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("sent_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["notification_id"],
+            ["notifications.id"],
+            name="fk_outbound_emails_notification_id",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_outbound_emails_status_next_attempt_at",
+        "outbound_emails",
+        ["status", "next_attempt_at"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_outbound_emails_notification_id",
+        "outbound_emails",
+        ["notification_id"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_outbound_emails_tenant_id",
+        "outbound_emails",
+        ["tenant_id"],
+        unique=False,
+    )
+    op.create_table(
         "workflow_tasks",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -1312,6 +1369,12 @@ def downgrade() -> None:
     op.drop_index("ix_workflow_tasks_tenant_id", table_name="workflow_tasks")
     op.drop_index("ix_workflow_tasks_tenant_id_status", table_name="workflow_tasks")
     op.drop_table("workflow_tasks")
+    op.drop_index("ix_outbound_emails_tenant_id", table_name="outbound_emails")
+    op.drop_index("ix_outbound_emails_notification_id", table_name="outbound_emails")
+    op.drop_index(
+        "ix_outbound_emails_status_next_attempt_at", table_name="outbound_emails"
+    )
+    op.drop_table("outbound_emails")
     op.drop_index("ix_notifications_workflow_id", table_name="notifications")
     op.drop_index("ix_notifications_workflow_execution_id", table_name="notifications")
     op.drop_index("ix_notifications_user_id", table_name="notifications")

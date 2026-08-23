@@ -92,6 +92,7 @@ from routers.exception_handlers import (
     workflow_not_runnable_exception_handler,
 )
 from services.agent_skill_sync import sync_agent_skill
+from services.email_queue_worker import run_email_queue_worker
 
 # Populates os.environ from backend/.env so vendor SDKs (litellm, google-genai)
 # that read GOOGLE_API_KEY/OPENAI_API_KEY/ANTHROPIC_API_KEY/AWS_BEARER_TOKEN_BEDROCK
@@ -106,7 +107,7 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Apply pending migrations, seed the baseline users and settings, and sync the demo data.
+    """Apply pending migrations, seed the baseline data, and start the email worker.
 
     Seeds the system, root, and Default-tenant admin users and the singleton
     system-settings row, applies any ``APP_BASE_URL``/``SMTP_*`` environment
@@ -115,10 +116,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run still needs its repository cloned; that runs as a background task
     rather than inline, so a slow or unreachable remote delays nothing
     (``sync_agent_skill`` records every failure on the skill row itself).
+
+    Unless ``EMAIL_WORKER_IN_PROCESS`` is off, the outgoing-email queue worker
+    is also started here, so a plain ``uvicorn main:app`` delivers notification
+    mail with nothing else running. A deployment with the dedicated ``worker``
+    process turns it off; either way the ``email-queue`` advisory lock still
+    elects exactly one sender across the whole deployment.
     """
     await run_migrations()
-    # Holds a strong reference to the clone task for as long as the
-    # application runs, so it cannot be garbage-collected mid-flight.
+    # Holds a strong reference to the background tasks for as long as the
+    # application runs, so they cannot be garbage-collected mid-flight.
     background: set[asyncio.Task[None]] = set()
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
@@ -137,7 +144,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         background.add(clone)
         clone.add_done_callback(background.discard)
-    yield
+    email_worker: asyncio.Task[None] | None = None
+    if settings.email_worker_in_process:
+        email_worker = asyncio.create_task(run_email_queue_worker())
+        background.add(email_worker)
+        email_worker.add_done_callback(background.discard)
+    try:
+        yield
+    finally:
+        if email_worker is not None:
+            email_worker.cancel()
+            # The worker swallows its own cancellation, so this only waits for
+            # the in-flight batch to unwind rather than re-raising here.
+            await email_worker
 
 
 app = FastAPI(

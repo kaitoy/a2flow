@@ -44,12 +44,14 @@ from .repository import (
     AgentSkillRepositoryDep,
     ApprovalCertificateRepositoryDep,
     ApprovalRepositoryDep,
+    DBSessionDep,
     EffectiveRoleRepositoryDep,
     McpCertificateAuthorityRepositoryDep,
     MCPServerRepositoryDep,
     MessageMetaRepositoryDep,
     MetricsRepositoryDep,
     NotificationRepositoryDep,
+    OutboundEmailRepositoryDep,
     SecretRepositoryDep,
     SystemSettingsRepositoryDep,
     TagRepositoryDep,
@@ -65,7 +67,6 @@ from .repository import (
 )
 from .singletons import (
     AgentRegistryDep,
-    EmailSenderDep,
     SecretCipherDep,
     SessionServiceDep,
     SkillManagerDep,
@@ -154,9 +155,11 @@ def get_mcp_registry_service() -> MCPRegistryService:
 MCPRegistryServiceDep = Annotated[MCPRegistryService, Depends(get_mcp_registry_service)]
 
 
-def get_metrics_service(repo: MetricsRepositoryDep) -> MetricsService:
+def get_metrics_service(
+    repo: MetricsRepositoryDep, emails: OutboundEmailRepositoryDep
+) -> MetricsService:
     """Create a MetricsService, resolving the day-boundary timezone from settings."""
-    return MetricsService(repo, timezone=get_settings().metrics_timezone)
+    return MetricsService(repo, emails, timezone=get_settings().metrics_timezone)
 
 
 MetricsServiceDep = Annotated[MetricsService, Depends(get_metrics_service)]
@@ -185,19 +188,25 @@ SystemSettingsServiceDep = Annotated[
 
 
 def get_notification_dispatcher(
+    db: DBSessionDep,
     notifications: NotificationRepositoryDep,
     users: UserRepositoryDep,
     settings: SystemSettingsServiceDep,
-    sender: EmailSenderDep,
+    emails: OutboundEmailRepositoryDep,
 ) -> NotificationDispatcher:
     """Create a NotificationDispatcher backed by the request's collaborators.
+
+    Takes the session as well as the repositories: the dispatcher writes the
+    notification and its queued email in one transaction, so it owns the commit
+    (see :mod:`services.notification_dispatch`). FastAPI caches ``Depends``
+    results per request, so this is the same session the repositories hold.
 
     Request-scoped counterpart of
     :func:`services.notification_dispatch.build_notification_dispatcher`, which
     the agent tools and background jobs use because they run outside request
     scope.
     """
-    return NotificationDispatcher(notifications, users, settings, sender)
+    return NotificationDispatcher(db, notifications, users, settings, emails)
 
 
 NotificationDispatcherDep = Annotated[

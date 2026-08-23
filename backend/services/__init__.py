@@ -4,6 +4,11 @@ from .approval import ApprovalService
 from .approval_certificate import ApprovalCertificateService
 from .approver_groups import ApproverGroupResolver
 from .auth import AuthService
+from .email_queue_worker import (
+    EmailQueueConfig,
+    EmailQueueWorker,
+    run_email_queue_worker,
+)
 from .impersonation import ImpersonationService
 from .mcp_registry import MCPRegistryService
 from .mcp_server import MCPServerService
@@ -34,6 +39,8 @@ __all__ = [
     "ApprovalService",
     "ApproverGroupResolver",
     "AuthService",
+    "EmailQueueConfig",
+    "EmailQueueWorker",
     "ImpersonationService",
     "MCPRegistryService",
     "MCPServerService",
@@ -56,5 +63,6 @@ __all__ = [
     "WorkflowTaskTemplateService",
     "build_notification_dispatcher",
     "generate_workflow_design",
+    "run_email_queue_worker",
     "sync_agent_skill",
 ]
