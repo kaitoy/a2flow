@@ -12,6 +12,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { StatusCard } from "@/components/admin/status-card";
 import { WorkflowExecutionStatusLabel } from "@/components/admin/workflow-execution-status";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
@@ -145,6 +146,9 @@ export default function WorkflowExecutionDetailPage() {
         }
         aside={audit && <AuditMeta {...audit} />}
       >
+        <StatusCard ariaLabel="Workflow execution status">
+          <WorkflowExecutionStatusLabel status={session.status} />
+        </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
             <DetailItem
@@ -161,10 +165,6 @@ export default function WorkflowExecutionDetailPage() {
                   session.name
                 )
               }
-            />
-            <DetailItem
-              label="Status"
-              value={<WorkflowExecutionStatusLabel status={session.status} />}
             />
             <DetailItem label="Description" value={session.description || EMPTY_VALUE} />
             <DetailItem

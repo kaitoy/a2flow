@@ -55,6 +55,13 @@ describe("WorkflowExecutionDetailPage", () => {
     expect(await screen.findByText("completed")).toBeInTheDocument();
   });
 
+  it("shows the status in its own status card", async () => {
+    render(<WorkflowExecutionDetailPage />);
+    await screen.findByRole("heading", { name: "My Workflow" });
+    const card = screen.getByRole("region", { name: "Workflow execution status" });
+    expect(within(card).getByText("completed")).toBeInTheDocument();
+  });
+
   it("navigates to the task list from the header action", async () => {
     const user = userEvent.setup();
     const pushMock = vi.fn();

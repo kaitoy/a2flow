@@ -11,6 +11,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { StatusCard } from "@/components/admin/status-card";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -173,14 +174,11 @@ export default function WorkflowTaskDetailPage() {
         }
         aside={audit && <AuditMeta {...audit} />}
       >
+        <StatusCard ariaLabel="Workflow task status">
+          <StatusDot dotClass={STATUS_DOT_CLASS[status]} label={formatStatusLabel(status)} />
+        </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
-            <DetailItem
-              label="Status"
-              value={
-                <StatusDot dotClass={STATUS_DOT_CLASS[status]} label={formatStatusLabel(status)} />
-              }
-            />
             <DetailItem label="Description" value={task.description || EMPTY_VALUE} />
             <DetailItem
               label="Depends on"

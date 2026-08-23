@@ -44,6 +44,13 @@ describe("WorkflowTaskDetailPage", () => {
     expect(await screen.findByText("pending")).toBeInTheDocument();
   });
 
+  it("shows the status in its own status card", async () => {
+    render(<WorkflowTaskDetailPage />);
+    await screen.findByRole("heading", { name: "Step 1" });
+    const card = screen.getByRole("region", { name: "Workflow task status" });
+    expect(within(card).getByText("pending")).toBeInTheDocument();
+  });
+
   it("resolves a dependency id to its title as a chip", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflow-tasks/:taskId", () =>
