@@ -18,6 +18,7 @@ from .notification_dispatch import (
     NotificationDispatcher,
     build_notification_dispatcher,
 )
+from .outbound_email import OutboundEmailService
 from .secret import SecretService
 from .system_settings import SystemSettingsService
 from .tag import TagService
@@ -48,6 +49,7 @@ __all__ = [
     "MetricsWindow",
     "NotificationDispatcher",
     "NotificationService",
+    "OutboundEmailService",
     "SecretService",
     "SystemSettingsService",
     "TagService",

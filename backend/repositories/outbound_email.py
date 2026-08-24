@@ -9,6 +9,7 @@ The queue is drained platform-wide through a single relay, so it cannot be
 scoped to a tenant at all; see :mod:`repositories.outbound_email_queue`.
 """
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol
 
@@ -19,18 +20,34 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.outbound_email import (
     OutboundEmail,
     OutboundEmailCreate,
+    OutboundEmailRead,
     OutboundEmailStatus,
 )
+from repositories.exceptions import NotFoundError
+from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
 
 class OutboundEmailRepository(Protocol):
-    """Interface for enqueuing outgoing email and reporting on the backlog."""
+    """Interface for enqueuing outgoing email, reporting on the backlog, and the super_admin read/delete API."""
 
     def stage(self, data: OutboundEmailCreate, *, user_id: str) -> OutboundEmail: ...
 
     async def counts_by_status(self) -> dict[OutboundEmailStatus, int]: ...
 
     async def oldest_pending_age_seconds(self, *, now: datetime) -> float | None: ...
+
+    async def get(self, email_id: str) -> OutboundEmailRead | None: ...
+
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[OutboundEmailRead]: ...
+
+    async def delete(self, email_id: str) -> None: ...
 
 
 class SqlOutboundEmailRepository:
@@ -115,6 +132,58 @@ class SqlOutboundEmailRepository:
         if oldest is None:
             return None
         return max((now - _as_aware(oldest, now)).total_seconds(), 0.0)
+
+    async def _get_scoped(self, email_id: str) -> OutboundEmail | None:
+        """Return the row when it belongs to this repository's tenant, else None."""
+        stmt = select(OutboundEmail).where(
+            OutboundEmail.id == email_id, OutboundEmail.tenant_id == self._tenant_id
+        )
+        return (await self._db.exec(stmt)).first()
+
+    async def get(self, email_id: str) -> OutboundEmailRead | None:
+        """Return the OutboundEmail with the given ID, resolved into a read model, or None."""
+        email = await self._get_scoped(email_id)
+        if email is None:
+            return None
+        return OutboundEmailRead.model_validate(email)
+
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[OutboundEmailRead]:
+        """Return a page of this tenant's queue rows, defaulting to createdAt descending."""
+        stmt = select(OutboundEmail).where(OutboundEmail.tenant_id == self._tenant_id)
+        stmt = apply_filters(stmt, OutboundEmail, filters, readable=OutboundEmailRead)
+        stmt = apply_sort(
+            stmt,
+            OutboundEmail,
+            sort,
+            default=[col(OutboundEmail.created_at).desc()],
+            readable=OutboundEmailRead,
+        )
+        result = await self._db.exec(stmt.limit(limit).offset(offset))
+        return [OutboundEmailRead.model_validate(row) for row in result.all()]
+
+    async def delete(self, email_id: str) -> None:
+        """Delete an OutboundEmail row unconditionally.
+
+        The terminal-status precondition (only ``sent``/``failed`` rows may be
+        deleted) is enforced by :class:`services.outbound_email.OutboundEmailService`,
+        not here -- this method only does the tenant-scoped existence check and
+        deletion, matching every other repository's ``delete``.
+
+        Raises:
+            NotFoundError: If no row with that id exists in this tenant.
+        """
+        email = await self._get_scoped(email_id)
+        if email is None:
+            raise NotFoundError("OutboundEmail", email_id)
+        await self._db.delete(email)
+        await self._db.commit()
 
 
 def _as_aware(value: datetime, reference: datetime) -> datetime:

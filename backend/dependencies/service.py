@@ -22,6 +22,7 @@ from services import (
     MetricsService,
     NotificationDispatcher,
     NotificationService,
+    OutboundEmailService,
     SecretService,
     SystemSettingsService,
     TagService,
@@ -211,6 +212,18 @@ def get_notification_dispatcher(
 
 NotificationDispatcherDep = Annotated[
     NotificationDispatcher, Depends(get_notification_dispatcher)
+]
+
+
+def get_outbound_email_service(
+    repo: OutboundEmailRepositoryDep,
+) -> OutboundEmailService:
+    """Create an OutboundEmailService backed by the request's tenant-scoped repository."""
+    return OutboundEmailService(repo)
+
+
+OutboundEmailServiceDep = Annotated[
+    OutboundEmailService, Depends(get_outbound_email_service)
 ]
 
 

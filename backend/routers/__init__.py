@@ -11,6 +11,7 @@ from routers import (
     mcp_servers,
     metrics,
     notifications,
+    outbound_emails,
     secrets,
     sessions,
     system_settings,
@@ -44,6 +45,7 @@ api_router.include_router(mcp_registry.router, dependencies=_protected)
 api_router.include_router(mcp_servers.router, dependencies=_protected)
 api_router.include_router(metrics.router, dependencies=_protected)
 api_router.include_router(notifications.router, dependencies=_protected)
+api_router.include_router(outbound_emails.router, dependencies=_protected)
 api_router.include_router(secrets.router, dependencies=_protected)
 api_router.include_router(sessions.router, dependencies=_protected)
 api_router.include_router(system_settings.router, dependencies=_protected)

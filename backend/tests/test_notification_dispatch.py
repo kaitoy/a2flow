@@ -7,7 +7,7 @@ should not receive mail are skipped before anything is queued, and a failure on
 the email side never costs the notification.
 """
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -29,6 +29,7 @@ from models.notification import (
 from models.outbound_email import (
     OutboundEmail,
     OutboundEmailCreate,
+    OutboundEmailRead,
     OutboundEmailStatus,
 )
 from models.system_settings import (
@@ -44,6 +45,7 @@ from repositories import (
     SqlSystemSettingsRepository,
     SqlUserRepository,
 )
+from repositories.query import FilterSpec, SortSpec
 from services.notification_dispatch import (
     NotificationDispatcher,
     _deep_link,
@@ -383,6 +385,22 @@ async def test_notification_survives_a_failure_on_the_email_side(
 
         async def oldest_pending_age_seconds(self, *, now: datetime) -> float | None:
             raise AssertionError("the dispatcher never reports on the queue")
+
+        async def get(self, email_id: str) -> OutboundEmailRead | None:
+            raise AssertionError("the dispatcher never reads a single row")
+
+        async def list(
+            self,
+            *,
+            limit: int,
+            offset: int,
+            sort: Sequence[SortSpec] = (),
+            filters: Sequence[FilterSpec] = (),
+        ) -> list[OutboundEmailRead]:
+            raise AssertionError("the dispatcher never lists the queue")
+
+        async def delete(self, email_id: str) -> None:
+            raise AssertionError("the dispatcher never deletes a row")
 
     await _seed(session)
     await _enable_smtp(session)

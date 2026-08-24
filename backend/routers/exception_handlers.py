@@ -26,6 +26,7 @@ from repositories.exceptions import (
     McpConnectionError,
     McpServerValidationError,
     NotFoundError,
+    OutboundEmailNotDeletableError,
     QueryValidationError,
     ReferencedError,
     RegistryUnavailableError,
@@ -333,6 +334,20 @@ async def approval_already_resolved_exception_handler(
         message=str(exc),
         status_code=409,
         details={"approvalId": exc.approval_id, "status": exc.status},
+    )
+
+
+async def outbound_email_not_deletable_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 409 with OUTBOUND_EMAIL_NOT_DELETABLE when a row is not terminal."""
+    assert isinstance(exc, OutboundEmailNotDeletableError)
+    return _envelope_error(
+        request,
+        code="OUTBOUND_EMAIL_NOT_DELETABLE",
+        message=str(exc),
+        status_code=409,
+        details={"outboundEmailId": exc.email_id, "status": exc.status},
     )
 
 

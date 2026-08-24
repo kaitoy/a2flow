@@ -18,19 +18,22 @@ There is no ``OutboundEmailUpdate``: the table has no PATCH surface. Every
 mutation after insert is a named lifecycle step on
 :class:`repositories.outbound_email_queue.SqlOutboundEmailQueue` (claim, mark
 sent, reschedule, mark failed), which is also the only place the ``status``
-transitions below are allowed to happen.
+transitions below are allowed to happen. There is a read view,
+:class:`OutboundEmailRead`, backing the super_admin-only List/Get/Delete API
+(see :mod:`routers.outbound_emails`) — "no PATCH surface" does not mean
+"no read surface".
 """
 
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from pydantic import EmailStr
+from pydantic import EmailStr, field_serializer
 from pydantic.alias_generators import to_camel
 from sqlalchemy import ForeignKeyConstraint, Index
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity, TZDateTime
+from models.base import BaseEntity, TZDateTime, iso_z, iso_z_or_none
 from models.constraints import BodyText, ShortText
 from models.tenant_scoped import TenantScoped
 
@@ -107,3 +110,37 @@ class OutboundEmail(OutboundEmailCreate, TenantScoped, BaseEntity, table=True):
             name="fk_outbound_emails_notification_id",
         ),
     )
+
+
+class OutboundEmailRead(BaseEntity):
+    """Read view of an OutboundEmail returned by the super_admin-only queue API.
+
+    Mirrors every persisted scalar field 1:1 -- nothing here is sensitive or
+    derived, unlike ``SecretRead``/``UserRead``, so every field is safely
+    filterable and sortable through :func:`repositories.query.apply_filters`/
+    :func:`~repositories.query.apply_sort`.
+    """
+
+    model_config = _alias_config
+
+    tenant_id: str
+    notification_id: str | None = None
+    to_email: str
+    subject: str
+    body: str
+    status: OutboundEmailStatus
+    attempts: int
+    next_attempt_at: datetime
+    lease_expires_at: datetime | None = None
+    last_error: str | None = None
+    sent_at: datetime | None = None
+
+    @field_serializer("next_attempt_at", when_used="json")
+    def _serialize_next_attempt_at(self, dt: datetime) -> str:
+        """Serialize as ISO-8601 with a ``Z`` suffix."""
+        return iso_z(dt)
+
+    @field_serializer("lease_expires_at", "sent_at", when_used="json")
+    def _serialize_optional_datetime(self, dt: datetime | None) -> str | None:
+        """Serialize as ISO-8601 with a ``Z`` suffix, or ``None`` when unset."""
+        return iso_z_or_none(dt)

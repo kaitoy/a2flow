@@ -40,6 +40,7 @@ from repositories.exceptions import (
     McpConnectionError,
     McpServerValidationError,
     NotFoundError,
+    OutboundEmailNotDeletableError,
     QueryValidationError,
     ReferencedError,
     RegistryUnavailableError,
@@ -71,6 +72,7 @@ from routers.exception_handlers import (
     mcp_connection_exception_handler,
     mcp_server_validation_exception_handler,
     not_found_exception_handler,
+    outbound_email_not_deletable_exception_handler,
     query_validation_exception_handler,
     referenced_exception_handler,
     registry_unavailable_exception_handler,
@@ -220,6 +222,9 @@ app.add_exception_handler(
 )
 app.add_exception_handler(
     WorkflowNotDeactivatableError, workflow_not_deactivatable_exception_handler
+)
+app.add_exception_handler(
+    OutboundEmailNotDeletableError, outbound_email_not_deletable_exception_handler
 )
 app.add_exception_handler(
     WorkflowDescriptionNotGeneratableError,

@@ -413,6 +413,27 @@ class SessionRunInProgressError(RepositoryError):
         )
 
 
+class OutboundEmailNotDeletableError(RepositoryError):
+    """Raised when deleting an OutboundEmail row that is not in a terminal status.
+
+    A ``pending``/``sending`` row may be actively claimed by the queue worker
+    (see :mod:`repositories.outbound_email_queue`); only ``sent``/``failed``
+    rows -- the terminal states -- may be deleted through the super_admin API.
+
+    Carries the ``email_id`` and the ``status`` found so the HTTP layer can
+    surface both in the error envelope's ``details`` block when returning
+    HTTP 409.
+    """
+
+    def __init__(self, email_id: str, status: str) -> None:
+        self.email_id = email_id
+        self.status = status
+        super().__init__(
+            f"OutboundEmail {email_id!r} cannot be deleted while its status "
+            f"is {status!r}; only 'sent' or 'failed' rows may be deleted"
+        )
+
+
 class QueryValidationError(RepositoryError):
     """Raised when a sort or filter query parameter is malformed or references an unknown field.
 
