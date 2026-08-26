@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends
 from dependencies import (
     ApiMetaDep,
     CurrentUserIdDep,
+    WorkflowTaskTemplateReadServiceDep,
     WorkflowTaskTemplateServiceDep,
     require_roles,
 )
@@ -50,7 +51,7 @@ async def create_workflow_task_template(
 @router.get("/{template_id}", response_model=ApiResponse[WorkflowTaskTemplateRead])
 async def get_workflow_task_template(
     template_id: str,
-    service: WorkflowTaskTemplateServiceDep,
+    service: WorkflowTaskTemplateReadServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowTaskTemplateRead]:
     """Return the template with the given ID, or HTTP 404 if missing."""

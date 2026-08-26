@@ -20,6 +20,7 @@ from dependencies import (
     ApiMetaDep,
     CurrentUserDep,
     EffectiveRolesDep,
+    WorkflowTaskReadServiceDep,
     WorkflowTaskServiceDep,
 )
 from models.response import ApiResponse
@@ -51,7 +52,7 @@ async def create_workflow_task(
 @router.get("/{task_id}", response_model=ApiResponse[WorkflowTaskRead])
 async def get_workflow_task(
     task_id: str,
-    service: WorkflowTaskServiceDep,
+    service: WorkflowTaskReadServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,

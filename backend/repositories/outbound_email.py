@@ -53,10 +53,22 @@ class OutboundEmailRepository(Protocol):
 class SqlOutboundEmailRepository:
     """SQLModel-backed implementation of OutboundEmailRepository."""
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the SQLModel async session and the tenant these queries are scoped to."""
         self._db = session
         self._tenant_id = tenant_id
+
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
 
     def stage(self, data: OutboundEmailCreate, *, user_id: str) -> OutboundEmail:
         """Add a delivery request to the session **without committing** it.
@@ -77,7 +89,7 @@ class SqlOutboundEmailRepository:
         email = OutboundEmail.model_validate(
             {
                 **data.model_dump(),
-                "tenant_id": self._tenant_id,
+                "tenant_id": self._require_tenant(),
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -134,10 +146,17 @@ class SqlOutboundEmailRepository:
         return max((now - _as_aware(oldest, now)).total_seconds(), 0.0)
 
     async def _get_scoped(self, email_id: str) -> OutboundEmail | None:
-        """Return the row when it belongs to this repository's tenant, else None."""
-        stmt = select(OutboundEmail).where(
-            OutboundEmail.id == email_id, OutboundEmail.tenant_id == self._tenant_id
-        )
+        """Return the row when it belongs to this repository's tenant, else None.
+
+        ``tenant_id=None`` means "all tenants" (see ``get_current_tenant_scope``
+        in ``dependencies/auth.py``), so the tenant filter is dropped entirely
+        rather than compared against ``None`` -- ``Column == None`` compiles to
+        ``IS NULL`` in SQL and would match nothing, since ``tenant_id`` is
+        non-nullable.
+        """
+        stmt = select(OutboundEmail).where(OutboundEmail.id == email_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(OutboundEmail.tenant_id == self._tenant_id)
         return (await self._db.exec(stmt)).first()
 
     async def get(self, email_id: str) -> OutboundEmailRead | None:
@@ -155,8 +174,13 @@ class SqlOutboundEmailRepository:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> list[OutboundEmailRead]:
-        """Return a page of this tenant's queue rows, defaulting to createdAt descending."""
-        stmt = select(OutboundEmail).where(OutboundEmail.tenant_id == self._tenant_id)
+        """Return a page of this tenant's queue rows, defaulting to createdAt descending.
+
+        ``tenant_id=None`` means "all tenants" -- see the note on ``_get_scoped``.
+        """
+        stmt = select(OutboundEmail)
+        if self._tenant_id is not None:
+            stmt = stmt.where(OutboundEmail.tenant_id == self._tenant_id)
         stmt = apply_filters(stmt, OutboundEmail, filters, readable=OutboundEmailRead)
         stmt = apply_sort(
             stmt,

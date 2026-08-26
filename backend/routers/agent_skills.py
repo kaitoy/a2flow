@@ -3,6 +3,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from dependencies import (
+    AgentSkillReadServiceDep,
     AgentSkillServiceDep,
     ApiMetaDep,
     CurrentUserIdDep,
@@ -118,7 +119,7 @@ async def generate_workflow(
 
 @router.get("", response_model=ApiResponse[list[AgentSkillRead]])
 async def list_agent_skills(
-    service: AgentSkillServiceDep,
+    service: AgentSkillReadServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -138,7 +139,7 @@ async def list_agent_skills(
 @router.get("/{skill_id}", response_model=ApiResponse[AgentSkillRead])
 async def get_agent_skill(
     skill_id: str,
-    service: AgentSkillServiceDep,
+    service: AgentSkillReadServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[AgentSkillRead]:
     skill = await service.get(skill_id)

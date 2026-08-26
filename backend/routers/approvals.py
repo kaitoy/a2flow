@@ -24,7 +24,8 @@ from fastapi import APIRouter
 
 from dependencies import (
     ApiMetaDep,
-    ApprovalCertificateServiceDep,
+    ApprovalCertificateReadServiceDep,
+    ApprovalReadServiceDep,
     ApprovalServiceDep,
     BacklogThresholdDep,
     CurrentUserDep,
@@ -44,7 +45,7 @@ router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 @router.get("", response_model=ApiResponse[list[Approval]])
 async def list_approvals(
-    service: ApprovalServiceDep,
+    service: ApprovalReadServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,
@@ -113,7 +114,7 @@ async def approval_backlog_by_workflow(
 @router.get("/{approval_id}", response_model=ApiResponse[Approval])
 async def get_approval(
     approval_id: str,
-    service: ApprovalServiceDep,
+    service: ApprovalReadServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Approval]:
     """Return the Approval record for the given ID."""
@@ -126,7 +127,7 @@ async def get_approval(
 )
 async def get_approval_certificate(
     approval_id: str,
-    service: ApprovalCertificateServiceDep,
+    service: ApprovalCertificateReadServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[ApprovalCertificateRead]:
     """Return the certificate issued when this approval was granted.

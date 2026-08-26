@@ -72,17 +72,29 @@ class SqlMCPServerRepository:
     bindings (``ondelete=RESTRICT``).
     """
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the SQLModel session and the tenant these operations are scoped to."""
         self._db = session
         self._tenant_id = tenant_id
         self._tags = TagLinks(session, McpServerTag, tenant_id=tenant_id)
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, server_id: str) -> MCPServer | None:
         """Return the MCPServer with the given ID within the current tenant, or ``None``."""
-        stmt = select(MCPServer).where(
-            MCPServer.id == server_id, MCPServer.tenant_id == self._tenant_id
-        )
+        stmt = select(MCPServer).where(MCPServer.id == server_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(MCPServer.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -109,7 +121,9 @@ class SqlMCPServerRepository:
         It is applied before the page window, so paging stays consistent with
         the filter.
         """
-        stmt = select(MCPServer).where(MCPServer.tenant_id == self._tenant_id)
+        stmt = select(MCPServer)
+        if self._tenant_id is not None:
+            stmt = stmt.where(MCPServer.tenant_id == self._tenant_id)
         for clause in self._tags.filter_clauses(col(MCPServer.id), tag_ids):
             stmt = stmt.where(clause)
         stmt = apply_filters(stmt, MCPServer, filters, readable=McpServerRead)
@@ -128,7 +142,7 @@ class SqlMCPServerRepository:
         server = MCPServer.model_validate(
             {
                 **data.model_dump(),
-                "tenant_id": self._tenant_id,
+                "tenant_id": self._require_tenant(),
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -148,6 +162,7 @@ class SqlMCPServerRepository:
         self, server_id: str, data: MCPServerUpdate, *, user_id: str
     ) -> MCPServer:
         """Apply a partial update, raising NotFoundError or UniqueViolationError."""
+        self._require_tenant()
         server = await self._get_scoped(server_id)
         if server is None:
             raise NotFoundError("MCPServer", server_id)
@@ -169,6 +184,7 @@ class SqlMCPServerRepository:
 
     async def delete(self, server_id: str) -> None:
         """Delete the MCPServer, raising ReferencedError while tool bindings remain."""
+        self._require_tenant()
         server = await self._get_scoped(server_id)
         if server is None:
             raise NotFoundError("MCPServer", server_id)
@@ -205,6 +221,7 @@ class SqlMCPServerRepository:
             ForeignKeyViolationError: If any id does not name a tag of this
                 tenant.
         """
+        self._require_tenant()
         server = await self._get_scoped(server_id)
         if server is None:
             raise NotFoundError("MCPServer", server_id)

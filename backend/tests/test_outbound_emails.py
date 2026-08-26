@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from dependencies.auth import ALL_TENANTS_SENTINEL, TENANT_HEADER_NAME
 from infrastructure.bootstrap import seed_system_user
 from models.outbound_email import (
     OutboundEmail,
@@ -267,3 +268,53 @@ async def test_delete_unknown_row_returns_404(
     assert_err(
         await client.delete(f"{_PATH}/does-not-exist"), code="NOT_FOUND", status=404
     )
+
+
+# ---------- all-tenants read mode ----------
+
+
+def _all_tenants_headers() -> dict[str, str]:
+    return {"X-User-Tenant-Id": "", TENANT_HEADER_NAME: ALL_TENANTS_SENTINEL}
+
+
+async def test_all_tenants_list_spans_every_tenant(
+    outbound_email_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A platform-scoped super_admin selecting "all tenants" sees every tenant's rows."""
+    client, engine = outbound_email_env
+    email_a = await _seed_email(engine, tenant_id=DEFAULT_TEST_TENANT_ID)
+    email_b = await _seed_email(engine, tenant_id=OTHER_TENANT_ID)
+
+    body = assert_ok(await client.get(_PATH, headers=_all_tenants_headers()))
+    ids = {row["id"] for row in body}
+    assert email_a in ids
+    assert email_b in ids
+
+
+async def test_all_tenants_get_reaches_any_tenants_row(
+    outbound_email_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Fetching a single row by id works across tenants in "all tenants" mode."""
+    client, engine = outbound_email_env
+    email_id = await _seed_email(engine, tenant_id=OTHER_TENANT_ID)
+
+    body = assert_ok(
+        await client.get(f"{_PATH}/{email_id}", headers=_all_tenants_headers())
+    )
+    assert body["id"] == email_id
+
+
+async def test_all_tenants_rejects_delete(
+    outbound_email_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Delete stays on the strict resolver, so "all tenants" 403s it like any write."""
+    client, engine = outbound_email_env
+    email_id = await _seed_email(
+        engine, tenant_id=OTHER_TENANT_ID, status=OutboundEmailStatus.sent
+    )
+    assert_err(
+        await client.delete(f"{_PATH}/{email_id}", headers=_all_tenants_headers()),
+        code="FORBIDDEN",
+        status=403,
+    )
+    assert await _get_row(engine, email_id) is not None

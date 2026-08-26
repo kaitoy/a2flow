@@ -37,8 +37,9 @@ from dependencies import (
     SortDep,
     TagFilterDep,
     WorkflowDesignServiceDep,
+    WorkflowReadServiceDep,
     WorkflowServiceDep,
-    WorkflowTaskTemplateServiceDep,
+    WorkflowTaskTemplateReadServiceDep,
     require_roles,
 )
 from infrastructure.agent import tenant_app_name, with_user_id
@@ -65,7 +66,7 @@ _requires_execute = [Depends(require_roles(Role.requester, Role.developer))]
 
 @router.get("", response_model=ApiResponse[list[WorkflowRead]])
 async def list_workflows(
-    service: WorkflowServiceDep,
+    service: WorkflowReadServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -93,7 +94,7 @@ async def list_workflows(
 @router.get("/{workflow_id}", response_model=ApiResponse[WorkflowRead])
 async def get_workflow(
     workflow_id: str,
-    service: WorkflowServiceDep,
+    service: WorkflowReadServiceDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowRead]:
@@ -109,7 +110,7 @@ async def get_workflow(
 )
 async def list_workflow_task_templates(
     workflow_id: str,
-    service: WorkflowTaskTemplateServiceDep,
+    service: WorkflowTaskTemplateReadServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,

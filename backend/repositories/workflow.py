@@ -88,17 +88,33 @@ class SqlWorkflowRepository:
     """
 
     def __init__(
-        self, session: AsyncSession, skills: AgentSkillRepository, *, tenant_id: str
+        self,
+        session: AsyncSession,
+        skills: AgentSkillRepository,
+        *,
+        tenant_id: str | None,
     ) -> None:
         self._db = session
         self._skills = skills
         self._tenant_id = tenant_id
         self._tags = TagLinks(session, WorkflowTag, tenant_id=tenant_id)
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, workflow_id: str) -> Workflow | None:
-        stmt = select(Workflow).where(
-            Workflow.id == workflow_id, Workflow.tenant_id == self._tenant_id
-        )
+        stmt = select(Workflow).where(Workflow.id == workflow_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Workflow.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -147,7 +163,9 @@ class SqlWorkflowRepository:
         tag. It is applied before the page window, so paging stays consistent
         with the filter.
         """
-        stmt = select(Workflow).where(Workflow.tenant_id == self._tenant_id)
+        stmt = select(Workflow)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Workflow.tenant_id == self._tenant_id)
         for clause in self._tags.filter_clauses(col(Workflow.id), tag_ids):
             stmt = stmt.where(clause)
         stmt = apply_filters(stmt, Workflow, filters, readable=WorkflowRead)
@@ -183,12 +201,13 @@ class SqlWorkflowRepository:
 
     async def create(self, data: WorkflowCreate, *, user_id: str) -> Workflow:
         """Create a new Workflow, raising UniqueViolationError on duplicate name."""
+        tenant_id = self._require_tenant()
         if not await self._skills.exists(data.agent_skill_id):
             raise ForeignKeyViolationError("AgentSkill", data.agent_skill_id)
         workflow = Workflow.model_validate(
             {
                 **data.model_dump(),
-                "tenant_id": self._tenant_id,
+                "tenant_id": tenant_id,
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -208,6 +227,7 @@ class SqlWorkflowRepository:
         self, workflow_id: str, data: WorkflowUpdate, *, user_id: str
     ) -> Workflow:
         """Apply a partial update, raising NotFoundError or UniqueViolationError."""
+        self._require_tenant()
         workflow = await self._get_scoped(workflow_id)
         if workflow is None:
             raise NotFoundError("Workflow", workflow_id)
@@ -260,6 +280,7 @@ class SqlWorkflowRepository:
         Raises:
             NotFoundError: If no workflow exists with the given ID.
         """
+        self._require_tenant()
         workflow = await self._get_scoped(workflow_id)
         if workflow is None:
             raise NotFoundError("Workflow", workflow_id)
@@ -289,6 +310,7 @@ class SqlWorkflowRepository:
             workflow_id: Identifier of the workflow that was edited.
             user_id: ID of the acting user recorded on ``updated_by``.
         """
+        self._require_tenant()
         workflow = await self._get_scoped(workflow_id)
         if workflow is None or workflow.status is not WorkflowStatus.published:
             return
@@ -321,6 +343,7 @@ class SqlWorkflowRepository:
             workflow_id: Identifier of the workflow whose templates changed.
             user_id: ID of the acting user recorded on ``updated_by``.
         """
+        self._require_tenant()
         workflow = await self._get_scoped(workflow_id)
         if workflow is None:
             return
@@ -336,6 +359,7 @@ class SqlWorkflowRepository:
         await commit_or_translate_user_fk(self._db, user_id=user_id)
 
     async def delete(self, workflow_id: str) -> None:
+        self._require_tenant()
         workflow = await self._get_scoped(workflow_id)
         if workflow is None:
             raise NotFoundError("Workflow", workflow_id)
@@ -372,6 +396,7 @@ class SqlWorkflowRepository:
             ForeignKeyViolationError: If any id does not name a tag of this
                 tenant.
         """
+        self._require_tenant()
         workflow = await self._get_scoped(workflow_id)
         if workflow is None:
             raise NotFoundError("Workflow", workflow_id)

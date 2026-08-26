@@ -66,7 +66,7 @@ class SqlApprovalRepository:
         execution_repo: WorkflowExecutionRepository,
         group_repo: UserGroupRepository,
         *,
-        tenant_id: str,
+        tenant_id: str | None,
     ) -> None:
         """Store the async session and the collaborator repositories.
 
@@ -83,11 +83,23 @@ class SqlApprovalRepository:
         self._group_repo = group_repo
         self._tenant_id = tenant_id
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, approval_id: str) -> Approval | None:
         """Return the Approval with the given ID within the current tenant, or ``None``."""
-        stmt = select(Approval).where(
-            Approval.id == approval_id, Approval.tenant_id == self._tenant_id
-        )
+        stmt = select(Approval).where(Approval.id == approval_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Approval.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -126,7 +138,9 @@ class SqlApprovalRepository:
         Returns:
             The matching approvals.
         """
-        stmt = select(Approval).where(Approval.tenant_id == self._tenant_id)
+        stmt = select(Approval)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Approval.tenant_id == self._tenant_id)
         if visible_to_user_id is not None:
             clauses = [
                 col(Approval.approver) == visible_to_user_id,
@@ -169,6 +183,7 @@ class SqlApprovalRepository:
                 match an existing user, or ``approver_group_id`` is set but
                 does not match a group in this tenant.
         """
+        tenant_id = self._require_tenant()
         if await self._execution_repo.get(data.workflow_execution_id) is None:
             raise ForeignKeyViolationError(
                 "WorkflowExecution", data.workflow_execution_id
@@ -185,7 +200,7 @@ class SqlApprovalRepository:
         approval = Approval.model_validate(
             {
                 **data.model_dump(),
-                "tenant_id": self._tenant_id,
+                "tenant_id": tenant_id,
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -199,6 +214,7 @@ class SqlApprovalRepository:
         self, approval_id: str, data: ApprovalUpdate, *, user_id: str
     ) -> Approval:
         """Apply a partial update to an Approval, raising NotFoundError if missing."""
+        self._require_tenant()
         approval = await self._get_scoped(approval_id)
         if approval is None:
             raise NotFoundError("Approval", approval_id)
@@ -235,6 +251,7 @@ class SqlApprovalRepository:
         Raises:
             NotFoundError: If the approval does not exist in this tenant.
         """
+        self._require_tenant()
         approval = await self._get_scoped(approval_id)
         if approval is None:
             raise NotFoundError("Approval", approval_id)

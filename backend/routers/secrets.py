@@ -24,6 +24,7 @@ from dependencies import (
     CurrentUserIdDep,
     FilterDep,
     PaginationDep,
+    SecretReadServiceDep,
     SecretServiceDep,
     SortDep,
     TagFilterDep,
@@ -58,7 +59,7 @@ async def create_secret(
 
 @router.get("", response_model=ApiResponse[list[SecretRead]])
 async def list_secrets(
-    service: SecretServiceDep,
+    service: SecretReadServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -78,7 +79,7 @@ async def list_secrets(
 @router.get("/{secret_id}", response_model=ApiResponse[SecretRead])
 async def get_secret(
     secret_id: str,
-    service: SecretServiceDep,
+    service: SecretReadServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[SecretRead]:
     secret = await service.get(secret_id)
@@ -88,7 +89,7 @@ async def get_secret(
 @router.get("/{secret_id}/keys", response_model=ApiResponse[list[str]])
 async def list_secret_keys(
     secret_id: str,
-    service: SecretServiceDep,
+    service: SecretReadServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[str]]:
     keys = await service.list_keys(secret_id)

@@ -315,7 +315,7 @@ class UserService:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
         acting_user: User,
-        acting_tenant_id: str,
+        acting_tenant_id: str | None,
     ) -> list[User]:
         """Return a page of User records visible to the acting user.
 
@@ -324,10 +324,14 @@ class UserService:
         combines with (never widens) whatever the caller supplied. A super
         admin is instead scoped to the tenant they are currently acting as
         (``acting_tenant_id``, resolved from the ``X-Tenant-Id`` header via
-        the app bar's tenant switcher -- see ``CurrentTenantIdDep``), plus
+        the app bar's tenant switcher -- see ``CurrentTenantScopeDep``), plus
         every ``super_admin`` user platform-wide regardless of tenant; this
         OR-scope can't be expressed as a ``FilterSpec`` (AND-only), so it's
         applied by the repository via ``visible_tenant_id`` instead.
+        ``acting_tenant_id`` of ``None`` means the super admin has selected
+        "all tenants": ``UserRepository.list`` already treats a ``None``
+        ``visible_tenant_id`` as no restriction at all, so this passes through
+        unchanged.
 
         Args:
             limit: Maximum number of records to return.
@@ -337,7 +341,8 @@ class UserService:
             acting_user: The authenticated user making the request.
             acting_tenant_id: The tenant the request is scoped to -- the
                 caller's own tenant, or, for a super admin, the tenant
-                currently selected via the app bar's tenant switcher.
+                currently selected via the app bar's tenant switcher (or
+                ``None`` for "all tenants").
 
         Returns:
             The requested page of users.

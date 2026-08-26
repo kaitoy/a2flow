@@ -11,6 +11,7 @@ from dependencies import (
     ApiMetaDep,
     CurrentUserIdDep,
     FilterDep,
+    NotificationReadServiceDep,
     NotificationServiceDep,
     PaginationDep,
     SortDep,
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 @router.get("", response_model=ApiResponse[list[Notification]])
 async def list_notifications(
-    service: NotificationServiceDep,
+    service: NotificationReadServiceDep,
     user_id: CurrentUserIdDep,
     pagination: PaginationDep,
     sort: SortDep,

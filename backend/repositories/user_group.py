@@ -89,19 +89,31 @@ class SqlUserGroupRepository:
     """
 
     def __init__(
-        self, session: AsyncSession, users: UserRepository, *, tenant_id: str
+        self, session: AsyncSession, users: UserRepository, *, tenant_id: str | None
     ) -> None:
         self._db = session
         self._users = users
         self._tenant_id = tenant_id
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     # -- group lookups -------------------------------------------------------
 
     async def _get_scoped(self, group_id: str) -> UserGroup | None:
         """Return the group when it belongs to this repository's tenant, else ``None``."""
-        stmt = select(UserGroup).where(
-            UserGroup.id == group_id, UserGroup.tenant_id == self._tenant_id
-        )
+        stmt = select(UserGroup).where(UserGroup.id == group_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(UserGroup.tenant_id == self._tenant_id)
         return (await self._db.exec(stmt)).first()
 
     async def get(self, group_id: str) -> UserGroupRead | None:
@@ -123,7 +135,9 @@ class SqlUserGroupRepository:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> _GroupList:
-        stmt = select(UserGroup).where(UserGroup.tenant_id == self._tenant_id)
+        stmt = select(UserGroup)
+        if self._tenant_id is not None:
+            stmt = stmt.where(UserGroup.tenant_id == self._tenant_id)
         stmt = apply_filters(stmt, UserGroup, filters, readable=UserGroupRead)
         stmt = apply_sort(
             stmt,
@@ -156,12 +170,13 @@ class SqlUserGroupRepository:
             ForeignKeyViolationError: If any member id is not a usable user of
                 this tenant.
         """
+        tenant_id = self._require_tenant()
         member_ids = list(data.member_ids or [])
         await self._validate_members(member_ids)
         group = UserGroup.model_validate(
             {
                 **data.model_dump(exclude={"member_ids"}),
-                "tenant_id": self._tenant_id,
+                "tenant_id": tenant_id,
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -192,6 +207,7 @@ class SqlUserGroupRepository:
             ForeignKeyViolationError: If any member id is not a usable user of
                 this tenant.
         """
+        self._require_tenant()
         group = await self._get_scoped(group_id)
         if group is None:
             raise NotFoundError("UserGroup", group_id)
@@ -226,6 +242,7 @@ class SqlUserGroupRepository:
             NotFoundError: If no group with that id exists in this tenant.
             ReferencedError: If an approval is still addressed to the group.
         """
+        self._require_tenant()
         group = await self._get_scoped(group_id)
         if group is None:
             raise NotFoundError("UserGroup", group_id)
@@ -330,6 +347,7 @@ class SqlUserGroupRepository:
             ForeignKeyViolationError: If the user is not a usable member of
                 this tenant, or any group id is not a group of this tenant.
         """
+        self._require_tenant()
         await self._validate_members([user_id])
         for group_id in group_ids:
             if await self._get_scoped(group_id) is None:

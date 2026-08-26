@@ -108,7 +108,7 @@ class SqlWorkflowTaskTemplateRepository:
         workflows: WorkflowRepository,
         mcp_repo: MCPServerRepository,
         *,
-        tenant_id: str,
+        tenant_id: str | None,
     ) -> None:
         """Store the session and the Workflow/MCPServer repos for FK checks."""
         self._db = session
@@ -116,12 +116,25 @@ class SqlWorkflowTaskTemplateRepository:
         self._mcp = mcp_repo
         self._tenant_id = tenant_id
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, template_id: str) -> WorkflowTaskTemplate | None:
         """Return the template row with the given ID within the current tenant."""
         stmt = select(WorkflowTaskTemplate).where(
-            WorkflowTaskTemplate.id == template_id,
-            WorkflowTaskTemplate.tenant_id == self._tenant_id,
+            WorkflowTaskTemplate.id == template_id
         )
+        if self._tenant_id is not None:
+            stmt = stmt.where(WorkflowTaskTemplate.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -151,9 +164,9 @@ class SqlWorkflowTaskTemplateRepository:
         workflow are returned. Each template's outgoing dependency edges are
         resolved into ``depends_on_ids`` with a single batched query.
         """
-        stmt = select(WorkflowTaskTemplate).where(
-            WorkflowTaskTemplate.tenant_id == self._tenant_id
-        )
+        stmt = select(WorkflowTaskTemplate)
+        if self._tenant_id is not None:
+            stmt = stmt.where(WorkflowTaskTemplate.tenant_id == self._tenant_id)
         if workflow_id is not None:
             stmt = stmt.where(WorkflowTaskTemplate.workflow_id == workflow_id)
         stmt = apply_filters(
@@ -182,12 +195,13 @@ class SqlWorkflowTaskTemplateRepository:
         self, data: WorkflowTaskTemplateCreate, *, user_id: str
     ) -> WorkflowTaskTemplateRead:
         """Create a new template after validating the parent workflow, dependencies, and tool bindings."""
+        tenant_id = self._require_tenant()
         if await self._workflows.get(data.workflow_id) is None:
             raise ForeignKeyViolationError("Workflow", data.workflow_id)
         template = WorkflowTaskTemplate.model_validate(
             {
                 **data.model_dump(exclude={"depends_on_ids", "tool_bindings"}),
-                "tenant_id": self._tenant_id,
+                "tenant_id": tenant_id,
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -226,6 +240,7 @@ class SqlWorkflowTaskTemplateRepository:
         the template's bound MCP tools. ``workflow_id`` is not part of
         ``WorkflowTaskTemplateUpdate`` so no parent re-validation is needed here.
         """
+        self._require_tenant()
         template = await self._get_scoped(template_id)
         if template is None:
             raise NotFoundError("WorkflowTaskTemplate", template_id)
@@ -261,6 +276,7 @@ class SqlWorkflowTaskTemplateRepository:
         removed by the ``ON DELETE CASCADE`` foreign keys on
         ``workflow_task_template_dependencies``.
         """
+        self._require_tenant()
         template = await self._get_scoped(template_id)
         if template is None:
             raise NotFoundError("WorkflowTaskTemplate", template_id)
@@ -296,6 +312,7 @@ class SqlWorkflowTaskTemplateRepository:
             ForeignKeyViolationError: If a snapshot binding references an MCP
                 server that no longer exists.
         """
+        tenant_id = self._require_tenant()
         bindings_by_template = {
             t.id: _dedupe_bindings(t.tool_bindings) for t in templates
         }
@@ -304,7 +321,7 @@ class SqlWorkflowTaskTemplateRepository:
 
         existing = await self._db.exec(
             select(WorkflowTaskTemplate).where(
-                WorkflowTaskTemplate.tenant_id == self._tenant_id,
+                WorkflowTaskTemplate.tenant_id == tenant_id,
                 WorkflowTaskTemplate.workflow_id == workflow_id,
             )
         )
@@ -322,7 +339,7 @@ class SqlWorkflowTaskTemplateRepository:
                     workflow_id=workflow_id,
                     title=snapshot.title,
                     description=snapshot.description,
-                    tenant_id=self._tenant_id,
+                    tenant_id=tenant_id,
                     created_by=user_id,
                     updated_by=user_id,
                 )

@@ -50,14 +50,28 @@ class SqlTagRepository:
     carried it rather than being blocked by them.
     """
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the SQLModel session and the tenant these operations are scoped to."""
         self._db = session
         self._tenant_id = tenant_id
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, tag_id: str) -> Tag | None:
         """Return the Tag with the given ID within the current tenant, or ``None``."""
-        stmt = select(Tag).where(Tag.id == tag_id, Tag.tenant_id == self._tenant_id)
+        stmt = select(Tag).where(Tag.id == tag_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Tag.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -83,7 +97,9 @@ class SqlTagRepository:
         reviewed by recency, so this is the one resource whose default order is
         alphabetical rather than ``created_at`` descending.
         """
-        stmt = select(Tag).where(Tag.tenant_id == self._tenant_id)
+        stmt = select(Tag)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Tag.tenant_id == self._tenant_id)
         stmt = apply_filters(stmt, Tag, filters, readable=Tag)
         stmt = apply_sort(
             stmt,
@@ -100,7 +116,7 @@ class SqlTagRepository:
         tag = Tag.model_validate(
             {
                 **data.model_dump(),
-                "tenant_id": self._tenant_id,
+                "tenant_id": self._require_tenant(),
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -118,6 +134,7 @@ class SqlTagRepository:
 
     async def update(self, tag_id: str, data: TagUpdate, *, user_id: str) -> Tag:
         """Apply a partial update, raising NotFoundError or UniqueViolationError."""
+        self._require_tenant()
         tag = await self._get_scoped(tag_id)
         if tag is None:
             raise NotFoundError("Tag", tag_id)
@@ -143,6 +160,7 @@ class SqlTagRepository:
         Attachments cascade away with it, so a tag in use is still deletable —
         the records simply stop carrying it.
         """
+        self._require_tenant()
         tag = await self._get_scoped(tag_id)
         if tag is None:
             raise NotFoundError("Tag", tag_id)

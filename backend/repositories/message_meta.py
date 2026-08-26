@@ -45,10 +45,22 @@ class SqlMessageMetaRepository:
     status-ful WorkflowTasks, so a design session never has a task to associate.
     """
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the SQLModel async session and the tenant these queries are scoped to."""
         self._db = session
         self._tenant_id = tenant_id
+
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
 
     def _scoped(self, scope: MessageScope) -> SelectOfScalar[MessageMeta]:
         """Return a tenant- and parent-filtered ``select`` over MessageMeta.
@@ -59,7 +71,9 @@ class SqlMessageMetaRepository:
         Returns:
             A statement matching only that chat's rows in the current tenant.
         """
-        stmt = select(MessageMeta).where(MessageMeta.tenant_id == self._tenant_id)
+        stmt = select(MessageMeta)
+        if self._tenant_id is not None:
+            stmt = stmt.where(MessageMeta.tenant_id == self._tenant_id)
         if scope.workflow_id is not None:
             return stmt.where(col(MessageMeta.workflow_id) == scope.workflow_id)
         return stmt.where(
@@ -95,6 +109,7 @@ class SqlMessageMetaRepository:
             ForeignKeyViolationError: If ``sender_user_id`` does not match an
                 existing user.
         """
+        tenant_id = self._require_tenant()
         row = await self._get(scope, adk_event_id)
         if row is not None and row.sender_user_id == sender_user_id:
             return
@@ -103,7 +118,7 @@ class SqlMessageMetaRepository:
                 **scope._asdict(),
                 adk_event_id=adk_event_id,
                 sender_user_id=sender_user_id,
-                tenant_id=self._tenant_id,
+                tenant_id=tenant_id,
                 created_by=sender_user_id,
                 updated_by=sender_user_id,
             )
@@ -140,6 +155,7 @@ class SqlMessageMetaRepository:
             ForeignKeyViolationError: If ``user_id`` does not match an existing
                 user (the audit FK); a missing task is swallowed instead.
         """
+        tenant_id = self._require_tenant()
         scope = MessageScope.workflow_session(workflow_execution_id)
         row = await self._get(scope, adk_event_id)
         if row is not None and row.workflow_task_id == workflow_task_id:
@@ -149,7 +165,7 @@ class SqlMessageMetaRepository:
                 **scope._asdict(),
                 adk_event_id=adk_event_id,
                 workflow_task_id=workflow_task_id,
-                tenant_id=self._tenant_id,
+                tenant_id=tenant_id,
                 created_by=user_id,
                 updated_by=user_id,
             )

@@ -42,28 +42,43 @@ from services import (
 
 from .context import APP_NAME
 from .repository import (
+    AgentSkillReadRepositoryDep,
     AgentSkillRepositoryDep,
+    ApprovalCertificateReadRepositoryDep,
     ApprovalCertificateRepositoryDep,
+    ApprovalReadRepositoryDep,
     ApprovalRepositoryDep,
     DBSessionDep,
     EffectiveRoleRepositoryDep,
     McpCertificateAuthorityRepositoryDep,
+    MCPServerReadRepositoryDep,
     MCPServerRepositoryDep,
+    MessageMetaReadRepositoryDep,
     MessageMetaRepositoryDep,
     MetricsRepositoryDep,
+    NotificationReadRepositoryDep,
     NotificationRepositoryDep,
+    OutboundEmailReadRepositoryDep,
     OutboundEmailRepositoryDep,
+    SecretReadRepositoryDep,
     SecretRepositoryDep,
     SystemSettingsRepositoryDep,
+    TagReadRepositoryDep,
     TagRepositoryDep,
     TenantRepositoryDep,
     UserAvatarRepositoryDep,
+    UserGroupReadRepositoryDep,
     UserGroupRepositoryDep,
     UserRepositoryDep,
+    WorkflowExecutionReadRepositoryDep,
     WorkflowExecutionRepositoryDep,
+    WorkflowPublishedVersionReadRepositoryDep,
     WorkflowPublishedVersionRepositoryDep,
+    WorkflowReadRepositoryDep,
     WorkflowRepositoryDep,
+    WorkflowTaskReadRepositoryDep,
     WorkflowTaskRepositoryDep,
+    WorkflowTaskTemplateReadRepositoryDep,
     WorkflowTaskTemplateRepositoryDep,
 )
 from .singletons import (
@@ -83,6 +98,24 @@ def get_agent_skill_service(
 
 
 AgentSkillServiceDep = Annotated[AgentSkillService, Depends(get_agent_skill_service)]
+
+
+def get_agent_skill_read_service(
+    repo: AgentSkillReadRepositoryDep, secrets: SecretReadRepositoryDep
+) -> AgentSkillService:
+    """Create an AgentSkillService for a read route, possibly across all tenants.
+
+    Backs only ``GET`` routes. ``secrets`` must be the read repository even
+    though ``AgentSkillService.get``/``list`` never call it: merely resolving
+    the strict ``SecretRepositoryDep`` would itself raise in all-tenants mode,
+    since it depends on ``CurrentTenantIdDep``.
+    """
+    return AgentSkillService(repo, secrets)
+
+
+AgentSkillReadServiceDep = Annotated[
+    AgentSkillService, Depends(get_agent_skill_read_service)
+]
 
 #: The background clone/pull job, as the agent-skills router hands it to
 #: ``BackgroundTasks``.
@@ -114,6 +147,23 @@ def get_secret_resolver(
 SecretResolverDep = Annotated[SecretResolver, Depends(get_secret_resolver)]
 
 
+def get_secret_resolver_read(
+    repo: SecretReadRepositoryDep,
+    cipher: SecretCipherDep,
+    vault: VaultClientDep,
+) -> SecretResolver:
+    """Create a SecretResolver for a read route, possibly across all tenants.
+
+    The collaborator any other read service must use in place of
+    :data:`SecretResolverDep` -- e.g. ``MCPServerService.list_tools`` resolves
+    ``${secret:NAME/KEY}`` placeholders through this on a read route.
+    """
+    return SecretResolver(repo, cipher, vault)
+
+
+SecretResolverReadDep = Annotated[SecretResolver, Depends(get_secret_resolver_read)]
+
+
 def get_secret_service(
     repo: SecretRepositoryDep, cipher: SecretCipherDep, resolver: SecretResolverDep
 ) -> SecretService:
@@ -130,12 +180,37 @@ def get_secret_service(
 SecretServiceDep = Annotated[SecretService, Depends(get_secret_service)]
 
 
+def get_secret_read_service(
+    repo: SecretReadRepositoryDep,
+    cipher: SecretCipherDep,
+    resolver: SecretResolverReadDep,
+) -> SecretService:
+    """Create a SecretService for a read route, possibly across all tenants.
+
+    Backs ``GET`` routes, including ``list_secret_keys``, which does call
+    ``resolver.list_keys`` -- unlike AgentSkill's collaborator, this one is
+    actually exercised on the read path, not just resolved and ignored.
+    """
+    return SecretService(repo, cipher, resolver)
+
+
+SecretReadServiceDep = Annotated[SecretService, Depends(get_secret_read_service)]
+
+
 def get_tag_service(repo: TagRepositoryDep) -> TagService:
     """Create a TagService backed by the request's tenant-scoped repository."""
     return TagService(repo)
 
 
 TagServiceDep = Annotated[TagService, Depends(get_tag_service)]
+
+
+def get_tag_read_service(repo: TagReadRepositoryDep) -> TagService:
+    """Create a TagService for a read route, possibly across all tenants."""
+    return TagService(repo)
+
+
+TagReadServiceDep = Annotated[TagService, Depends(get_tag_read_service)]
 
 
 def get_mcp_server_service(
@@ -146,6 +221,22 @@ def get_mcp_server_service(
 
 
 MCPServerServiceDep = Annotated[MCPServerService, Depends(get_mcp_server_service)]
+
+
+def get_mcp_server_read_service(
+    repo: MCPServerReadRepositoryDep, resolver: SecretResolverReadDep
+) -> MCPServerService:
+    """Create an MCPServerService for a read route, possibly across all tenants.
+
+    Backs ``GET`` routes, including ``list_tools``, which resolves
+    ``${secret:NAME/KEY}`` placeholders through ``resolver`` before connecting.
+    """
+    return MCPServerService(repo, resolver)
+
+
+MCPServerReadServiceDep = Annotated[
+    MCPServerService, Depends(get_mcp_server_read_service)
+]
 
 
 def get_mcp_registry_service() -> MCPRegistryService:
@@ -173,6 +264,18 @@ def get_notification_service(repo: NotificationRepositoryDep) -> NotificationSer
 
 NotificationServiceDep = Annotated[
     NotificationService, Depends(get_notification_service)
+]
+
+
+def get_notification_read_service(
+    repo: NotificationReadRepositoryDep,
+) -> NotificationService:
+    """Create a NotificationService for a read route, possibly across all tenants."""
+    return NotificationService(repo)
+
+
+NotificationReadServiceDep = Annotated[
+    NotificationService, Depends(get_notification_read_service)
 ]
 
 
@@ -227,6 +330,45 @@ OutboundEmailServiceDep = Annotated[
 ]
 
 
+def get_outbound_email_read_service(
+    repo: OutboundEmailReadRepositoryDep,
+) -> OutboundEmailService:
+    """Create an OutboundEmailService for a read route, possibly across all tenants.
+
+    Backs only ``GET`` routes (list/get); ``delete`` stays on
+    :func:`get_outbound_email_service`, so it can never run with no concrete
+    tenant selected.
+    """
+    return OutboundEmailService(repo)
+
+
+OutboundEmailReadServiceDep = Annotated[
+    OutboundEmailService, Depends(get_outbound_email_read_service)
+]
+
+
+def get_notification_dispatcher_read(
+    db: DBSessionDep,
+    notifications: NotificationReadRepositoryDep,
+    users: UserRepositoryDep,
+    settings: SystemSettingsServiceDep,
+    emails: OutboundEmailReadRepositoryDep,
+) -> NotificationDispatcher:
+    """Create a NotificationDispatcher for a read route.
+
+    Not exercised by any read route today -- exists only so a write-oriented
+    service with a read variant (e.g. ``WorkflowTaskService``) can be
+    constructed without resolving the strict, all-tenants-incompatible
+    dependency this collaborator would otherwise pull in.
+    """
+    return NotificationDispatcher(db, notifications, users, settings, emails)
+
+
+NotificationDispatcherReadDep = Annotated[
+    NotificationDispatcher, Depends(get_notification_dispatcher_read)
+]
+
+
 def get_tenant_service(repo: TenantRepositoryDep) -> TenantService:
     """Create a TenantService backed by the request's repository."""
     return TenantService(repo)
@@ -258,6 +400,16 @@ def get_user_group_service(repo: UserGroupRepositoryDep) -> UserGroupService:
 
 
 UserGroupServiceDep = Annotated[UserGroupService, Depends(get_user_group_service)]
+
+
+def get_user_group_read_service(repo: UserGroupReadRepositoryDep) -> UserGroupService:
+    """Create a UserGroupService for a read route, possibly across all tenants."""
+    return UserGroupService(repo)
+
+
+UserGroupReadServiceDep = Annotated[
+    UserGroupService, Depends(get_user_group_read_service)
+]
 
 
 def get_user_avatar_service(repo: UserAvatarRepositoryDep) -> UserAvatarService:
@@ -303,6 +455,44 @@ def get_workflow_service(
 
 
 WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
+
+
+def get_workflow_read_service(
+    workflows: WorkflowReadRepositoryDep,
+    skills: AgentSkillReadRepositoryDep,
+    execution_repo: WorkflowExecutionReadRepositoryDep,
+    templates: WorkflowTaskTemplateReadRepositoryDep,
+    tasks: WorkflowTaskReadRepositoryDep,
+    versions: WorkflowPublishedVersionReadRepositoryDep,
+    meta: MessageMetaReadRepositoryDep,
+    skills_store: SkillManagerDep,
+    registry: AgentRegistryDep,
+    session_service: SessionServiceDep,
+) -> WorkflowService:
+    """Create a WorkflowService for a read route, possibly across all tenants.
+
+    Backs only ``list_workflows``/``get_workflow``/``list_workflow_task_templates``,
+    which touch only ``workflows`` -- every other collaborator here must still
+    be the read repository (not the strict one), since merely resolving a
+    strict, tenant-scoped dependency would itself raise in all-tenants mode
+    regardless of whether this service ever calls into it.
+    """
+    return WorkflowService(
+        workflows,
+        skills,
+        execution_repo,
+        templates,
+        tasks,
+        versions,
+        meta,
+        skills_store,
+        registry,
+        session_service,
+        APP_NAME,
+    )
+
+
+WorkflowReadServiceDep = Annotated[WorkflowService, Depends(get_workflow_read_service)]
 
 
 def get_workflow_design_service(
@@ -373,6 +563,19 @@ ApproverGroupResolverDep = Annotated[
 ]
 
 
+def get_approver_group_resolver_read(
+    groups: UserGroupReadRepositoryDep,
+    effective_roles: EffectiveRoleRepositoryDep,
+) -> ApproverGroupResolver:
+    """Create the approver-group resolver for a read route, possibly across all tenants."""
+    return ApproverGroupResolver(groups, effective_roles)
+
+
+ApproverGroupResolverReadDep = Annotated[
+    ApproverGroupResolver, Depends(get_approver_group_resolver_read)
+]
+
+
 def get_workflow_execution_access_policy(
     approvals: ApprovalRepositoryDep,
     approver_groups: ApproverGroupResolverDep,
@@ -383,6 +586,25 @@ def get_workflow_execution_access_policy(
 
 WorkflowExecutionAccessPolicyDep = Annotated[
     WorkflowExecutionAccessPolicy, Depends(get_workflow_execution_access_policy)
+]
+
+
+def get_workflow_execution_access_policy_read(
+    approvals: ApprovalReadRepositoryDep,
+    approver_groups: ApproverGroupResolverReadDep,
+) -> WorkflowExecutionAccessPolicy:
+    """Create the access policy for a read route, possibly across all tenants.
+
+    A super_admin (the only caller who can reach all-tenants mode) always
+    passes ``assert_read_access``'s role bypass before ``approvals`` is ever
+    queried, but this must still be the read repository: merely resolving the
+    strict one would raise regardless.
+    """
+    return WorkflowExecutionAccessPolicy(approvals, approver_groups)
+
+
+WorkflowExecutionAccessPolicyReadDep = Annotated[
+    WorkflowExecutionAccessPolicy, Depends(get_workflow_execution_access_policy_read)
 ]
 
 
@@ -415,6 +637,35 @@ WorkflowExecutionServiceDep = Annotated[
 ]
 
 
+def get_workflow_execution_read_service(
+    execution_repo: WorkflowExecutionReadRepositoryDep,
+    tasks: WorkflowTaskReadRepositoryDep,
+    meta: MessageMetaReadRepositoryDep,
+    skills: AgentSkillReadRepositoryDep,
+    skills_store: SkillManagerDep,
+    registry: AgentRegistryDep,
+    session_service: SessionServiceDep,
+    access: WorkflowExecutionAccessPolicyReadDep,
+) -> WorkflowExecutionService:
+    """Create a WorkflowExecutionService for a read route, possibly across all tenants."""
+    return WorkflowExecutionService(
+        execution_repo,
+        tasks,
+        meta,
+        skills,
+        skills_store,
+        registry,
+        session_service,
+        APP_NAME,
+        access,
+    )
+
+
+WorkflowExecutionReadServiceDep = Annotated[
+    WorkflowExecutionService, Depends(get_workflow_execution_read_service)
+]
+
+
 def get_workflow_task_service(
     repo: WorkflowTaskRepositoryDep,
     execution_repo: WorkflowExecutionRepositoryDep,
@@ -441,6 +692,38 @@ WorkflowTaskServiceDep = Annotated[
 ]
 
 
+def get_workflow_task_read_service(
+    repo: WorkflowTaskReadRepositoryDep,
+    execution_repo: WorkflowExecutionReadRepositoryDep,
+    access: WorkflowExecutionAccessPolicyReadDep,
+    approvals: ApprovalReadRepositoryDep,
+    notifications: NotificationDispatcherReadDep,
+    approver_groups: ApproverGroupResolverReadDep,
+    certificates: ApprovalCertificateReadRepositoryDep,
+) -> WorkflowTaskService:
+    """Create a WorkflowTaskService for a read route, possibly across all tenants.
+
+    Backs only ``get_workflow_task``, which touches only ``repo`` and
+    ``access`` -- every other collaborator here must still be a read
+    repository/service, since merely resolving a strict one would itself
+    raise regardless of whether this service calls into it.
+    """
+    return WorkflowTaskService(
+        repo,
+        execution_repo,
+        access,
+        approvals,
+        notifications,
+        approver_groups,
+        certificates,
+    )
+
+
+WorkflowTaskReadServiceDep = Annotated[
+    WorkflowTaskService, Depends(get_workflow_task_read_service)
+]
+
+
 def get_workflow_task_template_service(
     repo: WorkflowTaskTemplateRepositoryDep,
     workflows: WorkflowRepositoryDep,
@@ -451,6 +734,19 @@ def get_workflow_task_template_service(
 
 WorkflowTaskTemplateServiceDep = Annotated[
     WorkflowTaskTemplateService, Depends(get_workflow_task_template_service)
+]
+
+
+def get_workflow_task_template_read_service(
+    repo: WorkflowTaskTemplateReadRepositoryDep,
+    workflows: WorkflowReadRepositoryDep,
+) -> WorkflowTaskTemplateService:
+    """Create a WorkflowTaskTemplateService for a read route, possibly across all tenants."""
+    return WorkflowTaskTemplateService(repo, workflows)
+
+
+WorkflowTaskTemplateReadServiceDep = Annotated[
+    WorkflowTaskTemplateService, Depends(get_workflow_task_template_read_service)
 ]
 
 
@@ -469,6 +765,26 @@ ApprovalCertificateServiceDep = Annotated[
 ]
 
 
+def get_approval_certificate_read_service(
+    certificates: ApprovalCertificateReadRepositoryDep,
+    tasks: WorkflowTaskReadRepositoryDep,
+    authorities: McpCertificateAuthorityRepositoryDep,
+    cipher: SecretCipherDep,
+) -> ApprovalCertificateService:
+    """Create an ApprovalCertificateService for a read route, possibly across all tenants.
+
+    Backs only ``read_for_approval`` (``GET /approvals/{id}/certificate``),
+    which touches only ``certificates`` -- ``tasks`` must still be the read
+    repository, since merely resolving the strict one would itself raise.
+    """
+    return ApprovalCertificateService(certificates, tasks, authorities, cipher)
+
+
+ApprovalCertificateReadServiceDep = Annotated[
+    ApprovalCertificateService, Depends(get_approval_certificate_read_service)
+]
+
+
 def get_approval_service(
     repo: ApprovalRepositoryDep,
     approver_groups: ApproverGroupResolverDep,
@@ -479,3 +795,15 @@ def get_approval_service(
 
 
 ApprovalServiceDep = Annotated[ApprovalService, Depends(get_approval_service)]
+
+
+def get_approval_read_service(
+    repo: ApprovalReadRepositoryDep,
+    approver_groups: ApproverGroupResolverReadDep,
+    certificates: ApprovalCertificateReadServiceDep,
+) -> ApprovalService:
+    """Create an ApprovalService for a read route, possibly across all tenants."""
+    return ApprovalService(repo, approver_groups, certificates)
+
+
+ApprovalReadServiceDep = Annotated[ApprovalService, Depends(get_approval_read_service)]

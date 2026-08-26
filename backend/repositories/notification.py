@@ -60,17 +60,28 @@ class NotificationRepository(Protocol):
 class SqlNotificationRepository:
     """SQLModel-backed implementation of NotificationRepository."""
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the SQLModel async session and the tenant these queries are scoped to."""
         self._db = session
         self._tenant_id = tenant_id
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, notification_id: str) -> Notification | None:
         """Return the Notification with the given ID within the current tenant, or ``None``."""
-        stmt = select(Notification).where(
-            Notification.id == notification_id,
-            Notification.tenant_id == self._tenant_id,
-        )
+        stmt = select(Notification).where(Notification.id == notification_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Notification.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -106,10 +117,9 @@ class SqlNotificationRepository:
         Returns:
             The matching notifications.
         """
-        stmt = select(Notification).where(
-            Notification.user_id == user_id,
-            Notification.tenant_id == self._tenant_id,
-        )
+        stmt = select(Notification).where(Notification.user_id == user_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Notification.tenant_id == self._tenant_id)
         stmt = apply_filters(stmt, Notification, filters, readable=Notification)
         stmt = apply_sort(
             stmt,
@@ -142,7 +152,7 @@ class SqlNotificationRepository:
         notification = Notification.model_validate(
             {
                 **data.model_dump(),
-                "tenant_id": self._tenant_id,
+                "tenant_id": self._require_tenant(),
                 "created_by": user_id,
                 "updated_by": user_id,
                 "link": build_notification_link(
@@ -166,6 +176,7 @@ class SqlNotificationRepository:
         self, notification_id: str, data: NotificationUpdate, *, user_id: str
     ) -> Notification:
         """Apply a partial update to a Notification, raising NotFoundError if missing."""
+        self._require_tenant()
         notification = await self._get_scoped(notification_id)
         if notification is None:
             raise NotFoundError("Notification", notification_id)
@@ -182,6 +193,7 @@ class SqlNotificationRepository:
         Notifications are leaf rows that nothing references, so a plain commit
         cannot raise a referential-integrity error.
         """
+        self._require_tenant()
         notification = await self._get_scoped(notification_id)
         if notification is None:
             raise NotFoundError("Notification", notification_id)
@@ -198,9 +210,10 @@ class SqlNotificationRepository:
         Returns:
             The number of notifications that were marked read.
         """
+        tenant_id = self._require_tenant()
         stmt = select(Notification).where(
             Notification.user_id == user_id,
-            Notification.tenant_id == self._tenant_id,
+            Notification.tenant_id == tenant_id,
             col(Notification.read).is_(False),
         )
         result = await self._db.exec(stmt)

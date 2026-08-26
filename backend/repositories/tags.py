@@ -35,11 +35,19 @@ class TagLinks:
         link_model: The join table for this resource type, e.g.
             :class:`models.tag.SecretTag`.
         tenant_id: Tenant the owning repository is scoped to; tags outside it
-            are not attachable.
+            are not attachable. ``None`` means the owning repository was built
+            for a read route running in "all tenants" mode -- :meth:`validate`
+            is only ever reached through the owning repository's write
+            methods, which guard against a ``None`` tenant before delegating
+            here, so this is never actually ``None`` when it matters.
     """
 
     def __init__(
-        self, session: AsyncSession, link_model: type[TagLink], *, tenant_id: str
+        self,
+        session: AsyncSession,
+        link_model: type[TagLink],
+        *,
+        tenant_id: str | None,
     ) -> None:
         """Store the session, the join model, and the tenant scope."""
         self._db = session

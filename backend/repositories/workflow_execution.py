@@ -57,17 +57,28 @@ class WorkflowExecutionRepository(Protocol):
 class SqlWorkflowExecutionRepository:
     """SQLModel-backed implementation of WorkflowExecutionRepository."""
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the SQLModel async session and the tenant these queries are scoped to."""
         self._db = session
         self._tenant_id = tenant_id
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, execution_id: str) -> WorkflowExecution | None:
         """Return the WorkflowExecution with the given ID within the current tenant, or ``None``."""
-        stmt = select(WorkflowExecution).where(
-            WorkflowExecution.id == execution_id,
-            WorkflowExecution.tenant_id == self._tenant_id,
-        )
+        stmt = select(WorkflowExecution).where(WorkflowExecution.id == execution_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(WorkflowExecution.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -133,9 +144,9 @@ class SqlWorkflowExecutionRepository:
         Returns:
             The matching executions.
         """
-        stmt = select(WorkflowExecution).where(
-            WorkflowExecution.tenant_id == self._tenant_id
-        )
+        stmt = select(WorkflowExecution)
+        if self._tenant_id is not None:
+            stmt = stmt.where(WorkflowExecution.tenant_id == self._tenant_id)
         if visible_to_user_id is not None:
             addressed_to = [col(Approval.approver) == visible_to_user_id]
             if visible_to_group_ids:
@@ -174,7 +185,7 @@ class SqlWorkflowExecutionRepository:
             {
                 **data.model_dump(),
                 "workflow_id": workflow_id,
-                "tenant_id": self._tenant_id,
+                "tenant_id": self._require_tenant(),
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -230,6 +241,7 @@ class SqlWorkflowExecutionRepository:
             status: The terminal status to record.
             finished_at: The moment the run finished.
         """
+        self._require_tenant()
         execution = await self._get_scoped(execution_id)
         if execution is None or execution.finished_at is not None:
             return
@@ -240,6 +252,7 @@ class SqlWorkflowExecutionRepository:
 
     async def delete(self, execution_id: str) -> None:
         """Delete the WorkflowExecution with the given ID, raising NotFoundError if missing."""
+        self._require_tenant()
         execution = await self._get_scoped(execution_id)
         if execution is None:
             raise NotFoundError("WorkflowExecution", execution_id)

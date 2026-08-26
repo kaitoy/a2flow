@@ -13,9 +13,11 @@ tenant, matching the same shape as :mod:`routers.system_settings`.
 
 Like every other tenant-scoped resource, a platform-scoped ``super_admin``
 (one who carries no ``tenant_id`` of their own) must select a tenant via the
-``X-Tenant-Id`` request header before these routes resolve -- there is no
-"see every tenant at once" mode; see ``CurrentTenantIdDep`` in
-``dependencies/auth.py``.
+``X-Tenant-Id`` request header before these routes resolve. List and Get,
+unlike Delete, additionally accept :data:`dependencies.auth.ALL_TENANTS_SENTINEL`
+in that header to browse the queue across every tenant at once, the same
+"all tenants" read mode every other resource router supports; see
+``CurrentTenantScopeDep`` in ``dependencies/auth.py``.
 """
 
 from fastapi import APIRouter, Depends
@@ -23,6 +25,7 @@ from fastapi import APIRouter, Depends
 from dependencies import (
     ApiMetaDep,
     FilterDep,
+    OutboundEmailReadServiceDep,
     OutboundEmailServiceDep,
     PaginationDep,
     SortDep,
@@ -44,7 +47,7 @@ _requires_super_admin = [Depends(require_roles(Role.super_admin))]
     dependencies=_requires_super_admin,
 )
 async def list_outbound_emails(
-    service: OutboundEmailServiceDep,
+    service: OutboundEmailReadServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -52,7 +55,8 @@ async def list_outbound_emails(
 ) -> ApiResponse[list[OutboundEmailRead]]:
     """Return a page of the acting tenant's outbound-email queue rows.
 
-    Defaults to ``createdAt`` descending.
+    Defaults to ``createdAt`` descending. A platform-scoped ``super_admin``
+    may select ``X-Tenant-Id: __all__`` to list across every tenant at once.
     """
     items = await service.list(
         limit=pagination.limit,
@@ -70,13 +74,14 @@ async def list_outbound_emails(
 )
 async def get_outbound_email(
     email_id: str,
-    service: OutboundEmailServiceDep,
+    service: OutboundEmailReadServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[OutboundEmailRead]:
     """Return a single outbound-email queue row.
 
     Raises HTTP 404 (not 403) for a row belonging to another tenant, so its
-    existence is never confirmed to the caller.
+    existence is never confirmed to the caller -- unless the caller has
+    selected ``X-Tenant-Id: __all__``, in which case any tenant's row resolves.
     """
     email = await service.get(email_id)
     return ApiResponse(meta=meta, data=email)

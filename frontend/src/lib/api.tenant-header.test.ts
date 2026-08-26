@@ -1,7 +1,7 @@
 import { http } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
 import { store } from "@/store";
-import { clearUser, setSelectedTenantId } from "@/store/authSlice";
+import { ALL_TENANTS_SENTINEL, clearUser, setSelectedTenantId } from "@/store/authSlice";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { listAgentSkills } from "./api";
@@ -37,5 +37,18 @@ describe("X-Tenant-Id header", () => {
     );
     await listAgentSkills();
     expect(captured).toBeNull();
+  });
+
+  it("attaches the All tenants sentinel verbatim -- the backend decides what it means", async () => {
+    store.dispatch(setSelectedTenantId(ALL_TENANTS_SENTINEL));
+    let captured: string | null = null;
+    server.use(
+      http.get(`${BASE}/api/v1/agent-skills`, ({ request }) => {
+        captured = request.headers.get("x-tenant-id");
+        return envelope([]);
+      })
+    );
+    await listAgentSkills();
+    expect(captured).toBe(ALL_TENANTS_SENTINEL);
   });
 });

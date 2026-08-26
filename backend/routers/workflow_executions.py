@@ -36,6 +36,7 @@ from dependencies import (
     MetricsWindowDep,
     PaginationDep,
     SortDep,
+    WorkflowExecutionReadServiceDep,
     WorkflowExecutionServiceDep,
     require_roles,
 )
@@ -61,7 +62,7 @@ _requires_admin = [Depends(require_roles(Role.admin))]
 
 @router.get("", response_model=ApiResponse[list[WorkflowExecution]])
 async def list_workflow_executions(
-    service: WorkflowExecutionServiceDep,
+    service: WorkflowExecutionReadServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,
@@ -146,7 +147,7 @@ async def list_failed_workflow_executions(
 @router.get("/{execution_id}", response_model=ApiResponse[WorkflowExecution])
 async def get_workflow_execution(
     execution_id: str,
-    service: WorkflowExecutionServiceDep,
+    service: WorkflowExecutionReadServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
@@ -168,7 +169,7 @@ async def get_workflow_execution(
 )
 async def list_workflow_execution_tasks(
     execution_id: str,
-    service: WorkflowExecutionServiceDep,
+    service: WorkflowExecutionReadServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,

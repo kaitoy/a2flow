@@ -38,17 +38,30 @@ class SqlWorkflowPublishedVersionRepository:
     its own tenant-scoped repository.
     """
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the session and the tenant every query is scoped to."""
         self._db = session
         self._tenant_id = tenant_id
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, workflow_id: str) -> WorkflowPublishedVersion | None:
         """Return the snapshot row of ``workflow_id`` within the current tenant."""
         stmt = select(WorkflowPublishedVersion).where(
-            WorkflowPublishedVersion.workflow_id == workflow_id,
-            WorkflowPublishedVersion.tenant_id == self._tenant_id,
+            WorkflowPublishedVersion.workflow_id == workflow_id
         )
+        if self._tenant_id is not None:
+            stmt = stmt.where(WorkflowPublishedVersion.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -81,6 +94,7 @@ class SqlWorkflowPublishedVersionRepository:
         Returns:
             The stored snapshot.
         """
+        tenant_id = self._require_tenant()
         version = await self._get_scoped(workflow_id)
         if version is None:
             version = WorkflowPublishedVersion(
@@ -88,7 +102,7 @@ class SqlWorkflowPublishedVersionRepository:
                 name=name,
                 description=description,
                 templates=templates,
-                tenant_id=self._tenant_id,
+                tenant_id=tenant_id,
                 created_by=user_id,
                 updated_by=user_id,
             )

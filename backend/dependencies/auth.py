@@ -72,6 +72,12 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 #: ``X-User-Tenant-Id`` header in ``tests/conftest.py``, which controls the
 #: synthetic test user's own ``tenant_id``, not a super_admin's selected tenant.
 TENANT_HEADER_NAME = "X-Tenant-Id"
+#: Reserved :data:`TENANT_HEADER_NAME` value meaning "no single tenant --
+#: browse across every tenant", selectable only via :func:`get_current_tenant_scope`
+#: and only by a platform-scoped caller. Rejected by the strict
+#: :func:`get_current_tenant_id` (used by every write route), so it can never
+#: reach a create/update/delete path.
+ALL_TENANTS_SENTINEL = "__all__"
 #: Header naming the user id to impersonate. Re-validated by
 #: :func:`get_current_user` on every request that carries it, not just when
 #: impersonation starts -- see the module docstring.
@@ -265,7 +271,11 @@ def get_current_tenant_id(user: CurrentUserDep, request: Request) -> str:
     Raises:
         ForbiddenError: If the caller is platform-scoped and the header is
             missing or empty. There is no implicit "see everything" fallback
-            and no server-side default tenant.
+            and no server-side default tenant. Also raised if the header is
+            :data:`ALL_TENANTS_SENTINEL` -- this dependency backs write
+            routes, which always require one concrete tenant; use
+            :func:`get_current_tenant_scope` for a read route that may run
+            across every tenant.
     """
     if user.tenant_id is not None:
         return user.tenant_id
@@ -274,10 +284,54 @@ def get_current_tenant_id(user: CurrentUserDep, request: Request) -> str:
         raise ForbiddenError(
             f"Select a tenant to act as via the {TENANT_HEADER_NAME} header"
         )
+    if tenant_id == ALL_TENANTS_SENTINEL:
+        raise ForbiddenError(
+            "This operation requires a specific tenant; select one instead of All Tenants"
+        )
     return tenant_id
 
 
 CurrentTenantIdDep = Annotated[str, Depends(get_current_tenant_id)]
+
+
+def get_current_tenant_scope(user: CurrentUserDep, request: Request) -> str | None:
+    """Return the tenant id a *read* request is scoped to, or ``None`` for all tenants.
+
+    Identical to :func:`get_current_tenant_id` except that a platform-scoped
+    caller may additionally send :data:`ALL_TENANTS_SENTINEL` to browse across
+    every tenant at once, signaled here by returning ``None``. Only read routes
+    (list/get) may depend on this; every write route depends on the strict
+    :func:`get_current_tenant_id` instead, which rejects the sentinel, so a
+    mutation can never run with no concrete tenant selected.
+
+    Args:
+        user: The user resolved by :func:`get_current_user`.
+        request: The incoming request, used to read :data:`TENANT_HEADER_NAME`
+            for a platform-scoped caller.
+
+    Returns:
+        The tenant id this request is scoped to, or ``None`` to mean "every
+        tenant" (only reachable for a platform-scoped caller).
+
+    Raises:
+        ForbiddenError: If the caller is platform-scoped and the header is
+            missing or empty. There is no implicit "see everything" fallback
+            and no server-side default tenant -- "all tenants" must be
+            selected explicitly via :data:`ALL_TENANTS_SENTINEL`.
+    """
+    if user.tenant_id is not None:
+        return user.tenant_id
+    tenant_id = request.headers.get(TENANT_HEADER_NAME, "").strip()
+    if not tenant_id:
+        raise ForbiddenError(
+            f"Select a tenant to act as via the {TENANT_HEADER_NAME} header"
+        )
+    if tenant_id == ALL_TENANTS_SENTINEL:
+        return None
+    return tenant_id
+
+
+CurrentTenantScopeDep = Annotated[str | None, Depends(get_current_tenant_scope)]
 
 
 async def verify_csrf(request: Request) -> None:

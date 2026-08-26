@@ -22,6 +22,7 @@ from dependencies import (
     FilterDep,
     PaginationDep,
     SortDep,
+    TagReadServiceDep,
     TagServiceDep,
     require_roles,
 )
@@ -53,7 +54,7 @@ async def create_tag(
 
 @router.get("", response_model=ApiResponse[list[Tag]])
 async def list_tags(
-    service: TagServiceDep,
+    service: TagReadServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -71,7 +72,7 @@ async def list_tags(
 @router.get("/{tag_id}", response_model=ApiResponse[Tag])
 async def get_tag(
     tag_id: str,
-    service: TagServiceDep,
+    service: TagReadServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Tag]:
     tag = await service.get(tag_id)

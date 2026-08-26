@@ -5,7 +5,11 @@ import { useEffect, useState } from "react";
 import { Select } from "@/components/ui/select";
 import { listTenants, type Tenant } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
-import { SELECTED_TENANT_STORAGE_KEY, setSelectedTenantId } from "@/store/authSlice";
+import {
+  ALL_TENANTS_SENTINEL,
+  SELECTED_TENANT_STORAGE_KEY,
+  setSelectedTenantId,
+} from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 /** Persist a tenant selection to localStorage, ignoring privacy-mode write failures. */
@@ -46,6 +50,11 @@ function persistSelection(tenantId: string | null): void {
  * on success so this picker (which lives in the persistent admin layout and
  * therefore doesn't remount on client-side navigation) reflects new/renamed/
  * deleted tenants without requiring a reload.
+ *
+ * A leading "All tenants" option (`ALL_TENANTS_SENTINEL`) lets a Super Admin
+ * browse every tenant's data at once -- read-only: the backend rejects any
+ * create/update/delete while it's selected (see `dependencies.auth`). Once
+ * explicitly chosen, it is never overwritten by the auto-select fallback.
  */
 export function TenantSwitcher() {
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
@@ -64,6 +73,7 @@ export function TenantSwitcher() {
 
   useEffect(() => {
     if (!isSuperAdmin || tenants.length === 0) return;
+    if (selectedTenantId === ALL_TENANTS_SENTINEL) return;
     if (selectedTenantId && tenants.some((t) => t.id === selectedTenantId)) return;
     const fallback = tenants.find((t) => t.enabled) ?? tenants[0];
     dispatch(setSelectedTenantId(fallback.id));
@@ -85,7 +95,13 @@ export function TenantSwitcher() {
       options={
         tenants.length === 0
           ? [{ value: "", label: "No tenants" }]
-          : tenants.map((tenant) => ({ value: tenant.id, label: tenant.displayName }))
+          : [
+              { value: ALL_TENANTS_SENTINEL, label: "All tenants" },
+              ...tenants.map((tenant) => ({
+                value: tenant.id,
+                label: tenant.displayName,
+              })),
+            ]
       }
       className="w-auto min-w-32"
     />

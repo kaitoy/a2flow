@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Tenant, User } from "@/lib/api";
 import type { Role } from "@/lib/roles";
 import type { RootState } from "@/store";
-import { SELECTED_TENANT_STORAGE_KEY } from "@/store/authSlice";
+import { ALL_TENANTS_SENTINEL, SELECTED_TENANT_STORAGE_KEY } from "@/store/authSlice";
 import { tenantsChanged } from "@/store/tenantsSlice";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
@@ -74,6 +74,14 @@ describe("TenantSwitcher", () => {
     expect(screen.getByRole("option", { name: "Globex" })).toBeInTheDocument();
   });
 
+  it("renders a leading All tenants option", async () => {
+    const user = userEvent.setup();
+    server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
+    render(<TenantSwitcher />, { preloadedState: authState(["super_admin"]) });
+    await user.click(await screen.findByRole("combobox", { name: "Acting tenant" }));
+    expect(screen.getByRole("option", { name: "All tenants" })).toBeInTheDocument();
+  });
+
   it("auto-selects the first tenant when nothing is selected yet", async () => {
     server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
     render(<TenantSwitcher />, { preloadedState: authState(["super_admin"]) });
@@ -89,6 +97,18 @@ describe("TenantSwitcher", () => {
     render(<TenantSwitcher />, { preloadedState: authState(["super_admin"], "tenant-2") });
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveTextContent("Globex");
+    });
+  });
+
+  it("keeps All tenants selected instead of overriding it with auto-select", async () => {
+    server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
+    render(<TenantSwitcher />, {
+      preloadedState: authState(["super_admin"], ALL_TENANTS_SENTINEL),
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Acting tenant" })).toHaveTextContent(
+        "All tenants"
+      );
     });
   });
 
@@ -115,6 +135,20 @@ describe("TenantSwitcher", () => {
     await user.click(screen.getByRole("option", { name: "Globex" }));
 
     expect(window.localStorage.getItem(SELECTED_TENANT_STORAGE_KEY)).toBe("tenant-2");
+    expect(reloadMock).toHaveBeenCalledOnce();
+  });
+
+  it("persists an All tenants selection to localStorage and reloads the page", async () => {
+    const user = userEvent.setup();
+    server.use(http.get(`${BASE}/api/v1/tenants`, () => envelope([TENANT_1, TENANT_2])));
+    render(<TenantSwitcher />, { preloadedState: authState(["super_admin"]) });
+    const trigger = screen.getByRole("combobox", { name: "Acting tenant" });
+    await waitFor(() => expect(trigger).toHaveTextContent("Acme Corp"));
+
+    await user.click(trigger);
+    await user.click(screen.getByRole("option", { name: "All tenants" }));
+
+    expect(window.localStorage.getItem(SELECTED_TENANT_STORAGE_KEY)).toBe(ALL_TENANTS_SENTINEL);
     expect(reloadMock).toHaveBeenCalledOnce();
   });
 

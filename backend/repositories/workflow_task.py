@@ -90,7 +90,7 @@ class SqlWorkflowTaskRepository:
         execution_repo: WorkflowExecutionRepository,
         mcp_repo: MCPServerRepository,
         *,
-        tenant_id: str,
+        tenant_id: str | None,
     ) -> None:
         """Store the session and the WorkflowExecution/MCPServer repos for FK checks."""
         self._db = session
@@ -98,11 +98,23 @@ class SqlWorkflowTaskRepository:
         self._mcp = mcp_repo
         self._tenant_id = tenant_id
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, task_id: str) -> WorkflowTask | None:
         """Return the WorkflowTask row with the given ID within the current tenant."""
-        stmt = select(WorkflowTask).where(
-            WorkflowTask.id == task_id, WorkflowTask.tenant_id == self._tenant_id
-        )
+        stmt = select(WorkflowTask).where(WorkflowTask.id == task_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(WorkflowTask.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -130,7 +142,9 @@ class SqlWorkflowTaskRepository:
         session are returned. Each task's outgoing dependency edges are resolved
         into ``depends_on_ids`` with a single batched query.
         """
-        stmt = select(WorkflowTask).where(WorkflowTask.tenant_id == self._tenant_id)
+        stmt = select(WorkflowTask)
+        if self._tenant_id is not None:
+            stmt = stmt.where(WorkflowTask.tenant_id == self._tenant_id)
         if workflow_execution_id is not None:
             stmt = stmt.where(
                 WorkflowTask.workflow_execution_id == workflow_execution_id
@@ -158,6 +172,7 @@ class SqlWorkflowTaskRepository:
         self, data: WorkflowTaskCreate, *, user_id: str
     ) -> WorkflowTaskRead:
         """Create a new WorkflowTask after validating the parent session, dependencies, and tool bindings."""
+        tenant_id = self._require_tenant()
         if await self._execution.get(data.workflow_execution_id) is None:
             raise ForeignKeyViolationError(
                 "WorkflowExecution", data.workflow_execution_id
@@ -165,7 +180,7 @@ class SqlWorkflowTaskRepository:
         task = WorkflowTask.model_validate(
             {
                 **data.model_dump(exclude={"depends_on_ids", "tool_bindings"}),
-                "tenant_id": self._tenant_id,
+                "tenant_id": tenant_id,
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -200,6 +215,7 @@ class SqlWorkflowTaskRepository:
         the task's bound MCP tools. ``workflow_execution_id`` is not part of
         ``WorkflowTaskUpdate`` so no parent re-validation is needed here.
         """
+        self._require_tenant()
         task = await self._get_scoped(task_id)
         if task is None:
             raise NotFoundError("WorkflowTask", task_id)
@@ -232,6 +248,7 @@ class SqlWorkflowTaskRepository:
         Dependency edges referencing the task (in either direction) are removed
         by the ``ON DELETE CASCADE`` foreign keys on ``workflow_task_dependencies``.
         """
+        self._require_tenant()
         task = await self._get_scoped(task_id)
         if task is None:
             raise NotFoundError("WorkflowTask", task_id)

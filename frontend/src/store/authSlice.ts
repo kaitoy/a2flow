@@ -8,6 +8,14 @@ export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 /** localStorage key persisting the tenant a super_admin has selected to act as. */
 export const SELECTED_TENANT_STORAGE_KEY = "a2flow.selectedTenantId";
 
+/**
+ * Reserved `selectedTenantId` value meaning "no single tenant -- browse
+ * across every tenant". Sent verbatim as the `X-Tenant-Id` header (see
+ * `lib/api.ts`); the backend rejects it on every write route and resolves it
+ * to "no filter" only for read routes (see `dependencies.auth.get_current_tenant_scope`).
+ */
+export const ALL_TENANTS_SENTINEL = "__all__";
+
 /** localStorage key persisting the user id an admin/super_admin is impersonating. */
 export const IMPERSONATED_USER_ID_STORAGE_KEY = "a2flow.impersonatedUserId";
 

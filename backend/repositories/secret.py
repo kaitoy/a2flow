@@ -69,17 +69,29 @@ class SqlSecretRepository:
     plaintext.
     """
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
+    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the SQLModel session and the tenant these operations are scoped to."""
         self._db = session
         self._tenant_id = tenant_id
         self._tags = TagLinks(session, SecretTag, tenant_id=tenant_id)
 
+    def _require_tenant(self) -> str:
+        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
+
+        Only a write method should call this -- see
+        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
+        """
+        if self._tenant_id is None:
+            raise RuntimeError(
+                f"{type(self).__name__} mutation requires a concrete tenant_id"
+            )
+        return self._tenant_id
+
     async def _get_scoped(self, secret_id: str) -> Secret | None:
         """Return the Secret with the given ID within the current tenant, or ``None``."""
-        stmt = select(Secret).where(
-            Secret.id == secret_id, Secret.tenant_id == self._tenant_id
-        )
+        stmt = select(Secret).where(Secret.id == secret_id)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Secret.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -89,9 +101,9 @@ class SqlSecretRepository:
 
     async def get_by_name(self, name: str) -> Secret | None:
         """Return the Secret with the given unique name, or ``None`` if missing."""
-        stmt = select(Secret).where(
-            Secret.name == name, Secret.tenant_id == self._tenant_id
-        )
+        stmt = select(Secret).where(Secret.name == name)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Secret.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -114,7 +126,9 @@ class SqlSecretRepository:
         It is applied before the page window, so paging stays consistent with
         the filter.
         """
-        stmt = select(Secret).where(Secret.tenant_id == self._tenant_id)
+        stmt = select(Secret)
+        if self._tenant_id is not None:
+            stmt = stmt.where(Secret.tenant_id == self._tenant_id)
         for clause in self._tags.filter_clauses(col(Secret.id), tag_ids):
             stmt = stmt.where(clause)
         stmt = apply_filters(stmt, Secret, filters, readable=SecretRead)
@@ -133,7 +147,7 @@ class SqlSecretRepository:
         secret = Secret.model_validate(
             {
                 **data.model_dump(),
-                "tenant_id": self._tenant_id,
+                "tenant_id": self._require_tenant(),
                 "created_by": user_id,
                 "updated_by": user_id,
             }
@@ -153,6 +167,7 @@ class SqlSecretRepository:
         self, secret_id: str, data: SecretUpdate, *, user_id: str
     ) -> Secret:
         """Apply a partial update, raising NotFoundError or UniqueViolationError."""
+        self._require_tenant()
         secret = await self._get_scoped(secret_id)
         if secret is None:
             raise NotFoundError("Secret", secret_id)
@@ -179,6 +194,7 @@ class SqlSecretRepository:
         by foreign key, so deletion never raises ReferencedError; a dangling
         reference instead fails lazily at resolution time.
         """
+        self._require_tenant()
         secret = await self._get_scoped(secret_id)
         if secret is None:
             raise NotFoundError("Secret", secret_id)
@@ -213,6 +229,7 @@ class SqlSecretRepository:
             ForeignKeyViolationError: If any id does not name a tag of this
                 tenant.
         """
+        self._require_tenant()
         secret = await self._get_scoped(secret_id)
         if secret is None:
             raise NotFoundError("Secret", secret_id)
