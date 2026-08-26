@@ -217,6 +217,7 @@ export const MCP_TOOL_1 = {
 // API is write-only.
 export const SECRET_1 = {
   id: "secret-1",
+  tenantId: "tenant-1",
   name: "github-token",
   description: null,
   type: "local",
@@ -231,6 +232,7 @@ export const SECRET_1 = {
 
 export const SECRET_VAULT_1 = {
   id: "secret-2",
+  tenantId: "tenant-1",
   name: "vault-token",
   description: null,
   type: "vault",

@@ -201,6 +201,7 @@ class SecretRead(BaseEntity):
     """
 
     model_config = _alias_config
+    tenant_id: str
     name: str
     description: str | None = None
     type: SecretType

@@ -50,6 +50,51 @@ describe("AuditMeta", () => {
     ]);
   });
 
+  it("shows the tenant first when tenantId is passed", async () => {
+    // The MSW tenant handler resolves "tenant-1" to TENANT_1 ("Acme Corp").
+    const { container } = render(
+      <AuditMeta
+        createdBy="user-1"
+        updatedBy="user-2"
+        createdAt="2026-01-02T03:04:05Z"
+        updatedAt="2026-01-02T03:04:05Z"
+        tenantId="tenant-1"
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText("Acme Corp")).toBeInTheDocument());
+
+    const dl = container.querySelector("dl");
+    expect(Array.from(dl?.querySelectorAll("dt") ?? []).map((dt) => dt.textContent)).toEqual([
+      "Tenant",
+      "Created at",
+      "Created by",
+      "Updated at",
+      "Updated by",
+    ]);
+  });
+
+  it("omits the Tenant field when tenantId is not passed", () => {
+    const { container } = render(<AuditMeta createdBy="user-1" updatedBy="user-2" />);
+    expect(screen.queryByText("Tenant")).not.toBeInTheDocument();
+    const dl = container.querySelector("dl");
+    expect(Array.from(dl?.querySelectorAll("dt") ?? []).map((dt) => dt.textContent)).not.toContain(
+      "Tenant"
+    );
+  });
+
+  it("falls back to the raw tenant id when the tenant cannot be resolved", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/tenants", () =>
+        HttpResponse.json({ detail: "boom" }, { status: 500 })
+      )
+    );
+
+    render(<AuditMeta createdBy="user-1" updatedBy="user-2" tenantId="ghost-tenant" />);
+
+    await waitFor(() => expect(screen.getByText("ghost-tenant")).toBeInTheDocument());
+  });
+
   it("falls back to the raw ID when the user cannot be resolved", async () => {
     server.use(
       http.post("http://localhost:8000/api/v1/users/resolve-names", () =>

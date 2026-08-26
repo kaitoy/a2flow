@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zUserGroupCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
   deleteUserGroup,
   getUserGroup,
@@ -60,6 +61,7 @@ export default function UserGroupDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.ADMIN);
+  const isAllTenantsView = useIsAllTenantsView();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -95,6 +97,7 @@ export default function UserGroupDetailPage() {
           updatedBy: group.updatedBy,
           createdAt: group.createdAt,
           updatedAt: group.updatedAt,
+          tenantId: isAllTenantsView ? group.tenantId : undefined,
         });
       })
       .catch((err: unknown) => {
@@ -105,7 +108,7 @@ export default function UserGroupDetailPage() {
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
-  }, [groupId, reset]);
+  }, [groupId, reset, isAllTenantsView]);
 
   async function onSubmit(values: FormValues) {
     try {

@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
   type AvatarConfig,
   deleteUser,
@@ -126,6 +127,7 @@ export default function UserDetailPage() {
   const [originalTenantId, setOriginalTenantId] = useState<string | null>(null);
   const isSuperAdminViewer = useHasRole(Role.SUPER_ADMIN);
   const isAdmin = useHasRole(Role.ADMIN);
+  const isAllTenantsView = useIsAllTenantsView();
   // Admin is exactly what `UserService.update`/`delete` require to act on
   // another user; its self-service exemption covers only `avatarConfig`, which
   // this form never sends.
@@ -196,6 +198,7 @@ export default function UserDetailPage() {
           updatedBy: user.updatedBy,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
+          tenantId: isAllTenantsView ? (user.tenantId ?? null) : undefined,
         });
       })
       .catch((err: unknown) => {
@@ -206,7 +209,7 @@ export default function UserDetailPage() {
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
-  }, [userId, reset]);
+  }, [userId, reset, isAllTenantsView]);
 
   // Membership is not carried on the user record, so it is read through the
   // dedicated sub-resource. A failure here is not fatal: the picker renders an

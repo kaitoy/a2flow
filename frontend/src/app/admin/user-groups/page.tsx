@@ -19,12 +19,15 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tenantColumn } from "@/components/admin/tenant-columns";
 import { USER_GROUP_SHARED_COLUMNS } from "@/components/admin/user-group-columns";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
 import { deleteUserGroup, listUserGroups, type UserGroup } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
@@ -37,7 +40,11 @@ const LIMIT = 20;
  * does — the rest is shared with {@link GroupPicker}'s dialog table via
  * {@link USER_GROUP_SHARED_COLUMNS}.
  */
-function buildColumns(names: Map<string, string>): ColumnDef<UserGroup>[] {
+function buildColumns(
+  names: Map<string, string>,
+  tenantNames: Map<string, string>,
+  isAllTenantsView: boolean
+): ColumnDef<UserGroup>[] {
   return [
     idColumn<UserGroup>(),
     {
@@ -61,6 +68,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<UserGroup>[] {
       visibility: "optional",
       cell: (g) => <DateTime value={g.createdAt} className="text-on-surface-variant" />,
     },
+    ...(isAllTenantsView ? [tenantColumn<UserGroup>(tenantNames)] : []),
     ...auditColumns<UserGroup>(names),
   ];
 }
@@ -80,6 +88,8 @@ export default function UserGroupsPage() {
     reload,
   } = useTableQuery<UserGroup>(listUserGroups, { limit: LIMIT });
   const names = useUserNames(rows.flatMap((g) => [g.createdBy, g.updatedBy]));
+  const isAllTenantsView = useIsAllTenantsView();
+  const tenantNames = useTenantNames(rows.map((g) => g.tenantId));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   async function executeDelete() {
@@ -95,7 +105,7 @@ export default function UserGroupsPage() {
   }
 
   const columns: ColumnDef<UserGroup>[] = [
-    ...buildColumns(names),
+    ...buildColumns(names, tenantNames, isAllTenantsView),
     ...(canEdit
       ? [
           {

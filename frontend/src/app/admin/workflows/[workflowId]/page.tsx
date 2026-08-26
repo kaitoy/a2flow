@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip } from "@/components/ui/tooltip";
 import { zGenerateWorkflowRequest } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import {
   type AgentSkill,
@@ -147,6 +148,7 @@ export default function WorkflowDetailPage() {
   const canRun = useHasRole(Role.REQUESTER, Role.DEVELOPER);
   const canEdit = useHasRole(Role.DEVELOPER);
   const canViewTemplates = useHasRole(Role.REQUESTER, Role.DEVELOPER);
+  const isAllTenantsView = useIsAllTenantsView();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
@@ -203,9 +205,10 @@ export default function WorkflowDetailPage() {
         updatedBy: wf.updatedBy,
         createdAt: wf.createdAt,
         updatedAt: wf.updatedAt,
+        tenantId: isAllTenantsView ? wf.tenantId : undefined,
       });
     },
-    [reset]
+    [reset, isAllTenantsView]
   );
 
   useEffect(() => {

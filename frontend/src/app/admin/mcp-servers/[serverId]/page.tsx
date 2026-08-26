@@ -26,6 +26,7 @@ import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
   deleteMcpServer,
   getMcpServer,
@@ -54,6 +55,7 @@ export default function McpServerDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
+  const isAllTenantsView = useIsAllTenantsView();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -106,6 +108,7 @@ export default function McpServerDetailPage() {
           updatedBy: server.updatedBy,
           createdAt: server.createdAt,
           updatedAt: server.updatedAt,
+          tenantId: isAllTenantsView ? server.tenantId : undefined,
         });
       })
       .catch((err: unknown) => {
@@ -116,7 +119,7 @@ export default function McpServerDetailPage() {
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
-  }, [serverId, reset]);
+  }, [serverId, reset, isAllTenantsView]);
 
   async function onSubmit(values: McpServerFormValues) {
     try {

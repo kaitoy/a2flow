@@ -12,11 +12,14 @@ import { auditColumns, idColumn } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tenantColumn } from "@/components/admin/tenant-columns";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useGroupNames } from "@/hooks/useGroupNames";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
 import { useWorkflowExecutionNames } from "@/hooks/useWorkflowExecutionNames";
 import { type Approval, listApprovals } from "@/lib/api";
@@ -47,6 +50,8 @@ export default function ApprovalsPage() {
   );
   const groupNames = useGroupNames(rows.map((a) => a.approverGroupId));
   const executionNames = useWorkflowExecutionNames(rows.map((a) => a.workflowExecutionId));
+  const isAllTenantsView = useIsAllTenantsView();
+  const tenantNames = useTenantNames(rows.map((a) => a.tenantId));
 
   const columns = useMemo<ColumnDef<Approval>[]>(
     () => [
@@ -126,6 +131,7 @@ export default function ApprovalsPage() {
         cell: (a) =>
           a.decidedAt ? <DateTime value={a.decidedAt} className="text-on-surface-variant" /> : "—",
       },
+      ...(isAllTenantsView ? [tenantColumn<Approval>(tenantNames)] : []),
       ...auditColumns<Approval>(names),
       {
         header: "Actions",
@@ -142,7 +148,7 @@ export default function ApprovalsPage() {
         ),
       },
     ],
-    [names, groupNames, executionNames]
+    [names, groupNames, executionNames, tenantNames, isAllTenantsView]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(

@@ -14,14 +14,17 @@ import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { GenerateWorkflowDialog } from "@/components/admin/generate-workflow-dialog";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { tagsColumn } from "@/components/admin/tag-columns";
+import { tenantColumn } from "@/components/admin/tenant-columns";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { StatusDot } from "@/components/ui/status-dot";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
 import {
   formatRevision,
@@ -64,7 +67,11 @@ function SyncStatus({ skill }: { skill: AgentSkill }) {
   );
 }
 
-function buildColumns(names: Map<string, string>): ColumnDef<AgentSkill>[] {
+function buildColumns(
+  names: Map<string, string>,
+  tenantNames: Map<string, string>,
+  isAllTenantsView: boolean
+): ColumnDef<AgentSkill>[] {
   return [
     idColumn<AgentSkill>(),
     {
@@ -146,6 +153,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<AgentSkill>[] {
       cell: (s) =>
         s.syncedAt ? <DateTime value={s.syncedAt} className="text-on-surface-variant" /> : "—",
     },
+    ...(isAllTenantsView ? [tenantColumn<AgentSkill>(tenantNames)] : []),
     ...auditColumns<AgentSkill>(names),
   ];
 }
@@ -168,6 +176,8 @@ export default function AgentSkillsPage() {
   } = useTableQuery<AgentSkill>(listAgentSkills, { limit: LIMIT });
   const { byId: tagsById } = useTags();
   const names = useUserNames(rows.flatMap((s) => [s.createdBy, s.updatedBy]));
+  const isAllTenantsView = useIsAllTenantsView();
+  const tenantNames = useTenantNames(rows.map((s) => s.tenantId));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [generateTarget, setGenerateTarget] = useState<{ id: string; name: string } | null>(null);
   const [pullingId, setPullingId] = useState<string | null>(null);
@@ -215,7 +225,7 @@ export default function AgentSkillsPage() {
   }
 
   const columns: ColumnDef<AgentSkill>[] = [
-    ...buildColumns(names),
+    ...buildColumns(names, tenantNames, isAllTenantsView),
     tagsColumn<AgentSkill>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [

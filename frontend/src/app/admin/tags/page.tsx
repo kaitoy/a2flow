@@ -20,12 +20,15 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tenantColumn } from "@/components/admin/tenant-columns";
 import { Chip } from "@/components/ui/chip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
 import { deleteTag, listTags, type Tag } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
@@ -33,7 +36,11 @@ import { resolveTagColor, tagColorLabel } from "@/lib/tag-palette";
 
 const LIMIT = 20;
 
-function buildColumns(names: Map<string, string>): ColumnDef<Tag>[] {
+function buildColumns(
+  names: Map<string, string>,
+  tenantNames: Map<string, string>,
+  isAllTenantsView: boolean
+): ColumnDef<Tag>[] {
   return [
     idColumn<Tag>(),
     {
@@ -75,6 +82,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<Tag>[] {
       visibility: "optional",
       cell: (tag) => <DateTime value={tag.createdAt} className="text-on-surface-variant" />,
     },
+    ...(isAllTenantsView ? [tenantColumn<Tag>(tenantNames)] : []),
     ...auditColumns<Tag>(names),
   ];
 }
@@ -94,6 +102,8 @@ export default function TagsPage() {
     reload,
   } = useTableQuery<Tag>(listTags, { limit: LIMIT });
   const names = useUserNames(rows.flatMap((tag) => [tag.createdBy, tag.updatedBy]));
+  const isAllTenantsView = useIsAllTenantsView();
+  const tenantNames = useTenantNames(rows.map((tag) => tag.tenantId));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   async function executeDelete() {
@@ -109,7 +119,7 @@ export default function TagsPage() {
   }
 
   const columns: ColumnDef<Tag>[] = [
-    ...buildColumns(names),
+    ...buildColumns(names, tenantNames, isAllTenantsView),
     ...(canEdit
       ? [
           {

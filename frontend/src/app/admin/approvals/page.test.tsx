@@ -1,10 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { store as appStore } from "@/store";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
+import { render, screen, waitFor } from "@/test/test-utils";
 import ApprovalsPage from "./page";
 
 vi.mock("next/link", () => ({

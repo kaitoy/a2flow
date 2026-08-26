@@ -21,14 +21,17 @@ import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { RegistrySearchDialog } from "@/components/admin/registry-search-dialog";
 import { tagsColumn } from "@/components/admin/tag-columns";
+import { tenantColumn } from "@/components/admin/tenant-columns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
 import {
   deleteMcpServer,
@@ -41,7 +44,11 @@ import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
 
-function buildColumns(names: Map<string, string>): ColumnDef<McpServer>[] {
+function buildColumns(
+  names: Map<string, string>,
+  tenantNames: Map<string, string>,
+  isAllTenantsView: boolean
+): ColumnDef<McpServer>[] {
   return [
     idColumn<McpServer>(),
     {
@@ -93,6 +100,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<McpServer>[] {
       visibility: "optional",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
+    ...(isAllTenantsView ? [tenantColumn<McpServer>(tenantNames)] : []),
     ...auditColumns<McpServer>(names),
   ];
 }
@@ -115,6 +123,8 @@ export default function McpServersPage() {
   } = useTableQuery<McpServer>(listMcpServers, { limit: LIMIT });
   const { byId: tagsById } = useTags();
   const names = useUserNames(rows.flatMap((s) => [s.createdBy, s.updatedBy]));
+  const isAllTenantsView = useIsAllTenantsView();
+  const tenantNames = useTenantNames(rows.map((s) => s.tenantId));
   const router = useRouter();
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [registryOpen, setRegistryOpen] = useState(false);
@@ -142,7 +152,7 @@ export default function McpServersPage() {
   }
 
   const columns: ColumnDef<McpServer>[] = [
-    ...buildColumns(names),
+    ...buildColumns(names, tenantNames, isAllTenantsView),
     tagsColumn<McpServer>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [

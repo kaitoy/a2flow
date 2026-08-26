@@ -18,6 +18,7 @@ import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
   deleteWorkflowExecution,
   getUserNames,
@@ -51,6 +52,7 @@ export default function WorkflowExecutionDetailPage() {
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const isAdmin = useHasRole(Role.ADMIN);
+  const isAllTenantsView = useIsAllTenantsView();
 
   useEffect(() => {
     let active = true;
@@ -63,6 +65,7 @@ export default function WorkflowExecutionDetailPage() {
           updatedBy: s.updatedBy,
           createdAt: s.createdAt,
           updatedAt: s.updatedAt,
+          tenantId: isAllTenantsView ? s.tenantId : undefined,
         });
         const names = await getUserNames([s.initiatorId]);
         if (active) setUserName(names.get(s.initiatorId) ?? null);
@@ -81,7 +84,7 @@ export default function WorkflowExecutionDetailPage() {
     return () => {
       active = false;
     };
-  }, [executionId]);
+  }, [executionId, isAllTenantsView]);
 
   async function executeDelete() {
     setConfirmOpen(false);

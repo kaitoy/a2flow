@@ -5,6 +5,7 @@ import type { User } from "@/lib/api";
 import type { Role } from "@/lib/roles";
 import type { RootState } from "@/store";
 import { store as appStore } from "@/store";
+import { ALL_TENANTS_SENTINEL } from "@/store/authSlice";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { act, render, screen, waitFor, within } from "@/test/test-utils";
@@ -33,6 +34,11 @@ function authState(roles: Role[]): Partial<RootState> {
 const FULL_ACCESS = authState(["developer"]);
 /** A signed-in user with no role granting agent-skill writes. */
 const READ_ONLY = authState(["requester"]);
+/** A Super Admin browsing every tenant at once. */
+const ALL_TENANTS: Partial<RootState> = {
+  ...FULL_ACCESS,
+  auth: { ...FULL_ACCESS.auth, selectedTenantId: ALL_TENANTS_SENTINEL } as RootState["auth"],
+};
 
 const SKILL_URL = "http://localhost:8000/api/v1/agent-skills";
 
@@ -96,6 +102,20 @@ describe("AgentSkillsPage", () => {
     render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-skill"));
     expect(screen.getByText("Cloning")).toBeInTheDocument();
+  });
+
+  it("shows the tenant column and name only while browsing all tenants", async () => {
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.queryByText("Tenant")).not.toBeInTheDocument();
+    expect(screen.queryByText("Acme Corp")).not.toBeInTheDocument();
+  });
+
+  it("shows the tenant column and resolved name while browsing all tenants", async () => {
+    render(<AgentSkillsPage />, { preloadedState: ALL_TENANTS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getByText("Tenant")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Acme Corp")).toBeInTheDocument());
   });
 
   it("hides the revision column by default", async () => {

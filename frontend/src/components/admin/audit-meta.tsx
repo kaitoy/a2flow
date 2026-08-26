@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { DateTime } from "@/components/ui/date-time";
 import { DetailItem } from "@/components/ui/detail-list";
+import { useTenantNames } from "@/hooks/useTenantNames";
 import { getUserNames } from "@/lib/api";
 
 /** Props for {@link AuditMeta}: the audit fields shared by every persistent entity. */
@@ -16,20 +17,35 @@ export interface AuditMetaProps {
   createdAt?: string;
   /** ISO timestamp the record was last updated, if available. */
   updatedAt?: string;
+  /**
+   * ID of the tenant the record belongs to. Pass this only when it should be
+   * shown — e.g. a caller gates it behind `useIsAllTenantsView()` so it
+   * appears only while a Super Admin is browsing across every tenant, where
+   * the record's tenant is otherwise invisible.
+   */
+  tenantId?: string | null;
 }
 
 /**
  * Read-only footer showing who created and last updated a record (resolved to
- * "First Last", falling back to the raw ID) alongside the timestamps. Shared by
- * the admin detail pages so audit display is identical everywhere.
+ * "First Last", falling back to the raw ID) alongside the timestamps, and
+ * optionally which tenant it belongs to. Shared by the admin detail pages so
+ * audit display is identical everywhere.
  *
  * Fixed at two columns (unlike `DetailList`'s responsive grid used elsewhere)
  * so "at"/"by" stay paired as a row. This component always renders inside
  * `FormLayout`'s fixed 16rem aside, which never reaches a container
  * breakpoint wide enough to earn two columns on its own.
  */
-export function AuditMeta({ createdBy, updatedBy, createdAt, updatedAt }: AuditMetaProps) {
+export function AuditMeta({
+  createdBy,
+  updatedBy,
+  createdAt,
+  updatedAt,
+  tenantId,
+}: AuditMetaProps) {
   const [names, setNames] = useState<Map<string, string>>(new Map());
+  const tenantNames = useTenantNames(tenantId ? [tenantId] : []);
 
   useEffect(() => {
     let active = true;
@@ -49,6 +65,7 @@ export function AuditMeta({ createdBy, updatedBy, createdAt, updatedAt }: AuditM
 
   return (
     <dl className="grid grid-cols-2 gap-4 rounded-xl glass-panel p-4 text-on-surface-variant">
+      {tenantId && <DetailItem label="Tenant" value={tenantNames.get(tenantId) ?? tenantId} />}
       {createdAt && <DetailItem label="Created at" value={<DateTime value={createdAt} />} />}
       <DetailItem label="Created by" value={nameOf(createdBy)} />
       {updatedAt && <DetailItem label="Updated at" value={<DateTime value={updatedAt} />} />}

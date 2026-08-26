@@ -12,12 +12,15 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tenantColumn } from "@/components/admin/tenant-columns";
 import { WorkflowExecutionStatusLabel } from "@/components/admin/workflow-execution-status";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import { deleteWorkflowExecution, listWorkflowExecutions, type WorkflowExecution } from "@/lib/api";
@@ -34,7 +37,9 @@ const LIMIT = 20;
 function buildColumns(
   userMap: Map<string, string>,
   onDelete: (id: string, name: string) => void,
-  isAdmin: boolean
+  isAdmin: boolean,
+  tenantNames: Map<string, string>,
+  isAllTenantsView: boolean
 ): ColumnDef<WorkflowExecution>[] {
   return [
     idColumn<WorkflowExecution>(),
@@ -128,6 +133,7 @@ function buildColumns(
       className: "font-mono",
       cell: (s) => formatRevision(s.agentSkillCommitSha),
     },
+    ...(isAllTenantsView ? [tenantColumn<WorkflowExecution>(tenantNames)] : []),
     ...auditColumns<WorkflowExecution>(userMap),
     {
       header: "Actions",
@@ -187,10 +193,12 @@ export default function WorkflowExecutionsPage() {
 
   // Resolve user display names for the current page of sessions.
   const userMap = useUserNames(rows.flatMap((s) => [s.initiatorId, s.createdBy, s.updatedBy]));
+  const isAllTenantsView = useIsAllTenantsView();
+  const tenantNames = useTenantNames(rows.map((s) => s.tenantId));
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowExecutions",
-    buildColumns(userMap, handleDelete, isAdmin)
+    buildColumns(userMap, handleDelete, isAdmin, tenantNames, isAllTenantsView)
   );
 
   return (

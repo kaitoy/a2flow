@@ -24,6 +24,7 @@ import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
   deleteTag,
   getTag,
@@ -54,6 +55,7 @@ export default function TagDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
+  const isAllTenantsView = useIsAllTenantsView();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -88,6 +90,7 @@ export default function TagDetailPage() {
           updatedBy: tag.updatedBy,
           createdAt: tag.createdAt,
           updatedAt: tag.updatedAt,
+          tenantId: isAllTenantsView ? tag.tenantId : undefined,
         });
       })
       .catch((err: unknown) => {
@@ -98,7 +101,7 @@ export default function TagDetailPage() {
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
-  }, [tagId, reset]);
+  }, [tagId, reset, isAllTenantsView]);
 
   async function onSubmit(values: TagFormValues) {
     try {

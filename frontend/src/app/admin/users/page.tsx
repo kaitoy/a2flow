@@ -21,6 +21,7 @@ import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { InheritedRoles } from "@/components/admin/inherited-roles";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tenantColumn } from "@/components/admin/tenant-columns";
 import { USER_SHARED_COLUMNS } from "@/components/admin/user-columns";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
 import { deleteUser, listUsers, startImpersonation, type User } from "@/lib/api";
 import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
@@ -56,7 +59,11 @@ function boolCell(value: boolean): string {
  * {@link UserPicker}'s dialog table via {@link USER_SHARED_COLUMNS}. Takes
  * `names` (rather than being a static array) because the audit columns need it.
  */
-function buildColumns(names: Map<string, string>): ColumnDef<User>[] {
+function buildColumns(
+  names: Map<string, string>,
+  tenantNames: Map<string, string>,
+  isAllTenantsView: boolean
+): ColumnDef<User>[] {
   return [
     idColumn<User>(),
     {
@@ -137,6 +144,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<User>[] {
       cell: (u) =>
         u.deletedAt ? <DateTime value={u.deletedAt} className="text-on-surface-variant" /> : "—",
     },
+    ...(isAllTenantsView ? [tenantColumn<User>(tenantNames)] : []),
     ...auditColumns<User>(names),
   ];
 }
@@ -155,6 +163,8 @@ export default function UsersPage() {
     reload,
   } = useTableQuery<User>(listUsers, { limit: LIMIT });
   const names = useUserNames(rows.flatMap((u) => [u.createdBy, u.updatedBy]));
+  const isAllTenantsView = useIsAllTenantsView();
+  const tenantNames = useTenantNames(rows.map((u) => u.tenantId));
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [impersonateTarget, setImpersonateTarget] = useState<{ id: string; name: string } | null>(
     null
@@ -203,7 +213,7 @@ export default function UsersPage() {
   }
 
   const columns: ColumnDef<User>[] = [
-    ...buildColumns(names),
+    ...buildColumns(names, tenantNames, isAllTenantsView),
     // Both actions in this column need the admin role — deleting a user
     // outright, and `canImpersonate`, which already answers false without it —
     // so the whole column goes for a viewer who only holds a read role.

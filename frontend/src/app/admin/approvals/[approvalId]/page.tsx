@@ -17,6 +17,7 @@ import { StatusCard } from "@/components/admin/status-card";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
   type Approval,
   type ApprovalCertificateRead,
@@ -56,6 +57,7 @@ export default function ApprovalDetailPage() {
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [certificate, setCertificate] = useState<ApprovalCertificateRead | null>(null);
   const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
+  const isAllTenantsView = useIsAllTenantsView();
 
   useEffect(() => {
     let active = true;
@@ -68,6 +70,7 @@ export default function ApprovalDetailPage() {
           updatedBy: a.updatedBy,
           createdAt: a.createdAt,
           updatedAt: a.updatedAt,
+          tenantId: isAllTenantsView ? a.tenantId : undefined,
         });
         // One batched lookup for both user references the page can show.
         const userIds = [a.approver, a.decidedBy].filter((id): id is string => !!id);
@@ -124,7 +127,7 @@ export default function ApprovalDetailPage() {
     return () => {
       active = false;
     };
-  }, [approvalId]);
+  }, [approvalId, isAllTenantsView]);
 
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },

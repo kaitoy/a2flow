@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { StatusDot } from "@/components/ui/status-dot";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
   formatRevision,
   formatSyncStatusLabel,
@@ -78,6 +79,7 @@ export default function AgentSkillDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
+  const isAllTenantsView = useIsAllTenantsView();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -139,6 +141,7 @@ export default function AgentSkillDetailPage() {
           updatedBy: skill.updatedBy,
           createdAt: skill.createdAt,
           updatedAt: skill.updatedAt,
+          tenantId: isAllTenantsView ? skill.tenantId : undefined,
         });
       })
       .catch((err: unknown) => {
@@ -149,7 +152,7 @@ export default function AgentSkillDetailPage() {
         // Failure toast is shown globally by api.ts; nothing else to do here.
       })
       .finally(() => setLoading(false));
-  }, [skillId, reset, applySync]);
+  }, [skillId, reset, applySync, isAllTenantsView]);
 
   // The clone runs in the background on the server and nothing pushes its
   // result here, so poll until it lands on ready or failed.
