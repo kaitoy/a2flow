@@ -8,21 +8,44 @@ end-to-end through the API, since that is what a client actually observes.
 """
 
 import pytest
+from google.adk.events.event import Event
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
 
+from dependencies import APP_NAME
 from dependencies.auth import (
     ALL_TENANTS_SENTINEL,
     TENANT_HEADER_NAME,
     get_current_tenant_id,
     get_current_tenant_scope,
 )
+from infrastructure.agent import tenant_app_name
+from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.user import SYSTEM_USER_ID, User
+from models.workflow import Workflow
+from models.workflow_execution import WorkflowExecution
 from repositories.exceptions import ForbiddenError
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID
 from tests._workflow import create_published_workflow
+from tests.conftest import FAKE_COMMIT_SHA
+
+#: Minimal well-formed body for the streaming ``POST .../agent`` routes --
+#: enough to pass request validation so a 403 unambiguously comes from the
+#: tenant dependency, not from a 422 on the body.
+_RUN_AGENT_INPUT_BODY = {
+    "threadId": "t1",
+    "runId": "r1",
+    "state": {},
+    "messages": [],
+    "tools": [],
+    "context": [],
+    "forwardedProps": {},
+}
 
 
 def _user(tenant_id: str | None) -> User:
@@ -460,3 +483,201 @@ async def test_super_admin_all_tenants_resolves_workflow_task_access_policy_grap
         )
     )
     assert got["id"] == seeded[0]["id"]
+
+
+async def _seed_cross_tenant_design_session(
+    eng: AsyncEngine, session_service: InMemorySessionService, *, tenant_id: str
+) -> str:
+    """Insert an AgentSkill + published Workflow directly into ``tenant_id``.
+
+    Bypasses the mocked sync/generation jobs, which hardcode
+    ``DEFAULT_TEST_TENANT_ID`` -- see
+    ``test_super_admin_all_tenants_resolves_workflows_deep_collaborator_graph``
+    above. Seeds the design session with one message and returns the
+    workflow's id.
+    """
+    skill_id, session_id = f"skill-{tenant_id}", f"design-session-{tenant_id}"
+    async with AsyncSession(eng) as db:
+        db.add(
+            AgentSkill(
+                id=skill_id,
+                name=skill_id,
+                repo_url="https://example.com/repo",
+                repo_path="",
+                sync_status=SkillSyncStatus.ready,
+                commit_sha=FAKE_COMMIT_SHA,
+                tenant_id=tenant_id,
+                created_by="owner",
+                updated_by="owner",
+            )
+        )
+        workflow = Workflow(
+            name=f"workflow-{tenant_id}",
+            agent_skill_id=skill_id,
+            session_id=session_id,
+            agent_skill_commit_sha=FAKE_COMMIT_SHA,
+            tenant_id=tenant_id,
+            created_by="owner",
+            updated_by="owner",
+        )
+        db.add(workflow)
+        await db.commit()
+        await db.refresh(workflow)
+
+    session = await session_service.create_session(
+        app_name=tenant_app_name(APP_NAME, tenant_id),
+        user_id="owner",
+        session_id=session_id,
+    )
+    await session_service.append_event(
+        session,
+        Event(
+            author="user",
+            content=types.Content(
+                role="user", parts=[types.Part(text="hello from tenant-b")]
+            ),
+        ),
+    )
+    return workflow.id
+
+
+async def _seed_cross_tenant_execution_with_message(
+    eng: AsyncEngine, session_service: InMemorySessionService, *, tenant_id: str
+) -> str:
+    """Insert an AgentSkill + WorkflowExecution directly into ``tenant_id``.
+
+    Same rationale as ``_seed_cross_tenant_design_session`` above. Seeds the
+    workflow session with one message and returns the execution's id.
+    """
+    skill_id, session_id = f"skill-exec-{tenant_id}", f"exec-session-{tenant_id}"
+    async with AsyncSession(eng) as db:
+        db.add(
+            AgentSkill(
+                id=skill_id,
+                name=skill_id,
+                repo_url="https://example.com/repo",
+                repo_path="",
+                sync_status=SkillSyncStatus.ready,
+                commit_sha=FAKE_COMMIT_SHA,
+                tenant_id=tenant_id,
+                created_by="owner",
+                updated_by="owner",
+            )
+        )
+        execution = WorkflowExecution(
+            session_id=session_id,
+            name="wf",
+            workflow_prompt="do it",
+            agent_skill_id=skill_id,
+            agent_skill_name=skill_id,
+            agent_skill_repo_url="https://example.com/repo",
+            agent_skill_repo_path="",
+            agent_skill_commit_sha=FAKE_COMMIT_SHA,
+            initiator_id="owner",
+            tenant_id=tenant_id,
+            created_by="owner",
+            updated_by="owner",
+        )
+        db.add(execution)
+        await db.commit()
+        await db.refresh(execution)
+
+    session = await session_service.create_session(
+        app_name=tenant_app_name(APP_NAME, tenant_id),
+        user_id="owner",
+        session_id=session_id,
+    )
+    await session_service.append_event(
+        session,
+        Event(
+            author="user",
+            content=types.Content(
+                role="user", parts=[types.Part(text="hello from tenant-b run")]
+            ),
+        ),
+    )
+    return execution.id
+
+
+async def test_super_admin_all_tenants_reads_design_session_messages_in_other_tenant(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+    real_session_service: InMemorySessionService,
+) -> None:
+    """A super_admin in "all tenants" mode reads another tenant's design chat."""
+    client, eng = workflow_client_with_engine
+    tenant_b = assert_ok(
+        await client.post(
+            "/api/v1/tenants",
+            json={"displayName": "Tenant Cross Design", "name": "tenant-cross-design"},
+        ),
+        status=201,
+    )["id"]
+    workflow_id = await _seed_cross_tenant_design_session(
+        eng, real_session_service, tenant_id=tenant_b
+    )
+
+    response = await client.get(
+        f"/api/v1/workflows/{workflow_id}/messages", headers=_all_tenants_headers()
+    )
+    messages = assert_ok(response)
+    assert [m["content"] for m in messages] == ["hello from tenant-b"]
+
+
+async def test_super_admin_all_tenants_rejects_design_session_agent(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """The mutating agent route stays on the strict, single-tenant dependency.
+
+    ``resolve_agent``'s DI graph (``WorkflowRepositoryDep`` ->
+    ``CurrentTenantIdDep``) raises before the route body or ``workflow_id`` is
+    ever resolved, so a nonexistent id is enough to prove the 403 comes from
+    the tenant dependency itself, mirroring ``test_super_admin_all_tenants_rejects_create``.
+    """
+    client, _eng = workflow_client_with_engine
+    response = await client.post(
+        "/api/v1/workflows/nonexistent/agent",
+        json=_RUN_AGENT_INPUT_BODY,
+        headers=_all_tenants_headers(),
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_super_admin_all_tenants_reads_workflow_session_messages_in_other_tenant(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+    real_session_service: InMemorySessionService,
+) -> None:
+    """A super_admin in "all tenants" mode reads another tenant's run chat."""
+    client, eng = workflow_client_with_engine
+    tenant_b = assert_ok(
+        await client.post(
+            "/api/v1/tenants",
+            json={
+                "displayName": "Tenant Cross Execution",
+                "name": "tenant-cross-execution",
+            },
+        ),
+        status=201,
+    )["id"]
+    execution_id = await _seed_cross_tenant_execution_with_message(
+        eng, real_session_service, tenant_id=tenant_b
+    )
+
+    response = await client.get(
+        f"/api/v1/workflow-executions/{execution_id}/messages",
+        headers=_all_tenants_headers(),
+    )
+    messages = assert_ok(response)
+    assert [m["content"] for m in messages] == ["hello from tenant-b run"]
+
+
+async def test_super_admin_all_tenants_rejects_workflow_session_agent(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Regression guard: the fix must not have leaked into the write route."""
+    client, _eng = workflow_client_with_engine
+    response = await client.post(
+        "/api/v1/workflow-executions/nonexistent/agent",
+        json=_RUN_AGENT_INPUT_BODY,
+        headers=_all_tenants_headers(),
+    )
+    assert_err(response, "FORBIDDEN", 403)

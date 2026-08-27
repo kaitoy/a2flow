@@ -341,7 +341,7 @@ async def workflow_session_agent(
 )
 async def get_workflow_session_messages(
     execution_id: str,
-    service: WorkflowExecutionServiceDep,
+    service: WorkflowExecutionReadServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
@@ -354,6 +354,13 @@ async def get_workflow_session_messages(
     an empty, separate session. Returns an empty list when the ADK session
     has not been created yet. Raises HTTP 404 if the WorkflowExecution does
     not exist.
+
+    Unlike ``POST /workflow-executions/{id}/agent`` above, this is a read: a
+    platform-scoped super_admin who has selected "All tenants"
+    (``X-Tenant-Id: __all__``) can read this chat for an execution in any
+    tenant -- see ``WorkflowExecutionReadServiceDep`` and
+    ``dependencies.auth.get_current_tenant_scope``. The agent route stays on
+    the strict, single-tenant dependency, since driving the chat is a write.
     """
     messages = await service.get_messages(
         execution_id, caller=caller, caller_roles=caller_roles

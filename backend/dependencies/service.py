@@ -471,11 +471,15 @@ def get_workflow_read_service(
 ) -> WorkflowService:
     """Create a WorkflowService for a read route, possibly across all tenants.
 
-    Backs only ``list_workflows``/``get_workflow``/``list_workflow_task_templates``,
-    which touch only ``workflows`` -- every other collaborator here must still
-    be the read repository (not the strict one), since merely resolving a
+    Backs ``list_workflows``, ``get_workflow``, and
+    ``get_design_session_messages`` (``list_workflow_task_templates`` is
+    served by ``WorkflowTaskTemplateReadServiceDep`` instead, not this one).
+    Only ``get_design_session_messages`` touches a collaborator beyond
+    ``workflows`` -- its ``meta`` read for the design session's per-message
+    attribution -- but every other collaborator here must still be the read
+    repository (not the strict one) regardless, since merely resolving a
     strict, tenant-scoped dependency would itself raise in all-tenants mode
-    regardless of whether this service ever calls into it.
+    even for the two methods that never call into it.
     """
     return WorkflowService(
         workflows,

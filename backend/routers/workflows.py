@@ -135,7 +135,7 @@ async def list_workflow_task_templates(
 @router.get("/{workflow_id}/messages", response_model=ApiResponse[list[dict[str, Any]]])
 async def get_design_session_messages(
     workflow_id: str,
-    service: WorkflowServiceDep,
+    service: WorkflowReadServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
@@ -149,6 +149,13 @@ async def get_design_session_messages(
     carries the ``senderUserId`` recorded for it. Returns an empty list when the
     ADK session has not been created yet (the background generation run has not
     started). Raises HTTP 404 if the workflow does not exist.
+
+    Unlike ``POST /workflows/{id}/agent`` below, this is a read: a
+    platform-scoped super_admin who has selected "All tenants"
+    (``X-Tenant-Id: __all__``) can read this chat for a workflow in any
+    tenant, not just the one they've picked -- see ``WorkflowReadServiceDep``
+    and ``dependencies.auth.get_current_tenant_scope``. The agent route stays
+    on the strict, single-tenant dependency, since driving the chat is a write.
     """
     messages = await service.get_messages(
         workflow_id, caller=caller, caller_roles=caller_roles

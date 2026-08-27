@@ -255,9 +255,19 @@ class WorkflowService:
         who generated it is not locked out of their own conversation if their
         ``developer`` role is later revoked.
 
-        The tenant boundary is enforced a layer below: the workflow was fetched
-        through the tenant-scoped repository, so another tenant's id surfaced as
-        404 before ever reaching here.
+        The tenant boundary, when there is one, is enforced a layer below --
+        by whichever repository fetched the workflow, not by this method.
+        ``get_for_design`` reaches this after fetching through the ordinary,
+        tenant-scoped repository for every caller except one: a platform-scoped
+        super_admin who has selected "All tenants" reaches ``get_messages``
+        through ``WorkflowReadServiceDep`` instead (``GET
+        /workflows/{id}/messages`` only -- ``POST /workflows/{id}/agent``'s
+        ``resolve_agent`` always stays on the strict, tenant-scoped
+        ``WorkflowServiceDep``). In that read-only, all-tenants mode
+        ``tenant_id`` is unfiltered, so another tenant's workflow resolves
+        instead of 404ing, and the checks below are the *only* thing standing
+        between an unrelated caller and another tenant's design session --
+        there is no tenant boundary left to fall back on.
 
         Args:
             workflow: The workflow whose design session is being operated on.
