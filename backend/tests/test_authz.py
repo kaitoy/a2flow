@@ -344,7 +344,9 @@ async def test_execute_workflow_allowed_for_developer(
     res = await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/execute", headers=_roles("developer")
     )
-    assert_ok(res, status=201)
+    execution = assert_ok(res, status=201)
+    # A run of a published workflow is a real run, not a pre-publish test.
+    assert execution["isDraft"] is False
 
 
 async def test_execute_workflow_allowed_for_super_admin(
@@ -378,7 +380,10 @@ async def test_execute_draft_workflow_allowed_for_developer(
     res = await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/execute", headers=_roles("developer")
     )
-    assert_ok(res, status=201)
+    execution = assert_ok(res, status=201)
+    # Running a still-draft workflow is a pre-publish test run, flagged so the
+    # operations metrics can leave it out.
+    assert execution["isDraft"] is True
 
 
 async def test_execute_draft_workflow_allowed_for_super_admin(

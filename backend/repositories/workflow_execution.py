@@ -38,7 +38,12 @@ class WorkflowExecutionRepository(Protocol):
     ) -> list[WorkflowExecution]: ...
 
     async def create(
-        self, data: WorkflowExecutionCreate, *, workflow_id: str, user_id: str
+        self,
+        data: WorkflowExecutionCreate,
+        *,
+        workflow_id: str,
+        user_id: str,
+        is_draft: bool = False,
     ) -> WorkflowExecution: ...
 
     async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]: ...
@@ -178,13 +183,32 @@ class SqlWorkflowExecutionRepository:
         return list(result.all())
 
     async def create(
-        self, data: WorkflowExecutionCreate, *, workflow_id: str, user_id: str
+        self,
+        data: WorkflowExecutionCreate,
+        *,
+        workflow_id: str,
+        user_id: str,
+        is_draft: bool = False,
     ) -> WorkflowExecution:
-        """Persist a new WorkflowExecution with audit fields populated."""
+        """Persist a new WorkflowExecution with audit fields populated.
+
+        Args:
+            data: The API-supplied snapshot of workflow and skill metadata.
+            workflow_id: The workflow this run belongs to.
+            user_id: The acting user, written to the audit columns.
+            is_draft: Whether the workflow was still ``draft`` when the run
+                started — a pre-publish test run. Server-set, like
+                ``workflow_id``; recorded so ``repositories/metrics.py`` can
+                exclude the run from the operations metrics.
+
+        Returns:
+            The persisted WorkflowExecution.
+        """
         execution = WorkflowExecution.model_validate(
             {
                 **data.model_dump(),
                 "workflow_id": workflow_id,
+                "is_draft": is_draft,
                 "tenant_id": self._require_tenant(),
                 "created_by": user_id,
                 "updated_by": user_id,

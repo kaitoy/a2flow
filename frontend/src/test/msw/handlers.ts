@@ -110,6 +110,7 @@ const WORKFLOW_EXECUTION_1 = {
   skillDir: "/tmp/skill",
   initiatorId: "user",
   status: "completed",
+  isDraft: false,
   finishedAt: "2026-01-01T00:05:00Z",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",

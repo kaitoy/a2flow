@@ -15,6 +15,7 @@ import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { StatusCard } from "@/components/admin/status-card";
 import { WorkflowExecutionStatusLabel } from "@/components/admin/workflow-execution-status";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
@@ -154,6 +155,7 @@ export default function WorkflowExecutionDetailPage() {
       >
         <StatusCard ariaLabel="Workflow execution status">
           <WorkflowExecutionStatusLabel status={session.status} />
+          {session.isDraft && <Badge>Draft</Badge>}
         </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>

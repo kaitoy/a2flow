@@ -97,10 +97,19 @@ class WorkflowExecution(WorkflowExecutionCreate, TenantScoped, BaseEntity, table
     exist to make a run's lifecycle queryable — active-run counts, per-day
     completion counts, and the ``created_at`` -> ``finished_at`` lead time all
     read them (``repositories/metrics.py``).
+
+    ``is_draft`` is server-managed the same way, but set once at creation rather
+    than stamped later: :meth:`services.workflow.WorkflowService.execute` passes
+    ``True`` when the workflow is still :attr:`models.workflow.WorkflowStatus.draft`
+    — a ``developer``/``super_admin`` pre-publish test run — and never updates it
+    afterwards, so publishing the workflow does not reclassify runs that already
+    happened. Draft runs are omitted from every query in ``repositories/metrics.py``
+    so throwaway test data does not skew the operations metrics.
     """
 
     __tablename__ = "workflow_executions"
     workflow_id: str | None = None
+    is_draft: bool = Field(default=False)
     status: WorkflowExecutionStatus = Field(default=WorkflowExecutionStatus.running)
     finished_at: datetime | None = Field(default=None, sa_type=TZDateTime)
     __table_args__ = (

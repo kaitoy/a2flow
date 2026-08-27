@@ -650,6 +650,12 @@ class WorkflowService:
         publish time, not from the edited live rows. Publishing again is what
         promotes the edits into runs.
 
+        A run started while the workflow is still ``draft`` is recorded with
+        ``is_draft=True`` and stays so for life — publishing the workflow later
+        does not reclassify it. ``repositories/metrics.py`` excludes such runs
+        from every operations metric so pre-publish test data does not skew
+        them.
+
         No cloning happens here: the skill's repository was published into the
         shared store when it was registered (and re-published by each pull), so
         a run only has to name the revision it starts against. A skill with no
@@ -714,7 +720,10 @@ class WorkflowService:
             initiator_id=user,
         )
         execution = await self._execution_repo.create(
-            execution_create, workflow_id=workflow.id, user_id=user
+            execution_create,
+            workflow_id=workflow.id,
+            user_id=user,
+            is_draft=workflow.status is WorkflowStatus.draft,
         )
         execution_id = execution.id
 

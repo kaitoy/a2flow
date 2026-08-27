@@ -119,9 +119,14 @@ async def _seed_execution(
     status: WorkflowExecutionStatus = WorkflowExecutionStatus.running,
     created_at: datetime | None = None,
     finished_at: datetime | None = None,
+    is_draft: bool = False,
     tenant_id: str = DEFAULT_TEST_TENANT_ID,
 ) -> str:
-    """Insert a WorkflowExecution with explicit lifecycle fields and return its id."""
+    """Insert a WorkflowExecution with explicit lifecycle fields and return its id.
+
+    ``is_draft`` marks the row as a pre-publish test run, which every query in
+    ``repositories/metrics.py`` filters out.
+    """
     async with AsyncSession(eng) as db:
         execution = WorkflowExecution(
             session_id=f"sess-{name}",
@@ -133,6 +138,7 @@ async def _seed_execution(
             initiator_id="owner",
             workflow_id=workflow_id,
             status=status,
+            is_draft=is_draft,
             created_at=created_at or datetime.now(UTC),
             finished_at=finished_at,
             tenant_id=tenant_id,
@@ -752,3 +758,103 @@ async def test_approval_backlog_by_approver_distinguishes_users_from_groups(
     assert entries["alice"]["groupKind"] == "user"
     # User names stay the client's job to resolve, as before.
     assert entries["alice"]["groupLabel"] is None
+
+
+# --------------------------------------------------------------------------
+# Draft (pre-publish test) runs
+# --------------------------------------------------------------------------
+
+
+async def test_draft_runs_are_excluded_from_every_metric(
+    metrics_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A run started against a still-``draft`` workflow counts toward nothing.
+
+    Seeds a draft run beside an otherwise identical real one on the same
+    workflow -- same recent timing, a failed ``api_error`` task each, and a
+    pending plus a decided approval each -- and asserts every gauge and every
+    aggregate sub-resource reflects only the real run.
+    """
+    client, eng = metrics_env
+    workflow_id = await _seed_workflow(eng, name="Onboarding")
+    now = datetime.now(UTC)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    started_at = max(today_start, now - timedelta(hours=2))
+    finished_at = max(today_start, now - timedelta(hours=1))
+
+    real_id = None
+    for name, is_draft in (("real-run", False), ("draft-run", True)):
+        execution_id = await _seed_execution(
+            eng,
+            workflow_id=workflow_id,
+            name=name,
+            status=WorkflowExecutionStatus.failed,
+            created_at=started_at,
+            finished_at=finished_at,
+            is_draft=is_draft,
+        )
+        if not is_draft:
+            real_id = execution_id
+        await _seed_task(
+            eng,
+            execution_id=execution_id,
+            status=WorkflowTaskStatus.failed,
+            error_kind=TaskErrorKind.api_error,
+        )
+        await _seed_approval(eng, execution_id=execution_id, approver="alice")
+        await _seed_approval(
+            eng,
+            execution_id=execution_id,
+            approver="alice",
+            status=ApprovalStatus.approved,
+            decided_at=max(today_start, now - timedelta(minutes=30)),
+        )
+
+    body = (await client.get("/api/v1/metrics", headers={"X-User-Id": "owner"})).text
+    # One of each, never two: the draft run's rows are filtered out.
+    assert _samples(body, "a2flow_workflow_executions_finished_today") == {
+        _labels(status="failed"): 1.0
+    }
+    assert _samples(body, "a2flow_workflow_executions_failed_recently") == {
+        _labels(window="24h"): 1.0
+    }
+    assert _samples(body, "a2flow_workflow_tasks_failed_recently") == {
+        _labels(window="24h", error_kind="api_error"): 1.0
+    }
+    assert _samples(body, "a2flow_workflow_executions_started_recently") == {
+        _labels(window="24h", workflow="Onboarding"): 1.0
+    }
+    assert _samples(body, "a2flow_approvals_pending") == {_labels(): 1.0}
+    assert (
+        _samples(body, "a2flow_approvals_decided_today")[_labels(decision="approved")]
+        == 1.0
+    )
+
+    headers = {"X-User-Id": "owner"}
+    by_workflow = assert_ok(
+        await client.get("/api/v1/workflow-executions/by-workflow", headers=headers)
+    )
+    assert len(by_workflow) == 1
+    assert by_workflow[0]["total"] == 1
+
+    failures = assert_ok(
+        await client.get("/api/v1/workflow-executions/failures", headers=headers)
+    )
+    assert [e["executionId"] for e in failures] == [real_id]
+
+    by_approver = assert_ok(
+        await client.get("/api/v1/approvals/by-approver", headers=headers)
+    )
+    assert len(by_approver) == 1
+    assert by_approver[0]["pending"] == 1
+
+    by_wf_approvals = assert_ok(
+        await client.get("/api/v1/approvals/by-workflow", headers=headers)
+    )
+    assert by_wf_approvals[0]["groupId"] == workflow_id
+    assert by_wf_approvals[0]["pending"] == 1
+
+    trend = assert_ok(
+        await client.get("/api/v1/workflow-executions/lead-time-trend", headers=headers)
+    )
+    assert sum(bucket["count"] for bucket in trend) == 1

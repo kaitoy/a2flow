@@ -61,6 +61,16 @@ export interface ColumnDef<T> {
   visibility?: "always" | "default" | "optional";
 }
 
+/**
+ * Shared `filterOptions` for a boolean column filtered with `filterOp: "eq"` —
+ * renders an "All / Yes / No" select in the column header menu. The values are
+ * the strings the list API expects for `field:eq:true` / `field:eq:false`.
+ */
+export const BOOL_FILTER_OPTIONS: FilterOption[] = [
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
+];
+
 /** Props for {@link DataTable}. */
 interface DataTableProps<T> {
   columns: ColumnDef<T>[];

@@ -26,7 +26,7 @@ import { USER_SHARED_COLUMNS } from "@/components/admin/user-columns";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { BOOL_FILTER_OPTIONS, type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
@@ -40,12 +40,6 @@ import { setMe } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 const LIMIT = 20;
-
-/** Yes/No options for the boolean `eq` column filters. */
-const BOOL_FILTER_OPTIONS = [
-  { label: "Yes", value: "true" },
-  { label: "No", value: "false" },
-];
 
 /** Render a boolean cell as a checkmark or an em dash. */
 function boolCell(value: boolean): string {

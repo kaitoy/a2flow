@@ -14,8 +14,9 @@ import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { tenantColumn } from "@/components/admin/tenant-columns";
 import { WorkflowExecutionStatusLabel } from "@/components/admin/workflow-execution-status";
+import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { BOOL_FILTER_OPTIONS, type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
@@ -69,6 +70,19 @@ function buildColumns(
       ],
       noTruncate: true,
       cell: (s) => <WorkflowExecutionStatusLabel status={s.status} />,
+    },
+    {
+      // A run started from a still-draft workflow — a pre-publish test run. It is
+      // excluded from the operations metrics; the filter lets an operator hide
+      // these from the list too.
+      header: "Draft",
+      sortField: "isDraft",
+      filterField: "isDraft",
+      filterOp: "eq",
+      filterOptions: BOOL_FILTER_OPTIONS,
+      noTruncate: true,
+      className: "text-center",
+      cell: (s) => (s.isDraft ? <Badge>Draft</Badge> : null),
     },
     {
       // Resolved from initiatorId to a display name; not sorted/filtered by raw id.

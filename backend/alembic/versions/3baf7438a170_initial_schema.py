@@ -552,6 +552,7 @@ def upgrade() -> None:
         ),
         sa.Column("initiator_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("is_draft", sa.Boolean(), nullable=False),
         sa.Column(
             "status",
             sa.Enum(

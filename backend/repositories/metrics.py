@@ -17,6 +17,12 @@ averaging, day bucketing — happens in :mod:`services.metrics`, deliberately:
 
 Like every other tenant-scoped repository, each query filters on the tenant
 resolved by ``CurrentTenantIdDep``; there is no cross-tenant read here.
+
+Every query here also excludes runs flagged ``WorkflowExecution.is_draft`` —
+pre-publish test runs a ``developer``/``super_admin`` started against a still
+``draft`` workflow (see :meth:`services.workflow.WorkflowService.execute`). They
+are throwaway by nature, so counting them would skew the operations metrics.
+Approvals raised by such a run are excluded for the same reason.
 """
 
 from collections.abc import Sequence
@@ -181,7 +187,11 @@ class SqlMetricsRepository:
                 col(WorkflowExecution.workflow_id) == Workflow.id,
                 isouter=True,
             )
-            .where(WorkflowExecution.tenant_id == self._tenant_id, *conditions)
+            .where(
+                WorkflowExecution.tenant_id == self._tenant_id,
+                col(WorkflowExecution.is_draft).is_(False),
+                *conditions,
+            )
             .order_by(col(WorkflowExecution.created_at).desc())
         )
         result = await self._db.exec(stmt)
@@ -245,7 +255,10 @@ class SqlMetricsRepository:
         """
         stmt = (
             select(WorkflowExecution.status, func.count())
-            .where(WorkflowExecution.tenant_id == self._tenant_id)
+            .where(
+                WorkflowExecution.tenant_id == self._tenant_id,
+                col(WorkflowExecution.is_draft).is_(False),
+            )
             .group_by(col(WorkflowExecution.status))
         )
         result = await self._db.exec(stmt)
@@ -294,7 +307,11 @@ class SqlMetricsRepository:
                 col(WorkflowExecution.workflow_id) == Workflow.id,
                 isouter=True,
             )
-            .where(Approval.tenant_id == self._tenant_id, *conditions)
+            .where(
+                Approval.tenant_id == self._tenant_id,
+                col(WorkflowExecution.is_draft).is_(False),
+                *conditions,
+            )
             .order_by(col(Approval.created_at).asc())
         )
         result = await self._db.exec(stmt)
@@ -386,6 +403,7 @@ class SqlMetricsRepository:
             )
             .where(
                 WorkflowTask.tenant_id == self._tenant_id,
+                col(WorkflowExecution.is_draft).is_(False),
                 WorkflowTask.status == WorkflowTaskStatus.failed,
                 col(WorkflowTask.updated_at) >= since,
                 col(WorkflowTask.updated_at) < until,

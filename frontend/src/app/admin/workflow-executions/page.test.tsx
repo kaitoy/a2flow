@@ -98,15 +98,71 @@ describe("WorkflowExecutionsPage", () => {
     expect(requests).toEqual([["ann", "bob", "cal"]]);
   });
 
-  it("shows Name, Status, Initiator and Created At by default, but not Agent Skill or Finished At", async () => {
+  it("shows Name, Status, Draft, Initiator and Created At by default, but not Agent Skill or Finished At", async () => {
     renderPage();
     await waitFor(() => screen.getByText("My Workflow"));
     expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Draft" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Initiator" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Created At" })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Agent Skill" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Finished At" })).not.toBeInTheDocument();
     expect(screen.getByText("completed")).toBeInTheDocument();
+  });
+
+  it("badges a draft run and leaves a real run unmarked", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions", () =>
+        envelope(
+          [
+            { id: "run-real", name: "Real Run", isDraft: false },
+            { id: "run-draft", name: "Draft Run", isDraft: true },
+          ].map((r) => ({
+            tenantId: "tenant-1",
+            sessionId: `session-${r.id}`,
+            workflowId: "wf-1",
+            description: null,
+            agentSkillId: "skill-1",
+            agentSkillName: "My Skill",
+            agentSkillRepoUrl: "https://github.com/example/repo",
+            agentSkillRepoPath: "",
+            initiatorId: "user",
+            status: "completed",
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+            ...r,
+          }))
+        )
+      )
+    );
+    renderPage();
+
+    const draftRow = (await screen.findByRole("link", { name: "Draft Run" })).closest("tr");
+    const realRow = screen.getByRole("link", { name: "Real Run" }).closest("tr");
+    expect(within(draftRow as HTMLElement).getByText("Draft")).toBeInTheDocument();
+    expect(within(realRow as HTMLElement).queryByText("Draft")).not.toBeInTheDocument();
+  });
+
+  it("filters the list by the Draft column", async () => {
+    const user = userEvent.setup();
+    const seen: string[] = [];
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions", ({ request }) => {
+        seen.push(new URL(request.url).searchParams.get("q") ?? "");
+        return envelope([]);
+      })
+    );
+    renderPage();
+    await waitFor(() => expect(seen.length).toBeGreaterThan(0));
+
+    await user.click(screen.getByRole("button", { name: "Draft" }));
+    const select = await screen.findByRole("combobox");
+    await user.click(select);
+    await user.click(await screen.findByRole("option", { name: "No" }));
+
+    await waitFor(() => expect(seen).toContain("isDraft:eq:false"));
   });
 
   it("links the user name to the user's edit page", async () => {

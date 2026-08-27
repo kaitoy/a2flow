@@ -166,6 +166,7 @@ async def test_get_workflow_execution_returns_correct_data(
     assert "workflowPrompt" not in body
     assert body["agentSkillId"] == skill["id"]
     assert body["sessionId"] == execution["sessionId"]
+    assert body["isDraft"] is False
 
 
 async def test_get_workflow_execution_unknown_id_returns_404(

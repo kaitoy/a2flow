@@ -66,6 +66,39 @@ describe("WorkflowExecutionDetailPage", () => {
     await screen.findByRole("heading", { name: "My Workflow" });
     const card = screen.getByRole("region", { name: "Workflow execution status" });
     expect(within(card).getByText("completed")).toBeInTheDocument();
+    // A published-workflow run carries no Draft marker.
+    expect(within(card).queryByText("Draft")).not.toBeInTheDocument();
+  });
+
+  it("marks a draft run with a Draft badge in the status card", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id", () =>
+        envelope({
+          id: "execution-1",
+          tenantId: "tenant-1",
+          sessionId: "executed-session-id",
+          workflowId: "wf-1",
+          name: "My Workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          agentSkillName: "My Skill",
+          agentSkillRepoUrl: "https://github.com/example/repo",
+          agentSkillRepoPath: "",
+          initiatorId: "user",
+          status: "completed",
+          isDraft: true,
+          finishedAt: "2026-01-01T00:05:00Z",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "",
+          updatedBy: "",
+        })
+      )
+    );
+    render(<WorkflowExecutionDetailPage />);
+    await screen.findByRole("heading", { name: "My Workflow" });
+    const card = screen.getByRole("region", { name: "Workflow execution status" });
+    expect(within(card).getByText("Draft")).toBeInTheDocument();
   });
 
   it("navigates to the task list from the header action", async () => {
