@@ -8,7 +8,7 @@
  */
 "use client";
 
-import { UserCog, Users as UsersIcon } from "lucide-react";
+import { UserCog, User as UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

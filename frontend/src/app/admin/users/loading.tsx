@@ -1,4 +1,4 @@
-import { Users as UsersIcon } from "lucide-react";
+import { User as UsersIcon } from "lucide-react";
 import { AdminListSkeleton } from "@/components/admin/admin-list-skeleton";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";

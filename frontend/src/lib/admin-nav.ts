@@ -9,7 +9,7 @@ import {
   Server,
   Settings2,
   Tags,
-  Users,
+  User,
   UsersRound,
   Wand2,
   Workflow,
@@ -57,7 +57,7 @@ export const adminNavItems: AdminNavItem[] = [
   {
     href: "/admin/users",
     label: "Users",
-    icon: Users,
+    icon: User,
     description: "Manage accounts and roles",
     roles: [Role.ADMIN, Role.DEVELOPER],
   },

@@ -10,7 +10,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { UserCog, Users as UsersIcon } from "lucide-react";
+import { UserCog, User as UsersIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";

@@ -11,7 +11,7 @@
  */
 "use client";
 
-import { Users } from "lucide-react";
+import { User as UserIcon } from "lucide-react";
 import { useCallback } from "react";
 import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { RecordPickerField } from "@/components/admin/record-picker-field";
@@ -109,7 +109,7 @@ export function UserPicker({ value, onChange, readOnly = false }: UserPickerProp
       dialogTitle="Select members"
       selectLabel="Select members…"
       emptyMessage="This tenant has no users to add."
-      emptyIcon={Users}
+      emptyIcon={UserIcon}
     />
   );
 }
