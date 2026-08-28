@@ -1,0 +1,119 @@
+/**
+ * A2Flow site theme.
+ *
+ * The palette is the application's own (see DESIGN.md) and the token names
+ * mirror homepage/index.html's, so the landing page's styles can use them
+ * unchanged. Docusaurus already stamps `data-theme="light|dark"` on <html>,
+ * which is exactly the switch the tokens below key off.
+ */
+
+/* ------------------------------------------------------------ A2Flow tokens */
+:root {
+  --a2f-surface: #f4f7ff;
+  --a2f-ink: #0b1c30;
+  --a2f-muted: #475569;
+  --a2f-accent: #0e7c7b;
+  --a2f-accent-bright: #14b8a6;
+  --a2f-secondary: #6366f1;
+  --a2f-accent-rgb: 20, 184, 166;
+  --a2f-on-primary: #ffffff;
+  --a2f-glass: rgba(255, 255, 255, 0.55);
+  --a2f-glass-strong: rgba(255, 255, 255, 0.72);
+  --a2f-glass-border: rgba(255, 255, 255, 0.65);
+  --a2f-success: #10b981;
+  --a2f-error: #dc2626;
+  --a2f-code-bg: rgba(11, 28, 48, 0.85);
+  --a2f-code-ink: #d7e4f7;
+  --a2f-blob-1: rgba(94, 234, 212, 0.5);
+  --a2f-blob-2: rgba(165, 180, 252, 0.55);
+  --a2f-blob-3: rgba(252, 211, 170, 0.48);
+  --a2f-blob-4: rgba(186, 230, 253, 0.45);
+  --a2f-shadow-glass: 0 10px 32px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --a2f-shadow-glass-lg: 0 28px 60px -16px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --a2f-shadow-glow: 0 0 36px rgba(var(--a2f-accent-rgb), 0.32);
+  --a2f-font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --a2f-font-body: "Inter", system-ui, sans-serif;
+}
+
+[data-theme="dark"] {
+  --a2f-surface: #050912;
+  --a2f-ink: #e2e8f0;
+  --a2f-muted: #94a3b8;
+  --a2f-accent: #5eead4;
+  --a2f-accent-bright: #5eead4;
+  --a2f-secondary: #a78bfa;
+  --a2f-accent-rgb: 94, 234, 212;
+  --a2f-on-primary: #06231f;
+  --a2f-glass: rgba(15, 23, 42, 0.45);
+  --a2f-glass-strong: rgba(15, 23, 42, 0.65);
+  --a2f-glass-border: rgba(148, 163, 184, 0.2);
+  --a2f-success: #34d399;
+  --a2f-error: #fb7185;
+  --a2f-code-bg: rgba(2, 8, 20, 0.72);
+  --a2f-code-ink: #cbd8ec;
+  --a2f-blob-1: rgba(94, 234, 212, 0.26);
+  --a2f-blob-2: rgba(167, 139, 250, 0.28);
+  --a2f-blob-3: rgba(244, 114, 182, 0.22);
+  --a2f-blob-4: rgba(125, 211, 252, 0.24);
+  --a2f-shadow-glass: 0 10px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(148, 163, 184, 0.12);
+  --a2f-shadow-glass-lg: 0 28px 60px -16px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(148, 163, 184, 0.12);
+  --a2f-shadow-glow: 0 0 42px rgba(var(--a2f-accent-rgb), 0.45);
+}
+
+/* ------------------------------------------- the same palette, as Infima vars */
+:root {
+  --ifm-color-primary: #0e7c7b;
+  --ifm-color-primary-dark: #0d706f;
+  --ifm-color-primary-darker: #0c6a69;
+  --ifm-color-primary-darkest: #0a5756;
+  --ifm-color-primary-light: #0f8887;
+  --ifm-color-primary-lighter: #108e8d;
+  --ifm-color-primary-lightest: #13a5a4;
+
+  --ifm-font-family-base: var(--a2f-font-body);
+  --ifm-heading-font-family: var(--a2f-font-display);
+  --ifm-background-color: var(--a2f-surface);
+  --ifm-code-font-size: 92%;
+  --docusaurus-highlighted-code-line-bg: rgba(14, 124, 123, 0.12);
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #5eead4;
+  --ifm-color-primary-dark: #41e6ca;
+  --ifm-color-primary-darker: #32e3c4;
+  --ifm-color-primary-darkest: #16bfa1;
+  --ifm-color-primary-light: #7beede;
+  --ifm-color-primary-lighter: #8af0e3;
+  --ifm-color-primary-lightest: #b8f6ee;
+
+  --docusaurus-highlighted-code-line-bg: rgba(94, 234, 212, 0.16);
+}
+
+/* --------------------------------------------------------------- doc pages */
+/*
+ * Docs are dense text, so they get the brand's colors and type but a plain
+ * background — the animated aurora belongs to the landing page alone.
+ */
+.navbar__title,
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  font-family: var(--a2f-font-display);
+  letter-spacing: -0.01em;
+}
+
+.navbar__logo img {
+  border-radius: 8px;
+}
+
+/* Tables in the manual carry wide reference material; let them scroll. */
+.markdown table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Landing-page section anchors have to clear the sticky navbar. */
+:target {
+  scroll-margin-top: calc(var(--ifm-navbar-height) + 1rem);
+}

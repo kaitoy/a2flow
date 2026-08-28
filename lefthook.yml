@@ -51,7 +51,17 @@ pre-commit:
 
 pre-push:
   jobs:
+    # The glob needs the `frontend/` prefix for the same reason the pre-commit
+    # ones do — lefthook matches it against repo-root-relative paths. Without it,
+    # a website-only or backend-only change would trigger a frontend build too.
     - name: frontend-build
       root: frontend/
-      glob: "**/*.{ts,tsx,js,jsx,json,css,mjs}"
+      glob: "frontend/**/*.{ts,tsx,js,jsx,json,css,mjs}"
+      run: pnpm run build
+
+    # Builds every locale of the manual site and fails on broken links, which is
+    # what .github/workflows/pages.yml does before deploying to GitHub Pages.
+    - name: website-build
+      root: website/
+      glob: "website/**"
       run: pnpm run build

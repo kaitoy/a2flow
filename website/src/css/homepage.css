@@ -1,0 +1,955 @@
+/**
+ * Landing-page styles, carried over from the standalone homepage/index.html.
+ *
+ * Every rule is scoped under `.a2flow-home` so the page keeps its own reset and
+ * typography without reaching the documentation pages, which use Infima. The
+ * color tokens it reads (`--a2f-*`) are defined in custom.css.
+ */
+
+/* ---------------------------------------------------------------- base */
+.a2flow-home, .a2flow-home * { box-sizing: border-box; margin: 0; padding: 0;
+}
+
+.a2flow-home {
+  font-family: var(--a2f-font-body);
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--a2f-ink);
+  background: var(--a2f-surface);
+  /* clip, not hidden: hidden would make this a scroll container, and the
+     sticky section nav would then anchor to it instead of the viewport. */
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Animated mesh-gradient canvas (layer 0), same technique as the app. */
+.a2flow-home::before {
+  content: "";
+  position: fixed;
+  inset: -12%;
+  z-index: -2;
+  background:
+    radial-gradient(38% 42% at 16% 18%, var(--a2f-blob-1) 0%, transparent 70%),
+    radial-gradient(44% 46% at 84% 22%, var(--a2f-blob-2) 0%, transparent 70%),
+    radial-gradient(40% 44% at 26% 86%, var(--a2f-blob-3) 0%, transparent 70%),
+    radial-gradient(42% 40% at 78% 78%, var(--a2f-blob-4) 0%, transparent 70%);
+  filter: saturate(120%);
+  animation: float-slow 22s ease-in-out infinite alternate;
+}
+
+/* Film-grain overlay. */
+.a2flow-home::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+}
+
+@keyframes float-slow {
+from { transform: translate3d(0, 0, 0) scale(1);
+}
+
+to { transform: translate3d(2.5%, -2%, 0) scale(1.06);
+}
+
+}
+
+.a2flow-home h1,
+.a2flow-home h2,
+.a2flow-home h3 { font-family: var(--a2f-font-display); letter-spacing: -0.02em; line-height: 1.15;
+}
+
+.a2flow-home a { color: inherit;
+}
+
+.a2flow-home img { max-width: 100%; display: block;
+}
+
+.a2flow-home code { font-family: var(--a2f-font-mono); font-size: 0.92em;
+}
+
+.a2flow-home :focus-visible { outline: 2px solid rgba(var(--a2f-accent-rgb), 0.7); outline-offset: 2px; border-radius: 4px;
+}
+
+.a2flow-home .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem;
+}
+
+/* ---------------------------------------------------------------- glass */
+.a2flow-home .glass,
+.a2flow-home .glass-strong {
+  border: 1px solid var(--a2f-glass-border);
+  box-shadow: var(--a2f-shadow-glass);
+}
+
+.a2flow-home .glass {
+  background: var(--a2f-glass);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+}
+
+.a2flow-home .glass-strong {
+  background: var(--a2f-glass-strong);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: var(--a2f-shadow-glass-lg);
+}
+
+.a2flow-home .eyebrow {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--a2f-accent);
+  margin-bottom: 0.875rem;
+}
+
+.a2flow-home .grad-text {
+  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.a2flow-home .section { padding: 6.5rem 0 0;
+}
+
+.a2flow-home .section-head { max-width: 44rem; margin-bottom: 3rem;
+}
+
+.a2flow-home .section-head h2 { font-size: clamp(1.75rem, 3.4vw, 2.5rem); font-weight: 700; margin-bottom: 1rem;
+}
+
+.a2flow-home .section-head p { color: var(--a2f-muted); font-size: 1.0625rem;
+}
+
+/* ---------------------------------------------------------------- buttons */
+.a2flow-home .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font: 600 0.9375rem/1 var(--a2f-font-body);
+  padding: 0.8125rem 1.375rem;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 240ms cubic-bezier(0.2, 0, 0, 1), box-shadow 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.a2flow-home .btn-primary {
+  color: var(--a2f-on-primary);
+  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+  box-shadow: 0 4px 16px -4px rgba(var(--a2f-accent-rgb), 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.a2flow-home .btn-primary:hover { box-shadow: var(--a2f-shadow-glow); transform: translateY(-2px);
+}
+
+.a2flow-home .btn-primary:active { transform: scale(0.97);
+}
+
+.a2flow-home .btn-ghost {
+  color: var(--a2f-ink);
+  background: var(--a2f-glass);
+  border-color: var(--a2f-glass-border);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+}
+
+.a2flow-home .btn-ghost:hover { box-shadow: var(--a2f-shadow-glow); transform: translateY(-2px);
+}
+
+.a2flow-home .btn svg { width: 1.05rem; height: 1.05rem;
+}
+
+.a2flow-home .header-actions { display: flex; align-items: center; gap: 0.625rem;
+}
+
+.a2flow-home #themeToggle .moon { display: none;
+}
+
+/* ----------------------------------------------------------------.a2f-hero */
+.a2flow-home .a2f-hero { padding: 9.5rem 0 1rem;
+}
+
+.a2flow-home .hero-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 3.5rem;
+  align-items: center;
+}
+
+.a2flow-home .a2f-hero h1 {
+  font-size: clamp(2.375rem, 5.2vw, 3.75rem);
+  font-weight: 700;
+  margin-bottom: 1.375rem;
+}
+
+.a2flow-home .hero-sub { color: var(--a2f-muted); font-size: 1.125rem; max-width: 34rem; margin-bottom: 2rem;
+}
+
+.a2flow-home .hero-cta { display: flex; flex-wrap: wrap; gap: 0.875rem; margin-bottom: 2rem;
+}
+
+.a2flow-home .hero-tags { display: flex; flex-wrap: wrap; gap: 0.5rem;
+}
+
+.a2flow-home .tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3125rem 0.8125rem;
+  border-radius: 9999px;
+  border: 1px solid var(--a2f-glass-border);
+  background: var(--a2f-glass);
+  color: var(--a2f-muted);
+}
+
+@media (max-width: 60rem) {
+.a2flow-home .a2f-hero { padding-top: 8rem;
+}
+
+.a2flow-home .hero-grid { grid-template-columns: 1fr; gap: 3rem;
+}
+
+}
+
+/* ------------------------------------------------------------.a2f-hero demo */
+.a2flow-home .demo {
+  border-radius: 1rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.a2flow-home .demo-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.8125rem 1.125rem;
+  border-bottom: 1px solid var(--a2f-glass-border);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.a2flow-home .demo-titlebar .live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--a2f-accent);
+}
+
+.a2flow-home .demo-titlebar .live::before {
+  content: "";
+  width: 0.5rem; height: 0.5rem;
+  border-radius: 50%;
+  background: var(--a2f-accent-bright);
+  box-shadow: 0 0 8px rgba(var(--a2f-accent-rgb), 0.8);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes breathe {
+0%, 100% { opacity: 1;
+}
+
+50% { opacity: 0.35;
+}
+
+}
+
+.a2flow-home .demo-mark { width: 1.375rem; height: 1.375rem; border-radius: 0.375rem;
+}
+
+.a2flow-home .demo-body {
+  padding: 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  height: 29rem;
+  overflow: hidden;
+  justify-content: flex-end;
+}
+
+.a2flow-home .dmsg { display: flex; gap: 0.625rem; align-items: flex-end;
+}
+
+.a2flow-home .dmsg.from-user { justify-content: flex-end;
+}
+
+.a2flow-home .demo.live .dmsg { display: none;
+}
+
+.a2flow-home .demo.live .dmsg.on {
+  display: flex;
+  animation: message-in 360ms cubic-bezier(0.3, 0, 0, 1) both;
+}
+
+@keyframes message-in {
+from { opacity: 0; transform: translateY(10px) scale(0.98);
+}
+
+to { opacity: 1; transform: none;
+}
+
+}
+
+.a2flow-home .a2f-avatar {
+  flex: none;
+  width: 1.875rem; height: 1.875rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.a2flow-home .a2f-avatar.mika { background: linear-gradient(135deg, #f59e0b, #ef4444);
+}
+
+.a2flow-home .a2f-avatar.sam { background: linear-gradient(135deg, #6366f1, #8b5cf6);
+}
+
+.a2flow-home .a2f-avatar.bot {
+  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+  color: var(--a2f-on-primary);
+}
+
+.a2flow-home .bubble {
+  max-width: 78%;
+  padding: 0.6875rem 0.9375rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.a2flow-home .bubble.user {
+  border-bottom-right-radius: 0.375rem;
+  color: var(--a2f-on-primary);
+  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+  box-shadow: 0 8px 24px -12px rgba(var(--a2f-accent-rgb), 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.a2flow-home .bubble.agent {
+  border-bottom-left-radius: 0.375rem;
+  background: var(--a2f-glass);
+  border: 1px solid var(--a2f-glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.a2flow-home .bubble .who {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--a2f-muted);
+  margin-bottom: 0.25rem;
+}
+
+.a2flow-home .plan { list-style: none; margin: 0.625rem 0 0.75rem; display: grid; gap: 0.4375rem;
+}
+
+.a2flow-home .plan li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--a2f-muted);
+}
+
+.a2flow-home .plan .tick {
+  flex: none;
+  width: 1.0625rem; height: 1.0625rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--a2f-muted);
+  opacity: 0.55;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.a2flow-home .plan .tick svg { width: 0.625rem; height: 0.625rem; opacity: 0; transition: opacity 300ms;
+}
+
+.a2flow-home .plan li.doing .tick {
+  border-color: var(--a2f-accent-bright);
+  opacity: 1;
+  box-shadow: 0 0 10px rgba(var(--a2f-accent-rgb), 0.6);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.a2flow-home .plan li.doing { color: var(--a2f-ink);
+}
+
+.a2flow-home .plan li.done .tick {
+  background: var(--a2f-success);
+  border-color: var(--a2f-success);
+  opacity: 1;
+  color: #fff;
+}
+
+.a2flow-home .plan li.done .tick svg { opacity: 1;
+}
+
+.a2flow-home .plan li.done { color: var(--a2f-ink);
+}
+
+.a2flow-home .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6875rem;
+  border-radius: 9999px;
+  border: 1px solid var(--a2f-glass-border);
+  background: var(--a2f-glass);
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .chip.ok { color: var(--a2f-success); border-color: color-mix(in srgb, var(--a2f-success) 40%, transparent);
+}
+
+.a2flow-home .demo-sys {
+  align-self: center;
+  font-size: 0.75rem;
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .demo-sys b { color: var(--a2f-ink); font-weight: 600;
+}
+
+.a2flow-home .approval {
+  border: 1px solid color-mix(in srgb, var(--a2f-secondary) 45%, transparent);
+  border-radius: 0.875rem;
+  padding: 0.8125rem 0.9375rem;
+  background: var(--a2f-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 78%;
+  font-size: 0.8125rem;
+  transition: border-color 400ms;
+}
+
+.a2flow-home .approval .ttl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  margin-bottom: 0.375rem;
+  color: var(--a2f-secondary);
+}
+
+.a2flow-home .approval .ttl svg { width: 1rem; height: 1rem; flex: none;
+}
+
+.a2flow-home .approval p { color: var(--a2f-muted); font-size: 0.8125rem; margin-bottom: 0.625rem;
+}
+
+.a2flow-home .approval .acts { display: flex; gap: 0.5rem; align-items: center;
+}
+
+.a2flow-home .fbtn {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.375rem 0.9375rem;
+  border-radius: 0.5625rem;
+}
+
+.a2flow-home .fbtn.yes { color: var(--a2f-on-primary); background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+}
+
+.a2flow-home .fbtn.no { border: 1px solid var(--a2f-glass-border); color: var(--a2f-muted);
+}
+
+.a2flow-home .approval .decided { display: none; align-items: center; gap: 0.4375rem; font-weight: 700; color: var(--a2f-success); font-size: 0.8125rem;
+}
+
+.a2flow-home .approval .decided svg { width: 1rem; height: 1rem;
+}
+
+.a2flow-home .approval.approved { border-color: color-mix(in srgb, var(--a2f-success) 55%, transparent);
+}
+
+.a2flow-home .approval.approved .acts { display: none;
+}
+
+.a2flow-home .approval.approved .decided { display: inline-flex;
+}
+
+.a2flow-home .demo-caption {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--a2f-muted);
+  margin-top: 0.875rem;
+}
+
+/* ---------------------------------------------------------------- concept */
+.a2flow-home .contrast { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+}
+
+.a2flow-home .contrast-card { border-radius: 1rem; padding: 2rem;
+}
+
+.a2flow-home .contrast-card h3 { font-size: 1.1875rem; margin-bottom: 0.375rem;
+}
+
+.a2flow-home .contrast-card .sub { font-size: 0.875rem; color: var(--a2f-muted); margin-bottom: 1.375rem;
+}
+
+.a2flow-home .contrast-card.past { opacity: 0.92;
+}
+
+.a2flow-home .contrast-card.past h3 { color: var(--a2f-muted);
+}
+
+.a2flow-home .contrast-card.next { border-color: color-mix(in srgb, var(--a2f-accent-bright) 45%, var(--a2f-glass-border));
+}
+
+.a2flow-home .flow-steps { list-style: none; display: grid; gap: 0.9375rem;
+}
+
+.a2flow-home .flow-steps li { display: flex; gap: 0.75rem; font-size: 0.9375rem;
+}
+
+.a2flow-home .flow-steps .dot {
+  flex: none;
+  width: 1.625rem; height: 1.625rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.0625rem;
+}
+
+.a2flow-home .flow-steps .dot svg { width: 0.875rem; height: 0.875rem;
+}
+
+.a2flow-home .past .dot { background: color-mix(in srgb, var(--a2f-muted) 14%, transparent); color: var(--a2f-muted);
+}
+
+.a2flow-home .next .dot {
+  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+  color: var(--a2f-on-primary);
+}
+
+.a2flow-home .flow-steps b { font-weight: 600;
+}
+
+.a2flow-home .flow-steps span.note { display: block; font-size: 0.8125rem; color: var(--a2f-muted);
+}
+
+.a2flow-home .concept-note {
+  margin-top: 1.5rem;
+  border-radius: 1rem;
+  padding: 1.375rem 1.75rem;
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+  font-size: 0.9375rem;
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .concept-note svg { flex: none; width: 1.25rem; height: 1.25rem; color: var(--a2f-accent); margin-top: 0.125rem;
+}
+
+.a2flow-home .concept-note b { color: var(--a2f-ink); font-weight: 600;
+}
+
+@media (max-width: 56rem) {
+.a2flow-home .contrast { grid-template-columns: 1fr;
+}
+
+}
+
+/* ---------------------------------------------------------------- how */
+.a2flow-home .how-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;
+}
+
+.a2flow-home .steps { display: grid; gap: 1.25rem; counter-reset: step;
+}
+
+.a2flow-home .step { border-radius: 1rem; padding: 1.625rem 1.75rem; position: relative;
+}
+
+.a2flow-home .step .n {
+  font-family: var(--a2f-font-display);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  color: var(--a2f-accent);
+  margin-bottom: 0.375rem;
+  display: block;
+}
+
+.a2flow-home .step h3 { font-size: 1.1875rem; margin-bottom: 0.5rem;
+}
+
+.a2flow-home .step p { font-size: 0.9375rem; color: var(--a2f-muted);
+}
+
+.a2flow-home .step p code {
+  background: color-mix(in srgb, var(--a2f-ink) 8%, transparent);
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.3125rem;
+  font-size: 0.8125rem;
+}
+
+.a2flow-home .dag-panel { border-radius: 1rem; padding: 1.75rem;
+}
+
+.a2flow-home .dag-panel .panel-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--a2f-muted);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.a2flow-home .dag-panel .panel-title .views span { opacity: 0.5;
+}
+
+.a2flow-home .dag-panel .panel-title .views .cur {
+  opacity: 1;
+  color: var(--a2f-accent);
+}
+
+.a2flow-home .dag-svg { width: 100%; height: auto; display: block;
+}
+
+.a2flow-home .dag-svg .node-box { fill: var(--a2f-glass); stroke: var(--a2f-glass-border);
+}
+
+.a2flow-home .dag-svg .node-label { font: 600 11px var(--a2f-font-body); fill: var(--a2f-ink);
+}
+
+.a2flow-home .dag-svg .node-sub { font: 700 8px var(--a2f-font-body); letter-spacing: 0.08em;
+}
+
+.a2flow-home .dag-svg .edge { stroke: color-mix(in srgb, var(--a2f-muted) 45%, transparent); stroke-width: 1.5; fill: none;
+}
+
+.a2flow-home .dag-svg .done-box { stroke: color-mix(in srgb, var(--a2f-success) 60%, transparent);
+}
+
+.a2flow-home .dag-svg .doing-box { stroke: var(--a2f-accent-bright);
+}
+
+.a2flow-home .dag-svg .doing-ring { animation: breathe 1.8s ease-in-out infinite;
+}
+
+.a2flow-home .dag-svg .gate-box { stroke: color-mix(in srgb, var(--a2f-secondary) 60%, transparent);
+}
+
+.a2flow-home .dag-svg .pend-box { stroke-dasharray: 4 3;
+}
+
+.a2flow-home .dag-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; font-size: 0.75rem; color: var(--a2f-muted);
+}
+
+.a2flow-home .dag-legend i {
+  display: inline-block;
+  width: 0.5625rem; height: 0.5625rem;
+  border-radius: 50%;
+  margin-right: 0.375rem;
+}
+
+@media (max-width: 56rem) {
+.a2flow-home .how-grid { grid-template-columns: 1fr;
+}
+
+}
+
+/* ---------------------------------------------------------------- roles */
+.a2flow-home .roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+}
+
+.a2flow-home .role-card { border-radius: 1rem; padding: 1.875rem;
+}
+
+.a2flow-home .role-card .a2f-avatar { width: 2.5rem; height: 2.5rem; font-size: 0.9375rem; margin-bottom: 1.125rem;
+}
+
+.a2flow-home .role-card h3 { font-size: 1.125rem; margin-bottom: 0.5rem;
+}
+
+.a2flow-home .role-card p { font-size: 0.9375rem; color: var(--a2f-muted);
+}
+
+.a2flow-home .trust-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;
+}
+
+.a2flow-home .trust-card { border-radius: 1rem; padding: 1.5rem 1.75rem; display: flex; gap: 1rem; align-items: flex-start;
+}
+
+.a2flow-home .trust-card svg { flex: none; width: 1.375rem; height: 1.375rem; color: var(--a2f-accent); margin-top: 0.125rem;
+}
+
+.a2flow-home .trust-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; font-family: var(--a2f-font-body); letter-spacing: 0;
+}
+
+.a2flow-home .trust-card p { font-size: 0.875rem; color: var(--a2f-muted);
+}
+
+@media (max-width: 56rem) {
+.a2flow-home .roles { grid-template-columns: 1fr;
+}
+
+.a2flow-home .trust-row { grid-template-columns: 1fr;
+}
+
+}
+
+/* ---------------------------------------------------------------- features */
+.a2flow-home .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+}
+
+.a2flow-home .feature { border-radius: 1rem; padding: 1.875rem; transition: transform 240ms cubic-bezier(0.2, 0, 0, 1), box-shadow 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.a2flow-home .feature:hover { transform: translateY(-4px); box-shadow: var(--a2f-shadow-glow);
+}
+
+.a2flow-home .feature .fic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.625rem; height: 2.625rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgba(var(--a2f-accent-rgb), 0.18), color-mix(in srgb, var(--a2f-secondary) 18%, transparent));
+  color: var(--a2f-accent);
+  margin-bottom: 1.125rem;
+}
+
+.a2flow-home .feature .fic svg { width: 1.25rem; height: 1.25rem;
+}
+
+.a2flow-home .feature h3 { font-size: 1.0625rem; margin-bottom: 0.5rem;
+}
+
+.a2flow-home .feature p { font-size: 0.875rem; color: var(--a2f-muted);
+}
+
+.a2flow-home .feature p code {
+  background: color-mix(in srgb, var(--a2f-ink) 8%, transparent);
+  padding: 0.0625rem 0.3125rem;
+  border-radius: 0.3125rem;
+  font-size: 0.78em;
+}
+
+@media (max-width: 56rem) {
+.a2flow-home .features { grid-template-columns: 1fr;
+}
+
+}
+
+@media (min-width: 56rem) and (max-width: 72rem) {
+.a2flow-home .features { grid-template-columns: repeat(2, 1fr);
+}
+
+}
+
+/* ---------------------------------------------------------------- architecture */
+.a2flow-home .arch { border-radius: 1rem; padding: 2.5rem 2rem;
+}
+
+.a2flow-home .arch-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.a2flow-home .arch-node {
+  border-radius: 0.875rem;
+  padding: 1rem 1.375rem;
+  text-align: center;
+  min-width: 11rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.a2flow-home .arch-node b { font-family: var(--a2f-font-display); font-size: 0.9375rem; letter-spacing: -0.01em;
+}
+
+.a2flow-home .arch-node span { font-size: 0.75rem; color: var(--a2f-muted);
+}
+
+.a2flow-home .arch-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  color: var(--a2f-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  min-width: 5.5rem;
+}
+
+.a2flow-home .arch-link svg { width: 1.5rem; height: 1.5rem; color: var(--a2f-accent);
+}
+
+.a2flow-home .arch-side { display: flex; flex-direction: column; gap: 0.75rem;
+}
+
+.a2flow-home .arch-side .arch-node { min-width: 10rem; padding: 0.75rem 1.125rem;
+}
+
+.a2flow-home .stack-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 2rem;
+}
+
+@media (max-width: 56rem) {
+.a2flow-home .arch-flow { flex-direction: column; align-items: center;
+}
+
+.a2flow-home .arch-link { transform: rotate(90deg); min-width: 3rem; min-height: 3rem;
+}
+
+.a2flow-home .arch-side { flex-direction: row; flex-wrap: wrap; justify-content: center;
+}
+
+}
+
+/* ---------------------------------------------------------------- footer */
+.a2flow-home .cta-final { text-align: center; padding: 6.5rem 0 5rem;
+}
+
+.a2flow-home .cta-final h2 { font-size: clamp(1.875rem, 4vw, 2.75rem); margin-bottom: 1rem;
+}
+
+.a2flow-home .cta-final > .wrap > p { color: var(--a2f-muted); max-width: 36rem; margin: 0 auto 2.25rem;
+}
+
+.a2flow-home .terminal {
+  max-width: 38rem;
+  margin: 0 auto 2.25rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  text-align: left;
+  border: 1px solid var(--a2f-glass-border);
+  box-shadow: var(--a2f-shadow-glass-lg);
+}
+
+.a2flow-home .terminal-bar {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  background: var(--a2f-glass);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border-bottom: 1px solid var(--a2f-glass-border);
+}
+
+.a2flow-home .terminal-bar i { width: 0.6875rem; height: 0.6875rem; border-radius: 50%; background: color-mix(in srgb, var(--a2f-muted) 35%, transparent);
+}
+
+.a2flow-home .terminal pre {
+  background: var(--a2f-code-bg);
+  color: var(--a2f-code-ink);
+  padding: 1.375rem 1.5rem;
+  font-family: var(--a2f-font-mono);
+  font-size: 0.8438rem;
+  line-height: 1.9;
+  overflow-x: auto;
+}
+
+.a2flow-home .terminal .p { color: var(--a2f-accent-bright); user-select: none;
+}
+
+.a2flow-home .terminal .c { opacity: 0.5;
+}
+
+/* ---------------------------------------------------------------- reveal */
+.a2flow-home.is-js .reveal { opacity: 0; transform: translateY(14px); transition: opacity 600ms cubic-bezier(0.3, 0, 0, 1), transform 600ms cubic-bezier(0.3, 0, 0, 1);
+}
+
+.a2flow-home.is-js .reveal.in { opacity: 1; transform: none;
+}
+
+/* ---------------------------------------------------------------- motion */
+@media (prefers-reduced-motion: reduce) {
+.a2flow-home, .a2flow-home *,
+.a2flow-home *::before,
+.a2flow-home *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+}
+
+.a2flow-home.is-js .reveal { opacity: 1; transform: none;
+}
+
+}
+
+/* ------------------------------------------- Docusaurus layout integration */
+/*
+ * The aurora and the film grain hung off <body> in the standalone page, where
+ * the root stacking context let their negative z-index sit behind the content
+ * but above the page background. Inside the Docusaurus layout the landing
+ * container has to become that stacking context itself, or the two fixed
+ * layers would sink behind the body background and disappear.
+ */
+.a2flow-home {
+  isolation: isolate;
+  min-height: 100vh;
+}
+
+/* The standalone page used html { scroll-padding-top }; here the sticky navbar
+   is what the section anchors have to clear. */
+.a2flow-home .a2f-hero,
+.a2flow-home .section,
+.a2flow-home .cta-final {
+  scroll-margin-top: calc(var(--ifm-navbar-height) + 4rem);
+}
+
+/* The section links the standalone page carried in its sticky header. The
+   Docusaurus navbar took that header's place, so they ride with the page. */
+.a2flow-home .page-nav {
+  position: sticky;
+  top: var(--ifm-navbar-height);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 0.7rem 1rem;
+  /* Opaque, and painted in the navbar's own color: it sticks directly under
+     an already-opaque navbar, and a translucent second bar just left the page
+     content legible through it. */
+  background: var(--ifm-navbar-background-color);
+  border-bottom: 1px solid var(--ifm-toc-border-color);
+}
+
+.a2flow-home .page-nav a {
+  color: var(--a2f-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.a2flow-home .page-nav a:hover {
+  color: var(--a2f-accent);
+}
+
+@media (max-width: 30rem) {
+  .a2flow-home .page-nav {
+    gap: 1rem;
+    font-size: 0.85rem;
+  }
+}

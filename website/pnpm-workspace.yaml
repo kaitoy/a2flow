@@ -1,0 +1,6 @@
+# @swc/core unpacks its platform binary in a postinstall script; @docusaurus/faster
+# needs it. core-js's postinstall only prints a funding notice, so it stays off —
+# both have to be answered explicitly or pnpm fails the run with ERR_PNPM_IGNORED_BUILDS.
+allowBuilds:
+  "@swc/core": true
+  core-js: false
