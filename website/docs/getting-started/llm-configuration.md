@@ -13,9 +13,7 @@ Set `LLM_MODEL` in `backend/.env`:
 | OpenAI via LiteLLM | `litellm:openai/gpt-4o` |
 | Anthropic via LiteLLM | `litellm:anthropic/claude-3-5-sonnet-20241022` |
 
-See [backend/README.md](https://github.com/kaitoy/a2flow/blob/master/backend/README.md) for the full configuration reference.
-
-Specify the LLM to use in the `.env` file.
+Every other backend setting has its own page under [Configuration reference](../operations/configuration.md).
 
 ## Gemini (default)
 

@@ -9,8 +9,8 @@ A deployment is the backend, the frontend, and one relational database; [Run wit
 
 ## Reverse proxy and load balancer
 
-**Sticky sessions / session affinity are not required.** See "Horizontal
-scaling" above — the PostgreSQL advisory lock, not routing affinity, is what
+**Sticky sessions / session affinity are not required.** See [Horizontal
+scaling](./scaling.md) — the PostgreSQL advisory lock, not routing affinity, is what
 keeps one ADK session pinned to one driver at a time, and only for the
 duration of a single SSE stream.
 

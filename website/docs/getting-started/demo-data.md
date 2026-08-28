@@ -17,11 +17,7 @@ The [workflow](../guides/workflows.md) itself is not seeded — these are the in
 
 ⚠️ The demo MCP server can run **mutating** AWS operations, not just reads. Whatever credentials you give it can create and delete real resources — use a throwaway account or a tightly scoped IAM policy.
 
-See [Demo data](https://github.com/kaitoy/a2flow/blob/master/backend/README.md#demo-data) for the full record list and every related environment variable.
-
 ## The seeded records
-
-`DEMO_DATA=true` registers a ready-made example of the approval-gated "launch an EC2 instance" workflow on startup, so a fresh install has something to run without registering every piece by hand. Everything lands in the seeded **Default** tenant:
 
 | Resource | Name | Details |
 |---|---|---|

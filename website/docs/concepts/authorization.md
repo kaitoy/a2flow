@@ -17,7 +17,7 @@ A role held only through a group is worth exactly as much as a directly granted 
 | Role | Grants |
 |---|---|
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the designated-approver checks described under [Human approval](../guides/approvals.md#human-approval)) |
-| `admin` | User CRUD, secrets CRUD, and read-only visibility into every workflow execution, its tasks, and its chat history, and every approval, in their tenant (see [Workflow execution access](./authorization.md) below — an Admin cannot drive an execution's agent, create/edit/delete its tasks, delete the execution, or resolve an approval) |
+| `admin` | User CRUD, secrets CRUD, and read-only visibility into every workflow execution, its tasks, and its chat history, and every approval, in their tenant (see **Workflow execution access** below — an Admin cannot drive an execution's agent, create/edit/delete its tasks, delete the execution, or resolve an approval) |
 | `developer` | Secrets CRUD, MCP server CRUD, [tool-mock](../guides/tool-mocks.md) CRUD, agent-skill CRUD, workflow generation/editing/publishing/deactivating — including regenerating a workflow's AI-generated `generatedDescription`, though only a Super Admin may edit that field directly — task-template CRUD, design-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
 | `requester` | Running **published** (and `modified`) workflows (`POST /workflows/{id}/execute`) |
 | `approver` | Eligibility to be a workflow approval's designated approver — individually, or as a member of a group an approval is addressed to — and resolving their own approvals |

@@ -1,0 +1,634 @@
+{
+  "theme.ErrorPageContent.title": {
+    "message": "エラーが発生しました",
+    "description": "The title of the fallback page when the page crashed"
+  },
+  "theme.BackToTopButton.buttonAriaLabel": {
+    "message": "先頭へ戻る",
+    "description": "The ARIA label for the back to top button"
+  },
+  "theme.blog.archive.title": {
+    "message": "アーカイブ",
+    "description": "The page & hero title of the blog archive page"
+  },
+  "theme.blog.archive.description": {
+    "message": "アーカイブ",
+    "description": "The page & hero description of the blog archive page"
+  },
+  "theme.blog.paginator.navAriaLabel": {
+    "message": "ブログ記事一覧のナビゲーション",
+    "description": "The ARIA label for the blog pagination"
+  },
+  "theme.blog.paginator.newerEntries": {
+    "message": "新しい記事",
+    "description": "The label used to navigate to the newer blog posts page (previous page)"
+  },
+  "theme.blog.paginator.olderEntries": {
+    "message": "過去の記事",
+    "description": "The label used to navigate to the older blog posts page (next page)"
+  },
+  "theme.blog.post.paginator.navAriaLabel": {
+    "message": "ブログ記事のナビゲーション",
+    "description": "The ARIA label for the blog posts pagination"
+  },
+  "theme.blog.post.paginator.newerPost": {
+    "message": "新しい記事",
+    "description": "The blog post button label to navigate to the newer/previous post"
+  },
+  "theme.blog.post.paginator.olderPost": {
+    "message": "過去の記事",
+    "description": "The blog post button label to navigate to the older/next post"
+  },
+  "theme.tags.tagsPageLink": {
+    "message": "全てのタグを見る",
+    "description": "The label of the link targeting the tag list page"
+  },
+  "theme.colorToggle.ariaLabel.mode.system": {
+    "message": "システムモード",
+    "description": "The name for the system color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.light": {
+    "message": "ライトモード",
+    "description": "The name for the light color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.dark": {
+    "message": "ダークモード",
+    "description": "The name for the dark color mode"
+  },
+  "theme.colorToggle.ariaLabel": {
+    "message": "ダークモードを切り替える(現在は{mode})",
+    "description": "The ARIA label for the color mode toggle"
+  },
+  "theme.docs.breadcrumbs.navAriaLabel": {
+    "message": "パンくずリストのナビゲーション",
+    "description": "The ARIA label for the breadcrumbs"
+  },
+  "theme.docs.paginator.navAriaLabel": {
+    "message": "ドキュメントページ",
+    "description": "The ARIA label for the docs pagination"
+  },
+  "theme.docs.paginator.previous": {
+    "message": "前へ",
+    "description": "The label used to navigate to the previous doc"
+  },
+  "theme.docs.paginator.next": {
+    "message": "次へ",
+    "description": "The label used to navigate to the next doc"
+  },
+  "theme.docs.tagDocListPageTitle.nDocsTagged": {
+    "message": "{count}記事",
+    "description": "Pluralized label for \"{count} docs tagged\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.docs.tagDocListPageTitle": {
+    "message": "「{tagName}」タグのついた{nDocsTagged}",
+    "description": "The title of the page for a docs tag"
+  },
+  "theme.docs.versionBadge.label": {
+    "message": "バージョン: {versionLabel}"
+  },
+  "theme.docs.versions.unreleasedVersionLabel": {
+    "message": "これはリリース前のバージョン{versionLabel}の{siteTitle}のドキュメントです。",
+    "description": "The label used to tell the user that he's browsing an unreleased doc version"
+  },
+  "theme.docs.versions.unmaintainedVersionLabel": {
+    "message": "これはバージョン{versionLabel}の{siteTitle}のドキュメントで現在はメンテナンスされていません",
+    "description": "The label used to tell the user that he's browsing an unmaintained doc version"
+  },
+  "theme.docs.versions.latestVersionSuggestionLabel": {
+    "message": "最新のドキュメントは{latestVersionLink} ({versionLabel}) を見てください",
+    "description": "The label used to tell the user to check the latest version"
+  },
+  "theme.docs.versions.latestVersionLinkLabel": {
+    "message": "最新バージョン",
+    "description": "The label used for the latest version suggestion link label"
+  },
+  "theme.common.editThisPage": {
+    "message": "このページを編集",
+    "description": "The link label to edit the current page"
+  },
+  "theme.common.headingLinkTitle": {
+    "message": "{heading} への直接リンク",
+    "description": "Title for link to heading"
+  },
+  "theme.lastUpdated.atDate": {
+    "message": "{date}に",
+    "description": "The words used to describe on which date a page has been last updated"
+  },
+  "theme.lastUpdated.byUser": {
+    "message": "{user}が",
+    "description": "The words used to describe by who the page has been last updated"
+  },
+  "theme.lastUpdated.lastUpdatedAtBy": {
+    "message": "{atDate}{byUser}最終更新",
+    "description": "The sentence used to display when a page has been last updated, and by who"
+  },
+  "theme.navbar.mobileVersionsDropdown.label": {
+    "message": "他のバージョン",
+    "description": "The label for the navbar versions dropdown on mobile view"
+  },
+  "theme.NotFound.title": {
+    "message": "ページが見つかりません",
+    "description": "The title of the 404 page"
+  },
+  "theme.tags.tagsListLabel": {
+    "message": "タグ:",
+    "description": "The label alongside a tag list"
+  },
+  "theme.AnnouncementBar.closeButtonAriaLabel": {
+    "message": "閉じる",
+    "description": "The ARIA label for close button of announcement bar"
+  },
+  "theme.admonition.caution": {
+    "message": "注意",
+    "description": "The default label used for the Caution admonition (:::caution)"
+  },
+  "theme.admonition.danger": {
+    "message": "危険",
+    "description": "The default label used for the Danger admonition (:::danger)"
+  },
+  "theme.admonition.info": {
+    "message": "備考",
+    "description": "The default label used for the Info admonition (:::info)"
+  },
+  "theme.admonition.note": {
+    "message": "注記",
+    "description": "The default label used for the Note admonition (:::note)"
+  },
+  "theme.admonition.tip": {
+    "message": "ヒント",
+    "description": "The default label used for the Tip admonition (:::tip)"
+  },
+  "theme.admonition.warning": {
+    "message": "警告",
+    "description": "The default label used for the Warning admonition (:::warning)"
+  },
+  "theme.blog.sidebar.navAriaLabel": {
+    "message": "最近のブログ記事のナビゲーション",
+    "description": "The ARIA label for recent posts in the blog sidebar"
+  },
+  "theme.DocSidebarItem.expandCategoryAriaLabel": {
+    "message": "'{label}'の目次を開く",
+    "description": "The ARIA label to expand the sidebar category"
+  },
+  "theme.DocSidebarItem.collapseCategoryAriaLabel": {
+    "message": "'{label}'の目次を隠す",
+    "description": "The ARIA label to collapse the sidebar category"
+  },
+  "theme.IconExternalLink.ariaLabel": {
+    "message": "(opens in new tab)",
+    "description": "The ARIA label for the external link icon"
+  },
+  "theme.NavBar.navAriaLabel": {
+    "message": "ナビゲーション",
+    "description": "The ARIA label for the main navigation"
+  },
+  "theme.navbar.mobileLanguageDropdown.label": {
+    "message": "他の言語",
+    "description": "The label for the mobile language switcher dropdown"
+  },
+  "theme.TOCCollapsible.toggleButtonLabel": {
+    "message": "このページの見出し",
+    "description": "The label used by the button on the collapsible TOC component"
+  },
+  "theme.NotFound.p1": {
+    "message": "お探しのページが見つかりませんでした",
+    "description": "The first paragraph of the 404 page"
+  },
+  "theme.NotFound.p2": {
+    "message": "このページにリンクしているサイトの所有者にリンクが壊れていることを伝えてください",
+    "description": "The 2nd paragraph of the 404 page"
+  },
+  "theme.blog.post.readingTime.plurals": {
+    "message": "約{readingTime}分",
+    "description": "Pluralized label for \"{readingTime} min read\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.blog.post.readMore": {
+    "message": "もっと見る",
+    "description": "The label used in blog post item excerpts to link to full blog posts"
+  },
+  "theme.blog.post.readMoreLabel": {
+    "message": "{title}についてもっと見る",
+    "description": "The ARIA label for the link to full blog posts from excerpts"
+  },
+  "theme.CodeBlock.wordWrapToggle": {
+    "message": "折り返し",
+    "description": "The title attribute for toggle word wrapping button of code block lines"
+  },
+  "theme.CodeBlock.copy": {
+    "message": "コピー",
+    "description": "The copy button label on code blocks"
+  },
+  "theme.CodeBlock.copied": {
+    "message": "コピーしました",
+    "description": "The copied button label on code blocks"
+  },
+  "theme.CodeBlock.copyButtonAriaLabel": {
+    "message": "クリップボードにコードをコピー",
+    "description": "The ARIA label for copy code blocks button"
+  },
+  "theme.docs.breadcrumbs.home": {
+    "message": "ホームページ",
+    "description": "The ARIA label for the home page in the breadcrumbs"
+  },
+  "theme.docs.sidebar.navAriaLabel": {
+    "message": "ドキュメントのサイドバー",
+    "description": "The ARIA label for the sidebar navigation"
+  },
+  "theme.docs.sidebar.collapseButtonTitle": {
+    "message": "サイドバーを隠す",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.collapseButtonAriaLabel": {
+    "message": "サイドバーを隠す",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.closeSidebarButtonAriaLabel": {
+    "message": "ナビゲーションバーを閉じる",
+    "description": "The ARIA label for close button of mobile sidebar"
+  },
+  "theme.navbar.mobileSidebarSecondaryMenu.backButtonLabel": {
+    "message": "← メインメニューに戻る",
+    "description": "The label of the back button to return to main menu, inside the mobile navbar sidebar secondary menu (notably used to display the docs sidebar)"
+  },
+  "theme.docs.sidebar.toggleSidebarButtonAriaLabel": {
+    "message": "ナビゲーションバーを開く",
+    "description": "The ARIA label for hamburger menu button of mobile navigation"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.expandAriaLabel": {
+    "message": "Expand the dropdown",
+    "description": "The ARIA label of the button to expand the mobile dropdown navbar item"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.collapseAriaLabel": {
+    "message": "Collapse the dropdown",
+    "description": "The ARIA label of the button to collapse the mobile dropdown navbar item"
+  },
+  "theme.docs.sidebar.expandButtonTitle": {
+    "message": "サイドバーを開く",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.docs.sidebar.expandButtonAriaLabel": {
+    "message": "サイドバーを開く",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.SearchBar.noResultsText": {
+    "message": "結果が見つかりません。"
+  },
+  "theme.SearchBar.seeAllOutsideContext": {
+    "message": "「{context}」以外のすべての結果を見る"
+  },
+  "theme.SearchBar.searchInContext": {
+    "message": "「{context}」のすべての結果を見る"
+  },
+  "theme.SearchBar.seeAll": {
+    "message": "すべての結果を見る"
+  },
+  "theme.SearchBar.label": {
+    "message": "検索",
+    "description": "The ARIA label and placeholder for search button"
+  },
+  "theme.SearchPage.existingResultsTitle": {
+    "message": "検索：{query}",
+    "description": "The search page title for non-empty query"
+  },
+  "theme.SearchPage.emptyResultsTitle": {
+    "message": "検索したい語句を入力してください。",
+    "description": "The search page title for empty query"
+  },
+  "theme.SearchPage.searchContext.everywhere": {
+    "message": "すべての場所"
+  },
+  "theme.SearchPage.documentsFound.plurals": {
+    "message": "検索数：{count}件",
+    "description": "Pluralized label for \"{count} documents found\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.SearchPage.noResultsText": {
+    "message": "結果が見つかりません。",
+    "description": "The paragraph for empty search result"
+  },
+  "theme.blog.post.plurals": {
+    "message": "{count}件",
+    "description": "Pluralized label for \"{count} posts\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.blog.tagTitle": {
+    "message": "「{tagName}」タグの記事が{nPosts}件あります",
+    "description": "The title of the page for a blog tag"
+  },
+  "theme.blog.author.pageTitle": {
+    "message": "{authorName} - {nPosts}",
+    "description": "The title of the page for a blog author"
+  },
+  "theme.blog.authorsList.pageTitle": {
+    "message": "著者一覧",
+    "description": "The title of the authors page"
+  },
+  "theme.blog.authorsList.viewAll": {
+    "message": "すべての著者を見る",
+    "description": "The label of the link targeting the blog authors page"
+  },
+  "theme.blog.author.noPosts": {
+    "message": "この著者による投稿はまだありません。",
+    "description": "The text for authors with 0 blog post"
+  },
+  "theme.contentVisibility.unlistedBanner.title": {
+    "message": "非公開のページ",
+    "description": "The unlisted content banner title"
+  },
+  "theme.contentVisibility.unlistedBanner.message": {
+    "message": "このページは非公開です。 検索対象外となり、このページのリンクに直接アクセスできるユーザーのみに公開されます。",
+    "description": "The unlisted content banner message"
+  },
+  "theme.contentVisibility.draftBanner.title": {
+    "message": "下書きのページ",
+    "description": "The draft content banner title"
+  },
+  "theme.contentVisibility.draftBanner.message": {
+    "message": "このページは下書きです。開発環境でのみ表示され、本番環境のビルドには含まれません。",
+    "description": "The draft content banner message"
+  },
+  "theme.docs.DocCard.categoryDescription.plurals": {
+    "message": "{count}項目",
+    "description": "The default description for a category card in the generated index about how many items this category includes"
+  },
+  "theme.ErrorPageContent.tryAgain": {
+    "message": "もう一度試してください",
+    "description": "The label of the button to try again rendering when the React error boundary captures an error"
+  },
+  "theme.common.skipToMainContent": {
+    "message": "メインコンテンツまでスキップ",
+    "description": "The skip to content label used for accessibility, allowing to rapidly navigate to main content with keyboard tab/enter navigation"
+  },
+  "theme.tags.tagsPageTitle": {
+    "message": "タグ",
+    "description": "The title of the tag list page"
+  },
+  "home.meta.title": {
+    "message": "エージェントがワークフローになる"
+  },
+  "home.meta.description": {
+    "message": "A2Flow は ITSM 型のワークフローを AI エージェントを軸に組み直します。仕事をタスクグラフとして計画し、承認が要る場面では人を待ち、それ以外は自分で実行します。"
+  },
+  "home.nav.concept": {
+    "message": "コンセプト"
+  },
+  "home.nav.how": {
+    "message": "仕組み"
+  },
+  "home.nav.features": {
+    "message": "機能"
+  },
+  "home.nav.architecture": {
+    "message": "アーキテクチャ"
+  },
+  "home.hero.eyebrow": {
+    "message": "Agent as Workflow"
+  },
+  "home.hero.title": {
+    "message": "ワークフローエンジンは{br}いまや{agent}。"
+  },
+  "home.hero.title.agent": {
+    "message": "エージェント"
+  },
+  "home.hero.sub": {
+    "message": "A2Flow は、サービス依頼、変更作業、周知といった ITSM 型のワークフローを、AI エージェントを軸に組み直します。仕事をタスクグラフとして計画し、承認が必要な場面では人を待ち、それ以外は自分で実行します。"
+  },
+  "home.hero.cta.github": {
+    "message": "GitHub で見る"
+  },
+  "home.hero.cta.how": {
+    "message": "仕組みを見る"
+  },
+  "home.hero.demoCaption": {
+    "message": "ワークフローセッション。申請者と承認者とエージェントが、1 つの会話に集まります。"
+  },
+  "home.concept.eyebrow": {
+    "message": "コンセプト"
+  },
+  "home.concept.title": {
+    "message": "ITSM のワークフローを、{reimagined}"
+  },
+  "home.concept.title.reimagined": {
+    "message": "作り直す"
+  },
+  "home.concept.lead": {
+    "message": "従来のワークフローエンジンは、業務を固定のフォームとチケットの待ち行列と人から人への引き継ぎとして書き下します。経過時間の大半は待ち時間です。A2Flow は本当に必要な 2 つ、手順と承認だけを残し、あいだの作業はすべてエージェントに渡します。"
+  },
+  "home.concept.past.title": {
+    "message": "チケットのパイプライン"
+  },
+  "home.concept.past.sub": {
+    "message": "ソフトウェアとしての業務。フォームも状態も固定で、人がのりの役をします。"
+  },
+  "home.concept.past.form": {
+    "message": "フォームを埋める"
+  },
+  "home.concept.past.form.note": {
+    "message": "1 項目間違っただけで差し戻されます。"
+  },
+  "home.concept.past.queue": {
+    "message": "順番を待つ"
+  },
+  "home.concept.past.queue.note": {
+    "message": "あなたの依頼は 14 番目です。"
+  },
+  "home.concept.past.handoff": {
+    "message": "チーム間で引き継ぐ"
+  },
+  "home.concept.past.handoff.note": {
+    "message": "引き継ぐたびに経緯が失われます。"
+  },
+  "home.concept.past.chase": {
+    "message": "状況を追いかける"
+  },
+  "home.concept.past.chase.note": {
+    "message": "「私のチケット、どうなりました?」"
+  },
+  "home.concept.next.title": {
+    "message": "エージェントのワークフロー"
+  },
+  "home.concept.next.sub": {
+    "message": "会話としての業務。エージェントが進め、人が決めます。"
+  },
+  "home.concept.next.intent": {
+    "message": "チャットでやりたいことを伝える"
+  },
+  "home.concept.next.intent.note": {
+    "message": "フォームは不要。何を聞くべきかはスキルが知っています。"
+  },
+  "home.concept.next.plan": {
+    "message": "エージェントがタスクグラフを立てる"
+  },
+  "home.concept.next.plan.note": {
+    "message": "依存関係つきの具体的な手順が、全員に見えます。"
+  },
+  "home.concept.next.approve": {
+    "message": "要所は人が承認する"
+  },
+  "home.concept.next.approve.note": {
+    "message": "計画そのものと、破壊的な手順のすべてが対象です。"
+  },
+  "home.concept.next.execute": {
+    "message": "エージェントが実行して確認する"
+  },
+  "home.concept.next.execute.note": {
+    "message": "進み具合は同じ会話の中に出ます。"
+  },
+  "home.concept.note": {
+    "message": "手順そのものは、ワークフローエンジンの中に閉じ込められたコードではありません。{skill}です。バージョン管理でき、レビューでき、チームの誰でも読めます。"
+  },
+  "home.concept.note.skill": {
+    "message": "エージェントスキル、つまり Git リポジトリの {file} ファイル"
+  },
+  "home.how.eyebrow": {
+    "message": "仕組み"
+  },
+  "home.how.title": {
+    "message": "計画する。承認する。{execute}"
+  },
+  "home.how.title.execute": {
+    "message": "実行する。"
+  },
+  "home.how.lead": {
+    "message": "どのワークフローセッションも同じ 2 段階の方針で動きます。人が計画を見るまで何も実行せず、指名された承認者が同意するまで破壊的な操作は何も実行しません。"
+  },
+  "home.how.step1.label": {
+    "message": "STEP 1 — 計画"
+  },
+  "home.how.step1.title": {
+    "message": "エージェントが意図をタスクグラフに変える"
+  },
+  "home.how.step1.body": {
+    "message": "紐づいたエージェントスキルを読み、依頼を依存関係の明示された WorkflowTask に分解し、DAG 全体を 1 回の呼び出しで登録します。循環の検出もそこで行います。この時点ではまだ何も動きません。"
+  },
+  "home.how.step2.label": {
+    "message": "STEP 2 — 承認"
+  },
+  "home.how.step2.title": {
+    "message": "要所では人がゲートになる"
+  },
+  "home.how.step2.body": {
+    "message": "セッションの持ち主が、実行を始める前に計画を承認します。破壊的な手順はさらに{approver}のところで止まります。承認と却下の操作はチャットの中にそのまま出て、決裁できるのはその人だけです。ほかの人には {forbidden} が返ります。"
+  },
+  "home.how.step2.body.approver": {
+    "message": "指名された承認者"
+  },
+  "home.how.step3.label": {
+    "message": "STEP 3 — 実行"
+  },
+  "home.how.step3.title": {
+    "message": "エージェントがグラフをたどる"
+  },
+  "home.how.step3.body": {
+    "message": "タスクは依存順に {statuses} と進み、そのとき動いているタスクに割り当てられた MCP ツールだけを呼びます。進み具合はテーブルでもグラフでも、全員がその場で見られます。"
+  },
+  "home.teams.eyebrow": {
+    "message": "チームのために"
+  },
+  "home.teams.title": {
+    "message": "3 つの役割が、{conversation}"
+  },
+  "home.teams.title.conversation": {
+    "message": "1 つの会話に"
+  },
+  "home.teams.lead": {
+    "message": "ワークフローセッションは共有のチャットです。申請者も承認者もエージェントも、同じスレッドに書き込みます。裏でのやり取りも、「私のチケット、どうなりました?」もありません。"
+  },
+  "home.teams.applicant.title": {
+    "message": "申請者"
+  },
+  "home.teams.applicant.body": {
+    "message": "セッションの持ち主です。やりたいことを伝え、エージェントの質問に答え、何かが動き出す前に計画を承認します。"
+  },
+  "home.teams.approver.title": {
+    "message": "承認者"
+  },
+  "home.teams.approver.body": {
+    "message": "通知を受け取ってセッションを開き、チャットの中でそのまま判断します。コメントも添えられます。承認を決裁できるのは指名された承認者だけです。"
+  },
+  "home.teams.agent.title": {
+    "message": "エージェント"
+  },
+  "home.teams.agent.body": {
+    "message": "タスクグラフを立て、必要な場面で承認を求め、スキルに従って各手順を実行し、進み具合を報告します。"
+  },
+  "home.teams.trust.notifications.title": {
+    "message": "判断の場所まで連れていく通知"
+  },
+  "home.teams.trust.notifications.body": {
+    "message": "承認依頼とセッションの完了は各ユーザーの通知ベルに届き、そのまま該当する会話へ飛べます。"
+  },
+  "home.teams.trust.audit.title": {
+    "message": "すべての承認に監査証跡"
+  },
+  "home.teams.trust.audit.body": {
+    "message": "誰が承認し、何を書き、いつだったのか。承認のレコードに残り、管理画面から辿れます。"
+  },
+  "home.features.eyebrow": {
+    "message": "機能"
+  },
+  "home.features.title": {
+    "message": "ワークフローに必要なものすべてを、{nothing}"
+  },
+  "home.features.title.nothing": {
+    "message": "余計なものは何も"
+  },
+  "home.features.skills.title": {
+    "message": "Git に置くエージェントスキル"
+  },
+  "home.features.skills.body": {
+    "message": "手順は Git リポジトリの {file} ファイルとして置かれ、初回実行時に clone されます。ほかのコードと同じように、バージョン管理して、レビューして、読めます。"
+  },
+  "home.features.graph.title": {
+    "message": "動くタスクグラフ"
+  },
+  "home.features.graph.body": {
+    "message": "タスクは本物の DAG を作ります。依存は強制され、循環は拒否されます。並べ替えできるテーブルとしても、自動レイアウトのグラフとしても描画され、エージェントの作業に合わせて更新されます。"
+  },
+  "home.features.gates.title": {
+    "message": "実行の途中に入る承認ゲート"
+  },
+  "home.features.gates.body": {
+    "message": "破壊的な手順の前に、エージェントは特定のユーザーへ承認を求めて停止します。承認と却下のボタンがチャットに出ますが、見えるのはその人だけです。"
+  },
+  "home.features.mcp.title": {
+    "message": "タスク単位に絞った MCP ツール"
+  },
+  "home.features.mcp.body": {
+    "message": "リモートの MCP サーバーを登録しておくと、エージェントは計画時に、各タスクが必要とするツールだけを割り当てます。実行時、タスクは自分のツール以外を呼べません。"
+  },
+  "home.features.a2ui.title": {
+    "message": "チャットの中のリッチな UI"
+  },
+  "home.features.a2ui.body": {
+    "message": "A2UI プロトコルを通じて、エージェントはボタンやフォームやカードをその場に描画します。クリックはツールの結果として実行へ戻ります。"
+  },
+  "home.features.llm.title": {
+    "message": "LLM は自分で選ぶ"
+  },
+  "home.features.llm.body": {
+    "message": "既定は Gemini。OpenAI と Anthropic のモデルは LiteLLM 経由で使えます。プロバイダの切り替えは環境変数 1 つです。"
+  },
+  "home.architecture.eyebrow": {
+    "message": "内側"
+  },
+  "home.architecture.title": {
+    "message": "オープンプロトコルの{stack}"
+  },
+  "home.architecture.title.stack": {
+    "message": "スタック"
+  },
+  "home.architecture.lead": {
+    "message": "Next.js のチャット UI が、Google ADK のエージェントを載せた FastAPI のバックエンドから AG-UI のイベントを受け取ります。スキルは Git から、ツールは MCP サーバーから来て、1 つのリレーショナルデータベースがすべてを保持します。"
+  },
+  "home.cta.eyebrow": {
+    "message": "はじめる"
+  },
+  "home.cta.title": {
+    "message": "{machine}動かす"
+  },
+  "home.cta.title.machine": {
+    "message": "手元のマシンで"
+  },
+  "home.cta.lead": {
+    "message": "PostgreSQL とバックエンドとフロントエンド。スタック一式が Docker Compose で立ち上がります。Google の API キーさえあれば、最初のワークフローまで 2 コマンドです。"
+  }
+}

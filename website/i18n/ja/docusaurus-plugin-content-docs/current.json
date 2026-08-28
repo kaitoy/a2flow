@@ -1,0 +1,26 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.manualSidebar.category.Getting started": {
+    "message": "はじめに",
+    "description": "The label for category 'Getting started' in sidebar 'manualSidebar'"
+  },
+  "sidebar.manualSidebar.category.Concepts": {
+    "message": "基本概念",
+    "description": "The label for category 'Concepts' in sidebar 'manualSidebar'"
+  },
+  "sidebar.manualSidebar.category.Guides": {
+    "message": "機能ガイド",
+    "description": "The label for category 'Guides' in sidebar 'manualSidebar'"
+  },
+  "sidebar.manualSidebar.category.Architecture": {
+    "message": "アーキテクチャ",
+    "description": "The label for category 'Architecture' in sidebar 'manualSidebar'"
+  },
+  "sidebar.manualSidebar.category.Operations": {
+    "message": "運用",
+    "description": "The label for category 'Operations' in sidebar 'manualSidebar'"
+  }
+}
