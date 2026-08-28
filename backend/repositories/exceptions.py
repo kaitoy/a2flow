@@ -312,6 +312,21 @@ class McpServerValidationError(RepositoryError):
         super().__init__(reason)
 
 
+class McpToolMockValidationError(RepositoryError):
+    """Raised when an MCPToolMock create/update would leave an invalid target.
+
+    ``McpToolMockCreate`` enforces the rule at the request boundary, but a PATCH
+    body alone cannot: whether the merged mock targets a registered server or a
+    built-in tool depends on the stored record, which only the service can see.
+    Carries a human-readable ``reason`` surfaced in the error envelope's
+    ``details`` block when returning HTTP 422.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class SecretValidationError(RepositoryError):
     """Raised when a Secret create/update would leave an invalid per-type shape.
 

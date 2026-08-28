@@ -970,3 +970,88 @@ async def test_initiator_id_must_reference_an_existing_user(
         )
         with pytest.raises(IntegrityError):
             await db.commit()
+
+
+# ---------- tool invocations ----------
+
+
+async def test_tool_invocations_lists_the_runs_recorded_decisions(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Rows are written by the MCP proxy, so this seeds them directly."""
+    from models.mcp_tool_invocation import McpAuditDecision, MCPToolInvocation
+
+    client, engine = workflow_client_with_engine
+    skill = await _create_skill(client)
+    execution = await _execute_workflow(client, skill["id"])
+    async with AsyncSession(engine) as db:
+        for tool_name, decision in (
+            ("search", McpAuditDecision.allowed),
+            ("write", McpAuditDecision.denied),
+        ):
+            db.add(
+                MCPToolInvocation(
+                    session_id=execution["sessionId"],
+                    workflow_execution_id=execution["id"],
+                    mcp_server_id="srv-1",
+                    tool_name=tool_name,
+                    decision=decision,
+                    arguments_digest="0" * 64,
+                    tenant_id=DEFAULT_TEST_TENANT_ID,
+                    created_by=SYSTEM_USER_ID,
+                    updated_by=SYSTEM_USER_ID,
+                )
+            )
+        await db.commit()
+
+    body = assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution['id']}/tool-invocations"
+        )
+    )
+    assert {row["toolName"] for row in body} == {"search", "write"}
+    assert all(row["argumentsDigest"] == "0" * 64 for row in body)
+
+    denied = assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution['id']}"
+            "/tool-invocations?q=decision:eq:denied"
+        )
+    )
+    assert [row["toolName"] for row in denied] == ["write"]
+
+
+async def test_tool_invocations_of_another_run_are_not_listed(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    from models.mcp_tool_invocation import McpAuditDecision, MCPToolInvocation
+
+    client, engine = workflow_client_with_engine
+    skill = await _create_skill(client)
+    workflow = await create_published_workflow(client, skill["id"])
+    first = assert_ok(
+        await client.post(f"/api/v1/workflows/{workflow['id']}/execute"), status=201
+    )
+    second = assert_ok(
+        await client.post(f"/api/v1/workflows/{workflow['id']}/execute"), status=201
+    )
+    async with AsyncSession(engine) as db:
+        db.add(
+            MCPToolInvocation(
+                session_id=first["sessionId"],
+                workflow_execution_id=first["id"],
+                mcp_server_id="srv-1",
+                tool_name="search",
+                decision=McpAuditDecision.allowed,
+                arguments_digest="0" * 64,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await db.commit()
+
+    body = assert_ok(
+        await client.get(f"/api/v1/workflow-executions/{second['id']}/tool-invocations")
+    )
+    assert body == []

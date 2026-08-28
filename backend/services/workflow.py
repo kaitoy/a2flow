@@ -35,6 +35,8 @@ from google.adk.sessions import BaseSessionService, Session
 
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
+from infrastructure.tool_mocks import snapshot_mock
+from models.mcp_tool_mock import MCPToolMock
 from models.message_meta import MessageScope
 from models.user import Role, User, has_any_role
 from models.workflow import Workflow, WorkflowRead, WorkflowStatus, WorkflowUpdate
@@ -48,6 +50,7 @@ from models.workflow_task import WorkflowTaskCreate, WorkflowTaskStatus
 from repositories import (
     MAX_TASK_TEMPLATES,
     AgentSkillRepository,
+    MCPToolMockRepository,
     MessageMetaRepository,
     WorkflowExecutionRepository,
     WorkflowPublishedVersionRepository,
@@ -57,6 +60,7 @@ from repositories import (
 )
 from repositories.exceptions import (
     ForbiddenError,
+    ForeignKeyViolationError,
     NotFoundError,
     SkillNotReadyError,
     WorkflowNotDeactivatableError,
@@ -155,6 +159,7 @@ class WorkflowService:
         tasks: WorkflowTaskRepository,
         versions: WorkflowPublishedVersionRepository,
         meta: MessageMetaRepository,
+        mocks: MCPToolMockRepository,
         skills_store: SkillManager,
         registry: AgentRegistry,
         session_service: BaseSessionService,
@@ -175,6 +180,8 @@ class WorkflowService:
                 :meth:`discard_changes` restores from.
             meta: Repository recording and reading per-message sender
                 attribution for the shared design session.
+            mocks: Repository providing MCPToolMock persistence, read at execute
+                time to snapshot the mocks a draft run applies.
             skills_store: Store locating a skill revision's directory on disk.
             registry: Registry resolving ADK agents per skill revision and kind.
             session_service: ADK session store holding the design chat history.
@@ -187,6 +194,7 @@ class WorkflowService:
         self._tasks = tasks
         self._versions = versions
         self._meta = meta
+        self._mocks = mocks
         self._skills_store = skills_store
         self._registry = registry
         self._session_service = session_service
@@ -631,8 +639,39 @@ class WorkflowService:
         """
         await self._workflows.delete(workflow_id)
 
+    async def _resolve_mocks(
+        self, mock_ids: Sequence[str]
+    ) -> builtins.list[MCPToolMock]:
+        """Resolve the tool mocks a run asked for, rejecting any that is missing.
+
+        A missing id is an error rather than a silent omission: dropping it
+        would start a run the caller believes is stubbed and that would in fact
+        perform the tool's real side effects.
+
+        Args:
+            mock_ids: Ids of the mocks the run should apply. Duplicates collapse.
+
+        Returns:
+            The resolved mocks.
+
+        Raises:
+            ForeignKeyViolationError: If any id names no mock in this tenant.
+        """
+        resolved: builtins.list[MCPToolMock] = []
+        for mock_id in dict.fromkeys(mock_ids):
+            mock = await self._mocks.get(mock_id)
+            if mock is None:
+                raise ForeignKeyViolationError("MCPToolMock", mock_id)
+            resolved.append(mock)
+        return resolved
+
     async def execute(
-        self, workflow_id: str, *, caller: User, caller_roles: Collection[str]
+        self,
+        workflow_id: str,
+        *,
+        caller: User,
+        caller_roles: Collection[str],
+        tool_mock_ids: Sequence[str] = (),
     ) -> WorkflowExecution:
         """Start a workflow run by creating a WorkflowExecution with its tasks.
 
@@ -656,6 +695,13 @@ class WorkflowService:
         from every operations metric so pre-publish test data does not skew
         them.
 
+        A draft run may also stub some of its tools: ``tool_mock_ids`` names
+        :class:`~models.mcp_tool_mock.MCPToolMock` records, and what each one
+        currently says is **copied onto the run** rather than referenced, so
+        editing or deleting a mock afterwards can never turn a stubbed call back
+        into a real one. Mocks are rejected outright for a non-draft workflow: a
+        published run that quietly did nothing would be worse than no run.
+
         No cloning happens here: the skill's repository was published into the
         shared store when it was registered (and re-published by each pull), so
         a run only has to name the revision it starts against. A skill with no
@@ -673,6 +719,8 @@ class WorkflowService:
                 ``modified`` workflows are runnable by any caller who reached
                 this route (role-gated to ``requester``/``developer`` at the
                 router).
+            tool_mock_ids: Ids of the tool mocks this run should apply. Only a
+                ``draft`` workflow may be given any.
 
         Returns:
             The created WorkflowExecution.
@@ -681,7 +729,9 @@ class WorkflowService:
             NotFoundError: If the workflow or its skill does not exist.
             WorkflowNotRunnableError: If the workflow is neither ``published``
                 nor ``modified`` (and, for a non-``developer`` caller, not
-                ``draft`` either), or has no task templates.
+                ``draft`` either), has no task templates, or is not ``draft``
+                while ``tool_mock_ids`` asks for mocks.
+            ForeignKeyViolationError: If a requested mock does not exist.
             SkillNotReadyError: If the skill has no published revision yet.
         """
         workflow = await self.get(workflow_id)
@@ -696,6 +746,14 @@ class WorkflowService:
             raise WorkflowNotRunnableError(
                 workflow_id, "only published workflows can be executed"
             )
+        is_draft = workflow.status is WorkflowStatus.draft
+        if tool_mock_ids and not is_draft:
+            raise WorkflowNotRunnableError(
+                workflow_id, "tool mocks are only available for draft workflows"
+            )
+        tool_mocks = [
+            snapshot_mock(m) for m in await self._resolve_mocks(tool_mock_ids)
+        ]
         skill = await self._skills.get(workflow.agent_skill_id)
         if skill is None:
             raise NotFoundError("AgentSkill", workflow.agent_skill_id)
@@ -723,7 +781,8 @@ class WorkflowService:
             execution_create,
             workflow_id=workflow.id,
             user_id=user,
-            is_draft=workflow.status is WorkflowStatus.draft,
+            is_draft=is_draft,
+            tool_mocks=tool_mocks,
         )
         execution_id = execution.id
 

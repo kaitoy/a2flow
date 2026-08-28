@@ -19,6 +19,8 @@ from repositories import (
     EffectiveRoleRepository,
     McpCertificateAuthorityRepository,
     MCPServerRepository,
+    McpToolInvocationRepository,
+    MCPToolMockRepository,
     MessageMetaRepository,
     MetricsRepository,
     NotificationRepository,
@@ -31,6 +33,8 @@ from repositories import (
     SqlEffectiveRoleRepository,
     SqlMcpCertificateAuthorityRepository,
     SqlMCPServerRepository,
+    SqlMcpToolInvocationRepository,
+    SqlMcpToolMockRepository,
     SqlMessageMetaRepository,
     SqlMetricsRepository,
     SqlNotificationRepository,
@@ -129,6 +133,62 @@ def get_mcp_server_read_repository(
 
 MCPServerReadRepositoryDep = Annotated[
     MCPServerRepository, Depends(get_mcp_server_read_repository)
+]
+
+
+def get_mcp_tool_mock_repository(
+    db: DBSessionDep,
+    servers: MCPServerRepositoryDep,
+    tenant_id: CurrentTenantIdDep,
+) -> MCPToolMockRepository:
+    """Create an MCPToolMockRepository backed by the current database session."""
+    return SqlMcpToolMockRepository(db, servers, tenant_id=tenant_id)
+
+
+MCPToolMockRepositoryDep = Annotated[
+    MCPToolMockRepository, Depends(get_mcp_tool_mock_repository)
+]
+
+
+def get_mcp_tool_mock_read_repository(
+    db: DBSessionDep,
+    servers: MCPServerReadRepositoryDep,
+    tenant_id: CurrentTenantScopeDep,
+) -> MCPToolMockRepository:
+    """Create an MCPToolMockRepository for a read route, possibly across all tenants.
+
+    Backs only ``GET`` routes; every write route stays on
+    :func:`get_mcp_tool_mock_repository`.
+    """
+    return SqlMcpToolMockRepository(db, servers, tenant_id=tenant_id)
+
+
+MCPToolMockReadRepositoryDep = Annotated[
+    MCPToolMockRepository, Depends(get_mcp_tool_mock_read_repository)
+]
+
+
+def get_mcp_tool_invocation_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> McpToolInvocationRepository:
+    """Create an McpToolInvocationRepository backed by the current database session."""
+    return SqlMcpToolInvocationRepository(db, tenant_id=tenant_id)
+
+
+McpToolInvocationRepositoryDep = Annotated[
+    McpToolInvocationRepository, Depends(get_mcp_tool_invocation_repository)
+]
+
+
+def get_mcp_tool_invocation_read_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+) -> McpToolInvocationRepository:
+    """Create an McpToolInvocationRepository for a read route, possibly across all tenants."""
+    return SqlMcpToolInvocationRepository(db, tenant_id=tenant_id)
+
+
+McpToolInvocationReadRepositoryDep = Annotated[
+    McpToolInvocationRepository, Depends(get_mcp_tool_invocation_read_repository)
 ]
 
 

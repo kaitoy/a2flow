@@ -331,6 +331,46 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
+        "mcp_tool_mocks",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("mcp_server_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("tool_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "responses",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["mcp_server_id"], ["mcp_servers.id"], ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "tenant_id", "name", name="uq_mcp_tool_mocks_tenant_id_name"
+        ),
+    )
+    op.create_index(
+        "ix_mcp_tool_mocks_mcp_server_id",
+        "mcp_tool_mocks",
+        ["mcp_server_id"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_mcp_tool_mocks_tenant_id_name",
+        "mcp_tool_mocks",
+        ["tenant_id", "name"],
+        unique=False,
+    )
+    op.create_table(
         "secrets",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -553,6 +593,16 @@ def upgrade() -> None:
         sa.Column("initiator_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("is_draft", sa.Boolean(), nullable=False),
+        sa.Column(
+            "tool_mocks",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
+        sa.Column(
+            "tool_mock_calls",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
         sa.Column(
             "status",
             sa.Enum(
@@ -1396,6 +1446,9 @@ def downgrade() -> None:
     op.drop_table("user_avatars")
     op.drop_index("ix_secrets_tenant_id_name", table_name="secrets")
     op.drop_table("secrets")
+    op.drop_index("ix_mcp_tool_mocks_tenant_id_name", table_name="mcp_tool_mocks")
+    op.drop_index("ix_mcp_tool_mocks_mcp_server_id", table_name="mcp_tool_mocks")
+    op.drop_table("mcp_tool_mocks")
     op.drop_index("ix_mcp_servers_tenant_id_name", table_name="mcp_servers")
     op.drop_table("mcp_servers")
     op.drop_index(

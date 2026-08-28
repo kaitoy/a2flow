@@ -30,6 +30,7 @@ import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
+import { RunWorkflowDialog } from "@/components/admin/run-workflow-dialog";
 import { StatusCard } from "@/components/admin/status-card";
 import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
@@ -323,11 +324,11 @@ export default function WorkflowDetailPage() {
     router.push(`/workflows/${encodeURIComponent(workflowId)}/design-session`);
   }
 
-  async function handleRun() {
+  async function handleRun(toolMockIds: string[]) {
     setConfirmRunOpen(false);
     try {
       await run.run(async () => {
-        const workflowExecution = await executeWorkflow(workflowId);
+        const workflowExecution = await executeWorkflow(workflowId, { toolMockIds });
         router.push(`/workflow-executions/${workflowExecution.id}/session`);
       });
     } catch {
@@ -656,12 +657,10 @@ export default function WorkflowDetailPage() {
         onConfirm={handlePublish}
         onCancel={() => setConfirmPublishOpen(false)}
       />
-      <ConfirmDialog
+      <RunWorkflowDialog
         open={confirmRunOpen}
-        title="Run Workflow"
-        description={`Run "${workflow.name}"? This starts a new execution.`}
-        confirmLabel="Run"
-        confirmVariant="primary"
+        workflowName={workflow.name}
+        isDraft={workflow.status === "draft"}
         onConfirm={handleRun}
         onCancel={() => setConfirmRunOpen(false)}
       />

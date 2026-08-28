@@ -26,6 +26,12 @@ results and errors into the JSON-serializable dicts the LLM consumes on the way
 out -- including mapping every failure to an ``{"error": ...}`` payload the
 model can react to instead of raising.
 
+A draft run may **mock** the tool (see :mod:`infrastructure.tool_mocks`), but
+nothing about that is handled here: the proxy applies the mock itself, behind
+its policy chain, and hands back an ordinary result carrying a marker in
+``_meta``. All this module does is turn that marker into the ``"mocked": true``
+the model sees, through the same ``_result_to_dict`` a real result goes through.
+
 The two tools differ in what the proxy demands of them. ``list_mcp_tools`` only
 needs the tenant, so it works in both an execution run (keyed on a
 WorkflowExecution) and a design run (keyed on a Workflow's design session).
@@ -44,6 +50,7 @@ from mcp import types
 
 from infrastructure.mcp_credentials import get_approval_credential_provider
 from infrastructure.mcp_proxy import (
+    MOCKED_META_KEY,
     CallToolRequest,
     ListToolsRequest,
     McpPrincipal,
@@ -112,24 +119,35 @@ def _coerce_arguments(arguments: object) -> dict[str, Any] | None:
 def _result_to_dict(result: types.CallToolResult) -> dict[str, Any]:
     """Convert a ``tools/call`` result into a plain dict the LLM can consume.
 
+    One function for real and stubbed results alike: the proxy answers a mocked
+    call with the same wire type, so the two shapes cannot drift apart. The
+    ``mocked`` marker it sets in ``_meta`` is the only difference the model sees.
+
     Args:
-        result: The raw MCP call result.
+        result: The raw MCP call result, real or stubbed.
 
     Returns:
         ``{"error": <joined text>}`` when the tool reported an error, otherwise
         ``{"result": {"content": [<text blocks>], "structured": <object|None>}}``.
+        A stubbed result carries an added ``"mocked": True``.
     """
     texts = [
         block.text for block in result.content if isinstance(block, types.TextContent)
     ]
     if result.isError:
-        return {"error": "\n".join(texts) or "MCP tool reported an error"}
-    return {
-        "result": {
-            "content": texts,
-            "structured": result.structuredContent,
+        payload: dict[str, Any] = {
+            "error": "\n".join(texts) or "MCP tool reported an error"
         }
-    }
+    else:
+        payload = {
+            "result": {
+                "content": texts,
+                "structured": result.structuredContent,
+            }
+        }
+    if (result.meta or {}).get(MOCKED_META_KEY):
+        payload["mocked"] = True
+    return payload
 
 
 def _listing_to_dict(listing: ServerToolListing) -> dict[str, Any]:
@@ -219,7 +237,10 @@ async def call_mcp_tool(
         ``{"result": {"content": [...], "structured": ...}}`` on success, or
         ``{"error": <message>}`` when the session/task cannot be resolved, the
         tool is not bound to the current in-progress task, the server is not
-        registered or unreachable, or the tool itself reports an error.
+        registered or unreachable, or the tool itself reports an error. When the
+        current run mocks this tool the same shapes come back with an added
+        ``"mocked": true`` and no server was contacted -- the checks above still
+        applied, so a mocked call to an unbound tool is refused like any other.
     """
     args = _coerce_arguments(arguments)
     if args is None:

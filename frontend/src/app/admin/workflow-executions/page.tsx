@@ -85,6 +85,16 @@ function buildColumns(
       cell: (s) => (s.isDraft ? <Badge>Draft</Badge> : null),
     },
     {
+      // A draft run that stubbed some of its tools. Not sortable or filterable:
+      // toolMocks is a JSON column, so there is no scalar for the list query to
+      // order or compare against.
+      header: "Mocked",
+      visibility: "optional",
+      noTruncate: true,
+      className: "text-center",
+      cell: (s) => (s.toolMocks && s.toolMocks.length > 0 ? <Badge>Mocked</Badge> : null),
+    },
+    {
       // Resolved from initiatorId to a display name; not sorted/filtered by raw id.
       header: "Initiator",
       cell: (s) =>

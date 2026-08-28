@@ -42,6 +42,7 @@ from dependencies import (
 )
 from infrastructure.agent import keep_a2ui_context, tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from models.mcp_tool_invocation import MCPToolInvocation
 from models.metrics import (
     FailedExecutionEntry,
     LeadTimeBucket,
@@ -185,6 +186,44 @@ async def list_workflow_execution_tasks(
     execution" from "execution exists but has no tasks".
     """
     items = await service.list_tasks(
+        execution_id,
+        caller=caller,
+        caller_roles=caller_roles,
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort=sort.sort,
+        filters=filters.filters,
+    )
+    return ApiResponse(meta=meta, data=items)
+
+
+@router.get(
+    "/{execution_id}/tool-invocations",
+    response_model=ApiResponse[list[MCPToolInvocation]],
+)
+async def list_workflow_execution_tool_invocations(
+    execution_id: str,
+    service: WorkflowExecutionReadServiceDep,
+    caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
+    pagination: PaginationDep,
+    sort: SortDep,
+    filters: FilterDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[MCPToolInvocation]]:
+    """Return the MCP tool-call decisions recorded for the given WorkflowExecution.
+
+    These are the calls that reached the MCP proxy: ``allowed`` ones that went
+    upstream and ``denied`` ones a policy vetoed. Calls answered by a tool mock
+    never reach the proxy and are therefore absent — the chat transcript shows
+    those. Arguments appear only as ``argumentsDigest``; the raw values are
+    never recorded here.
+
+    Restricted to the execution's initiator, its designated approvers, admins,
+    and super admins. Raises HTTP 404 (``NotFoundError``) if the parent
+    execution does not exist.
+    """
+    items = await service.list_tool_invocations(
         execution_id,
         caller=caller,
         caller_roles=caller_roles,

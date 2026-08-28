@@ -1,7 +1,7 @@
 /** @module WorkflowExecutionDetailPage — Read-only admin detail page for an executed WorkflowExecution. */
 "use client";
 
-import { ClipboardList, ListChecks, MessageSquareText } from "lucide-react";
+import { ClipboardList, ListChecks, MessageSquareText, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -142,6 +142,14 @@ export default function WorkflowExecutionDetailPage() {
                   <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" />
                 </HeaderIconButton>
                 <HeaderIconButton
+                  label="View tool invocations"
+                  onClick={() =>
+                    router.push(`/admin/workflow-executions/${executionId}/tool-invocations`)
+                  }
+                >
+                  <ShieldCheck size={18} strokeWidth={1.8} aria-hidden="true" />
+                </HeaderIconButton>
+                <HeaderIconButton
                   label="Open workflow session"
                   onClick={() => router.push(`/workflow-executions/${executionId}/session`)}
                 >
@@ -156,6 +164,7 @@ export default function WorkflowExecutionDetailPage() {
         <StatusCard ariaLabel="Workflow execution status">
           <WorkflowExecutionStatusLabel status={session.status} />
           {session.isDraft && <Badge>Draft</Badge>}
+          {session.toolMocks && session.toolMocks.length > 0 && <Badge>Mocked</Badge>}
         </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>

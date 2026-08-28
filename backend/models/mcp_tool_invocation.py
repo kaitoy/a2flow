@@ -1,9 +1,15 @@
 """Append-only audit of every MCP tool call the proxy decided on.
 
-One row per ``call_tool`` the proxy authorized or refused, written by
+One row per ``call_tool`` that reached a registered MCP server, or was stopped
+on its way to one, written by
 :class:`infrastructure.mcp_audit.SqlMcpAuditSink` before the proxy releases its
-database session. Listings are not recorded: they have no side effect and would
-bury the calls that do.
+database session.
+
+Two kinds of operation are deliberately absent. Listings have no side effect and
+would bury the calls that do. A call a draft run answers from its
+:mod:`tool mocks <infrastructure.tool_mocks>` never reaches a server at all, so
+neither its approval nor its refusal is recorded -- a row either way would
+misdescribe what happened.
 
 **What makes it non-repudiable.** When the call presented an approval
 certificate, the row keeps the certificate's serial together with the exact

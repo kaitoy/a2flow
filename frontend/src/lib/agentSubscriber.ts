@@ -3,8 +3,10 @@ import type { AgentSubscriber } from "@ag-ui/client";
 import {
   A2UI_SOURCE_TOOL_CALL_ID_KEY,
   CALL_MCP_TOOL_NAME,
+  getToolCallArguments,
   getToolDisplayName,
   isHiddenToolName,
+  parseToolResult,
   REASONING_ACTIVITY_TYPE,
   TOOL_CALL_ACTIVITY_TYPE,
 } from "@/lib/agentActivity";
@@ -13,6 +15,7 @@ import type { AppDispatch } from "@/store";
 import {
   addActivityMessage,
   appendDelta,
+  attachToolCallResult,
   endAssistantMessage,
   setError,
   startAssistantMessage,
@@ -124,7 +127,16 @@ export function createAgentSubscriber(
             name: getToolDisplayName(toolCallName, toolCallArgs),
             status: "done",
             isMcp: toolCallName === CALL_MCP_TOOL_NAME,
+            args: getToolCallArguments(toolCallName, toolCallArgs),
           },
+        })
+      );
+    },
+    onToolCallResultEvent: async ({ event }) => {
+      dispatch(
+        attachToolCallResult({
+          toolCallId: event.toolCallId,
+          result: parseToolResult(event.content),
         })
       );
     },

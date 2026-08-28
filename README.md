@@ -174,11 +174,11 @@ A role held only through a group is worth exactly as much as a directly granted 
 |---|---|
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the designated-approver checks described under [Human approval](#human-approval)) |
 | `admin` | User CRUD, secrets CRUD, and read-only visibility into every workflow execution, its tasks, and its chat history, and every approval, in their tenant (see [Workflow execution access](#roles-and-authorization) below — an Admin cannot drive an execution's agent, create/edit/delete its tasks, delete the execution, or resolve an approval) |
-| `developer` | Secrets CRUD, MCP server CRUD, agent-skill CRUD, workflow generation/editing/publishing/deactivating — including regenerating a workflow's AI-generated `generatedDescription`, though only a Super Admin may edit that field directly — task-template CRUD, design-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
+| `developer` | Secrets CRUD, MCP server CRUD, [tool-mock](#tool-mocks) CRUD, agent-skill CRUD, workflow generation/editing/publishing/deactivating — including regenerating a workflow's AI-generated `generatedDescription`, though only a Super Admin may edit that field directly — task-template CRUD, design-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
 | `requester` | Running **published** (and `modified`) workflows (`POST /workflows/{id}/execute`) |
 | `approver` | Eligibility to be a workflow approval's designated approver — individually, or as a member of a group an approval is addressed to — and resolving their own approvals |
 
-**Reads stay open.** Only writes, workflow execution, and approvals are role-gated; every authenticated user may `GET` the collections (the UI needs them to resolve names, pick approvers, and list workflows). Secret *values* are never returned by the API regardless of role. Roles are assigned from the [Users](#users) admin page, or in bulk from the [User Groups](#user-groups) page; only a Super Admin may grant or revoke `super_admin`. A rejected request returns HTTP 403 (`FORBIDDEN`), and the admin UI hides the actions and nav entries a user's roles do not allow — on a **list** page that means the Add button and the per-row Actions column (Delete, and MCP Servers' "Browse registry", which only leads to the create form). Because reads stay open, a detail page can be opened by someone who may not write it — agent skills, MCP servers, secrets, tenants, users, workflows, and task templates all render **read-only** in that case: every field shows as a recessed value instead of an input, Save and Delete are absent, and Cancel becomes Back. A secret's entries then list their keys alone (values are never returned anyway), and the password field on a user is omitted entirely. Fields that are immutable for *everyone* — a tenant's `name`, a user's `username` — render the same way regardless of role. The **create** forms have no read-only reading, so they answer an access-denied screen instead: reaching `/admin/<section>/new` without the role means a deep link, since the Add button that leads there is already hidden.
+**Reads stay open.** Only writes, workflow execution, and approvals are role-gated; every authenticated user may `GET` the collections (the UI needs them to resolve names, pick approvers, and list workflows). Secret *values* are never returned by the API regardless of role. Roles are assigned from the [Users](#users) admin page, or in bulk from the [User Groups](#user-groups) page; only a Super Admin may grant or revoke `super_admin`. A rejected request returns HTTP 403 (`FORBIDDEN`), and the admin UI hides the actions and nav entries a user's roles do not allow — on a **list** page that means the Add button and the per-row Actions column (Delete, and MCP Servers' "Browse registry", which only leads to the create form). Because reads stay open, a detail page can be opened by someone who may not write it — agent skills, MCP servers, tool mocks, secrets, tenants, users, workflows, and task templates all render **read-only** in that case: every field shows as a recessed value instead of an input, Save and Delete are absent, and Cancel becomes Back. A secret's entries then list their keys alone (values are never returned anyway), and the password field on a user is omitted entirely. Fields that are immutable for *everyone* — a tenant's `name`, a user's `username` — render the same way regardless of role. The **create** forms have no read-only reading, so they answer an access-denied screen instead: reaching `/admin/<section>/new` without the role means a deep link, since the Add button that leads there is already hidden.
 
 The initial seeded **`root`** user holds `super_admin` and is platform-scoped (no tenant). The **`admin`** user seeded inside the **Default** tenant holds `admin`, scoped to that tenant; every other user starts with no roles.
 
@@ -355,6 +355,34 @@ The list page's **Browse registry** button opens a search dialog backed by the o
 
 `GET /api/v1/mcp-servers/{id}/tools` queries the live server and returns the tools it advertises (name, description, input schema); the admin task forms call it for the one server the operator has picked, never for the whole registry at once. A server that cannot be reached or launched yields HTTP 502 (`MCP_UNREACHABLE`). A server cannot be deleted while WorkflowTask tool bindings still reference it (HTTP 409 `CONFLICT_REFERENCED`).
 
+### Tool Mocks
+
+Navigate to [http://localhost:3000/admin/mcp-tool-mocks](http://localhost:3000/admin/mcp-tool-mocks) to manage **tool mocks** — stand-ins that let a **draft** workflow run be exercised end to end without its tools' side effects. A mocked tool is not called: the mock's configured result is returned instead, so no request reaches the MCP server, no approval is recorded, and nobody is emailed.
+
+Mocking is chosen **per tool**, not per run, because a dry run is only useful if it stays realistic. A workflow that searches a system and then writes to it can stub only the write — the read still hits the real server, and the agent still reasons over real data. For the same reason a mock buys past the side effect but not past the rules: a mocked MCP call is still checked against the tools the run's current task is allowed to use, and against any approval that task is waiting on, so a workflow that would be refused in production is refused in its dry run too.
+
+A mock targets either one tool of a [registered MCP server](#mcp-servers) or a **built-in** A2Flow tool (currently `request_approval` alone — the one whose side effects otherwise need a human to clear before the run can continue).
+
+Its **responses** are an ordered list indexed by call ordinal: the first answers the run's first call to that tool, the second its second, and so on; once the list runs out the last response repeats, so a single response behaves as a constant. That is what lets one mock express a scenario rather than a fixed value — approve the first request, reject the second, and see how the workflow handles both. Each response is one of:
+
+| Kind | Meaning |
+|---|---|
+| `structured` | A JSON object placed in the result's `structuredContent` — for a tool whose caller reads fields off the result |
+| `text` | A string placed in the result's textual content |
+| `error` | A message returned as a failed call, so the agent sees the tool report an error |
+
+Mocks are applied by **checking them in the Run dialog** of a draft workflow (see [Running a workflow](#running-a-workflow)); the dialog offers no mocks for a published one. Starting the run **copies** what each chosen mock currently says onto the execution, so editing or deleting a mock afterwards never changes a run already under way — and can never silently turn a stubbed call back into a real one.
+
+What a mocked call sent and returned is visible in the run's chat transcript: its tool line expands to show the arguments and the result, badged **Mocked**. It deliberately does not appear on the run's [Tool Invocations](#workflow-executions) page — that page records the decisions the MCP proxy actually made, and a stub never reaches it.
+
+A mocked `request_approval` still validates its destination — a mock skips the side effects, not the checks — so a workflow naming an ineligible approver fails in a dry run exactly as it would for real.
+
+| Operation | Path |
+|-----------|------|
+| List tool mocks | `GET /admin/mcp-tool-mocks` |
+| Create a tool mock | `GET /admin/mcp-tool-mocks/new` |
+| Edit or delete a tool mock | `GET /admin/mcp-tool-mocks/{id}` |
+
 ### Secrets
 
 Navigate to [http://localhost:3000/admin/secrets](http://localhost:3000/admin/secrets) to manage named credentials used for authentication elsewhere in the app.
@@ -479,10 +507,12 @@ Refining the task templates through the **design chat** counts as an edit too: w
 
 #### Running a workflow
 
-Clicking **Run** on a **published** or **modified** workflow — or, for a `developer`/`super_admin` caller, a **draft** one too, for pre-publish testing — creates a **WorkflowExecution** — an independent entity that captures a snapshot of the workflow configuration at execution time:
+Clicking **Run** on a **published** or **modified** workflow — or, for a `developer`/`super_admin` caller, a **draft** one too, for pre-publish testing — creates a **WorkflowExecution** — an independent entity that captures a snapshot of the workflow configuration at execution time.
+
+For a **draft** workflow the Run dialog additionally lists the tenant's [tool mocks](#tool-mocks); checking one stubs that tool for this run, so a pre-publish test can be repeated without the tool's side effects. The dialog offers no mocks for a published workflow, and asking for one anyway is rejected with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`) — a published run that quietly did nothing would be worse than no run.
 
 1. The backend rejects any other status outright, and rejects a `draft` workflow for any caller who isn't `developer`/`super_admin`, with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`); it also re-checks the skill's published revision (`SKILL_NOT_READY` otherwise) — the repository was cloned when the skill was registered, so **nothing is cloned here**.
-2. A `WorkflowExecution` record is persisted, capturing the workflow name, its effective description (`description` if the user set one, else the AI-generated `generatedDescription`), skill details, the id of the **workflow session** it will run in, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). If the workflow was still `draft` at this point — a pre-publish test run — the record is flagged `isDraft: true`, which keeps it out of the [operations metrics](#operations-metrics); the flag never changes afterwards. The workflow's task templates are **copied into the execution as `pending` WorkflowTasks** (dependency edges and tool bindings included, ids remapped), so later template edits never affect this run. For a `modified` workflow the name, description, and templates all come from its **last published version** rather than the edited rows. The ADK session itself is created lazily on the first agent call.
+2. A `WorkflowExecution` record is persisted, capturing the workflow name, its effective description (`description` if the user set one, else the AI-generated `generatedDescription`), skill details, the id of the **workflow session** it will run in, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). If the workflow was still `draft` at this point — a pre-publish test run — the record is flagged `isDraft: true`, which keeps it out of the [operations metrics](#operations-metrics); the flag never changes afterwards. The workflow's task templates are **copied into the execution as `pending` WorkflowTasks** (dependency edges and tool bindings included, ids remapped), so later template edits never affect this run. For a `modified` workflow the name, description, and templates all come from its **last published version** rather than the edited rows. Any [tool mocks](#tool-mocks) chosen for the run are **copied onto the record** at the same time — by value, not by reference — so editing or deleting a mock afterwards cannot change how this run behaves. The ADK session itself is created lazily on the first agent call.
 3. The backend returns the `WorkflowExecution` (HTTP 201). The frontend redirects to `/workflow-executions/{workflowExecution.id}/session` — the **workflow session**, the chat the run happens in. It has no record of its own, so it is addressed by its execution's id.
 4. On mount, that page fetches the `WorkflowExecution`, and if no prior messages exist it auto-sends a fixed kickoff message via `POST /workflow-executions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](#welcome-page).
 5. The `/workflow-executions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id`, the pinned revision, **and the agent role**) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under an **execute-only** instruction — the tasks were approved by publishing, so it **begins immediately**, with the execution's effective description injected server-side as trusted run context.
@@ -559,6 +589,9 @@ Navigate to [http://localhost:3000/admin/workflow-executions](http://localhost:3
 | List all executions | `GET /admin/workflow-executions` |
 | Delete an execution | `DELETE /api/v1/workflow-executions/{id}` |
 | View an execution's tasks | `GET /admin/workflow-executions/{id}/workflow-tasks` |
+| View an execution's MCP tool calls | `GET /admin/workflow-executions/{id}/tool-invocations` |
+
+A **Tool Invocations** page (`/admin/workflow-executions/{id}/tool-invocations`, reached from the run's detail header) lists the MCP tool calls the [proxy](backend/README.md#mcp-proxy) decided on for that run — `allowed` ones that went upstream and `denied` ones a policy vetoed — with the tool, the server, the denial reason, and the presented certificate. Arguments appear only as a digest; the raw values are never stored. A call to a [mocked](#tool-mocks) tool is absent here whichever way it went: the proxy checks it like any other call, but a call that was always going to be answered from a snapshot reached no server, so neither its approval nor its refusal is recorded. The run's chat transcript is where a stubbed call is inspected. A **Mocked** badge on the run marks one that stubbed any of its tools.
 
 A run also carries a **lifecycle** of its own: it starts `running` and reaches `completed` or `failed` — with a `finishedAt` timestamp — once it has at least one task and every task has reached a terminal state (`completed` / `failed` / `skipped`). A run whose tasks include a failure ends `failed`. This is evaluated after every task write, whether the write came from the execution agent or from the REST task endpoints, and the recorded `finishedAt` is never moved by a later edit. A run with no tasks at all stays `running`. These fields are server-managed — they cannot be set through the API — and are what the [operations metrics](#operations-metrics) count.
 
@@ -703,6 +736,11 @@ surfaced inline in the chat stream:
   `call_mcp_tool` proxy are shown under the **real MCP tool name** with an `MCP`
   tag. The `render_a2ui` / `render_approval` client tools keep their dedicated UI
   and are not shown as tool lines.
+- **Call details** — a tool line with arguments or a result **expands on click**
+  to show both as formatted JSON, so what the agent actually sent and got back is
+  inspectable without leaving the chat. A line answered by a [tool mock](#tool-mocks)
+  carries a `Mocked` badge — and the chat is the *only* place to inspect one,
+  since a stubbed call never reaches the MCP proxy and so leaves no audit row.
 - **Reasoning** — when a thinking-capable model emits `REASONING_*` events, the
   streamed thoughts render as a muted "Thinking" panel. The default
   `gemini-3.5-flash` reasons internally but does not stream thought summaries

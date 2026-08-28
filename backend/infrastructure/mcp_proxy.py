@@ -1,7 +1,7 @@
 """A2Flow's own gateway to the MCP servers a tenant has registered.
 
 Every call the agent makes to a user-registered MCP server passes through
-:class:`McpProxy`. The proxy owns the three things the ADK tool functions in
+:class:`McpProxy`. The proxy owns the four things the ADK tool functions in
 :mod:`infrastructure.mcp_tools` used to each own a copy of:
 
 1. **Authentication** -- turning the caller's claimed :class:`McpPrincipal`
@@ -10,16 +10,19 @@ Every call the agent makes to a user-registered MCP server passes through
 2. **Authorization** -- a chain of :class:`McpPolicy` objects consulted before
    every operation, each of which may veto by raising
    :class:`McpPolicyDeniedError`.
-3. **Credential injection** -- expanding the registered server's
+3. **Stubbing** -- a draft run may answer a call from a recorded tool mock
+   instead of reaching the server, through the :class:`McpToolStub` protocol.
+   Deliberately *behind* the policy chain, so a stubbed run rehearses the same
+   authorization a real one faces.
+4. **Credential injection** -- expanding the registered server's
    ``${secret:NAME/KEY}`` placeholders into a connection spec.
 
 The transport itself still belongs to :mod:`infrastructure.mcp_client`, which
 this module calls and never bypasses.
 
-Why a layer at all: the two hooks above are the seams a real security layer
-lands in later. Today the authenticator is a pass-through (the caller is a run
-this very process is driving, so there is no channel to forge a session id
-over) and exactly one policy is registered.
+Why a layer at all: the hooks above are the seams a real security layer lands
+in later. Today the authenticator is a pass-through (the caller is a run this
+very process is driving, so there is no channel to forge a session id over).
 
 **Shaped for a future HTTP lift.** Every value this module's public surface
 accepts or returns is a plain, serializable value object or an MCP wire type --
@@ -535,6 +538,98 @@ class McpPolicy(Protocol):
         ...
 
 
+#: Key set in a stubbed result's ``_meta`` so the ADK boundary can tell the
+#: model its call was answered by a mock. ``_meta`` is the MCP wire type's own
+#: extension slot, which is what keeps the marker on the same value an HTTP
+#: proxy would hand back rather than in a parallel return channel.
+MOCKED_META_KEY = "a2flow/mocked"
+
+
+class McpToolStub(Protocol):
+    """Answers a ``call_tool`` in place of the target server, when a run stubs it.
+
+    Consulted only for ``call_tool``, and only *after* the policy chain has
+    allowed it: a stubbed run is meant to rehearse a real one, so it faces the
+    same authorization. What it skips is the upstream call, the server row it
+    would have needed, and the audit -- a stubbed call reaches no MCP server and
+    therefore earns no ``mcp_tool_invocations`` row.
+
+    **Two methods on purpose.** :meth:`stubs` must be answerable without side
+    effects, because the proxy asks it before the chain runs and on the denial
+    path, while :meth:`answer` consumes one of the run's recorded responses.
+    Merging them would make a refused call burn a response it never received.
+    """
+
+    async def stubs(self, ctx: McpCallContext, db: AsyncSession) -> bool:
+        """Return whether this run answers this call from a mock.
+
+        Must not mutate anything: it is asked for calls that go on to be
+        refused.
+
+        Args:
+            ctx: The operation being attempted.
+            db: The proxy's open database session.
+
+        Returns:
+            ``True`` when :meth:`answer` should be called instead of the server.
+        """
+        ...
+
+    async def answer(
+        self, ctx: McpCallContext, db: AsyncSession
+    ) -> types.CallToolResult:
+        """Return the recorded response standing in for this call.
+
+        Called only when :meth:`stubs` returned ``True`` and the policy chain
+        allowed the call. May advance per-run state, since exactly one response
+        is consumed per invocation.
+
+        Args:
+            ctx: The operation being attempted.
+            db: The proxy's open database session.
+
+        Returns:
+            The result to hand back in place of calling the server, carrying
+            :data:`MOCKED_META_KEY` in its ``_meta``.
+        """
+        ...
+
+
+class NullToolStub:
+    """Stubs nothing.
+
+    The default, so a directly constructed :class:`McpProxy` (as in tests) does
+    not need a run carrying mock snapshots. The process-wide proxy from
+    :func:`get_mcp_proxy` is built with the WorkflowExecution-backed stub.
+    """
+
+    async def stubs(self, ctx: McpCallContext, db: AsyncSession) -> bool:
+        """Report that nothing is stubbed.
+
+        Args:
+            ctx: The operation being attempted.
+            db: The proxy's open database session.
+
+        Returns:
+            Always ``False``.
+        """
+        return False
+
+    async def answer(
+        self, ctx: McpCallContext, db: AsyncSession
+    ) -> types.CallToolResult:
+        """Fail loudly: :meth:`stubs` never returns ``True``, so this is unreachable.
+
+        Args:
+            ctx: The operation being attempted.
+            db: The proxy's open database session.
+
+        Raises:
+            RuntimeError: Always.
+        """
+        raise RuntimeError("NullToolStub answers nothing")
+
+
 @asynccontextmanager
 async def _default_session() -> AsyncIterator[AsyncSession]:
     """Open a database session on the module-level engine.
@@ -579,6 +674,7 @@ class McpProxy:
         authenticator: McpAuthenticator | None = None,
         policies: Sequence[McpPolicy] | None = None,
         audit: McpAuditSink | None = None,
+        stub: McpToolStub | None = None,
         session_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]]
         | None = None,
     ) -> None:
@@ -591,15 +687,20 @@ class McpProxy:
                 an empty chain, which allows everything -- the process-wide
                 proxy built by :func:`get_mcp_proxy` passes
                 :func:`infrastructure.mcp_policies.default_policies` instead.
-            audit: Receives every ``call_tool`` decision. Defaults to
-                :class:`NullAuditSink`; the process-wide proxy built by
-                :func:`get_mcp_proxy` passes the SQL-backed sink instead.
+            audit: Receives every ``call_tool`` decision that reaches a server.
+                Defaults to :class:`NullAuditSink`; the process-wide proxy built
+                by :func:`get_mcp_proxy` passes the SQL-backed sink instead.
+            stub: Answers a call from a run's recorded tool mocks. Defaults to
+                :class:`NullToolStub`, which stubs nothing; the process-wide
+                proxy built by :func:`get_mcp_proxy` passes the
+                WorkflowExecution-backed stub instead.
             session_factory: Opens the database session each operation runs
                 against. Defaults to a session on the module-level engine.
         """
         self._audit: McpAuditSink = audit or NullAuditSink()
         self._authenticator: McpAuthenticator = authenticator or AgentRunAuthenticator()
         self._policies: tuple[McpPolicy, ...] = tuple(policies or ())
+        self._stub: McpToolStub = stub or NullToolStub()
         self._session_factory = session_factory or _default_session
 
     async def list_tools(self, request: ListToolsRequest) -> list[ServerToolListing]:
@@ -658,11 +759,15 @@ class McpProxy:
         result with ``isError`` set, so the caller can relay them verbatim. Only
         proxy-level failures raise.
 
+        A call the run stubs (see :class:`McpToolStub`) is authorized exactly
+        like any other and then answered from the run's recorded mocks, without
+        reaching a server and without an audit row.
+
         Args:
             request: The call request.
 
         Returns:
-            The raw ``tools/call`` result.
+            The raw ``tools/call`` result, or the stubbed one standing in for it.
 
         Raises:
             McpAuthenticationError: If the caller maps to no WorkflowExecution.
@@ -687,14 +792,29 @@ class McpProxy:
                 tool_name=request.tool_name,
                 arguments=request.arguments,
             )
+            # Asked before the chain runs because both outcomes need it: a
+            # refused call that would have been stubbed is left unaudited too,
+            # since the audit describes calls that reached a server. Asking is
+            # side-effect free; ``answer`` below is what consumes a response.
+            stubbed = await self._stub.stubs(ctx, db)
             try:
                 await self._authorize(ctx, db)
             except McpProxyError as exc:
-                await self._record(ctx, db, McpAuditDecision.denied, exc.message)
+                if not stubbed:
+                    await self._record(ctx, db, McpAuditDecision.denied, exc.message)
                 raise
+            if stubbed:
+                # Authorized, but answered from the run's mocks: no server row
+                # is loaded, no upstream call goes out, and no row is written.
+                # Unlike ``_record``, a failure here is *not* swallowed --
+                # falling through to the real tool is the one outcome a stub
+                # must never produce.
+                return await self._stub.answer(ctx, db)
             # Recorded before the upstream call, not after: what is being
             # audited is the authorization decision, and the session that owns
-            # the write is closed before the call goes out.
+            # the write is closed before the call goes out. Safe to write here
+            # because everything above only read, except ``answer``, which
+            # returns instead of reaching this line.
             await self._record(ctx, db, McpAuditDecision.allowed, None)
             server = await SqlMCPServerRepository(db, tenant_id=identity.tenant_id).get(
                 request.server_id
@@ -888,10 +1008,15 @@ def get_mcp_proxy() -> McpProxy:
     reason -- :mod:`infrastructure.mcp_policies` imports this module.
 
     Returns:
-        The shared proxy, built with the default policy chain and the
-        database-backed audit sink.
+        The shared proxy, built with the default policy chain, the
+        database-backed audit sink, and the run's tool-mock stub.
     """
     from infrastructure.mcp_audit import SqlMcpAuditSink
     from infrastructure.mcp_policies import default_policies
+    from infrastructure.tool_mocks import WorkflowExecutionToolStub
 
-    return McpProxy(policies=default_policies(), audit=SqlMcpAuditSink())
+    return McpProxy(
+        policies=default_policies(),
+        audit=SqlMcpAuditSink(),
+        stub=WorkflowExecutionToolStub(),
+    )

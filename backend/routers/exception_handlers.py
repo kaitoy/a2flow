@@ -25,6 +25,7 @@ from repositories.exceptions import (
     ForeignKeyViolationError,
     McpConnectionError,
     McpServerValidationError,
+    McpToolMockValidationError,
     NotFoundError,
     OutboundEmailNotDeletableError,
     QueryValidationError,
@@ -167,6 +168,20 @@ async def mcp_server_validation_exception_handler(
     return _envelope_error(
         request,
         code="INVALID_MCP_SERVER",
+        message=str(exc),
+        status_code=422,
+        details={"reason": exc.reason},
+    )
+
+
+async def mcp_tool_mock_validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 422 with INVALID_MCP_TOOL_MOCK code when a merged mock target is invalid."""
+    assert isinstance(exc, McpToolMockValidationError)
+    return _envelope_error(
+        request,
+        code="INVALID_MCP_TOOL_MOCK",
         message=str(exc),
         status_code=422,
         details={"reason": exc.reason},

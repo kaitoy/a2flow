@@ -16,12 +16,14 @@ from google.adk.sessions import BaseSessionService, Session
 
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
+from models.mcp_tool_invocation import MCPToolInvocation
 from models.message_meta import MessageScope
 from models.user import Role, User, has_any_role
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
 from repositories import (
     AgentSkillRepository,
+    McpToolInvocationRepository,
     MessageMetaRepository,
     WorkflowExecutionRepository,
     WorkflowTaskRepository,
@@ -42,6 +44,7 @@ class WorkflowExecutionService:
         execution_repo: WorkflowExecutionRepository,
         tasks: WorkflowTaskRepository,
         meta: MessageMetaRepository,
+        invocations: McpToolInvocationRepository,
         skills: AgentSkillRepository,
         skills_store: SkillManager,
         registry: AgentRegistry,
@@ -57,6 +60,8 @@ class WorkflowExecutionService:
             meta: Repository recording and reading per-message side-channel
                 metadata (sender attribution and task association) for the
                 shared workflow session.
+            invocations: Append-only audit of the MCP tool calls the proxy
+                decided on, read back for the execution's tool-invocation list.
             skills: Repository providing AgentSkill persistence, read to resolve
                 the ``repo_path`` and fallback revision of an execution's skill.
             skills_store: Store locating a skill revision's directory on disk.
@@ -71,6 +76,7 @@ class WorkflowExecutionService:
         self._execution_repo = execution_repo
         self._tasks = tasks
         self._meta = meta
+        self._invocations = invocations
         self._skills = skills
         self._skills_store = skills_store
         self._registry = registry
@@ -218,6 +224,50 @@ class WorkflowExecutionService:
             workflow_execution_id=execution_id,
             sort=sort,
             filters=filters,
+        )
+
+    async def list_tool_invocations(
+        self,
+        execution_id: str,
+        *,
+        caller: User,
+        caller_roles: Collection[str],
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> builtins.list[MCPToolInvocation]:
+        """Return the MCP tool-call decisions recorded for an execution.
+
+        These are the calls that actually reached
+        :class:`infrastructure.mcp_proxy.McpProxy` — allowed ones that went
+        upstream and denied ones that a policy vetoed. A call answered by a mock
+        (see :mod:`infrastructure.tool_mocks`) never reaches the proxy and so is
+        deliberately absent here; the chat transcript is where a mocked call is
+        inspected.
+
+        Args:
+            execution_id: Identifier of the parent execution.
+            caller: The authenticated user requesting the records.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
+
+        Returns:
+            The requested page of recorded decisions, newest first by default.
+
+        Raises:
+            NotFoundError: If the parent execution does not exist.
+            ForbiddenError: If the caller is neither the execution initiator,
+                a designated approver of the execution, nor holds ``admin``
+                or ``super_admin``.
+        """
+        await self.get(execution_id, caller=caller, caller_roles=caller_roles)
+        return await self._invocations.list_for_execution(
+            execution_id, limit=limit, offset=offset, sort=sort, filters=filters
         )
 
     async def resolve_agent(

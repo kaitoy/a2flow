@@ -18,6 +18,13 @@ holding the ``approver`` role, whose single decision settles it. Both discovery
 tools and the eligibility check share :func:`_is_eligible_approver`, so who a
 request may be *addressed* to and who may *act* on it never drift apart.
 
+A draft run may mock :func:`request_approval` (see
+:mod:`infrastructure.tool_mocks`). The destination is still validated -- a run
+that names an ineligible approver should fail the same way mocked or not -- but
+no Approval is recorded, nobody is notified, and the mock's per-call response is
+returned instead, letting a test run drive the approval path to a decision (or
+through several successive ones) without a human.
+
 Like the WorkflowTask tools, these run *during* the AG-UI SSE stream outside
 FastAPI's request scope, so each call opens its own ``AsyncSession`` on the
 module-level engine and resolves the current WorkflowExecution from the ADK
@@ -27,6 +34,7 @@ mapping errors to an ``{"error": ...}`` payload instead of raising.
 """
 
 import logging
+import uuid
 from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -36,13 +44,19 @@ from google.adk.tools.tool_context import ToolContext
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database
+from infrastructure.tool_mocks import resolve_mock
 from infrastructure.workflow_task_tools import (
     _NO_SESSION,
     _notify,
     _resolve_scope,
     _user_id,
 )
-from models.approval import ApprovalCreate
+from models.approval import ApprovalCreate, ApprovalStatus
+from models.mcp_tool_mock import (
+    REQUEST_APPROVAL_TOOL,
+    MockResponse,
+    MockResponseKind,
+)
 from models.notification import NotificationType
 from models.user import Role, User, has_any_role
 from repositories import (
@@ -85,6 +99,10 @@ class _Scope:
 
     execution_id: str
     tenant_id: str
+    #: The open session the repositories below share, exposed so
+    #: :func:`infrastructure.tool_mocks.resolve_mock` can read and advance the
+    #: run's mock state on the same transaction.
+    db: AsyncSession
     execution_repo: WorkflowExecutionRepository
     approval_repo: ApprovalRepository
     task_repo: WorkflowTaskRepository
@@ -129,6 +147,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
         yield _Scope(
             execution_id=execution_id,
             tenant_id=tenant_id,
+            db=db,
             execution_repo=execution_repo,
             approval_repo=SqlApprovalRepository(
                 db, execution_repo, group_repo, tenant_id=tenant_id
@@ -236,6 +255,47 @@ async def _eligible_members(s: _Scope, member_ids: Sequence[str]) -> list[User]:
     return _filter_eligible(users, inherited, tenant_id=s.tenant_id)
 
 
+#: Appended to every mocked approval result. The execution agent is cached per
+#: skill revision, so its instruction cannot vary per run; the tool's own result
+#: is what tells the model this decision is final and that the client-side
+#: approval UI must not be shown for it.
+_MOCK_NOTE = (
+    "Mock run: no approval record was created and nobody was notified. "
+    "Do NOT call render_approval and do NOT poll get_approval; "
+    "treat this status as final."
+)
+
+
+def _mocked_approval(response: MockResponse) -> dict[str, Any]:
+    """Build the tool result for a mocked approval request.
+
+    A ``structured`` mock supplies the payload directly, which is what makes a
+    scenario expressible -- ``{"status": "approved"}`` for the first request and
+    ``{"status": "rejected"}`` for the second. A ``text`` mock is read as the
+    status alone. Either way an ``approval_id`` is synthesized when the mock does
+    not name one, so the model has something to refer to; it deliberately does
+    not exist in ``approvals``, since nothing was recorded.
+
+    Args:
+        response: The mocked response selected for this call.
+
+    Returns:
+        The dict the tool returns to the model.
+    """
+    if response.kind is MockResponseKind.error:
+        return {"error": str(response.value)}
+    payload: dict[str, Any] = (
+        dict(response.value)
+        if response.kind is MockResponseKind.structured
+        else {"status": str(response.value)}
+    )
+    payload.setdefault("approval_id", f"mock-{uuid.uuid4()}")
+    payload.setdefault("status", ApprovalStatus.approved.value)
+    payload["mocked"] = True
+    payload["note"] = _MOCK_NOTE
+    return payload
+
+
 #: Upper bound on the notifications one group-addressed request fans out to.
 #: A group is normally a handful of people; the cap stops one tool call from
 #: turning a pathologically large group into that many separate commits.
@@ -290,7 +350,10 @@ async def request_approval(
         On success ``{"approval_id": <id>, "status": "pending"}``. On failure
         ``{"error": <message>}`` (no destination or both, unresolved session,
         unknown task, unknown or ineligible approver or group, or a persistence
-        error).
+        error). When the current run mocks this tool the destination is still
+        validated but nothing is recorded or notified, and the mock's response
+        comes back with ``"mocked": true`` and a ``note`` saying the status is
+        final -- typically already ``approved``, so the run continues unattended.
     """
     if (approver is None or not approver) == (
         approver_group_id is None or not approver_group_id
@@ -350,6 +413,18 @@ async def request_approval(
                         "groups."
                     }
                 recipients = [u.id for u in members]
+            # Checked above, before this branch: a mock is meant to skip the
+            # side effects, not the validation. A run that names an ineligible
+            # approver should fail the same way mocked or not.
+            mocked = await resolve_mock(
+                s.db,
+                s.execution_id,
+                tenant_id=s.tenant_id,
+                server_id=None,
+                tool_name=REQUEST_APPROVAL_TOOL,
+            )
+            if mocked is not None:
+                return _mocked_approval(mocked)
             data = ApprovalCreate(
                 workflow_execution_id=s.execution_id,
                 title=title,

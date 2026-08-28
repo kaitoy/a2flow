@@ -14,6 +14,7 @@ import type {
   ApprovalStatus,
   ApprovalUpdate,
   AvatarConfig,
+  ExecuteWorkflowRequest,
   GenerateWorkflowRequest,
   LoginRequest,
   McpCommand,
@@ -25,7 +26,13 @@ import type {
   McpServerRead as McpServerModel,
   McpServerUpdate,
   McpToolInfo,
+  McpToolInvocation as McpToolInvocationModel,
+  McpToolMockCreate,
+  McpToolMockRead as McpToolMockModel,
+  McpToolMockUpdate,
   McpTransport,
+  MockResponse,
+  MockResponseKind,
   Notification as NotificationModel,
   NotificationType,
   NotificationUpdate,
@@ -68,6 +75,7 @@ import type {
 import {
   zCreateAgentSkillApiV1AgentSkillsPostResponse,
   zCreateMcpServerApiV1McpServersPostResponse,
+  zCreateMcpToolMockApiV1McpToolMocksPostResponse,
   zCreateSecretApiV1SecretsPostResponse,
   zCreateTagApiV1TagsPostResponse,
   zCreateTenantApiV1TenantsPostResponse,
@@ -78,6 +86,7 @@ import {
   zDeactivateWorkflowApiV1WorkflowsWorkflowIdDeactivatePostResponse,
   zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse,
   zDeleteMcpServerApiV1McpServersServerIdDeleteResponse,
+  zDeleteMcpToolMockApiV1McpToolMocksMockIdDeleteResponse,
   zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse,
   zDeleteSecretApiV1SecretsSecretIdDeleteResponse,
   zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
@@ -99,6 +108,7 @@ import {
   zGetApprovalCertificateApiV1ApprovalsApprovalIdCertificateGetResponse,
   zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
+  zGetMcpToolMockApiV1McpToolMocksMockIdGetResponse,
   zGetSecretApiV1SecretsSecretIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
@@ -117,6 +127,7 @@ import {
   zListGroupsForUserApiV1UsersUserIdGroupsGetResponse,
   zListMcpServersApiV1McpServersGetResponse,
   zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse,
+  zListMcpToolMocksApiV1McpToolMocksGetResponse,
   zListNotificationsApiV1NotificationsGetResponse,
   zListSecretKeysApiV1SecretsSecretIdKeysGetResponse,
   zListSecretsApiV1SecretsGetResponse,
@@ -127,6 +138,7 @@ import {
   zListUsersApiV1UsersGetResponse,
   zListWorkflowExecutionsApiV1WorkflowExecutionsGetResponse,
   zListWorkflowExecutionTasksApiV1WorkflowExecutionsExecutionIdWorkflowTasksGetResponse,
+  zListWorkflowExecutionToolInvocationsApiV1WorkflowExecutionsExecutionIdToolInvocationsGetResponse,
   zListWorkflowsApiV1WorkflowsGetResponse,
   zListWorkflowTaskTemplatesApiV1WorkflowsWorkflowIdTaskTemplatesGetResponse,
   zLoginApiV1AuthLoginPostResponse,
@@ -148,6 +160,7 @@ import {
   zStopImpersonationApiV1AuthImpersonateDeleteResponse,
   zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
   zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
+  zUpdateMcpToolMockApiV1McpToolMocksMockIdPatchResponse,
   zUpdateNotificationApiV1NotificationsNotificationIdPatchResponse,
   zUpdateSecretApiV1SecretsSecretIdPatchResponse,
   zUpdateSystemSettingsApiV1SystemSettingsPatchResponse,
@@ -446,6 +459,8 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
 export type AgentSkill = WithAudit<AgentSkillModel>;
 export type Approval = WithAudit<ApprovalModel>;
 export type McpServer = WithAudit<McpServerModel>;
+export type McpToolMock = WithAudit<McpToolMockModel>;
+export type McpToolInvocation = WithAudit<McpToolInvocationModel>;
 export type Notification = WithAudit<NotificationModel>;
 export type Secret = WithAudit<SecretModel>;
 export type SystemSettings = WithAudit<SystemSettingsModel>;
@@ -475,7 +490,11 @@ export type {
   McpServerCreate,
   McpServerUpdate,
   McpToolInfo,
+  McpToolMockCreate,
+  McpToolMockUpdate,
   McpTransport,
+  MockResponse,
+  MockResponseKind,
   NotificationType,
   SecretCreate,
   SecretType,
@@ -746,6 +765,72 @@ export async function deleteMcpServer(id: string): Promise<void> {
     apiClient.delete(`/api/v1/mcp-servers/${encodeURIComponent(id)}`),
     zDeleteMcpServerApiV1McpServersServerIdDeleteResponse
   );
+}
+
+/** List the tool mocks registered in the tenant (createdAt DESC by default). */
+export async function listMcpToolMocks(query: ListQuery = {}): Promise<McpToolMock[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/mcp-tool-mocks", listConfig(query)),
+    zListMcpToolMocksApiV1McpToolMocksGetResponse
+  ) as Promise<McpToolMock[]>;
+}
+
+/** Fetch a single tool mock by ID. */
+export async function getMcpToolMock(
+  id: string,
+  config?: AxiosRequestConfig
+): Promise<McpToolMock> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/mcp-tool-mocks/${encodeURIComponent(id)}`, config),
+    zGetMcpToolMockApiV1McpToolMocksMockIdGetResponse
+  ) as Promise<McpToolMock>;
+}
+
+/** Register a new tool mock. */
+export async function createMcpToolMock(body: McpToolMockCreate): Promise<McpToolMock> {
+  return fetchEnvelope(
+    apiClient.post("/api/v1/mcp-tool-mocks", body),
+    zCreateMcpToolMockApiV1McpToolMocksPostResponse
+  ) as Promise<McpToolMock>;
+}
+
+/** Apply a partial update to a tool mock. `responses` replaces the full list. */
+export async function updateMcpToolMock(id: string, body: McpToolMockUpdate): Promise<McpToolMock> {
+  return fetchEnvelope(
+    apiClient.patch(`/api/v1/mcp-tool-mocks/${encodeURIComponent(id)}`, body),
+    zUpdateMcpToolMockApiV1McpToolMocksMockIdPatchResponse
+  ) as Promise<McpToolMock>;
+}
+
+/**
+ * Delete a tool mock. Runs already started keep their own snapshot of it, so
+ * deleting one never changes how an existing run behaves.
+ */
+export async function deleteMcpToolMock(id: string): Promise<void> {
+  await fetchEnvelope(
+    apiClient.delete(`/api/v1/mcp-tool-mocks/${encodeURIComponent(id)}`),
+    zDeleteMcpToolMockApiV1McpToolMocksMockIdDeleteResponse
+  );
+}
+
+/**
+ * List the MCP tool-call decisions recorded for one workflow execution.
+ *
+ * Only calls that reached the MCP proxy appear here — allowed ones that went
+ * upstream and denied ones a policy vetoed. A call answered by a tool mock never
+ * reaches the proxy, so it shows in the chat transcript instead.
+ */
+export async function listWorkflowExecutionToolInvocations(
+  executionId: string,
+  query: ListQuery = {}
+): Promise<McpToolInvocation[]> {
+  return fetchEnvelope(
+    apiClient.get(
+      `/api/v1/workflow-executions/${encodeURIComponent(executionId)}/tool-invocations`,
+      listConfig(query)
+    ),
+    zListWorkflowExecutionToolInvocationsApiV1WorkflowExecutionsExecutionIdToolInvocationsGetResponse
+  ) as Promise<McpToolInvocation[]>;
 }
 
 /** Fetch the tools advertised by a registered MCP server (live query to the server). */
@@ -1295,10 +1380,23 @@ export async function deleteWorkflow(id: string): Promise<void> {
   );
 }
 
-/** Execute a workflow, creating a WorkflowExecution that links the ADK session to the workflow. */
-export async function executeWorkflow(id: string): Promise<WorkflowExecution> {
+/**
+ * Execute a workflow, creating a WorkflowExecution that links the ADK session to
+ * the workflow.
+ *
+ * @param id - Identifier of the workflow to run.
+ * @param options - `toolMockIds` names the tool mocks the run should apply,
+ *   stubbing those tools instead of calling them. Accepted only while the
+ *   workflow is still `draft`; the server answers 409 `WORKFLOW_NOT_RUNNABLE`
+ *   otherwise.
+ */
+export async function executeWorkflow(
+  id: string,
+  options: { toolMockIds?: string[] } = {}
+): Promise<WorkflowExecution> {
+  const body: ExecuteWorkflowRequest = { toolMockIds: options.toolMockIds ?? [] };
   const session = (await fetchEnvelope(
-    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/execute`),
+    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/execute`, body),
     zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse
   )) as WorkflowExecution;
   logger.info({ workflowExecutionId: session.id, workflowId: id }, "workflow executed");

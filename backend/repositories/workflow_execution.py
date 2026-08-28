@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 from sqlalchemy import or_
 from sqlmodel import col, select
@@ -44,7 +44,10 @@ class WorkflowExecutionRepository(Protocol):
         workflow_id: str,
         user_id: str,
         is_draft: bool = False,
+        tool_mocks: Sequence[dict[str, Any]] = (),
     ) -> WorkflowExecution: ...
+
+    async def next_tool_mock_ordinal(self, execution_id: str, key: str) -> int: ...
 
     async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]: ...
 
@@ -189,6 +192,7 @@ class SqlWorkflowExecutionRepository:
         workflow_id: str,
         user_id: str,
         is_draft: bool = False,
+        tool_mocks: Sequence[dict[str, Any]] = (),
     ) -> WorkflowExecution:
         """Persist a new WorkflowExecution with audit fields populated.
 
@@ -200,6 +204,10 @@ class SqlWorkflowExecutionRepository:
                 started — a pre-publish test run. Server-set, like
                 ``workflow_id``; recorded so ``repositories/metrics.py`` can
                 exclude the run from the operations metrics.
+            tool_mocks: Snapshot of the tool mocks this run should apply, taken
+                at start time so later edits to the mock records cannot change
+                how the run behaves. Server-set for the same reason as
+                ``is_draft``, and only ever non-empty for a draft run.
 
         Returns:
             The persisted WorkflowExecution.
@@ -209,6 +217,7 @@ class SqlWorkflowExecutionRepository:
                 **data.model_dump(),
                 "workflow_id": workflow_id,
                 "is_draft": is_draft,
+                "tool_mocks": list(tool_mocks),
                 "tenant_id": self._require_tenant(),
                 "created_by": user_id,
                 "updated_by": user_id,
@@ -218,6 +227,43 @@ class SqlWorkflowExecutionRepository:
         await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(execution)
         return execution
+
+    async def next_tool_mock_ordinal(self, execution_id: str, key: str) -> int:
+        """Increment and return the call count for one mocked tool of a run.
+
+        The counter is what selects a mock's per-ordinal response, so it has to
+        survive the process: an agent run spans many HTTP requests and may move
+        between replicas. It is stored on the run rather than in memory for that
+        reason, and committed immediately so the next call sees it.
+
+        Concurrent calls within one run cannot race: agent runs for a session are
+        serialized by the advisory lock in :mod:`infrastructure.locks`.
+
+        Args:
+            execution_id: Primary key of the run whose counter to advance.
+            key: ``"<server_id or 'builtin'>:<tool_name>"``, identifying the
+                mocked tool within the run.
+
+        Returns:
+            The 1-based ordinal of this call.
+
+        Raises:
+            NotFoundError: If no execution exists with the given ID in this tenant.
+        """
+        self._require_tenant()
+        execution = await self._get_scoped(execution_id)
+        if execution is None:
+            raise NotFoundError("WorkflowExecution", execution_id)
+        # Rebound rather than mutated in place: SQLAlchemy does not track
+        # mutation of a plain JSON column's contents, so an in-place increment
+        # would never be flushed.
+        counts = dict(execution.tool_mock_calls)
+        ordinal = counts.get(key, 0) + 1
+        counts[key] = ordinal
+        execution.tool_mock_calls = counts
+        self._db.add(execution)
+        await self._db.commit()
+        return ordinal
 
     async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]:
         """Return every skill revision that executions of this skill are pinned to.

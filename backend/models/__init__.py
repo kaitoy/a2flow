@@ -10,6 +10,16 @@ from .mcp_server import (
     McpToolInfo,
     McpTransport,
 )
+from .mcp_tool_mock import (
+    BUILTIN_MOCKABLE_TOOLS,
+    REQUEST_APPROVAL_TOOL,
+    MCPToolMock,
+    McpToolMockCreate,
+    McpToolMockRead,
+    McpToolMockUpdate,
+    MockResponse,
+    MockResponseKind,
+)
 from .message_meta import MessageMeta, MessageScope
 from .notification import (
     Notification,
@@ -43,6 +53,7 @@ from .user_group import (
     UserGroupUpdate,
 )
 from .workflow import (
+    ExecuteWorkflowRequest,
     GenerateWorkflowRequest,
     Workflow,
     WorkflowCreate,
@@ -78,7 +89,9 @@ from .workflow_task_template import (
 )
 
 __all__ = [
+    "BUILTIN_MOCKABLE_TOOLS",
     "MAX_RECORD_TAGS",
+    "REQUEST_APPROVAL_TOOL",
     "AgentSkill",
     "AgentSkillCreate",
     "AgentSkillRead",
@@ -93,12 +106,19 @@ __all__ = [
     "MCPServer",
     "MCPServerCreate",
     "MCPServerUpdate",
+    "MCPToolMock",
     "McpServerRead",
     "McpServerTag",
     "McpToolInfo",
+    "McpToolMockCreate",
+    "McpToolMockRead",
+    "McpToolMockUpdate",
     "McpTransport",
+    "ExecuteWorkflowRequest",
     "MessageMeta",
     "MessageScope",
+    "MockResponse",
+    "MockResponseKind",
     "GenerateWorkflowRequest",
     "Notification",
     "NotificationCreate",

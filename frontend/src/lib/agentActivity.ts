@@ -45,6 +45,77 @@ export interface ToolCallActivityContent {
   status: ToolCallStatus;
   /** True when this line represents a user-added MCP tool call. */
   isMcp?: boolean;
+  /**
+   * The arguments the call was made with, unwrapped for `call_mcp_tool` so the
+   * target tool's own arguments show rather than the proxy's envelope. Absent
+   * while the call is still streaming its arguments.
+   */
+  args?: unknown;
+  /** The parsed tool result, once it has come back. */
+  result?: unknown;
+  /**
+   * True when the result came from a tool mock rather than the real tool (see
+   * the backend's `infrastructure.tool_mocks`), so nothing actually happened.
+   */
+  mocked?: boolean;
+}
+
+/**
+ * Unwrap the arguments worth showing for a tool call.
+ *
+ * `call_mcp_tool` is a proxy: its own arguments are `{server_id, tool_name,
+ * arguments}`, and the first two are already what the line is labelled with, so
+ * the nested `arguments` object is what the reader actually wants. Every other
+ * tool shows its arguments as they are.
+ *
+ * @param toolCallName - The function name from the AG-UI tool-call event.
+ * @param args - The parsed tool-call arguments.
+ * @returns The arguments to display.
+ */
+export function getToolCallArguments(toolCallName: string, args: Record<string, unknown>): unknown {
+  if (toolCallName === CALL_MCP_TOOL_NAME) {
+    const inner = args.arguments;
+    if (inner !== null && typeof inner === "object") return inner;
+  }
+  return args;
+}
+
+/**
+ * Parse a tool result payload, which arrives as a JSON string on the wire.
+ *
+ * A result that is not JSON (a plain-text tool answer, or a truncated stream) is
+ * returned as the original string rather than dropped — showing the raw text is
+ * more useful than showing nothing.
+ *
+ * @param raw - The `content` of an AG-UI `TOOL_CALL_RESULT` event, or of a
+ *   persisted `tool` message.
+ * @returns The parsed value, or the original string when it is not JSON.
+ */
+export function parseToolResult(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * Whether a parsed tool result was produced by a mock instead of the real tool.
+ *
+ * The backend marks every stubbed result with `"mocked": true` (see
+ * `infrastructure/tool_mocks.py`), which is the only signal the client gets —
+ * and the only one it needs, since a mocked call is otherwise shaped exactly
+ * like a real one.
+ *
+ * @param result - The parsed tool result.
+ * @returns True when the result is a stub.
+ */
+export function isMockedResult(result: unknown): boolean {
+  return (
+    result !== null &&
+    typeof result === "object" &&
+    (result as Record<string, unknown>).mocked === true
+  );
 }
 
 /**

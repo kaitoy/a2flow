@@ -1243,3 +1243,126 @@ async def test_execute_twice_creates_independent_task_copies(
     )
     assert len(tasks1) == len(tasks2) == 1
     assert tasks1[0]["id"] != tasks2[0]["id"]
+
+
+# ---------- execute with tool mocks ----------
+
+
+async def _create_tool_mock(
+    client: AsyncClient,
+    name: str = "auto approve",
+    statuses: tuple[str, ...] = ("approved",),
+) -> Any:
+    """Register a mock of the built-in approval tool and return it."""
+    return assert_ok(
+        await client.post(
+            "/api/v1/mcp-tool-mocks",
+            json={
+                "name": name,
+                "toolName": "request_approval",
+                "responses": [
+                    {"kind": "structured", "value": {"status": s}} for s in statuses
+                ],
+            },
+        ),
+        status=201,
+    )
+
+
+async def _draft_workflow(client: AsyncClient) -> Any:
+    """Generate a runnable ``draft`` workflow (one template, not published)."""
+    skill = await create_skill(client)
+    workflow = await generate_workflow(client, skill["id"])
+    await add_template(client, workflow["id"])
+    return workflow
+
+
+async def test_execute_draft_workflow_snapshots_the_requested_mocks(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _draft_workflow(workflow_client)
+    mock = await _create_tool_mock(workflow_client)
+    body = assert_ok(
+        await workflow_client.post(
+            f"/api/v1/workflows/{wf['id']}/execute",
+            json={"toolMockIds": [mock["id"]]},
+            headers={"X-User-Roles": "developer"},
+        ),
+        status=201,
+    )
+    assert body["toolMocks"] == [
+        {
+            "mcpServerId": None,
+            "toolName": "request_approval",
+            "responses": [{"kind": "structured", "value": {"status": "approved"}}],
+        }
+    ]
+
+
+async def test_execute_snapshot_survives_deleting_the_mock(
+    workflow_client: AsyncClient,
+) -> None:
+    """The run keeps stubbing the tool after its mock record is gone."""
+    wf = await _draft_workflow(workflow_client)
+    mock = await _create_tool_mock(workflow_client)
+    body = assert_ok(
+        await workflow_client.post(
+            f"/api/v1/workflows/{wf['id']}/execute",
+            json={"toolMockIds": [mock["id"]]},
+            headers={"X-User-Roles": "developer"},
+        ),
+        status=201,
+    )
+    assert_ok(await workflow_client.delete(f"/api/v1/mcp-tool-mocks/{mock['id']}"))
+    reloaded = assert_ok(
+        await workflow_client.get(f"/api/v1/workflow-executions/{body['id']}")
+    )
+    assert reloaded["toolMocks"] == body["toolMocks"]
+
+
+async def test_execute_without_mocks_records_an_empty_list(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    body = assert_ok(
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
+    )
+    assert body["toolMocks"] == []
+    assert body["toolMockCalls"] == {}
+
+
+async def test_execute_published_workflow_with_mocks_returns_409(
+    workflow_client: AsyncClient,
+) -> None:
+    """A published run that quietly did nothing would be worse than no run."""
+    skill = await create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    mock = await _create_tool_mock(workflow_client)
+    err = assert_err(
+        await workflow_client.post(
+            f"/api/v1/workflows/{wf['id']}/execute",
+            json={"toolMockIds": [mock["id"]]},
+            headers={"X-User-Roles": "developer"},
+        ),
+        code="WORKFLOW_NOT_RUNNABLE",
+        status=409,
+    )
+    assert "draft" in err["details"]["reason"]
+
+
+async def test_execute_with_unknown_mock_id_returns_422(
+    workflow_client: AsyncClient,
+) -> None:
+    """A missing mock must fail the run, not silently un-stub the tool."""
+    wf = await _draft_workflow(workflow_client)
+    err = assert_err(
+        await workflow_client.post(
+            f"/api/v1/workflows/{wf['id']}/execute",
+            json={"toolMockIds": ["nope"]},
+            headers={"X-User-Roles": "developer"},
+        ),
+        code="FOREIGN_KEY_VIOLATION",
+        status=422,
+    )
+    assert err["details"]["entity"] == "MCPToolMock"

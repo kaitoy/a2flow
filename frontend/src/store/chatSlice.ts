@@ -10,7 +10,10 @@ import { A2UI_CATALOG_ID } from "@/lib/a2uiCatalogId";
 import {
   A2UI_SOURCE_TOOL_CALL_ID_KEY,
   CALL_MCP_TOOL_NAME,
+  getToolCallArguments,
   getToolDisplayName,
+  isMockedResult,
+  parseToolResult,
   TOOL_CALL_ACTIVITY_TYPE,
 } from "@/lib/agentActivity";
 import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
@@ -112,14 +115,43 @@ function synthesizeA2UIActivityMessage(
  */
 function synthesizeMcpToolActivityMessage(
   toolCallId: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  rawResult: string | undefined
 ): Message {
+  const result = rawResult === undefined ? undefined : parseToolResult(rawResult);
   return {
     id: toolCallId,
     role: "activity",
     activityType: TOOL_CALL_ACTIVITY_TYPE,
-    content: { name: getToolDisplayName(CALL_MCP_TOOL_NAME, args), status: "done", isMcp: true },
+    content: {
+      name: getToolDisplayName(CALL_MCP_TOOL_NAME, args),
+      status: "done",
+      isMcp: true,
+      args: getToolCallArguments(CALL_MCP_TOOL_NAME, args),
+      result,
+      mocked: isMockedResult(result),
+    },
   } as Message;
+}
+
+/**
+ * Index a persisted history's tool results by the call each one answers.
+ *
+ * Results are separate `tool` messages rather than fields of the assistant
+ * message that made the call, so rebuilding a call's activity line means
+ * looking its answer up here.
+ *
+ * @param messages - The persisted message history.
+ * @returns The raw result content, keyed by tool call id.
+ */
+function toolResultsByCallId(messages: Message[]): Map<string, string> {
+  const byId = new Map<string, string>();
+  for (const msg of messages) {
+    if (msg.role === "tool" && msg.toolCallId && typeof msg.content === "string") {
+      byId.set(msg.toolCallId, msg.content);
+    }
+  }
+  return byId;
 }
 
 /**
@@ -174,6 +206,7 @@ function* synthesizeActivityMessages(
   messages: Message[],
   existingToolActivityById?: Map<string, Message>
 ): Generator<Message> {
+  const resultsByCallId = toolResultsByCallId(messages);
   for (const msg of messages) {
     yield msg;
     if (msg.role !== "assistant" || !msg.toolCalls) continue;
@@ -195,7 +228,7 @@ function* synthesizeActivityMessages(
       } else if (tc.function.name === RENDER_APPROVAL_TOOL_NAME) {
         synthesized = synthesizeApprovalActivityMessage(tc.id, args);
       } else if (tc.function.name === CALL_MCP_TOOL_NAME) {
-        synthesized = synthesizeMcpToolActivityMessage(tc.id, args);
+        synthesized = synthesizeMcpToolActivityMessage(tc.id, args, resultsByCallId.get(tc.id));
       }
       if (synthesized) yield synthesized;
     }
@@ -363,6 +396,25 @@ const chatSlice = createSlice({
         });
       }
     },
+    /**
+     * Attach a tool's result to the activity line already rendered for that call.
+     *
+     * Merged rather than replaced: the line's name, status, and arguments were
+     * set by the earlier start/end events and must survive. A result for a call
+     * with no line — a hidden tool such as `render_a2ui`, which has its own UI —
+     * is ignored.
+     */
+    attachToolCallResult(state, action: PayloadAction<{ toolCallId: string; result: unknown }>) {
+      const existing = state.messages.find((m) => m.id === action.payload.toolCallId);
+      if (!existing || existing.role !== "activity") return;
+      if (existing.activityType !== TOOL_CALL_ACTIVITY_TYPE) return;
+      const content = (existing.content ?? {}) as Record<string, unknown>;
+      existing.content = {
+        ...content,
+        result: action.payload.result,
+        mocked: isMockedResult(action.payload.result),
+      };
+    },
     startRun(state) {
       state.isRunning = true;
       state.error = null;
@@ -397,6 +449,7 @@ export const {
   appendDelta,
   endAssistantMessage,
   addActivityMessage,
+  attachToolCallResult,
   startRun,
   finishRun,
   setError,

@@ -418,6 +418,54 @@ async def test_admin_can_list_session_tasks(
     )
 
 
+async def test_unrelated_user_cannot_list_tool_invocations(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    res = await client.get(
+        f"/api/v1/workflow-executions/{execution_id}/tool-invocations",
+        headers=UNRELATED,
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_admin_can_list_tool_invocations(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution_id}/tool-invocations",
+            headers=ADMIN,
+        )
+    )
+
+
+async def test_owner_can_list_tool_invocations(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution_id}/tool-invocations",
+            headers=OWNER,
+        )
+    )
+
+
+async def test_listing_tool_invocations_of_an_unknown_run_returns_404(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = access_env
+    res = await client.get(
+        "/api/v1/workflow-executions/nope/tool-invocations", headers=ADMIN
+    )
+    assert_err(res, "NOT_FOUND", 404)
+
+
 async def test_unrelated_user_cannot_stream_agent(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:

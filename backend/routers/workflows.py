@@ -47,7 +47,7 @@ from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_
 from models.response import ApiResponse
 from models.tag import TagIdsUpdate
 from models.user import Role
-from models.workflow import WorkflowRead, WorkflowUpdate
+from models.workflow import ExecuteWorkflowRequest, WorkflowRead, WorkflowUpdate
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task_template import WorkflowTaskTemplateRead
 from repositories.exceptions import SessionRunInProgressError
@@ -398,6 +398,7 @@ async def execute_workflow(
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
+    body: ExecuteWorkflowRequest | None = None,
 ) -> ApiResponse[WorkflowExecution]:
     """Create a WorkflowExecution pre-filled with the workflow's task templates.
 
@@ -407,9 +408,17 @@ async def execute_workflow(
     pre-publish testing (HTTP 409 ``WORKFLOW_NOT_RUNNABLE`` otherwise). The ADK
     session is created lazily on the first agent call, which starts executing
     immediately.
+
+    The body is optional. When it names ``toolMockIds``, the run stubs those
+    tools instead of calling them; that is accepted only for a ``draft``
+    workflow (HTTP 409 ``WORKFLOW_NOT_RUNNABLE`` otherwise) and HTTP 422
+    ``FOREIGN_KEY_VIOLATION`` when an id names no mock.
     """
     execution = await service.execute(
-        workflow_id, caller=caller, caller_roles=caller_roles
+        workflow_id,
+        caller=caller,
+        caller_roles=caller_roles,
+        tool_mock_ids=body.tool_mock_ids if body is not None else (),
     )
     return ApiResponse(meta=meta, data=execution)
 

@@ -31,6 +31,7 @@ from infrastructure.mcp_policies import (
     default_policies,
 )
 from infrastructure.mcp_proxy import (
+    MOCKED_META_KEY,
     AgentRunAuthenticator,
     CallToolRequest,
     ListToolsRequest,
@@ -49,6 +50,7 @@ from infrastructure.mcp_proxy import (
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
 from models.mcp_server import MCPServer, McpTransport
+from models.mcp_tool_invocation import McpAuditDecision
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
 from models.workflow import Workflow
@@ -682,6 +684,165 @@ async def test_call_tool_closes_the_session_before_the_outbound_call(
         CallToolRequest(_principal(), server_id, "search", {})
     )
     assert closed == [True]
+
+
+# ---------- the tool stub ----------
+
+
+class _RecordingStub:
+    """Test stub that answers when configured to, recording what it was asked."""
+
+    def __init__(self, *, stubbed: bool) -> None:
+        """Initialize the stub.
+
+        Args:
+            stubbed: What :meth:`stubs` reports for every call.
+        """
+        self.stubbed = stubbed
+        self.asked: list[McpCallContext] = []
+        self.answered: list[McpCallContext] = []
+
+    async def stubs(self, ctx: McpCallContext, db: AsyncSession) -> bool:
+        """Record the question and report the configured answer."""
+        self.asked.append(ctx)
+        return self.stubbed
+
+    async def answer(
+        self, ctx: McpCallContext, db: AsyncSession
+    ) -> types.CallToolResult:
+        """Record the call and return a marked result."""
+        self.answered.append(ctx)
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text="stubbed")],
+            _meta={MOCKED_META_KEY: True},
+        )
+
+
+class _CountingAuditSink:
+    """Test audit sink that keeps every decision it is handed."""
+
+    def __init__(self) -> None:
+        """Start with no recorded decisions."""
+        self.records: list[tuple[McpAuditDecision, str | None]] = []
+
+    async def record(
+        self,
+        ctx: McpCallContext,
+        db: AsyncSession,
+        *,
+        decision: McpAuditDecision,
+        reason: str | None,
+    ) -> None:
+        """Keep the decision."""
+        self.records.append((decision, reason))
+
+
+async def test_call_tool_reaches_the_server_when_nothing_is_stubbed(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The default NullToolStub must not divert anything."""
+    server_id = await _seed_server(engine)
+    await _seed_session(engine)
+    called: list[str] = []
+
+    async def fake_call_server_tool(
+        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+    ) -> types.CallToolResult:
+        called.append(tool_name)
+        return _tool_result()
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
+    )
+    audit = _CountingAuditSink()
+    result = await McpProxy(policies=[], audit=audit).call_tool(
+        CallToolRequest(_principal(), server_id, "search", {})
+    )
+    assert called == ["search"]
+    assert result.meta is None
+    assert audit.records == [(McpAuditDecision.allowed, None)]
+
+
+async def test_a_stubbed_call_skips_the_server_and_the_audit(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An allowed but stubbed call reaches no server and earns no audit row."""
+    server_id = await _seed_server(engine)
+    await _seed_session(engine)
+
+    async def _explode(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("a stubbed call must not reach the MCP client")
+
+    monkeypatch.setattr("infrastructure.mcp_client.call_server_tool", _explode)
+    stub = _RecordingStub(stubbed=True)
+    audit = _CountingAuditSink()
+    result = await McpProxy(policies=[], audit=audit, stub=stub).call_tool(
+        CallToolRequest(_principal(), server_id, "search", {})
+    )
+    assert (result.meta or {}).get(MOCKED_META_KEY) is True
+    assert len(stub.answered) == 1
+    assert audit.records == []
+
+
+async def test_a_stubbed_call_is_still_run_through_the_policy_chain(
+    engine: AsyncEngine,
+) -> None:
+    """The whole point of the placement: a stub does not buy past authorization."""
+    server_id = await _seed_server(engine)
+    await _seed_session(engine)
+    stub = _RecordingStub(stubbed=True)
+    log: list[str] = []
+    policy = _RecordingPolicy(log, "gate", deny=True)
+    with pytest.raises(McpPolicyDeniedError):
+        await McpProxy(policies=[policy], stub=stub).call_tool(
+            CallToolRequest(_principal(), server_id, "search", {})
+        )
+    assert log == ["gate"]
+    # Asked, so the proxy could tell the refusal was of a stubbed call, but
+    # never asked to answer -- which is what keeps a response unconsumed.
+    assert len(stub.asked) == 1
+    assert stub.answered == []
+
+
+async def test_a_refused_stubbed_call_is_not_audited(
+    engine: AsyncEngine,
+) -> None:
+    """No row either way: the table describes calls that reached a server."""
+    server_id = await _seed_server(engine)
+    await _seed_session(engine)
+    audit = _CountingAuditSink()
+    with pytest.raises(McpPolicyDeniedError):
+        await McpProxy(
+            policies=[_RecordingPolicy([], "gate", deny=True)],
+            audit=audit,
+            stub=_RecordingStub(stubbed=True),
+        ).call_tool(CallToolRequest(_principal(), server_id, "search", {}))
+    assert audit.records == []
+
+
+async def test_a_refused_unstubbed_call_is_still_audited(
+    engine: AsyncEngine,
+) -> None:
+    """The counterpart: an ordinary refusal keeps its ``denied`` row."""
+    server_id = await _seed_server(engine)
+    await _seed_session(engine)
+    audit = _CountingAuditSink()
+    with pytest.raises(McpPolicyDeniedError):
+        await McpProxy(
+            policies=[_RecordingPolicy([], "gate", deny=True)],
+            audit=audit,
+            stub=_RecordingStub(stubbed=False),
+        ).call_tool(CallToolRequest(_principal(), server_id, "search", {}))
+    assert audit.records == [(McpAuditDecision.denied, "denied by gate")]
+
+
+async def test_the_stub_is_not_consulted_for_a_listing(engine: AsyncEngine) -> None:
+    """Stubbing is a ``call_tool`` concern; a listing has no side effect to skip."""
+    await _seed_server(engine)
+    await _seed_session(engine)
+    stub = _RecordingStub(stubbed=True)
+    await McpProxy(policies=[], stub=stub).list_tools(ListToolsRequest(_principal()))
+    assert stub.asked == []
 
 
 # ---------- list_tools ----------

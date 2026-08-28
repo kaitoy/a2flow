@@ -24,6 +24,11 @@ from .mcp_ca import (
     SqlMcpCertificateAuthorityRepository,
 )
 from .mcp_server import MCPServerRepository, SqlMCPServerRepository
+from .mcp_tool_invocation import (
+    McpToolInvocationRepository,
+    SqlMcpToolInvocationRepository,
+)
+from .mcp_tool_mock import MCPToolMockRepository, SqlMcpToolMockRepository
 from .message_meta import MessageMetaRepository, SqlMessageMetaRepository
 from .metrics import MetricsRepository, SqlMetricsRepository
 from .notification import NotificationRepository, SqlNotificationRepository
@@ -68,7 +73,9 @@ __all__ = [
     "MAX_TASK_TEMPLATES",
     "ImpersonationEventRepository",
     "MCPServerRepository",
+    "MCPToolMockRepository",
     "McpCertificateAuthorityRepository",
+    "McpToolInvocationRepository",
     "MessageMetaRepository",
     "MetricsRepository",
     "NotFoundError",
@@ -85,6 +92,8 @@ __all__ = [
     "SqlImpersonationEventRepository",
     "SqlMCPServerRepository",
     "SqlMcpCertificateAuthorityRepository",
+    "SqlMcpToolInvocationRepository",
+    "SqlMcpToolMockRepository",
     "SqlMessageMetaRepository",
     "SqlMetricsRepository",
     "SqlNotificationRepository",

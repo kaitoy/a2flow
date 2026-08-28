@@ -214,6 +214,60 @@ export const MCP_TOOL_1 = {
   inputSchema: { type: "object" },
 };
 
+export const MCP_TOOL_MOCK_1 = {
+  id: "mock-1",
+  tenantId: "tenant-1",
+  name: "search returns nothing",
+  description: null,
+  mcpServerId: "mcp-1",
+  toolName: "search",
+  responses: [{ kind: "structured", value: { hits: [] } }],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+/** A mock of the built-in approval tool: no server, two successive decisions. */
+export const MCP_TOOL_MOCK_BUILTIN = {
+  id: "mock-2",
+  tenantId: "tenant-1",
+  name: "approve then reject",
+  description: null,
+  mcpServerId: null,
+  toolName: "request_approval",
+  responses: [
+    { kind: "structured", value: { status: "approved" } },
+    { kind: "structured", value: { status: "rejected" } },
+  ],
+  createdAt: "2026-01-02T00:00:00Z",
+  updatedAt: "2026-01-02T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+export const MCP_TOOL_INVOCATION_1 = {
+  id: "invocation-1",
+  tenantId: "tenant-1",
+  sessionId: "session-1",
+  workflowExecutionId: "execution-1",
+  workflowTaskId: null,
+  certificateSerial: null,
+  approvalId: null,
+  mcpServerId: "mcp-1",
+  toolName: "search",
+  decision: "allowed",
+  denialReason: null,
+  argumentsDigest: "a".repeat(64),
+  signature: null,
+  nonce: null,
+  signedAt: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 // Note: secret responses carry only the entry `keys`, never their values — the
 // API is write-only.
 export const SECRET_1 = {
@@ -448,6 +502,24 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(MCP_SERVER_1)),
 
   http.delete(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/mcp-tool-mocks`, () =>
+    envelope([MCP_TOOL_MOCK_1, MCP_TOOL_MOCK_BUILTIN])
+  ),
+
+  http.get(`${BASE}/api/v1/mcp-tool-mocks/:mockId`, () => envelope(MCP_TOOL_MOCK_1)),
+
+  http.post(`${BASE}/api/v1/mcp-tool-mocks`, () =>
+    envelope({ ...MCP_TOOL_MOCK_1, id: "new-mock-id" }, 201)
+  ),
+
+  http.patch(`${BASE}/api/v1/mcp-tool-mocks/:mockId`, () => envelope(MCP_TOOL_MOCK_1)),
+
+  http.delete(`${BASE}/api/v1/mcp-tool-mocks/:mockId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/workflow-executions/:executionId/tool-invocations`, () =>
+    envelope([MCP_TOOL_INVOCATION_1])
+  ),
 
   http.get(`${BASE}/api/v1/tags`, () => envelope([TAG_2, TAG_1])),
 

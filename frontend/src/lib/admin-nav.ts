@@ -2,6 +2,7 @@
 import {
   Building2,
   CheckCircle2,
+  FlaskConical,
   KeyRound,
   ListChecks,
   type LucideIcon,
@@ -93,6 +94,13 @@ export const adminNavItems: AdminNavItem[] = [
     label: "MCP Servers",
     icon: Server,
     description: "Register tool servers",
+    roles: [Role.DEVELOPER, Role.ADMIN],
+  },
+  {
+    href: "/admin/mcp-tool-mocks",
+    label: "Tool Mocks",
+    icon: FlaskConical,
+    description: "Stub tools for draft workflow runs",
     roles: [Role.DEVELOPER, Role.ADMIN],
   },
   {

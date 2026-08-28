@@ -19,6 +19,7 @@ from services import (
     ApproverGroupResolver,
     MCPRegistryService,
     MCPServerService,
+    MCPToolMockService,
     MetricsService,
     NotificationDispatcher,
     NotificationService,
@@ -53,6 +54,10 @@ from .repository import (
     McpCertificateAuthorityRepositoryDep,
     MCPServerReadRepositoryDep,
     MCPServerRepositoryDep,
+    McpToolInvocationReadRepositoryDep,
+    McpToolInvocationRepositoryDep,
+    MCPToolMockReadRepositoryDep,
+    MCPToolMockRepositoryDep,
     MessageMetaReadRepositoryDep,
     MessageMetaRepositoryDep,
     MetricsRepositoryDep,
@@ -236,6 +241,28 @@ def get_mcp_server_read_service(
 
 MCPServerReadServiceDep = Annotated[
     MCPServerService, Depends(get_mcp_server_read_service)
+]
+
+
+def get_mcp_tool_mock_service(repo: MCPToolMockRepositoryDep) -> MCPToolMockService:
+    """Create an MCPToolMockService backed by the request's repository."""
+    return MCPToolMockService(repo)
+
+
+MCPToolMockServiceDep = Annotated[
+    MCPToolMockService, Depends(get_mcp_tool_mock_service)
+]
+
+
+def get_mcp_tool_mock_read_service(
+    repo: MCPToolMockReadRepositoryDep,
+) -> MCPToolMockService:
+    """Create an MCPToolMockService for a read route, possibly across all tenants."""
+    return MCPToolMockService(repo)
+
+
+MCPToolMockReadServiceDep = Annotated[
+    MCPToolMockService, Depends(get_mcp_tool_mock_read_service)
 ]
 
 
@@ -428,6 +455,7 @@ def get_workflow_service(
     tasks: WorkflowTaskRepositoryDep,
     versions: WorkflowPublishedVersionRepositoryDep,
     meta: MessageMetaRepositoryDep,
+    mocks: MCPToolMockRepositoryDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
@@ -447,6 +475,7 @@ def get_workflow_service(
         tasks,
         versions,
         meta,
+        mocks,
         skills_store,
         registry,
         session_service,
@@ -465,6 +494,7 @@ def get_workflow_read_service(
     tasks: WorkflowTaskReadRepositoryDep,
     versions: WorkflowPublishedVersionReadRepositoryDep,
     meta: MessageMetaReadRepositoryDep,
+    mocks: MCPToolMockReadRepositoryDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
@@ -489,6 +519,7 @@ def get_workflow_read_service(
         tasks,
         versions,
         meta,
+        mocks,
         skills_store,
         registry,
         session_service,
@@ -616,6 +647,7 @@ def get_workflow_execution_service(
     execution_repo: WorkflowExecutionRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     meta: MessageMetaRepositoryDep,
+    invocations: McpToolInvocationRepositoryDep,
     skills: AgentSkillRepositoryDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
@@ -627,6 +659,7 @@ def get_workflow_execution_service(
         execution_repo,
         tasks,
         meta,
+        invocations,
         skills,
         skills_store,
         registry,
@@ -645,6 +678,7 @@ def get_workflow_execution_read_service(
     execution_repo: WorkflowExecutionReadRepositoryDep,
     tasks: WorkflowTaskReadRepositoryDep,
     meta: MessageMetaReadRepositoryDep,
+    invocations: McpToolInvocationReadRepositoryDep,
     skills: AgentSkillReadRepositoryDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
@@ -656,6 +690,7 @@ def get_workflow_execution_read_service(
         execution_repo,
         tasks,
         meta,
+        invocations,
         skills,
         skills_store,
         registry,

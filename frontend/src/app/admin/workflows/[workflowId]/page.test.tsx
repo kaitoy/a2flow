@@ -421,6 +421,54 @@ describe("WorkflowDetailPage", () => {
     expect(screen.getByRole("button", { name: /run workflow/i })).not.toBeDisabled();
   });
 
+  it("sends the tool mocks chosen in the Run dialog of a draft workflow", async () => {
+    const user = userEvent.setup();
+    let body: unknown;
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
+          status: "draft",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "user",
+          updatedBy: "",
+        })
+      ),
+      http.post("http://localhost:8000/api/v1/workflows/:id/execute", async ({ request }) => {
+        body = await request.json();
+        return envelope({ id: "execution-1" }, 201);
+      })
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() => expect(screen.getByText("draft")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /run workflow/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      await within(dialog).findByRole("checkbox", { name: /search returns nothing/ })
+    );
+    await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
+
+    await waitFor(() => expect(body).toEqual({ toolMockIds: ["mock-1"] }));
+  });
+
+  it("offers no tool mocks in the Run dialog of a published workflow", async () => {
+    const user = userEvent.setup();
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    await screen.findByRole("heading", { name: "my-workflow" });
+    await user.click(screen.getByRole("button", { name: /run workflow/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText("Mock tools")).not.toBeInTheDocument();
+  });
+
   it("saves name and description only", async () => {
     const user = userEvent.setup();
     let receivedBody: unknown;

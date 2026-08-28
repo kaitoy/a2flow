@@ -51,6 +51,55 @@ describe("createAgentSubscriber", () => {
     expect(msg.content).toMatchObject({ name: "search_web", status: "done", isMcp: true });
   });
 
+  it("carries the proxied tool's own arguments onto the line", async () => {
+    const store = makeStore();
+    const sub = createAgentSubscriber(store.dispatch, { onRenderA2uiEnd: vi.fn() });
+
+    await sub.onToolCallEndEvent?.({
+      event: { toolCallId: "tc-mcp" },
+      toolCallName: CALL_MCP_TOOL_NAME,
+      toolCallArgs: { server_id: "srv-1", tool_name: "search_web", arguments: { q: "rust" } },
+    } as never);
+    expect(lastActivity(store).content).toMatchObject({ args: { q: "rust" } });
+  });
+
+  it("attaches a tool result to the line that made the call", async () => {
+    const store = makeStore();
+    const sub = createAgentSubscriber(store.dispatch, { onRenderA2uiEnd: vi.fn() });
+
+    await sub.onToolCallEndEvent?.({
+      event: { toolCallId: "tc-mcp" },
+      toolCallName: CALL_MCP_TOOL_NAME,
+      toolCallArgs: { tool_name: "search_web", arguments: {} },
+    } as never);
+    await sub.onToolCallResultEvent?.({
+      event: { toolCallId: "tc-mcp", content: '{"result":{"content":["ok"]}}' },
+    } as never);
+
+    expect(store.getState().chat.messages).toHaveLength(1);
+    expect(lastActivity(store).content).toMatchObject({
+      name: "search_web",
+      result: { result: { content: ["ok"] } },
+      mocked: false,
+    });
+  });
+
+  it("flags a mocked result on the line", async () => {
+    const store = makeStore();
+    const sub = createAgentSubscriber(store.dispatch, { onRenderA2uiEnd: vi.fn() });
+
+    await sub.onToolCallEndEvent?.({
+      event: { toolCallId: "tc-mcp" },
+      toolCallName: CALL_MCP_TOOL_NAME,
+      toolCallArgs: { tool_name: "delete_record", arguments: {} },
+    } as never);
+    await sub.onToolCallResultEvent?.({
+      event: { toolCallId: "tc-mcp", content: '{"result":{},"mocked":true}' },
+    } as never);
+
+    expect(lastActivity(store).content).toMatchObject({ mocked: true });
+  });
+
   it("does not create a tool line for render tools", async () => {
     const store = makeStore();
     const onRenderA2uiEnd = vi.fn();

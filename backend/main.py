@@ -39,6 +39,7 @@ from repositories.exceptions import (
     ForeignKeyViolationError,
     McpConnectionError,
     McpServerValidationError,
+    McpToolMockValidationError,
     NotFoundError,
     OutboundEmailNotDeletableError,
     QueryValidationError,
@@ -71,6 +72,7 @@ from routers.exception_handlers import (
     http_exception_handler,
     mcp_connection_exception_handler,
     mcp_server_validation_exception_handler,
+    mcp_tool_mock_validation_exception_handler,
     not_found_exception_handler,
     outbound_email_not_deletable_exception_handler,
     query_validation_exception_handler,
@@ -241,6 +243,9 @@ app.add_exception_handler(AvatarValidationError, avatar_validation_exception_han
 app.add_exception_handler(SecretValidationError, secret_validation_exception_handler)
 app.add_exception_handler(
     McpServerValidationError, mcp_server_validation_exception_handler
+)
+app.add_exception_handler(
+    McpToolMockValidationError, mcp_tool_mock_validation_exception_handler
 )
 app.add_exception_handler(UserValidationError, user_validation_exception_handler)
 app.add_exception_handler(

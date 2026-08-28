@@ -17,6 +17,7 @@ import chatReducer, {
   addPendingRenderCall,
   addUserMessage,
   appendDelta,
+  attachToolCallResult,
   clearError,
   clearPendingRenderCalls,
   endAssistantMessage,
@@ -221,6 +222,82 @@ describe("chatSlice", () => {
       expect(activityMsg.id).toBe("tc-mcp");
       const content = activityMsg.content as unknown as ToolCallActivityContent;
       expect(content).toMatchObject({ name: "search_web", status: "done", isMcp: true });
+    });
+
+    it("restores the MCP call's arguments and result from the persisted history", () => {
+      const messages: Message[] = [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-mcp",
+              type: "function",
+              function: {
+                name: CALL_MCP_TOOL_NAME,
+                arguments: JSON.stringify({
+                  server_id: "srv-1",
+                  tool_name: "search_web",
+                  arguments: { query: "rust" },
+                }),
+              },
+            },
+          ],
+        },
+        {
+          id: "m2",
+          role: "tool",
+          toolCallId: "tc-mcp",
+          content: JSON.stringify({ result: { content: ["ok"], structured: null } }),
+        },
+      ];
+      const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
+      const activityMsg = state.messages.find((m) => m.id === "tc-mcp");
+      if (!activityMsg || activityMsg.role !== "activity") {
+        throw new Error("expected activity message");
+      }
+      const content = activityMsg.content as unknown as ToolCallActivityContent;
+      // Only the proxied tool's own arguments, not the call_mcp_tool envelope.
+      expect(content.args).toEqual({ query: "rust" });
+      expect(content.result).toEqual({ result: { content: ["ok"], structured: null } });
+      expect(content.mocked).toBe(false);
+    });
+
+    it("marks a restored MCP call as mocked when its result says so", () => {
+      const messages: Message[] = [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-mcp",
+              type: "function",
+              function: {
+                name: CALL_MCP_TOOL_NAME,
+                arguments: JSON.stringify({
+                  server_id: "srv-1",
+                  tool_name: "delete_record",
+                  arguments: {},
+                }),
+              },
+            },
+          ],
+        },
+        {
+          id: "m2",
+          role: "tool",
+          toolCallId: "tc-mcp",
+          content: JSON.stringify({ result: { content: [], structured: {} }, mocked: true }),
+        },
+      ];
+      const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
+      const activityMsg = state.messages.find((m) => m.id === "tc-mcp");
+      if (!activityMsg || activityMsg.role !== "activity") {
+        throw new Error("expected activity message");
+      }
+      expect((activityMsg.content as unknown as ToolCallActivityContent).mocked).toBe(true);
     });
 
     it("does NOT synthesize activity for an internal tool call", () => {
@@ -458,6 +535,64 @@ describe("chatSlice", () => {
       );
       expect(state.messages).toHaveLength(1);
       expect((state.messages[0].content as { v: number }).v).toBe(2);
+    });
+  });
+
+  describe("attachToolCallResult", () => {
+    /** Seed a done tool-call line the way the subscriber's end event does. */
+    function stateWithToolCall() {
+      return chatReducer(
+        emptyState,
+        addActivityMessage({
+          id: "tc-1",
+          activityType: TOOL_CALL_ACTIVITY_TYPE,
+          content: { name: "search_web", status: "done", isMcp: true, args: { q: "rust" } },
+        })
+      );
+    }
+
+    it("merges the result into the line without losing its name or arguments", () => {
+      const state = chatReducer(
+        stateWithToolCall(),
+        attachToolCallResult({ toolCallId: "tc-1", result: { ok: true } })
+      );
+      const content = state.messages[0].content as unknown as ToolCallActivityContent;
+      expect(content).toMatchObject({
+        name: "search_web",
+        status: "done",
+        isMcp: true,
+        args: { q: "rust" },
+        result: { ok: true },
+        mocked: false,
+      });
+    });
+
+    it("marks the line as mocked when the result says so", () => {
+      const state = chatReducer(
+        stateWithToolCall(),
+        attachToolCallResult({ toolCallId: "tc-1", result: { mocked: true } })
+      );
+      expect((state.messages[0].content as unknown as ToolCallActivityContent).mocked).toBe(true);
+    });
+
+    it("ignores a result for a call with no rendered line", () => {
+      const state = chatReducer(
+        emptyState,
+        attachToolCallResult({ toolCallId: "unknown", result: { ok: true } })
+      );
+      expect(state.messages).toHaveLength(0);
+    });
+
+    it("ignores a result addressed to a non-tool activity message", () => {
+      const seeded = chatReducer(
+        emptyState,
+        addActivityMessage({ id: "act1", activityType: A2UIActivityType, content: { v: 1 } })
+      );
+      const state = chatReducer(
+        seeded,
+        attachToolCallResult({ toolCallId: "act1", result: { ok: true } })
+      );
+      expect(state.messages[0].content).toEqual({ v: 1 });
     });
   });
 

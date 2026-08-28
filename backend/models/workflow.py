@@ -235,3 +235,19 @@ class GenerateWorkflowRequest(SQLModel):
     model_config = _alias_config
     name: EntityName
     prompt: PromptText
+
+
+class ExecuteWorkflowRequest(SQLModel):
+    """Request body of ``POST /workflows/{workflow_id}/execute``.
+
+    Optional in full: a body-less POST still starts an ordinary run, which is
+    what every published workflow does.
+
+    ``tool_mock_ids`` names the :class:`models.mcp_tool_mock.MCPToolMock` records
+    the run should apply, stubbing those tools instead of calling them. It is
+    accepted only while the workflow is still ``draft`` -- mocking a published
+    workflow's tools would produce a run that looks real and did nothing.
+    """
+
+    model_config = _alias_config
+    tool_mock_ids: list[str] = Field(default_factory=list)

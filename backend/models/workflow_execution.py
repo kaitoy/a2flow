@@ -14,12 +14,13 @@ it, exactly as a workflow's id identifies its design session.
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import field_serializer
-from sqlalchemy import ForeignKeyConstraint, Index
+from sqlalchemy import Column, ForeignKeyConstraint, Index
 from sqlmodel import Field, SQLModel
 
-from models.base import BaseEntity, TZDateTime, iso_z_or_none
+from models.base import BaseEntity, JSONColumn, TZDateTime, iso_z_or_none
 from models.tenant_scoped import TenantScoped
 
 
@@ -105,11 +106,27 @@ class WorkflowExecution(WorkflowExecutionCreate, TenantScoped, BaseEntity, table
     afterwards, so publishing the workflow does not reclassify runs that already
     happened. Draft runs are omitted from every query in ``repositories/metrics.py``
     so throwaway test data does not skew the operations metrics.
+
+    ``tool_mocks`` and ``tool_mock_calls`` drive the run's mocked tools (see
+    :mod:`models.mcp_tool_mock`). ``tool_mocks`` is a **snapshot** of the
+    :class:`~models.mcp_tool_mock.MCPToolMock` rows selected when the run
+    started, not a list of their ids: editing or deleting a mock afterwards must
+    not change how a run behaves, and above all must never silently turn a
+    stubbed call back into a real one with live side effects. Only a draft run
+    may carry mocks. ``tool_mock_calls`` counts how many times each mocked tool
+    has been called so far, keyed ``"<server_id or 'builtin'>:<tool_name>"``,
+    which is what selects the per-ordinal response.
     """
 
     __tablename__ = "workflow_executions"
     workflow_id: str | None = None
     is_draft: bool = Field(default=False)
+    tool_mocks: list[dict[str, Any]] = Field(
+        default_factory=list, sa_column=Column(JSONColumn, nullable=False)
+    )
+    tool_mock_calls: dict[str, int] = Field(
+        default_factory=dict, sa_column=Column(JSONColumn, nullable=False)
+    )
     status: WorkflowExecutionStatus = Field(default=WorkflowExecutionStatus.running)
     finished_at: datetime | None = Field(default=None, sa_type=TZDateTime)
     __table_args__ = (
