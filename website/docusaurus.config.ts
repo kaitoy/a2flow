@@ -28,6 +28,10 @@ const config: Config = {
   onBrokenAnchors: 'warn',
 
   markdown: {
+    // 'detect' keeps .md files on CommonMark (only .mdx is compiled as MDX), so
+    // the braces and angle brackets that run through the manual's prose stay
+    // literal instead of being read as JSX.
+    format: 'detect',
     hooks: {
       onBrokenMarkdownLinks: 'throw',
     },

@@ -32,6 +32,8 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Guides',
       items: [
+        'guides/admin-ui',
+        'guides/users-and-groups',
         'guides/workflows',
         'guides/workflow-executions',
         'guides/approvals',
@@ -40,7 +42,6 @@ const sidebars: SidebarsConfig = {
         'guides/tool-mocks',
         'guides/secrets',
         'guides/tags',
-        'guides/users-and-groups',
         'guides/notifications',
         'guides/system-settings',
       ],
