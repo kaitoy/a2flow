@@ -27,233 +27,21 @@ cp .env.example .env
 
 ## Configuration
 
-Specify the LLM to use in the `.env` file.
+Every environment variable the backend reads is documented in the manual, and
+[.env.example](.env.example) is the annotated template:
 
-### Gemini (default)
-
-```env
-LLM_MODEL=gemini-3.5-flash
-GOOGLE_API_KEY=your_google_api_key
-```
-
-### OpenAI (via LiteLLM)
-
-```env
-LLM_MODEL=litellm:openai/gpt-4o
-OPENAI_API_KEY=your_openai_api_key
-```
-
-### Anthropic (via LiteLLM)
-
-```env
-LLM_MODEL=litellm:anthropic/claude-3-5-sonnet-20241022
-ANTHROPIC_API_KEY=your_anthropic_api_key
-```
-
-### Agent instruction
-
-```env
-AGENT_INSTRUCTION=You are a helpful assistant. Answer concisely and clearly.
-```
-
-### Server settings
-
-```env
-HOST=0.0.0.0
-PORT=8000
-# RELOAD=true
-```
-
-Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted. `RELOAD` (default `false`) enables uvicorn autoreload; it only affects `python -m backend.main` — the `uv run uvicorn main:app --reload` command below and the Dockerfile's startup path are unaffected either way.
-
-### Operations metrics
-
-```env
-# METRICS_TIMEZONE=Asia/Tokyo
-```
-
-IANA timezone name deciding where a calendar day starts for the workflow operations metrics — the "today" counts on `GET /api/v1/metrics` and the daily buckets of the lead-time trend. Defaults to `UTC`; an unrecognized name falls back to `UTC` rather than failing startup, so a typo skews a dashboard's day boundary instead of stopping the app. The metrics themselves are described in the [root README](../README.md#operations-metrics).
-
-### Agent skill store
-
-```env
-SKILLS_DIR=.skills
-# SKILLS_PRUNE_GRACE_SECONDS=3600
-# SKILLS_CLONE_TIMEOUT_SECONDS=120
-```
-
-Root of the store Agent Skill repositories are shallow-cloned into, laid out as one immutable directory per revision:
-
-```
-$SKILLS_DIR/<agent_skill_id>/<commit_sha>/
-```
-
-A clone is staged in a temporary sibling and published with a single atomic rename, so no reader ever observes a half-written revision; once published, a revision is never modified. Writers (the clone at registration, and every pull) serialize on the `skill-sync:<id>` advisory lock in `infrastructure/locks.py`. Readers take no lock at all — a pull only adds a sibling directory, so it cannot disturb an agent loading an existing revision.
-
-`SKILLS_PRUNE_GRACE_SECONDS` (default 3600) is how long a revision directory survives regardless of whether anything references it. A pull prunes revisions that no workflow execution is pinned to, and the grace window covers the gap between a run reading the skill's current revision and inserting the execution row that names it.
-
-`SKILLS_CLONE_TIMEOUT_SECONDS` (default 120) bounds how long a clone's individual HTTP requests may take. Without it, a slow or hanging remote could stall a clone indefinitely — and with it, the skill's sync advisory lock, leaving the skill `pending` and making a pull of it on another replica silently skip rather than wait.
-
-Defaults to `backend/.skills` (relative to the working directory). Under `docker compose` it is `/var/lib/a2flow/skills`, backed by the `skills` named volume.
-
-This is **durable state, not a cache**: a `WorkflowExecution` pins the revision it started with, so wiping the directory leaves existing executions unable to load their skill (HTTP 409 `SKILL_NOT_READY`) until an admin pulls the skill again. Running more than one backend replica requires all of them to mount this same directory.
-
-### Secret management
-
-```env
-# SECRET_ENCRYPTION_KEY=
-# SECRET_KEY_FILE=.secret_key
-# VAULT_ADDR=https://vault.example.com
-# VAULT_TOKEN=hvs.xxxxxxxx
-# VAULT_ROLE_ID=...
-# VAULT_SECRET_ID=...
-# VAULT_APPROLE_MOUNT=approle
-```
-
-`local`-type [secrets](#secrets) are Fernet-encrypted before storage. The key is resolved at first use: `SECRET_ENCRYPTION_KEY` (must be a valid Fernet key) takes precedence; otherwise the key file at `SECRET_KEY_FILE` (default `.secret_key` next to the SQLite database file) is read; otherwise a key is generated, saved to that file, and a WARNING is logged. Back the key up — losing it makes every stored local secret undecryptable.
-
-`vault`-type secrets are read live from a single HashiCorp Vault (KV v2 only) selected by `VAULT_ADDR`. Authentication uses AppRole (`VAULT_ROLE_ID` + `VAULT_SECRET_ID`, login mount from `VAULT_APPROLE_MOUNT`) when set, else the static `VAULT_TOKEN`. `VAULT_ADDR` is deliberately exempt from the SSRF URL checks applied to user-supplied URLs: it is operator-set deployment configuration and typically points at a private address.
-
-### Application database
-
-```env
-DB_URL=sqlite:///a2flow.db
-# DB_URL=postgresql://user:password@localhost:5432/a2flow
-```
-
-Database URL for REST API data and ADK session storage — both live in the same database. SQLite (the default, relative to the working directory) and PostgreSQL are supported; the async driver suffix (`sqlite+aiosqlite` / `postgresql+asyncpg`) is added automatically, so the plain scheme is enough. With SQLite the ADK session store uses `SqliteSessionService`; any other URL switches it to the SQLAlchemy-based `DatabaseSessionService`. Schema changes are tracked as versioned [Alembic](https://alembic.sqlalchemy.org/) migrations under `alembic/versions/` and applied automatically (`alembic upgrade head`) on startup, so redeploying the app is what brings the schema up to date. To add a migration after changing a model, run `uv run alembic revision --autogenerate -m "..."` and review the generated file before committing.
-
-| Table | Description |
+| | |
 |---|---|
-| `users` | Application users (soft-deleted via `deleted_at`; `roles` holds their granted roles); see [Seeded users](#seeded-users) and [Authorization](#authorization-roles) |
-| `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](#authentication) |
-| `impersonation_events` | Audit trail of impersonation sessions (`impersonator_id`, `target_user_id`, `started_at`, `ended_at`); see [Authentication](#authentication) |
-| `agent_skills` | Agent skill definitions (incl. optional `repo_auth_password` / `repo_auth_username` for private-repo clones) |
-| `mcp_servers` | Registered MCP servers (name, `transport`, then either streamable HTTP URL + request headers or stdio command + args + env — header and env values may embed `${secret:NAME/KEY}` placeholders) |
-| `secrets` | Named key/value credential bundles: an `entries` map of Fernet-encrypted local values, or a HashiCorp Vault KV v2 path reference; see [Secrets](#secrets) |
-| `workflows` | Workflow definitions (name, skill reference, lifecycle `status`, AI-summarized `generatedDescription`, user-editable `description`), plus the `session_id` of the design session (the ADK chat) its task templates are designed in and the `agent_skill_commit_sha` that chat is pinned to |
-| `workflow_task_templates` | The pre-designed task list of a workflow (`workflow_id` FK with `ON DELETE CASCADE`; dependency edges and MCP tool bindings live in their own `workflow_task_template_*` join tables) |
-| `workflow_published_versions` | At most one per workflow: the name, description, and task templates (as JSON) frozen at publish time, which a `modified` workflow runs against; see [Workflows](#workflows) |
-| `workflow_executions` | One row per run of a workflow: the workflow and skill metadata snapshotted at execute time, plus the `session_id` of the workflow session (the ADK chat) the run happens in (`workflow_id` FK with `ON DELETE SET NULL`, so a run outlives its design) |
-| `workflow_tasks` | Individual tasks belonging to a `WorkflowExecution`, copied from the templates at execute time (`workflow_execution_id` FK with `ON DELETE CASCADE`) |
-| `workflow_task_tool_bindings` | MCP tools bound to a task (`task_id` FK `ON DELETE CASCADE`, `mcp_server_id` FK `ON DELETE RESTRICT`) |
-| `message_meta` | Per-message side-channel facts for the two shared session chats: who sent a message (`sender_user_id`) and which task was in progress (`workflow_task_id`, workflow sessions only). Neither chat has a table of its own, so a row names its parent through exactly one of `workflow_execution_id` (workflow session) / `workflow_id` (design session) — a `CHECK` enforces it, both cascade on delete |
-| `sessions` | Session metadata and session-level state |
-| `events` | Full event history per session (JSON) |
-| `app_states` | App-level shared state |
-| `user_states` | Per-user state shared across sessions |
+| [LLM configuration](https://kaitoy.github.io/a2flow/docs/getting-started/llm-configuration) | `LLM_MODEL` and the provider API keys |
+| [Configuration reference](https://kaitoy.github.io/a2flow/docs/operations/configuration) | Server settings, the agent skill store, secret management, the database, the seeded users, session lifetime, CORS |
+| [Demo data](https://kaitoy.github.io/a2flow/docs/getting-started/demo-data) | `DEMO_DATA` and the records it seeds |
+| [Horizontal scaling](https://kaitoy.github.io/a2flow/docs/operations/scaling) | What running more than one replica requires |
+| [Deployment](https://kaitoy.github.io/a2flow/docs/operations/deployment) | Reverse proxy and load balancer settings |
 
-### Horizontal scaling
+What follows is the part of the request path that is implementation detail
+rather than configuration.
 
-Running more than one backend replica requires PostgreSQL (SQLite is single-writer and single-process). All replicas then share one database, which is also what coordinates them.
-
-Writes to an ADK session are already safe across replicas: google-adk's `DatabaseSessionService.append_event` takes `SELECT ... FOR UPDATE` on the session row for the whole append transaction, so appends to one session are serialized and neither the session state nor the event rows can be lost.
-
-Reads are the part that needs help. The ADK `Runner` holds one in-memory session for the length of an invocation, so events another replica appends during that window never reach it, and the rest of the run reasons over a conversation that is missing them. Serializing writes cannot repair that — only keeping a session to one driver at a time can. So `POST /api/v1/agent` takes a **PostgreSQL session-level advisory lock** (`infrastructure/locks.py`) keyed on `app_name:user_id:thread_id` and holds it for the whole SSE stream. A second concurrent run of the same session is refused with HTTP 409 `SESSION_RUN_IN_PROGRESS` before any SSE headers are sent, rather than being left to diverge quietly. Different sessions never contend, and the lock is briefly waited on before it gives up, so a client that aborts a stream and immediately retries is not rejected while the abandoned run is still tearing down.
-
-Because the lock is session-level (not transaction-level), the deployment must not place a **transaction-pooling** proxy — PgBouncer in `transaction` mode, and most serverless PostgreSQL poolers — between the app and PostgreSQL; the lock would not survive between statements. Session-level pooling (or a direct connection) is required.
-
-Human-in-the-loop is unaffected: a frontend tool call ends the run and closes the stream, releasing the lock, and the approval resumes as a *new* `POST /agent` that may land on any replica.
-
-### Reverse proxy / load balancer
-
-**Sticky sessions / session affinity are not required.** See "Horizontal
-scaling" above — the PostgreSQL advisory lock, not routing affinity, is what
-keeps one ADK session pinned to one driver at a time, and only for the
-duration of a single SSE stream.
-
-The two SSE routes (`POST /api/v1/agent`, `POST /api/v1/workflow-executions/{id}/agent`)
-need the following at the reverse proxy / load balancer layer:
-
-- **Disable response buffering** for these paths. The app already sends
-  `X-Accel-Buffering: no` on both, which nginx honors per-response even if
-  buffering is enabled globally; other proxies/LBs need buffering disabled at
-  the config level instead (e.g. nginx's own `proxy_buffering off;`, since
-  `X-Accel-Buffering` only covers nginx).
-- **Disable gzip/compression for `text/event-stream`.** The app itself never
-  compresses responses (no `GZipMiddleware` is registered), so any
-  compression seen by the client can only come from the LB/proxy layer —
-  make sure it excludes `text/event-stream`.
-- **Size the read/idle timeout generously.** Agent runs have no server-side
-  time limit today (no `session_timeout_seconds`, nothing wraps the run in a
-  timeout), so a proxy-level read timeout is the only thing that can end a
-  stream, and it will silently cut off a legitimate long-running response if
-  set too low. Set it well above the longest run you expect, not a "typical"
-  request timeout.
-- **uvicorn's graceful-shutdown grace period is 30s** (`--timeout-graceful-shutdown`,
-  set in `Dockerfile`'s `CMD`). A rolling deploy forcibly ends any SSE stream
-  still open 30s after the container receives SIGTERM; this is safe because
-  the advisory lock releases with the connection and the client resumes with
-  a fresh request, the same way an abandoned/disconnected stream already
-  behaves.
-
-### Seeded users
-
-On startup the backend seeds a hidden **system user**, plus two real accounts, each created only on the very first startup that finds its target record missing:
-
-- An initial **`root`** user holding the **`super_admin`** role (see [Authorization](#authorization-roles)), platform-scoped (`tenantId: null`). Skipped once *any* real (non-system) user already exists, so it runs only on the very first startup.
-- A **Default** tenant (`slug: default`) and, inside it, an initial **`admin`** user holding the **`admin`** role. The tenant (by `slug`) and the user (by `username` scoped to that tenant) are checked independently, so either can be recreated without duplicating the other.
-
-The hidden **system user** owns the bootstrap records (it cannot log in and is excluded from the user list).
-
-Passwords are read from environment variables, with the same generate-and-log-once fallback for each:
-
-```env
-ROOT_PASSWORD=change-me-now-123
-ADMIN_PASSWORD=change-me-now-123
-```
-
-If either is unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when that user is created — it cannot be recovered once the log line has scrolled past. Set both explicitly before the first run for anything beyond local experimentation, or capture the generated passwords from the startup logs immediately and change them through the user API afterwards. The usernames are fixed to `root` and `admin`.
-
-### Demo data
-
-`DEMO_DATA=true` registers a ready-made example of the approval-gated "launch an EC2 instance" workflow on startup, so a fresh install has something to run without registering every piece by hand. Everything lands in the seeded **Default** tenant:
-
-| Resource | Name | Details |
-|---|---|---|
-| Secret | `demo-aws-credentials` | `local` type with two entries, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, each Fernet-encrypted like any other secret |
-| MCP server | `AWS MCP Server` | `stdio` transport, `uvx mcp-proxy-for-aws@1.6.4 https://aws-mcp.us-east-1.api.aws/mcp --region us-east-1 --metadata AWS_REGION=${env:AWS_REGION}`; its `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars are `${secret:demo-aws-credentials/…}` references to the two entries above, and its `AWS_REGION` env var (from `DEMO_AWS_REGION`) is what the `--metadata AWS_REGION=${env:AWS_REGION}` argument expands to at connection time |
-| Agent skill | `Demo AWS EC2 Launch` | `sample_skills/aws-ec2-launch` in this repository (see [Agent skills](#agent-skills)) |
-| User | `demo-approver-1` | holds **no direct role**; inherits `approver` from `Demo Approvers` — a manager the sample skill can route its approval request to |
-| User | `demo-approver-2` | holds **no direct role**; inherits `approver` from `Demo Approvers` — a second manager, showing a group can have more than one member |
-| User | `demo-requester-1` | holds **no direct role**; inherits `requester` from `Demo Requesters` — may execute the workflow |
-| User | `demo-requester-2` | holds **no direct role**; inherits `requester` from `Demo Requesters` — a second requester, showing a group can have more than one member |
-| User | `demo-developer` | holds **no direct role**; inherits `developer` from `Demo Developers` — may build and register the workflow, MCP server, and agent skill |
-| User group | `Demo Approvers` | grants `approver`; members `demo-approver-1` and `demo-approver-2` |
-| User group | `Demo Requesters` | grants `requester`; members `demo-requester-1` and `demo-requester-2` |
-| User group | `Demo Developers` | grants `developer`; sole member `demo-developer` |
-
-Granting each demo account its role through a group rather than directly is deliberate: it makes the demo exercise [role inheritance](#authorization-roles) end to end, so removing a user from their group visibly revokes their access. A database seeded by an older version — where the roles were granted directly — is normalized on the next startup, so the grant never ends up duplicated.
-
-The Workflow itself is deliberately not seeded: these records are the ingredients you assemble one from.
-
-```env
-DEMO_DATA=true
-DEMO_PASSWORD=change-me-now-123
-DEMO_AWS_ACCESS_KEY_ID=AKIA...
-DEMO_AWS_SECRET_ACCESS_KEY=...
-DEMO_AWS_REGION=us-east-1
-```
-
-- `DEMO_PASSWORD` is shared by all five demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
-- **AWS MCP Server** is a managed remote server AWS hosts, not something this project runs, so the registered `stdio` server actually launches [`mcp-proxy-for-aws`](https://github.com/aws/mcp-proxy-for-aws) — a thin bridge that SigV4-signs each request with the credentials it finds in its environment and forwards it to the endpoint. It supersedes the deprecated self-hosted `awslabs.aws-api-mcp-server`; see the upstream [migration guide](https://github.com/awslabs/mcp/blob/main/src/aws-api-mcp-server/MIGRATION.md).
-
-  The two regions in the arguments are not the same knob. `--region us-east-1` is the region the *signature* is computed for and is fixed to wherever the endpoint lives, while `--metadata AWS_REGION=${env:AWS_REGION}` (which expands to `DEMO_AWS_REGION`, carried in the row's own `env` — see [`${env:NAME}`](#mcp-servers)) is the region the server's *tools* act on. The proxy does not infer the signing region from the endpoint URL, so it stays explicit.
-
-- The AWS credentials are optional. Left unset, a `REPLACE_ME` placeholder is stored instead, so the demo is complete in shape and you fill the real values in from the Secrets page. Set them here to have the demo reach AWS straight after startup. They need permission to call the managed endpoint (the `aws-mcp` service) on top of the permissions for whatever the tools go on to do.
-
-  > **The demo MCP server is not restricted to read-only operations.** Whatever credentials you give it can create, modify, and delete real resources — including running instances that cost money. Point it at a throwaway account, or scope the IAM policy down. (`mcp-proxy-for-aws` has a `--read-only` flag, but the sample workflow launches an instance, so the demo deliberately does not pass it.)
-
-- The agent skill's repository is cloned in the background after startup, so a slow or unreachable remote never delays the server coming up. The skill shows as `pending` until the clone lands, exactly as a skill registered through the API does; a failure is recorded on the skill row with its reason.
-
-Turning the flag off (`DEMO_DATA=false`, or removing it) **removes those records again** on the next startup — the flag is declarative in both directions. Each record is tracked by a fixed id, not by name, so renaming one in the admin UI does not strand it.
-
-Two things survive that removal by design:
-
-- A demo record something else has come to depend on — a Workflow built on the demo skill, a task tool binding on the demo MCP server — cannot be deleted. That is logged at `WARNING` and skipped; the remaining demo records are still removed, and the app starts normally.
-- A demo user who has signed in and created records is **soft-deleted** (disabled, `deletedAt` set) rather than removed, so their name still resolves on those records. Re-enabling `DEMO_DATA` revives such an account instead of leaving it disabled.
-
-### Authentication
+## Authentication
 
 All API routes except `POST /api/v1/auth/login` and `GET /api/v1/health` require an authenticated session. Authentication is cookie-based and backed by the `auth_sessions` table.
 
@@ -267,18 +55,9 @@ All API routes except `POST /api/v1/auth/login` and `GET /api/v1/health` require
 
 A missing or invalid session returns `401 UNAUTHENTICATED`.
 
-**Session lifetime**
+Sessions use a sliding idle timeout, and the cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes. `SESSION_IDLE_TIMEOUT_SECONDS` and `SESSION_COOKIE_SECURE` are documented under [Session lifetime](https://kaitoy.github.io/a2flow/docs/operations/configuration#session-lifetime).
 
-Sessions use a sliding idle timeout: each authenticated request refreshes the session's last-active time, and a session left idle longer than `SESSION_IDLE_TIMEOUT_SECONDS` (default `28800`, 8 hours) is rejected and deleted. The cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes.
-
-```env
-# Sliding idle timeout in seconds (default 28800 = 8 hours)
-SESSION_IDLE_TIMEOUT_SECONDS=28800
-# Mark cookies Secure (HTTPS only); leave false for local HTTP dev (default false)
-SESSION_COOKIE_SECURE=false
-```
-
-The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `root` or Default-tenant `admin` user (see [Seeded users](#seeded-users)) on first run.
+The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `root` or Default-tenant `admin` user (see [Seeded users](https://kaitoy.github.io/a2flow/docs/operations/configuration#seeded-users)) on first run.
 
 **Impersonation.** A signed-in `admin`/`super_admin` can act as another user via a request header, `X-Impersonate-User-Id`, rather than a second session — the real session cookie never changes, so stopping never requires re-authenticating. `get_current_user` (`dependencies/auth.py`) re-validates the header on **every** request carrying it (not just when impersonation starts): it resolves the real session identity first (`RealUserDep` / `get_session_user`), then, if the header names a user with an open, still-valid impersonation, returns that user as the *effective* identity instead — which is what `CurrentUserDep`/`CurrentUserIdDep`/`CurrentTenantIdDep` resolve to everywhere else in the app, so authorization, tenant scoping, and `createdBy`/`updatedBy` audit fields all transparently apply to the impersonated user with no other code changes. An invalid or stale header (target since disabled, promoted, or already stopped elsewhere) is never an error — it silently falls back to the real user, since the frontend attaches a persisted selection starting with the very first `/auth/me` call on page load, and failing that call would otherwise boot a legitimate admin out of the whole app over a merely stale local selection.
 
@@ -286,9 +65,9 @@ The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`
 - `DELETE /api/v1/auth/impersonate` — stops impersonating, closing the open `impersonation_events` row; a no-op (never an error) if nothing is open.
 - `GET /api/v1/auth/me` returns `{ "user", "impersonatedBy" }`: `user` is the effective (possibly impersonated) identity, and `impersonatedBy` is the real actor whenever it differs from `user` — `null` otherwise. The frontend uses a `null` `impersonatedBy` to self-heal a stale local impersonation selection.
 
-### Authorization (roles)
+## Authorization (roles)
 
-Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every route-level role gate; the seeded `root` user holds it. Two ownership-layer checks are a deliberate exception — see the bullet below. See the [Roles and authorization](../README.md#roles-and-authorization) section of the root README for the full matrix.
+Authenticated users additionally hold **roles** (`users.roles`, a JSON list of `super_admin` / `admin` / `developer` / `requester` / `approver`) that gate the write endpoints. `super_admin` bypasses every route-level role gate; the seeded `root` user holds it. Two ownership-layer checks are a deliberate exception — see the bullet below. See the [Roles and authorization](https://kaitoy.github.io/a2flow/docs/concepts/authorization) chapter of the manual for the full matrix.
 
 **Effective roles.** A role reaches a user either directly (the `users.roles` column) or through a [user group](#user-groups) they belong to, and authorization uses the **union** of the two. That union is resolved per request by `dependencies/auth.py`'s `get_effective_roles` (backed by `repositories/effective_roles.py`, one indexed join) and handed to `models/user.py`'s `has_any_role`. Nothing is denormalized onto `users`, so there is no cache to invalidate and a membership change cannot leave a stale grant behind — the trade the alternative would have made is a *fail-open* one, which is why it was not taken.
 
@@ -300,20 +79,6 @@ Two enforcement points:
 - **Service layer** — ownership rules that a role cannot express: self-service user/avatar edits (`services/user.py`, `services/user_avatar.py`), the `super_admin` grant/revoke guard, the designated-approver check (`services/approval.py`), `WorkflowTaskService.update`'s status-change guard (`services/workflow_task.py`: changing a task's `status` is restricted to the execution's initiator or, when the task has a linked `Approval`, an eligible approver of it — the named user, or a member of its approver group holding `approver`), and the workflow-execution access policy (`services/workflow_execution_access.py`). That policy has two methods: `assert_access` (initiator, a designated approver of the execution, or a super admin — used to authorize driving the execution's agent and creating/updating/deleting its tasks) and `assert_read_access` (the same three plus a plain `admin`, read-only — used to authorize fetching the execution, listing/reading its tasks, and loading its chat history). Deletion is authorized separately, by the route-dependency layer above, not by this policy. The designated-approver and status-change checks intentionally exclude `super_admin` (and `admin`) — no exception, not even for a super admin who isn't the addressee. `WorkflowExecutionService.list` and `ApprovalService.list` apply the same initiator-or-designated-approver-or-super-admin-or-admin rule to `GET /workflow-executions` and `GET /approvals`, so nothing appears in a list that `assert_read_access` would then reject on the single-record read. Because `admin`, unlike `super_admin`, can be granted through a group, `assert_read_access` and both `list` methods take the caller's **effective** roles (`caller_roles: EffectiveRolesDep`) as an explicit parameter rather than reading `caller.roles` directly — see "Effective roles" above.
 
 Both raise `ForbiddenError` → HTTP 403 `FORBIDDEN`.
-
-### CORS
-
-```env
-CORS_ORIGINS=http://localhost:3000
-```
-
-Comma-separated list of origins allowed to call `/chat` and `/sessions`. Defaults to `http://localhost:3000`. Add additional origins when the frontend is served from a different host or port:
-
-```env
-CORS_ORIGINS=https://app.example.com,http://localhost:3000
-```
-
-`*` is rejected at startup — `allow_credentials=True` is always enabled, and pairing it with a wildcard origin is invalid per the CORS spec.
 
 ## Development
 

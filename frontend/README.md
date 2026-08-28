@@ -2,6 +2,9 @@
 
 Chat UI for [A2Flow](../README.md). Streams responses from the backend via SSE and renders them in real time.
 
+What each screen does, from the user's side, is in the manual at
+<https://kaitoy.github.io/a2flow/>. This file covers the implementation.
+
 ## Tech stack
 
 | | |

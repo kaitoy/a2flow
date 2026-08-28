@@ -2,11 +2,7 @@
 
 ![A2Flow](frontend/assets/logo.png)
 
-A chat application that connects a [Google ADK](https://google.github.io/adk-docs/) agent to a Next.js UI using the [AG-UI protocol](https://docs.ag-ui.com/concepts/events). The agent supports [A2UI](https://a2ui.org/) — when it needs input from the user it renders interactive A2UI input components (text fields, choice pickers, buttons) so the user can see exactly what to provide, while purely informational replies stream token-by-token as Markdown-rendered text so the user never waits on a tool call.
-
-The frontend uses a **glassmorphism** visual style with a **light/dark theme toggle** (persisted in `localStorage`, defaults to the OS preference). See [DESIGN.md](DESIGN.md) for the full design system reference. A **notification center** in the top toolbar surfaces unread workflow events such as generated drafts and approval requests, with the full history available from a dedicated Notifications page reachable from the account menu (see [Notifications](#notifications)); once a Super Admin has configured an SMTP server under [System Settings](#system-settings), the same events are also **emailed** to their recipient.
-
-The UI is **responsive**: below the `md` breakpoint every sidebar (chat session list, admin navigation, workflow task timeline) collapses into an off-canvas drawer opened from a hamburger button in the header, layouts use dynamic-viewport heights so mobile URL bars don't clip the chat input, and touch devices get always-visible controls, ~44px tap targets, 16px form fields (no iOS focus zoom), and Enter-as-newline in the chat input.
+A chat application that connects a [Google ADK](https://google.github.io/adk-docs/) agent to a Next.js UI using the [AG-UI protocol](https://docs.ag-ui.com/concepts/events). A2Flow rebuilds ITSM-style, multi-person, approval-gated workflows around that agent: it plans the work as a task graph, pauses for the humans who must sign off, and executes the rest.
 
 ```
 ┌──────────────────────────────────┐    AG-UI RunAgentInput (JSON)    ┌──────────────────────┐
@@ -19,18 +15,21 @@ The UI is **responsive**: below the `md` breakpoint every sidebar (chat session 
      :3000                            A2UI (TOOL_CALL_*)                    :8000
 ```
 
-## Project homepage
+## Documentation
 
-A single-page static homepage lives in [homepage/](homepage/) and is published to GitHub Pages at <https://kaitoy.github.io/a2flow/> by the [pages.yml](.github/workflows/pages.yml) workflow, which runs on every push to `master` that touches `homepage/**`. One-time setup: in the repository **Settings → Pages**, set **Source** to **GitHub Actions**.
+The user and operator manual lives at **<https://kaitoy.github.io/a2flow/>** ([日本語](https://kaitoy.github.io/a2flow/ja/)). It is built from [`website/`](website/) and deployed by [pages.yml](.github/workflows/pages.yml).
 
-To preview it locally, serve the directory with Python's built-in HTTP server and open the printed URL:
+| | |
+|---|---|
+| [Introduction](https://kaitoy.github.io/a2flow/docs/intro) | What A2Flow is and how the pieces fit together |
+| [Quick start](https://kaitoy.github.io/a2flow/docs/getting-started/quick-start) | Get the backend and the frontend running |
+| [Terminology](https://kaitoy.github.io/a2flow/docs/concepts/terminology) | Workflows, design sessions, executions, workflow sessions |
+| [Roles and authorization](https://kaitoy.github.io/a2flow/docs/concepts/authorization) | Who may do what |
+| [Guides](https://kaitoy.github.io/a2flow/docs/guides/workflows) | One page per feature, from workflows to notifications |
+| [Configuration reference](https://kaitoy.github.io/a2flow/docs/operations/configuration) | Every environment variable the backend reads |
+| [Deployment](https://kaitoy.github.io/a2flow/docs/operations/deployment) | Reverse proxies, scaling, what has to persist |
 
-```bash
-cd homepage
-python -m http.server
-```
-
-Open [http://localhost:8000](http://localhost:8000).
+The rest of this file is for **working on** A2Flow rather than using it.
 
 ## Repository layout
 
@@ -38,38 +37,8 @@ Open [http://localhost:8000](http://localhost:8000).
 a2flow/
 ├── backend/   # FastAPI + Google ADK agent
 ├── frontend/  # Next.js 16 chat UI
-└── homepage/  # Static project homepage (GitHub Pages)
+└── website/   # The manual site (Docusaurus → GitHub Pages)
 ```
-
-## Terminology
-
-Four terms carry most of the domain, and two of them are chats. They are worth
-keeping straight:
-
-| Term | What it is | Stored as |
-|---|---|---|
-| **Workflow** | A reusable, pre-designed unit of work: an agent skill plus the task templates generated for it. | `workflows` |
-| **Design session** | The chat in which a workflow's task templates are produced and refined. Exactly one per workflow, and it exists before any run does. | No table of its own: it is the ADK session named by `Workflow.sessionId`, so its workflow's id identifies it. |
-| **Workflow execution** | One run of a workflow: the workflow and skill metadata snapshotted at run time, and the parent of the run's `WorkflowTask`s, `Approval`s, and message metadata. | `workflow_executions` |
-| **Workflow session** | The chat that one workflow execution happens in — the run-time counterpart of a design session. | No table of its own: it is the ADK session named by `WorkflowExecution.session_id`, so its execution's id identifies it. |
-| **User group** | A named bundle of users within a tenant, carrying a set of roles that every member inherits. | `user_groups`, with membership in `user_group_members` |
-
-So a design session designs a workflow, and a workflow session runs one.
-Neither chat is an entity in its own right, so each is addressed by the
-record it belongs to — a design session by its workflow, a workflow session
-by its execution — and each borrows that record's id as its own address. Their
-URLs diverge, though: a design session lives inside the admin UI, at
-`/admin/workflows/{workflowId}/design-session` alongside that workflow's other
-admin views, while a workflow session lives outside it, at a top-level
-`/workflow-executions/{executionId}/session` distinct from that execution's
-admin view at `/admin/workflow-executions/{executionId}`. A design session's
-owner is its workflow's `createdBy` — the user who generated it — exactly as a
-workflow session's is its execution's `initiatorId`. Both chats are **shared**,
-and keying the ADK session by that owner is what makes sharing work: everyone
-who enters lands in the one conversation instead of forking a private copy. Who
-may enter differs — a design session admits the tenant's Developers, a workflow
-session admits its execution's designated approvers — but both record who sent
-each message, so the chat shows every participant's avatar.
 
 ## Quick start
 
@@ -96,17 +65,15 @@ Not using mise? The minimum versions are Python 3.11+, Node.js 20+, plus [uv](ht
 
 ### 1. Backend
 
-The backend itself needs only Python and uv; Node.js is used only to launch stdio [MCP servers](#mcp-servers) published as npm packages (`npx`), and the `docker compose` image ships it.
-
 ```bash
 cd backend
 uv sync
 cp .env.example .env
-# Edit .env — set LLM_MODEL and the corresponding API key (see backend/README.md)
+# Edit .env — set LLM_MODEL and the corresponding API key
 uv run uvicorn main:app --reload
 ```
 
-The API is now available at `http://localhost:8000`.
+The API is now available at `http://localhost:8000`. See [LLM configuration](https://kaitoy.github.io/a2flow/docs/getting-started/llm-configuration) for the model and API-key settings.
 
 ### 2. Frontend
 
@@ -117,650 +84,49 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). To run on a different port, see [Changing the port](frontend/README.md#changing-the-port) in the frontend README.
+Open [http://localhost:3000](http://localhost:3000).
 
 ### 3. Git hooks (lefthook)
 
-Pre-commit / pre-push hooks (lefthook) run linters, formatters, type checkers, and tests. `mise install` already provides the `lefthook` binary; run `lefthook install` once from the repository root to wire it into `.git/hooks/`. See [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md) for details.
+Pre-commit / pre-push hooks run linters, formatters, type checkers, and tests. `mise install` already provides the `lefthook` binary; run `lefthook install` once from the repository root to wire it into `.git/hooks/`. See [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md) for what each hook runs.
 
-## Run with Docker Compose
+### Or: Docker Compose
 
-Alternatively, the whole stack — PostgreSQL 17, the backend, the [outgoing-email worker](#the-delivery-queue), and the frontend — can be built and started with Docker Compose ([compose.yml](compose.yml)):
+The whole stack — PostgreSQL 17, the backend, the outgoing-email worker, and the frontend — comes up with [compose.yml](compose.yml):
 
 ```bash
 echo GOOGLE_API_KEY=your_google_api_key_here > .env
 docker compose up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Database data persists in the `pgdata` volume across restarts.
+See [Run with Docker Compose](https://kaitoy.github.io/a2flow/docs/getting-started/docker-compose) for the details.
 
-Set `FRONTEND_PORT` in `.env` to publish the frontend on a different host port (the container still listens on 3000 internally); the backend's `CORS_ORIGINS` follows it automatically.
+## Development
 
-## Database
+### Toolchain versions
 
-All persistent data — REST API records and ADK session storage — lives in one relational database selected by `DB_URL` in `backend/.env`:
+[mise.toml](mise.toml) is the single source of truth for the Python, Node.js, pnpm, uv, and lefthook versions. Run `mise install` after cloning or after any change to it.
 
-| Backend | `DB_URL` | Notes |
-|---|---|---|
-| SQLite (default) | `sqlite:///a2flow.db` | Zero-config local file |
-| PostgreSQL | `postgresql://user:password@host:5432/a2flow` | Used by the Docker Compose stack |
+Bumping a version there means updating the places that pin the same tool independently, in the same change:
 
-The async driver suffix (`aiosqlite` / `asyncpg`) is added automatically. Schema changes are tracked as versioned [Alembic](https://alembic.sqlalchemy.org/) migrations (`backend/alembic/versions/`) and applied automatically on startup — redeploying the app (a container restart) is what runs any pending migrations, so no separate migration step is needed.
-
-The database is also what coordinates a multi-replica backend: an agent run holds a PostgreSQL advisory lock on its ADK session for the length of its SSE stream, so one conversation is never driven by two replicas at once. See [Horizontal scaling](backend/README.md#horizontal-scaling) for what that protects and the constraint it places on connection pooling.
-
-## Authentication
-
-The app requires sign-in. Visiting any page while logged out redirects to `/login`. On first run, log in with the seeded **`root`** user (platform-wide `super_admin` — leave the tenant field blank) or the **`admin`** user seeded inside the **Default** tenant (enter `default` as the tenant): set `ROOT_PASSWORD` / `ADMIN_PASSWORD` before the first startup, or, if left unset, read the randomly generated passwords from `docker compose logs backend` (each printed once and not recoverable afterwards). Manage additional users from the [admin UI](#users). After signing in the user lands on the [welcome page](#welcome-page).
-
-- **Session** — login creates a server-side session (`auth_sessions` table) and sets an HttpOnly `a2flow_session` cookie holding an opaque token (only its hash is stored). Sessions use a sliding **idle timeout** (`SESSION_IDLE_TIMEOUT_SECONDS`, default 8 hours).
-- **CSRF** — login also sets a readable `a2flow_csrf` cookie; the frontend echoes it in the `X-CSRF-Token` header on every state-changing request (double-submit cookie). The backend rejects mismatches with `403`.
-- **Same-origin proxy** — the browser calls the frontend origin (`:3000`); the frontend's proxy (`frontend/src/proxy.ts`) forwards `/api/*` to the backend (`:8000`), so the auth cookies are first-party and `SameSite=Lax` works. Point the proxy elsewhere with `BACKEND_BASE_URL`.
-
-See [backend/README.md](backend/README.md#authentication) for the endpoint and cookie details.
-
-## Roles and authorization
-
-Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy — with one exception: **Super Admin bypasses every role-based check** and, for that reason, is **mutually exclusive** with every other role — a user is either a Super Admin or holds some combination of the other four roles, never both. Two ownership-layer checks are a deliberate exception to the bypass — see [Human approval](#human-approval). A user with **no roles at all** is valid: they can still manage their own [account](#users) (avatar), but nothing else — the regular chat (`/sessions/*`) is Super Admin–only, see below.
-
-A role reaches a user in one of two ways, and every authorization check uses the **union** of the two — a user's **effective roles**:
-
-- **Directly**, granted on the user record from the [Users](#users) page.
-- **Inherited** from a [user group](#user-groups) they belong to: assigning a role to a group grants it to every member.
-
-A role held only through a group is worth exactly as much as a directly granted one: it passes the same gates, makes the user eligible as an approver, and protects them from impersonation the same way. Nothing is cached — the union is resolved on every request — so adding someone to a group, or removing them, takes effect immediately with no re-sync step. A group is also addressable in its own right: an [approval](#human-approval) can be sent to a group instead of a person, and any member holding `approver` can settle it. **A group can never grant `super_admin`**: the option is not offered in the UI, the API rejects it (HTTP 422), and a database check constraint backs both up. Since a Super Admin is platform-scoped and a group belongs to exactly one tenant, a Super Admin can never be a member of one either.
-
-| Role | Grants |
+| `mise.toml` entry | Also update |
 |---|---|
-| `super_admin` | Everything (bypasses every role gate; does **not** bypass the designated-approver checks described under [Human approval](#human-approval)) |
-| `admin` | User CRUD, secrets CRUD, and read-only visibility into every workflow execution, its tasks, and its chat history, and every approval, in their tenant (see [Workflow execution access](#roles-and-authorization) below — an Admin cannot drive an execution's agent, create/edit/delete its tasks, delete the execution, or resolve an approval) |
-| `developer` | Secrets CRUD, MCP server CRUD, [tool-mock](#tool-mocks) CRUD, agent-skill CRUD, workflow generation/editing/publishing/deactivating — including regenerating a workflow's AI-generated `generatedDescription`, though only a Super Admin may edit that field directly — task-template CRUD, design-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows, for pre-publish testing |
-| `requester` | Running **published** (and `modified`) workflows (`POST /workflows/{id}/execute`) |
-| `approver` | Eligibility to be a workflow approval's designated approver — individually, or as a member of a group an approval is addressed to — and resolving their own approvals |
+| `python` | `backend/.python-version`, `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
+| `node` | `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
+| `pnpm` | `packageManager` in `frontend/package.json` and `website/package.json` (corepack reads it during the Docker build, and pnpm self-switches to it) |
 
-**Reads stay open.** Only writes, workflow execution, and approvals are role-gated; every authenticated user may `GET` the collections (the UI needs them to resolve names, pick approvers, and list workflows). Secret *values* are never returned by the API regardless of role. Roles are assigned from the [Users](#users) admin page, or in bulk from the [User Groups](#user-groups) page; only a Super Admin may grant or revoke `super_admin`. A rejected request returns HTTP 403 (`FORBIDDEN`), and the admin UI hides the actions and nav entries a user's roles do not allow — on a **list** page that means the Add button and the per-row Actions column (Delete, and MCP Servers' "Browse registry", which only leads to the create form). Because reads stay open, a detail page can be opened by someone who may not write it — agent skills, MCP servers, tool mocks, secrets, tenants, users, workflows, and task templates all render **read-only** in that case: every field shows as a recessed value instead of an input, Save and Delete are absent, and Cancel becomes Back. A secret's entries then list their keys alone (values are never returned anyway), and the password field on a user is omitted entirely. Fields that are immutable for *everyone* — a tenant's `name`, a user's `username` — render the same way regardless of role. The **create** forms have no read-only reading, so they answer an access-denied screen instead: reaching `/admin/<section>/new` without the role means a deep link, since the Add button that leads there is already hidden.
+`backend/pyproject.toml` sets `[tool.uv] python-preference = "only-system"` so `uv sync` builds `backend/.venv` from the mise-pinned interpreter on `PATH` instead of downloading its own. `requires-python`, ruff's `target-version`, and mypy's `python_version` stay at the 3.11 support floor and are deliberately not bumped alongside `mise.toml`.
 
-The initial seeded **`root`** user holds `super_admin` and is platform-scoped (no tenant). The **`admin`** user seeded inside the **Default** tenant holds `admin`, scoped to that tenant; every other user starts with no roles.
+### Testing
 
-**Acting as a tenant.** Nearly every resource (agent skills, workflows, secrets, MCP servers, workflow executions, chat, etc.) belongs to a tenant, but a platform-scoped Super Admin has none of their own. A **tenant switcher** in the app header (visible only to Super Admins) lets them pick which tenant to act as; the choice is remembered across reloads and applies everywhere, including the admin section and chat. With no tenant selected, tenant-scoped requests are rejected with HTTP 403. Switching tenants doesn't change *roles* — a Super Admin still bypasses every role gate regardless of which tenant is selected. The switcher also offers an **All tenants** option, which browses every tenant's data at once on the read-only admin list/detail pages (writes stay rejected while it's selected); with it active, those pages add a **Tenant** column/field so rows from different tenants stay distinguishable. It also reaches a workflow's design-session chat and a workflow execution's workflow-session chat (`GET /workflows/{id}/messages`, `GET /workflow-executions/{id}/messages`), so a Super Admin reviewing another tenant's workflow or run can read its history too — but not the agent endpoints that drive those chats (`POST .../agent`), which always require one concrete tenant to be selected.
-
-**Impersonating a user.** A Super Admin may act as any user platform-wide; an Admin may act as any user within their own tenant. A `super_admin`-held target can never be impersonated, by anyone. An `admin`-held target can only be impersonated by a Super Admin — a regular Admin still can't impersonate a fellow Admin, whether that Admin role was granted directly or inherited from a group — so impersonation can't be used to gain a privilege the actor doesn't already have (a Super Admin already bypasses every role gate an Admin would, so acting as one grants nothing new). Start it from the **Impersonate** action on the [Users](#users) list; while active, a header chip shows "Acting as `<user>`" with a one-click **Stop**. Every request while impersonating — reads, writes, and the audit `createdBy`/`updatedBy` fields — is attributed to the impersonated user, exactly as if they were signed in themselves; the real actor's own session is untouched underneath, so stopping never requires signing in again. Every impersonation session is recorded in a persistent audit trail (who, whom, and when) for accountability.
-
-**Workflow execution access.** Beyond roles, each operation on a workflow execution — reading it, loading its workflow session's chat history, listing or editing its tasks, and driving its agent — requires the caller to be the execution's **initiator** (the user who ran the workflow) or a **designated approver of one of its approvals** — the named user, or a member holding `approver` of a group one is addressed to (see [Human approval](#human-approval)); unrelated users get HTTP 403. This preserves the approver-sharing design (the approver joins the initiator's chat) while keeping third parties out. **Reading** an execution is broader, though: reading the record, listing its tasks (both the nested list and a single task's own page), and loading its chat history additionally admit any **Admin** in the tenant, so an Admin can review every run without being an initiator or approver — but an Admin still cannot drive the execution's agent, create/update/delete its tasks, or delete the execution itself, and the same `GET /approvals` list additionally shows an Admin every approval in the tenant. **Deleting** an execution is stricter still: initiator (or Super Admin) only. Changing a task's **status** specifically is further restricted when that task has a linked approval: only the execution's initiator or that approval's designated approver may do so — not merely any approver of the execution (see [Human approval](#human-approval)); an Admin gets no exception here either.
-
-**Platform-wide sections.** [Tenants](#tenants) and [System Settings](#system-settings) are the two admin sections **Super Admin** keeps to itself. Unlike everywhere else, reads are gated too: both hold platform-level configuration rather than tenant data, so the sidebar entry, the welcome card, and every endpoint behind them are closed to all other roles.
-
-**Chat session access.** The regular chat (`/sessions`, `/sessions/new`, `/sessions/{id}`, and the `POST /agent` / `GET|DELETE /sessions*` endpoints behind them) is restricted to **Super Admin**: everyone else gets HTTP 403, the welcome page's "Start chat" card is hidden, and the frontend shows an access-denied screen if a non-Super-Admin navigates there directly. This is distinct from the design-session and workflow-session chats below, which stay open along their own access rules.
-
-**Design session access.** A workflow's design chat (`GET /workflows/{id}/messages`, `POST /workflows/{id}/agent`) is shared too, but along role lines rather than per-record participation: any **Developer** in the tenant may read and drive it, so a team can refine a design together. Super Admins pass as usual, and the workflow's `createdBy` keeps access even if their Developer role is later revoked, so nobody is locked out of a chat they started. Everyone else gets HTTP 403; another tenant's workflow id is a 404, never a 403 — except `GET .../messages` under a Super Admin's **All tenants** selection (see "Acting as a tenant" above), where the workflow resolves regardless of tenant and this same role/creator/Super-Admin check is what stands in for the tenant boundary.
-
-⚠️ Approver eligibility is validated when the approval is created: `list_users` / `list_user_groups` only offer destinations that can actually approve, and `request_approval` rejects anything else (including a group with no eligible member). What happens *afterwards* differs by destination, and the difference is deliberate:
-
-- **User destination** — revoking the `approver` role later does **not** invalidate approvals already addressed to that user. They can still resolve them, so an in-flight workflow never gets stuck.
-- **Group destination** — membership and role are re-checked at decision time, because "the group" is a moving set rather than a fixed person. That is what lets a newly added member pick up a pending request, but it cuts both ways: removing the group's `approver` grant, or emptying it of eligible members, leaves the pending request **resolvable by nobody** and its run waiting indefinitely. Re-granting the role or re-adding a member unblocks it immediately.
-
-## Demo data
-
-Setting `DEMO_DATA=true` on the backend registers a ready-made example of the approval-gated "launch an EC2 instance" workflow on startup, so there is something to run without registering every piece by hand. Everything lands in the seeded **Default** tenant:
-
-- two [secrets](#secrets) holding an AWS access key id and secret access key,
-- an [MCP server](#mcp-servers) (`AWS MCP Server`) that reaches AWS's managed AWS MCP Server over `stdio`, through the `mcp-proxy-for-aws` bridge launched with `uvx`, reading those secrets through `${secret:…}` references,
-- an [agent skill](#agent-skills) pointing at `sample_skills/aws-ec2-launch` in this repository,
-- two approver [users](#users), `demo-approver-1` and `demo-approver-2`, two requester users, `demo-requester-1` and `demo-requester-2`, plus a `demo-developer`, each holding **no direct role at all**,
-- three [user groups](#user-groups) — `Demo Approvers`, `Demo Requesters`, and `Demo Developers` — granting `approver`, `requester`, and `developer` respectively. `Demo Approvers` and `Demo Requesters` each hold both matching accounts; `Demo Developers` holds its one matching user alone. Every demo account therefore gets its role purely by inheritance, so the demo exercises the group feature itself: take a user out of their group and their access disappears on the next request.
-
-The [workflow](#workflows) itself is not seeded — these are the ingredients you generate one from. Turning the flag off and restarting **removes** the same records again, so it is a genuine on/off switch. Records that other data has come to depend on are kept (and logged) rather than deleted, and a demo user who has created records is soft-deleted so their name still resolves.
-
-⚠️ The demo MCP server can run **mutating** AWS operations, not just reads. Whatever credentials you give it can create and delete real resources — use a throwaway account or a tightly scoped IAM policy.
-
-See [Demo data](backend/README.md#demo-data) for the full record list and every related environment variable.
-
-## Admin UI
-
-The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admin).
-
-### Welcome page
-
-[http://localhost:3000/admin](http://localhost:3000/admin) is the welcome landing page. It renders inside the admin shell (sidebar + app bar) and greets the user with quick-action cards that link to a new chat (Super Admin only — see [Chat session access](#roles-and-authorization)) and each admin section the user's roles allow. This is where the user lands when visiting the site root (`/`), after signing in, and when clicking the **A2Flow** logo in the app bar from any screen.
-
-Every admin list table shares interactive features: **per-column sorting and filtering** (applied server-side via the list APIs' `s` and `q` query parameters, so they cover the whole dataset rather than just the current page), **drag-to-resize column widths** (kept for the session, not persisted), and **hover tooltips** that reveal the full text of any cell clipped to its column width.
-
-Where a record has a **detail page**, the list's identifier column links to it. That page is the one screen for the record: its attributes plus every action it supports — saving edits, deleting it, and whatever else the record type offers (publishing a workflow, pulling a skill's repository). A detail page is titled with the **record's own name** rather than with the operation, and the breadcrumb trail above the title ends on that same name, so the path reads `Admin › Workflows › my-workflow` and every crumb before the last links back up. [Workflow executions](#workflow-executions) are the exception: a run is a history rather than a record to edit, so its row opens its workflow session or its read-only task list instead.
-
-Each table also has a **column picker** — the ▥ button next to Refresh — listing every column the table can show, with a "Show all" / "Hide all" bulk toggle and a "Reset to default" action. The panel always fits the screen: it opens above the button when there is no room below, scrolls its column list internally while keeping the bulk toggle and the reset action in view, and splits into two columns once the table has more than eight toggleable ones — so even the widest list (agent skills, at seventeen columns) stays fully reachable on a short laptop screen. Each table ships a default set, and some columns (an MCP server's transport, a secret's reference, an agent skill's ref and revision, a user's email and verification flag) start hidden so the columns that matter most get the width. The identifier column and the Actions column are always shown and are not listed. Choices are remembered per table in the browser's local storage, so they survive a reload; only the departures from the defaults are stored, which keeps a table's later columns arriving at their intended default. Hiding a column that a sort or filter is currently using clears that sort or filter, so the rows on screen are never ordered or narrowed by a criterion nothing on the page can show.
-
-### Users
-
-Navigate to [http://localhost:3000/admin/users](http://localhost:3000/admin/users) to manage application users.
-
-| Operation | Path |
-|-----------|------|
-| List all users | `GET /admin/users` |
-| Create a new user | `GET /admin/users/new` |
-| A user's detail page — edit / delete | `GET /admin/users/{id}` |
-
-Each user record stores a username (unique within its tenant, and separately unique among platform-scoped users with no tenant), first name, last name, email, an `enabled` flag, an `emailVerified` flag, and the user's [roles](#roles-and-authorization). Passwords are hashed with [bcrypt](https://pypi.org/project/bcrypt/) before persistence and are never returned by the API. On edit, leaving the password field blank keeps the existing password. Users are persisted in `a2flow.db`.
-
-**Roles.** The create form and the detail page include a roles picker (one checkbox per role); the list shows each user's roles in a **Roles** column. Roles are stored as a JSON list, so they cannot be sorted or filtered server-side via the list API's `s` / `q` parameters. The **Super Admin** checkbox is disabled unless the signed-in user is a Super Admin — the backend rejects granting or revoking it otherwise. Because Super Admin is mutually exclusive with every other role, checking it disables every other role checkbox (and vice versa), with a divider and hint explaining why — the backend rejects any combination of the two regardless.
-
-**Roles from groups.** The picker edits **direct** grants only. Roles the user inherits from a [user group](#user-groups) are shown beneath it under **Roles from groups**, as read-only chips — editing the user cannot change them, only editing the group can. The list's **Roles** column shows both, with inherited roles as muted chips so it stays obvious which grants this page can change. See [Roles and authorization](#roles-and-authorization) for how the two combine.
-
-**Groups.** The current group memberships show as removable chips; a **Select groups…** button opens a modal table of the tenant's user groups, paged and filtered server-side, for adding more. It is hidden for a platform-scoped account (a Super Admin, or the seeded system user), which can never belong to a tenant's group. Membership is read through `GET /api/v1/users/{id}/groups` and written as a separate request (`PUT /api/v1/users/{id}/groups`), only when the selection actually changed. The same membership is editable from the other side, on each [group's](#user-groups) detail page.
-
-**Impersonate.** Each row eligible under the [impersonation rules](#roles-and-authorization) shows an **Impersonate** action — hidden for the signed-in user's own row, for any `super_admin` row, and, unless the viewer is a Super Admin, for any `admin` row; confirming navigates to the welcome page acting as that user. See [Roles and authorization](#roles-and-authorization) for who can impersonate whom and how to stop.
-
-**Profile.** A signed-in user reviews their own account from the **Profile** page (toolbar profile button → **Profile**, at `/profile`). The page opens with an identity card: an aurora banner, the user's avatar across its lower edge, and their display name as the page heading, with the `@username` handle, their roles, and the `enabled` / `emailVerified` flags as status pills beside it. Below it the remaining attributes are split into two **read-only** cards — **Account** (username, email, first and last name) and **Access** (roles, **Roles from Groups**, and **Groups**). The backend only accepts self-service updates to the avatar (everything else requires the `admin` role and the admin user detail page), so these attributes render as plain text rather than as disabled inputs. **Roles from Groups** are the roles inherited from the user's group memberships, shown as the same muted chips as the admin user detail page (see [Roles from groups](#users) above); **Groups** are the memberships themselves, read through `GET /api/v1/users/{id}/groups`. The avatar is the page's one editable thing, and clicking it is how you edit it.
-
-**Avatars.** Every user has an avatar shown on the toolbar profile button and in the admin user list and detail page. By default it is a deterministic SVG generated client-side with [boring-avatars](https://github.com/boringdesigners/boring-avatars) (the `beam` variant) — no image is stored and no network call is made. The seed is the user's tenant and username (`{tenantId}/{username}`), since usernames are only unique within a tenant: the same username in two tenants gets two distinct faces. A platform-scoped user (a `super_admin`, and the seeded system user) has no tenant and is seeded from the username alone. A signed-in user manages their own avatar from a dialog on the [Profile page](#users), opened by clicking the avatar in the page's identity card: **upload** a custom image (PNG, JPEG, WebP, or GIF, up to 2 MB) or remove it, and **customize** the generated avatar by editing the color palette it is drawn from. Uploading commits immediately and closes the dialog; the palette is the dialog's only unsaved state, so **Reset to default** just rewinds the swatches and **Save** is what commits them (and closes the dialog too). A palette that matches the application default is stored as no palette at all, so resetting and saving clears the record rather than writing a copy of the default into it, and closing the dialog discards anything not saved. The palette is stored as `UserRead.avatarConfig.colors` (an ordered list of up to eight `#rrggbb` values) and applied wherever the avatar renders; the seed still decides which colors land where, so each user stays visually distinct even on a shared palette. When no palette is saved, the application default from `frontend/src/lib/avatar-palette.ts` is used. Avatar editing is self-service only — the admin user detail page shows the avatar read-only, with no upload or customization controls. An uploaded image is stored in a dedicated `user_avatars` table and served from `GET /api/v1/users/{id}/avatar`, with `UserRead.avatarUpdatedAt` acting as a presence marker and cache-busting key; uploading or removing it refreshes the signed-in user everywhere, so the toolbar profile button updates immediately. Precedence is **uploaded image → custom-palette avatar → default-palette avatar**; removing the image or resetting the palette falls back to the next option.
-
-**Audit ownership.** Every persistent record stores `createdBy` / `updatedBy` as a foreign key to `users.id`, populated from the **authenticated session** (see [Authentication](#authentication)). A write whose acting user does not exist is rejected with HTTP 422 (`FOREIGN_KEY_VIOLATION`). To resolve the bootstrap "who creates the first user" problem, a hidden, login-disabled **system user** is seeded on startup when the `users` table is empty, and it owns the initial seeded `root` and `admin` users. In the admin UI the raw IDs are never shown — each detail page resolves `createdBy` / `updatedBy` to the user's `first last` name, and list views resolve user IDs the same way.
-
-**Resolving names in bulk.** A screen showing many user references (an audit footer, a table of workflow initiators or approvers) resolves them all through one `POST /api/v1/users/resolve-names` call, which takes up to 1000 IDs and returns `{id, displayName}` for each. It applies the same tenant boundary as `GET /api/v1/users/{id}`: a user outside the caller's tenant is not named, and the ID is simply absent from the response so the UI falls back to showing it raw. Two kinds of account are labelled rather than dropped, since they own records across tenant boundaries and a bare UUID would read as a bug: the seeded system user resolves to **System User**, and any `super_admin` invisible to the caller resolves to **Super Admin** — the same label for all of them, so which individual it was stays undisclosed. A Super Admin caller is exempt from the boundary and sees every real name.
-
-**Deleting a user.** If no other record references the user, it is hard-deleted from the database. If it is still referenced (via any `createdBy` / `updatedBy`), it is instead **soft-deleted**: `deletedAt` is set and the account is disabled, so existing references stay valid and the name still resolves. Soft-deleted users (and the system user) are hidden from the user list but remain fetchable by id.
-
-### User Groups
-
-Navigate to [http://localhost:3000/admin/user-groups](http://localhost:3000/admin/user-groups) to manage user groups — named bundles of users that grant their roles to every member.
-
-| Operation | Path |
-|-----------|------|
-| List all user groups | `GET /admin/user-groups` |
-| Create a new user group | `GET /admin/user-groups/new` |
-| A group's detail page — edit / delete | `GET /admin/user-groups/{id}` |
-
-A group belongs to exactly one tenant (its name is unique within that tenant) and stores a description, the **roles it grants**, and its **members**. Every member holds those roles on top of whatever is granted on their own user record — see [Roles and authorization](#roles-and-authorization) for how the two combine. Nothing is denormalized onto the user, so changing a group's roles or membership takes effect for everyone affected on their very next request.
-
-**Roles granted.** The roles picker is the same one the [Users](#users) pages use, minus **Super Admin** — a group can never grant it, and the option is hidden from every viewer including a Super Admin. Submitting it anyway is rejected with HTTP 422, and a database check constraint backs that up.
-
-**Members.** The current members show as removable chips; a **Select members…** button opens a modal table of the tenant's users, paged and filtered server-side, for adding more. Platform-scoped accounts (Super Admins and the seeded system user) are omitted: they belong to no tenant, so they can never be members — which is also why `super_admin` can never arrive through a group. Supplying members replaces the group's membership wholesale; leaving the field untouched on an edit keeps it as-is. The same membership is editable from the other side, on each [user's](#users) detail page.
-
-Writes require the `admin` role. Reads stay open like every other section, so a viewer without it sees the list and a read-only detail page. **Deleting** a group removes its membership rows with it: the accounts are untouched, but they lose the roles the group was granting them.
-
-### Tenants
-
-Navigate to [http://localhost:3000/admin/tenants](http://localhost:3000/admin/tenants) to manage tenants — the top-level organizational boundary for multi-tenancy. Unlike every other admin section, this one is restricted to **Super Admin**: it is hidden from the sidebar and welcome page for every other role, and the backend rejects writes from anyone else with HTTP 403 (`FORBIDDEN`).
-
-| Operation | Path |
-|-----------|------|
-| List all tenants | `GET /admin/tenants` |
-| Create a new tenant | `GET /admin/tenants/new` |
-| A tenant's detail page — edit / delete | `GET /admin/tenants/{id}` |
-
-Each tenant record stores a unique `displayName` (human-readable label), a unique URL-safe `name` (lowercase kebab-case, intended for use in paths or subdomains by later tasks), and an `enabled` flag for deactivating a tenant without deleting it — disabling a tenant blocks sign-in for its users and signs out anyone already logged in on their next request. A [user](#users) belongs to at most one tenant (`User.tenantId`); a tenant cannot be deleted while any user is still assigned to it — the API rejects the delete with HTTP 409 (`CONFLICT_REFERENCED`) instead. A **Default** tenant (`name: default`) is seeded automatically on first startup, holding the initial seeded `admin` user.
-
-### Agent Skills
-
-Navigate to [http://localhost:3000/admin/agent-skills](http://localhost:3000/admin/agent-skills) to manage the Agent Skills registry — a catalog of AI agent skills stored in Git repositories.
-
-| Operation | Path |
-|-----------|------|
-| List all skills | `GET /admin/agent-skills` |
-| Register a new skill | `GET /admin/agent-skills/new` |
-| A skill's detail page — edit / delete | `GET /admin/agent-skills/{id}` |
-| Generate a workflow from a skill | "Generate workflow" in the list's Actions column, or the Generate Workflow icon button in the detail page's header (see [Generating a workflow](#generating-a-workflow)) |
-| Pull a skill's repository | `POST /api/v1/agent-skills/{id}/pull` |
-
-Skills are persisted in a SQLite database (`a2flow.db` by default, configurable via `DB_URL` in `backend/.env`). Each record stores the skill name, repository URL, repository path, an optional **Ref** (a branch or tag name), and description, plus any [tags](#tags) it is classified by.
-
-#### The skill store
-
-Registering a skill returns immediately and **shallow-clones its repository in the background** using [Dulwich](https://www.dulwich.io/) — no external `git` CLI required. The clone is published into the skill store under `SKILLS_DIR` as one immutable directory per revision:
-
-```
-$SKILLS_DIR/<agent_skill_id>/<commit_sha>/
+```bash
+cd backend && uv run pytest       # parallel via pytest-xdist; no API keys needed
+cd frontend && pnpm test          # vitest + Testing Library + MSW on happy-dom
 ```
 
-The clone is staged in a temporary sibling directory and moved into place with a single atomic rename, so a replica reading the store never sees a half-written revision. A published revision is then **never modified** — a pull only ever adds a sibling.
+Both suites also run from the pre-commit hook, gated so a backend-only or frontend-only commit skips the other side. See [backend/README.md](backend/README.md#testing) and [frontend/README.md](frontend/README.md#testing) for the options each takes.
 
-The list and detail pages show each skill's **Status** (`Cloning` / `ready` / `failed`, with the failure reason) and the short **Revision** it has published. Two fields carry that state, and they mean different things:
-
-- **`commitSha`** — the published revision. A skill is runnable **only** once this is set; a workflow started against a skill with no revision is rejected with HTTP 409 (`SKILL_NOT_READY`).
-- **`syncStatus`** — how the *last* clone or pull went. A pull that fails does **not** clear `commitSha`, so a skill that was working keeps working at its previous revision; only the status and the error change.
-
-**Pull** re-clones the repository at its configured **Ref**, or its default branch when none is set. It is how a skill picks up upstream changes, and how a failed registration clone is retried after fixing the URL or the credentials. Setting a **Ref** (a branch or tag name) pins every clone and pull to that ref instead of the repository's default branch — a moved branch tip or a re-pointed tag is picked up the next time the skill is synced. Concurrent clones of one skill are serialized across replicas by the advisory lock in `backend/infrastructure/locks.py`; a replica that finds another already cloning the skill skips the work instead of duplicating it. After a successful pull, revisions that no longer back any workflow execution are pruned.
-
-Under `docker compose`, `SKILLS_DIR` is `/var/lib/a2flow/skills`, persisted in the `skills` Docker volume so the store survives container recreation. It is **durable state, not a cache**: a workflow execution pins the revision it started with, so wiping the directory leaves existing executions unable to load their skill until an admin pulls again. Scaling the backend past one replica requires every replica to mount this same volume.
-
-Private repositories are supported through the optional **Auth Password** field. It is not typed in: pick a registered [Secret](#secrets) and one **Entry Key** within it from the two dropdowns, and that entry's value is used as the HTTP basic-auth password (typically a personal access token) when the repository is cloned. Both secret types are offered — a `vault` secret's entry keys are read live from its KV v2 path, since they are not stored locally. The **Auth Username** field defaults to `x-access-token` (suitable for GitHub PATs); set it explicitly for hosts that require a real account name.
-
-The secret is stored as a `name/key` reference and resolved at clone time, so deleting or renaming it later makes the next pull fail and record the reason on the skill. The detail page does not quietly drop such a stale reference: it stays selected, marked `(not found)`, with a warning — clearing it is your call.
-
-### MCP Servers
-
-Navigate to [http://localhost:3000/admin/mcp-servers](http://localhost:3000/admin/mcp-servers) to manage the registry of [MCP](https://modelcontextprotocol.io/) servers whose tools the workflow agent can bind to WorkflowTasks (see [MCP tools for tasks](#mcp-tools-for-tasks)).
-
-| Operation | Path |
-|-----------|------|
-| List all servers | `GET /admin/mcp-servers` |
-| Register a new server | `GET /admin/mcp-servers/new` |
-| A server's detail page — edit / delete | `GET /admin/mcp-servers/{id}` |
-
-Each record stores a unique name, any [tags](#tags) it is classified by, and a **transport**, which decides the rest of the form:
-
-| Transport | Fields | Notes |
-|---|---|---|
-| **Streamable HTTP** (default) | `url`, `headers` | A remote server. SSE-only servers are not supported. Headers are sent with every request — typically `Authorization: Bearer …`. |
-| **stdio** | `command`, `args`, `env` | A server launched as a child process of the backend, e.g. `npx` + `["-y", "@modelcontextprotocol/server-everything"]`. Both `npx` (Node.js 22) and `uvx` are available in the backend image. |
-
-⚠️ Literal header and environment values are stored **in plaintext** in `a2flow.db` and returned by the API; instead of embedding a credential directly, reference one entry of a registered [Secret](#secrets) with the `${secret:name/key}` placeholder syntax (e.g. `Authorization: Bearer ${secret:github/token}`, or `AWS_ACCESS_KEY_ID: ${secret:aws-credentials/AWS_ACCESS_KEY_ID}`) — placeholders are expanded only at connect time and the credential never appears in the stored record or any API response.
-
-⚠️ Registering a stdio server means **running the chosen command inside the backend container**, as the container's unprivileged `app` user. It is gated behind the same `developer` role as any other MCP server write. `args` is passed to the process as a list and never through a shell, and the child inherits only the small safe set of environment variables the MCP SDK allows (`PATH`, `HOME`, …) plus the `env` you configure — the backend's own API keys and `DB_URL` are not visible to it.
-
-An `args` entry may also reference this same server's own `env` by name as `${env:NAME}`, expanded after `env`'s own `${secret:…}` placeholders — so `--token ${env:API_KEY}` can reuse a secret-backed `env` value as a CLI flag, for a launcher that expects the value as an argument rather than reading it from the process environment. `NAME` must be a key of `env`, checked when saving (both on create and on a PATCH that changes either field); a stale reference left behind by removing the `env` key it names is rejected the same way.
-
-Switching an existing server's transport clears the other transport's fields; a request that mixes the two shapes (a URL on a stdio server, a command on a remote one) is rejected with HTTP 422 (`INVALID_MCP_SERVER`).
-
-The list page's **Browse registry** button opens a search dialog backed by the official [MCP registry](https://registry.modelcontextprotocol.io/) (`GET /api/v1/mcp-registry`). It searches servers by name and lists those A2Flow can register: servers with a streamable-HTTP remote, and servers published as an npm or PyPI package it can launch over stdio (OCI/NuGet packages are skipped). Picking a result opens the create form pre-filled with the connection details and the required header/environment keys, so you only fill in secret values before saving. The package-to-command mapping is best-effort — review it before saving. The registry base URL is configurable via the `MCP_REGISTRY_URL` env var; an unreachable registry yields HTTP 502 (`REGISTRY_UNREACHABLE`).
-
-`GET /api/v1/mcp-servers/{id}/tools` queries the live server and returns the tools it advertises (name, description, input schema); the admin task forms call it for the one server the operator has picked, never for the whole registry at once. A server that cannot be reached or launched yields HTTP 502 (`MCP_UNREACHABLE`). A server cannot be deleted while WorkflowTask tool bindings still reference it (HTTP 409 `CONFLICT_REFERENCED`).
-
-### Tool Mocks
-
-Navigate to [http://localhost:3000/admin/mcp-tool-mocks](http://localhost:3000/admin/mcp-tool-mocks) to manage **tool mocks** — stand-ins that let a **draft** workflow run be exercised end to end without its tools' side effects. A mocked tool is not called: the mock's configured result is returned instead, so no request reaches the MCP server, no approval is recorded, and nobody is emailed.
-
-Mocking is chosen **per tool**, not per run, because a dry run is only useful if it stays realistic. A workflow that searches a system and then writes to it can stub only the write — the read still hits the real server, and the agent still reasons over real data. For the same reason a mock buys past the side effect but not past the rules: a mocked MCP call is still checked against the tools the run's current task is allowed to use, and against any approval that task is waiting on, so a workflow that would be refused in production is refused in its dry run too.
-
-A mock targets either one tool of a [registered MCP server](#mcp-servers) or a **built-in** A2Flow tool (currently `request_approval` alone — the one whose side effects otherwise need a human to clear before the run can continue).
-
-Its **responses** are an ordered list indexed by call ordinal: the first answers the run's first call to that tool, the second its second, and so on; once the list runs out the last response repeats, so a single response behaves as a constant. That is what lets one mock express a scenario rather than a fixed value — approve the first request, reject the second, and see how the workflow handles both. Each response is one of:
-
-| Kind | Meaning |
-|---|---|
-| `structured` | A JSON object placed in the result's `structuredContent` — for a tool whose caller reads fields off the result |
-| `text` | A string placed in the result's textual content |
-| `error` | A message returned as a failed call, so the agent sees the tool report an error |
-
-Mocks are applied by **checking them in the Run dialog** of a draft workflow (see [Running a workflow](#running-a-workflow)); the dialog offers no mocks for a published one. Starting the run **copies** what each chosen mock currently says onto the execution, so editing or deleting a mock afterwards never changes a run already under way — and can never silently turn a stubbed call back into a real one.
-
-What a mocked call sent and returned is visible in the run's chat transcript: its tool line expands to show the arguments and the result, badged **Mocked**. It deliberately does not appear on the run's [Tool Invocations](#workflow-executions) page — that page records the decisions the MCP proxy actually made, and a stub never reaches it.
-
-A mocked `request_approval` still validates its destination — a mock skips the side effects, not the checks — so a workflow naming an ineligible approver fails in a dry run exactly as it would for real.
-
-| Operation | Path |
-|-----------|------|
-| List tool mocks | `GET /admin/mcp-tool-mocks` |
-| Create a tool mock | `GET /admin/mcp-tool-mocks/new` |
-| Edit or delete a tool mock | `GET /admin/mcp-tool-mocks/{id}` |
-
-### Secrets
-
-Navigate to [http://localhost:3000/admin/secrets](http://localhost:3000/admin/secrets) to manage named credentials used for authentication elsewhere in the app.
-
-A secret is a **named bundle of key/value entries**, the same shape [HashiCorp Vault's KV engine](https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2) uses: one path holds a map of keys to values. Like the other registries, a secret can carry [tags](#tags). Credentials that belong together — an AWS access key id and its secret access key, say — live in one secret as two entries rather than in two separate secrets.
-
-A single entry is referenced as `name/key`:
-
-- **MCP server headers and environment** — any header value (streamable HTTP) or environment variable value (stdio) may embed `${secret:name/key}` placeholders, expanded when connecting (see [MCP Servers](#mcp-servers)).
-- **Agent Skill repository clones** — a skill's **Auth Password** is a `name/key` reference to the entry used as the git basic-auth password, chosen from dropdowns rather than typed (see [Agent Skills](#agent-skills)).
-
-The key is **always required**, even when the secret holds a single entry — a bare name identifies a map, not a value. A key-less `${secret:name}` fails with `SECRET_RESOLUTION_FAILED` rather than being passed through as a literal string.
-
-| Operation | Path |
-|-----------|------|
-| List all secrets | `GET /admin/secrets` |
-| Register a new secret | `GET /admin/secrets/new` |
-| A secret's detail page — edit / delete | `GET /admin/secrets/{id}` |
-
-A secret has one of two types:
-
-- **Local (encrypted)** — the entries are submitted once and stored in `a2flow.db` with each value encrypted with [Fernet](https://cryptography.io/en/latest/fernet/) (AES-128-CBC + HMAC). Keys are stored in plaintext so they can be listed without decrypting anything. The API is **write-only**: a response carries the entry keys but never a value (neither plaintext nor ciphertext). The detail page therefore shows every stored key with a blank value — leave one blank to keep the stored value, retype it to replace it, or remove the row to delete that entry.
-- **HashiCorp Vault** — only a KV v2 reference (mount and path) is stored; every key at that path is readable, and each value is fetched live from Vault when it is resolved.
-
-`GET /api/v1/secrets/{id}/keys` lists one secret's entry keys — and only its keys — for both types alike: from the stored map for a `local` secret, from a live KV v2 read for a `vault` one (which yields HTTP 502 `SECRET_RESOLUTION_FAILED` when Vault is unreachable or unconfigured). The Agent Skill auth-password picker uses it; the `keys` field on a secret read cannot serve that purpose, since it is always empty for a `vault` secret.
-
-Secrets are referenced **by name** and resolved lazily: renaming or deleting a secret that something still references does not fail at edit time, but the next use fails with HTTP 502 (`SECRET_RESOLUTION_FAILED`) naming the missing secret.
-
-#### Encryption key
-
-The Fernet key for local secrets is resolved at first use with the following precedence:
-
-1. `SECRET_ENCRYPTION_KEY` env var (must be a valid Fernet key; generate one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`).
-2. The key file at `SECRET_KEY_FILE` (default: `.secret_key` next to the SQLite database file, or the working directory for other databases).
-3. A fresh key is generated, saved to that file, and a WARNING is logged.
-
-⚠️ Back the key up — losing it makes every stored local secret undecryptable.
-
-#### HashiCorp Vault connection
-
-A single global Vault connection is configured through env vars (see `backend/.env.example`): `VAULT_ADDR` selects the server, and either a static `VAULT_TOKEN` or **AppRole** credentials (`VAULT_ROLE_ID` + `VAULT_SECRET_ID`, login mount configurable via `VAULT_APPROLE_MOUNT`, default `approle`) authenticate. AppRole takes precedence when both are set; its client token is cached and refreshed automatically when its lease expires. Only the KV v2 secrets engine is supported. When Vault is not configured, `vault`-type secrets fail to resolve with `SECRET_RESOLUTION_FAILED`.
-
-### Tags
-
-Navigate to [http://localhost:3000/admin/tags](http://localhost:3000/admin/tags) to curate the tenant's **tags** — the labels [secrets](#secrets), [MCP servers](#mcp-servers), [agent skills](#agent-skills), and [workflows](#workflows) are classified by. One tag set is shared by all four, so a `aws` tag narrows secrets and MCP servers alike.
-
-| Operation | Path |
-|-----------|------|
-| List all tags | `GET /admin/tags` |
-| Create a new tag | `GET /admin/tags/new` |
-| A tag's detail page — rename / recolor / delete | `GET /admin/tags/{id}` |
-
-Each tag stores a **name** (unique within its tenant) and a **color** picked from a fixed eight-slot palette (see [DESIGN.md](DESIGN.md#colors)) — an arbitrary color value is rejected. Writes require `admin` **or** `developer`, matching the union of roles that can write to any of the four taggable resources, so a tag can always be minted by whoever is about to need it. Reads stay open like every other section.
-
-**Renaming is safe at any time.** Records reference a tag by its id, never its name, so every record carrying it follows the new name with nothing to re-sync — which is the whole reason tags are registered up front instead of typed free-form on each record. **Deleting** a tag, conversely, removes it from every record that carried it rather than being blocked by them; the confirmation says so.
-
-**Attaching tags.** Each taggable resource's create and detail form carries a **Tags** picker, shaped like the [user group](#user-groups) picker: the current selection shows as removable colored chips above a **Select tags…** button, so the field stands as tall as the selection rather than as tall as the vocabulary. The button opens a dialog holding the whole vocabulary as a wrapping grid of colored chips, each one a toggle — a pressed chip takes a stronger fill *and* a leading check, so the state never rests on color alone. Two filters narrow the grid and compose: a name box, and a row of the eight palette swatches, any number of which can be pressed at once (pressing them all off is the cleared state). The choice is a draft until **Select** confirms it; **Cancel** discards it. A tag selected and then filtered out of view stays selected. Attachment is a sub-resource of the record — `PUT /api/v1/{resource}/{id}/tags` with `{"tagIds": [...]}`, replacing the set wholesale — gated by that resource's own write role, independent of whatever minted the tag itself. Creating a tagged record is therefore a create followed by that call; editing writes it only when the selection actually changed.
-
-**Filtering by tag.** Every taggable list has a **Tags** column showing each record's chips, and its column header menu offers a multi-select. The selection is **conjunctive** — a record must carry *every* tag picked, so adding one narrows the result — which the menu states as "Filter (all of)". It is applied server-side through a repeatable `?tag=<id>` query parameter (see [.claude/rules/api-conventions.md](.claude/rules/api-conventions.md)), so it covers the whole dataset rather than the current page. Tags are a separate axis from the other column filters: hiding the Tags column through the column picker clears the tag filter, exactly as hiding any other column clears its own.
-
-### Workflows
-
-Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/workflows) to manage Workflows — reusable units of work that pair an Agent Skill with a **pre-designed task list** (the workflow's *task templates*). A workflow's lifecycle is **generate → adjust → publish → execute**: the task templates are designed and settled *before* any run, so executing a workflow starts working immediately instead of redesigning them every time.
-
-| Operation | Path |
-|-----------|------|
-| Generate a workflow from a skill | "Generate workflow" on [Agent Skills](#agent-skills) — the list's row action or the detail page header's icon button (both calling `POST /agent-skills/{id}/workflows`) |
-| List all workflows | `GET /admin/workflows` |
-| A workflow's detail page — edit / publish / deactivate / discard changes / open its design session | `GET /admin/workflows/{id}` |
-| Manage its task templates | `GET /admin/workflows/{id}/task-templates` |
-| Run a workflow | "Run" button in the list (calls `POST /workflows/{id}/execute`) |
-
-Each workflow record stores a name, any [tags](#tags) it is classified by, a reference to an Agent Skill, a lifecycle **status** (`generating` / `draft` / `failed` / `published` / `modified`), and two description fields: `generatedDescription` — **summarized from the design conversation** by the AI when the workflow is generated and again whenever a `developer` presses the field's **generate action**, editable directly only by a **Super Admin** — and `description`, a free-form field any `developer` can set to override it. Whichever is non-empty (`description` takes precedence, else `generatedDescription`) is handed to the execution agent as run context. Since the override is usually a hand-edit of the AI's summary, the Description field on the detail page carries a **diff action** opening a dialog with a word-level diff from `generatedDescription` to `description`; it reads the values currently in the form, so unsaved edits are diffed too. Workflows are persisted in `a2flow.db`; there is no bare `POST /workflows` — generation is the only way a workflow is born.
-
-#### Generating a workflow
-
-**Generate workflow** is reachable from two places, both opening the same modal dialog without leaving the page: the row action in the [Agent Skills](#agent-skills) list, and the Generate Workflow icon button in the header of a skill's detail page. Either is disabled until the skill's clone has published a revision. The dialog asks for the workflow **name** (prefilled with the skill name) and the **prompt** describing the work. Because generating navigates away to the new workflow, the detail page offers to save unsaved edits first — declining the prompt leaves the page untouched and does not generate.
-
-Submitting the dialog:
-
-1. Checks that the skill has a published revision (`commitSha`); otherwise HTTP 409 (`SKILL_NOT_READY`). The new workflow (`status: "generating"`) is registered immediately (HTTP 201), carrying the id of the **design session** it will be designed in and pinned to that revision, and the frontend navigates to the workflow's detail page, which polls while generation runs.
-2. A **background design run** sends the prompt as the design session's first chat message and drives an *initial-design* agent: following the skill, it breaks the request into steps and registers them as the workflow's **task templates** in one `register_design_tasks` call (a DAG — each step declares a `key` and its `depends_on` predecessors, plus optional MCP `tools` bindings).
-3. When the run finishes, the design conversation is summarized (one LLM call) into the workflow's `generatedDescription`, the status becomes **`draft`**, and a **workflow-draft-ready notification** deep-links back to the workflow. Any failure — an LLM error, or a run that registered no templates — lands on the row as **`failed`** with the reason and raises a **workflow-generation-failed notification**. The reason is shown on the workflow's detail page and as a banner in its design chat, which stays usable: writing the task templates from there (or from the admin template editor) recovers the workflow to **`draft`** and clears the failure, since rebuilding the design is what repairs it.
-
-The prompt itself is not stored on the workflow: it lives on as the first message of the design conversation, and the generated summary carries the intent forward.
-
-#### Regenerating the description
-
-The AI summary goes stale as the task templates are adjusted, so the **Generated description** field on the workflow detail page carries a **generate action** (`POST /workflows/{id}/generate-description`, developer-gated) that re-summarizes the design conversation on demand — one LLM call — and saves the result straight away. There is no summarization at publish time: whether and when to refresh the summary is the user's call.
-
-The same action is also reachable from the design session's chat input: its "+" menu (developer-gated, hidden while the workflow's task templates are still generating) offers **Generate description**, which previews the change through the same description-diff dialog as the detail page before it's saved — handy for regenerating without leaving the conversation.
-
-A `published` workflow becomes `modified` when the summary is rewritten, since a run whose `description` is empty falls back to it and would otherwise drift from the published version. The action returns HTTP 409 (`WORKFLOW_DESCRIPTION_NOT_GENERATABLE`) while generation is still in flight or when there is no design conversation to summarize, and HTTP 502 (`SUMMARIZATION_FAILED`) if the LLM call fails.
-
-#### Adjusting the task templates
-
-A draft's task templates can be refined in two ways, in any mix:
-
-- **By chat** — the workflow detail page's **Open design session** button opens `/admin/workflows/{workflowId}/design-session` (the chat has no id of its own, so it is addressed by its workflow): the same chat UI as a run, with the template list down the left edge, driven by an interactive *design* agent whose tools (`register_design_tasks`, `create_design_task`, `list_design_tasks`, `get_design_task`, `update_design_task`, `delete_design_task`) edit the workflow's templates directly. The design agent never executes anything. The design session is shared by every **Developer** in the tenant (plus Super Admins and the workflow's `createdBy`), so a team can refine a design together: it reuses the shared chat plumbing (history poll, A2UI surfaces, per-message sender avatars), and two people hitting send at once collide on the same run lock a workflow session uses.
-- **By hand** — the **Task Templates** admin pages (`/admin/workflows/{id}/task-templates`) offer the familiar Table / Graph views (the Graph stacks the templates in one vertical column in dependency order, each branching rightward into the MCP servers it binds tools from and then into the individual tools) plus a create form and a per-template detail page with **Depends on** and **MCP Tools** pickers, backed by `GET /workflows/{id}/task-templates` and the `POST`/`PATCH`/`DELETE /workflow-task-templates` endpoints (developer-gated).
-
-Templates mirror session tasks structurally — title, description, DAG edges (`workflow_task_template_dependencies`), and MCP tool bindings (`workflow_task_template_tool_bindings`, server side `RESTRICT`) — but carry **no status**: the lifecycle belongs to a run, not the design. The same DAG rules apply (same-workflow targets, cycles rejected with HTTP 409 `DEPENDENCY_CYCLE`).
-
-#### Publishing
-
-**Publish** (on the workflow detail page, `POST /workflows/{id}/publish`, developer-gated) is what makes a workflow executable. It requires at least one template (and no generation in flight) — otherwise HTTP 409 (`WORKFLOW_NOT_RUNNABLE`). Publishing **freezes the design**: the workflow's name, effective description (`description` if set, else `generatedDescription`), and full template list (edges and tool bindings included) are captured as its published version, replacing the previous one. No LLM runs here — refreshing the AI summary is a [separate, user-triggered action](#regenerating-the-description). Re-adjust → re-publish is allowed at any time; runs already started are unaffected because they copied the task templates (below).
-
-#### Editing a published workflow — `modified`
-
-Editing a workflow after it has been published does not silently change what runs. Saving the detail form, regenerating its AI description, or adding / editing / deleting one of its **task templates**, moves the workflow to **`modified`**:
-
-- Runs keep using the **last published version** — its name, effective description, and templates — not the edits.
-- The workflow stays runnable by anyone who could run it while `published`; the Run button in the list is not gated differently.
-- **Publish** again to promote the edits into future runs.
-- **Discard changes** (the undo icon that appears in the detail page's status bar next to Publish, `POST /workflows/{id}/discard-changes`, developer-gated) throws the edits away instead: the task templates are rewritten from the published version — original template ids reused, so the dependency edges survive — the name is restored and the published version's frozen effective description is written back into the workflow's `description` field (`generatedDescription` is left untouched), and the workflow returns to `published`. Discarding a workflow that has no unpublished changes returns HTTP 409 (`WORKFLOW_NOT_MODIFIED`).
-
-Refining the task templates through the **design chat** counts as an edit too: when the design agent adds, changes, or removes a task template of a `published` workflow, the workflow moves to `modified` exactly as a manual edit would.
-
-#### Deactivating a workflow
-
-**Deactivate** (the power-off icon that appears in the detail page's status bar next to Publish whenever the workflow is `published` or `modified`, `POST /workflows/{id}/deactivate`, developer-gated) returns a workflow to **`draft`**. This revokes the `requester` role's execute access — the same gate a never-published workflow starts under — while a `developer`/`super_admin` can still run it for testing and the task templates, both description fields, and published snapshot are left exactly as they were. Publishing again promotes it straight back to `published`. Deactivating a workflow that is not currently `published`/`modified` returns HTTP 409 (`WORKFLOW_NOT_DEACTIVATABLE`).
-
-#### Running a workflow
-
-Clicking **Run** on a **published** or **modified** workflow — or, for a `developer`/`super_admin` caller, a **draft** one too, for pre-publish testing — creates a **WorkflowExecution** — an independent entity that captures a snapshot of the workflow configuration at execution time.
-
-For a **draft** workflow the Run dialog additionally lists the tenant's [tool mocks](#tool-mocks); checking one stubs that tool for this run, so a pre-publish test can be repeated without the tool's side effects. The dialog offers no mocks for a published workflow, and asking for one anyway is rejected with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`) — a published run that quietly did nothing would be worse than no run.
-
-1. The backend rejects any other status outright, and rejects a `draft` workflow for any caller who isn't `developer`/`super_admin`, with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`); it also re-checks the skill's published revision (`SKILL_NOT_READY` otherwise) — the repository was cloned when the skill was registered, so **nothing is cloned here**.
-2. A `WorkflowExecution` record is persisted, capturing the workflow name, its effective description (`description` if the user set one, else the AI-generated `generatedDescription`), skill details, the id of the **workflow session** it will run in, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). If the workflow was still `draft` at this point — a pre-publish test run — the record is flagged `isDraft: true`, which keeps it out of the [operations metrics](#operations-metrics); the flag never changes afterwards. The workflow's task templates are **copied into the execution as `pending` WorkflowTasks** (dependency edges and tool bindings included, ids remapped), so later template edits never affect this run. For a `modified` workflow the name, description, and templates all come from its **last published version** rather than the edited rows. Any [tool mocks](#tool-mocks) chosen for the run are **copied onto the record** at the same time — by value, not by reference — so editing or deleting a mock afterwards cannot change how this run behaves. The ADK session itself is created lazily on the first agent call.
-3. The backend returns the `WorkflowExecution` (HTTP 201). The frontend redirects to `/workflow-executions/{workflowExecution.id}/session` — the **workflow session**, the chat the run happens in. It has no record of its own, so it is addressed by its execution's id.
-4. On mount, that page fetches the `WorkflowExecution`, and if no prior messages exist it auto-sends a fixed kickoff message via `POST /workflow-executions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](#welcome-page).
-5. The `/workflow-executions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id`, the pinned revision, **and the agent role**) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under an **execute-only** instruction — the tasks were approved by publishing, so it **begins immediately**, with the execution's effective description injected server-side as trusted run context.
-6. Subsequent user messages continue to flow through `POST /workflow-executions/{id}/agent`, so A2UI rendering, A2UI user actions (e.g. clicking a rendered button), and the full chat experience work normally.
-
-##### Agent-managed execution
-
-The execution agent works through the pre-copied WorkflowTasks: it lists the tasks, picks the next runnable one (a `pending` task whose dependencies are all `completed`), marks it `in_progress`, does the work per the skill, and marks it `completed` (or `failed` / `skipped`). When every task reaches a terminal state, a **session-completed notification** is raised. Five tools back this — `create_workflow_task`, `list_workflow_tasks`, `get_workflow_task`, `update_workflow_task`, and `delete_workflow_task` — which resolve the current session from the ADK session id and operate on the same `WorkflowTask` records exposed by the REST API (so the agent can still adjust the run's task list mid-flight when needed). You can watch the statuses update live in the read-only **Workflow Tasks** admin view (Table or Graph). See [backend/README.md](backend/README.md#agent-task-tools) for the tool reference.
-
-##### MCP tools for tasks
-
-WorkflowTasks can use tools from the MCP servers registered in the [MCP Servers](#mcp-servers) admin page:
-
-1. **Bind at design time** — while designing, the agent calls `list_mcp_tools`, which queries every registered server concurrently and returns each server's advertised tools (unreachable servers are reported per-server without failing the listing). Steps that need an external tool get a `tools` entry (`[{"server_id": …, "tool_name": …}]`) in `register_design_tasks`; bindings are persisted on the templates and copied onto the run's tasks at execute time, surfaced as `toolBindings` on the REST read models.
-2. **Enforce at execution time** — the agent invokes bound tools through the `call_mcp_tool(server_id, tool_name, arguments)` proxy. Every such call goes through A2Flow's own MCP proxy layer, which resolves who is calling, consults its access-control policies, expands the server's secret references, and only then opens a per-call connection to the server — a streamable HTTP request, or a freshly spawned child process for a stdio server. Its first policy is the binding check: the `(server, tool)` pair must be bound to a task currently `in_progress` in the session (the union of bindings when several are in progress). Calls to unbound tools are rejected with an error listing the allowed tools, so a shared, skill-cached agent can never use tools a task wasn't granted. The proxy exists as a layer of its own so that authentication and finer-grained access control can be added in one place later; see [backend/README.md](backend/README.md#mcp-proxy).
-
-Bound tools appear as chips in the **Tools** column of the Task Templates and Workflow Tasks lists. The template forms include an **MCP Tools** picker that works in two steps, like the Agent Skill auth-password picker: choose a server through a paged dialog, then add one of its tools from a dropdown, each added tool becoming a removable chip. Only the chosen server is queried live, so opening the form costs one plain registry read rather than a connection to every registered server; a server that cannot be reached says so in place of its tool list, and an already-bound tool keeps its chip either way.
-
-Both of those lists show **every** record instead of paginating, which lets the **Depends on** column work as a cross-reference: each dependency is named by its title, and hovering that chip highlights the depended-on task's own row. The design agent is held to terse imperative task titles — 2–4 words, 30 characters — so they read cleanly as chips; its task tools reject a longer one with a message telling it to move the detail into the description. (The limit binds the agent, not people: a title edited through the admin form is still allowed the full 200 characters.) A title that still overflows its chip is clipped and revealed in full on hover.
-
-Workflow executions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowExecution` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains). Deleting a workflow **does** delete its task templates and published version (cascade), and with the row goes the design session it named.
-
-The individual tasks of a run are persisted as `WorkflowTask` records. Each task carries a status (`pending` / `in_progress` / `completed` / `failed` / `skipped`); tasks are listed in `createdAt` order. See [backend/README.md](backend/README.md#workflow-tasks) for the API reference. Deleting a `WorkflowExecution` cascades to its tasks.
-
-Tasks form a **directed acyclic graph (DAG)** rather than a flat list: each task may depend on zero or more other tasks in the same session via its `dependsOnIds` field (`(task, dependsOn)` edges are stored in the `workflow_task_dependencies` join table). Dependency targets must exist and belong to the same session (otherwise HTTP 422 `FOREIGN_KEY_VIOLATION`), and edges that would introduce a cycle — including a self-dependency — are rejected with HTTP 409 `DEPENDENCY_CYCLE`. Deleting a task cascades to the dependency edges that reference it in either direction.
-
-##### Human approval
-
-When a task needs the user's explicit go-ahead before the agent acts (for example a destructive or irreversible operation), the agent asks for an **approval** mid-execution:
-
-1. The agent calls the `request_approval` backend tool, which persists a `pending` **Approval** record for the current session (optionally linked to a `WorkflowTask`). A request is addressed to **exactly one destination**, never both and never neither:
-   - **`approver`** — one specific user, looked up with the `list_users` tool (which lists only users holding the [`approver` role](#roles-and-authorization)). Only they are notified and only they can decide.
-   - **`approverGroupId`** — a [user group](#user-groups), looked up with the `list_user_groups` tool. **Every** member holding `approver` is notified with their own approval-request notification, and the **first** decision from any of them completes the request — so an approval is not blocked on one person's availability. A group with no member who can approve is rejected up front, since such a request could never be resolved. Nothing dismisses the other members' notifications when someone decides; they simply stop being actionable.
-
-   The agent is instructed to prefer a group whenever any member of a team may decide, and to name a single user when the Skill calls for a specific person.
-2. The agent explains the request in plain text and then calls **`render_approval`** — an AG-UI **frontend tool** (declared by the client via `RunAgentInput.tools`, distinct from A2UI). Like `render_a2ui`, the bridge exposes it as a long-running client tool: the run pauses and the frontend renders **Approve / Reject** controls, plus an optional **comment** field, in the chat. The controls are shown **only to the designated approver** — for a group destination, to every member holding `approver`, so several people may hold them at once; everyone else sees a read-only "waiting" message.
-3. Clicking a button writes the decision (and any comment) **directly** to the backend via `PATCH /api/v1/approvals/{id}`, then returns the decision as the tool result so the agent run resumes. The resolving user is recorded both in the audit fields and in a dedicated server-managed **`decidedBy`**, which is what answers "who approved this?" for a group destination — the group alone does not say. Only the designated approver may resolve a request, with **no exception — not even a Super Admin** who isn't the addressee; a `PATCH` from any other user is rejected with HTTP 403 (`FORBIDDEN`). A decision is **final**: because two members of an approver group can genuinely race each other, a second `PATCH` that would *change* an already-recorded status is rejected with HTTP 409 (`APPROVAL_ALREADY_RESOLVED`) rather than overwriting the first decision. Editing the comment afterwards is still allowed and moves neither `decidedAt` nor `decidedBy`.
-4. On `approved` the agent proceeds; on `rejected` it marks the task `failed` (or `skipped`). The agent can re-check a decision with the `get_approval` tool.
-5. Granting the approval also **issues a certificate** for the task, which is what actually unlocks its MCP tools — see below.
-
-**The approval gate is enforced by the server, not by the agent.** A task that has an approval attached cannot call any of its bound [MCP tools](#mcp-servers) until that approval is granted: the MCP proxy refuses the call. Granting it mints a short-lived X.509 certificate; every subsequent tool call from that task must present it, signed, or be denied. Tasks with no approval attached are unaffected and keep running under the ordinary tool-binding rule.
-
-Two things this buys that an instruction to the model could not:
-
-- **A prompt injection or a bug cannot skip the approval.** Before, the gate was the agent's system instruction plus the frontend declining to resume the run — neither is a rule the server checks.
-- **The granted tools are frozen at the moment of decision.** The certificate carries the tools the task had bound when the approver clicked Approve. The agent can rewrite its own task's tool bindings mid-run, so a check that reads bindings at call time is a check the agent can widen; it cannot re-sign a certificate. Approving a task to read a file does not become approval to delete one.
-
-Every decided tool call — allowed or refused — is recorded with the certificate's serial and the exact bytes signed for it, so "which approval authorized this, and who granted it" can be answered afterwards and checked cryptographically.
-
-The signing root is generated on first use and stored encrypted; nothing needs configuring. The certificate's lifetime (default one hour) and the clock-skew tolerance are adjustable via `MCP_APPROVAL_CERT_TTL_SECONDS` and `MCP_APPROVAL_CERT_SIGNATURE_WINDOW_SECONDS`. `GET /api/v1/approvals/{id}/certificate` and the [Approvals](#approvals) admin detail page report what an approval authorized: the granted tools, the validity window, and whether the certificate has been revoked. Design and implementation notes are in [backend/README.md](backend/README.md#approval-certificates).
-
-> **Scope of the guarantee.** The MCP proxy currently runs inside the backend process, so the signature proves possession of the certificate's key to a verifier sharing that process — it is not a defence against an attacker who already controls the backend. What it does provide is a single fail-closed enforcement point, a grant that cannot be widened after the fact, and a verifiable record. The certificates carry `clientAuth`, so the same material becomes real TLS client authentication unchanged if the proxy is ever split out over the network.
-
-Approvals are persisted in `a2flow.db` and cascade-delete with their `WorkflowExecution` (the optional `WorkflowTask` link is set to `NULL` when that task is deleted). Browse them in the [Approvals](#approvals) admin view.
-
-The same no-exception rule extends to a linked task's **status**: since flipping a `WorkflowTask`'s `status` straight to `completed` would otherwise let any approver of the session stand in for the addressee, `PATCH /api/v1/workflow-tasks/{id}` restricts a `status` change to the session owner or, when the task has a linked `Approval`, an eligible approver of it — the named user, or a member of its approver group holding `approver`. Tasks with no linked approval keep the broader any-session-participant rule.
-
-A **workflow session** — the ADK chat a run happens in — is keyed by its execution's **initiator** (the user who started the run), not by whoever is currently viewing it. So when a designated approver — a different user — opens it, they share the **same** ADK session: they see the initiator's full conversation and state, and approving resumes the original run rather than starting a fresh, empty session. Both the agent stream (`POST /workflow-executions/{id}/agent`) and the history load (`GET /workflow-executions/{id}/messages`) resolve the initiator from the `WorkflowExecution` record. (Regular, non-workflow chat sessions remain keyed per user.) Sharing is limited to those participants: any other user is rejected with HTTP 403 — see [Roles and authorization](#roles-and-authorization). When an approval is addressed to a group, every member holding `approver` is such a participant, so the shared chat follows the group's membership: adding someone to an approver group opens every run that group has been asked to approve, and removing them closes it again, on their next request. That is the direct consequence of "any member can resolve it" — deciding is what the chat access exists to enable. A member who does *not* hold `approver` gets nothing from the membership.
-
-Because that one chat is shared, several people (the **applicant**/initiator, designated **approvers**, and the **agent**) post into it, so each message carries a **sender avatar** to show who sent it — the applicant's or approver's avatar beside their messages, and an agent badge (hover shows the workflow name) beside the agent's. Clicking a button inside a rendered A2UI surface is attributed the same way: it shows the acting user's avatar beside that surface once resolved. ADK records every human message under the author `user`, and A2UI action acknowledgements as tool-response (function-response) events, so the backend attributes both to their real sender: the agent run endpoint snapshots the workflow session's existing `user` events and tool-response `tool_call_id`s, then records the current user as the sender of any new ones once the run ends, and `GET /workflow-executions/{id}/messages` returns each message's `senderUserId`. That includes a run that ends badly: a client disconnecting mid-stream (tab closed, page reloaded) cancels the run, but the messages it already appended are attributed on the way out rather than silently left ownerless. Tool-response messages are keyed by `tool_call_id` rather than their own id, since the AG-UI/ADK bridge regenerates a fresh id for them on every read. Messages with no recorded sender (history sent before attribution existed) fall back to the initiator. Hovering an avatar reveals the sender's name.
-
-Per-message side-channel facts like this live in a single **`message_meta`** table, with nullable columns the run-completion step upserts independently — currently `sender_user_id` (above) and `workflow_task_id` (below). A row names the chat it belongs to through exactly one of `workflow_execution_id` (a workflow session) or `workflow_id` (a **design session** — also shared, by the tenant's Developers, and attributed the same way; see [Adjusting the task templates](#adjusting-the-task-templates)), each unique with `adk_event_id`.
-
-Because the chat is shared, the page **polls `GET /workflow-executions/{id}/messages` every 10 seconds** so each participant sees the others' messages (and the agent's progress) without reloading. Polling pauses while the viewer's own agent run is in flight (so it never clobbers the live stream), skips re-applying an unchanged history, and the view follows new messages to the bottom only when the viewer is already scrolled near the bottom.
-
-The chat screen also shows a collapsible **task timeline** down the left edge: the execution's `WorkflowTask`s in order, each with a numbered, status-coloured badge, with the in-progress task highlighted. The agent drives the task lifecycle by calling `update_workflow_task(status="in_progress")` before working on a task, so after each run the backend walks the workflow session's events in order, tracks the most recent such transition, and records the in-progress task for every following message as that message's `workflow_task_id`. `GET /workflow-executions/{id}/messages` returns each message's `workflowTaskId`, and the chat wraps each run of consecutive same-task messages in a **task group** — a status-coloured left rail with a numbered heading whose number matches the timeline badge — so the boundary of each task is obvious at a glance. The timeline and chat are linked both ways: scrolling the chat highlights the task at the top of the viewport in the timeline (scroll-spy), hovering either a timeline entry or a chat group highlights its counterpart, and clicking a timeline entry scrolls the chat to that task's group.
-
-### Workflow Executions
-
-Navigate to [http://localhost:3000/admin/workflow-executions](http://localhost:3000/admin/workflow-executions) to browse every `WorkflowExecution`. Each row links to its workflow session (`/workflow-executions/{id}/session`) and to the nested **Workflow Tasks** admin page (`/admin/workflow-executions/{id}/workflow-tasks`), a **read-only** view of the run's tasks — the task templates are edited on the workflow's [task templates](#adjusting-the-task-templates), and a run's statuses are advanced by the execution agent (and the approval flow), so a run's history stays faithful to what actually ran. A **Draft** column badges runs started from a still-`draft` workflow ([pre-publish test runs](#running-a-workflow), left out of the [operations metrics](#operations-metrics)) and doubles as a Yes/No filter to hide them; the same badge shows next to the status on the execution's detail page. A row's **Delete** action removes the `WorkflowExecution` after a confirmation prompt: the record, its tasks (cascade), and its workflow session are all deleted. The Workflow Tasks page offers a **Table / Graph** toggle: the Graph view renders the task DAG with [React Flow](https://reactflow.dev/), stacking the tasks in a single vertical column in dependency order so prerequisites sit above the tasks that depend on them, with each task branching rightward into the MCP servers it binds tools from and then into the individual tools (read-only; pan / zoom / fit).
-
-| Operation | Path |
-|-----------|------|
-| List all executions | `GET /admin/workflow-executions` |
-| Delete an execution | `DELETE /api/v1/workflow-executions/{id}` |
-| View an execution's tasks | `GET /admin/workflow-executions/{id}/workflow-tasks` |
-| View an execution's MCP tool calls | `GET /admin/workflow-executions/{id}/tool-invocations` |
-
-A **Tool Invocations** page (`/admin/workflow-executions/{id}/tool-invocations`, reached from the run's detail header) lists the MCP tool calls the [proxy](backend/README.md#mcp-proxy) decided on for that run — `allowed` ones that went upstream and `denied` ones a policy vetoed — with the tool, the server, the denial reason, and the presented certificate. Arguments appear only as a digest; the raw values are never stored. A call to a [mocked](#tool-mocks) tool is absent here whichever way it went: the proxy checks it like any other call, but a call that was always going to be answered from a snapshot reached no server, so neither its approval nor its refusal is recorded. The run's chat transcript is where a stubbed call is inspected. A **Mocked** badge on the run marks one that stubbed any of its tools.
-
-A run also carries a **lifecycle** of its own: it starts `running` and reaches `completed` or `failed` — with a `finishedAt` timestamp — once it has at least one task and every task has reached a terminal state (`completed` / `failed` / `skipped`). A run whose tasks include a failure ends `failed`. This is evaluated after every task write, whether the write came from the execution agent or from the REST task endpoints, and the recorded `finishedAt` is never moved by a later edit. A run with no tasks at all stays `running`. These fields are server-managed — they cannot be set through the API — and are what the [operations metrics](#operations-metrics) count.
-
-### Approvals
-
-Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/approvals) to browse every **Approval** request (see [Human approval](#human-approval)). By default the list shows the title, a link to the originating **workflow execution**'s admin detail page (its name is resolved from the execution, falling back to the raw id while unresolved), status (`pending` / `approved` / `rejected` / `returned`), description, and creation time, with sort and filter controls; the designated approver — a user name, or the **approver group's** name linked to its admin page — who actually decided (`Decided By`), the approver's comment, and the decision time are hidden by default but available through the column picker. Each row's Actions column also carries an **Open Workflow Session** button, mirroring the one on the [Workflow Executions](#workflow-executions) list, that jumps straight to `/workflow-executions/{id}/session`. Decisions are normally made from the in-chat Approve / Reject / Return controls; this view is read-only browsing. A granted approval's detail page additionally shows the **Authorized MCP tools** its certificate carries, together with the certificate's serial, validity window, and revocation state (see [Human approval](#human-approval)). The `GET`/`PATCH /api/v1/approvals` endpoints are documented in the [API reference](http://localhost:3000/api-doc).
-
-**`returned`** is a third decision alongside approve and reject: it sends the work back to be revised and re-submitted rather than settling the request, so a high return rate points at an upstream quality problem rather than at work that should not have been requested at all. Whichever decision is recorded, the transition out of `pending` stamps a server-managed **`decidedAt`**; a later edit to the comment leaves it alone, so the `createdAt` → `decidedAt` turnaround stays the approver's real one.
-
-### System Settings
-
-Navigate to [http://localhost:3000/admin/system-settings](http://localhost:3000/admin/system-settings) to configure the mail server that [notification email](#email-delivery) is sent through. Like [Tenants](#tenants), this section is restricted to **Super Admin** — the settings are platform-wide rather than tenant-scoped, so there is no tenant-admin carve-out, and the backend rejects reads as well as writes from anyone else with HTTP 403 (`FORBIDDEN`).
-
-There is exactly one settings record for the whole deployment. It is seeded on first startup with email delivery **off**, so a fresh install keeps notifications in-app until an operator turns it on.
-
-| Field | Purpose |
-|---|---|
-| `appBaseUrl` | Where notification email links back to, e.g. `https://a2flow.example.com`. Left empty, messages are sent without a link. |
-| `smtpEnabled` | Master switch. While off, notifications stay in-app and nothing is sent. |
-| `smtpHost` / `smtpPort` | The relay to hand messages to. |
-| `smtpSecurity` | `starttls` (default), `ssl` (implicit TLS), or `none`. |
-| `smtpUsername` / `smtpPassword` | SMTP AUTH credentials. Leave the username empty for a relay that needs none. |
-| `smtpFromEmail` / `smtpFromName` | The sender address, and the optional display name shown beside it. |
-
-The password is **write-only**, the same treatment [secrets](#secrets) and user passwords get: it is stored as Fernet ciphertext and never returned by the API. The form therefore shows the field blank with a "Saved" placeholder once one is stored, and saving with it left empty keeps the stored value rather than clearing it. Enabling delivery without a host or a sender address is rejected with HTTP 422 (`INVALID_SYSTEM_SETTINGS`).
-
-A **Send test email** button delivers a fixed test message using the *saved* settings, so a misconfiguration surfaces immediately rather than the next time a workflow raises a notification. The recipient is fixed server-side to the signed-in super admin's own address — it cannot be pointed anywhere else — and a relay failure comes back as HTTP 502 (`EMAIL_SEND_FAILED`) with the underlying reason logged server-side only.
-
-`appBaseUrl` and `smtpHost` deliberately skip the SSRF host check that [Agent Skill](#agent-skills) repository URLs and [MCP server](#mcp-servers) URLs go through: both legitimately name a host inside the deployment's own network, and neither is fetched on a caller's behalf.
-
-## Operations metrics
-
-Workflow operations data — approval backlog, run volume, failures, and lead time — is exposed for third-party dashboards in two shapes, both scoped to the caller's tenant and both available to any authenticated user.
-
-Runs started from a still-`draft` workflow (a `developer`/`super_admin` [pre-publish test run](#running-a-workflow)) are recorded with `isDraft: true` and **excluded from every metric below** — both the Prometheus KPIs and the aggregate sub-resources, including the approval-backlog views — so throwaway test data never skews the numbers. The flag is fixed when the run starts; publishing the workflow afterwards does not reclassify runs that already happened.
-
-### Prometheus endpoint
-
-`GET /api/v1/metrics` renders the single-value KPIs in [Prometheus](https://prometheus.io/) text exposition format. Every sample carries a `tenant` label.
-
-| Metric | Meaning |
-|---|---|
-| `a2flow_approvals_pending` | Approval requests awaiting a decision |
-| `a2flow_approvals_pending_over_threshold{threshold}` | Of those, the ones waiting longer than the threshold (default 24h) |
-| `a2flow_approval_pending_age_seconds_max` | How long the longest-waiting request has been waiting |
-| `a2flow_workflow_executions_active` | Runs currently in progress |
-| `a2flow_workflow_executions_finished_today{status}` | Runs that finished today, by terminal status |
-| `a2flow_approvals_decided_today{decision}` | Approvals decided today, by `approved` / `rejected` / `returned` |
-| `a2flow_workflow_executions_failed_recently{window}` | Runs that finished in failure in the last 24h |
-| `a2flow_workflow_tasks_failed_recently{window,error_kind}` | Tasks that failed in the last 24h, by cause |
-| `a2flow_workflow_executions_started_recently{window,workflow}` | Runs started in the last 24h, by workflow |
-| `a2flow_workflow_execution_lead_time_seconds_avg{window,workflow}` | Mean start-to-finish duration of runs finishing in the last 24h |
-| `a2flow_email_queue_depth{status}` | Notification emails in the [outgoing queue](#the-delivery-queue), by `pending` / `sending` / `sent` / `failed` |
-| `a2flow_email_queue_oldest_pending_age_seconds` | How long the longest-waiting undelivered email has waited — rises when the relay is unreachable |
-
-`?thresholdHours=` overrides the stalled-approval cutoff. `METRICS_TIMEZONE` (an IANA name, default `UTC`) decides where "today" starts; an unrecognized name falls back to UTC rather than failing startup.
-
-The endpoint is protected by the ordinary session cookie, so a scrape config has to carry one. `GET` is a safe method, so no CSRF token is needed:
-
-```yaml
-- job_name: a2flow
-  metrics_path: /api/v1/metrics
-  http_headers:
-    Cookie: { values: ["a2flow_session=<token>"] }
-```
-
-The session's idle timeout slides on every request, so a running scrape keeps its own session alive indefinitely; it does not survive a backend restart or an explicit logout, which is when the token has to be refreshed. A scrape covers exactly one tenant — to watch several, configure one job per tenant.
-
-### Aggregate sub-resources
-
-Anything whose natural key is a user id, a run id, or a free-text error message is deliberately kept out of Prometheus — those are unbounded label sets. Those views are served as JSON sub-resources of the existing collections instead, in the usual `{meta, data, error}` envelope:
-
-| Endpoint | Returns |
-|---|---|
-| `GET /api/v1/workflow-executions/by-workflow` | Per-workflow run counts (`total` / `running` / `completed` / `failed`) and average lead time |
-| `GET /api/v1/workflow-executions/lead-time-trend` | Daily average lead time, one bucket per calendar day including empty ones |
-| `GET /api/v1/workflow-executions/failures` | Runs needing triage, each with its failed tasks and their recorded cause |
-| `GET /api/v1/approvals/by-approver` | Pending-approval backlog per designated approver |
-| `GET /api/v1/approvals/by-workflow` | The same backlog, grouped by workflow |
-
-The execution endpoints take `since` / `until` (ISO-8601, defaulting to the last 30 days, capped at 366) and `limit`; the approval endpoints take `thresholdHours` (default 24) and `limit`. Backlog entries come back longest-single-wait first, so `?limit=5` is the worst five. Durations are always whole seconds.
-
-`by-approver` groups by an approval's **destination**, which may be a user or a group, and the two are indistinguishable as bare ids — so each entry carries a `groupKind` of `"user"` or `"group"`. For `"user"` it returns the **id** only, not the name: resolving a name is `UserService`'s decision, and clients already resolve ids in bulk through `POST /users/resolve-names`. For `"group"` the entry's `groupLabel` already carries the group's name, which carries no such visibility rule.
-
-A task that fails records **why**: the execution agent passes `error_kind` (one of `api_error`, `timeout`, `script_error`, `invalid_input`, `permission_denied`, `rejected`, `other`) and a free-text `error_message` alongside `status="failed"`. Both are ordinary task fields, so they are also filterable through the [list query parameters](#list-query-parameters) — e.g. `?q=errorKind:eq:timeout`.
-
-## Notifications
-
-A **bell icon** in the top toolbar (present on both the chat header and the admin sidebar) opens a notification center with an unread-count badge. Notifications are **per-user**, persisted in `a2flow.db`, and delivered by **polling** (the frontend refreshes every 30 seconds).
-
-The bell's dropdown lists **unread notifications only** — it is there to surface what still needs attention. The full history, read items included, lives on a dedicated [Notifications page](#notification-history-page), reachable from the account menu (toolbar profile button → **Notifications**), which is also the only place a notification can be deleted.
-
-Four workflow events generate a notification. The recipient depends on the event: a `request_approval` notification is addressed to that approval's **designated approver** — or, for a group destination, one notification per eligible member — while the others are addressed to the **user who started the session or generation**:
-
-| Type | Raised when |
-|---|---|
-| `workflow_draft_ready` | The background design run of ["Generate workflow"](#generating-a-workflow) finished and the draft's initial task templates are ready for review. |
-| `workflow_generation_failed` | That same design run failed. Since it runs unattended with no client watching it, this is how the user finds out; the reason is on the workflow's detail page and in its design chat. |
-| `approval_request` | The agent requests a mid-execution decision (`request_approval`) and waits for the designated approver. |
-| `execution_completed` | Every `WorkflowTask` in the run has reached a terminal state (`completed` / `failed` / `skipped`) — emitted once per run, whether the final task was written by the execution agent or through the REST task endpoints. The same evaluation stamps the run's own [terminal status](#workflow-executions). |
-
-Clicking a notification marks it read and deep-links to the relevant place: run-scoped events to the `/workflow-executions/{id}/session` chat, workflow-scoped ones (`workflow_draft_ready`, `workflow_generation_failed`) to the workflow's detail page. Each row also has a **"Mark as read" (✓)** button that clears it from the dropdown without navigating, and the panel header offers a **"Mark all read"** action (shown only while unread items remain) that clears every unread notification at once. Nothing in the dropdown deletes a notification — marking it read only moves it out of the way.
-
-### Notification history page
-
-The [`/notifications`](http://localhost:3000/notifications) page, reachable from the toolbar profile button's account menu (**Notifications**), lists every notification the signed-in user has received, read ones included, as a sortable and filterable table (title, type, and creation time). An **All / Unread** switch above it toggles the read-state filter, each unread row offers the same **"Mark as read"** action, and every row has a **delete (✕)** button that permanently removes that notification after a confirmation dialog.
-
-`GET /api/v1/notifications` takes the same `limit` / `offset` / `s` / `q` [list query parameters](#list-query-parameters) as every other collection endpoint, so unread-only listing is `?q=read:eq:false` and ordering is e.g. `?s=-createdAt` (the default). `PATCH /api/v1/notifications/{id}` takes a request body and accepts `read` as its only mutable field, so `{"read": true}` marks a notification read and `{"read": false}` returns it to unread. Those endpoints, plus mark-all-read and delete, are documented in the [API reference](http://localhost:3000/api-doc); all are scoped to the authenticated user, so reading, updating, or deleting another user's notification returns HTTP 404 — and a `q` term naming `userId` can only narrow that scope, never escape it. Notifications cascade-delete with their recipient user and their linked `WorkflowExecution` or `Workflow`.
-
-### Email delivery
-
-Once a `super_admin` has configured an SMTP server under [System Settings](#system-settings), the same four events are **also emailed** to the recipient, so an approval request does not have to wait for someone to open the app.
-
-The message carries the notification's title as its subject, its body as the text, and a link back to what it is about — the run for `approval_request` / `execution_completed`, the workflow for `workflow_draft_ready` / `workflow_generation_failed` — built from the configured **Application Base URL**. When no base URL is set the message is sent without a link.
-
-Recipients who cannot be reached are skipped before any relay is contacted: the internal system user, disabled or soft-deleted accounts, accounts whose address is unverified, and any account without an address. There is no per-user opt-out — email delivery is on or off for the whole platform.
-
-#### The delivery queue
-
-Nothing is sent while a workflow operation is in flight. The notification row and a row in `outbound_emails` — the fully rendered message, recipient and all — are written in **one transaction**, so a crash can never leave a notification whose email was never queued. A worker then drains that queue:
-
-- **Paced.** A token bucket holds the relay to a sustained rate (5/s by default, with a burst of 10), and a whole batch goes out over one reused SMTP connection.
-- **Retried.** A transient failure — the relay is down, returns a 4xx, or rejects the credentials — schedules another attempt with exponential backoff and jitter: 15s, 30s, 1m, 2m, doubling to a one-hour ceiling. The default budget of 9 attempts rides out roughly an hour of downtime.
-- **Written off when hopeless.** A failure the relay reports as permanent (an unknown recipient, say) is not retried at all. Once a message is out of attempts, or fails permanently, it stays as `status=failed` with the last error on the row — a dead letter to look at, not a silent loss. Delivered messages are purged after 30 days; dead letters are kept.
-
-Exactly **one process sends at a time**, elected by a PostgreSQL advisory lock, which is what makes the rate limit exact rather than approximate. Scaling the worker past one replica buys failover, not throughput. A sender that dies mid-batch leaves its claims leased; the next pass reclaims them without spending an attempt.
-
-The API process runs the worker itself by default, so `uvicorn main:app` alone delivers mail. `compose.yml` instead runs a dedicated `worker` service and sets `EMAIL_WORKER_IN_PROCESS=false` on the API, keeping SMTP work off the process serving requests. Every tunable is listed under **Outgoing email queue** in [`backend/.env.example`](backend/.env.example).
-
-Backlog and stuck-relay symptoms are visible on the [metrics endpoint](#operations-metrics) as `a2flow_email_queue_depth{tenant,status}` and `a2flow_email_queue_oldest_pending_age_seconds{tenant}`.
-
-## Agent activity in the chat
-
-So you can see what the agent is doing between replies, its intermediate work is
-surfaced inline in the chat stream:
-
-- **Working indicator** — while a run is in flight but nothing is on screen yet, a
-  subtle "考えています…" pulse appears at the bottom of the message list.
-- **Tool-call lines** — every backend tool call (e.g. `create_workflow_task`,
-  `list_workflow_tasks`) becomes a compact status line that transitions from a
-  spinner (`running…`) to a check (`done`). Calls routed through the
-  `call_mcp_tool` proxy are shown under the **real MCP tool name** with an `MCP`
-  tag. The `render_a2ui` / `render_approval` client tools keep their dedicated UI
-  and are not shown as tool lines.
-- **Call details** — a tool line with arguments or a result **expands on click**
-  to show both as formatted JSON, so what the agent actually sent and got back is
-  inspectable without leaving the chat. A line answered by a [tool mock](#tool-mocks)
-  carries a `Mocked` badge — and the chat is the *only* place to inspect one,
-  since a stubbed call never reaches the MCP proxy and so leaves no audit row.
-- **Reasoning** — when a thinking-capable model emits `REASONING_*` events, the
-  streamed thoughts render as a muted "Thinking" panel. The default
-  `gemini-3.5-flash` reasons internally but does not stream thought summaries
-  unless they are enabled, so the panel only appears with a model configured to
-  emit them.
-
-On session resume, only **MCP tool calls** (`call_mcp_tool`) are reconstructed
-from history; internal A2Flow tool calls and reasoning are live-only.
-
-## How it works
-
-1. When the user clicks "+ New session", the frontend navigates to `/newSession` without contacting the backend. The session ID (`threadId`) is generated by the frontend (`crypto.randomUUID()`) at the moment the user submits the first message; the ADK session is created implicitly by the backend on the first `POST /agent` request that references it. The page URL is then replaced with `/sessions/{id}` so the streamed response continues under the canonical session route.
-2. When the user submits a message, `createChatAgent()` creates an `HttpAgent` (from `@ag-ui/client`) that sends the auth session cookie (`credentials: "include"`) and the `X-CSRF-Token` header, with `A2UIMiddleware` (from `@ag-ui/a2ui-middleware`) applied. Before each request reaches the backend, the middleware injects the `render_a2ui` tool into `RunAgentInput.tools` and the A2UI Basic Catalog schema (downloaded from `https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json` at build time) into `RunAgentInput.context`.
-3. The backend's `ADKAgent` (from `ag-ui-adk`) bridges the AG-UI protocol to a Google ADK `LlmAgent` — translating events, managing sessions, and streaming AG-UI SSE events back to the client. The agent uses `AGUIToolset`, which the bridge replaces at runtime with a `ClientProxyToolset` built from `RunAgentInput.tools` — making the frontend-injected `render_a2ui` tool callable by the LLM.
-4. When the LLM calls `render_a2ui`, the `ADKAgent` streams `TOOL_CALL_*` events. The `A2UIMiddleware` intercepts these, reconstructs the A2UI operations, and emits `ACTIVITY_SNAPSHOT` events (one per surface, `activityType: "a2ui-surface"`). No tool execution happens on the backend.
-5. The frontend's `AgentSubscriber` (built by `createAgentSubscriber` in `src/lib/agentSubscriber.ts`, shared by both chat surfaces) dispatches each event to a Redux store. Text events update the chat incrementally; assistant text is rendered as Markdown (`marked`, styled by the `markdown-body` utility). `TOOL_CALL_*` events for non-rendering tools and `REASONING_*` events are mapped to `activity` messages (`activityType: "tool_call"` / `"reasoning"`) and rendered inline by `ToolActivityBubble` / `ReasoningBubble` (see [Agent activity in the chat](#agent-activity-in-the-chat)). `ACTIVITY_SNAPSHOT` events carry A2UI operations under the `a2ui_operations` key, which are stored in Redux. `A2uiRenderer` feeds the operations to `MessageProcessor` (from `@a2ui/web_core/v0_9`) and renders surfaces via `<A2uiSurface>`. Component rendering uses `tailwindCatalog` — a custom `Catalog<ReactComponentImplementation>` in `src/components/a2uiCatalog.tsx` that provides Tailwind CSS–styled versions of `Text`, `Button`, `Card`, `Row`, `Column`, `TextField`, and `ChoicePicker`. A `ChoicePicker` offering a single choice among five or more options is collapsed into the shared `Select` dropdown instead of a radio list, so an agent can enumerate every allowed value (EC2 instance types, regions, …) without burying the conversation — see [A2UI flow](docs/a2ui-flow.md). `marked` is used as the markdown renderer via `MarkdownContext`.
-6. When the LLM calls `render_a2ui`, `useChat` captures the tool call ID via `onToolCallEndEvent` and stores it in `pendingRenderCalls`. When the user triggers an action on the rendered surface (e.g. clicking a `Button`), `sendA2uiAction` sends a tool result message for that `render_a2ui` call directly to `POST /agent`. This lets the backend match the result against the pending `render_a2ui` tool call and forward it to the LLM, which then responds to the user's action. `forwardedProps.a2uiAction` / `A2UIMiddleware.processUserAction` is not used. The tool result is a **JSON object** carrying the surface's entire data model under `values` — every value the user typed or selected. It is JSON rather than prose because `ag-ui-adk` wraps any tool result it cannot parse as JSON before persisting it, which would change its shape on reload; and it carries the whole data model rather than the action's `context` because `context` holds only the bindings the agent chose to declare on the acted-on component. Together these let the agent read the real input, and let a reloaded session redisplay an answered surface pre-filled with what the user submitted instead of the agent's defaults (see [docs/a2ui-flow.md](docs/a2ui-flow.md)).
-7. Session state is preserved in memory on the backend; `threadId` is used directly as the ADK session ID (`use_thread_id_as_session_id=True`), so reusing the same `threadId` continues the conversation efficiently.
-
-## API contract (OpenAPI → Zod)
+### API contract (OpenAPI → Zod)
 
 The REST endpoints are described by the FastAPI app and exported as OpenAPI 3.1. The frontend consumes that spec to generate Zod schemas and TypeScript types, which are then used for runtime response validation.
 
@@ -780,27 +146,30 @@ The AG-UI streaming endpoint (`POST /agent`) is marked `include_in_schema=False`
 
 `pnpm generate:api` (frontend) runs the backend export step via `uv` first, then the Zod codegen — so a single command keeps both layers in sync. The frontend's `predev` and `prebuild` hooks invoke it automatically, so `pnpm dev` and `pnpm build` regenerate the spec and schemas on every run. `uv` must be available on `PATH`.
 
-### Interactive API reference
-
-An interactive [Scalar](https://scalar.com/) reference is served at [http://localhost:3000/api-doc](http://localhost:3000/api-doc). It loads the FastAPI app's live OpenAPI document (`/openapi.json`, proxied to the backend by `next.config.ts`), so it always reflects the running backend. The page is behind the same login gate as the rest of the app.
-
-## List query parameters
+Regenerating can rename the Zod schema exports in `zod.gen.ts`, since they embed the full URL path segments — adding an `/api/v1/` prefix turns `zListAgentSkillsAgentSkillsGetResponse` into `zListAgentSkillsApiV1AgentSkillsGetResponse`. After any regeneration, `cd frontend && pnpm build` is the quick check: a module-not-found error on a `zod.gen` import is a name mismatch to fix.
 
 Every collection endpoint accepts a shared set of `limit` / `offset` / sort (`s`) / filter (`q`) query parameters, with camelCase field names. See [.claude/rules/api-conventions.md](.claude/rules/api-conventions.md) for the full reference.
 
-## LLM configuration
+#### Interactive API reference
 
-Set `LLM_MODEL` in `backend/.env`:
+An interactive [Scalar](https://scalar.com/) reference is served at [http://localhost:3000/api-doc](http://localhost:3000/api-doc). It loads the FastAPI app's live OpenAPI document (`/openapi.json`, proxied to the backend by `next.config.ts`), so it always reflects the running backend. The page is behind the same login gate as the rest of the app.
 
-| Provider | Value |
-|---|---|
-| Google Gemini (default) | `gemini-3.5-flash` |
-| OpenAI via LiteLLM | `litellm:openai/gpt-4o` |
-| Anthropic via LiteLLM | `litellm:anthropic/claude-3-5-sonnet-20241022` |
+### The manual site
 
-See [backend/README.md](backend/README.md) for the full configuration reference.
+```bash
+cd website
+pnpm install
+pnpm start                 # dev server on http://localhost:3100/a2flow/ (English)
+pnpm start --locale ja     # dev server in Japanese (one locale at a time)
+pnpm build                 # builds every locale; fails on broken links
+pnpm serve                 # serves the build — the only way to exercise search
+```
+
+Every page has an English original under `website/docs/` and a Japanese translation under `website/i18n/ja/docusaurus-plugin-content-docs/current/`; **both are updated in the same change**. What belongs on the site and what stays in this repository is described in [website/README.md](website/README.md).
 
 ## Further reading
 
-- [backend/README.md](backend/README.md) — API reference, environment variables, running options
+- [backend/README.md](backend/README.md) — API reference, implementation notes, environment variables
 - [frontend/README.md](frontend/README.md) — project structure, component overview, environment variables
+- [docs/a2ui-flow.md](docs/a2ui-flow.md) — how A2UI surfaces are generated and rendered, end to end
+- [DESIGN.md](DESIGN.md) — the design system: colors, typography, spacing, component styles

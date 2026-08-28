@@ -1,11 +1,11 @@
-# Deploys the static project homepage in homepage/ to GitHub Pages.
+# Builds the manual site in website/ and deploys it to GitHub Pages.
 # One-time setup: in the repository Settings > Pages, set Source to "GitHub Actions".
-name: Deploy homepage to GitHub Pages
+name: Deploy the manual site to GitHub Pages
 
 on:
   push:
     branches: [master]
-    paths: ["homepage/**", ".github/workflows/pages.yml"]
+    paths: ["website/**", "mise.toml", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -18,20 +18,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # mise.toml is the single source of truth for the Node.js and pnpm
+      # versions, here as much as on a developer's machine.
+      - name: Install the pinned toolchain
+        uses: jdx/mise-action@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Builds every locale, and fails on a broken link.
+      - name: Build
+        run: pnpm build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/build
+
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload homepage artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: homepage
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
