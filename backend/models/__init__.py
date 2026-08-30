@@ -1,7 +1,7 @@
 from .agent_skill import AgentSkill, AgentSkillCreate, AgentSkillRead, AgentSkillUpdate
 from .approval import Approval, ApprovalCreate, ApprovalStatus, ApprovalUpdate
 from .auth_session import AuthSession
-from .impersonation_event import ImpersonationEvent
+from .impersonation_event import ImpersonationEvent, ImpersonationEventRead
 from .mcp_server import (
     MCPServer,
     MCPServerCreate,
@@ -103,6 +103,7 @@ __all__ = [
     "ApprovalUpdate",
     "AuthSession",
     "ImpersonationEvent",
+    "ImpersonationEventRead",
     "MCPServer",
     "MCPServerCreate",
     "MCPServerUpdate",

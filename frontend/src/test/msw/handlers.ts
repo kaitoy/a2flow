@@ -268,6 +268,53 @@ export const MCP_TOOL_INVOCATION_1 = {
   updatedBy: "",
 };
 
+export const IMPERSONATION_EVENT_1 = {
+  id: "impersonation-1",
+  impersonatorId: "user-1",
+  targetUserId: "user-2",
+  startedAt: "2026-01-01T00:00:00Z",
+  endedAt: null,
+  targetTenantId: "tenant-1",
+};
+
+export const APPROVAL_CERTIFICATE_1 = {
+  id: "certificate-1",
+  tenantId: "tenant-1",
+  approvalId: "appr-1",
+  workflowExecutionId: "execution-1",
+  workflowTaskId: "task-1",
+  caId: "ca-1",
+  serialNumber: "123456789",
+  notBefore: "2026-01-01T00:00:00Z",
+  notAfter: "2026-01-02T00:00:00Z",
+  revokedAt: null,
+  revocationReason: null,
+  allowedTools: [{ mcpServerId: "mcp-1", toolName: "search" }],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+export const OUTBOUND_EMAIL_1 = {
+  id: "email-1",
+  tenantId: "tenant-1",
+  notificationId: "notification-1",
+  toEmail: "alice@example.com",
+  subject: "Approval requested",
+  body: "Please review the pending approval.",
+  status: "sent",
+  attempts: 1,
+  nextAttemptAt: "2026-01-01T00:00:00Z",
+  leaseExpiresAt: null,
+  lastError: null,
+  sentAt: "2026-01-01T00:01:00Z",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:01:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 // Note: secret responses carry only the entry `keys`, never their values — the
 // API is write-only.
 export const SECRET_1 = {
@@ -587,6 +634,30 @@ export const handlers = [
       updatedBy: "alice",
     });
   }),
+
+  http.get(`${BASE}/api/v1/mcp-tool-invocations`, () => envelope([MCP_TOOL_INVOCATION_1])),
+
+  http.get(`${BASE}/api/v1/mcp-tool-invocations/:invocationId`, ({ params }) =>
+    envelope({ ...MCP_TOOL_INVOCATION_1, id: params.invocationId as string })
+  ),
+
+  http.get(`${BASE}/api/v1/impersonation-events`, () => envelope([IMPERSONATION_EVENT_1])),
+
+  http.get(`${BASE}/api/v1/impersonation-events/:eventId`, ({ params }) =>
+    envelope({ ...IMPERSONATION_EVENT_1, id: params.eventId as string })
+  ),
+
+  http.get(`${BASE}/api/v1/approval-certificates`, () => envelope([APPROVAL_CERTIFICATE_1])),
+
+  http.get(`${BASE}/api/v1/approval-certificates/:certificateId`, ({ params }) =>
+    envelope({ ...APPROVAL_CERTIFICATE_1, id: params.certificateId as string })
+  ),
+
+  http.get(`${BASE}/api/v1/outbound-emails`, () => envelope([OUTBOUND_EMAIL_1])),
+
+  http.get(`${BASE}/api/v1/outbound-emails/:emailId`, ({ params }) =>
+    envelope({ ...OUTBOUND_EMAIL_1, id: params.emailId as string })
+  ),
 
   http.get(`${BASE}/api/v1/notifications`, () => envelope([])),
 

@@ -10,6 +10,7 @@ A certificate's contents are signed, so the only thing that can change after
 issuance is whether it still counts.
 """
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -19,10 +20,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.approval_certificate import (
     ApprovalCertificate,
     ApprovalCertificateCreate,
+    ApprovalCertificateRead,
     RevocationReason,
 )
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.exceptions import NotFoundError
+from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
 
 class ApprovalCertificateRepository(Protocol):
@@ -46,6 +49,15 @@ class ApprovalCertificateRepository(Protocol):
 
     async def list_live_for_execution(
         self, workflow_execution_id: str
+    ) -> list[ApprovalCertificate]: ...
+
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
     ) -> list[ApprovalCertificate]: ...
 
     async def create(
@@ -224,6 +236,52 @@ class SqlApprovalCertificateRepository:
             )
             .order_by(col(ApprovalCertificate.created_at))
         )
+        return list(result.all())
+
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[ApprovalCertificate]:
+        """Return a page of the tenant's certificates, newest first by default.
+
+        Backs the admin audit list, which spans every approval rather than
+        starting from one -- unlike the other read methods here, each of which
+        answers a question the verification path asks about a specific approval,
+        task, run, or serial.
+
+        ``readable=ApprovalCertificateRead`` keeps ``certificate_pem`` and
+        ``private_key_encrypted`` out of the filter and sort surface: they are
+        absent from that schema, so a client cannot use "which rows match" as a
+        blind oracle on key material it never receives (see
+        :func:`repositories.query._resolve_column`).
+
+        Args:
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
+
+        Returns:
+            The requested page of certificates.
+        """
+        stmt = select(ApprovalCertificate)
+        if self._tenant_id is not None:
+            stmt = stmt.where(ApprovalCertificate.tenant_id == self._tenant_id)
+        stmt = apply_filters(
+            stmt, ApprovalCertificate, filters, readable=ApprovalCertificateRead
+        )
+        stmt = apply_sort(
+            stmt,
+            ApprovalCertificate,
+            sort,
+            default=[col(ApprovalCertificate.created_at).desc()],
+            readable=ApprovalCertificateRead,
+        )
+        result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 
     async def create(

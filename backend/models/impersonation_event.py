@@ -13,10 +13,13 @@ any other ``RESTRICT`` reference to ``users.id``.
 from datetime import UTC, datetime
 
 import uuid_utils
+from pydantic import field_serializer
+from pydantic.alias_generators import to_camel
 from sqlalchemy import ForeignKeyConstraint, Index
 from sqlmodel import Field, SQLModel
+from sqlmodel._compat import SQLModelConfig
 
-from models.base import TZDateTime
+from models.base import TZDateTime, iso_z, iso_z_or_none
 
 
 class ImpersonationEvent(SQLModel, table=True):
@@ -55,3 +58,47 @@ class ImpersonationEvent(SQLModel, table=True):
         sa_type=TZDateTime,
     )
     ended_at: datetime | None = Field(default=None, sa_type=TZDateTime)
+
+
+class ImpersonationEventRead(SQLModel):
+    """Read view of one impersonation session, returned by the admin audit API.
+
+    The table class above is deliberately not the response model, unlike most
+    read-only entities here. It inherits plain :class:`~sqlmodel.SQLModel`
+    rather than :class:`~models.base.BaseEntity`, so it carries neither the
+    camelCase alias generator every other payload uses nor the ``Z``-suffixed
+    datetime serialization the generated frontend Zod schemas require. This
+    schema supplies both.
+
+    ``target_tenant_id`` is the one field with no column behind it: it is filled
+    from the join :meth:`repositories.impersonation_event.SqlImpersonationEventRepository.list`
+    already performs to scope rows by tenant, so an all-tenants listing can label
+    which tenant each session touched. Because it is absent from the table class,
+    :func:`repositories.query._resolve_column` will not resolve it -- filtering
+    and sorting stay on the real columns, which is the intended behavior.
+    """
+
+    model_config = SQLModelConfig(
+        from_attributes=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    id: str
+    impersonator_id: str
+    target_user_id: str
+    started_at: datetime
+    ended_at: datetime | None = None
+    #: Tenant of the impersonated user, resolved through the join. ``None`` when
+    #: the target is platform-scoped (a super admin or the seeded system user).
+    target_tenant_id: str | None = None
+
+    @field_serializer("started_at", when_used="json")
+    def _serialize_started_at(self, dt: datetime) -> str:
+        """Serialize the start instant as ISO-8601 with a ``Z`` suffix."""
+        return iso_z(dt)
+
+    @field_serializer("ended_at", when_used="json")
+    def _serialize_ended_at(self, dt: datetime | None) -> str | None:
+        """Serialize the end instant, passing ``None`` through for an open session."""
+        return iso_z_or_none(dt)

@@ -45,3 +45,5 @@ sidebar_position: 4
 ## 監査証跡 {#audit-trail}
 
 なりすましのセッションは、誰が誰にいつ、という形で `impersonation_events` テーブルに永続的に記録されます([設定リファレンス](../operations/configuration.md)を参照)。`createdBy` と `updatedBy` に入るのはなりすまし先のユーザーなので、「その書き込みの後ろにいたのは実際には誰か」に答えられるのはこの証跡だけです。だからこれは省略可能な機能ではありません。
+
+Admin はこの証跡を[監査ログ](../guides/audit-logs.md#impersonations)の **Impersonations** タブで読めます。自テナントのアカウントが関わったセッションが、Super Admin が開始したものも含めてすべて並びます。

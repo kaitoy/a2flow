@@ -1,10 +1,10 @@
-"""Tests for the super_admin-only ``/outbound-emails`` List/Get/Delete API.
+"""Tests for the admin-gated ``/outbound-emails`` List/Get/Delete API.
 
 There is no Create or Update route (see :mod:`models.outbound_email`), so every
 row here is inserted directly through :class:`repositories.outbound_email.SqlOutboundEmailRepository`
-rather than through the API. Covers the role gate (every route, not just
-writes, requires ``super_admin``), tenant isolation, and the terminal-status
-rule on delete.
+rather than through the API. Covers the split role gate (reads require ``admin``,
+Delete requires ``super_admin``), tenant isolation, and the terminal-status rule
+on delete.
 """
 
 from collections.abc import AsyncGenerator
@@ -145,23 +145,24 @@ async def test_super_admin_can_delete_a_terminal_row(
     assert await _get_row(engine, email_id) is None
 
 
-async def test_plain_admin_is_forbidden_from_list(
+async def test_plain_admin_can_list(
     outbound_email_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    client, _ = outbound_email_env
-    assert_err(await client.get(_PATH, headers=ADMIN), code="FORBIDDEN", status=403)
+    """Reads sit at ``admin``: the queue is part of the audit trail a tenant's
+    administrators follow, unlike Delete, which destroys that evidence."""
+    client, engine = outbound_email_env
+    email_id = await _seed_email(engine)
+    rows = assert_ok(await client.get(_PATH, headers=ADMIN))
+    assert [row["id"] for row in rows] == [email_id]
 
 
-async def test_plain_admin_is_forbidden_from_get(
+async def test_plain_admin_can_get(
     outbound_email_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, engine = outbound_email_env
     email_id = await _seed_email(engine)
-    assert_err(
-        await client.get(f"{_PATH}/{email_id}", headers=ADMIN),
-        code="FORBIDDEN",
-        status=403,
-    )
+    body = assert_ok(await client.get(f"{_PATH}/{email_id}", headers=ADMIN))
+    assert body["id"] == email_id
 
 
 async def test_plain_admin_is_forbidden_from_delete(

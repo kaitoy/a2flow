@@ -1,8 +1,10 @@
 """MCP tool-invocation audit repository: Protocol and SQLModel implementation.
 
-Append-only: there is no ``update`` or ``delete``. ``list`` reads a run's rows
-back for ``GET /workflow-executions/{id}/tool-invocations``; nothing else in the
-application touches them, and no route can alter or remove one.
+Append-only: there is no ``update`` or ``delete``. ``list_for_execution`` reads
+one run's rows back for ``GET /workflow-executions/{id}/tool-invocations``, and
+``list``/``get`` read them tenant-wide for the admin audit surface
+(``GET /mcp-tool-invocations``); nothing else in the application touches them,
+and no route can alter or remove one.
 """
 
 from collections.abc import Sequence
@@ -10,6 +12,7 @@ from typing import Protocol
 
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel.sql.expression import SelectOfScalar
 
 from models.mcp_tool_invocation import (
     MCPToolInvocation,
@@ -29,6 +32,17 @@ class McpToolInvocationRepository(Protocol):
     async def list_for_execution(
         self,
         execution_id: str,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[MCPToolInvocation]: ...
+
+    async def get(self, invocation_id: str) -> MCPToolInvocation | None: ...
+
+    async def list(
+        self,
         *,
         limit: int,
         offset: int,
@@ -95,6 +109,49 @@ class SqlMcpToolInvocationRepository:
         await self._db.refresh(invocation)
         return invocation
 
+    async def _page(
+        self,
+        stmt: SelectOfScalar[MCPToolInvocation],
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec],
+        filters: Sequence[FilterSpec],
+    ) -> list[MCPToolInvocation]:
+        """Apply the tenant predicate, filters, sort, and paging to a select.
+
+        Shared by :meth:`list` and :meth:`list_for_execution` so the two cannot
+        drift in how they scope or order rows.
+
+        Declared before both on purpose: once a method named ``list`` exists in
+        this class body, a later ``list[...]`` annotation resolves to that
+        method instead of the builtin.
+
+        Args:
+            stmt: The select to narrow, already carrying any caller predicate.
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
+
+        Returns:
+            The requested page of records.
+        """
+        if self._tenant_id is not None:
+            stmt = stmt.where(MCPToolInvocation.tenant_id == self._tenant_id)
+        stmt = apply_filters(
+            stmt, MCPToolInvocation, filters, readable=MCPToolInvocation
+        )
+        stmt = apply_sort(
+            stmt,
+            MCPToolInvocation,
+            sort,
+            default=[col(MCPToolInvocation.created_at).desc()],
+            readable=MCPToolInvocation,
+        )
+        result = await self._db.exec(stmt.limit(limit).offset(offset))
+        return [*result.all()]
+
     async def list_for_execution(
         self,
         execution_id: str,
@@ -125,17 +182,56 @@ class SqlMcpToolInvocationRepository:
         stmt = select(MCPToolInvocation).where(
             MCPToolInvocation.workflow_execution_id == execution_id
         )
+        return await self._page(
+            stmt, limit=limit, offset=offset, sort=sort, filters=filters
+        )
+
+    async def get(self, invocation_id: str) -> MCPToolInvocation | None:
+        """Return one recorded decision by id, filtered by tenant.
+
+        Uses a filtered ``select`` rather than ``session.get`` so a cross-tenant
+        id returns ``None`` (surfacing as a 404) instead of another tenant's
+        evidence. The tenant predicate is dropped entirely in all-tenants mode,
+        since ``tenant_id`` is non-nullable and ``Column == None`` would compile
+        to ``IS NULL`` and match nothing.
+
+        Args:
+            invocation_id: The record's primary key.
+
+        Returns:
+            The row, or ``None`` when it does not exist in this tenant.
+        """
+        stmt = select(MCPToolInvocation).where(MCPToolInvocation.id == invocation_id)
         if self._tenant_id is not None:
             stmt = stmt.where(MCPToolInvocation.tenant_id == self._tenant_id)
-        stmt = apply_filters(
-            stmt, MCPToolInvocation, filters, readable=MCPToolInvocation
+        return (await self._db.exec(stmt)).first()
+
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[MCPToolInvocation]:
+        """Return a page of the tenant's recorded decisions, newest first by default.
+
+        Backs the tenant-wide admin audit list, unlike
+        :meth:`list_for_execution` which narrows to one run.
+
+        Args:
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
+
+        Returns:
+            The requested page of records.
+        """
+        return await self._page(
+            select(MCPToolInvocation),
+            limit=limit,
+            offset=offset,
+            sort=sort,
+            filters=filters,
         )
-        stmt = apply_sort(
-            stmt,
-            MCPToolInvocation,
-            sort,
-            default=[col(MCPToolInvocation.created_at).desc()],
-            readable=MCPToolInvocation,
-        )
-        result = await self._db.exec(stmt.limit(limit).offset(offset))
-        return list(result.all())

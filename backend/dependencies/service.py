@@ -17,8 +17,10 @@ from services import (
     ApprovalCertificateService,
     ApprovalService,
     ApproverGroupResolver,
+    ImpersonationEventService,
     MCPRegistryService,
     MCPServerService,
+    McpToolInvocationService,
     MCPToolMockService,
     MetricsService,
     NotificationDispatcher,
@@ -51,6 +53,7 @@ from .repository import (
     ApprovalRepositoryDep,
     DBSessionDep,
     EffectiveRoleRepositoryDep,
+    ImpersonationEventReadRepositoryDep,
     McpCertificateAuthorityRepositoryDep,
     MCPServerReadRepositoryDep,
     MCPServerRepositoryDep,
@@ -263,6 +266,34 @@ def get_mcp_tool_mock_read_service(
 
 MCPToolMockReadServiceDep = Annotated[
     MCPToolMockService, Depends(get_mcp_tool_mock_read_service)
+]
+
+
+def get_mcp_tool_invocation_service(
+    repo: McpToolInvocationReadRepositoryDep,
+) -> McpToolInvocationService:
+    """Create an McpToolInvocationService for the tenant-wide audit read routes.
+
+    Built on the read repository because the service exposes nothing but reads,
+    which a platform-scoped caller may run across every tenant at once.
+    """
+    return McpToolInvocationService(repo)
+
+
+McpToolInvocationServiceDep = Annotated[
+    McpToolInvocationService, Depends(get_mcp_tool_invocation_service)
+]
+
+
+def get_impersonation_event_service(
+    repo: ImpersonationEventReadRepositoryDep,
+) -> ImpersonationEventService:
+    """Create an ImpersonationEventService for the audit read routes."""
+    return ImpersonationEventService(repo)
+
+
+ImpersonationEventServiceDep = Annotated[
+    ImpersonationEventService, Depends(get_impersonation_event_service)
 ]
 
 

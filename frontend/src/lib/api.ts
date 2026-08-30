@@ -16,6 +16,7 @@ import type {
   AvatarConfig,
   ExecuteWorkflowRequest,
   GenerateWorkflowRequest,
+  ImpersonationEventRead,
   LoginRequest,
   McpCommand,
   McpRegistryEnvVar,
@@ -36,6 +37,7 @@ import type {
   Notification as NotificationModel,
   NotificationType,
   NotificationUpdate,
+  OutboundEmailRead as OutboundEmailModel,
   SecretCreate,
   SecretRead as SecretModel,
   SecretType,
@@ -106,9 +108,13 @@ import {
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
   zGetApprovalCertificateApiV1ApprovalsApprovalIdCertificateGetResponse,
+  zGetApprovalCertificateByIdApiV1ApprovalCertificatesCertificateIdGetResponse,
   zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse,
+  zGetImpersonationEventApiV1ImpersonationEventsEventIdGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
+  zGetMcpToolInvocationApiV1McpToolInvocationsInvocationIdGetResponse,
   zGetMcpToolMockApiV1McpToolMocksMockIdGetResponse,
+  zGetOutboundEmailApiV1OutboundEmailsEmailIdGetResponse,
   zGetSecretApiV1SecretsSecretIdGetResponse,
   zGetSessionApiV1SessionsSessionIdGetResponse,
   zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
@@ -123,12 +129,16 @@ import {
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
+  zListApprovalCertificatesApiV1ApprovalCertificatesGetResponse,
   zListApprovalsApiV1ApprovalsGetResponse,
   zListGroupsForUserApiV1UsersUserIdGroupsGetResponse,
+  zListImpersonationEventsApiV1ImpersonationEventsGetResponse,
   zListMcpServersApiV1McpServersGetResponse,
   zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse,
+  zListMcpToolInvocationsApiV1McpToolInvocationsGetResponse,
   zListMcpToolMocksApiV1McpToolMocksGetResponse,
   zListNotificationsApiV1NotificationsGetResponse,
+  zListOutboundEmailsApiV1OutboundEmailsGetResponse,
   zListSecretKeysApiV1SecretsSecretIdKeysGetResponse,
   zListSecretsApiV1SecretsGetResponse,
   zListSessionsApiV1SessionsGetResponse,
@@ -458,10 +468,20 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
 
 export type AgentSkill = WithAudit<AgentSkillModel>;
 export type Approval = WithAudit<ApprovalModel>;
+export type ApprovalCertificate = WithAudit<ApprovalCertificateRead>;
 export type McpServer = WithAudit<McpServerModel>;
 export type McpToolMock = WithAudit<McpToolMockModel>;
 export type McpToolInvocation = WithAudit<McpToolInvocationModel>;
 export type Notification = WithAudit<NotificationModel>;
+export type OutboundEmail = WithAudit<OutboundEmailModel>;
+/**
+ * One recorded impersonation session.
+ *
+ * Not wrapped in `WithAudit` like the rows above: the table skips the shared
+ * audit columns entirely, so there is no `createdBy`/`updatedBy` to require —
+ * `impersonatorId` is who acted, and `startedAt` is when.
+ */
+export type ImpersonationEvent = ImpersonationEventRead;
 export type Secret = WithAudit<SecretModel>;
 export type SystemSettings = WithAudit<SystemSettingsModel>;
 export type Tag = WithAudit<TagModel>;
@@ -481,6 +501,7 @@ export type {
   ApprovalUpdate,
   AvatarConfig,
   GenerateWorkflowRequest,
+  ImpersonationEventRead,
   LoginRequest,
   McpCommand,
   McpRegistryEnvVar,
@@ -831,6 +852,108 @@ export async function listWorkflowExecutionToolInvocations(
     ),
     zListWorkflowExecutionToolInvocationsApiV1WorkflowExecutionsExecutionIdToolInvocationsGetResponse
   ) as Promise<McpToolInvocation[]>;
+}
+
+/**
+ * List every MCP tool-call decision recorded in the tenant (createdAt DESC by default).
+ *
+ * The audit-screen counterpart of {@link listWorkflowExecutionToolInvocations},
+ * which narrows to one run. Admin-only, since it spans every run in the tenant.
+ */
+export async function listMcpToolInvocations(query: ListQuery = {}): Promise<McpToolInvocation[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/mcp-tool-invocations", listConfig(query)),
+    zListMcpToolInvocationsApiV1McpToolInvocationsGetResponse
+  ) as Promise<McpToolInvocation[]>;
+}
+
+/** Fetch a single recorded MCP tool-call decision by ID. */
+export async function getMcpToolInvocation(
+  id: string,
+  config?: AxiosRequestConfig
+): Promise<McpToolInvocation> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/mcp-tool-invocations/${encodeURIComponent(id)}`, config),
+    zGetMcpToolInvocationApiV1McpToolInvocationsInvocationIdGetResponse
+  ) as Promise<McpToolInvocation>;
+}
+
+/**
+ * List recorded impersonation sessions (startedAt DESC by default).
+ *
+ * Rows are scoped by the impersonated user's tenant, so an admin sees the
+ * sessions that touched their own tenant's accounts — including ones a
+ * platform-scoped super admin opened.
+ */
+export async function listImpersonationEvents(
+  query: ListQuery = {}
+): Promise<ImpersonationEvent[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/impersonation-events", listConfig(query)),
+    zListImpersonationEventsApiV1ImpersonationEventsGetResponse
+  ) as Promise<ImpersonationEvent[]>;
+}
+
+/** Fetch a single recorded impersonation session by ID. */
+export async function getImpersonationEvent(
+  id: string,
+  config?: AxiosRequestConfig
+): Promise<ImpersonationEvent> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/impersonation-events/${encodeURIComponent(id)}`, config),
+    zGetImpersonationEventApiV1ImpersonationEventsEventIdGetResponse
+  ) as Promise<ImpersonationEvent>;
+}
+
+/**
+ * List the certificates issued for granted approvals (createdAt DESC by default).
+ *
+ * Each row's `allowedTools` is parsed back out of the signed certificate, so it
+ * can never disagree with what the approval actually authorized. Key material is
+ * never part of the response.
+ */
+export async function listApprovalCertificates(
+  query: ListQuery = {}
+): Promise<ApprovalCertificate[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/approval-certificates", listConfig(query)),
+    zListApprovalCertificatesApiV1ApprovalCertificatesGetResponse
+  ) as Promise<ApprovalCertificate[]>;
+}
+
+/**
+ * Fetch a single approval certificate by its own ID.
+ *
+ * Distinct from {@link getApprovalCertificate}, which reaches the same record
+ * through the approval it was issued for.
+ */
+export async function getApprovalCertificateById(
+  id: string,
+  config?: AxiosRequestConfig
+): Promise<ApprovalCertificate> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/approval-certificates/${encodeURIComponent(id)}`, config),
+    zGetApprovalCertificateByIdApiV1ApprovalCertificatesCertificateIdGetResponse
+  ) as Promise<ApprovalCertificate>;
+}
+
+/** List the outgoing notification-email queue (createdAt DESC by default). */
+export async function listOutboundEmails(query: ListQuery = {}): Promise<OutboundEmail[]> {
+  return fetchEnvelope(
+    apiClient.get("/api/v1/outbound-emails", listConfig(query)),
+    zListOutboundEmailsApiV1OutboundEmailsGetResponse
+  ) as Promise<OutboundEmail[]>;
+}
+
+/** Fetch a single queued or delivered notification email by ID. */
+export async function getOutboundEmail(
+  id: string,
+  config?: AxiosRequestConfig
+): Promise<OutboundEmail> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/outbound-emails/${encodeURIComponent(id)}`, config),
+    zGetOutboundEmailApiV1OutboundEmailsEmailIdGetResponse
+  ) as Promise<OutboundEmail>;
 }
 
 /** Fetch the tools advertised by a registered MCP server (live query to the server). */

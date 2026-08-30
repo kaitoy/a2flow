@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # Admin UI
 
-The admin area is where every record in A2Flow is created, inspected and edited. It is a single shell — an app bar across the top, a section sidebar down the left — and every section inside it works the same way, so learning one list teaches you all twelve.
+The admin area is where every record in A2Flow is created, inspected and edited. It is a single shell — an app bar across the top, a section sidebar down the left — and every section inside it works the same way, so learning one list teaches you all thirteen.
 
 ## Welcome page {#welcome-page}
 
@@ -37,9 +37,12 @@ The breadcrumb trail above every title mirrors that path — `Admin › Workflow
 | **Workflows** | Multi-step flows and their task templates | Developer, Requester, Admin |
 | **Workflow Executions** | Workflow runs and their history | Everyone signed in |
 | **Approvals** | Approval requests and their decisions | Everyone signed in |
+| **Audit Logs** | Tool calls, impersonation, granted authority, and sent mail | Admin, Super Admin |
 | **System Settings** | The mail server notifications are sent through | Super Admin |
 
 A section missing from your sidebar is one your roles cannot write to. Reads stay open, so a colleague can still send you a direct link to a record inside it — see [Roles and authorization](../concepts/authorization.md).
+
+[Audit Logs](./audit-logs.md) is the exception: its reads are restricted too, and a direct link into it gets an access-denied screen without the Admin role.
 
 ## The list screen
 

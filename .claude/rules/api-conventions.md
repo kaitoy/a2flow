@@ -5,7 +5,7 @@ paths:
 
 # List Query Parameters
 
-Every collection endpoint (`GET /agent-skills`, `GET /workflows`, `GET /workflows/{id}/task-templates`, `GET /workflow-executions`, `GET /workflow-executions/{id}/workflow-tasks`, `GET /notifications`, `GET /outbound-emails`) accepts the same set of optional query parameters. Field names are written in **camelCase** (matching the JSON response), and an unknown field, operator, or uncoercible value returns HTTP 400 with the `INVALID_QUERY` error code.
+Every collection endpoint (`GET /agent-skills`, `GET /workflows`, `GET /workflows/{id}/task-templates`, `GET /workflow-executions`, `GET /workflow-executions/{id}/workflow-tasks`, `GET /notifications`, `GET /outbound-emails`, `GET /mcp-tool-invocations`, `GET /approval-certificates`, `GET /impersonation-events`) accepts the same set of optional query parameters. Field names are written in **camelCase** (matching the JSON response), and an unknown field, operator, or uncoercible value returns HTTP 400 with the `INVALID_QUERY` error code.
 
 | Param | Purpose | Syntax | Example |
 |---|---|---|---|
@@ -24,6 +24,6 @@ Filter operators (`op`):
 | `like` | Case-insensitive substring match (string fields) |
 | `in` | Matches any of a comma-separated list, e.g. `status:in:pending,completed` |
 
-When `s` is omitted, each endpoint falls back to its default ordering (`createdAt` descending; workflow tasks and task templates order by `createdAt` then `id` ascending; tags order by `name` ascending).
+When `s` is omitted, each endpoint falls back to its default ordering (`createdAt` descending; workflow tasks and task templates order by `createdAt` then `id` ascending; tags order by `name` ascending; impersonation events order by `startedAt` descending, since that table has no `createdAt` column).
 
 `tag` is accepted only by the four taggable collections (`GET /secrets`, `/workflows`, `/mcp-servers`, `/agent-skills`) and is **conjunctive**: a record must carry every tag listed, so repeating the parameter narrows the result rather than widening it. It is a parameter of its own rather than a `q` term because tags are not a column of any record — `apply_filters`/`apply_sort` resolve field names against the model, so `q=tagIds:eq:…` and `s=tagIds` are rejected as unknown fields, which is the intended behavior.

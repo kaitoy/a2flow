@@ -44,6 +44,7 @@ const sidebars: SidebarsConfig = {
         'guides/secrets',
         'guides/tags',
         'guides/notifications',
+        'guides/audit-logs',
         'guides/system-settings',
       ],
     },

@@ -45,3 +45,5 @@ Failing the request instead would be worse than useless: the selection lives in 
 ## Audit trail {#audit-trail}
 
 Every impersonation session is recorded in a persistent audit trail — who, whom, and when — in the `impersonation_events` table (see the [configuration reference](../operations/configuration.md)). Because the impersonated user is what lands in `createdBy` / `updatedBy`, this trail is the only thing that answers "who was really behind that write?", which is exactly why it is not optional.
+
+An Admin reads that trail on the **Impersonations** tab of [Audit Logs](../guides/audit-logs.md#impersonations), which lists every session that touched their tenant's accounts — including ones a Super Admin opened.

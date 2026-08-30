@@ -1,6 +1,6 @@
 ---
 title: システム設定
-sidebar_position: 12
+sidebar_position: 13
 ---
 
 # システム設定

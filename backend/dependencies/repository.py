@@ -17,6 +17,7 @@ from repositories import (
     ApprovalRepository,
     AuthSessionRepository,
     EffectiveRoleRepository,
+    ImpersonationEventRepository,
     McpCertificateAuthorityRepository,
     MCPServerRepository,
     McpToolInvocationRepository,
@@ -31,6 +32,7 @@ from repositories import (
     SqlApprovalRepository,
     SqlAuthSessionRepository,
     SqlEffectiveRoleRepository,
+    SqlImpersonationEventRepository,
     SqlMcpCertificateAuthorityRepository,
     SqlMCPServerRepository,
     SqlMcpToolInvocationRepository,
@@ -165,6 +167,24 @@ def get_mcp_tool_mock_read_repository(
 
 MCPToolMockReadRepositoryDep = Annotated[
     MCPToolMockRepository, Depends(get_mcp_tool_mock_read_repository)
+]
+
+
+def get_impersonation_event_read_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+) -> ImpersonationEventRepository:
+    """Create an ImpersonationEventRepository for the audit read routes.
+
+    The write half of this repository (used by the impersonation flow in
+    ``dependencies/auth.py``) is constructed with the session alone: the table
+    has no ``tenant_id``, and scoping applies only to the reads, which narrow by
+    the impersonated user's tenant. See :mod:`repositories.impersonation_event`.
+    """
+    return SqlImpersonationEventRepository(db, tenant_id=tenant_id)
+
+
+ImpersonationEventReadRepositoryDep = Annotated[
+    ImpersonationEventRepository, Depends(get_impersonation_event_read_repository)
 ]
 
 

@@ -6,10 +6,12 @@ rows are written only by :class:`services.notification_dispatch.NotificationDisp
 and mutated only by the queue worker's named lifecycle steps -- see
 :mod:`models.outbound_email`.
 
-Every route, not just writes, is gated behind ``super_admin`` -- unlike most
-resource routers here, which leave reads open to any authenticated caller,
-this surface exposes every queued message's recipient and body across the
-tenant, matching the same shape as :mod:`routers.system_settings`.
+Reads are gated behind ``admin`` and Delete behind ``super_admin``, so no route
+here is open to a plain authenticated caller the way most resource routers'
+``GET``s are: this surface exposes every queued message's recipient and body
+across the tenant. Reads sit at ``admin`` because the queue is part of the audit
+trail a tenant's administrators are expected to be able to follow; Delete stays
+at ``super_admin`` because discarding a dead letter destroys that evidence.
 
 Like every other tenant-scoped resource, a platform-scoped ``super_admin``
 (one who carries no ``tenant_id`` of their own) must select a tenant via the
@@ -37,14 +39,18 @@ from models.user import Role
 
 router = APIRouter(prefix="/outbound-emails", tags=["outbound-emails"])
 
-#: Route dependency gating every outbound-email route behind the ``super_admin`` role.
+#: Route dependency gating the outbound-email reads behind the ``admin`` role
+#: (``super_admin`` passes through :func:`models.user.has_role`'s bypass).
+_requires_admin = [Depends(require_roles(Role.admin))]
+
+#: Route dependency gating Delete behind the stricter ``super_admin`` role.
 _requires_super_admin = [Depends(require_roles(Role.super_admin))]
 
 
 @router.get(
     "",
     response_model=ApiResponse[list[OutboundEmailRead]],
-    dependencies=_requires_super_admin,
+    dependencies=_requires_admin,
 )
 async def list_outbound_emails(
     service: OutboundEmailReadServiceDep,
@@ -70,7 +76,7 @@ async def list_outbound_emails(
 @router.get(
     "/{email_id}",
     response_model=ApiResponse[OutboundEmailRead],
-    dependencies=_requires_super_admin,
+    dependencies=_requires_admin,
 )
 async def get_outbound_email(
     email_id: str,
@@ -98,6 +104,9 @@ async def delete_outbound_email(
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
     """Delete an outbound-email queue row.
+
+    Restricted to ``super_admin``, unlike the reads above: discarding a row
+    destroys audit evidence, so it is not part of what a tenant admin may do.
 
     Only permitted once the row has reached a terminal status (``sent`` or
     ``failed``); a ``pending``/``sending`` row may be actively claimed by the

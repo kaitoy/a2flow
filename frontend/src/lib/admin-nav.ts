@@ -6,6 +6,7 @@ import {
   KeyRound,
   ListChecks,
   type LucideIcon,
+  ScrollText,
   Server,
   Settings2,
   Tags,
@@ -121,6 +122,13 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Approvals",
     icon: CheckCircle2,
     description: "Review pending approvals",
+  },
+  {
+    href: "/admin/audit",
+    label: "Audit Logs",
+    icon: ScrollText,
+    description: "Trace tool calls, impersonation, certificates, and mail",
+    roles: [Role.ADMIN],
   },
   {
     href: "/admin/system-settings",

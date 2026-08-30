@@ -339,6 +339,30 @@ The point is not the transport. The proxy is still in-process, so the presenter 
 
 ---
 
+### Audit read APIs
+
+Three admin-gated, read-only surfaces back the frontend's `/admin/audit` section. All of them use `require_roles(Role.admin)` (so `super_admin` passes through `has_role`'s bypass) on **every** route, reads included — unlike most resource routers, which leave `GET` open to any authenticated caller. Each spans every record in the acting tenant, so the participant-level access that gates the narrower per-record views is not sufficient here.
+
+| Routes | Returns | Repository |
+|---|---|---|
+| `GET /api/v1/mcp-tool-invocations`, `.../{id}` | `MCPToolInvocation` | `repositories/mcp_tool_invocation.py` |
+| `GET /api/v1/approval-certificates`, `.../{id}` | `ApprovalCertificateRead` | `repositories/approval_certificate.py` |
+| `GET /api/v1/impersonation-events`, `.../{id}` | `ImpersonationEventRead` | `repositories/impersonation_event.py` |
+
+None of the three has a Create, Update, or Delete route, which is what keeps the trails append-only. All accept the shared pagination / sort / filter query params and are built on `CurrentTenantScopeDep`, so a platform-scoped `super_admin` may send `X-Tenant-Id: __all__` to read across every tenant.
+
+The narrower views they complement are unchanged: `GET /workflow-executions/{id}/tool-invocations` (one run, open to that run's participants) and `GET /approvals/{id}/certificate` (one approval, open to any authenticated caller).
+
+**`approval_certificates` list.** `SqlApprovalCertificateRepository.list` passes `readable=ApprovalCertificateRead` so `certificate_pem` and `private_key_encrypted` resolve as unknown fields — a client cannot use "which rows match" as a blind oracle on key material it never receives. `ApprovalCertificateService.list` parses each row's grants back out of its PEM, the same as the single read, so a page costs a page of X.509 parses and the response can never report a grant that differs from what was signed.
+
+**`impersonation_events` scoping.** This table has no `tenant_id` — it references users, which are platform-scoped — so the audit reads scope rows by an `IN` subquery over `users` on `target_user_id`, filtering the *impersonated* user's tenant. Filtering on the target rather than the actor is what makes a platform-scoped `super_admin`'s session visible to the tenant whose data it touched: the actor carries no `tenant_id` at all. The subquery is used in place of a join so the statement stays a scalar `select`, which is what `apply_filters`/`apply_sort` resolve field names against; the target's tenant is then attached in one further query and surfaced as `ImpersonationEventRead.target_tenant_id`. That field has no column behind it, so it is not filterable or sortable. The three write methods stay unscoped as they always were, so this is not a fourth entry in the audited list of tenant-unscoped repositories.
+
+`ImpersonationEventRead` exists because `ImpersonationEvent` inherits plain `SQLModel` rather than `BaseEntity`: it carries neither the camelCase alias generator nor the `Z`-suffixed datetime serialization the generated frontend Zod schemas require.
+
+**Outgoing email.** `GET /api/v1/outbound-emails` and `.../{id}` moved from `super_admin` to `admin` alongside these three, since the queue is part of the same audit trail. `DELETE` stays at `super_admin`: discarding a dead letter destroys evidence. See [Outgoing email queue](#outgoing-email-queue).
+
+---
+
 ### Notifications
 
 Per-user notifications surfaced in the frontend's toolbar bell. Notifications are generated as side effects of workflow activity — the generation job raises a `workflow_draft_ready` when the initial task templates land, `request_approval` raises an `approval_request` addressed to the designated approver — or one per eligible member when the request is addressed to a group, and the final `update_workflow_task` that drives every task to a terminal state raises a one-shot `execution_completed` addressed to the user who started the run. Both endpoints below are scoped to the authenticated user; the list never accepts a `user_id`, and reading or marking another user's notification returns `404 NOT_FOUND`.

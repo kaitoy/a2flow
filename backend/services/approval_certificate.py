@@ -18,6 +18,7 @@ logged so the gap is visible rather than silent.
 """
 
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from cryptography import x509
@@ -49,6 +50,7 @@ from models.workflow_task import ToolBinding, WorkflowTaskRead, WorkflowTaskStat
 from repositories.approval_certificate import ApprovalCertificateRepository
 from repositories.exceptions import NotFoundError
 from repositories.mcp_ca import McpCertificateAuthorityRepository
+from repositories.query import FilterSpec, SortSpec
 from repositories.workflow_task import WorkflowTaskRepository
 
 logger = logging.getLogger(__name__)
@@ -267,13 +269,89 @@ class ApprovalCertificateService:
         certificate = await self._certificates.get_latest_for_approval(approval_id)
         if certificate is None:
             raise NotFoundError("ApprovalCertificate", approval_id)
-        claims = extract_claims(
-            x509.load_pem_x509_certificate(certificate.certificate_pem.encode("ascii"))
+        return _to_read(certificate)
+
+    async def read(self, certificate_id: str) -> ApprovalCertificateRead:
+        """Return the public view of one certificate by its own id.
+
+        Backs the admin audit surface, which reaches a certificate directly
+        rather than through the approval it was issued for.
+
+        Args:
+            certificate_id: The certificate's primary key.
+
+        Returns:
+            The read view, including the granted tools.
+
+        Raises:
+            NotFoundError: If no certificate exists with that ID in the acting
+                tenant.
+            CertificateVerificationError: If the stored certificate is
+                unparseable or carries claims that do not fit the grammar.
+        """
+        certificate = await self._certificates.get(certificate_id)
+        if certificate is None:
+            raise NotFoundError("ApprovalCertificate", certificate_id)
+        return _to_read(certificate)
+
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[ApprovalCertificateRead]:
+        """Return a page of the acting tenant's certificates as read views.
+
+        Every row's granted tools are parsed back out of its signed certificate,
+        exactly as :meth:`read_for_approval` does for one. That means a page of
+        rows costs a page of X.509 parses, which is the price of the guarantee
+        the single read already makes: the API cannot report a grant that
+        differs from what was actually signed.
+
+        Args:
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
+
+        Returns:
+            The requested page of read views.
+
+        Raises:
+            CertificateVerificationError: If a stored certificate is unparseable
+                or carries claims that do not fit the grammar.
+        """
+        certificates = await self._certificates.list(
+            limit=limit, offset=offset, sort=sort, filters=filters
         )
-        allowed = [
-            ToolBinding(mcp_server_id=server_id, tool_name=tool_name)
-            for server_id, tool_name in sorted(claims.allowed_tools)
-        ]
-        return ApprovalCertificateRead.from_certificate(
-            certificate, allowed_tools=allowed
-        )
+        return [_to_read(certificate) for certificate in certificates]
+
+
+def _to_read(certificate: ApprovalCertificate) -> ApprovalCertificateRead:
+    """Build a certificate's public view, parsing its grants out of the PEM.
+
+    The granted tools are read back from the signed certificate rather than from
+    a column, so a response can never report a grant that differs from what the
+    certificate says. The private key and the PEM itself are dropped by
+    :meth:`models.approval_certificate.ApprovalCertificateRead.from_certificate`.
+
+    Args:
+        certificate: The persisted certificate row.
+
+    Returns:
+        The read view, including the granted tools in a stable order.
+
+    Raises:
+        CertificateVerificationError: If the stored certificate is unparseable
+            or carries claims that do not fit the grammar.
+    """
+    claims = extract_claims(
+        x509.load_pem_x509_certificate(certificate.certificate_pem.encode("ascii"))
+    )
+    allowed = [
+        ToolBinding(mcp_server_id=server_id, tool_name=tool_name)
+        for server_id, tool_name in sorted(claims.allowed_tools)
+    ]
+    return ApprovalCertificateRead.from_certificate(certificate, allowed_tools=allowed)

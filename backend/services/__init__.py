@@ -10,8 +10,10 @@ from .email_queue_worker import (
     run_email_queue_worker,
 )
 from .impersonation import ImpersonationService
+from .impersonation_event import ImpersonationEventService
 from .mcp_registry import MCPRegistryService
 from .mcp_server import MCPServerService
+from .mcp_tool_invocation import McpToolInvocationService
 from .mcp_tool_mock import MCPToolMockService
 from .metrics import MetricsService, MetricsWindow
 from .notification import NotificationService
@@ -43,10 +45,12 @@ __all__ = [
     "AuthService",
     "EmailQueueConfig",
     "EmailQueueWorker",
+    "ImpersonationEventService",
     "ImpersonationService",
     "MCPRegistryService",
     "MCPServerService",
     "MCPToolMockService",
+    "McpToolInvocationService",
     "MetricsService",
     "MetricsWindow",
     "NotificationDispatcher",
