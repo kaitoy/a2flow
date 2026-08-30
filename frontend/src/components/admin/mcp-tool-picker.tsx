@@ -11,9 +11,9 @@
  * server's tools in one list had to fan those connections out on mount and made
  * the operator wait for the slowest one before showing anything. Here the mount
  * cost is a single registry read, and a server is queried only once it has
- * actually been picked.
+ * actually been picked (via {@link useMcpServerTools}).
  *
- * The server side is a {@link RecordPickerDialog} rather than a second select
+ * The server side is a {@link McpServerPickerDialog} rather than a second select
  * for the same reason the secret side is: it pages, sorts, and filters
  * server-side, so it stays usable however many servers a tenant registers.
  *
@@ -22,6 +22,9 @@
  * server's catalog at once. A chip is always removable — including one whose
  * server is unreachable or which the server no longer advertises — since
  * `value` alone is authoritative and needs no live option to stay visible.
+ *
+ * The single-select sibling — one `(server, tool)` pair rather than a list — is
+ * {@link McpToolField}.
  */
 "use client";
 
@@ -29,17 +32,14 @@ import { Server } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormField } from "@/components/admin/form-field";
-import { RecordPickerDialog } from "@/components/admin/record-picker-dialog";
-import { tagsColumn } from "@/components/admin/tag-columns";
+import { McpServerPickerDialog } from "@/components/admin/mcp-server-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import type { ColumnDef } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select, type SelectOption } from "@/components/ui/select";
-import { useTags } from "@/hooks/useTags";
-import { getApiErrorMessage, listMcpServers, listMcpServerTools, type McpServer } from "@/lib/api";
+import { useMcpServerTools } from "@/hooks/useMcpServerTools";
+import { getApiErrorMessage, listMcpServers } from "@/lib/api";
 import { bindingLabel, bindingToValue, valueToBinding } from "@/lib/mcp-tool-options";
-import { EMPTY_VALUE } from "@/lib/read-only-display";
 
 /** Upper bound used to read the whole MCP server registry for the name map. */
 const SERVER_LIMIT = 1000;
@@ -47,93 +47,10 @@ const SERVER_LIMIT = 1000;
 /** DOM id of the tool select, and the prefix of the dialog's panel id. */
 const ID_PREFIX = "mcpTool";
 
-/** Props for {@link McpServerPickerDialog}. */
-interface McpServerPickerDialogProps {
-  open: boolean;
-  onClose: () => void;
-  /** Called with the chosen server's id and name, or `("", "")` if cleared. */
-  onAssign: (id: string, name: string) => void;
-  panelId: string;
-  /** Currently chosen server id, or `""` when none is chosen. */
-  value: string;
-}
-
-/**
- * {@link RecordPickerDialog} configured for MCP servers, columned like the MCP
- * Servers list page minus the columns that don't help a picker: the name is
- * plain text rather than a link (this dialog does not navigate away from a
- * half-filled form), and the id, audit, and action columns describe bookkeeping
- * the operator is not picking on. Endpoint stays because it is what tells two
- * similarly named servers apart, and Tags stays and is filterable, since tags
- * are how a tenant with many servers narrows down to the one it wants.
- *
- * A component of its own, not inlined into {@link McpToolPicker}, so `useTags` —
- * like {@link RecordPickerDialog}'s own row fetch — only runs once the picker
- * has actually been opened, not on every mount of the field.
- */
-function McpServerPickerDialog({
-  open,
-  onClose,
-  onAssign,
-  panelId,
-  value,
-}: McpServerPickerDialogProps) {
-  const { byId: tagsById } = useTags();
-  const columns: ColumnDef<McpServer>[] = [
-    {
-      header: "Name",
-      sortField: "name",
-      filterField: "name",
-      visibility: "always",
-      cell: (server) => server.name,
-    },
-    {
-      header: "Description",
-      cell: (server) => server.description || EMPTY_VALUE,
-    },
-    {
-      header: "Endpoint",
-      sortField: "url",
-      filterField: "url",
-      className: "font-mono",
-      cell: (server) =>
-        server.transport === "stdio"
-          ? [server.command, ...(server.args ?? [])].join(" ")
-          : server.url,
-    },
-    tagsColumn<McpServer>((server) => server.tagIds, tagsById),
-  ];
-
-  return (
-    <RecordPickerDialog<McpServer>
-      open={open}
-      onClose={onClose}
-      onAssign={(ids, options) => onAssign(ids[0] ?? "", options[0]?.label ?? "")}
-      panelId={panelId}
-      title="Select MCP server"
-      value={value === "" ? [] : [value]}
-      multiple={false}
-      listRecords={listMcpServers}
-      columns={columns}
-      getId={(server) => server.id}
-      getLabel={(server) => server.name}
-      emptyMessage="This tenant has no MCP servers yet."
-      emptyIcon={Server}
-    />
-  );
-}
-
 /** What the one-off registry read is currently doing. */
 type RegistryState =
   | { phase: "loading" }
   | { phase: "ready"; names: Map<string, string> }
-  | { phase: "error"; message: string };
-
-/** What the chosen server's live tool listing is currently doing. */
-type ToolsState =
-  | { phase: "idle" }
-  | { phase: "loading" }
-  | { phase: "ready"; names: string[] }
   | { phase: "error"; message: string };
 
 /** Props for {@link McpToolPicker}. */
@@ -150,15 +67,14 @@ export interface McpToolPickerProps {
  * Reads the server registry once on mount — a plain database listing, with no
  * MCP connection behind it — both to label already-bound tools and to tell "no
  * servers are registered" apart from "the registry could not be read". The
- * chosen server's tools are then fetched on demand, and that fetch's four
- * outcomes (in flight, none advertised, all already added, unreachable) each
- * name themselves in the select rather than all collapsing into an empty
- * dropdown.
+ * chosen server's tools are then fetched on demand by {@link useMcpServerTools},
+ * and that fetch's four outcomes (in flight, none advertised, all already added,
+ * unreachable) each name themselves in the select rather than all collapsing
+ * into an empty dropdown.
  */
 export function McpToolPicker({ value, onChange }: McpToolPickerProps) {
   const [registry, setRegistry] = useState<RegistryState>({ phase: "loading" });
   const [picked, setPicked] = useState<{ id: string; name: string } | null>(null);
-  const [tools, setTools] = useState<ToolsState>({ phase: "idle" });
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
 
@@ -172,14 +88,8 @@ export function McpToolPicker({ value, onChange }: McpToolPickerProps) {
     };
   }, []);
 
-  // Identifies the in-flight tool request. A `stdio` server can take a minute
-  // to answer, which is long enough for the operator to have picked a different
-  // server in the meantime — without this the slow reply would land on top of
-  // the new server's tools.
-  const toolsRequestRef = useRef(0);
-
-  // Stable, so the effects below run once per input and the retry buttons can
-  // reuse them.
+  // Stable, so the effect below runs once per input and the retry button can
+  // reuse it.
   const loadRegistry = useCallback(async () => {
     setRegistry({ phase: "loading" });
     try {
@@ -191,35 +101,12 @@ export function McpToolPicker({ value, onChange }: McpToolPickerProps) {
     }
   }, []);
 
-  const loadTools = useCallback(async (serverId: string) => {
-    const token = toolsRequestRef.current + 1;
-    toolsRequestRef.current = token;
-    setTools({ phase: "loading" });
-    try {
-      const fetched = await listMcpServerTools(serverId);
-      if (!mountedRef.current || toolsRequestRef.current !== token) return;
-      setTools({ phase: "ready", names: fetched.map((tool) => tool.name) });
-    } catch (err) {
-      if (!mountedRef.current || toolsRequestRef.current !== token) return;
-      setTools({ phase: "error", message: getApiErrorMessage(err) });
-    }
-  }, []);
-
   useEffect(() => {
     void loadRegistry();
   }, [loadRegistry]);
 
   const pickedId = picked?.id ?? null;
-  useEffect(() => {
-    if (pickedId === null) {
-      // Abandon whatever is in flight, so a slow reply for the server just
-      // cleared cannot repopulate the select after the fact.
-      toolsRequestRef.current += 1;
-      setTools({ phase: "idle" });
-      return;
-    }
-    void loadTools(pickedId);
-  }, [pickedId, loadTools]);
+  const { state: tools, reload: reloadTools } = useMcpServerTools(pickedId);
 
   // Names known from the registry, plus the one the dialog just reported —
   // which is the only source when the registry read itself failed.
@@ -364,11 +251,7 @@ export function McpToolPicker({ value, onChange }: McpToolPickerProps) {
               {tools.phase === "error" && (
                 <div className="flex flex-col items-start gap-1.5">
                   <p className="text-xs text-error">{tools.message}</p>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => void loadTools(picked.id)}
-                  >
+                  <Button type="button" variant="secondary" onClick={reloadTools}>
                     Retry
                   </Button>
                 </div>

@@ -23,23 +23,18 @@ import {
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { SelectOption } from "@/components/ui/select";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
   deleteMcpToolMock,
   getMcpToolMock,
   isForbiddenError,
-  listMcpServers,
   SUPPRESS_FORBIDDEN_TOAST,
   updateMcpToolMock,
 } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
-
-/** Upper bound used to fetch the MCP server registry for the server select. */
-const SERVER_LIMIT = 1000;
 
 /**
  * Detail page of one tool mock. The page is titled with the mock's own name.
@@ -59,7 +54,6 @@ export default function McpToolMockDetailPage() {
   const [forbidden, setForbidden] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
-  const [serverOptions, setServerOptions] = useState<SelectOption[]>([]);
   // The persisted name, which titles the page. Kept out of the form so the
   // heading names the saved record rather than following every keystroke.
   const [name, setName] = useState("");
@@ -79,15 +73,6 @@ export default function McpToolMockDetailPage() {
     defaultValues: emptyMcpToolMockFormValues(),
   });
   const target = watch("target");
-
-  useEffect(() => {
-    listMcpServers({ limit: SERVER_LIMIT })
-      .then((servers) => setServerOptions(servers.map((s) => ({ value: s.id, label: s.name }))))
-      .catch(() => {
-        // Failure toast is shown globally by api.ts; the select simply stays
-        // empty and the stored server id shows as unresolved.
-      });
-  }, []);
 
   useEffect(() => {
     getMcpToolMock(mockId, SUPPRESS_FORBIDDEN_TOAST)
@@ -187,10 +172,9 @@ export default function McpToolMockDetailPage() {
               control={control}
               errors={errors}
               target={target}
-              serverOptions={serverOptions}
             />
           ) : (
-            <McpToolMockFields readOnly values={getValues()} serverOptions={serverOptions} />
+            <McpToolMockFields readOnly values={getValues()} />
           )}
 
           <div className="flex gap-2">

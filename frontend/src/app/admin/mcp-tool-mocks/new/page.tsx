@@ -4,7 +4,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FlaskConical } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -19,22 +18,17 @@ import {
 } from "@/components/admin/mcp-tool-mock-fields";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
-import type { SelectOption } from "@/components/ui/select";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { createMcpToolMock, listMcpServers } from "@/lib/api";
+import { createMcpToolMock } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
-
-/** Upper bound used to fetch the MCP server registry for the server select. */
-const SERVER_LIMIT = 1000;
 
 /** Admin page for registering a new tool mock. */
 export default function NewMcpToolMockPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
-  const [serverOptions, setServerOptions] = useState<SelectOption[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -49,15 +43,6 @@ export default function NewMcpToolMockPage() {
     defaultValues: emptyMcpToolMockFormValues(),
   });
   const target = watch("target");
-
-  useEffect(() => {
-    listMcpServers({ limit: SERVER_LIMIT })
-      .then((servers) => setServerOptions(servers.map((s) => ({ value: s.id, label: s.name }))))
-      .catch(() => {
-        // Failure toast is shown globally by api.ts; the select simply stays
-        // empty, and the schema then blocks submitting without a server.
-      });
-  }, []);
 
   async function onSubmit(values: McpToolMockFormValues) {
     try {
@@ -103,7 +88,6 @@ export default function NewMcpToolMockPage() {
             control={control}
             errors={errors}
             target={target}
-            serverOptions={serverOptions}
             showPlaceholders
           />
 

@@ -31,7 +31,7 @@ Mocking is chosen **per tool**, not per run, because a dry run is only useful if
 | Field | Notes |
 |---|---|
 | **Name** / **Description** | How you recognize it in the Run dialog. |
-| **Target** | Either one tool of a [registered MCP server](./mcp-servers.md) — pick the **MCP Server**, then the **Tool Name** — or a **built-in** A2Flow tool. |
+| **Target** | Either one tool of a [registered MCP server](./mcp-servers.md) — choose **Select MCP server**, pick the server, then choose its **Tool Name** from the list loaded from that server — or a **built-in** A2Flow tool. |
 | **Responses** | An ordered list, indexed by call ordinal. |
 
 The only built-in tool currently mockable is `request_approval`: the one whose side effects otherwise need a human to clear before the run can continue.

@@ -1,3 +1,4 @@
+import type { UserEvent } from "@testing-library/user-event";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it } from "vitest";
@@ -13,6 +14,21 @@ function renderPage() {
   return render(<NewMcpToolMockPage />, { preloadedState: DEVELOPER });
 }
 
+/**
+ * Point the MCP mock at `my-mcp-server`'s `search` tool the way an operator
+ * does: open the server dialog, choose the server, then pick the tool from the
+ * list loaded from it (the default handler advertises `search`).
+ */
+async function pickServerAndTool(user: UserEvent) {
+  await user.click(await screen.findByRole("button", { name: "Select MCP server…" }));
+  await user.click(await screen.findByRole("radio", { name: "my-mcp-server" }));
+  await user.click(screen.getByRole("button", { name: "Select" }));
+  const toolSelect = await screen.findByRole("combobox", { name: /tool name/i });
+  await waitFor(() => expect(toolSelect).toBeEnabled());
+  await user.click(toolSelect);
+  await user.click(await screen.findByRole("option", { name: "search" }));
+}
+
 /** Capture the body the create request sends, returning a getter for it. */
 function captureCreate(): () => unknown {
   let body: unknown;
@@ -26,10 +42,10 @@ function captureCreate(): () => unknown {
 }
 
 describe("NewMcpToolMockPage", () => {
-  it("renders the name and tool-name inputs", async () => {
+  it("renders the name field and the MCP server picker", async () => {
     renderPage();
     expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
-    expect(await screen.findByLabelText(/tool name/i)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Select MCP server…" })).toBeInTheDocument();
   });
 
   it("starts with one structured response", () => {
@@ -44,9 +60,7 @@ describe("NewMcpToolMockPage", () => {
 
     renderPage();
     await user.type(screen.getByLabelText(/^name/i), "no hits");
-    await user.click(await screen.findByRole("combobox", { name: /mcp server/i }));
-    await user.click(await screen.findByRole("option", { name: "my-mcp-server" }));
-    await user.type(screen.getByLabelText(/tool name/i), "search");
+    await pickServerAndTool(user);
     const value = screen.getByLabelText("Response 1 value");
     await user.clear(value);
     await user.type(value, '{{"hits": 0}');
@@ -107,9 +121,7 @@ describe("NewMcpToolMockPage", () => {
     renderPage();
 
     await user.type(screen.getByLabelText(/^name/i), "broken");
-    await user.click(await screen.findByRole("combobox", { name: /mcp server/i }));
-    await user.click(await screen.findByRole("option", { name: "my-mcp-server" }));
-    await user.type(screen.getByLabelText(/tool name/i), "search");
+    await pickServerAndTool(user);
     const value = screen.getByLabelText("Response 1 value");
     await user.clear(value);
     await user.type(value, "not json");
@@ -123,9 +135,7 @@ describe("NewMcpToolMockPage", () => {
     renderPage();
 
     await user.type(screen.getByLabelText(/^name/i), "scalar");
-    await user.click(await screen.findByRole("combobox", { name: /mcp server/i }));
-    await user.click(await screen.findByRole("option", { name: "my-mcp-server" }));
-    await user.type(screen.getByLabelText(/tool name/i), "search");
+    await pickServerAndTool(user);
     const value = screen.getByLabelText("Response 1 value");
     await user.clear(value);
     await user.type(value, "42");

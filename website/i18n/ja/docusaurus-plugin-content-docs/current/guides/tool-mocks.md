@@ -31,7 +31,7 @@ flowchart LR
 | 項目 | 説明 |
 |---|---|
 | **Name** / **Description** | 実行ダイアログで見分けるための名前と説明。 |
-| **Target** | [登録済みの MCP サーバー](./mcp-servers.md)のツール 1 つ(**MCP Server** を選び、次に **Tool Name** を選ぶ)か、A2Flow の**組み込み**ツール。 |
+| **Target** | [登録済みの MCP サーバー](./mcp-servers.md)のツール 1 つ(**Select MCP server** を押してサーバーを選び、そのサーバーから読み込んだ一覧で **Tool Name** を選ぶ)か、A2Flow の**組み込み**ツール。 |
 | **Responses** | 呼び出しの回数で引く順序つきのリスト。 |
 
 今のところモックできる組み込みツールは `request_approval` だけです。副作用を消さない限り、実行を続けるのに人の対応が要るツールだからです。

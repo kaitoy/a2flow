@@ -11,14 +11,20 @@
  * it as text is what lets a half-finished object stay on screen with an inline
  * error instead of being rejected keystroke by keystroke. It is parsed once, in
  * {@link toMcpToolMockBody}, after the schema has confirmed it parses at all.
+ *
+ * An `mcp` target's server and tool are picked through {@link McpToolField} —
+ * the same two-step "choose the server, then a tool from its live listing"
+ * control the task-template forms use — so the two forms behave alike and the
+ * page no longer fetches the server registry itself.
  */
 "use client";
 
 import { Plus, Server, Trash2, Wrench } from "lucide-react";
 import type { Control, FieldErrors, UseFormRegister } from "react-hook-form";
-import { Controller, useFieldArray } from "react-hook-form";
+import { Controller, useController, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { FormField } from "@/components/admin/form-field";
+import { McpToolField } from "@/components/admin/mcp-tool-field";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
@@ -173,8 +179,6 @@ export interface McpToolMockEditableFieldsProps {
   errors: FieldErrors<McpToolMockFormValues>;
   /** Currently selected target, watched by the page so the fields re-render. */
   target: MockTarget;
-  /** Registered MCP servers, offered as the server choices. */
-  serverOptions: SelectOption[];
   /** Whether to show input placeholders (the create form does, the edit form does not). */
   showPlaceholders?: boolean;
 }
@@ -185,8 +189,6 @@ export interface McpToolMockReadOnlyFieldsProps {
   readOnly: true;
   /** The values to display, e.g. the edit form's `getValues()`. */
   values: McpToolMockFormValues;
-  /** Registered MCP servers, used to name the selected one. */
-  serverOptions: SelectOption[];
 }
 
 /**
@@ -280,13 +282,7 @@ function ResponseListEditor({
 }
 
 /** The same fields as values, for a viewer who may see the mock but not edit it. */
-function McpToolMockFieldValues({
-  values,
-  serverOptions,
-}: {
-  values: McpToolMockFormValues;
-  serverOptions: SelectOption[];
-}) {
+function McpToolMockFieldValues({ values }: { values: McpToolMockFormValues }) {
   return (
     <>
       <FormField htmlFor="name" label="Name" required>
@@ -303,17 +299,19 @@ function McpToolMockFieldValues({
         <ReadOnlyField>{formatChoice(TARGET_OPTIONS, values.target)}</ReadOnlyField>
       </FormField>
 
-      {values.target === "mcp" && (
-        <FormField htmlFor="mcpServerId" label="MCP Server" required>
-          <ReadOnlyField>
-            {serverOptions.find((o) => o.value === values.mcpServerId)?.label || EMPTY_VALUE}
-          </ReadOnlyField>
+      {values.target === "mcp" ? (
+        <McpToolField
+          readOnly
+          idPrefix="mcpToolMock"
+          mcpServerId={values.mcpServerId}
+          toolName={values.toolName}
+          onChange={() => {}}
+        />
+      ) : (
+        <FormField htmlFor="toolName" label="Tool Name" required>
+          <ReadOnlyField>{values.toolName || EMPTY_VALUE}</ReadOnlyField>
         </FormField>
       )}
-
-      <FormField htmlFor="toolName" label="Tool Name" required>
-        <ReadOnlyField>{values.toolName || EMPTY_VALUE}</ReadOnlyField>
-      </FormField>
 
       <FormField htmlFor="responses" label="Responses" required>
         <div className="flex flex-col gap-2">
@@ -335,6 +333,36 @@ function McpToolMockFieldValues({
 }
 
 /**
+ * Wires {@link McpToolField} to the form's `mcpServerId` / `toolName` fields.
+ *
+ * A sub-component so the two `useController` calls run only while the `mcp`
+ * target is selected, mirroring how {@link ResponseListEditor} takes `control`.
+ */
+function McpToolMockServerToolField({
+  control,
+  errors,
+}: {
+  control: Control<McpToolMockFormValues>;
+  errors: FieldErrors<McpToolMockFormValues>;
+}) {
+  const server = useController({ control, name: "mcpServerId" });
+  const tool = useController({ control, name: "toolName" });
+  return (
+    <McpToolField
+      idPrefix="mcpToolMock"
+      mcpServerId={server.field.value}
+      toolName={tool.field.value}
+      onChange={({ mcpServerId, toolName }) => {
+        server.field.onChange(mcpServerId);
+        tool.field.onChange(toolName);
+      }}
+      serverError={errors.mcpServerId?.message}
+      toolError={errors.toolName?.message}
+    />
+  );
+}
+
+/**
  * The tool-mock form fields, shared by the create and edit pages.
  *
  * Pass `readOnly` with the current values to render them as text instead of
@@ -342,9 +370,9 @@ function McpToolMockFieldValues({
  */
 export function McpToolMockFields(props: McpToolMockFieldsProps) {
   if (props.readOnly) {
-    return <McpToolMockFieldValues values={props.values} serverOptions={props.serverOptions} />;
+    return <McpToolMockFieldValues values={props.values} />;
   }
-  const { register, control, errors, target, serverOptions, showPlaceholders } = props;
+  const { register, control, errors, target, showPlaceholders } = props;
   return (
     <>
       <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
@@ -380,36 +408,7 @@ export function McpToolMockFields(props: McpToolMockFieldsProps) {
       </FormField>
 
       {target === "mcp" ? (
-        <>
-          <FormField
-            htmlFor="mcpServerId"
-            label="MCP Server"
-            required
-            error={errors.mcpServerId?.message}
-          >
-            <Controller
-              control={control}
-              name="mcpServerId"
-              render={({ field }) => (
-                <Select
-                  id="mcpServerId"
-                  options={serverOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                  placeholder="Select a server"
-                />
-              )}
-            />
-          </FormField>
-
-          <FormField htmlFor="toolName" label="Tool Name" required error={errors.toolName?.message}>
-            <Input
-              id="toolName"
-              {...register("toolName")}
-              placeholder={showPlaceholders ? "search_issues" : undefined}
-            />
-          </FormField>
-        </>
+        <McpToolMockServerToolField control={control} errors={errors} />
       ) : (
         <FormField htmlFor="toolName" label="Tool Name" required error={errors.toolName?.message}>
           <Controller

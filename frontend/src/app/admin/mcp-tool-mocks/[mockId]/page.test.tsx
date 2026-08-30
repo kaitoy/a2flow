@@ -35,7 +35,10 @@ describe("McpToolMockDetailPage", () => {
     await waitFor(() =>
       expect(screen.getByDisplayValue("search returns nothing")).toBeInTheDocument()
     );
-    expect(screen.getByDisplayValue("search")).toBeInTheDocument();
+    // The MCP tool is now a two-step picker: the server named on a chip, the
+    // tool selected in the dropdown loaded from it.
+    expect(await screen.findByRole("button", { name: "Remove my-mcp-server" })).toBeInTheDocument();
+    expect(await screen.findByRole("combobox", { name: /tool name/i })).toHaveTextContent("search");
     expect(screen.getByLabelText("Response 1 value")).toHaveValue('{\n  "hits": []\n}');
   });
 

@@ -9,8 +9,6 @@ import {
   toMcpToolMockBody,
 } from "./mcp-tool-mock-fields";
 
-const SERVER_OPTIONS = [{ value: "mcp-1", label: "my-mcp-server" }];
-
 function values(overrides: Partial<McpToolMockFormValues> = {}): McpToolMockFormValues {
   return { ...emptyMcpToolMockFormValues(), ...overrides };
 }
@@ -90,11 +88,10 @@ describe("toMcpToolMockBody", () => {
 });
 
 describe("McpToolMockFields read-only mode", () => {
-  it("shows every value as text, naming the selected server", () => {
+  it("shows every value as text, naming the selected server", async () => {
     render(
       <McpToolMockFields
         readOnly
-        serverOptions={SERVER_OPTIONS}
         values={values({
           name: "no hits",
           target: "mcp",
@@ -105,7 +102,8 @@ describe("McpToolMockFields read-only mode", () => {
       />
     );
     expect(screen.getByText("no hits")).toBeInTheDocument();
-    expect(screen.getByText("my-mcp-server")).toBeInTheDocument();
+    // The name is resolved from the MCP server registry, read on mount.
+    expect(await screen.findByText("my-mcp-server")).toBeInTheDocument();
     expect(screen.getByText("search")).toBeInTheDocument();
     expect(screen.getByText(/#1 \(text\)/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
@@ -115,7 +113,6 @@ describe("McpToolMockFields read-only mode", () => {
     render(
       <McpToolMockFields
         readOnly
-        serverOptions={SERVER_OPTIONS}
         values={values({ name: "auto approve", target: "builtin", toolName: "request_approval" })}
       />
     );
