@@ -39,11 +39,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ## Amazon Bedrock(LiteLLM 経由)
 
-Bedrock だけは追加のパッケージが必要です。バックエンドを起動する前に入れてください。
-
-```bash
-cd backend && uv add boto3 "botocore[crt]"
-```
+この経路が必要とする `boto3` と `botocore[crt]` はバックエンドに同梱されているため、追加のインストールは不要です。
 
 ```env
 LLM_MODEL=litellm:bedrock/global.anthropic.claude-sonnet-4-6

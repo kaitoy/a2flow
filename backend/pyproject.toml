@@ -15,6 +15,11 @@ dependencies = [
     "litellm>=1.50.0,<1.92.0",
     "ag-ui-protocol>=0.1.15",
     "ag-ui-adk>=0.7.0,<0.8.0",
+    # Required by litellm's Bedrock route (LLM_MODEL=litellm:bedrock/...). The
+    # [crt] extra pulls awscrt for SigV4a, used to sign the cross-region
+    # inference profiles (e.g. bedrock/global.anthropic.claude-*).
+    "boto3>=1.40.0",
+    "botocore[crt]>=1.40.0",
     "pydantic[email]>=2.0.0",
     "pydantic-settings>=2.13.0",
     "sqlmodel>=0.0.22",

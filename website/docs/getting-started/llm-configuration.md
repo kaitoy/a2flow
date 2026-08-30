@@ -39,11 +39,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ## Amazon Bedrock (via LiteLLM)
 
-Bedrock is the one provider that needs extra packages — install them into the backend before starting it:
-
-```bash
-cd backend && uv add boto3 "botocore[crt]"
-```
+The `boto3` and `botocore[crt]` packages this route needs ship with the backend, so there is no extra install step.
 
 ```env
 LLM_MODEL=litellm:bedrock/global.anthropic.claude-sonnet-4-6
