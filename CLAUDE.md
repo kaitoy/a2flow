@@ -112,6 +112,23 @@ Whenever a change falls into any of the following categories, update the manual 
 - **Architecture change** — modifications to how components interact (e.g. adding a new service, changing the AG-UI message flow)
 - **Technology stack change** — swapping or adding a framework, runtime, language, or major library
 
+### How to write a manual page
+
+Manual pages address people who **use or operate** A2Flow, never people building it —
+developer-facing detail belongs in the repository files listed under **The manual site**
+above. On a page, describe what the reader sees and does on screen:
+
+| Keep | Drop |
+|---|---|
+| UI text — screen and button names, column headers, status values, field labels, notation like `${secret:name/key}` | REST endpoints, `localhost` URLs, HTTP status and error codes |
+| Navigation written as an action — "open **Users** in the admin sidebar" | Route paths and deep-link URLs |
+| Observable behaviour — "the save is rejected with an error" | DB table and column names; library or mechanism names; agent-internal tool names |
+
+Prefer a **table**, a **numbered step list**, or a **Mermaid diagram** over long prose.
+Environment variables are documented only in
+[operations/configuration.md](website/docs/operations/configuration.md), which collects
+them all — never on a feature page.
+
 Every page has an English original under `website/docs/` and a Japanese translation
 under `website/i18n/ja/docusaurus-plugin-content-docs/current/`. **Both are written in
 the same change** — a page that exists in only one locale is not done.
