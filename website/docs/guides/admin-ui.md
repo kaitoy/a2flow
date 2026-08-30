@@ -5,18 +5,72 @@ sidebar_position: 1
 
 # Admin UI
 
-The admin area lives at [http://localhost:3000/admin](http://localhost:3000/admin).
+The admin area is where every record in A2Flow is created, inspected and edited. It is a single shell — an app bar across the top, a section sidebar down the left — and every section inside it works the same way, so learning one list teaches you all twelve.
 
-## Welcome page
+## Welcome page {#welcome-page}
 
-[http://localhost:3000/admin](http://localhost:3000/admin) is the welcome landing page. It renders inside the admin shell (sidebar + app bar) and greets the user with quick-action cards that link to a new chat (Super Admin only — see [Chat session access](../concepts/authorization.md)) and each admin section the user's roles allow. This is where the user lands when visiting the site root (`/`), after signing in, and when clicking the **A2Flow** logo in the app bar from any screen.
+The welcome page is the landing screen: you arrive here after signing in, when you open the site root, and whenever you click the **A2Flow** logo in the app bar. It greets you with quick-action cards, one per admin section your roles allow.
 
-Every admin list table shares interactive features: **per-column sorting and filtering** (applied server-side via the list APIs' `s` and `q` query parameters, so they cover the whole dataset rather than just the current page), **drag-to-resize column widths** (kept for the session, not persisted), and **hover tooltips** that reveal the full text of any cell clipped to its column width.
+```mermaid
+flowchart LR
+  W["Welcome page<br/>quick-action cards"] --> L["Section list<br/>e.g. Workflows"]
+  L -->|"Add"| N["Create form"]
+  L -->|"click the name"| D["Detail page<br/>titled with the record's name"]
+  N --> D
+  D -->|"breadcrumb"| L
+```
 
-Where a record has a **detail page**, the list's identifier column links to it. That page is the one screen for the record: its attributes plus every action it supports — saving edits, deleting it, and whatever else the record type offers (publishing a workflow, pulling a skill's repository). A detail page is titled with the **record's own name** rather than with the operation, and the breadcrumb trail above the title ends on that same name, so the path reads `Admin › Workflows › my-workflow` and every crumb before the last links back up. [Workflow executions](./workflow-executions.md) are the exception: a run is a history rather than a record to edit, so its row opens its workflow session or its read-only task list instead.
+The breadcrumb trail above every title mirrors that path — `Admin › Workflows › my-workflow` — and every crumb but the last one links back up.
 
-Each table also has a **column picker** — the ▥ button next to Refresh — listing every column the table can show, with a "Show all" / "Hide all" bulk toggle and a "Reset to default" action. The panel always fits the screen: it opens above the button when there is no room below, scrolls its column list internally while keeping the bulk toggle and the reset action in view, and splits into two columns once the table has more than eight toggleable ones — so even the widest list (agent skills, at seventeen columns) stays fully reachable on a short laptop screen. Each table ships a default set, and some columns (an MCP server's transport, a secret's reference, an agent skill's ref and revision, a user's email and verification flag) start hidden so the columns that matter most get the width. The identifier column and the Actions column are always shown and are not listed. Choices are remembered per table in the browser's local storage, so they survive a reload; only the departures from the defaults are stored, which keeps a table's later columns arriving at their intended default. Hiding a column that a sort or filter is currently using clears that sort or filter, so the rows on screen are never ordered or narrowed by a criterion nothing on the page can show.
+## The sections
 
-## List query parameters
+| Section | What it holds | Shown in the sidebar to |
+|---|---|---|
+| **Tenants** | Tenant organizations | Super Admin |
+| **Users** | Accounts and their roles | Admin, Developer |
+| **User Groups** | Named bundles that grant roles to several accounts at once | Admin, Developer |
+| **Tags** | The labels records are classified by | Admin, Developer |
+| **Secrets** | Credentials for tools and repositories | Admin, Developer |
+| **Agent Skills** | Agent capabilities, cloned from Git repositories | Developer, Admin |
+| **MCP Servers** | Tool servers the agent can call | Developer, Admin |
+| **Tool Mocks** | Stand-ins that stub tools for draft workflow runs | Developer, Admin |
+| **Workflows** | Multi-step flows and their task templates | Developer, Requester, Admin |
+| **Workflow Executions** | Workflow runs and their history | Everyone signed in |
+| **Approvals** | Approval requests and their decisions | Everyone signed in |
+| **System Settings** | The mail server notifications are sent through | Super Admin |
 
-Every collection endpoint accepts a shared set of `limit` / `offset` / sort (`s`) / filter (`q`) query parameters, with camelCase field names. See [.claude/rules/api-conventions.md](https://github.com/kaitoy/a2flow/blob/master/.claude/rules/api-conventions.md) for the full reference.
+A section missing from your sidebar is one your roles cannot write to. Reads stay open, so a colleague can still send you a direct link to a record inside it — see [Roles and authorization](../concepts/authorization.md).
+
+## The list screen
+
+Every section opens on a table, and every table offers the same controls:
+
+| Control | What it does |
+|---|---|
+| **Column header menu** | Sorts and filters by that column. Both are applied across the whole dataset, not just the page on screen. |
+| **Column edges** | Drag to resize. Widths last for the session and are not saved. |
+| **Hover on a cell** | Reveals the full text of anything clipped to the column width. |
+| **▥ Columns** | Opens the column picker (below). |
+| **Refresh** | Re-reads the list. |
+| **Add** | Opens the create form. Hidden without the write role. |
+| **Actions column** | Per-row actions — Delete, and whatever else the record type offers. Hidden without the write role. |
+
+### Choosing columns
+
+The **▥** button next to Refresh lists every column the table can show:
+
+- **Show all** / **Hide all** toggles the lot; **Reset to default** returns to the shipped set.
+- Some columns start hidden so the ones that matter get the width — an MCP server's transport, a secret's reference, an agent skill's ref and revision, a user's email and verification flag.
+- The identifier column and the Actions column are always shown, so they are not listed.
+- Your choices are remembered per table in the browser and survive a reload. Only your departures from the default are kept, so a column added to a table later still arrives at its intended default.
+- Hiding a column that a sort or filter is using clears that sort or filter, so the rows on screen are never narrowed by a criterion nothing on the page can show.
+
+The panel always fits the screen: it opens upwards when there is no room below, scrolls its list internally while keeping the bulk toggles in view, and splits into two columns once a table has more than eight toggleable ones — so even Agent Skills, at seventeen columns, stays reachable on a short laptop screen.
+
+## The detail screen
+
+Clicking a record's name in the identifier column opens its detail page. That page is the one screen for the record: its attributes, plus every action it supports — saving edits, deleting it, and whatever else the type offers, such as publishing a workflow or pulling a skill's repository. It is titled with the **record's own name** rather than with the operation.
+
+Without the write role the same page renders read-only: fields show as recessed values instead of inputs, Save and Delete are gone, and Cancel becomes Back.
+
+[Workflow executions](./workflow-executions.md) are the exception to all of this. A run is a history rather than a record to edit, so its row opens the run's chat or its read-only task list instead of an edit form.

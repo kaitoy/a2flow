@@ -24,8 +24,9 @@ const sidebars: SidebarsConfig = {
       label: 'Concepts',
       items: [
         'concepts/terminology',
-        'concepts/authentication',
+        'concepts/tenants',
         'concepts/authorization',
+        'concepts/impersonation',
       ],
     },
     {
@@ -49,15 +50,26 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Architecture',
-      items: ['architecture/overview', 'architecture/database'],
+      items: [
+        'architecture/overview',
+        'architecture/workflow-design',
+        'architecture/workflow-execution',
+        'architecture/sessions',
+        'architecture/approvals',
+        'architecture/mcp-proxy',
+        'architecture/database',
+        'architecture/secrets',
+      ],
     },
     {
       type: 'category',
       label: 'Operations',
       items: [
-        'operations/configuration',
         'operations/deployment',
+        'operations/configuration',
         'operations/scaling',
+        'operations/backup',
+        'operations/health',
         'operations/metrics',
       ],
     },

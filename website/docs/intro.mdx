@@ -1,0 +1,97 @@
+---
+title: Introduction
+description: A2Flow is a workflow engine rebuilt from the ground up around an AI agent — the agent does not sit inside the workflow, it is the workflow.
+slug: /intro
+sidebar_position: 1
+hide_title: true
+hide_table_of_contents: true
+---
+
+import {IntroPage, IntroHero, IntroContrast, IntroPanel, IntroActs, IntroAct, IntroClosing, IntroNext} from '@site/src/components/IntroSections';
+
+<IntroPage>
+
+<IntroHero
+  eyebrow="AI Agent as a Workflow"
+  title={<>The workflow engine <span className="grad">is the agent</span>.</>}>
+
+A2Flow is a workflow engine rebuilt from the ground up around an AI agent. Not an
+engine with an AI step bolted into it: an engine whose runtime *is* an agent. It
+plans the work, asks the people who have to decide, and does the rest itself.
+
+</IntroHero>
+
+<IntroContrast>
+
+<IntroPanel kind="past" title="An agent inside a workflow">
+
+The flowchart is the program, and somewhere in it sits a box labelled "AI". It
+fills a field, drafts a summary, classifies a ticket. Then control returns to the
+diagram someone drew last year, and the rest of the process runs the way it
+always did.
+
+</IntroPanel>
+
+<IntroPanel kind="next" title="The agent is the workflow">
+
+There is no diagram to return to. The agent reads the procedure, plans the steps,
+binds the tools, asks for the approvals, and executes. A workflow is not
+something the agent takes part in. It is what the agent does.
+
+</IntroPanel>
+
+</IntroContrast>
+
+<IntroActs>
+
+<IntroAct step="01 — Design" icon="design" title="Designed in conversation, not on a canvas">
+
+You start from an [Agent Skill](./guides/agent-skills.md): a `SKILL.md` file in a
+Git repository, versioned and reviewable like any other code. Then you talk to
+the AI. It drafts the task graph, you adjust it, and the
+[MCP tools](./guides/mcp-servers.md) each step needs are bound as you go. What
+you [publish](./guides/workflows.md) is a workflow nobody had to draw.
+
+</IntroAct>
+
+<IntroAct step="02 — Run" icon="run" title="A run is a conversation with several people in it">
+
+Executing a workflow opens one shared chat. The applicant states the intent, the
+agent walks the task graph, and the approver decides right there in the same
+thread, with a comment. No ticket queue, no side channel, no "any update on my
+request?"
+
+</IntroAct>
+
+<IntroAct step="03 — Control" icon="control" title="Every tool call carries a signed approval">
+
+An [approval](./guides/approvals.md) is not advice the agent is asked to follow.
+Granting one mints a short-lived X.509 certificate over exactly the tools that
+task held at the moment of the decision, and the MCP proxy refuses any call that
+does not present it, signed. A prompt injection cannot talk its way past it, and
+the agent cannot widen it afterwards. Every call — allowed or refused — is
+recorded with the certificate's serial and the exact bytes signed for it.
+
+</IntroAct>
+
+</IntroActs>
+
+<IntroClosing headline={<>Plan. Approve. Execute.</>}>
+
+The three things a workflow was ever really made of. A2Flow keeps those and
+hands everything in between to the agent.
+
+</IntroClosing>
+
+<IntroNext title="Where to go next">
+
+- **[Quick start](./getting-started/quick-start.md)** — get the backend and the frontend running on your machine.
+- **[Terminology](./concepts/terminology.md)** — workflows, design sessions, executions, and workflow sessions.
+- **[Agent Skills](./guides/agent-skills.md)** — the Git-backed procedures a workflow is designed from.
+- **[Workflows](./guides/workflows.md)** — generate a workflow from a skill, adjust it, publish it, run it.
+- **[Approvals](./guides/approvals.md)** — how a run stops for a person, and what the certificate authorizes.
+- **[Configuration reference](./operations/configuration.md)** — every environment variable the backend reads.
+
+</IntroNext>
+
+</IntroPage>

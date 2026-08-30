@@ -32,6 +32,10 @@ const config: Config = {
     // the braces and angle brackets that run through the manual's prose stay
     // literal instead of being read as JSX.
     format: 'detect',
+    // Renders ```mermaid fences through @docusaurus/theme-mermaid. The remark
+    // plugin rewrites the code node itself, so this works in the CommonMark
+    // .md pages above as well as in .mdx.
+    mermaid: true,
     hooks: {
       onBrokenMarkdownLinks: 'throw',
     },
@@ -79,6 +83,7 @@ const config: Config = {
   ],
 
   themes: [
+    '@docusaurus/theme-mermaid',
     [
       '@easyops-cn/docusaurus-search-local',
       {
@@ -102,6 +107,15 @@ const config: Config = {
     ],
     colorMode: {
       respectPrefersColorScheme: true,
+    },
+    // Both themes are named explicitly: the site follows the OS colour scheme,
+    // so a diagram drawn for one of them alone is unreadable in the other.
+    mermaid: {
+      theme: {light: 'neutral', dark: 'dark'},
+      // Mermaid's 200px default wraps a node label mid-word, which Japanese
+      // hits constantly (no spaces to break on). Widening it leaves the
+      // authored <br/> as the only line break in either locale.
+      options: {flowchart: {wrappingWidth: 340}},
     },
     navbar: {
       title: 'A2Flow',

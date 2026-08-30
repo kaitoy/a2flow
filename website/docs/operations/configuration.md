@@ -1,100 +1,42 @@
 ---
 title: Configuration reference
-sidebar_position: 1
+sidebar_position: 2
 ---
 
 # Configuration reference
 
-Every setting below is an environment variable the backend reads from `backend/.env`. [backend/.env.example](https://github.com/kaitoy/a2flow/blob/master/backend/.env.example) is the annotated template, and the model and API-key settings have a page of their own under [LLM configuration](../getting-started/llm-configuration.md).
+Every setting below is an environment variable. The backend reads them from `backend/.env` ([backend/.env.example](https://github.com/kaitoy/a2flow/blob/master/backend/.env.example) is the annotated template); the two frontend variables are read from the frontend's own process environment. The model and API-key settings have a page of their own under [LLM configuration](../getting-started/llm-configuration.md).
 
 ## Server settings
 
-```env
-HOST=0.0.0.0
-PORT=8000
-# RELOAD=true
-```
+| Variable | Default | What it does |
+|---|---|---|
+| `HOST` | `0.0.0.0` | Address the backend binds to |
+| `PORT` | `8000` | Port the backend binds to |
+| `RELOAD` | `false` | uvicorn autoreload for local development. Only read when the backend is started as `python -m backend.main`; the Docker image's own start command is unaffected either way |
 
-Defaults to `HOST=0.0.0.0` and `PORT=8000` if omitted. `RELOAD` (default `false`) enables uvicorn autoreload; it only affects `python -m backend.main` — the `uv run uvicorn main:app --reload` command in [Quick start](../getting-started/quick-start.md) and the Dockerfile's startup path are unaffected either way.
+## Frontend settings
 
-## Operations metrics
-
-```env
-# METRICS_TIMEZONE=Asia/Tokyo
-```
-
-IANA timezone name deciding where a calendar day starts for the workflow operations metrics — the "today" counts on `GET /api/v1/metrics` and the daily buckets of the lead-time trend. Defaults to `UTC`; an unrecognized name falls back to `UTC` rather than failing startup, so a typo skews a dashboard's day boundary instead of stopping the app. The metrics themselves are described under [Operations metrics](./metrics.md).
-
-## Agent skill store
-
-```env
-SKILLS_DIR=.skills
-# SKILLS_PRUNE_GRACE_SECONDS=3600
-# SKILLS_CLONE_TIMEOUT_SECONDS=120
-```
-
-Root of the store Agent Skill repositories are shallow-cloned into, laid out as one immutable directory per revision:
-
-```
-$SKILLS_DIR/<agent_skill_id>/<commit_sha>/
-```
-
-A clone is staged in a temporary sibling and published with a single atomic rename, so no reader ever observes a half-written revision; once published, a revision is never modified. Writers (the clone at registration, and every pull) serialize on the `skill-sync:<id>` advisory lock in `infrastructure/locks.py`. Readers take no lock at all — a pull only adds a sibling directory, so it cannot disturb an agent loading an existing revision.
-
-`SKILLS_PRUNE_GRACE_SECONDS` (default 3600) is how long a revision directory survives regardless of whether anything references it. A pull prunes revisions that no workflow execution is pinned to, and the grace window covers the gap between a run reading the skill's current revision and inserting the execution row that names it.
-
-`SKILLS_CLONE_TIMEOUT_SECONDS` (default 120) bounds how long a clone's individual HTTP requests may take. Without it, a slow or hanging remote could stall a clone indefinitely — and with it, the skill's sync advisory lock, leaving the skill `pending` and making a pull of it on another replica silently skip rather than wait.
-
-Defaults to `backend/.skills` (relative to the working directory). Under `docker compose` it is `/var/lib/a2flow/skills`, backed by the `skills` named volume.
-
-This is **durable state, not a cache**: a `WorkflowExecution` pins the revision it started with, so wiping the directory leaves existing executions unable to load their skill (HTTP 409 `SKILL_NOT_READY`) until an admin pulls the skill again. Running more than one backend replica requires all of them to mount this same directory.
-
-## Secret management
-
-```env
-# SECRET_ENCRYPTION_KEY=
-# SECRET_KEY_FILE=.secret_key
-# VAULT_ADDR=https://vault.example.com
-# VAULT_TOKEN=hvs.xxxxxxxx
-# VAULT_ROLE_ID=...
-# VAULT_SECRET_ID=...
-# VAULT_APPROLE_MOUNT=approle
-```
-
-`local`-type [secrets](../guides/secrets.md) are Fernet-encrypted before storage. The key is resolved at first use: `SECRET_ENCRYPTION_KEY` (must be a valid Fernet key) takes precedence; otherwise the key file at `SECRET_KEY_FILE` (default `.secret_key` next to the SQLite database file) is read; otherwise a key is generated, saved to that file, and a WARNING is logged. Back the key up — losing it makes every stored local secret undecryptable.
-
-`vault`-type secrets are read live from a single HashiCorp Vault (KV v2 only) selected by `VAULT_ADDR`. Authentication uses AppRole (`VAULT_ROLE_ID` + `VAULT_SECRET_ID`, login mount from `VAULT_APPROLE_MOUNT`) when set, else the static `VAULT_TOKEN`. `VAULT_ADDR` is deliberately exempt from the SSRF URL checks applied to user-supplied URLs: it is operator-set deployment configuration and typically points at a private address.
+| Variable | Default | What it does |
+|---|---|---|
+| `BACKEND_BASE_URL` | `http://localhost:8000` | Where the frontend's server-side proxy forwards `/api/*`. Read once at process start. In the Docker Compose stack this is the backend's address on the internal network, not a public one |
+| `FRONTEND_PORT` | `3000` | Docker Compose only: the host port the frontend is published on. The container keeps listening on 3000 internally, and the backend's `CORS_ORIGINS` follows this automatically |
 
 ## Application database
 
+| Variable | Default | What it does |
+|---|---|---|
+| `DB_URL` | `sqlite:///a2flow.db` | Database URL. SQLite (relative to the working directory) and PostgreSQL are supported |
+
+The async driver suffix (`sqlite+aiosqlite` / `postgresql+asyncpg`) is added automatically, so the plain scheme is enough:
+
 ```env
-DB_URL=sqlite:///a2flow.db
-# DB_URL=postgresql://user:password@localhost:5432/a2flow
+DB_URL=postgresql://user:password@localhost:5432/a2flow
 ```
 
-Database URL for REST API data and ADK session storage — both live in the same database. SQLite (the default, relative to the working directory) and PostgreSQL are supported; the async driver suffix (`sqlite+aiosqlite` / `postgresql+asyncpg`) is added automatically, so the plain scheme is enough. With SQLite the ADK session store uses `SqliteSessionService`; any other URL switches it to the SQLAlchemy-based `DatabaseSessionService`. Schema changes are tracked as versioned [Alembic](https://alembic.sqlalchemy.org/) migrations under `alembic/versions/` and applied automatically (`alembic upgrade head`) on startup, so redeploying the app is what brings the schema up to date. To add a migration after changing a model, run `uv run alembic revision --autogenerate -m "..."` and review the generated file before committing.
+Schema changes are tracked as versioned [Alembic](https://alembic.sqlalchemy.org/) migrations and applied automatically on startup, so redeploying the app is what brings the schema up to date. Running more than one backend replica requires PostgreSQL — see [Horizontal scaling](./scaling.md). What each table holds is in [Database](../architecture/database.md).
 
-| Table | Description |
-|---|---|
-| `users` | Application users (soft-deleted via `deleted_at`; `roles` holds their granted roles); see [Seeded users](./configuration.md#seeded-users) and [Authorization](../concepts/authorization.md) |
-| `auth_sessions` | Server-side login sessions (hashed cookie token + CSRF token); see [Authentication](../concepts/authentication.md) |
-| `impersonation_events` | Audit trail of impersonation sessions (`impersonator_id`, `target_user_id`, `started_at`, `ended_at`); see [Authentication](../concepts/authentication.md) |
-| `agent_skills` | Agent skill definitions (incl. optional `repo_auth_password` / `repo_auth_username` for private-repo clones) |
-| `mcp_servers` | Registered MCP servers (name, `transport`, then either streamable HTTP URL + request headers or stdio command + args + env — header and env values may embed `${secret:NAME/KEY}` placeholders) |
-| `secrets` | Named key/value credential bundles: an `entries` map of Fernet-encrypted local values, or a HashiCorp Vault KV v2 path reference; see [Secrets](../guides/secrets.md) |
-| `workflows` | Workflow definitions (name, skill reference, lifecycle `status`, AI-summarized `generatedDescription`, user-editable `description`), plus the `session_id` of the design session (the ADK chat) its task templates are designed in and the `agent_skill_commit_sha` that chat is pinned to |
-| `workflow_task_templates` | The pre-designed task list of a workflow (`workflow_id` FK with `ON DELETE CASCADE`; dependency edges and MCP tool bindings live in their own `workflow_task_template_*` join tables) |
-| `workflow_published_versions` | At most one per workflow: the name, description, and task templates (as JSON) frozen at publish time, which a `modified` workflow runs against; see [Workflows](../guides/workflows.md) |
-| `workflow_executions` | One row per run of a workflow: the workflow and skill metadata snapshotted at execute time, plus the `session_id` of the workflow session (the ADK chat) the run happens in (`workflow_id` FK with `ON DELETE SET NULL`, so a run outlives its design) |
-| `workflow_tasks` | Individual tasks belonging to a `WorkflowExecution`, copied from the templates at execute time (`workflow_execution_id` FK with `ON DELETE CASCADE`) |
-| `workflow_task_tool_bindings` | MCP tools bound to a task (`task_id` FK `ON DELETE CASCADE`, `mcp_server_id` FK `ON DELETE RESTRICT`) |
-| `message_meta` | Per-message side-channel facts for the two shared session chats: who sent a message (`sender_user_id`) and which task was in progress (`workflow_task_id`, workflow sessions only). Neither chat has a table of its own, so a row names its parent through exactly one of `workflow_execution_id` (workflow session) / `workflow_id` (design session) — a `CHECK` enforces it, both cascade on delete |
-| `sessions` | Session metadata and session-level state |
-| `events` | Full event history per session (JSON) |
-| `app_states` | App-level shared state |
-| `user_states` | Per-user state shared across sessions |
-
-## Seeded users
+## Seeded users {#seeded-users}
 
 On startup the backend seeds a hidden **system user**, plus two real accounts, each created only on the very first startup that finds its target record missing:
 
@@ -103,38 +45,127 @@ On startup the backend seeds a hidden **system user**, plus two real accounts, e
 
 The hidden **system user** owns the bootstrap records (it cannot log in and is excluded from the user list).
 
-Passwords are read from environment variables, with the same generate-and-log-once fallback for each:
+| Variable | Default | What it does |
+|---|---|---|
+| `ROOT_PASSWORD` | generated | Password for the seeded `root` user |
+| `ADMIN_PASSWORD` | generated | Password for the seeded `admin` user in the Default tenant |
 
-```env
-ROOT_PASSWORD=change-me-now-123
-ADMIN_PASSWORD=change-me-now-123
-```
-
-If either is unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when that user is created — it cannot be recovered once the log line has scrolled past. Set both explicitly before the first run for anything beyond local experimentation, or capture the generated passwords from the startup logs immediately and change them through the user API afterwards. The usernames are fixed to `root` and `admin`.
+If either is unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when that user is created — it cannot be recovered once the log line has scrolled past. Set both explicitly before the first run for anything beyond local experimentation, or capture the generated passwords from the startup logs immediately and change them afterwards. The usernames are fixed to `root` and `admin`.
 
 ## Session lifetime
 
-Sessions use a sliding idle timeout: each authenticated request refreshes the session's last-active time, and a session left idle longer than `SESSION_IDLE_TIMEOUT_SECONDS` (default `28800`, 8 hours) is rejected and deleted. The cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes.
+| Variable | Default | What it does |
+|---|---|---|
+| `SESSION_IDLE_TIMEOUT_SECONDS` | `28800` (8 hours) | Sliding idle timeout. Each authenticated request refreshes the session's last-active time; a session left idle longer than this is rejected and deleted |
+| `SESSION_COOKIE_SECURE` | `false` | Marks the session and CSRF cookies `Secure` (HTTPS only). Set it to `true` for any deployment behind HTTPS |
 
-```env
-# Sliding idle timeout in seconds (default 28800 = 8 hours)
-SESSION_IDLE_TIMEOUT_SECONDS=28800
-# Mark cookies Secure (HTTPS only); leave false for local HTTP dev (default false)
-SESSION_COOKIE_SECURE=false
-```
-
-The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `root` or Default-tenant `admin` user (see [Seeded users](./configuration.md#seeded-users)) on first run.
+The cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes. The frontend reaches the backend through a same-origin rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly.
 
 ## CORS
 
-```env
-CORS_ORIGINS=http://localhost:3000
-```
+| Variable | Default | What it does |
+|---|---|---|
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated list of origins allowed to call the backend API |
 
-Comma-separated list of origins allowed to call `/chat` and `/sessions`. Defaults to `http://localhost:3000`. Add additional origins when the frontend is served from a different host or port:
+Add each origin the frontend is served from:
 
 ```env
 CORS_ORIGINS=https://app.example.com,http://localhost:3000
 ```
 
 `*` is rejected at startup — `allow_credentials=True` is always enabled, and pairing it with a wildcard origin is invalid per the CORS spec.
+
+## Agent skill store {#agent-skill-store}
+
+| Variable | Default | What it does |
+|---|---|---|
+| `SKILLS_DIR` | `backend/.skills` | Root of the store Agent Skill repositories are shallow-cloned into. Under `docker compose` it is `/var/lib/a2flow/skills`, backed by the `skills` named volume |
+| `SKILLS_PRUNE_GRACE_SECONDS` | `3600` | How long a revision directory survives regardless of whether anything references it. A pull prunes revisions no execution is pinned to, and the grace window covers the gap between a run reading the current revision and inserting the row that names it |
+| `SKILLS_CLONE_TIMEOUT_SECONDS` | `120` | Bounds how long a clone's individual HTTP requests may take. Without it a hanging remote stalls the clone indefinitely, leaving the skill `pending` |
+
+The store holds one immutable directory per revision, and a revision is never modified once published, so a pull never disturbs an agent loading an existing one:
+
+```
+$SKILLS_DIR/<agent_skill_id>/<commit_sha>/
+```
+
+This is **durable state, not a cache**: a workflow execution pins the revision it started with, so wiping the directory leaves existing executions unable to load their skill (HTTP 409 `SKILL_NOT_READY`) until an admin pulls the skill again — and a pull fetches the repository's current head, not the pinned revision. Back it up ([Backup and restore](./backup.md)), and give every backend replica the same directory ([Horizontal scaling](./scaling.md)).
+
+## Secret management {#secret-management}
+
+| Variable | Default | What it does |
+|---|---|---|
+| `SECRET_ENCRYPTION_KEY` | — | Fernet key used to encrypt `local` [secrets](../guides/secrets.md) before storage |
+| `SECRET_KEY_FILE` | `.secret_key` | Path to the on-disk key file, next to the SQLite database file |
+| `VAULT_ADDR` | — | Address of the single HashiCorp Vault (KV v2 only) that `vault`-type secrets are read live from. Vault is disabled when unset |
+| `VAULT_ROLE_ID` / `VAULT_SECRET_ID` | — | AppRole credentials, which take precedence over the static token |
+| `VAULT_APPROLE_MOUNT` | `approle` | AppRole login mount path |
+| `VAULT_TOKEN` | — | Static token, used when no AppRole credentials are set |
+
+The encryption key is resolved at first use, in order:
+
+1. `SECRET_ENCRYPTION_KEY`, which must be a valid Fernet key.
+2. The key file at `SECRET_KEY_FILE`.
+3. Failing both, a key is generated, saved to that file, and a WARNING is logged.
+
+**Back the key up.** Losing it makes every stored local secret undecryptable, and the same key protects the [approval CA](../architecture/approvals.md)'s signing key.
+
+`VAULT_ADDR` is deliberately exempt from the SSRF URL checks applied to user-supplied URLs: it is operator-set deployment configuration and typically points at a private address.
+
+## MCP tools and approvals {#mcp-tools-and-approvals}
+
+A task that has an [approval](../guides/approvals.md#human-approval) attached cannot call its bound MCP tools until the approver grants it: granting issues a short-lived X.509 certificate, and the MCP proxy refuses a call that does not present one. The signing root is generated on first use and stored encrypted with the same key as local secrets, so nothing here needs configuring for the feature to work.
+
+| Variable | Default | What it bounds |
+|---|---|---|
+| `MCP_APPROVAL_CERT_TTL_SECONDS` | `3600` | How long a granted approval's certificate stays valid — the window in which the approved task may call its tools |
+| `MCP_APPROVAL_CERT_SIGNATURE_WINDOW_SECONDS` | `60` | Clock-skew tolerance for the proof-of-possession signature accompanying each proxied call |
+| `MCP_CA_COMMON_NAME` / `MCP_CA_VALIDITY_DAYS` | `A2Flow MCP Approval CA` / `3650` | Subject and lifetime of the generated root. Read only when the root is first generated; changing them later has no effect on an existing root |
+| `MCP_REGISTRY_URL` | `https://registry.modelcontextprotocol.io` | Base URL of the registry the [Browse registry](../guides/mcp-servers.md#registering-from-the-mcp-registry) dialog searches |
+
+## Notification email {#notification-email}
+
+These are the same values the admin UI edits under [System Settings](../guides/system-settings.md), settable from the environment so a deployment can ship its mail configuration rather than leaving it as a manual step.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `APP_BASE_URL` | — | Base URL at which users reach this deployment in a browser, e.g. `https://a2flow.example.com`. Used to build the deep links in outgoing notification email; without it, messages go out with no link back |
+| `SMTP_ENABLED` | `false` | Master switch for email delivery. Must be explicitly `true`; it is never inferred from the other variables being set |
+| `SMTP_HOST` / `SMTP_PORT` | — / `587` | The relay to hand messages to. A bare internal hostname is fine here — this is handed to the SMTP client, not fetched |
+| `SMTP_SECURITY` | `starttls` | `none`, `starttls`, or `ssl` |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | — | SMTP AUTH credentials. The password is only ever stored as ciphertext, never logged, and never returned by any API response |
+| `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME` | — | Sender address, required once delivery is on, and the optional display name beside it |
+
+Unlike everything else on this page, these are not read fresh on each use — they are written onto the single settings record. That gives them their own rules:
+
+- **Re-applied on every startup**, not just the first, so rotating a relay password is a redeploy.
+- **Only the variables you actually set are written**, so leaving one unset preserves whatever is stored — including anything an admin configured by hand in the UI.
+- **A malformed value is logged as a warning and skipped entirely.** A bad port, an invalid address, or `SMTP_ENABLED=true` with no host leaves the stored configuration untouched; the app still starts.
+
+Because the enable flag is separate, a relay's host and credentials can be staged in one deploy and delivery switched on in a later one.
+
+## Outgoing email queue {#outgoing-email-queue}
+
+These are the knobs for the queue that drains into the relay — see [The delivery queue](../guides/notifications.md#the-delivery-queue) for how it behaves. Nothing here needs setting for a normal deployment.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `EMAIL_WORKER_IN_PROCESS` | `true` | Whether the API process also runs the drain worker, so `uvicorn main:app` on its own delivers mail. Set it false when running a dedicated worker process — see [Process layout](./deployment.md#process-layout). Leaving both on is safe, just pointless: an advisory lock elects exactly one sender across the deployment |
+| `EMAIL_SEND_RATE_PER_SECOND` / `EMAIL_SEND_BURST` | `5.0` / `10` | Sustained messages per second handed to the relay, and how many may go out back-to-back after an idle period before that rate applies. Lower them to sit under a stricter relay limit |
+| `EMAIL_QUEUE_BATCH_SIZE` / `EMAIL_QUEUE_POLL_INTERVAL_SECONDS` | `20` / `5.0` | How many messages one drain pass claims, and how long the worker sleeps when the queue is empty. The poll interval is the floor on delivery latency for a notification produced while the worker is asleep |
+| `EMAIL_MAX_ATTEMPTS` | `9` | Delivery attempts before a message becomes a dead letter. The backoff runs 15s, 30s, 1m, 2m and so on, capped at an hour, so the default rides out roughly an hour of relay downtime. A failure the relay reports as permanent is written off on the first attempt regardless |
+| `EMAIL_SENT_RETENTION_DAYS` | `30` | How long delivered messages are kept before the worker purges them. They are a record of what went out, not queue state. Dead letters are never purged |
+
+## Operations metrics
+
+| Variable | Default | What it does |
+|---|---|---|
+| `METRICS_TIMEZONE` | `UTC` | IANA timezone name deciding where a calendar day starts for the [operations metrics](./metrics.md) — the "today" counts and the daily buckets of the lead-time trend |
+
+An unrecognized name falls back to `UTC` rather than failing startup, so a typo skews a dashboard's day boundary instead of stopping the app.
+
+## Agent
+
+| Variable | Default | What it does |
+|---|---|---|
+| `ROLE_DESCRIPTION` | A generic assistant description | Role text the agent's system prompt is built around, alongside the workflow rules and the interface schema |

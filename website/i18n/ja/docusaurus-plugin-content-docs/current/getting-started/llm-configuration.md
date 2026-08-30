@@ -12,6 +12,7 @@ sidebar_position: 3
 | Google Gemini(既定) | `gemini-3.5-flash` |
 | OpenAI(LiteLLM 経由) | `litellm:openai/gpt-4o` |
 | Anthropic(LiteLLM 経由) | `litellm:anthropic/claude-3-5-sonnet-20241022` |
+| Amazon Bedrock(LiteLLM 経由) | `litellm:bedrock/global.anthropic.claude-sonnet-4-6` |
 
 バックエンドのそれ以外の設定は[設定リファレンス](../operations/configuration.md)にまとめてあります。
 
@@ -19,25 +20,32 @@ sidebar_position: 3
 
 ```env
 LLM_MODEL=gemini-3.5-flash
-GOOGLE_API_KEY=your_google_api_key
+GOOGLE_API_KEY=your_google_api_key_here
 ```
 
 ## OpenAI(LiteLLM 経由)
 
 ```env
 LLM_MODEL=litellm:openai/gpt-4o
-OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 ## Anthropic(LiteLLM 経由)
 
 ```env
 LLM_MODEL=litellm:anthropic/claude-3-5-sonnet-20241022
-ANTHROPIC_API_KEY=your_anthropic_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
-## エージェントへの指示
+## Amazon Bedrock(LiteLLM 経由)
+
+Bedrock だけは追加のパッケージが必要です。バックエンドを起動する前に入れてください。
+
+```bash
+cd backend && uv add boto3 "botocore[crt]"
+```
 
 ```env
-AGENT_INSTRUCTION=You are a helpful assistant. Answer concisely and clearly.
+LLM_MODEL=litellm:bedrock/global.anthropic.claude-sonnet-4-6
+AWS_BEARER_TOKEN_BEDROCK=your_bedrock_bearer_token_here
 ```

@@ -7,7 +7,7 @@ sidebar_position: 1
 
 ## 0. ツールチェーン([mise](https://mise.jdx.dev/))
 
-Python、Node.js、pnpm、uv、lefthook のバージョンは [mise.toml](https://github.com/kaitoy/a2flow/blob/master/mise.toml) で固定し、mise が用意します。どのマシンでも同じツールチェーンが動くようにするためです。mise 自体のインストールは一度だけです。
+Python、Node.js、pnpm、uv のバージョンは [mise.toml](https://github.com/kaitoy/a2flow/blob/master/mise.toml) で固定し、mise が用意します。どのマシンでも同じツールチェーンが動くようにするためです。mise 自体のインストールは一度だけです。
 
 | OS | コマンド |
 |---|---|
@@ -22,9 +22,9 @@ mise trust
 mise install
 ```
 
-Windows では、mise の shims ディレクトリ(`%LOCALAPPDATA%\mise\shims`)を `PATH` にも通してください。Git フックやエディタの連携機能は有効化済みのシェルの外から起動されるため、`uv` や `pnpm` や `python` を `PATH` からしか解決できません。
+Windows では、mise の shims ディレクトリ(`%LOCALAPPDATA%\mise\shims`)を `PATH` にも通してください。有効化済みのシェルの外でも `uv` や `pnpm` や `python` を解決できるようにするためです。
 
-mise を使わない場合は、Python 3.11 以上、Node.js 20 以上に加えて、[uv](https://docs.astral.sh/uv/)、pnpm、lefthook を手動で入れてください。
+mise を使わない場合は、Python 3.11 以上、Node.js 20 以上に加えて、[uv](https://docs.astral.sh/uv/) と pnpm を手動で入れてください。
 
 ## 1. バックエンド
 
@@ -34,9 +34,11 @@ mise を使わない場合は、Python 3.11 以上、Node.js 20 以上に加え�
 cd backend
 uv sync
 cp .env.example .env
-# .env を編集し、LLM_MODEL と対応する API キーを設定する(backend/README.md を参照)
-uv run uvicorn main:app --reload
+sed -i.bak 's/^GOOGLE_API_KEY=.*/GOOGLE_API_KEY=YOUR_API_KEY/' .env && rm .env.bak
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 30
 ```
+
+`.env.example` は既定で Google Gemini を使うので、`YOUR_API_KEY` を取得済みの API キーに置き換えてください。別のモデルやプロバイダに切り替える場合は [LLM の設定](./llm-configuration.md) を参照してください。
 
 これで API が `http://localhost:8000` で使えるようになります。
 
@@ -46,11 +48,8 @@ uv run uvicorn main:app --reload
 cd frontend
 pnpm install
 # 任意: cp .env.local.example .env.local  (バックエンドが :8000 にない場合だけ必要)
-pnpm dev
+pnpm build
+pnpm start
 ```
 
 [http://localhost:3000](http://localhost:3000) を開きます。別のポートで動かす方法は、フロントエンドの README にある [Changing the port](https://github.com/kaitoy/a2flow/blob/master/frontend/README.md#changing-the-port) を参照してください。
-
-## 3. Git フック(lefthook)
-
-コミット前とプッシュ前のフック(lefthook)が、リンター、フォーマッター、型チェッカー、テストを実行します。`lefthook` のバイナリは `mise install` で入っているので、リポジトリのルートで `lefthook install` を一度実行して `.git/hooks/` に登録してください。詳細は [.claude/rules/git-workflow.md](https://github.com/kaitoy/a2flow/blob/master/.claude/rules/git-workflow.md) にあります。

@@ -1,0 +1,77 @@
+---
+title: はじめに
+description: A2Flow は AI エージェントを中心に一から作りなおしたワークフローエンジンです。エージェントはワークフローの中の一部品ではなく、ワークフローそのものです。
+slug: /intro
+sidebar_position: 1
+hide_title: true
+hide_table_of_contents: true
+---
+
+import {IntroPage, IntroHero, IntroContrast, IntroPanel, IntroActs, IntroAct, IntroClosing, IntroNext} from '@site/src/components/IntroSections';
+
+<IntroPage>
+
+<IntroHero
+  eyebrow="AI Agent as a Workflow"
+  title={<>ワークフローエンジンは、<span className="grad">エージェントそのもの</span>。</>}>
+
+A2Flow は、AI エージェントを中心に一から作りなおしたワークフローエンジンです。既存のエンジンに AI のステップを足したものではありません。実行するのはエージェント自身です。段取りを立て、判断が要るところでは人に尋ね、残りは自分で片づけます。
+
+</IntroHero>
+
+<IntroContrast>
+
+<IntroPanel kind="past" title="ワークフローの中の AI">
+
+フローチャートがプログラムで、そのどこかに「AI」と書かれた箱が置いてあります。項目を埋め、要約を書き、問い合わせを分類する。そこで出番は終わりです。制御は去年だれかが描いた図に戻り、あとの工程はこれまでどおり流れていきます。
+
+</IntroPanel>
+
+<IntroPanel kind="next" title="AI がワークフロー">
+
+戻る先の図がありません。エージェントが手順書を読み、ステップを組み立て、ツールを結びつけ、承認を仰ぎ、実行します。ワークフローはエージェントが参加する対象ではなく、エージェントの振る舞いそのものです。
+
+</IntroPanel>
+
+</IntroContrast>
+
+<IntroActs>
+
+<IntroAct step="01 設計" icon="design" title="図を描かずに、会話で設計する">
+
+出発点は[エージェントスキル](./guides/agent-skills.md)です。Git リポジトリに置いた `SKILL.md` ファイルなので、ほかのコードと同じようにバージョンを管理でき、レビューもできます。あとは AI と話すだけです。AI がタスクの並びを下書きし、あなたが直し、各ステップに必要な[MCP ツール](./guides/mcp-servers.md)をその場で結びつけます。こうして[公開](./guides/workflows.md)されるのは、誰も図を描かずに済んだワークフローです。
+
+</IntroAct>
+
+<IntroAct step="02 実行" icon="run" title="実行は、複数人が入った一つの会話">
+
+ワークフローを実行すると、共有のチャットが一つ開きます。申請者が用件を書き、エージェントがタスクをたどり、承認者はその同じ場でコメントを添えて判断します。チケットの列に並ぶことも、別の連絡経路を用意することもありません。「私の依頼はどうなりましたか」と聞いて回る手間もなくなります。
+
+</IntroAct>
+
+<IntroAct step="03 統制" icon="control" title="ツールの実行は、署名された承認が通す">
+
+[承認](./guides/approvals.md)は、エージェントに守るよう頼むお願いではありません。承認すると、そのタスクがその時点で持っていたツールに対して、短命の X.509 証明書が発行されます。MCP プロキシは、これを署名付きで提示しない呼び出しを拒みます。プロンプトインジェクションで言いくるめることはできませんし、エージェントが後から範囲を広げることもできません。許可された呼び出しも拒まれた呼び出しも、証明書のシリアルと、署名した正確なバイト列とともに記録されます。
+
+</IntroAct>
+
+</IntroActs>
+
+<IntroClosing headline={<>計画する。承認する。実行する。</>}>
+
+ワークフローに本当に要るのは、この三つだけです。A2Flow はそれを残し、あいだの作業をエージェントに渡します。
+
+</IntroClosing>
+
+<IntroNext title="次に読むページ">
+
+- **[クイックスタート](./getting-started/quick-start.md)** — 手元のマシンでバックエンドとフロントエンドを動かす
+- **[用語](./concepts/terminology.md)** — ワークフロー、設計セッション、実行、ワークフローセッションの違い
+- **[エージェントスキル](./guides/agent-skills.md)** — ワークフローの設計元になる、Git 管理の手順書
+- **[ワークフロー](./guides/workflows.md)** — スキルからワークフローを生成し、調整して、公開し、実行する
+- **[承認](./guides/approvals.md)** — 実行が人を待って止まるしくみと、証明書が許可する範囲
+- **[設定リファレンス](./operations/configuration.md)** — バックエンドが読む環境変数の一覧
+
+</IntroNext>
+
+</IntroPage>

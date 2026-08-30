@@ -5,28 +5,51 @@ sidebar_position: 8
 
 # Tool Mocks
 
-Navigate to [http://localhost:3000/admin/mcp-tool-mocks](http://localhost:3000/admin/mcp-tool-mocks) to manage **tool mocks** — stand-ins that let a **draft** workflow run be exercised end to end without its tools' side effects. A mocked tool is not called: the mock's configured result is returned instead, so no request reaches the MCP server, no approval is recorded, and nobody is emailed.
+A tool mock is a stand-in that lets a **draft** workflow run be exercised end to end without its tools' side effects. A mocked tool is not called: the mock's configured result is returned instead, so no request reaches the MCP server, no approval is recorded, and nobody is emailed.
 
-Mocking is chosen **per tool**, not per run, because a dry run is only useful if it stays realistic. A workflow that searches a system and then writes to it can stub only the write — the read still hits the real server, and the agent still reasons over real data. For the same reason a mock buys past the side effect but not past the rules: a mocked MCP call is still checked against the tools the run's current task is allowed to use, and against any approval that task is waiting on, so a workflow that would be refused in production is refused in its dry run too.
+Open **Tool Mocks** in the admin sidebar to manage them.
 
-A mock targets either one tool of a [registered MCP server](./mcp-servers.md) or a **built-in** A2Flow tool (currently `request_approval` alone — the one whose side effects otherwise need a human to clear before the run can continue).
+```mermaid
+flowchart LR
+  A["The agent calls a tool"] --> P{"Is this tool mocked<br/>for this run?"}
+  P -->|"no"| S["The MCP server<br/>the real side effect"]
+  P -->|"yes"| M["The mock's next response<br/>no server is contacted"]
+```
 
-Its **responses** are an ordered list indexed by call ordinal: the first answers the run's first call to that tool, the second its second, and so on; once the list runs out the last response repeats, so a single response behaves as a constant. That is what lets one mock express a scenario rather than a fixed value — approve the first request, reject the second, and see how the workflow handles both. Each response is one of:
+## Using one
+
+1. Create a mock for the tool you want to stub.
+2. Click **Run** on a **draft** workflow. The dialog lists the tenant's mocks under **Mock tools**.
+3. Check the ones this run should use, and start the run.
+
+The dialog offers no mocks for a published workflow, and asking for one anyway is refused. Starting the run **copies** what each chosen mock currently says onto the execution, so editing or deleting a mock afterwards never changes a run already under way — and can never silently turn a stubbed call back into a real one.
+
+Mocking is chosen **per tool**, not per run, because a dry run is only useful if it stays realistic. A workflow that searches a system and then writes to it can stub only the write: the read still hits the real server, and the agent still reasons over real data.
+
+## What a mock holds
+
+| Field | Notes |
+|---|---|
+| **Name** / **Description** | How you recognize it in the Run dialog. |
+| **Target** | Either one tool of a [registered MCP server](./mcp-servers.md) — pick the **MCP Server**, then the **Tool Name** — or a **built-in** A2Flow tool. |
+| **Responses** | An ordered list, indexed by call ordinal. |
+
+The only built-in tool currently mockable is `request_approval`: the one whose side effects otherwise need a human to clear before the run can continue.
+
+### Responses
+
+The first response answers the run's first call to that tool, the second its second, and so on. Once the list runs out, the last response repeats — so a single response behaves as a constant. That is what lets one mock express a *scenario* rather than a fixed value: approve the first request, reject the second, and see how the workflow handles both.
 
 | Kind | Meaning |
 |---|---|
-| `structured` | A JSON object placed in the result's `structuredContent` — for a tool whose caller reads fields off the result |
+| `structured` | A JSON object placed in the result's structured content — for a tool whose caller reads fields off the result |
 | `text` | A string placed in the result's textual content |
 | `error` | A message returned as a failed call, so the agent sees the tool report an error |
 
-Mocks are applied by **checking them in the Run dialog** of a draft workflow (see [Running a workflow](./workflows.md#running-a-workflow)); the dialog offers no mocks for a published one. Starting the run **copies** what each chosen mock currently says onto the execution, so editing or deleting a mock afterwards never changes a run already under way — and can never silently turn a stubbed call back into a real one.
+## What a mock does not skip
 
-What a mocked call sent and returned is visible in the run's chat transcript: its tool line expands to show the arguments and the result, badged **Mocked**. It deliberately does not appear on the run's [Tool Invocations](./workflow-executions.md) page — that page records the decisions the MCP proxy actually made, and a stub never reaches it.
+A mock buys past the side effect, not past the rules. A mocked call is still checked against the tools the run's current task is allowed to use, and against any [approval](./approvals.md) that task is waiting on, so a workflow that would be refused in production is refused in its dry run too. A mocked `request_approval` still validates its destination, so a workflow naming an ineligible approver fails in a dry run exactly as it would for real.
 
-A mocked `request_approval` still validates its destination — a mock skips the side effects, not the checks — so a workflow naming an ineligible approver fails in a dry run exactly as it would for real.
+## Seeing what a mocked call did
 
-| Operation | Path |
-|-----------|------|
-| List tool mocks | `GET /admin/mcp-tool-mocks` |
-| Create a tool mock | `GET /admin/mcp-tool-mocks/new` |
-| Edit or delete a tool mock | `GET /admin/mcp-tool-mocks/{id}` |
+The run's chat transcript is where a stubbed call is inspected: its tool line expands to show the arguments and the result, badged **Mocked**. It deliberately does not appear on the run's [Tool Invocations](./workflow-executions.md#tool-invocations) page — that page records the decisions the tool proxy actually made, and a stub never reaches it. The run itself is badged **Mocked** in the [executions list](./workflow-executions.md).

@@ -7,49 +7,78 @@ sidebar_position: 5
 
 An approval is how a run stops and waits for a person. The agent asks for one mid-execution, the designated approver decides in the chat, and that decision is what unlocks the task's tools.
 
-## Human approval
+## Human approval {#human-approval}
 
-When a task needs the user's explicit go-ahead before the agent acts (for example a destructive or irreversible operation), the agent asks for an **approval** mid-execution:
+When a task needs an explicit go-ahead before the agent acts — a destructive or irreversible operation, say — the agent asks for an approval and pauses.
 
-1. The agent calls the `request_approval` backend tool, which persists a `pending` **Approval** record for the current session (optionally linked to a `WorkflowTask`). A request is addressed to **exactly one destination**, never both and never neither:
-   - **`approver`** — one specific user, looked up with the `list_users` tool (which lists only users holding the [`approver` role](../concepts/authorization.md)). Only they are notified and only they can decide.
-   - **`approverGroupId`** — a [user group](./users-and-groups.md#user-groups), looked up with the `list_user_groups` tool. **Every** member holding `approver` is notified with their own approval-request notification, and the **first** decision from any of them completes the request — so an approval is not blocked on one person's availability. A group with no member who can approve is rejected up front, since such a request could never be resolved. Nothing dismisses the other members' notifications when someone decides; they simply stop being actionable.
+```mermaid
+sequenceDiagram
+  participant A as Execution agent
+  participant F as A2Flow
+  participant P as Approver
+  A->>F: Requests approval, naming one person or one group
+  F->>P: Notification, and email if it is switched on
+  Note over A,P: The run pauses. Approve / Reject / Return appear in the chat
+  P->>F: Decides, with an optional comment
+  Note over F: On Approve, a certificate is issued for the task
+  F-->>A: The decision. The run resumes
+```
 
-   The agent is instructed to prefer a group whenever any member of a team may decide, and to name a single user when the Skill calls for a specific person.
-2. The agent explains the request in plain text and then calls **`render_approval`** — an AG-UI **frontend tool** (declared by the client via `RunAgentInput.tools`, distinct from A2UI). Like `render_a2ui`, the bridge exposes it as a long-running client tool: the run pauses and the frontend renders **Approve / Reject** controls, plus an optional **comment** field, in the chat. The controls are shown **only to the designated approver** — for a group destination, to every member holding `approver`, so several people may hold them at once; everyone else sees a read-only "waiting" message.
-3. Clicking a button writes the decision (and any comment) **directly** to the backend via `PATCH /api/v1/approvals/{id}`, then returns the decision as the tool result so the agent run resumes. The resolving user is recorded both in the audit fields and in a dedicated server-managed **`decidedBy`**, which is what answers "who approved this?" for a group destination — the group alone does not say. Only the designated approver may resolve a request, with **no exception — not even a Super Admin** who isn't the addressee; a `PATCH` from any other user is rejected with HTTP 403 (`FORBIDDEN`). A decision is **final**: because two members of an approver group can genuinely race each other, a second `PATCH` that would *change* an already-recorded status is rejected with HTTP 409 (`APPROVAL_ALREADY_RESOLVED`) rather than overwriting the first decision. Editing the comment afterwards is still allowed and moves neither `decidedAt` nor `decidedBy`.
-4. On `approved` the agent proceeds; on `rejected` it marks the task `failed` (or `skipped`). The agent can re-check a decision with the `get_approval` tool.
-5. Granting the approval also **issues a certificate** for the task, which is what actually unlocks its MCP tools — see below.
+### Who is asked
 
-**The approval gate is enforced by the server, not by the agent.** A task that has an approval attached cannot call any of its bound [MCP tools](./mcp-servers.md) until that approval is granted: the MCP proxy refuses the call. Granting it mints a short-lived X.509 certificate; every subsequent tool call from that task must present it, signed, or be denied. Tasks with no approval attached are unaffected and keep running under the ordinary tool-binding rule.
+A request is addressed to **exactly one destination**, never both and never neither.
+
+| Destination | Who is notified | Who can decide |
+|---|---|---|
+| **One user** | That person alone | That person alone |
+| **A [user group](./users-and-groups.md#user-groups)** | Every member holding the `approver` role, each with their own notification | Any of them — the **first** decision settles it |
+
+Addressing a group means an approval is not blocked on one person's availability. A group with no member who can approve is refused up front, since such a request could never be settled. Nothing dismisses the other members' notifications once someone decides; they simply stop being actionable. Whoever actually decided is recorded, because the group's name alone does not answer "who approved this?".
+
+The agent is instructed to prefer a group whenever any member of a team may decide, and to name a single person when the Skill calls for one.
+
+### Deciding
+
+The agent explains the request in plain text, and the controls appear in the chat below it — but **only for the designated approver**. For a group destination, several people may hold them at once. Everyone else sees a read-only "waiting" message.
+
+| Decision | What it means | What the agent does |
+|---|---|---|
+| **Approve** | Go ahead | Proceeds, with the task's tools unlocked |
+| **Reject** | Do not do this | Marks the task `failed` or `skipped` |
+| **Return** | Revise and ask again | Sends the work back rather than settling the request |
+
+**Return** is a third decision alongside the other two, not a variant of Reject: a high return rate points at an upstream quality problem, rather than at work that should not have been requested at all.
+
+Each decision takes an optional **comment**. The decision itself is **final** — two members of an approver group can genuinely race each other, so a second decision that would change the recorded one is refused rather than overwriting it. Editing the comment afterwards is still allowed, and it moves neither the recorded decider nor the decision time, so the turnaround from request to decision stays the approver's real one.
+
+Only the designated approver may decide, with **no exception — not even a Super Admin** who is not the addressee. The same rule extends to the linked task's status: marking such a task `completed` by hand is limited to the person who started the run and to an eligible approver, since flipping the status would otherwise let any approver of the run stand in for the addressee.
+
+### What approval unlocks
+
+**The approval gate is enforced by the server, not by the agent.** A task with an approval attached cannot call any of its bound [MCP tools](./mcp-servers.md) until that approval is granted — the call is refused before it reaches the server. Granting the approval issues a short-lived **certificate** for the task, and every subsequent tool call from that task must present it. Tasks with no approval attached are unaffected and keep running under the ordinary [tool-binding rule](./workflows.md#mcp-tools-for-tasks).
 
 Two things this buys that an instruction to the model could not:
 
-- **A prompt injection or a bug cannot skip the approval.** Before, the gate was the agent's system instruction plus the frontend declining to resume the run — neither is a rule the server checks.
-- **The granted tools are frozen at the moment of decision.** The certificate carries the tools the task had bound when the approver clicked Approve. The agent can rewrite its own task's tool bindings mid-run, so a check that reads bindings at call time is a check the agent can widen; it cannot re-sign a certificate. Approving a task to read a file does not become approval to delete one.
+- **A prompt injection or a bug cannot skip the approval.** The gate is a rule the server checks, not a sentence in the agent's instructions plus a frontend that declines to resume.
+- **The granted tools are frozen at the moment of decision.** The certificate carries the tools the task had bound when the approver clicked Approve. An agent can rewrite its own task's tool bindings mid-run, so a check that re-reads the bindings at call time is a check the agent could widen. Approving a task to read a file does not become approval to delete one.
 
-Every decided tool call — allowed or refused — is recorded with the certificate's serial and the exact bytes signed for it, so "which approval authorized this, and who granted it" can be answered afterwards and checked cryptographically.
+Every decided tool call — allowed or refused — is recorded on the run's [Tool Invocations](./workflow-executions.md#tool-invocations) page with the certificate it presented, so "which approval authorized this, and who granted it" can be answered afterwards.
 
-The signing root is generated on first use and stored encrypted; nothing needs configuring. The certificate's lifetime (default one hour) and the clock-skew tolerance are adjustable via `MCP_APPROVAL_CERT_TTL_SECONDS` and `MCP_APPROVAL_CERT_SIGNATURE_WINDOW_SECONDS`. `GET /api/v1/approvals/{id}/certificate` and the [Approvals](./approvals.md#browsing-approvals) admin detail page report what an approval authorized: the granted tools, the validity window, and whether the certificate has been revoked. Design and implementation notes are in [backend/README.md](https://github.com/kaitoy/a2flow/blob/master/backend/README.md#approval-certificates).
+Nothing needs configuring for any of this; the certificate's lifetime is adjustable in the [configuration reference](../operations/configuration.md#mcp-tools-and-approvals).
 
-> **Scope of the guarantee.** The MCP proxy currently runs inside the backend process, so the signature proves possession of the certificate's key to a verifier sharing that process — it is not a defence against an attacker who already controls the backend. What it does provide is a single fail-closed enforcement point, a grant that cannot be widened after the fact, and a verifiable record. The certificates carry `clientAuth`, so the same material becomes real TLS client authentication unchanged if the proxy is ever split out over the network.
+> **Scope of the guarantee.** The tool proxy currently runs inside the backend process, so a certificate proves possession to a verifier sharing that process — it is not a defence against an attacker who already controls the backend. What it provides is a single fail-closed enforcement point, a grant that cannot be widened after the fact, and a verifiable record.
 
-Approvals are persisted in `a2flow.db` and cascade-delete with their `WorkflowExecution` (the optional `WorkflowTask` link is set to `NULL` when that task is deleted). Browse them in the [Approvals](./approvals.md#browsing-approvals) admin view.
+## Browsing approvals {#browsing-approvals}
 
-The same no-exception rule extends to a linked task's **status**: since flipping a `WorkflowTask`'s `status` straight to `completed` would otherwise let any approver of the session stand in for the addressee, `PATCH /api/v1/workflow-tasks/{id}` restricts a `status` change to the session owner or, when the task has a linked `Approval`, an eligible approver of it — the named user, or a member of its approver group holding `approver`. Tasks with no linked approval keep the broader any-session-participant rule.
+Open **Approvals** in the admin sidebar to browse every approval request. This view is for looking: decisions are made from the Approve / Reject / Return controls in the chat.
 
-A **workflow session** — the ADK chat a run happens in — is keyed by its execution's **initiator** (the user who started the run), not by whoever is currently viewing it. So when a designated approver — a different user — opens it, they share the **same** ADK session: they see the initiator's full conversation and state, and approving resumes the original run rather than starting a fresh, empty session. Both the agent stream (`POST /workflow-executions/{id}/agent`) and the history load (`GET /workflow-executions/{id}/messages`) resolve the initiator from the `WorkflowExecution` record. (Regular, non-workflow chat sessions remain keyed per user.) Sharing is limited to those participants: any other user is rejected with HTTP 403 — see [Roles and authorization](../concepts/authorization.md). When an approval is addressed to a group, every member holding `approver` is such a participant, so the shared chat follows the group's membership: adding someone to an approver group opens every run that group has been asked to approve, and removing them closes it again, on their next request. That is the direct consequence of "any member can resolve it" — deciding is what the chat access exists to enable. A member who does *not* hold `approver` gets nothing from the membership.
+| Column | Shown by default |
+|---|---|
+| Title, status (`pending` / `approved` / `rejected` / `returned`), description, created time | Yes |
+| Workflow execution — a link to the run it came from | Yes |
+| Decided By — the user or the approver group's name, linked to its page | Through the column picker |
+| The approver's comment, and the decision time | Through the column picker |
 
-Because that one chat is shared, several people (the **applicant**/initiator, designated **approvers**, and the **agent**) post into it, so each message carries a **sender avatar** to show who sent it — the applicant's or approver's avatar beside their messages, and an agent badge (hover shows the workflow name) beside the agent's. Clicking a button inside a rendered A2UI surface is attributed the same way: it shows the acting user's avatar beside that surface once resolved. ADK records every human message under the author `user`, and A2UI action acknowledgements as tool-response (function-response) events, so the backend attributes both to their real sender: the agent run endpoint snapshots the workflow session's existing `user` events and tool-response `tool_call_id`s, then records the current user as the sender of any new ones once the run ends, and `GET /workflow-executions/{id}/messages` returns each message's `senderUserId`. That includes a run that ends badly: a client disconnecting mid-stream (tab closed, page reloaded) cancels the run, but the messages it already appended are attributed on the way out rather than silently left ownerless. Tool-response messages are keyed by `tool_call_id` rather than their own id, since the AG-UI/ADK bridge regenerates a fresh id for them on every read. Messages with no recorded sender (history sent before attribution existed) fall back to the initiator. Hovering an avatar reveals the sender's name.
+Each row also carries an **Open Workflow Session** action that jumps straight into the run's chat, mirroring the one on the [Workflow Executions](./workflow-executions.md) list.
 
-Per-message side-channel facts like this live in a single **`message_meta`** table, with nullable columns the run-completion step upserts independently — currently `sender_user_id` (above) and `workflow_task_id` (below). A row names the chat it belongs to through exactly one of `workflow_execution_id` (a workflow session) or `workflow_id` (a **design session** — also shared, by the tenant's Developers, and attributed the same way; see [Adjusting the task templates](./workflows.md#adjusting-the-task-templates)), each unique with `adk_event_id`.
-
-Because the chat is shared, the page **polls `GET /workflow-executions/{id}/messages` every 10 seconds** so each participant sees the others' messages (and the agent's progress) without reloading. Polling pauses while the viewer's own agent run is in flight (so it never clobbers the live stream), skips re-applying an unchanged history, and the view follows new messages to the bottom only when the viewer is already scrolled near the bottom.
-
-The chat screen also shows a collapsible **task timeline** down the left edge: the execution's `WorkflowTask`s in order, each with a numbered, status-coloured badge, with the in-progress task highlighted. The agent drives the task lifecycle by calling `update_workflow_task(status="in_progress")` before working on a task, so after each run the backend walks the workflow session's events in order, tracks the most recent such transition, and records the in-progress task for every following message as that message's `workflow_task_id`. `GET /workflow-executions/{id}/messages` returns each message's `workflowTaskId`, and the chat wraps each run of consecutive same-task messages in a **task group** — a status-coloured left rail with a numbered heading whose number matches the timeline badge — so the boundary of each task is obvious at a glance. The timeline and chat are linked both ways: scrolling the chat highlights the task at the top of the viewport in the timeline (scroll-spy), hovering either a timeline entry or a chat group highlights its counterpart, and clicking a timeline entry scrolls the chat to that task's group.
-
-## Browsing approvals
-
-Navigate to [http://localhost:3000/admin/approvals](http://localhost:3000/admin/approvals) to browse every **Approval** request (see [Human approval](./approvals.md#human-approval)). By default the list shows the title, a link to the originating **workflow execution**'s admin detail page (its name is resolved from the execution, falling back to the raw id while unresolved), status (`pending` / `approved` / `rejected` / `returned`), description, and creation time, with sort and filter controls; the designated approver — a user name, or the **approver group's** name linked to its admin page — who actually decided (`Decided By`), the approver's comment, and the decision time are hidden by default but available through the column picker. Each row's Actions column also carries an **Open Workflow Session** button, mirroring the one on the [Workflow Executions](./workflow-executions.md) list, that jumps straight to `/workflow-executions/{id}/session`. Decisions are normally made from the in-chat Approve / Reject / Return controls; this view is read-only browsing. A granted approval's detail page additionally shows the **Authorized MCP tools** its certificate carries, together with the certificate's serial, validity window, and revocation state (see [Human approval](./approvals.md#human-approval)). The `GET`/`PATCH /api/v1/approvals` endpoints are documented in the [API reference](http://localhost:3000/api-doc).
-
-**`returned`** is a third decision alongside approve and reject: it sends the work back to be revised and re-submitted rather than settling the request, so a high return rate points at an upstream quality problem rather than at work that should not have been requested at all. Whichever decision is recorded, the transition out of `pending` stamps a server-managed **`decidedAt`**; a later edit to the comment leaves it alone, so the `createdAt` → `decidedAt` turnaround stays the approver's real one.
+A granted approval's detail page additionally shows what its certificate authorized: the **Authorized MCP tools**, the validity window, and whether the certificate has been revoked.

@@ -1,6 +1,6 @@
 ---
 title: Operations metrics
-sidebar_position: 4
+sidebar_position: 6
 ---
 
 # Operations metrics
@@ -13,19 +13,31 @@ Runs started from a still-`draft` workflow (a `developer`/`super_admin` [pre-pub
 
 `GET /api/v1/metrics` renders the single-value KPIs in [Prometheus](https://prometheus.io/) text exposition format. Every sample carries a `tenant` label.
 
+Approvals:
+
 | Metric | Meaning |
 |---|---|
 | `a2flow_approvals_pending` | Approval requests awaiting a decision |
 | `a2flow_approvals_pending_over_threshold{threshold}` | Of those, the ones waiting longer than the threshold (default 24h) |
 | `a2flow_approval_pending_age_seconds_max` | How long the longest-waiting request has been waiting |
+| `a2flow_approvals_decided_today{decision}` | Approvals decided today, by `approved` / `rejected` / `returned` |
+
+Workflow executions:
+
+| Metric | Meaning |
+|---|---|
 | `a2flow_workflow_executions_active` | Runs currently in progress |
 | `a2flow_workflow_executions_finished_today{status}` | Runs that finished today, by terminal status |
-| `a2flow_approvals_decided_today{decision}` | Approvals decided today, by `approved` / `rejected` / `returned` |
+| `a2flow_workflow_executions_started_recently{window,workflow}` | Runs started in the last 24h, by workflow |
 | `a2flow_workflow_executions_failed_recently{window}` | Runs that finished in failure in the last 24h |
 | `a2flow_workflow_tasks_failed_recently{window,error_kind}` | Tasks that failed in the last 24h, by cause |
-| `a2flow_workflow_executions_started_recently{window,workflow}` | Runs started in the last 24h, by workflow |
 | `a2flow_workflow_execution_lead_time_seconds_avg{window,workflow}` | Mean start-to-finish duration of runs finishing in the last 24h |
-| `a2flow_email_queue_depth{status}` | Notification emails in the [outgoing queue](../guides/notifications.md#the-delivery-queue), by `pending` / `sending` / `sent` / `failed` |
+
+Notification email:
+
+| Metric | Meaning |
+|---|---|
+| `a2flow_email_queue_depth{status}` | Emails in the [outgoing queue](../guides/notifications.md#the-delivery-queue), by `pending` / `sending` / `sent` / `failed` |
 | `a2flow_email_queue_oldest_pending_age_seconds` | How long the longest-waiting undelivered email has waited — rises when the relay is unreachable |
 
 `?thresholdHours=` overrides the stalled-approval cutoff. `METRICS_TIMEZONE` (an IANA name, default `UTC`) decides where "today" starts; an unrecognized name falls back to UTC rather than failing startup.
@@ -55,6 +67,6 @@ Anything whose natural key is a user id, a run id, or a free-text error message 
 
 The execution endpoints take `since` / `until` (ISO-8601, defaulting to the last 30 days, capped at 366) and `limit`; the approval endpoints take `thresholdHours` (default 24) and `limit`. Backlog entries come back longest-single-wait first, so `?limit=5` is the worst five. Durations are always whole seconds.
 
-`by-approver` groups by an approval's **destination**, which may be a user or a group, and the two are indistinguishable as bare ids — so each entry carries a `groupKind` of `"user"` or `"group"`. For `"user"` it returns the **id** only, not the name: resolving a name is `UserService`'s decision, and clients already resolve ids in bulk through `POST /users/resolve-names`. For `"group"` the entry's `groupLabel` already carries the group's name, which carries no such visibility rule.
+`by-approver` groups by an approval's **destination**, which may be a user or a group. Each entry carries a `groupKind` of `"user"` or `"group"` to tell them apart: a `"user"` entry gives the id only, while a `"group"` entry also carries the group's name in `groupLabel`.
 
-A task that fails records **why**: the execution agent passes `error_kind` (one of `api_error`, `timeout`, `script_error`, `invalid_input`, `permission_denied`, `rejected`, `other`) and a free-text `error_message` alongside `status="failed"`. Both are ordinary task fields, so they are also filterable through the [list query parameters](../guides/admin-ui.md#list-query-parameters) — e.g. `?q=errorKind:eq:timeout`.
+A task that fails records **why**: `error_kind` (one of `api_error`, `timeout`, `script_error`, `invalid_input`, `permission_denied`, `rejected`, `other`) and a free-text `error_message` are stored alongside `status="failed"`. Both are ordinary task fields, so a task list can be filtered on them — e.g. `?q=errorKind:eq:timeout`.

@@ -7,7 +7,7 @@ sidebar_position: 1
 
 ## 0. Toolchain ([mise](https://mise.jdx.dev/))
 
-Python, Node.js, pnpm, uv, and lefthook versions are pinned in [mise.toml](https://github.com/kaitoy/a2flow/blob/master/mise.toml) and provisioned by mise, so every machine runs the same toolchain. Install mise once:
+Python, Node.js, pnpm, and uv versions are pinned in [mise.toml](https://github.com/kaitoy/a2flow/blob/master/mise.toml) and provisioned by mise, so every machine runs the same toolchain. Install mise once:
 
 | OS | Command |
 |---|---|
@@ -22,9 +22,9 @@ mise trust
 mise install
 ```
 
-On Windows, also put mise's shims directory (`%LOCALAPPDATA%\mise\shims`) on your `PATH`. Git hooks and editor integrations are spawned outside an activated shell and resolve `uv` / `pnpm` / `python` from `PATH` alone.
+On Windows, also put mise's shims directory (`%LOCALAPPDATA%\mise\shims`) on your `PATH`, so `uv` / `pnpm` / `python` resolve even outside an activated shell.
 
-Not using mise? The minimum versions are Python 3.11+, Node.js 20+, plus [uv](https://docs.astral.sh/uv/), pnpm, and lefthook installed by hand.
+Not using mise? The minimum versions are Python 3.11+, Node.js 20+, plus [uv](https://docs.astral.sh/uv/) and pnpm installed by hand.
 
 ## 1. Backend
 
@@ -34,9 +34,11 @@ The backend itself needs only Python and uv; Node.js is used only to launch stdi
 cd backend
 uv sync
 cp .env.example .env
-# Edit .env — set LLM_MODEL and the corresponding API key (see backend/README.md)
-uv run uvicorn main:app --reload
+sed -i.bak 's/^GOOGLE_API_KEY=.*/GOOGLE_API_KEY=YOUR_API_KEY/' .env && rm .env.bak
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 30
 ```
+
+`.env.example` defaults to Google Gemini, so replace `YOUR_API_KEY` with your own key. To use a different model or provider, see [LLM configuration](./llm-configuration.md).
 
 The API is now available at `http://localhost:8000`.
 
@@ -46,11 +48,8 @@ The API is now available at `http://localhost:8000`.
 cd frontend
 pnpm install
 # Optional: cp .env.local.example .env.local  (only needed if backend is not on :8000)
-pnpm dev
+pnpm build
+pnpm start
 ```
 
 Open [http://localhost:3000](http://localhost:3000). To run on a different port, see [Changing the port](https://github.com/kaitoy/a2flow/blob/master/frontend/README.md#changing-the-port) in the frontend README.
-
-## 3. Git hooks (lefthook)
-
-Pre-commit / pre-push hooks (lefthook) run linters, formatters, type checkers, and tests. `mise install` already provides the `lefthook` binary; run `lefthook install` once from the repository root to wire it into `.git/hooks/`. See [.claude/rules/git-workflow.md](https://github.com/kaitoy/a2flow/blob/master/.claude/rules/git-workflow.md) for details.

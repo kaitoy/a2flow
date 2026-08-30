@@ -5,96 +5,169 @@ sidebar_position: 3
 
 # Workflows
 
-Navigate to [http://localhost:3000/admin/workflows](http://localhost:3000/admin/workflows) to manage Workflows — reusable units of work that pair an Agent Skill with a **pre-designed task list** (the workflow's *task templates*). A workflow's lifecycle is **generate → adjust → publish → execute**: the task templates are designed and settled *before* any run, so executing a workflow starts working immediately instead of redesigning them every time.
+A workflow is a reusable unit of work: an [Agent Skill](./agent-skills.md) paired with a **pre-designed task list**, its *task templates*. The templates are settled *before* any run, so executing a workflow starts working immediately instead of redesigning the same steps every time.
 
-| Operation | Path |
-|-----------|------|
-| Generate a workflow from a skill | "Generate workflow" on [Agent Skills](./agent-skills.md) — the list's row action or the detail page header's icon button (both calling `POST /agent-skills/{id}/workflows`) |
-| List all workflows | `GET /admin/workflows` |
-| A workflow's detail page — edit / publish / deactivate / discard changes / open its design session | `GET /admin/workflows/{id}` |
-| Manage its task templates | `GET /admin/workflows/{id}/task-templates` |
-| Run a workflow | "Run" button in the list (calls `POST /workflows/{id}/execute`) |
+Open **Workflows** in the admin sidebar to manage them.
 
-Each workflow record stores a name, any [tags](./tags.md) it is classified by, a reference to an Agent Skill, a lifecycle **status** (`generating` / `draft` / `failed` / `published` / `modified`), and two description fields: `generatedDescription` — **summarized from the design conversation** by the AI when the workflow is generated and again whenever a `developer` presses the field's **generate action**, editable directly only by a **Super Admin** — and `description`, a free-form field any `developer` can set to override it. Whichever is non-empty (`description` takes precedence, else `generatedDescription`) is handed to the execution agent as run context. Since the override is usually a hand-edit of the AI's summary, the Description field on the detail page carries a **diff action** opening a dialog with a word-level diff from `generatedDescription` to `description`; it reads the values currently in the form, so unsaved edits are diffed too. Workflows are persisted in `a2flow.db`; there is no bare `POST /workflows` — generation is the only way a workflow is born.
+```mermaid
+flowchart LR
+  S["Agent Skill"] -->|"Generate workflow"| G["Workflow<br/>task templates designed by AI"]
+  G -->|"design chat or admin forms"| A["Adjusted draft"]
+  A -->|"Publish"| P["Published<br/>the design is frozen"]
+  P -->|"Run"| E["Workflow execution<br/>one run, with its own copy of the tasks"]
+```
 
-## Generating a workflow
+There is no way to create a bare workflow: generating one from a skill is how a workflow is born.
 
-**Generate workflow** is reachable from two places, both opening the same modal dialog without leaving the page: the row action in the [Agent Skills](./agent-skills.md) list, and the Generate Workflow icon button in the header of a skill's detail page. Either is disabled until the skill's clone has published a revision. The dialog asks for the workflow **name** (prefilled with the skill name) and the **prompt** describing the work. Because generating navigates away to the new workflow, the detail page offers to save unsaved edits first — declining the prompt leaves the page untouched and does not generate.
+## Statuses
 
-Submitting the dialog:
+```mermaid
+stateDiagram-v2
+  [*] --> generating: Generate workflow
+  generating --> draft: task templates registered
+  generating --> failed: generation failed
+  failed --> draft: templates written by hand or by chat
+  draft --> published: Publish
+  published --> modified: any edit
+  modified --> published: Publish
+  modified --> draft: Deactivate
+  published --> draft: Deactivate
+```
 
-1. Checks that the skill has a published revision (`commitSha`); otherwise HTTP 409 (`SKILL_NOT_READY`). The new workflow (`status: "generating"`) is registered immediately (HTTP 201), carrying the id of the **design session** it will be designed in and pinned to that revision, and the frontend navigates to the workflow's detail page, which polls while generation runs.
-2. A **background design run** sends the prompt as the design session's first chat message and drives an *initial-design* agent: following the skill, it breaks the request into steps and registers them as the workflow's **task templates** in one `register_design_tasks` call (a DAG — each step declares a `key` and its `depends_on` predecessors, plus optional MCP `tools` bindings).
-3. When the run finishes, the design conversation is summarized (one LLM call) into the workflow's `generatedDescription`, the status becomes **`draft`**, and a **workflow-draft-ready notification** deep-links back to the workflow. Any failure — an LLM error, or a run that registered no templates — lands on the row as **`failed`** with the reason and raises a **workflow-generation-failed notification**. The reason is shown on the workflow's detail page and as a banner in its design chat, which stays usable: writing the task templates from there (or from the admin template editor) recovers the workflow to **`draft`** and clears the failure, since rebuilding the design is what repairs it.
+| Status | What it means | Who can run it |
+|---|---|---|
+| `generating` | The background design run is still writing the task templates. | Nobody |
+| `draft` | The design exists but has never been published, or was deactivated. | Developer and Super Admin, for pre-publish testing |
+| `failed` | The design run ended without producing templates. The reason is shown on the detail page and in the design chat. | Nobody |
+| `published` | The design is frozen and executable. | Anyone holding `requester` or above |
+| `modified` | Published once, then edited. Runs still use the published version. | Same as `published` |
 
-The prompt itself is not stored on the workflow: it lives on as the first message of the design conversation, and the generated summary carries the intent forward.
+## The screens
 
-## Regenerating the description
+| Screen | How to get there | What you do there |
+|---|---|---|
+| **Workflows** list | Admin sidebar → Workflows | Browse, filter by [tag](./tags.md), and **Run** a workflow |
+| Workflow detail | Click a workflow's name | Edit its fields, **Publish**, **Deactivate**, **Discard changes**, **Open design session** |
+| **Task Templates** | The workflow detail page's Task Templates link | Add, edit and reorder the steps by hand, as a Table or a Graph |
+| Design session | **Open design session** on the detail page | Refine the steps by talking to the design agent |
 
-The AI summary goes stale as the task templates are adjusted, so the **Generated description** field on the workflow detail page carries a **generate action** (`POST /workflows/{id}/generate-description`, developer-gated) that re-summarizes the design conversation on demand — one LLM call — and saves the result straight away. There is no summarization at publish time: whether and when to refresh the summary is the user's call.
+Each workflow record carries a **Name**, the [tags](./tags.md) it is classified by, the **Agent Skill** it follows, its status, and two description fields.
 
-The same action is also reachable from the design session's chat input: its "+" menu (developer-gated, hidden while the workflow's task templates are still generating) offers **Generate description**, which previews the change through the same description-diff dialog as the detail page before it's saved — handy for regenerating without leaving the conversation.
+## Generating a workflow {#generating-a-workflow}
 
-A `published` workflow becomes `modified` when the summary is rewritten, since a run whose `description` is empty falls back to it and would otherwise drift from the published version. The action returns HTTP 409 (`WORKFLOW_DESCRIPTION_NOT_GENERATABLE`) while generation is still in flight or when there is no design conversation to summarize, and HTTP 502 (`SUMMARIZATION_FAILED`) if the LLM call fails.
+**Generate workflow** is reachable from two places, both opening the same dialog without leaving the page: the row action in the [Agent Skills](./agent-skills.md) list, and the Generate Workflow icon button in the header of a skill's detail page. Either is disabled until the skill has published a revision.
 
-## Adjusting the task templates
+1. Fill in the **Workflow Name** (prefilled with the skill name) and the **Prompt** describing the work. Because generating navigates away, the detail page offers to save unsaved edits first — declining leaves the page untouched and does not generate.
+2. The workflow is registered right away as `generating`, and you land on its detail page, which refreshes itself while the work runs.
+3. In the background, the prompt is sent as the first message of the workflow's **design session**. The design agent follows the skill, breaks the request into steps, and registers them as the workflow's task templates — a dependency graph, where each step declares which steps must finish before it, plus any [MCP tools](./workflows.md#mcp-tools-for-tasks) it needs.
+4. When the run finishes, the design conversation is summarized into **Generated description**, the status becomes `draft`, and a [notification](./notifications.md) deep-links you back to the workflow.
 
-A draft's task templates can be refined in two ways, in any mix:
+If the run fails — or finishes without registering a single template — the workflow lands on `failed` with the reason, and a notification says so. The design chat stays usable: writing the task templates from there, or from the Task Templates admin pages, recovers the workflow to `draft` and clears the failure.
 
-- **By chat** — the workflow detail page's **Open design session** button opens `/admin/workflows/{workflowId}/design-session` (the chat has no id of its own, so it is addressed by its workflow): the same chat UI as a run, with the template list down the left edge, driven by an interactive *design* agent whose tools (`register_design_tasks`, `create_design_task`, `list_design_tasks`, `get_design_task`, `update_design_task`, `delete_design_task`) edit the workflow's templates directly. The design agent never executes anything. The design session is shared by every **Developer** in the tenant (plus Super Admins and the workflow's `createdBy`), so a team can refine a design together: it reuses the shared chat plumbing (history poll, A2UI surfaces, per-message sender avatars), and two people hitting send at once collide on the same run lock a workflow session uses.
-- **By hand** — the **Task Templates** admin pages (`/admin/workflows/{id}/task-templates`) offer the familiar Table / Graph views (the Graph stacks the templates in one vertical column in dependency order, each branching rightward into the MCP servers it binds tools from and then into the individual tools) plus a create form and a per-template detail page with **Depends on** and **MCP Tools** pickers, backed by `GET /workflows/{id}/task-templates` and the `POST`/`PATCH`/`DELETE /workflow-task-templates` endpoints (developer-gated).
+The prompt itself is not stored on the workflow. It lives on as the first message of the design conversation, and the generated summary carries the intent forward.
 
-Templates mirror session tasks structurally — title, description, DAG edges (`workflow_task_template_dependencies`), and MCP tool bindings (`workflow_task_template_tool_bindings`, server side `RESTRICT`) — but carry **no status**: the lifecycle belongs to a run, not the design. The same DAG rules apply (same-workflow targets, cycles rejected with HTTP 409 `DEPENDENCY_CYCLE`).
+## The two description fields
+
+Whichever description is in effect is handed to the execution agent as context for the run, so it is worth knowing which one that is.
+
+| Field | Written by | Who can edit it directly |
+|---|---|---|
+| **Generated description** | The AI, summarizing the design conversation | Super Admin only |
+| **Description** | A person, usually by hand-editing the AI's summary | Any Developer |
+
+**Description** wins when it is non-empty; otherwise **Generated description** is used. Since the override usually starts life as a copy of the summary, the Description field carries a **Show diff from the generated description** action, which opens a word-level diff between the two. It reads the values currently in the form, so unsaved edits are diffed too.
+
+### Regenerating the description {#regenerating-the-description}
+
+The AI summary goes stale as the task templates are adjusted, so **Generated description** carries a **Generate from the design conversation** action that re-summarizes the design conversation on demand and saves the result straight away. Nothing is summarized at publish time: whether and when to refresh it is your call.
+
+The same action is offered from the design session's chat input, under its "+" menu, where it previews the change through the same diff dialog before saving — handy for regenerating without leaving the conversation. The menu is hidden while the task templates are still generating.
+
+Both are Developer actions. Rewriting the summary of a `published` workflow moves it to `modified`, because a run whose Description is empty falls back to the summary and would otherwise drift from the published version.
+
+## Adjusting the task templates {#adjusting-the-task-templates}
+
+A draft's task templates can be refined in two ways, in any mix.
+
+**By chat.** **Open design session** on the workflow detail page opens the design chat: the same chat as a run, with the template list down the left edge, driven by a design agent that edits the templates directly. The design agent never executes anything. The session is shared by every **Developer** in the tenant, plus Super Admins and the workflow's creator, so a team can refine a design together — with the same shared-chat behavior as a [workflow session](./workflow-executions.md#the-workflow-session-screen), including per-message sender avatars.
+
+**By hand.** The **Task Templates** pages offer a **Table** and a **Graph** view, a create form, and a detail page per template with **Depends on** and **MCP Tools** pickers. The Graph stacks the templates in one vertical column in dependency order, each branching rightward into the MCP servers it binds tools from and then into the individual tools.
+
+Templates mirror a run's tasks structurally — title, description, dependency edges, and tool bindings — but carry **no status**: the lifecycle belongs to a run, not to the design. Dependencies must point at templates of the same workflow, and an edge that would close a cycle is refused.
 
 ## Publishing
 
-**Publish** (on the workflow detail page, `POST /workflows/{id}/publish`, developer-gated) is what makes a workflow executable. It requires at least one template (and no generation in flight) — otherwise HTTP 409 (`WORKFLOW_NOT_RUNNABLE`). Publishing **freezes the design**: the workflow's name, effective description (`description` if set, else `generatedDescription`), and full template list (edges and tool bindings included) are captured as its published version, replacing the previous one. No LLM runs here — refreshing the AI summary is a [separate, user-triggered action](./workflows.md#regenerating-the-description). Re-adjust → re-publish is allowed at any time; runs already started are unaffected because they copied the task templates (below).
+**Publish**, on the workflow detail page, is what makes a workflow executable. It needs at least one template, and no generation in flight.
 
-## Editing a published workflow — `modified`
+Publishing **freezes the design**: the workflow's name, its effective description, and its full template list — dependency edges and tool bindings included — are captured as the published version, replacing the previous one. No AI runs here; refreshing the summary is a [separate action](./workflows.md#regenerating-the-description). Re-adjust and re-publish as often as you like: runs already started are unaffected, because each run took its own copy of the tasks.
 
-Editing a workflow after it has been published does not silently change what runs. Saving the detail form, regenerating its AI description, or adding / editing / deleting one of its **task templates**, moves the workflow to **`modified`**:
+## Editing a published workflow
 
-- Runs keep using the **last published version** — its name, effective description, and templates — not the edits.
-- The workflow stays runnable by anyone who could run it while `published`; the Run button in the list is not gated differently.
-- **Publish** again to promote the edits into future runs.
-- **Discard changes** (the undo icon that appears in the detail page's status bar next to Publish, `POST /workflows/{id}/discard-changes`, developer-gated) throws the edits away instead: the task templates are rewritten from the published version — original template ids reused, so the dependency edges survive — the name is restored and the published version's frozen effective description is written back into the workflow's `description` field (`generatedDescription` is left untouched), and the workflow returns to `published`. Discarding a workflow that has no unpublished changes returns HTTP 409 (`WORKFLOW_NOT_MODIFIED`).
+Editing a workflow after it has been published does not silently change what runs. Saving the detail form, regenerating the AI description, or adding, editing or deleting a task template — including a change the design agent makes in the chat — moves the workflow to `modified`.
 
-Refining the task templates through the **design chat** counts as an edit too: when the design agent adds, changes, or removes a task template of a `published` workflow, the workflow moves to `modified` exactly as a manual edit would.
+| While `modified` | |
+|---|---|
+| What runs use | The **last published version** — its name, effective description, and templates — not the edits |
+| Who can run it | The same people as while `published`; the Run button is not gated differently |
+| **Publish** | Promotes the edits into future runs |
+| **Discard changes** | Throws the edits away: the templates are rewritten from the published version, the name is restored, the published version's description is written back, and the workflow returns to `published` |
+
+**Discard changes** is the undo icon in the detail page's status bar, next to Publish. Discarding a workflow that has no unpublished changes does nothing but report as much.
 
 ## Deactivating a workflow
 
-**Deactivate** (the power-off icon that appears in the detail page's status bar next to Publish whenever the workflow is `published` or `modified`, `POST /workflows/{id}/deactivate`, developer-gated) returns a workflow to **`draft`**. This revokes the `requester` role's execute access — the same gate a never-published workflow starts under — while a `developer`/`super_admin` can still run it for testing and the task templates, both description fields, and published snapshot are left exactly as they were. Publishing again promotes it straight back to `published`. Deactivating a workflow that is not currently `published`/`modified` returns HTTP 409 (`WORKFLOW_NOT_DEACTIVATABLE`).
+**Deactivate** — the power-off icon that appears next to Publish while a workflow is `published` or `modified` — returns it to `draft`. That revokes the `requester` role's execute access, the same gate a never-published workflow starts under, while a Developer or Super Admin can still run it for testing. Task templates, both description fields, and the published snapshot are left exactly as they were, so publishing again promotes it straight back.
 
-## Running a workflow
+## Running a workflow {#running-a-workflow}
 
-Clicking **Run** on a **published** or **modified** workflow — or, for a `developer`/`super_admin` caller, a **draft** one too, for pre-publish testing — creates a **WorkflowExecution** — an independent entity that captures a snapshot of the workflow configuration at execution time.
+Clicking **Run** in the workflows list creates a **workflow execution** — an independent record that captures a snapshot of the workflow at that moment.
 
-For a **draft** workflow the Run dialog additionally lists the tenant's [tool mocks](./tool-mocks.md); checking one stubs that tool for this run, so a pre-publish test can be repeated without the tool's side effects. The dialog offers no mocks for a published workflow, and asking for one anyway is rejected with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`) — a published run that quietly did nothing would be worse than no run.
+```mermaid
+flowchart LR
+  W["Workflow<br/>(published version)"] -->|"Run"| X["Workflow execution<br/>the snapshot"]
+  M["Chosen tool mocks"] -->|"copied by value"| X
+  X --> C["Workflow session<br/>the chat the run happens in"]
+```
 
-1. The backend rejects any other status outright, and rejects a `draft` workflow for any caller who isn't `developer`/`super_admin`, with HTTP 409 (`WORKFLOW_NOT_RUNNABLE`); it also re-checks the skill's published revision (`SKILL_NOT_READY` otherwise) — the repository was cloned when the skill was registered, so **nothing is cloned here**.
-2. A `WorkflowExecution` record is persisted, capturing the workflow name, its effective description (`description` if the user set one, else the AI-generated `generatedDescription`), skill details, the id of the **workflow session** it will run in, and the skill revision the run is **pinned** to (`agentSkillCommitSha`). If the workflow was still `draft` at this point — a pre-publish test run — the record is flagged `isDraft: true`, which keeps it out of the [operations metrics](../operations/metrics.md); the flag never changes afterwards. The workflow's task templates are **copied into the execution as `pending` WorkflowTasks** (dependency edges and tool bindings included, ids remapped), so later template edits never affect this run. For a `modified` workflow the name, description, and templates all come from its **last published version** rather than the edited rows. Any [tool mocks](./tool-mocks.md) chosen for the run are **copied onto the record** at the same time — by value, not by reference — so editing or deleting a mock afterwards cannot change how this run behaves. The ADK session itself is created lazily on the first agent call.
-3. The backend returns the `WorkflowExecution` (HTTP 201). The frontend redirects to `/workflow-executions/{workflowExecution.id}/session` — the **workflow session**, the chat the run happens in. It has no record of its own, so it is addressed by its execution's id.
-4. On mount, that page fetches the `WorkflowExecution`, and if no prior messages exist it auto-sends a fixed kickoff message via `POST /workflow-executions/{id}/agent`. The page renders the same shared app bar as the regular chat (notification bell, theme toggle, and account menu), with the workflow name shown beside the title; its **A2Flow** logo links to the [welcome page](./admin-ui.md#welcome-page).
-5. The `/workflow-executions/{id}/agent` endpoint loads the skill-bound `ADKAgent` (keyed by `agent_skill_id`, the pinned revision, **and the agent role**) and streams AG-UI SSE events back, identical to the regular `POST /agent` endpoint. The agent runs under an **execute-only** instruction — the tasks were approved by publishing, so it **begins immediately**, with the execution's effective description injected server-side as trusted run context.
-6. Subsequent user messages continue to flow through `POST /workflow-executions/{id}/agent`, so A2UI rendering, A2UI user actions (e.g. clicking a rendered button), and the full chat experience work normally.
+For a **draft** workflow the Run dialog additionally lists the tenant's [tool mocks](./tool-mocks.md) under **Mock tools**; checking one stubs that tool for this run, so a pre-publish test can be repeated without the tool's side effects. The dialog offers no mocks for a published workflow, and asking for one anyway is refused — a published run that quietly did nothing would be worse than no run at all.
 
-### Agent-managed execution
+Everything the run needs is copied onto the execution when it starts, so later edits never reach back into it:
 
-The execution agent works through the pre-copied WorkflowTasks: it lists the tasks, picks the next runnable one (a `pending` task whose dependencies are all `completed`), marks it `in_progress`, does the work per the skill, and marks it `completed` (or `failed` / `skipped`). When every task reaches a terminal state, a **session-completed notification** is raised. Five tools back this — `create_workflow_task`, `list_workflow_tasks`, `get_workflow_task`, `update_workflow_task`, and `delete_workflow_task` — which resolve the current session from the ADK session id and operate on the same `WorkflowTask` records exposed by the REST API (so the agent can still adjust the run's task list mid-flight when needed). You can watch the statuses update live in the read-only **Workflow Tasks** admin view (Table or Graph). See [backend/README.md](https://github.com/kaitoy/a2flow/blob/master/backend/README.md#agent-task-tools) for the tool reference.
+| Copied onto the run | Taken from |
+|---|---|
+| Name and effective description | The last published version (the edited rows, for a workflow that was still `draft`) |
+| Task templates, as `pending` tasks with their dependencies and tool bindings | The same version |
+| The agent skill revision the run is pinned to | The skill's published revision |
+| The chosen tool mocks, by value | The mocks as they read at that moment |
 
-### MCP tools for tasks
+You are then taken to the **workflow session** — the chat the run happens in. It opens with a fixed kickoff message, and the agent begins immediately: the tasks were approved by publishing, so there is nothing to confirm first. From there the run behaves like any chat, including rendered interactive surfaces and the buttons inside them. The [Workflow Executions](./workflow-executions.md) guide covers that screen.
 
-WorkflowTasks can use tools from the MCP servers registered in the [MCP Servers](./mcp-servers.md) admin page:
+### How the agent works through the tasks
 
-1. **Bind at design time** — while designing, the agent calls `list_mcp_tools`, which queries every registered server concurrently and returns each server's advertised tools (unreachable servers are reported per-server without failing the listing). Steps that need an external tool get a `tools` entry (`[{"server_id": …, "tool_name": …}]`) in `register_design_tasks`; bindings are persisted on the templates and copied onto the run's tasks at execute time, surfaced as `toolBindings` on the REST read models.
-2. **Enforce at execution time** — the agent invokes bound tools through the `call_mcp_tool(server_id, tool_name, arguments)` proxy. Every such call goes through A2Flow's own MCP proxy layer, which resolves who is calling, consults its access-control policies, expands the server's secret references, and only then opens a per-call connection to the server — a streamable HTTP request, or a freshly spawned child process for a stdio server. Its first policy is the binding check: the `(server, tool)` pair must be bound to a task currently `in_progress` in the session (the union of bindings when several are in progress). Calls to unbound tools are rejected with an error listing the allowed tools, so a shared, skill-cached agent can never use tools a task wasn't granted. The proxy exists as a layer of its own so that authentication and finer-grained access control can be added in one place later; see [backend/README.md](https://github.com/kaitoy/a2flow/blob/master/backend/README.md#mcp-proxy).
+The execution agent lists the run's tasks, picks the next runnable one — a `pending` task whose dependencies have all completed — marks it `in_progress`, does the work as the skill directs, and marks it `completed`, `failed` or `skipped`. When every task has reached a terminal state, a [notification](./notifications.md) says the run is done.
 
-Bound tools appear as chips in the **Tools** column of the Task Templates and Workflow Tasks lists. The template forms include an **MCP Tools** picker that works in two steps, like the Agent Skill auth-password picker: choose a server through a paged dialog, then add one of its tools from a dropdown, each added tool becoming a removable chip. Only the chosen server is queried live, so opening the form costs one plain registry read rather than a connection to every registered server; a server that cannot be reached says so in place of its tool list, and an already-bound tool keeps its chip either way.
+You can watch the statuses update live in the read-only **Workflow Tasks** view of the run, as a Table or a Graph. The agent can also adjust the run's task list mid-flight when the work calls for it.
 
-Both of those lists show **every** record instead of paginating, which lets the **Depends on** column work as a cross-reference: each dependency is named by its title, and hovering that chip highlights the depended-on task's own row. The design agent is held to terse imperative task titles — 2–4 words, 30 characters — so they read cleanly as chips; its task tools reject a longer one with a message telling it to move the detail into the description. (The limit binds the agent, not people: a title edited through the admin form is still allowed the full 200 characters.) A title that still overflows its chip is clipped and revealed in full on hover.
+## MCP tools for tasks {#mcp-tools-for-tasks}
 
-Workflow executions are independent of regular chat sessions — deleting a workflow does not affect existing `WorkflowExecution` records (the `workflow_id` FK is set to `NULL` on delete, but the snapshot data remains). Deleting a workflow **does** delete its task templates and published version (cascade), and with the row goes the design session it named.
+Tasks can use tools from the servers registered under [MCP Servers](./mcp-servers.md). Tools are bound at design time and enforced at execution time.
 
-The individual tasks of a run are persisted as `WorkflowTask` records. Each task carries a status (`pending` / `in_progress` / `completed` / `failed` / `skipped`); tasks are listed in `createdAt` order. See [backend/README.md](https://github.com/kaitoy/a2flow/blob/master/backend/README.md#workflow-tasks) for the API reference. Deleting a `WorkflowExecution` cascades to its tasks.
+```mermaid
+flowchart LR
+  D["Design time<br/>a template binds (server, tool) pairs"] -->|"copied at Run"| R["Run time<br/>the task carries the same bindings"]
+  R --> P{"Is the tool bound to a task<br/>that is in progress?"}
+  P -->|"yes"| OK["The call goes through to the server"]
+  P -->|"no"| NO["Refused, listing the tools that are allowed"]
+```
 
-Tasks form a **directed acyclic graph (DAG)** rather than a flat list: each task may depend on zero or more other tasks in the same session via its `dependsOnIds` field (`(task, dependsOn)` edges are stored in the `workflow_task_dependencies` join table). Dependency targets must exist and belong to the same session (otherwise HTTP 422 `FOREIGN_KEY_VIOLATION`), and edges that would introduce a cycle — including a self-dependency — are rejected with HTTP 409 `DEPENDENCY_CYCLE`. Deleting a task cascades to the dependency edges that reference it in either direction.
+While designing, the agent can list the tools every registered server advertises and give a step the ones it needs. Those bindings live on the template and are copied onto the run's tasks when it starts.
+
+At execution time every call is checked before it reaches a server: the `(server, tool)` pair must be bound to a task that is currently in progress. Calls to unbound tools are refused with a message listing what is allowed, so an agent shared across workflows can never reach for a tool a task was not granted. A task that also has an [approval](./approvals.md) attached is gated by that too.
+
+**Binding tools by hand.** The template forms carry an **MCP Tools** picker that works in two steps: choose a server through a paged dialog, then add one of its tools from a dropdown, each added tool becoming a removable chip. Only the chosen server is queried, so opening the form does not go out to every registered server; one that cannot be reached says so in place of its tool list, and an already-bound tool keeps its chip either way. Bound tools appear as chips in the **Tools** column of the Task Templates and Workflow Tasks lists.
+
+**Task titles.** Both of those lists show every record instead of paginating, which lets the **Depends on** column work as a cross-reference: each dependency is named by its title, and hovering that chip highlights the row it points at. The design agent is held to terse imperative titles — 2 to 4 words, 30 characters — so they read cleanly as chips; a longer one is refused with a note telling it to move the detail into the description. The limit binds the agent, not people: a title edited through the admin form may run to 200 characters, and one that overflows its chip is clipped and revealed on hover.
+
+## Deleting a workflow
+
+Deleting a workflow also deletes its task templates, its published version, and its design session. Existing [workflow executions](./workflow-executions.md) survive: each holds its own snapshot, so a run's history stays readable after the workflow it came from is gone.

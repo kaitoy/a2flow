@@ -21,7 +21,7 @@ The user and operator manual lives at **<https://kaitoy.github.io/a2flow/>** ([æ
 
 | | |
 |---|---|
-| [Introduction](https://kaitoy.github.io/a2flow/docs/intro) | What A2Flow is and how the pieces fit together |
+| [Introduction](https://kaitoy.github.io/a2flow/docs/intro) | What A2Flow is: an agent that is the workflow, not a step inside one |
 | [Quick start](https://kaitoy.github.io/a2flow/docs/getting-started/quick-start) | Get the backend and the frontend running |
 | [Terminology](https://kaitoy.github.io/a2flow/docs/concepts/terminology) | Workflows, design sessions, executions, workflow sessions |
 | [Roles and authorization](https://kaitoy.github.io/a2flow/docs/concepts/authorization) | Who may do what |

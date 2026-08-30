@@ -1,0 +1,397 @@
+/**
+ * Styles for the manual's Introduction page (see src/components/IntroSections.tsx).
+ *
+ * Everything is scoped under `.a2f-intro` — this file is loaded globally by the
+ * component module, exactly like homepage.css, which scopes itself under
+ * `.a2flow-home`. The palette is the `--a2f-*` token set custom.css defines for
+ * both themes, so the only dark-mode override below is the one hairline colour
+ * the token set has no equivalent for.
+ */
+
+.a2f-intro {
+  --intro-radius: 1.125rem;
+  /* `--a2f-glass-border` is a white highlight meant to sit on top of a glass
+   * pane; on the bare page background it disappears. Anything outside a pane
+   * uses this hairline instead, which is the one place a dark override is
+   * needed since it is drawn in ink rather than in light. */
+  --intro-hairline: rgba(71, 85, 105, 0.3);
+}
+
+[data-theme="dark"] .a2f-intro {
+  --intro-hairline: rgba(148, 163, 184, 0.28);
+}
+
+/* Entrance: staggered, CSS-only, and off entirely under reduced motion. */
+@keyframes intro-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.a2f-intro .intro-hero,
+.a2f-intro .intro-contrast,
+.a2f-intro .intro-acts,
+.a2f-intro .intro-closing,
+.a2f-intro .intro-next {
+  animation: intro-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.a2f-intro .intro-contrast {
+  animation-delay: 0.1s;
+}
+
+.a2f-intro .intro-acts {
+  animation-delay: 0.18s;
+}
+
+.a2f-intro .intro-closing {
+  animation-delay: 0.26s;
+}
+
+.a2f-intro .intro-next {
+  animation-delay: 0.32s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a2f-intro .intro-hero,
+  .a2f-intro .intro-contrast,
+  .a2f-intro .intro-acts,
+  .a2f-intro .intro-closing,
+  .a2f-intro .intro-next {
+    animation: none;
+  }
+
+  .a2f-intro .intro-act {
+    transition: none;
+  }
+}
+
+/* ------------------------------------------------------------------- hero */
+.a2f-intro .intro-hero {
+  position: relative;
+  padding: 1.5rem 0 3rem;
+}
+
+.a2f-intro .intro-glow {
+  position: absolute;
+  z-index: -1;
+  top: -8rem;
+  left: 50%;
+  width: min(46rem, 100%);
+  height: 26rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(var(--a2f-accent-rgb), 0.22), transparent 78%);
+  filter: blur(6px);
+}
+
+.a2f-intro .intro-eyebrow {
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--a2f-accent);
+}
+
+.a2f-intro .intro-title {
+  margin: 0 0 1.25rem;
+  max-width: 20ch;
+  font-family: var(--a2f-font-display);
+  font-size: clamp(2rem, 5.2vw, 3.25rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  /* Japanese wraps anywhere by default, which breaks the headline mid-word;
+   * browsers that don't know this value simply keep the default behaviour. */
+  word-break: auto-phrase;
+}
+
+.a2f-intro .grad {
+  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.a2f-intro .intro-lead {
+  max-width: 44rem;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: var(--a2f-muted);
+}
+
+.a2f-intro .intro-lead p:last-child {
+  margin-bottom: 0;
+}
+
+/* --------------------------------------------------------------- contrast */
+.a2f-intro .intro-contrast {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 3.5rem;
+}
+
+.a2f-intro .intro-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 1.5rem;
+  border-radius: var(--intro-radius);
+  border: 1px solid var(--a2f-glass-border);
+  background: var(--a2f-glass);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: var(--a2f-shadow-glass);
+}
+
+/* The old way is drawn quieter: dashed edge, no glass, muted ink. */
+.a2f-intro .intro-panel-past {
+  border-style: dashed;
+  border-color: var(--intro-hairline);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.a2f-intro .intro-panel-next::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--a2f-accent), var(--a2f-secondary));
+}
+
+.a2f-intro .intro-mark {
+  display: block;
+  width: 6.5rem;
+  height: 2rem;
+  margin-bottom: 1rem;
+}
+
+.a2f-intro .mark-box {
+  stroke: var(--a2f-muted);
+  opacity: 0.55;
+}
+
+.a2f-intro .mark-wire {
+  stroke: var(--a2f-muted);
+  opacity: 0.45;
+}
+
+.a2f-intro .mark-box-ai,
+.a2f-intro .mark-box-whole {
+  stroke: var(--a2f-accent);
+  opacity: 1;
+}
+
+.a2f-intro .mark-box-whole {
+  fill: rgba(var(--a2f-accent-rgb), 0.08);
+}
+
+.a2f-intro .mark-spark {
+  fill: var(--a2f-accent);
+}
+
+.a2f-intro .mark-dot {
+  fill: var(--a2f-secondary);
+  opacity: 0.75;
+}
+
+.a2f-intro .intro-panel-title {
+  margin: 0 0 0.625rem;
+  font-family: var(--a2f-font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.a2f-intro .intro-panel-past .intro-panel-title {
+  color: var(--a2f-muted);
+}
+
+.a2f-intro .intro-panel-body {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--a2f-muted);
+}
+
+.a2f-intro .intro-panel-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------------- acts */
+.a2f-intro .intro-acts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 3.5rem;
+}
+
+.a2f-intro .intro-act {
+  position: relative;
+  padding: 1.5rem;
+  border-radius: var(--intro-radius);
+  border: 1px solid var(--a2f-glass-border);
+  background: var(--a2f-glass);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: var(--a2f-shadow-glass);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.a2f-intro .intro-act:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--a2f-shadow-glass-lg);
+}
+
+/* A chevron in the gutter, so the three cards read as one sequence. */
+.a2f-intro .intro-act + .intro-act::before {
+  content: "";
+  position: absolute;
+  top: 3.25rem;
+  left: -0.95rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-top: 2px solid var(--a2f-accent);
+  border-right: 2px solid var(--a2f-accent);
+  transform: rotate(45deg);
+  opacity: 0.6;
+}
+
+.a2f-intro .intro-act-head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 0.875rem;
+}
+
+.a2f-intro .intro-act-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--a2f-accent);
+}
+
+.a2f-intro .intro-act-step {
+  font-family: var(--a2f-font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--a2f-muted);
+}
+
+.a2f-intro .intro-act-title {
+  margin: 0 0 0.625rem;
+  font-family: var(--a2f-font-display);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.a2f-intro .intro-act-body {
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  color: var(--a2f-muted);
+}
+
+.a2f-intro .intro-act-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------------------------------------------------------------- closing */
+.a2f-intro .intro-closing {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 3.5rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  border-radius: var(--intro-radius);
+  border: 1px solid var(--a2f-glass-border);
+  background: linear-gradient(135deg, rgba(var(--a2f-accent-rgb), 0.1), rgba(99, 102, 241, 0.08));
+}
+
+.a2f-intro .intro-closing-headline {
+  margin: 0 0 0.75rem;
+  font-family: var(--a2f-font-display);
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.a2f-intro .intro-closing-body {
+  max-width: 38rem;
+  margin: 0 auto;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  color: var(--a2f-muted);
+}
+
+.a2f-intro .intro-closing-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------------- next */
+.a2f-intro .intro-next-title {
+  margin: 0 0 1.25rem;
+  font-family: var(--a2f-font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.a2f-intro .intro-next ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.875rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.a2f-intro .intro-next li {
+  padding: 1rem 1.125rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--a2f-glass-border);
+  background: var(--a2f-glass);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--a2f-muted);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.a2f-intro .intro-next li:hover {
+  border-color: var(--a2f-accent);
+  transform: translateY(-2px);
+}
+
+.a2f-intro .intro-next a {
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------- narrow view */
+@media (max-width: 996px) {
+  .a2f-intro .intro-contrast,
+  .a2f-intro .intro-acts,
+  .a2f-intro .intro-next ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .a2f-intro .intro-act + .intro-act::before {
+    top: -0.95rem;
+    left: 2.25rem;
+    transform: rotate(135deg);
+  }
+}

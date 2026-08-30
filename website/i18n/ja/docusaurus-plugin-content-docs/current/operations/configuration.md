@@ -1,140 +1,171 @@
 ---
 title: 設定リファレンス
-sidebar_position: 1
+sidebar_position: 2
 ---
 
 # 設定リファレンス
 
-以下の設定はすべて、バックエンドが `backend/.env` から読む環境変数です。注釈つきのテンプレートは [backend/.env.example](https://github.com/kaitoy/a2flow/blob/master/backend/.env.example) にあります。モデルと API キーの設定は [LLM の設定](../getting-started/llm-configuration.md)に別ページとしてまとめてあります。
+以下の設定はすべて環境変数です。バックエンドは `backend/.env` から読みます([backend/.env.example](https://github.com/kaitoy/a2flow/blob/master/backend/.env.example) が注釈つきのテンプレートです)。フロントエンドの 2 つは、フロントエンド自身のプロセス環境から読みます。モデルと API キーの設定は [LLM の設定](../getting-started/llm-configuration.md)に別ページとしてまとめてあります。
 
-## サーバーの設定
+## サーバーの設定 {#server-settings}
 
-```env
-HOST=0.0.0.0
-PORT=8000
-# RELOAD=true
-```
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `HOST` | `0.0.0.0` | バックエンドがバインドするアドレス |
+| `PORT` | `8000` | バックエンドがバインドするポート |
+| `RELOAD` | `false` | ローカル開発用の uvicorn オートリロード。バックエンドを `python -m backend.main` で起動したときだけ読まれます。Docker イメージの起動コマンドには、どちらにしても影響しません |
 
-省略した場合の既定は `HOST=0.0.0.0` と `PORT=8000` です。`RELOAD`(既定 `false`)は uvicorn の自動リロードを有効にします。効くのは `python -m backend.main` だけで、[クイックスタート](../getting-started/quick-start.md)の `uv run uvicorn main:app --reload` や Dockerfile の起動経路は、どちらの値でも影響を受けません。
+## フロントエンドの設定 {#frontend-settings}
 
-## 運用メトリクス
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `BACKEND_BASE_URL` | `http://localhost:8000` | フロントエンドのサーバー側プロキシが `/api/*` を転送する先。プロセス起動時に一度だけ読まれます。Docker Compose の構成では、公開アドレスではなく内部ネットワーク上のバックエンドのアドレスです |
+| `FRONTEND_PORT` | `3000` | Docker Compose 専用。フロントエンドを公開するホスト側のポートです。コンテナ内部では 3000 で待ち受けたままで、バックエンドの `CORS_ORIGINS` は自動的にこれに追従します |
 
-```env
-# METRICS_TIMEZONE=Asia/Tokyo
-```
+## アプリケーションのデータベース {#application-database}
 
-ワークフローの運用メトリクスで暦日がどこから始まるかを決める IANA のタイムゾーン名です。`GET /api/v1/metrics` の「今日」の件数と、リードタイムの推移の日次バケットに効きます。既定は `UTC` です。認識できない名前は起動を止めず `UTC` にフォールバックするので、打ち間違いはアプリを止めるのではなくダッシュボードの日の境目をずらすだけで済みます。メトリクス自体は[運用メトリクス](./metrics.md)で説明しています。
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `DB_URL` | `sqlite:///a2flow.db` | データベース URL。SQLite(作業ディレクトリからの相対)と PostgreSQL に対応します |
 
-## エージェントスキルストア {#agent-skill-store}
-
-```env
-SKILLS_DIR=.skills
-# SKILLS_PRUNE_GRACE_SECONDS=3600
-# SKILLS_CLONE_TIMEOUT_SECONDS=120
-```
-
-エージェントスキルのリポジトリをシャロークローンするストアのルートです。リビジョンごとに 1 つの不変ディレクトリという配置になります。
-
-```
-$SKILLS_DIR/<agent_skill_id>/<commit_sha>/
-```
-
-クローンは一時的な隣のディレクトリに用意し、1 回のアトミックな rename で公開します。そのため読み手が書きかけのリビジョンを見ることはありませんし、公開されたリビジョンが変更されることもありません。書き手(登録時のクローンと、すべての pull)は `infrastructure/locks.py` の `skill-sync:<id>` アドバイザリロックで直列化されます。読み手はロックを一切取りません。pull は隣にディレクトリを足すだけなので、既存のリビジョンを読み込んでいるエージェントを邪魔できないからです。
-
-`SKILLS_PRUNE_GRACE_SECONDS`(既定 3600)は、何かから参照されているかどうかに関係なくリビジョンのディレクトリが残る時間です。pull は、どのワークフロー実行からも固定されていないリビジョンを削除します。この猶予時間は、実行がスキルの現在のリビジョンを読んでから、それを指す実行の行を挿入するまでの隙間をカバーします。
-
-`SKILLS_CLONE_TIMEOUT_SECONDS`(既定 120)は、クローン中の個々の HTTP リクエストにかけられる時間の上限です。これがないと、遅い、あるいは応答しないリモートがクローンを無期限に止め、それと一緒にスキルの同期用アドバイザリロックも止めてしまいます。スキルは `pending` のまま残り、別のレプリカでの pull は待つのではなく黙って処理を飛ばすことになります。
-
-既定は `backend/.skills`(作業ディレクトリからの相対)です。`docker compose` では `/var/lib/a2flow/skills` で、`skills` という名前つきボリュームに支えられます。
-
-これは**キャッシュではなく永続的な状態**です。`WorkflowExecution` は開始時のリビジョンに固定されるので、このディレクトリを消すと、既存の実行は管理者がスキルをもう一度 pull するまでスキルを読み込めなくなります(HTTP 409 `SKILL_NOT_READY`)。バックエンドを 2 レプリカ以上で動かす場合は、すべてのレプリカがこの同じディレクトリをマウントする必要があります。
-
-## シークレットの管理 {#secret-management}
+非同期ドライバーのサフィックス(`sqlite+aiosqlite` / `postgresql+asyncpg`)は自動で付くので、素のスキームで足ります。
 
 ```env
-# SECRET_ENCRYPTION_KEY=
-# SECRET_KEY_FILE=.secret_key
-# VAULT_ADDR=https://vault.example.com
-# VAULT_TOKEN=hvs.xxxxxxxx
-# VAULT_ROLE_ID=...
-# VAULT_SECRET_ID=...
-# VAULT_APPROLE_MOUNT=approle
+DB_URL=postgresql://user:password@localhost:5432/a2flow
 ```
 
-`local` タイプの[シークレット](../guides/secrets.md)は保存前に Fernet で暗号化されます。キーは最初の使用時に解決されます。`SECRET_ENCRYPTION_KEY`(有効な Fernet キーであること)が優先され、なければ `SECRET_KEY_FILE` のキーファイル(既定は SQLite のデータベースファイルの隣の `.secret_key`)を読み、それもなければキーを生成してそのファイルに保存し、WARNING をログに出します。キーはバックアップしてください。失うと保存済みのローカルシークレットはすべて復号できなくなります。
-
-`vault` タイプのシークレットは、`VAULT_ADDR` で指定した 1 つの HashiCorp Vault(KV v2 のみ)からその場で読みます。認証は、設定されていれば AppRole(`VAULT_ROLE_ID` と `VAULT_SECRET_ID`。ログインのマウントは `VAULT_APPROLE_MOUNT`)を、なければ静的な `VAULT_TOKEN` を使います。`VAULT_ADDR` は、ユーザーが入力した URL に適用される SSRF のチェックを意図的に免除されています。運用者が設定するデプロイの構成であり、通常はプライベートアドレスを指すからです。
-
-## アプリケーションのデータベース
-
-```env
-DB_URL=sqlite:///a2flow.db
-# DB_URL=postgresql://user:password@localhost:5432/a2flow
-```
-
-REST API のデータと ADK のセッションストレージのためのデータベース URL です。どちらも同じデータベースに入ります。対応しているのは SQLite(既定。作業ディレクトリからの相対)と PostgreSQL です。非同期ドライバの接尾辞(`sqlite+aiosqlite` と `postgresql+asyncpg`)は自動で付くので、素のスキームで足ります。SQLite の場合 ADK のセッションストアは `SqliteSessionService` を使い、それ以外の URL では SQLAlchemy ベースの `DatabaseSessionService` に切り替わります。スキーマの変更はバージョン管理された [Alembic](https://alembic.sqlalchemy.org/) のマイグレーション(`alembic/versions/` 以下)として追跡し、起動時に自動適用します(`alembic upgrade head`)。つまりアプリを再デプロイすることがスキーマを最新にする操作です。モデルを変えたあとにマイグレーションを追加するには `uv run alembic revision --autogenerate -m "..."` を実行し、生成されたファイルを確認してからコミットしてください。
-
-| テーブル | 説明 |
-|---|---|
-| `users` | アプリケーションのユーザー(`deleted_at` による論理削除。`roles` に付与されたロールが入ります)。[初期投入されるユーザー](./configuration.md#seeded-users)と[認可](../concepts/authorization.md)を参照 |
-| `auth_sessions` | サーバー側のログインセッション(ハッシュ化したクッキーのトークンと CSRF トークン)。[認証](../concepts/authentication.md)を参照 |
-| `impersonation_events` | なりすましセッションの監査証跡(`impersonator_id`、`target_user_id`、`started_at`、`ended_at`)。[認証](../concepts/authentication.md)を参照 |
-| `agent_skills` | エージェントスキルの定義(プライベートリポジトリのクローン用に任意の `repo_auth_password` と `repo_auth_username` を含みます) |
-| `mcp_servers` | 登録された MCP サーバー(名前、`transport`、続いてストリーマブル HTTP の URL とリクエストヘッダー、または stdio の command と args と env。ヘッダーと env の値には `${secret:NAME/KEY}` のプレースホルダーを埋め込めます) |
-| `secrets` | 名前つきのキー/値の認証情報のまとまり。Fernet で暗号化したローカルの値の `entries` マップか、HashiCorp Vault の KV v2 パスへの参照です。[シークレット](../guides/secrets.md)を参照 |
-| `workflows` | ワークフローの定義(名前、スキルへの参照、ライフサイクルの `status`、AI が要約した `generatedDescription`、ユーザーが編集できる `description`)に加えて、タスクテンプレートを設計する設計セッション(ADK のチャット)の `session_id` と、そのチャットが固定されている `agent_skill_commit_sha` |
-| `workflow_task_templates` | ワークフローの、事前に設計されたタスク一覧(`workflow_id` の外部キーは `ON DELETE CASCADE`。依存の辺と MCP ツールの割り当ては専用の `workflow_task_template_*` 中間テーブルにあります) |
-| `workflow_published_versions` | ワークフローごとに最大 1 行。公開時に凍結した名前、説明、タスクテンプレート(JSON)で、`modified` のワークフローはこれをもとに実行されます。[ワークフロー](../guides/workflows.md)を参照 |
-| `workflow_executions` | ワークフローの実行 1 回につき 1 行。実行時点のワークフローとスキルのメタデータのスナップショットに加えて、実行が行われるワークフローセッション(ADK のチャット)の `session_id`(`workflow_id` の外部キーは `ON DELETE SET NULL` なので、実行は設計より長生きします) |
-| `workflow_tasks` | `WorkflowExecution` に属する個々のタスク。実行時にテンプレートからコピーされます(`workflow_execution_id` の外部キーは `ON DELETE CASCADE`) |
-| `workflow_task_tool_bindings` | タスクに割り当てられた MCP ツール(`task_id` の外部キーは `ON DELETE CASCADE`、`mcp_server_id` は `ON DELETE RESTRICT`) |
-| `message_meta` | 共有される 2 つのセッションチャットの、メッセージごとの付帯情報。誰が送ったか(`sender_user_id`)と、どのタスクが進行中だったか(`workflow_task_id`。ワークフローセッションのみ)です。どちらのチャットも専用のテーブルを持たないので、行は `workflow_execution_id`(ワークフローセッション)か `workflow_id`(設計セッション)のちょうど一方で親を示します。`CHECK` がそれを強制し、どちらも削除時にカスケードします |
-| `sessions` | セッションのメタデータとセッションレベルの状態 |
-| `events` | セッションごとの全イベント履歴(JSON) |
-| `app_states` | アプリケーションレベルの共有状態 |
-| `user_states` | セッションをまたいで共有されるユーザーごとの状態 |
+スキーマの変更はバージョン管理された [Alembic](https://alembic.sqlalchemy.org/) のマイグレーションとして扱われ、起動時に自動で適用されます。つまりアプリを再デプロイすることがスキーマを最新にする操作です。バックエンドを 2 レプリカ以上で動かすには PostgreSQL が必要です([水平スケーリング](./scaling.md))。各テーブルの中身は[データベース](../architecture/database.md)にあります。
 
 ## 初期投入されるユーザー {#seeded-users}
 
-起動時、バックエンドは隠しの**システムユーザー**に加えて実在の 2 アカウントを投入します。いずれも、対象のレコードが見つからなかった最初の起動でだけ作られます。
+起動時、バックエンドは隠れた**システムユーザー**と、実在の 2 アカウントを投入します。それぞれ、対象のレコードが無いことを見つけた最初の起動でのみ作られます。
 
-- **`super_admin`** ロールを持つ初期の **`root`** ユーザー([認可](../concepts/authorization.md)を参照)。プラットフォーム全体を対象とします(`tenantId: null`)。実在の(システム以外の)ユーザーが 1 人でもいれば飛ばされるので、実行されるのは本当に最初の起動のときだけです。
-- **Default** テナント(`slug: default`)と、その中の **`admin`** ロールを持つ初期の **`admin`** ユーザー。テナント(`slug` で)とユーザー(そのテナント内の `username` で)は別々に確認するので、片方だけを重複なく作り直せます。
+- **`super_admin`** ロールを持つ初期の **`root`** ユーザー([認可](../concepts/authorization.md)を参照)。プラットフォーム全体のスコープです(`tenantId: null`)。実在の(システム以外の)ユーザーが*1 人でも*いればスキップされるので、実質的にいちばん最初の起動でだけ走ります。
+- **Default** テナント(`slug: default`)と、その中の **`admin`** ロールを持つ初期の **`admin`** ユーザー。テナント(`slug` で判定)とユーザー(そのテナント内の `username` で判定)は独立に確認されるので、片方だけを再作成しても、もう片方が重複することはありません。
 
-隠しの**システムユーザー**がブートストラップのレコードを所有します(ログインできず、ユーザー一覧からも除かれます)。
+隠れた**システムユーザー**はブートストラップのレコードを所有します(ログインできず、ユーザー一覧にも出ません)。
 
-パスワードは環境変数から読みます。どちらにも、生成してログに一度だけ出す同じフォールバックがあります。
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `ROOT_PASSWORD` | 自動生成 | 投入される `root` ユーザーのパスワード |
+| `ADMIN_PASSWORD` | 自動生成 | Default テナントに投入される `admin` ユーザーのパスワード |
 
-```env
-ROOT_PASSWORD=change-me-now-123
-ADMIN_PASSWORD=change-me-now-123
-```
+どちらかが未設定(または空)なら、ランダムなパスワードが生成され、そのユーザーの作成時に `WARNING` レベルで**一度だけ**ログに出ます。そのログ行が流れてしまうと、もう取り戻せません。ローカルでの試用を超える用途では、最初の起動より前に両方を明示的に設定するか、起動ログから生成されたパスワードをすぐ控えて、あとで変更してください。ユーザー名は `root` と `admin` で固定です。
 
-どちらかが未設定(または空)の場合は、そのユーザーの作成時にランダムなパスワードを生成し、`WARNING` レベルで**一度だけ**ログに出します。そのログ行が流れてしまうと復元できません。ローカルでの試用を超える用途では、初回起動より前に両方を明示的に設定するか、起動ログから生成されたパスワードをすぐ控えて、あとからユーザー API で変更してください。ユーザー名は `root` と `admin` に固定です。
+## セッションの有効期間 {#session-lifetime}
 
-## セッションの有効期間
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `SESSION_IDLE_TIMEOUT_SECONDS` | `28800`(8 時間) | スライドするアイドルタイムアウト。認証済みリクエストのたびに最終アクティブ時刻が更新され、これより長く放置されたセッションは拒否されて削除されます |
+| `SESSION_COOKIE_SECURE` | `false` | セッションと CSRF のクッキーに `Secure`(HTTPS のみ)を付けます。HTTPS の背後に置くデプロイでは `true` にしてください |
 
-セッションにはスライド式のアイドルタイムアウトがあります。認証済みのリクエストのたびにセッションの最終アクティブ時刻が更新され、`SESSION_IDLE_TIMEOUT_SECONDS`(既定 `28800`、8 時間)より長く放置されたセッションは拒否されて削除されます。クッキー自体はセッションクッキーなので(`Max-Age` も `Expires` もありません)、ブラウザを閉じたときにも消えます。
+クッキー自体はセッションクッキー(`Max-Age` も `Expires` もなし)なので、ブラウザを閉じたときにも消えます。フロントエンドは同一オリジンの書き換え(`/api/*`)でバックエンドに届くため、クッキーはファーストパーティとなり `SameSite=Lax` がきれいに効きます。
 
-```env
-# スライド式のアイドルタイムアウト(秒。既定 28800 = 8 時間)
-SESSION_IDLE_TIMEOUT_SECONDS=28800
-# クッキーに Secure を付ける(HTTPS のみ)。ローカルの HTTP 開発では false のまま(既定 false)
-SESSION_COOKIE_SECURE=false
-```
+## CORS {#cors}
 
-フロントエンドは同一オリジンの Next.js のリライト(`/api/*`)経由でバックエンドに届くので、クッキーはファーストパーティになり、`SameSite=Lax` がそのまま効きます。初回は初期投入された `root` か、Default テナントの `admin` でログインしてください([初期投入されるユーザー](./configuration.md#seeded-users)を参照)。
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `CORS_ORIGINS` | `http://localhost:3000` | バックエンド API を呼び出せる origin のカンマ区切りリスト |
 
-## CORS
-
-```env
-CORS_ORIGINS=http://localhost:3000
-```
-
-`/chat` と `/sessions` を呼べるオリジンをカンマ区切りで並べます。既定は `http://localhost:3000` です。フロントエンドを別のホストやポートから配信する場合はオリジンを追加します。
+フロントエンドを配信する origin をすべて追加します。
 
 ```env
 CORS_ORIGINS=https://app.example.com,http://localhost:3000
 ```
 
-`*` は起動時に拒否されます。`allow_credentials=True` を常に有効にしており、ワイルドカードのオリジンと組み合わせるのは CORS の仕様に反するためです。
+`*` は起動時に拒否されます。`allow_credentials=True` が常に有効で、ワイルドカードの origin と組み合わせることは CORS の仕様上できないからです。
+
+## エージェントスキルストア {#agent-skill-store}
+
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `SKILLS_DIR` | `backend/.skills` | Agent Skill のリポジトリを浅くクローンして置くストアのルート。`docker compose` では `/var/lib/a2flow/skills` で、`skills` という名前付きボリュームが実体です |
+| `SKILLS_PRUNE_GRACE_SECONDS` | `3600` | 参照の有無にかかわらずリビジョンのディレクトリを残す時間。取得のたびに、どの実行からも固定されていないリビジョンを削除しますが、実行が現在のリビジョンを読んでからそれを指す行を挿入するまでの隙間を、この猶予が埋めます |
+| `SKILLS_CLONE_TIMEOUT_SECONDS` | `120` | クローンの個々の HTTP リクエストにかけられる時間の上限。これがないと応答しないリモートでクローンが止まり続け、スキルが `pending` のままになります |
+
+ストアはリビジョンごとに 1 つの不変なディレクトリを持ちます。公開されたリビジョンがあとから変更されることはないので、取得処理が既存のリビジョンを読み込み中のエージェントを妨げることはありません。
+
+```
+$SKILLS_DIR/<agent_skill_id>/<commit_sha>/
+```
+
+これは**キャッシュではなく永続的な状態**です。ワークフロー実行は開始時のリビジョンに固定されるため、ディレクトリを消すと、既存の実行は管理者がスキルを取得し直すまでスキルを読み込めません(HTTP 409 `SKILL_NOT_READY`)。しかも取得はリポジトリの現在の HEAD を取るので、固定されていたリビジョンは戻りません。[バックアップ](./backup.md)を取り、すべてのバックエンドレプリカに同じディレクトリを与えてください([水平スケーリング](./scaling.md))。
+
+## シークレットの管理 {#secret-management}
+
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `SECRET_ENCRYPTION_KEY` | — | `local` タイプの[シークレット](../guides/secrets.md)を保存前に暗号化する Fernet キー |
+| `SECRET_KEY_FILE` | `.secret_key` | ディスク上のキーファイルのパス。SQLite のデータベースファイルの隣です |
+| `VAULT_ADDR` | — | `vault` タイプのシークレットをその都度読みに行く、単一の HashiCorp Vault のアドレス(KV v2 のみ)。未設定なら Vault は無効です |
+| `VAULT_ROLE_ID` / `VAULT_SECRET_ID` | — | AppRole の認証情報。静的トークンより優先されます |
+| `VAULT_APPROLE_MOUNT` | `approle` | AppRole のログインマウントパス |
+| `VAULT_TOKEN` | — | 静的トークン。AppRole の認証情報が設定されていないときに使われます |
+
+暗号化キーは最初の使用時に、次の順で解決されます。
+
+1. `SECRET_ENCRYPTION_KEY`。有効な Fernet キーである必要があります。
+2. `SECRET_KEY_FILE` のキーファイル。
+3. どちらもなければ、キーを生成してそのファイルに保存し、WARNING をログに出します。
+
+**キーはバックアップしてください。** 失うと保存済みのローカルシークレットがすべて復号できなくなり、同じキーが守っている[承認 CA](../architecture/approvals.md) の署名キーも使えなくなります。
+
+`VAULT_ADDR` は、ユーザーが入力した URL に適用される SSRF チェックの対象から意図的に外してあります。運用者が設定するデプロイ設定であり、通常はプライベートアドレスを指すからです。
+
+## MCP ツールと承認 {#mcp-tools-and-approvals}
+
+[承認](../guides/approvals.md#human-approval)が紐づいたタスクは、承認者が許可するまで、割り当てられた MCP ツールを呼べません。許可すると短命の X.509 証明書が発行され、MCP プロキシは証明書を提示しない呼び出しを拒否します。署名のルートは最初の使用時に生成され、ローカルシークレットと同じキーで暗号化して保存されるので、この機能を動かすためにここを設定する必要はありません。
+
+| 変数 | 既定値 | 何を決めるか |
+|---|---|---|
+| `MCP_APPROVAL_CERT_TTL_SECONDS` | `3600` | 許可された承認の証明書が有効な時間。承認されたタスクがツールを呼べる窓の長さです |
+| `MCP_APPROVAL_CERT_SIGNATURE_WINDOW_SECONDS` | `60` | プロキシ経由の各呼び出しに付く所持証明の署名について、許容する時刻のずれ |
+| `MCP_CA_COMMON_NAME` / `MCP_CA_VALIDITY_DAYS` | `A2Flow MCP Approval CA` / `3650` | 生成されるルートのサブジェクトと有効期間。ルートの初回生成時にだけ読まれ、あとから変えても既存のルートには影響しません |
+| `MCP_REGISTRY_URL` | `https://registry.modelcontextprotocol.io` | [レジストリを見る](../guides/mcp-servers.md#registering-from-the-mcp-registry)ダイアログが検索するレジストリのベース URL |
+
+## 通知メール {#notification-email}
+
+ここにある値は、管理 UI の[システム設定](../guides/system-settings.md)が編集するものと同じです。環境変数からも設定できるので、メールの設定を手作業の手順ではなくデプロイ設定として持てます。
+
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `APP_BASE_URL` | — | 利用者がブラウザでこのデプロイに到達する URL(例 `https://a2flow.example.com`)。通知メールに埋めるリンクの組み立てに使われ、未設定だとリンクなしで送られます |
+| `SMTP_ENABLED` | `false` | メール配信のマスタースイッチ。明示的に `true` にする必要があり、他の変数が設定されていることから推測されることはありません |
+| `SMTP_HOST` / `SMTP_PORT` | — / `587` | メッセージを渡すリレー。ここは内部のホスト名でも構いません。取得しに行く URL ではなく SMTP クライアントに渡す値だからです |
+| `SMTP_SECURITY` | `starttls` | `none`、`starttls`、`ssl` のいずれか |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | — | SMTP AUTH の認証情報。パスワードは暗号文としてのみ保存され、ログにも出ず、どの API レスポンスにも返りません |
+| `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME` | — | 送信元アドレス(配信を有効にするなら必須)と、その横に表示される任意の表示名 |
+
+このページの他の設定と違い、これらは使うたびに読み直されるのではなく、単一の設定レコードに書き込まれます。そのため独自の規則があります。
+
+- **毎回の起動で再適用されます。** 初回だけではないので、リレーのパスワードのローテーションは再デプロイで行えます。
+- **実際に設定した変数だけが書き込まれます。** 未設定のものは保存済みの値をそのまま残します。管理者が UI で手作業で設定した内容も含みます。
+- **不正な値は警告をログに出して、まるごとスキップされます。** ポートが不正、アドレスが不正、`SMTP_ENABLED=true` なのにホストがない、といった場合は保存済みの設定に手を触れません。アプリはそのまま起動します。
+
+有効化のフラグが独立しているので、リレーのホストと認証情報を先のデプロイで用意しておき、配信を有効にするのは後のデプロイ、という進め方ができます。
+
+## 送信メールのキュー {#outgoing-email-queue}
+
+ここにあるのは、リレーへ流し込むキューの調整つまみです。挙動は[配信キュー](../guides/notifications.md#the-delivery-queue)を参照してください。通常のデプロイで設定が必要なものはありません。
+
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `EMAIL_WORKER_IN_PROCESS` | `true` | API プロセスがキューの処理も行うかどうか。`true` なら `uvicorn main:app` だけでメールが届きます。専用のワーカープロセスを動かす場合は `false` にします([プロセス構成](./deployment.md#process-layout))。両方を有効にしても、アドバイザリロックがデプロイ全体でちょうど 1 つの送信者を選ぶので安全です。単に無意味なだけです |
+| `EMAIL_SEND_RATE_PER_SECOND` / `EMAIL_SEND_BURST` | `5.0` / `10` | リレーに渡す毎秒あたりの持続的な通数と、アイドル後にその速度が効き始めるまで連続して送れる通数。リレー側の制限が厳しいときは下げてください |
+| `EMAIL_QUEUE_BATCH_SIZE` / `EMAIL_QUEUE_POLL_INTERVAL_SECONDS` | `20` / `5.0` | 1 回の処理で取り出す通数と、キューが空のときにワーカーが眠る時間。ポーリング間隔は、ワーカーが眠っているあいだに発生した通知の配信遅延の下限になります |
+| `EMAIL_MAX_ATTEMPTS` | `9` | デッドレターになるまでの配信試行回数。バックオフは 15 秒、30 秒、1 分、2 分…と伸びて 1 時間で頭打ちなので、既定値でリレーの停止をおよそ 1 時間乗り切れます。リレーが恒久的な失敗と報告したものは、回数にかかわらず初回で切り捨てます |
+| `EMAIL_SENT_RETENTION_DAYS` | `30` | 配信済みメッセージをワーカーが削除するまでの保持期間。これらはキューの状態ではなく、何を送ったかの記録です。デッドレターは削除されません |
+
+## 運用メトリクス {#operations-metrics}
+
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `METRICS_TIMEZONE` | `UTC` | [運用メトリクス](./metrics.md)でカレンダー上の 1 日がどこで始まるかを決める IANA のタイムゾーン名。「今日」の件数と、リードタイムの推移の日別バケットに効きます |
+
+認識できない名前は起動を止めず `UTC` にフォールバックします。つまり打ち間違いはアプリを止めるのではなく、ダッシュボードの日付の区切りをずらします。
+
+## エージェント {#agent}
+
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `ROLE_DESCRIPTION` | 一般的なアシスタントの説明 | エージェントのシステムプロンプトを組み立てる土台になる役割の説明。ワークフローのルールとインターフェースのスキーマと並べて使われます |
