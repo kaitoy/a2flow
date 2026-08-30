@@ -113,6 +113,23 @@ describe("SecretsPage", () => {
     );
   });
 
+  it("does not request the super-admin-only tenants list for a developer", async () => {
+    let tenantsRequested = false;
+    server.use(
+      http.get("http://localhost:8000/api/v1/tenants", () => {
+        tenantsRequested = true;
+        return envelope([]);
+      })
+    );
+    const toastsBefore = appStore.getState().toast.items.length;
+
+    renderPage(DEVELOPER);
+    await waitFor(() => screen.getByText("github-token"));
+
+    expect(tenantsRequested).toBe(false);
+    expect(appStore.getState().toast.items).toHaveLength(toastsBefore);
+  });
+
   describe("without the admin or developer role", () => {
     it("hides the add link and the per-row delete", async () => {
       renderPage(REQUESTER);

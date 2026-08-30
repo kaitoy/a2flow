@@ -70,6 +70,23 @@ describe("TagsPage", () => {
     );
   });
 
+  it("does not request the super-admin-only tenants list for a developer", async () => {
+    let tenantsRequested = false;
+    server.use(
+      http.get(`${BASE}/api/v1/tenants`, () => {
+        tenantsRequested = true;
+        return envelope([]);
+      })
+    );
+    const toastsBefore = appStore.getState().toast.items.length;
+
+    renderPage(DEVELOPER);
+    await screen.findByRole("link", { name: "production" });
+
+    expect(tenantsRequested).toBe(false);
+    expect(appStore.getState().toast.items).toHaveLength(toastsBefore);
+  });
+
   it("hides the Add button and the row actions from a viewer who cannot write", async () => {
     renderPage(REQUESTER);
     await screen.findByRole("link", { name: "production" });

@@ -89,7 +89,10 @@ export default function UserGroupsPage() {
   } = useTableQuery<UserGroup>(listUserGroups, { limit: LIMIT });
   const names = useUserNames(rows.flatMap((g) => [g.createdBy, g.updatedBy]));
   const isAllTenantsView = useIsAllTenantsView();
-  const tenantNames = useTenantNames(rows.map((g) => g.tenantId));
+  // Only resolved when the Tenant column is actually rendered: the lookup goes
+  // through the super_admin-only tenants list, so asking for it as a plain
+  // admin spends a request that can only come back 403 — and toasts.
+  const tenantNames = useTenantNames(isAllTenantsView ? rows.map((g) => g.tenantId) : []);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   async function executeDelete() {

@@ -218,7 +218,10 @@ export default function WorkflowExecutionsPage() {
   // Resolve user display names for the current page of sessions.
   const userMap = useUserNames(rows.flatMap((s) => [s.initiatorId, s.createdBy, s.updatedBy]));
   const isAllTenantsView = useIsAllTenantsView();
-  const tenantNames = useTenantNames(rows.map((s) => s.tenantId));
+  // Only resolved when the Tenant column is actually rendered: the lookup goes
+  // through the super_admin-only tenants list, so asking for it as a plain
+  // admin spends a request that can only come back 403 — and toasts.
+  const tenantNames = useTenantNames(isAllTenantsView ? rows.map((s) => s.tenantId) : []);
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowExecutions",

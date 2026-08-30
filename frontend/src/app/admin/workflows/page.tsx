@@ -210,7 +210,10 @@ export default function WorkflowsPage() {
   const [skillMap, setSkillMap] = useState<Map<string, string>>(new Map());
   const names = useUserNames(rows.flatMap((w) => [w.createdBy, w.updatedBy]));
   const isAllTenantsView = useIsAllTenantsView();
-  const tenantNames = useTenantNames(rows.map((w) => w.tenantId));
+  // Only resolved when the Tenant column is actually rendered: the lookup goes
+  // through the super_admin-only tenants list, so asking for it as a plain
+  // admin spends a request that can only come back 403 — and toasts.
+  const tenantNames = useTenantNames(isAllTenantsView ? rows.map((w) => w.tenantId) : []);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [runTarget, setRunTarget] = useState<{ id: string; name: string } | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);

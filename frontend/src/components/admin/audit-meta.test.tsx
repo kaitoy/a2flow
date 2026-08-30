@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
+import { DEVELOPER, SUPER_ADMIN } from "@/test/auth-state";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
+import { render, screen, waitFor } from "@/test/test-utils";
 import { AuditMeta } from "./audit-meta";
 
 describe("AuditMeta", () => {
@@ -52,6 +53,7 @@ describe("AuditMeta", () => {
 
   it("shows the tenant first when tenantId is passed", async () => {
     // The MSW tenant handler resolves "tenant-1" to TENANT_1 ("Acme Corp").
+    // Only a super_admin ever resolves tenant names, so the viewer must be one.
     const { container } = render(
       <AuditMeta
         createdBy="user-1"
@@ -59,7 +61,8 @@ describe("AuditMeta", () => {
         createdAt="2026-01-02T03:04:05Z"
         updatedAt="2026-01-02T03:04:05Z"
         tenantId="tenant-1"
-      />
+      />,
+      { preloadedState: SUPER_ADMIN }
     );
 
     await waitFor(() => expect(screen.getByText("Acme Corp")).toBeInTheDocument());
@@ -90,9 +93,28 @@ describe("AuditMeta", () => {
       )
     );
 
-    render(<AuditMeta createdBy="user-1" updatedBy="user-2" tenantId="ghost-tenant" />);
+    render(<AuditMeta createdBy="user-1" updatedBy="user-2" tenantId="ghost-tenant" />, {
+      preloadedState: SUPER_ADMIN,
+    });
 
     await waitFor(() => expect(screen.getByText("ghost-tenant")).toBeInTheDocument());
+  });
+
+  it("never looks the tenant up for a non-super_admin viewer, showing the raw id", async () => {
+    let called = false;
+    server.use(
+      http.get("http://localhost:8000/api/v1/tenants", () => {
+        called = true;
+        return envelope([]);
+      })
+    );
+
+    render(<AuditMeta createdBy="user-1" updatedBy="user-2" tenantId="tenant-1" />, {
+      preloadedState: DEVELOPER,
+    });
+
+    await waitFor(() => expect(screen.getByText("tenant-1")).toBeInTheDocument());
+    expect(called).toBe(false);
   });
 
   it("falls back to the raw ID when the user cannot be resolved", async () => {

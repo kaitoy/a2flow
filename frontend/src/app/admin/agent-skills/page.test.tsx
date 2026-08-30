@@ -34,10 +34,14 @@ function authState(roles: Role[]): Partial<RootState> {
 const FULL_ACCESS = authState(["developer"]);
 /** A signed-in user with no role granting agent-skill writes. */
 const READ_ONLY = authState(["requester"]);
-/** A Super Admin browsing every tenant at once. */
+/**
+ * A Super Admin browsing every tenant at once. Must be a `super_admin`: it is the
+ * only role that resolves tenant names (`GET /tenants` is gated to it).
+ */
+const SUPER_ADMIN = authState(["super_admin"]);
 const ALL_TENANTS: Partial<RootState> = {
-  ...FULL_ACCESS,
-  auth: { ...FULL_ACCESS.auth, selectedTenantId: ALL_TENANTS_SENTINEL } as RootState["auth"],
+  ...SUPER_ADMIN,
+  auth: { ...SUPER_ADMIN.auth, selectedTenantId: ALL_TENANTS_SENTINEL } as RootState["auth"],
 };
 
 const SKILL_URL = "http://localhost:8000/api/v1/agent-skills";
