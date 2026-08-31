@@ -1,10 +1,10 @@
 import userEvent from "@testing-library/user-event";
-import { http } from "msw";
+import { delay, http } from "msw";
 import { useParams } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
-import { MCP_TOOL_MOCK_1, MCP_TOOL_MOCK_BUILTIN } from "@/test/msw/handlers";
+import { MCP_TOOL_1, MCP_TOOL_MOCK_1, MCP_TOOL_MOCK_BUILTIN } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import McpToolMockDetailPage from "./page";
@@ -103,6 +103,50 @@ describe("McpToolMockDetailPage", () => {
     await user.click(within(dialog).getByRole("button", { name: /delete/i }));
 
     await waitFor(() => expect(deleted).toBe(true));
+  });
+
+  it("holds the output-format panel with a skeleton until the listing lands", async () => {
+    setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/mcp-servers/:serverId/tools", async () => {
+        await delay(50);
+        return envelope([MCP_TOOL_1]);
+      })
+    );
+    renderPage();
+
+    // The stored tool name is on screen long before the server answers, so the
+    // panel takes its place rather than appearing out of nowhere later.
+    expect(
+      await screen.findByRole("status", { name: /loading output format/i })
+    ).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("status", { name: /loading output format/i })
+      ).not.toBeInTheDocument()
+    );
+    // `array` appears only in the tool's declared output schema, never in the
+    // stored response the editor below is prefilled with.
+    expect(screen.getByText(/"array"/)).toBeInTheDocument();
+  });
+
+  it("drops the skeleton instead of spinning forever when the listing fails", async () => {
+    setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/mcp-servers/:serverId/tools", () =>
+        envelopeErr("MCP_ERROR", "unreachable", 502)
+      )
+    );
+    renderPage();
+
+    // The tool picker owns the error and its Retry; the panel just stays away.
+    await screen.findByRole("combobox", { name: /tool name/i });
+    expect(await screen.findByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("status", { name: /loading output format/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /output format/i })).not.toBeInTheDocument();
   });
 
   it("renders read-only for a viewer without the developer role", async () => {

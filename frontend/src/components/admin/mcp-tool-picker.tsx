@@ -133,8 +133,8 @@ export function McpToolPicker({ value, onChange }: McpToolPickerProps) {
     );
   }, [value, pickedId]);
 
-  const available =
-    tools.phase === "ready" ? tools.names.filter((name) => !alreadyAdded.has(name)) : [];
+  const toolNames = tools.phase === "ready" ? tools.tools.map((tool) => tool.name) : [];
+  const available = toolNames.filter((name) => !alreadyAdded.has(name));
 
   // The select's placeholder carries the state: an empty dropdown alone cannot
   // say whether the server is slow, silent, exhausted, or unreachable.
@@ -146,7 +146,7 @@ export function McpToolPicker({ value, onChange }: McpToolPickerProps) {
   } else if (tools.phase === "error") {
     placeholder = "Could not load tools";
     toolsDisabled = true;
-  } else if (tools.names.length === 0) {
+  } else if (toolNames.length === 0) {
     placeholder = "No tools advertised";
     toolsDisabled = true;
   } else if (available.length === 0) {

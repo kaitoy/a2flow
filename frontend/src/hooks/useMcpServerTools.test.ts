@@ -7,9 +7,9 @@ import { useMcpServerTools } from "./useMcpServerTools";
 
 const TOOLS_URL = "http://localhost:8000/api/v1/mcp-servers/:serverId/tools";
 
-/** Minimal `McpToolInfo` — the hook only reads the name. */
+/** Minimal `McpToolInfo`, as the listing endpoint returns it. */
 function tool(name: string) {
-  return { name, description: null, inputSchema: {} };
+  return { name, description: null, inputSchema: {}, outputSchema: null };
 }
 
 describe("useMcpServerTools", () => {
@@ -34,7 +34,27 @@ describe("useMcpServerTools", () => {
     const { result } = renderHook(() => useMcpServerTools("mcp-1"));
 
     await waitFor(() => expect(result.current.state.phase).toBe("ready"));
-    expect(result.current.state).toEqual({ phase: "ready", names: ["search", "fetch"] });
+    expect(result.current.state).toEqual({
+      phase: "ready",
+      tools: [tool("search"), tool("fetch")],
+    });
+  });
+
+  it("keeps each tool's declared output schema, not just its name", async () => {
+    const outputSchema = { type: "object", properties: { hits: { type: "array" } } };
+    server.use(
+      http.get(TOOLS_URL, () =>
+        envelope([{ name: "search", description: "Search", inputSchema: {}, outputSchema }])
+      )
+    );
+
+    const { result } = renderHook(() => useMcpServerTools("mcp-1"));
+
+    await waitFor(() => expect(result.current.state.phase).toBe("ready"));
+    expect(result.current.state).toEqual({
+      phase: "ready",
+      tools: [{ name: "search", description: "Search", inputSchema: {}, outputSchema }],
+    });
   });
 
   it("reports an unreachable server as an error", async () => {
@@ -58,7 +78,7 @@ describe("useMcpServerTools", () => {
     rerender({ id: "mcp-2" });
 
     await waitFor(() => expect(result.current.state.phase).toBe("ready"));
-    expect(result.current.state).toEqual({ phase: "ready", names: ["read"] });
+    expect(result.current.state).toEqual({ phase: "ready", tools: [tool("read")] });
   });
 
   it("returns to idle when the server id is cleared", async () => {
@@ -93,6 +113,6 @@ describe("useMcpServerTools", () => {
     });
 
     await waitFor(() => expect(result.current.state.phase).toBe("ready"));
-    expect(result.current.state).toEqual({ phase: "ready", names: ["search"] });
+    expect(result.current.state).toEqual({ phase: "ready", tools: [tool("search")] });
   });
 });

@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select, type SelectOption } from "@/components/ui/select";
-import { useMcpServerTools } from "@/hooks/useMcpServerTools";
+import { type UseMcpServerToolsResult, useMcpServerTools } from "@/hooks/useMcpServerTools";
 import { getApiErrorMessage, listMcpServers } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
@@ -66,6 +66,16 @@ export interface McpToolFieldProps extends McpToolSelection {
   toolError?: string;
   /** Render the chosen pair as plain text, with no controls. */
   readOnly?: boolean;
+  /**
+   * A listing the caller already holds, used instead of fetching one here.
+   *
+   * Listing a server means connecting to it live — a `stdio` server can take a
+   * minute — so a caller that needs the same listing for something else of its
+   * own (the tool-mock form reads the chosen tool's declared output format)
+   * owns one {@link useMcpServerTools} and passes it in rather than causing a
+   * second connection.
+   */
+  tools?: UseMcpServerToolsResult;
 }
 
 /**
@@ -84,6 +94,7 @@ export function McpToolField({
   serverError,
   toolError,
   readOnly = false,
+  tools: providedTools,
 }: McpToolFieldProps) {
   const [registry, setRegistry] = useState<RegistryState>({ phase: "loading" });
   // Holds the name the dialog last reported, so the chip has a label before the
@@ -118,15 +129,18 @@ export function McpToolField({
   }, [loadRegistry]);
 
   // No live connection behind a read-only rendering: it shows the stored tool
-  // name as text and never offers the listing.
-  const { state: tools, reload: reloadTools } = useMcpServerTools(
-    readOnly || mcpServerId === "" ? null : mcpServerId
+  // name as text and never offers the listing. Nor behind a caller-owned
+  // listing — the hook is still called unconditionally (it is a hook), just
+  // told to fetch nothing.
+  const ownTools = useMcpServerTools(
+    readOnly || providedTools !== undefined || mcpServerId === "" ? null : mcpServerId
   );
+  const { state: tools, reload: reloadTools } = providedTools ?? ownTools;
 
   const registryName = registry.phase === "ready" ? registry.names.get(mcpServerId) : undefined;
   const serverLabel = registryName ?? (pickedName !== "" ? pickedName : mcpServerId);
 
-  const toolNames = tools.phase === "ready" ? tools.names : [];
+  const toolNames = tools.phase === "ready" ? tools.tools.map((tool) => tool.name) : [];
   const toolUnlisted = toolName !== "" && !toolNames.includes(toolName);
   // The listing loaded and positively lacks it — as opposed to not having
   // loaded yet, or having failed.
@@ -142,7 +156,7 @@ export function McpToolField({
   } else if (tools.phase === "error") {
     placeholder = "Could not load tools";
     toolsDisabled = true;
-  } else if (tools.names.length === 0) {
+  } else if (toolNames.length === 0) {
     placeholder = "No tools advertised";
     toolsDisabled = true;
   }

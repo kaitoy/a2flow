@@ -144,6 +144,70 @@ describe("NewMcpToolMockPage", () => {
     expect(await screen.findByText("Must be a JSON object")).toBeVisible();
   });
 
+  it("shows the chosen tool's declared output format", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.queryByRole("button", { name: /output format/i })).not.toBeInTheDocument();
+    await pickServerAndTool(user);
+
+    expect(await screen.findByRole("button", { name: /output format/i })).toBeInTheDocument();
+    expect(screen.getByText("Search the web")).toBeInTheDocument();
+    expect(screen.getByText(/"hits"/)).toBeInTheDocument();
+  });
+
+  it("fills a fresh structured response from the schema without asking", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await pickServerAndTool(user);
+    await user.click(await screen.findByRole("button", { name: /insert from schema/i }));
+
+    expect(screen.getByLabelText("Response 1 value")).toHaveValue('{\n  "hits": [\n    ""\n  ]\n}');
+  });
+
+  it("asks before replacing a response the operator has already written", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await pickServerAndTool(user);
+    const value = screen.getByLabelText("Response 1 value");
+    await user.clear(value);
+    await user.type(value, '{{"mine": 1}');
+
+    await user.click(screen.getByRole("button", { name: /insert from schema/i }));
+    expect(await screen.findByText(/discards what is there/i)).toBeVisible();
+    expect(value).toHaveValue('{"mine": 1}');
+
+    await user.click(screen.getByRole("button", { name: "Replace" }));
+    expect(value).toHaveValue('{\n  "hits": [\n    ""\n  ]\n}');
+  });
+
+  it("offers no schema shortcut for a text response", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await pickServerAndTool(user);
+    await user.click(screen.getByRole("combobox", { name: "Response 1 kind" }));
+    await user.click(await screen.findByRole("option", { name: "Text" }));
+
+    expect(screen.queryByRole("button", { name: /insert from schema/i })).not.toBeInTheDocument();
+  });
+
+  it("describes the built-in tool's output without contacting any server", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("tab", { name: /built-in tool/i }));
+
+    expect(await screen.findByRole("button", { name: /output format/i })).toBeInTheDocument();
+    expect(screen.getByText(/"approval_id"/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /insert from schema/i }));
+    expect(screen.getByLabelText("Response 1 value")).toHaveValue(
+      '{\n  "approval_id": "",\n  "status": "pending"\n}'
+    );
+  });
+
   it("refuses the form to a viewer without the developer role", () => {
     render(<NewMcpToolMockPage />, { preloadedState: REQUESTER });
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();

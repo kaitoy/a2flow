@@ -289,3 +289,9 @@ class McpToolInfo(SQLModel):
     name: str
     description: str | None = None
     input_schema: dict[str, Any] = Field(default_factory=dict)
+    #: JSON Schema of the tool's structured result, when the server declares one
+    #: (MCP spec 2025-06-18 and later). ``None`` means *not declared*, which is
+    #: deliberately distinct from the empty schema an unset ``input_schema``
+    #: defaults to: the admin UI tells the operator "this tool does not say what
+    #: it returns" rather than showing them an empty object.
+    output_schema: dict[str, Any] | None = None

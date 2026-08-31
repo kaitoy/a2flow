@@ -11,17 +11,21 @@
  * Listing a server's tools makes A2Flow *connect to it live*, so nothing is
  * fetched until a server id is actually passed: a field's own mount cost stays a
  * single registry read, and a server is queried only once it has been picked.
+ *
+ * The whole {@link McpToolInfo} record is kept, not just the name: the tool-mock
+ * form shows the chosen tool's declared output format so the operator can write
+ * a mocked response against it.
  */
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getApiErrorMessage, listMcpServerTools } from "@/lib/api";
+import { getApiErrorMessage, listMcpServerTools, type McpToolInfo } from "@/lib/api";
 
 /** What the chosen server's live tool listing is currently doing. */
 export type McpServerToolsState =
   | { phase: "idle" }
   | { phase: "loading" }
-  | { phase: "ready"; names: string[] }
+  | { phase: "ready"; tools: McpToolInfo[] }
   | { phase: "error"; message: string };
 
 /** Everything a consumer needs to render a server's tool list. */
@@ -70,7 +74,7 @@ export function useMcpServerTools(serverId: string | null): UseMcpServerToolsRes
     try {
       const fetched = await listMcpServerTools(id);
       if (!mountedRef.current || requestRef.current !== token) return;
-      setState({ phase: "ready", names: fetched.map((tool) => tool.name) });
+      setState({ phase: "ready", tools: fetched });
     } catch (err) {
       if (!mountedRef.current || requestRef.current !== token) return;
       setState({ phase: "error", message: getApiErrorMessage(err) });

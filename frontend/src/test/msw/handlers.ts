@@ -212,6 +212,10 @@ export const MCP_TOOL_1 = {
   name: "search",
   description: "Search the web",
   inputSchema: { type: "object" },
+  outputSchema: {
+    type: "object",
+    properties: { hits: { type: "array", items: { type: "string" } } },
+  },
 };
 
 export const MCP_TOOL_MOCK_1 = {

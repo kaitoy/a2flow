@@ -4,33 +4,15 @@ import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 import type { ToolCallActivityContent } from "@/lib/agentActivity";
 import { Badge } from "./ui/badge";
+import { JsonBlock } from "./ui/json-block";
 import { Spinner } from "./ui/spinner";
-
-/**
- * Render one value of a tool call — its arguments or its result — as pretty
- * printed JSON. A value that is already a string is shown as-is rather than
- * re-quoted, so a plain-text tool answer stays readable.
- *
- * @param value - The parsed value to display.
- * @returns The text to render inside the detail panel.
- */
-function formatValue(value: unknown): string {
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
 
 /** One labelled JSON block inside the expanded detail panel. */
 function DetailBlock({ label, value }: { label: string; value: unknown }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-label-caps text-on-surface-variant">{label}</span>
-      <pre className="max-h-64 overflow-auto rounded-lg bg-surface-container-high px-3 py-2 font-mono text-xs leading-relaxed text-on-surface">
-        {formatValue(value)}
-      </pre>
+      <JsonBlock value={value} />
     </div>
   );
 }

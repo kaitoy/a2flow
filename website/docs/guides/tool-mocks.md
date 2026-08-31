@@ -36,6 +36,12 @@ Mocking is chosen **per tool**, not per run, because a dry run is only useful if
 
 The only built-in tool currently mockable is `request_approval`: the one whose side effects otherwise need a human to clear before the run can continue.
 
+### What the tool returns
+
+Once a tool is chosen, **Output format** opens under it, showing the tool's own description and the shape it says it returns. Use it as the reference for what to write below — a mock is only useful if the workflow can read it the way it would read the real thing.
+
+Not every tool says what it returns. When one doesn't, the panel says so and leaves the shape up to you.
+
 ### Responses
 
 The first response answers the run's first call to that tool, the second its second, and so on. Once the list runs out, the last response repeats — so a single response behaves as a constant. That is what lets one mock express a *scenario* rather than a fixed value: approve the first request, reject the second, and see how the workflow handles both.
@@ -45,6 +51,8 @@ The first response answers the run's first call to that tool, the second its sec
 | `structured` | A JSON object placed in the result's structured content — for a tool whose caller reads fields off the result |
 | `text` | A string placed in the result's textual content |
 | `error` | A message returned as a failed call, so the agent sees the tool report an error |
+
+When the tool declares an output format, a `structured` response offers **Insert from schema**: it fills the box with that shape, keys and all, so you edit values instead of transcribing the structure. It replaces whatever is in the box, and asks first if you have already written something there.
 
 ## What a mock does not skip
 

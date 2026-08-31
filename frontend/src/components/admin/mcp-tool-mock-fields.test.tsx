@@ -1,4 +1,7 @@
+import { http } from "msw";
 import { describe, expect, it } from "vitest";
+import { envelope } from "@/test/msw/envelope";
+import { server } from "@/test/msw/server";
 import { render, screen } from "@/test/test-utils";
 import {
   emptyMcpToolMockFormValues,
@@ -107,6 +110,34 @@ describe("McpToolMockFields read-only mode", () => {
     expect(screen.getByText("search")).toBeInTheDocument();
     expect(screen.getByText(/#1 \(text\)/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("never lists a server's tools, so it makes no MCP connection", async () => {
+    let listed = false;
+    server.use(
+      http.get("http://localhost:8000/api/v1/mcp-servers/:serverId/tools", () => {
+        listed = true;
+        return envelope([]);
+      })
+    );
+
+    render(
+      <McpToolMockFields
+        readOnly
+        values={values({
+          name: "no hits",
+          target: "mcp",
+          mcpServerId: "mcp-1",
+          toolName: "search",
+        })}
+      />
+    );
+
+    // The registry read still happens — it names the server — so wait for it
+    // before concluding the tool listing did not.
+    expect(await screen.findByText("my-mcp-server")).toBeInTheDocument();
+    expect(listed).toBe(false);
+    expect(screen.queryByRole("button", { name: /output format/i })).not.toBeInTheDocument();
   });
 
   it("omits the server field for a built-in mock", () => {

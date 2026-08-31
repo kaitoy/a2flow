@@ -608,7 +608,18 @@ async def test_list_server_tools_returns_tools(
                 name="search",
                 description="Search the web",
                 inputSchema={"type": "object"},
-            )
+                outputSchema={
+                    "type": "object",
+                    "properties": {"hits": {"type": "array"}},
+                },
+            ),
+            # A server on an older spec revision advertises no output schema.
+            SimpleNamespace(
+                name="ping",
+                description=None,
+                inputSchema={"type": "object"},
+                outputSchema=None,
+            ),
         ]
 
     monkeypatch.setattr(
@@ -621,7 +632,17 @@ async def test_list_server_tools_returns_tools(
             "name": "search",
             "description": "Search the web",
             "inputSchema": {"type": "object"},
-        }
+            "outputSchema": {
+                "type": "object",
+                "properties": {"hits": {"type": "array"}},
+            },
+        },
+        {
+            "name": "ping",
+            "description": None,
+            "inputSchema": {"type": "object"},
+            "outputSchema": None,
+        },
     ]
     assert seen["connection"] == HttpConnection(
         url="https://mcp.example.com/mcp", headers={"Authorization": "Bearer secret"}
