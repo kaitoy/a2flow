@@ -228,6 +228,53 @@ describe("WorkflowsPage", () => {
     expect(screen.getByRole("button", { name: "Run" })).not.toBeDisabled();
   });
 
+  it("offers the draft workflow's tool mocks in the Run dialog", async () => {
+    mockDraftWorkflowRow();
+    const user = userEvent.setup();
+    render(<WorkflowsPage />, { preloadedState: authState(["developer"]) });
+    await waitFor(() => screen.getByText("my-workflow"));
+
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Mock tools")).toBeInTheDocument();
+    expect(
+      await within(dialog).findByRole("checkbox", { name: /search returns nothing/ })
+    ).toBeVisible();
+  });
+
+  it("sends the tool mocks chosen for a draft run", async () => {
+    mockDraftWorkflowRow();
+    let body: unknown;
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflows/:id/execute", async ({ request }) => {
+        body = await request.json();
+        return envelope({ id: "execution-1" }, 201);
+      })
+    );
+    const user = userEvent.setup();
+    render(<WorkflowsPage />, { preloadedState: authState(["developer"]) });
+    await waitFor(() => screen.getByText("my-workflow"));
+
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      await within(dialog).findByRole("checkbox", { name: /search returns nothing/ })
+    );
+    await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
+
+    await waitFor(() => expect(body).toEqual({ toolMockIds: ["mock-1"] }));
+  });
+
+  it("offers no tool mocks in the Run dialog of a published workflow", async () => {
+    const user = userEvent.setup();
+    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-workflow"));
+
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText("Mock tools")).not.toBeInTheDocument();
+  });
+
   it("enables Run for a requester on a modified workflow (its published version runs)", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows", () =>

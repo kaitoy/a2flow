@@ -124,7 +124,7 @@ const WORKFLOW_TASK_TEMPLATE_1 = {
   title: "Template Step 1",
   description: null,
   dependsOnIds: [],
-  toolBindings: [],
+  toolBindings: [{ mcpServerId: "mcp-1", toolName: "search" }],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",

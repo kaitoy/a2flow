@@ -13,6 +13,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { RunWorkflowDialog } from "@/components/admin/run-workflow-dialog";
 import { tagsColumn } from "@/components/admin/tag-columns";
 import { tenantColumn } from "@/components/admin/tenant-columns";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -79,7 +80,7 @@ function StatusCell({ workflow }: { workflow: Workflow }) {
 function buildColumns(
   skillMap: Map<string, string>,
   names: Map<string, string>,
-  onRun: (id: string, name: string) => void,
+  onRun: (id: string, name: string, isDraft: boolean) => void,
   runningId: string | null,
   onDelete: (id: string, name: string) => void,
   onOpenDesign: (id: string) => void,
@@ -173,7 +174,7 @@ function buildColumns(
             <ActionIconButton
               icon={runningId === w.id ? Loader2 : Play}
               label="Run"
-              onClick={() => onRun(w.id, w.name)}
+              onClick={() => onRun(w.id, w.name, w.status === "draft")}
               // Published workflows are executable by anyone with Run access;
               // drafts are executable only by someone who can also edit
               // workflows (developer/super_admin), for pre-publish testing.
@@ -215,7 +216,11 @@ export default function WorkflowsPage() {
   // admin spends a request that can only come back 403 — and toasts.
   const tenantNames = useTenantNames(isAllTenantsView ? rows.map((w) => w.tenantId) : []);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
-  const [runTarget, setRunTarget] = useState<{ id: string; name: string } | null>(null);
+  const [runTarget, setRunTarget] = useState<{
+    id: string;
+    name: string;
+    isDraft: boolean;
+  } | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
 
   // Load the agent-skill name map once, to label the Agent Skill column.
@@ -256,17 +261,19 @@ export default function WorkflowsPage() {
     }
   }
 
-  function handleRun(id: string, name: string) {
-    setRunTarget({ id, name });
+  function handleRun(id: string, name: string, isDraft: boolean) {
+    setRunTarget({ id, name, isDraft });
   }
 
-  async function executeRun() {
+  async function executeRun(toolMockIds: string[]) {
     if (!runTarget) return;
     const id = runTarget.id;
     setRunTarget(null);
     setRunningId(id);
     try {
-      const workflowExecution = await executeWorkflow(id);
+      // `toolMockIds` is only ever non-empty for a draft run — the dialog hides
+      // the tool-mock picker otherwise and hands back an empty list.
+      const workflowExecution = await executeWorkflow(id, { toolMockIds });
       router.push(`/workflow-executions/${workflowExecution.id}/session`);
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -342,12 +349,11 @@ export default function WorkflowsPage() {
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />
-      <ConfirmDialog
+      <RunWorkflowDialog
         open={runTarget !== null}
-        title="Run Workflow"
-        description={runTarget ? `Run "${runTarget.name}"? This starts a new execution.` : ""}
-        confirmLabel="Run"
-        confirmVariant="primary"
+        workflowId={runTarget?.id ?? ""}
+        workflowName={runTarget?.name ?? ""}
+        isDraft={runTarget?.isDraft ?? false}
         onConfirm={executeRun}
         onCancel={() => setRunTarget(null)}
       />

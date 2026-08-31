@@ -129,7 +129,7 @@ flowchart LR
   X --> C["Workflow session<br/>the chat the run happens in"]
 ```
 
-For a **draft** workflow the Run dialog additionally lists the tenant's [tool mocks](./tool-mocks.md) under **Mock tools**; checking one stubs that tool for this run, so a pre-publish test can be repeated without the tool's side effects. The dialog offers no mocks for a published workflow, and asking for one anyway is refused — a published run that quietly did nothing would be worse than no run at all.
+For a **draft** workflow the Run dialog additionally lists, under **Mock tools**, the [tool mocks](./tool-mocks.md) for a tool one of the workflow's tasks uses, plus every mock of a built-in tool; checking one stubs that tool for this run, so a pre-publish test can be repeated without the tool's side effects. The dialog offers no mocks for a published workflow, and asking for one anyway is refused — a published run that quietly did nothing would be worse than no run at all.
 
 Everything the run needs is copied onto the execution when it starts, so later edits never reach back into it:
 

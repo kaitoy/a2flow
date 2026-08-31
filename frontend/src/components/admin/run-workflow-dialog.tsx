@@ -11,12 +11,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Spinner } from "@/components/ui/spinner";
-import { listMcpToolMocks, type McpToolMock } from "@/lib/api";
+import { listMcpToolMocks, listWorkflowTaskTemplates, type McpToolMock } from "@/lib/api";
 
 /** Props for {@link RunWorkflowDialog}. */
 export interface RunWorkflowDialogProps {
   /** Whether the dialog is visible. */
   open: boolean;
+  /** Id of the workflow about to run, used to load the mocks that apply to it. */
+  workflowId: string;
   /** Name of the workflow about to run, shown in the confirmation sentence. */
   workflowName: string;
   /**
@@ -36,43 +38,83 @@ function mockLabel(mock: McpToolMock): string {
   return `${mock.name} — ${mock.toolName}`;
 }
 
+/** Key identifying one bound `(server, tool)` pair. */
+function toolKey(mcpServerId: string, toolName: string): string {
+  return `${mcpServerId}:${toolName}`;
+}
+
 /**
  * Ask the operator to confirm a run, offering a draft workflow's tool mocks.
  *
- * The mock list is fetched when the dialog opens rather than with the page: a
- * run is a deliberate action and the list is only ever read here, so loading it
- * up front would be a request most page views never need. Selections reset every
- * time the dialog opens — a stubbed run is an explicit choice, never a sticky
- * setting that could silently carry into the next run.
+ * The mock list and the workflow's task templates are fetched when the dialog
+ * opens rather than with the page: a run is a deliberate action and neither is
+ * read anywhere else here, so loading them up front would be a request most
+ * page views never need. Only the mocks worth offering are listed — a mock
+ * that stands in for a tool one of the workflow's tasks binds, or a mock of a
+ * built-in tool, which every run can reach. A mock for any other tool would
+ * never fire in the run, so it is left out. If the templates cannot be loaded
+ * the list falls back to every mock rather than hiding all of them. Selections
+ * reset every time the dialog opens — a stubbed run is an explicit choice,
+ * never a sticky setting that could silently carry into the next run.
  */
 export function RunWorkflowDialog({
   open,
+  workflowId,
   workflowName,
   isDraft,
   onConfirm,
   onCancel,
 }: RunWorkflowDialogProps) {
   const [mocks, setMocks] = useState<McpToolMock[] | null>(null);
+  const [applicable, setApplicable] = useState<McpToolMock[] | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open || !isDraft) return;
     setSelected([]);
     setMocks(null);
+    setApplicable(null);
     let cancelled = false;
-    listMcpToolMocks({ limit: 100 })
-      .then((items) => {
-        if (!cancelled) setMocks(items);
+    Promise.all([
+      listMcpToolMocks({ limit: 100 }),
+      // A failed templates load leaves the binding set unknown; `null` tells
+      // the handler below to skip filtering rather than hide every mock.
+      listWorkflowTaskTemplates(workflowId, { limit: 1000 }).catch(() => null),
+    ])
+      .then(([items, templates]) => {
+        if (cancelled) return;
+        setMocks(items);
+        if (templates === null) {
+          setApplicable(items);
+          return;
+        }
+        const bound = new Set<string>();
+        for (const template of templates) {
+          for (const binding of template.toolBindings ?? []) {
+            bound.add(toolKey(binding.mcpServerId, binding.toolName));
+          }
+        }
+        setApplicable(
+          items.filter((mock) => {
+            const serverId = mock.mcpServerId;
+            // A built-in tool's mock carries no server id and every run can
+            // reach it, so it is always offered.
+            if (serverId === null || serverId === undefined) return true;
+            return bound.has(toolKey(serverId, mock.toolName));
+          })
+        );
       })
       .catch(() => {
         // The failure toast is shown globally by api.ts; an empty list here
         // still lets the operator start an ordinary, unstubbed run.
-        if (!cancelled) setMocks([]);
+        if (cancelled) return;
+        setMocks([]);
+        setApplicable([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [open, isDraft]);
+  }, [open, isDraft, workflowId]);
 
   function toggle(id: string) {
     setSelected((current) =>
@@ -104,21 +146,26 @@ export function RunWorkflowDialog({
           <h3 className="text-label-caps text-on-surface-variant">Mock tools</h3>
           <p className="text-sm text-on-surface-variant">
             A stubbed tool is not called: it returns the mock&apos;s configured result and has no
-            effect. Leave a tool unchecked to exercise it for real.
+            effect. Leave a tool unchecked to exercise it for real. Only mocks for a tool this
+            workflow&apos;s tasks use, and mocks of a built-in tool, are listed.
           </p>
-          {mocks === null ? (
+          {applicable === null || mocks === null ? (
             <div className="flex justify-center py-4">
               <Spinner size="sm" />
             </div>
-          ) : mocks.length === 0 ? (
+          ) : applicable.length === 0 ? (
             <EmptyState
               icon={FlaskConical}
               compact
-              description="No tool mocks are registered yet."
+              description={
+                mocks.length === 0
+                  ? "No tool mocks are registered yet."
+                  : "No registered tool mock targets a tool this workflow uses."
+              }
             />
           ) : (
             <div className="flex max-h-64 flex-col overflow-y-auto">
-              {mocks.map((mock) => (
+              {applicable.map((mock) => (
                 <Checkbox
                   key={mock.id}
                   label={mockLabel(mock)}

@@ -19,10 +19,10 @@ flowchart LR
 ## Using one
 
 1. Create a mock for the tool you want to stub.
-2. Click **Run** on a **draft** workflow. The dialog lists the tenant's mocks under **Mock tools**.
+2. Click **Run** on a **draft** workflow. Under **Mock tools** the dialog lists the mocks that stand in for a tool one of this workflow's tasks uses, together with every mock of a built-in tool.
 3. Check the ones this run should use, and start the run.
 
-The dialog offers no mocks for a published workflow, and asking for one anyway is refused. Starting the run **copies** what each chosen mock currently says onto the execution, so editing or deleting a mock afterwards never changes a run already under way — and can never silently turn a stubbed call back into a real one.
+A mock for a tool that none of this workflow's tasks use is left out of the list — bind that tool to a task first. The dialog offers no mocks at all for a published workflow, and asking for one anyway is refused. Starting the run **copies** what each chosen mock currently says onto the execution, so editing or deleting a mock afterwards never changes a run already under way — and can never silently turn a stubbed call back into a real one.
 
 Mocking is chosen **per tool**, not per run, because a dry run is only useful if it stays realistic. A workflow that searches a system and then writes to it can stub only the write: the read still hits the real server, and the agent still reasons over real data.
 

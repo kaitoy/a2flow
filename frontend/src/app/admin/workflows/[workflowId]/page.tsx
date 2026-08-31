@@ -659,6 +659,7 @@ export default function WorkflowDetailPage() {
       />
       <RunWorkflowDialog
         open={confirmRunOpen}
+        workflowId={workflowId}
         workflowName={workflow.name}
         isDraft={workflow.status === "draft"}
         onConfirm={handleRun}
