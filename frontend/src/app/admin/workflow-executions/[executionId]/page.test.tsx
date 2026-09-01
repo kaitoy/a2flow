@@ -32,13 +32,19 @@ describe("WorkflowExecutionDetailPage", () => {
     expect(within(nav).getByText("My Workflow")).toHaveAttribute("aria-current", "page");
   });
 
-  it("links the Name field to its detail page", async () => {
+  it("shows the run's own name as plain text, not a link", async () => {
     renderPage();
-    await waitFor(() =>
-      expect(screen.getAllByRole("link", { name: "My Workflow" })[0]).toHaveAttribute(
-        "href",
-        "/admin/workflows/wf-1"
-      )
+    await screen.findByRole("heading", { name: "My Workflow" });
+    expect(screen.queryByRole("link", { name: "My Workflow" })).not.toBeInTheDocument();
+    const nameTerm = screen.getByText("Name", { selector: "dt" });
+    expect(nameTerm.parentElement).toHaveTextContent("My Workflow");
+  });
+
+  it("resolves the workflow id to its current name in the Workflow field and links to it", async () => {
+    renderPage();
+    expect(await screen.findByRole("link", { name: "my-workflow" })).toHaveAttribute(
+      "href",
+      "/admin/workflows/wf-1"
     );
   });
 

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useWorkflowNames } from "@/hooks/useWorkflowNames";
 import {
   deleteWorkflowExecution,
   getUserNames,
@@ -35,6 +36,11 @@ import { Role, useHasRole } from "@/lib/roles";
  * Read-only detail page for a single executed `WorkflowExecution`: the workflow
  * and agent skill it ran, who ran it, and when — followed by the same audit
  * footer every admin detail page shows.
+ *
+ * The `Name` field is the run's own snapshot name, fixed when it started, and is
+ * shown as plain text. The separate `Workflow` field resolves the parent
+ * workflow's *current* name and links to it, mirroring the list's Workflow
+ * column.
  *
  * Nothing here is editable: a session is a record of a run, not an
  * author-managed entity. The header offers quick jumps to the session's task
@@ -54,6 +60,9 @@ export default function WorkflowExecutionDetailPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const isAdmin = useHasRole(Role.ADMIN);
   const isAllTenantsView = useIsAllTenantsView();
+  // Resolve the parent workflow's *current* name for the Workflow field, the
+  // same way the workflow-executions list's Workflow column does.
+  const workflowNames = useWorkflowNames(session?.workflowId ? [session.workflowId] : []);
 
   useEffect(() => {
     let active = true;
@@ -168,18 +177,19 @@ export default function WorkflowExecutionDetailPage() {
         </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
+            <DetailItem label="Name" value={session.name} />
             <DetailItem
-              label="Name"
+              label="Workflow"
               value={
                 session.workflowId ? (
                   <Link
                     href={`/admin/workflows/${session.workflowId}`}
                     className="font-medium text-accent transition-colors hover:underline"
                   >
-                    {session.name}
+                    {workflowNames.get(session.workflowId) ?? session.workflowId}
                   </Link>
                 ) : (
-                  session.name
+                  EMPTY_VALUE
                 )
               }
             />
