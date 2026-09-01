@@ -10,6 +10,11 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
 * one stdio MCPServer reaching the managed AWS MCP Server through the
   ``mcp-proxy-for-aws`` proxy launched with ``uvx``, referencing those
   entries from its ``env`` via ``${secret:NAME/KEY}``, also described,
+* three MCPToolMocks that stub the demo run's side-effecting tools so a
+  ``draft`` workflow run plays through without reaching AWS or waiting on a
+  human -- ``call_aws`` and ``run_script`` on that MCP server, each returning
+  a successful EC2 launch, and the built-in ``request_approval``, returning
+  ``approved``,
 * one AgentSkill pointing at ``sample_skills/aws-ec2-launch`` in this
   repository,
 * two Tags -- ``AWS`` (attached to the secret, MCP server, and agent skill,
@@ -51,7 +56,7 @@ make application startup depend on working name resolution.
 
 import logging
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import SQLModel, col, select
@@ -63,6 +68,7 @@ from infrastructure.password import hash_password
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
 from models.mcp_server import McpCommand, MCPServer, McpTransport
+from models.mcp_tool_mock import REQUEST_APPROVAL_TOOL, MCPToolMock
 from models.secret import Secret, SecretType
 from models.tag import AgentSkillTag, McpServerTag, SecretTag, Tag, TagColor, TagLink
 from models.tenant import Tenant
@@ -115,6 +121,15 @@ DEMO_AWS_TAG_ID = "00000000-0000-0000-0000-00000000d501"
 #: Fixed identifier of the demo ``Approval Required`` tag.
 DEMO_APPROVAL_TAG_ID = "00000000-0000-0000-0000-00000000d502"
 
+#: Fixed identifier of the demo ``call_aws`` tool mock (AWS MCP server).
+DEMO_CALL_AWS_MOCK_ID = "00000000-0000-0000-0000-00000000d601"
+
+#: Fixed identifier of the demo ``run_script`` tool mock (AWS MCP server).
+DEMO_RUN_SCRIPT_MOCK_ID = "00000000-0000-0000-0000-00000000d602"
+
+#: Fixed identifier of the demo ``request_approval`` built-in tool mock.
+DEMO_REQUEST_APPROVAL_MOCK_ID = "00000000-0000-0000-0000-00000000d603"
+
 #: Name of the demo tag shared by the secret, MCP server, and agent skill.
 DEMO_AWS_TAG_NAME = "AWS"
 
@@ -137,6 +152,15 @@ DEMO_MCP_SERVER_NAME = "AWS MCP Server"
 
 #: Name of the demo agent skill as shown in the admin UI.
 DEMO_AGENT_SKILL_NAME = "Demo AWS EC2 Launch"
+
+#: Name of the demo ``call_aws`` tool mock as shown in the admin UI.
+DEMO_CALL_AWS_MOCK_NAME = "Demo AWS call_aws (EC2 launch success)"
+
+#: Name of the demo ``run_script`` tool mock as shown in the admin UI.
+DEMO_RUN_SCRIPT_MOCK_NAME = "Demo AWS run_script (EC2 launch success)"
+
+#: Name of the demo ``request_approval`` tool mock as shown in the admin UI.
+DEMO_REQUEST_APPROVAL_MOCK_NAME = "Demo request_approval (always approved)"
 
 #: Proxy package the demo MCP server is launched from. Pinned to an exact
 #: version rather than ``@latest``, which is what the upstream migration guide
@@ -297,6 +321,132 @@ _DEMO_GROUPS = (
     ),
 )
 
+#: The tool of the demo AWS MCP server that runs one AWS CLI command.
+_DEMO_CALL_AWS_TOOL = "call_aws"
+
+#: The tool of the demo AWS MCP server that runs a script (AWS CLI + boto3).
+_DEMO_RUN_SCRIPT_TOOL = "run_script"
+
+#: Instance id shared by the ``call_aws`` and ``run_script`` mock results, so a
+#: run that happens to call both still tells one consistent story.
+_DEMO_MOCK_INSTANCE_ID = "i-0a1b2c3d4e5f67890"
+
+#: Structured result of the demo ``call_aws`` mock: the JSON an
+#: ``aws ec2 run-instances`` call prints, trimmed to the fields the sample skill
+#: reads back to the user (the instance id and its state).
+_DEMO_CALL_AWS_RESULT: dict[str, Any] = {
+    "Instances": [
+        {
+            "InstanceId": _DEMO_MOCK_INSTANCE_ID,
+            "ImageId": "ami-0demoamazonlinux2023",
+            "InstanceType": "t3.medium",
+            "State": {"Code": 0, "Name": "pending"},
+            "PrivateIpAddress": "10.0.12.34",
+            "SubnetId": "subnet-0demo1234567890",
+            "KeyName": "demo-keypair",
+            "SecurityGroups": [
+                {"GroupId": "sg-0demo1234567890", "GroupName": "demo-sg"}
+            ],
+            "Placement": {"AvailabilityZone": "us-east-1a"},
+            "Tags": [{"Key": "Name", "Value": "demo-instance"}],
+            "LaunchTime": "2026-01-01T00:00:00+00:00",
+        }
+    ],
+    "OwnerId": "123456789012",
+    "ReservationId": "r-0demo1234567890",
+}
+
+#: Structured result of the demo ``run_script`` mock: the exit status, captured
+#: output, and a small parsed result a script-runner tool returns.
+_DEMO_RUN_SCRIPT_RESULT: dict[str, Any] = {
+    "status": "success",
+    "exit_code": 0,
+    "stdout": f"Launched {_DEMO_MOCK_INSTANCE_ID} in us-east-1a; state: pending\n",
+    "stderr": "",
+    "result": {
+        "instance_id": _DEMO_MOCK_INSTANCE_ID,
+        "instance_type": "t3.medium",
+        "availability_zone": "us-east-1a",
+        "state": "pending",
+    },
+}
+
+#: Description shown on the demo ``call_aws`` tool mock in the admin UI.
+_DEMO_CALL_AWS_MOCK_DESCRIPTION = (
+    "Stubs the AWS MCP Server's call_aws tool with a successful ec2 "
+    "run-instances result, so a draft run of the demo workflow completes its "
+    "launch step without reaching AWS."
+)
+
+#: Description shown on the demo ``run_script`` tool mock in the admin UI.
+_DEMO_RUN_SCRIPT_MOCK_DESCRIPTION = (
+    "Stubs the AWS MCP Server's run_script tool with a successful EC2 launch, "
+    "so a draft run of the demo workflow completes its launch step without "
+    "reaching AWS."
+)
+
+#: Description shown on the demo ``request_approval`` tool mock in the admin UI.
+_DEMO_REQUEST_APPROVAL_MOCK_DESCRIPTION = (
+    "Stubs the built-in request_approval tool as approved, so a draft run of "
+    "the demo workflow plays through without waiting on a manager's decision."
+)
+
+
+@dataclass(frozen=True)
+class _DemoToolMockSpec:
+    """One demo tool mock: a single constant response standing in for one tool.
+
+    Attributes:
+        id: Fixed primary key, so the mock can be found again for removal.
+        name: Mock name shown in the admin UI, unique within the tenant.
+        description: Sentence shown on the mock list and the Run dialog.
+        mcp_server_id: Id of the registered MCP server the mocked tool belongs
+            to, or ``None`` for a built-in agent tool.
+        tool_name: The tool this mock stands in for.
+        response: The single ``{"kind", "value"}`` response entry, returned for
+            every call the run makes to the tool.
+    """
+
+    id: str
+    name: str
+    description: str
+    mcp_server_id: str | None
+    tool_name: str
+    response: dict[str, Any]
+
+
+#: The demo tool mocks, all in the seeded ``Default`` tenant. The first two stub
+#: tools of the demo MCP server (see :func:`_seed_demo_mcp_server`); the third
+#: stubs the built-in :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`.
+#: Checked in a draft run's Run dialog, together they let the sample "launch an
+#: EC2 instance" workflow run end to end without reaching AWS or an approver.
+_DEMO_TOOL_MOCKS = (
+    _DemoToolMockSpec(
+        id=DEMO_CALL_AWS_MOCK_ID,
+        name=DEMO_CALL_AWS_MOCK_NAME,
+        description=_DEMO_CALL_AWS_MOCK_DESCRIPTION,
+        mcp_server_id=DEMO_MCP_SERVER_ID,
+        tool_name=_DEMO_CALL_AWS_TOOL,
+        response={"kind": "structured", "value": _DEMO_CALL_AWS_RESULT},
+    ),
+    _DemoToolMockSpec(
+        id=DEMO_RUN_SCRIPT_MOCK_ID,
+        name=DEMO_RUN_SCRIPT_MOCK_NAME,
+        description=_DEMO_RUN_SCRIPT_MOCK_DESCRIPTION,
+        mcp_server_id=DEMO_MCP_SERVER_ID,
+        tool_name=_DEMO_RUN_SCRIPT_TOOL,
+        response={"kind": "structured", "value": _DEMO_RUN_SCRIPT_RESULT},
+    ),
+    _DemoToolMockSpec(
+        id=DEMO_REQUEST_APPROVAL_MOCK_ID,
+        name=DEMO_REQUEST_APPROVAL_MOCK_NAME,
+        description=_DEMO_REQUEST_APPROVAL_MOCK_DESCRIPTION,
+        mcp_server_id=None,
+        tool_name=REQUEST_APPROVAL_TOOL,
+        response={"kind": "structured", "value": {"status": "approved"}},
+    ),
+)
+
 
 async def sync_demo_data(session: AsyncSession) -> str | None:
     """Register or remove the demo dataset according to ``DEMO_DATA``.
@@ -343,6 +493,7 @@ async def _seed_demo_data(session: AsyncSession) -> str | None:
     await _seed_demo_groups(session, tenant_id)
     await _seed_demo_secrets(session, tenant_id)
     await _seed_demo_mcp_server(session, tenant_id)
+    await _seed_demo_tool_mocks(session, tenant_id)
     new_skill_id = await _seed_demo_agent_skill(session, tenant_id)
     await _seed_demo_tags(session, tenant_id)
     return new_skill_id
@@ -351,12 +502,15 @@ async def _seed_demo_data(session: AsyncSession) -> str | None:
 async def _remove_demo_data(session: AsyncSession) -> None:
     """Delete every demo record that is still present.
 
-    Deletion follows the direction of the foreign keys — agent skill, then MCP
-    server, then secrets, then tags, then user groups, then users — so a
-    record is never orphaned by the removal of something it points at. A
-    record that other data has come to depend on (a Workflow built on the
-    demo skill, a task tool binding on the demo MCP server) cannot be
-    deleted; that is logged and skipped rather than allowed to fail startup.
+    Deletion follows the direction of the foreign keys — tool mocks, then agent
+    skill, then MCP server, then secrets, then tags, then user groups, then
+    users — so a record is never orphaned by the removal of something it points
+    at. The tool mocks go first because two of them (``call_aws`` and
+    ``run_script``) reference the demo MCP server with ``ondelete="RESTRICT"``,
+    which would otherwise block its removal. A record that other data has come
+    to depend on (a Workflow built on the demo skill, a task tool binding on
+    the demo MCP server) cannot be deleted; that is logged and skipped rather
+    than allowed to fail startup.
 
     Deleting a tag has no such protection — the join tables cascade rather
     than restrict, by design (see the module docstring of ``models.tag``) —
@@ -371,6 +525,10 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     Args:
         session: Database session used to read and delete records.
     """
+    for mock_spec in _DEMO_TOOL_MOCKS:
+        await _delete_demo_row(
+            session, MCPToolMock, mock_spec.id, label=f"tool mock {mock_spec.name!r}"
+        )
     await _delete_demo_row(
         session, AgentSkill, DEMO_AGENT_SKILL_ID, label="agent skill"
     )
@@ -698,6 +856,47 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
         ),
         label=f"MCP server '{DEMO_MCP_SERVER_NAME}'",
     )
+
+
+async def _seed_demo_tool_mocks(session: AsyncSession, tenant_id: str) -> None:
+    """Create the demo tool mocks that let a draft run play through unattended.
+
+    Three stubs, all in the seeded ``Default`` tenant: ``call_aws`` and
+    ``run_script`` on the demo MCP server, each returning a successful EC2
+    launch, and the built-in
+    :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`, returning ``approved``.
+    Selected in a draft run's Run dialog, they let the "launch an EC2 instance"
+    workflow run end to end without reaching AWS or waiting on an approver.
+
+    Must run after :func:`_seed_demo_mcp_server`: the first two mocks reference
+    ``mcp_servers.id``. Each mock defines a single response, so it behaves as a
+    constant however many times the run calls the tool. ``responses`` is stored
+    as plain ``{"kind", "value"}`` dicts because the table column cannot carry
+    the :class:`~models.mcp_tool_mock.MockResponse` type (see
+    :class:`~models.mcp_tool_mock.MCPToolMock`).
+
+    Args:
+        session: Database session used to read and insert the mocks.
+        tenant_id: Id of the ``Default`` tenant the mocks belong to.
+    """
+    for spec in _DEMO_TOOL_MOCKS:
+        if await session.get(MCPToolMock, spec.id) is not None:
+            continue
+        await _insert(
+            session,
+            MCPToolMock(
+                id=spec.id,
+                tenant_id=tenant_id,
+                name=spec.name,
+                description=spec.description,
+                mcp_server_id=spec.mcp_server_id,
+                tool_name=spec.tool_name,
+                responses=[spec.response],
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            ),
+            label=f"tool mock {spec.name!r}",
+        )
 
 
 async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str | None:

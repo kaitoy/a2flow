@@ -33,13 +33,16 @@ from infrastructure.demo_data import (
     DEMO_AWS_SECRET_NAME,
     DEMO_AWS_TAG_ID,
     DEMO_AWS_TAG_NAME,
+    DEMO_CALL_AWS_MOCK_ID,
     DEMO_DEVELOPER_USER_ID,
     DEMO_DEVELOPERS_GROUP_ID,
     DEMO_MCP_SERVER_ID,
     DEMO_MCP_SERVER_NAME,
+    DEMO_REQUEST_APPROVAL_MOCK_ID,
     DEMO_REQUESTER_2_USER_ID,
     DEMO_REQUESTER_USER_ID,
     DEMO_REQUESTERS_GROUP_ID,
+    DEMO_RUN_SCRIPT_MOCK_ID,
     DEMO_SECRET_KEY_ENTRY_KEY,
     sync_demo_data,
 )
@@ -47,6 +50,7 @@ from infrastructure.password import verify_password
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.mcp_server import McpCommand, MCPServer, McpTransport
+from models.mcp_tool_mock import MCPToolMock
 from models.secret import Secret, SecretType
 from models.tag import AgentSkillTag, McpServerTag, SecretTag, Tag
 from models.tenant import Tenant
@@ -198,6 +202,7 @@ async def test_sync_demo_data_seeds_the_full_dataset(
     assert len(await _demo_users(engine)) == 5
     assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
+    assert len(await _rows(engine, MCPToolMock)) == 3
     assert len(await _rows(engine, AgentSkill)) == 1
     assert len(await _rows(engine, Tag)) == 2
 
@@ -228,6 +233,7 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _demo_users(engine)) == 5
     assert len(await _rows(engine, Secret)) == 1
     assert len(await _rows(engine, MCPServer)) == 1
+    assert len(await _rows(engine, MCPToolMock)) == 3
     assert len(await _rows(engine, AgentSkill)) == 1
     assert len(await _rows(engine, Tag)) == 2
     assert len(await _rows(engine, SecretTag)) == 1
@@ -590,6 +596,7 @@ async def test_disabling_removes_the_full_dataset(
     assert await _demo_users(engine) == []
     assert await _rows(engine, Secret) == []
     assert await _rows(engine, MCPServer) == []
+    assert await _rows(engine, MCPToolMock) == []
     assert await _rows(engine, AgentSkill) == []
     assert await _rows(engine, Tag) == []
     assert await _rows(engine, SecretTag) == []
@@ -740,3 +747,47 @@ async def test_removal_keeps_a_referenced_demo_skill(
         assert await session.get(AgentSkill, DEMO_AGENT_SKILL_ID) is not None
         # Everything not blocked is still removed.
         assert await session.get(MCPServer, DEMO_MCP_SERVER_ID) is None
+
+
+# ---------- tool mocks ----------
+
+
+async def test_demo_tool_mocks_stub_the_demo_run_tools(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    mocks = {mock.id: mock for mock in await _rows(engine, MCPToolMock)}
+    assert set(mocks) == {
+        DEMO_CALL_AWS_MOCK_ID,
+        DEMO_RUN_SCRIPT_MOCK_ID,
+        DEMO_REQUEST_APPROVAL_MOCK_ID,
+    }
+    targets = {(mock.mcp_server_id, mock.tool_name) for mock in mocks.values()}
+    assert targets == {
+        (DEMO_MCP_SERVER_ID, "call_aws"),
+        (DEMO_MCP_SERVER_ID, "run_script"),
+        (None, "request_approval"),
+    }
+    for mock in mocks.values():
+        assert mock.tenant_id == TENANT_ID
+        assert mock.created_by == SYSTEM_USER_ID
+        assert mock.description
+        assert len(mock.responses) == 1
+        assert mock.responses[0]["kind"] == "structured"
+    approval = mocks[DEMO_REQUEST_APPROVAL_MOCK_ID]
+    assert approval.responses[0]["value"] == {"status": "approved"}
+    launch = mocks[DEMO_CALL_AWS_MOCK_ID]
+    assert launch.responses[0]["value"]["Instances"][0]["InstanceId"].startswith("i-")
+
+
+async def test_disabling_removes_tool_mocks_before_the_mcp_server(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A mock's RESTRICT FK on the demo MCP server must not block removal."""
+    _enable(monkeypatch)
+    await _sync(engine)
+    _disable(monkeypatch)
+    assert await _sync(engine) is None
+    assert await _rows(engine, MCPToolMock) == []
+    assert await _rows(engine, MCPServer) == []

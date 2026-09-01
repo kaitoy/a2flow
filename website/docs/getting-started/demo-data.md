@@ -30,6 +30,7 @@ DEMO_AWS_REGION=us-east-1
 - **[Agent skill](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — gathers the instance configuration, gets a manager's explicit approval of it, then launches the instance through an MCP tool. Its repository is cloned in the background after startup, so the skill shows as `pending` for a moment before it can be used.
 - **[MCP server](../guides/mcp-servers.md) `AWS MCP Server`** — a `stdio` server reaching AWS's managed AWS MCP Server, which is where the EC2 tools come from.
 - **[Secret](../guides/secrets.md) `demo-aws-credentials`** — the AWS access key id and secret access key that MCP server reads.
+- **[Tool mocks](../guides/tool-mocks.md)** — stubs for the demo run's side-effecting tools: `call_aws` and `run_script` on the AWS MCP Server, each returning a successful launch, and the built-in `request_approval`, returning approved. Selecting them in a draft run's **Run** dialog lets the workflow finish without touching AWS or waiting on a manager.
 - **Demo users and groups:**
 
 | User | Role | What they do |
@@ -50,7 +51,7 @@ Sign in with `DEMO_PASSWORD` as each account in turn:
 4. As **`demo-requester-1`**, press **Run** on the workflow ([Running a workflow](../guides/workflows.md#running-a-workflow)). The run's chat opens and the agent starts working through the tasks.
 5. When the skill asks for approval, sign in as **`demo-approver-1`** and approve it ([Approvals](../guides/approvals.md)). The agent then launches the instance through the MCP tool.
 
-**No AWS account?** Skip step 3 and run the workflow while it is still `draft` — as a `developer`, `demo-developer` may do that, and only a draft run's dialog offers the tenant's [tool mocks](../guides/tool-mocks.md). Mock the EC2-launch tool and the built-in `request_approval`, and the whole workflow plays through without reaching AWS or waiting on a human.
+**No AWS account?** Skip step 3 and run the workflow while it is still `draft` — as a `developer`, `demo-developer` may do that, and only a draft run's dialog offers the tenant's [tool mocks](../guides/tool-mocks.md). Under **Mock tools**, check the seeded stubs it lists (`call_aws` or `run_script` for the launch, and `request_approval`); the whole workflow then plays through without reaching AWS or waiting on a human.
 
 ## Removing it
 
