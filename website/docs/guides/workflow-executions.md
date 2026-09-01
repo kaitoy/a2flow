@@ -16,7 +16,9 @@ Open **Workflow Executions** in the admin sidebar to browse them. Unlike the oth
 | **Workflow Tasks** | A row's tasks link | The run's tasks and their statuses, read-only, as a Table or a Graph |
 | **Tool Invocations** | The run detail header | The MCP tool calls the run made, and how each was decided |
 
-Two badges narrow the list. **Draft** marks a run started from a workflow that was still `draft` — a [pre-publish test run](./workflows.md#running-a-workflow), left out of the [operations metrics](../operations/metrics.md) — and doubles as a Yes/No filter to hide them. **Mocked** marks a run that stubbed any of its tools with a [tool mock](./tool-mocks.md).
+**Mocked** marks a run that stubbed any of its tools with a [tool mock](./tool-mocks.md).
+
+The [**Columns** menu](./admin-ui.md#choosing-columns) offers two more columns that start hidden. **Workflow** shows the run's parent workflow under its current name and links to it — each row's own name is a snapshot fixed when the run started, so this column is how you see what that workflow is called today. **Draft** shows a checkmark for a run started from a workflow that was still `draft` — a [pre-publish test run](./workflows.md#running-a-workflow), left out of the [operations metrics](../operations/metrics.md) — and works as a Yes/No filter to hide them.
 
 ## Run status
 

@@ -16,7 +16,9 @@ sidebar_position: 4
 | **Workflow Tasks** | 行のタスクへのリンク | その実行のタスクとステータス。読み取り専用で Table と Graph の 2 表示 |
 | **Tool Invocations** | 実行の詳細ヘッダー | その実行が行った MCP ツール呼び出しと、それぞれの判定 |
 
-一覧を絞るバッジが 2 つあります。**Draft** は `draft` のままのワークフローから始めた実行 — [公開前のテスト実行](./workflows.md#running-a-workflow)で、[運用メトリクス](../operations/metrics.md)には数えられません — を示し、Yes/No のフィルターとしても働くので隠せます。**Mocked** は[ツールモック](./tool-mocks.md)でいずれかのツールを差し替えた実行を示します。
+**Mocked** は[ツールモック](./tool-mocks.md)でいずれかのツールを差し替えた実行を示します。
+
+[**Columns** メニュー](./admin-ui.md#choosing-columns)には、既定で隠れている列がもう 2 つあります。**Workflow** はその実行のもとになったワークフローを今の名前で示し、そこへリンクします。行そのものの名前は実行開始時のスナップショットで固定なので、そのワークフローが今どう呼ばれているかはこの列で分かります。**Draft** は `draft` のままのワークフローから始めた実行 — [公開前のテスト実行](./workflows.md#running-a-workflow)で、[運用メトリクス](../operations/metrics.md)には数えられません — にチェックマークを付け、Yes/No のフィルターとしても働くので隠せます。
 
 ## 実行のステータス {#run-status}
 

@@ -56,6 +56,40 @@ describe("WorkflowExecutionsPage", () => {
     expect(link).toHaveAttribute("href", "/admin/agent-skills/skill-1");
   });
 
+  it("resolves the workflow id to its name in the Workflow column and links to it", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows", () =>
+        envelope([
+          {
+            id: "wf-1",
+            name: "Invoice intake",
+            tenantId: "tenant-1",
+            description: null,
+            generatedDescription: null,
+            agentSkillId: "skill-1",
+            sessionId: "design-session-id",
+            agentSkillCommitSha: "a".repeat(40),
+            status: "published",
+            generationError: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+    renderPage();
+    await waitFor(() => screen.getByText("My Workflow"));
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Workflow" }));
+
+    const link = await screen.findByRole("link", { name: "Invoice intake" });
+    expect(link).toHaveAttribute("href", "/admin/workflows/wf-1");
+  });
+
   it("resolves the session user ID to the user's name", async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
@@ -98,19 +132,21 @@ describe("WorkflowExecutionsPage", () => {
     expect(requests).toEqual([["ann", "bob", "cal"]]);
   });
 
-  it("shows Name, Status, Draft, Initiator and Created At by default, but not Agent Skill or Finished At", async () => {
+  it("shows Name, Status, Initiator and Created At by default, but not Draft, Workflow, Agent Skill or Finished At", async () => {
     renderPage();
     await waitFor(() => screen.getByText("My Workflow"));
     expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Draft" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Initiator" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Created At" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Draft" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Workflow" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Agent Skill" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Finished At" })).not.toBeInTheDocument();
     expect(screen.getByText("completed")).toBeInTheDocument();
   });
 
-  it("badges a draft run and leaves a real run unmarked", async () => {
+  it("marks a draft run with a checkmark once the Draft column is shown", async () => {
+    const user = userEvent.setup();
     server.use(
       http.get("http://localhost:8000/api/v1/workflow-executions", () =>
         envelope(
@@ -138,11 +174,15 @@ describe("WorkflowExecutionsPage", () => {
       )
     );
     renderPage();
+    await screen.findByRole("link", { name: "Draft Run" });
 
-    const draftRow = (await screen.findByRole("link", { name: "Draft Run" })).closest("tr");
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Draft" }));
+
+    const draftRow = screen.getByRole("link", { name: "Draft Run" }).closest("tr");
     const realRow = screen.getByRole("link", { name: "Real Run" }).closest("tr");
-    expect(within(draftRow as HTMLElement).getByText("Draft")).toBeInTheDocument();
-    expect(within(realRow as HTMLElement).queryByText("Draft")).not.toBeInTheDocument();
+    expect(within(draftRow as HTMLElement).getByText("✓")).toBeInTheDocument();
+    expect(within(realRow as HTMLElement).queryByText("✓")).not.toBeInTheDocument();
   });
 
   it("filters the list by the Draft column", async () => {
@@ -156,6 +196,11 @@ describe("WorkflowExecutionsPage", () => {
     );
     renderPage();
     await waitFor(() => expect(seen.length).toBeGreaterThan(0));
+
+    // Draft is an optional column now — turn it on before its header menu exists.
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Draft" }));
+    await user.click(screen.getByRole("button", { name: "Columns" }));
 
     await user.click(screen.getByRole("button", { name: "Draft" }));
     const select = await screen.findByRole("combobox");

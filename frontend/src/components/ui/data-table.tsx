@@ -71,6 +71,19 @@ export const BOOL_FILTER_OPTIONS: FilterOption[] = [
   { label: "No", value: "false" },
 ];
 
+/**
+ * Render a boolean column's cell as a checkmark for `true` and an em dash for
+ * `false`, so a table of flags scans as a column of ticks rather than a wall of
+ * repeated words. Pair it with `filterOptions: BOOL_FILTER_OPTIONS` and
+ * `className: "text-center"` on the column.
+ *
+ * @param value - The row's flag.
+ * @returns `"✓"` when `value` is `true`, `"—"` otherwise.
+ */
+export function boolCell(value: boolean): string {
+  return value ? "✓" : "—";
+}
+
 /** Props for {@link DataTable}. */
 interface DataTableProps<T> {
   columns: ColumnDef<T>[];

@@ -16,13 +16,19 @@ import { tenantColumn } from "@/components/admin/tenant-columns";
 import { WorkflowExecutionStatusLabel } from "@/components/admin/workflow-execution-status";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { BOOL_FILTER_OPTIONS, type ColumnDef, DataTable } from "@/components/ui/data-table";
+import {
+  BOOL_FILTER_OPTIONS,
+  boolCell,
+  type ColumnDef,
+  DataTable,
+} from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
+import { useWorkflowNames } from "@/hooks/useWorkflowNames";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import { deleteWorkflowExecution, listWorkflowExecutions, type WorkflowExecution } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
@@ -30,13 +36,14 @@ import { Role, useHasRole } from "@/lib/roles";
 const LIMIT = 20;
 
 /**
- * Build the table columns, resolving user ids to display names via `userMap`
- * and wiring the Actions column's Delete button to `onDelete`. The Delete
- * button only renders when `isAdmin` is true — the backend restricts
- * deletion to admins and super admins.
+ * Build the table columns, resolving user ids to display names via `userMap`,
+ * workflow ids to their current names via `workflowMap`, and wiring the Actions
+ * column's Delete button to `onDelete`. The Delete button only renders when
+ * `isAdmin` is true — the backend restricts deletion to admins and super admins.
  */
 function buildColumns(
   userMap: Map<string, string>,
+  workflowMap: Map<string, string>,
   onDelete: (id: string, name: string) => void,
   isAdmin: boolean,
   tenantNames: Map<string, string>,
@@ -59,6 +66,24 @@ function buildColumns(
       ),
     },
     {
+      // Resolved from workflowId to the workflow's current name via workflowMap;
+      // not sorted/filtered by the raw id. Falls back to the id, then an em dash
+      // once the run's workflow has been deleted (workflowId is null).
+      header: "Workflow",
+      visibility: "optional",
+      cell: (s) =>
+        s.workflowId ? (
+          <Link
+            href={`/admin/workflows/${s.workflowId}`}
+            className="font-medium text-accent transition-colors hover:underline"
+          >
+            {workflowMap.get(s.workflowId) ?? s.workflowId}
+          </Link>
+        ) : (
+          "—"
+        ),
+    },
+    {
       header: "Status",
       sortField: "status",
       filterField: "status",
@@ -74,15 +99,16 @@ function buildColumns(
     {
       // A run started from a still-draft workflow — a pre-publish test run. It is
       // excluded from the operations metrics; the filter lets an operator hide
-      // these from the list too.
+      // these from the list too. Off by default: only the pre-publish test runs
+      // of a few developers, not something most operators need on screen.
       header: "Draft",
       sortField: "isDraft",
       filterField: "isDraft",
       filterOp: "eq",
       filterOptions: BOOL_FILTER_OPTIONS,
-      noTruncate: true,
+      visibility: "optional",
       className: "text-center",
-      cell: (s) => (s.isDraft ? <Badge>Draft</Badge> : null),
+      cell: (s) => boolCell(s.isDraft ?? false),
     },
     {
       // A draft run that stubbed some of its tools. Not sortable or filterable:
@@ -217,6 +243,8 @@ export default function WorkflowExecutionsPage() {
 
   // Resolve user display names for the current page of sessions.
   const userMap = useUserNames(rows.flatMap((s) => [s.initiatorId, s.createdBy, s.updatedBy]));
+  // Resolve each run's parent workflow to its current name for the Workflow column.
+  const workflowMap = useWorkflowNames(rows.map((s) => s.workflowId));
   const isAllTenantsView = useIsAllTenantsView();
   // Only resolved when the Tenant column is actually rendered: the lookup goes
   // through the super_admin-only tenants list, so asking for it as a plain
@@ -225,7 +253,7 @@ export default function WorkflowExecutionsPage() {
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowExecutions",
-    buildColumns(userMap, handleDelete, isAdmin, tenantNames, isAllTenantsView)
+    buildColumns(userMap, workflowMap, handleDelete, isAdmin, tenantNames, isAllTenantsView)
   );
 
   return (
