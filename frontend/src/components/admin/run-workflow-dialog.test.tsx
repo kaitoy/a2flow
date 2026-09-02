@@ -40,12 +40,26 @@ function renderDialog(overrides: Partial<Parameters<typeof RunWorkflowDialog>[0]
       workflowId="wf-1"
       workflowName="my-workflow"
       isDraft
+      canChooseDesign={false}
       onConfirm={onConfirm}
       onCancel={onCancel}
       {...overrides}
     />
   );
   return { onConfirm, onCancel };
+}
+
+/** The dialog's answer for an ordinary, unstubbed run of the published design. */
+const PUBLISHED_RUN = { designSource: "published", toolMockIds: [] };
+
+/** Render the dialog as a developer sees it for a `modified` workflow. */
+function renderModified() {
+  return renderDialog({ isDraft: false, canChooseDesign: true });
+}
+
+/** The radio choosing the unpublished edits. */
+function liveRadio() {
+  return screen.getByRole("radio", { name: /Unpublished edits/ });
 }
 
 describe("RunWorkflowDialog", () => {
@@ -56,7 +70,7 @@ describe("RunWorkflowDialog", () => {
     expect(screen.queryByText("Mock tools")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Run" }));
 
-    expect(onConfirm).toHaveBeenCalledWith([]);
+    expect(onConfirm).toHaveBeenCalledWith(PUBLISHED_RUN);
   });
 
   it("lists the registered mocks for a draft workflow", async () => {
@@ -79,7 +93,10 @@ describe("RunWorkflowDialog", () => {
     await user.click(await screen.findByRole("checkbox", { name: /approve then reject/ }));
     await user.click(screen.getByRole("button", { name: "Run" }));
 
-    expect(onConfirm).toHaveBeenCalledWith(["mock-2"]);
+    expect(onConfirm).toHaveBeenCalledWith({
+      designSource: "published",
+      toolMockIds: ["mock-2"],
+    });
   });
 
   it("unchecks a mock again", async () => {
@@ -91,7 +108,7 @@ describe("RunWorkflowDialog", () => {
     await user.click(checkbox);
     await user.click(screen.getByRole("button", { name: "Run" }));
 
-    expect(onConfirm).toHaveBeenCalledWith([]);
+    expect(onConfirm).toHaveBeenCalledWith(PUBLISHED_RUN);
   });
 
   it("cancels without confirming", async () => {
@@ -136,7 +153,7 @@ describe("RunWorkflowDialog", () => {
 
     // An unstubbed run is still possible from this state.
     await user.click(screen.getByRole("button", { name: "Run" }));
-    expect(onConfirm).toHaveBeenCalledWith([]);
+    expect(onConfirm).toHaveBeenCalledWith(PUBLISHED_RUN);
   });
 
   it("falls back to every mock when the task templates cannot be loaded", async () => {
@@ -145,5 +162,58 @@ describe("RunWorkflowDialog", () => {
 
     expect(await screen.findByRole("checkbox", { name: /search returns nothing/ })).toBeVisible();
     expect(screen.getByRole("checkbox", { name: /approve then reject/ })).toBeVisible();
+  });
+
+  describe("a modified workflow", () => {
+    it("offers no design choice unless one was granted", () => {
+      renderDialog({ isDraft: false });
+      expect(screen.queryByText("Which design to run")).not.toBeInTheDocument();
+    });
+
+    it("preselects the published design", () => {
+      renderModified();
+      expect(screen.getByRole("radio", { name: /Published version/ })).toBeChecked();
+      expect(liveRadio()).not.toBeChecked();
+    });
+
+    it("offers no mocks while the published design is selected", () => {
+      renderModified();
+      expect(screen.queryByText("Mock tools")).not.toBeInTheDocument();
+    });
+
+    it("reveals the mock picker once the unpublished edits are chosen", async () => {
+      const user = userEvent.setup();
+      renderModified();
+
+      await user.click(liveRadio());
+
+      expect(await screen.findByRole("checkbox", { name: /approve then reject/ })).toBeVisible();
+    });
+
+    it("confirms with the chosen design and its mocks", async () => {
+      const user = userEvent.setup();
+      const { onConfirm } = renderModified();
+
+      await user.click(liveRadio());
+      await user.click(await screen.findByRole("checkbox", { name: /approve then reject/ }));
+      await user.click(screen.getByRole("button", { name: "Run" }));
+
+      expect(onConfirm).toHaveBeenCalledWith({
+        designSource: "live",
+        toolMockIds: ["mock-2"],
+      });
+    });
+
+    it("drops the mocks again when the published design is reselected", async () => {
+      const user = userEvent.setup();
+      const { onConfirm } = renderModified();
+
+      await user.click(liveRadio());
+      await user.click(await screen.findByRole("checkbox", { name: /approve then reject/ }));
+      await user.click(screen.getByRole("radio", { name: /Published version/ }));
+      await user.click(screen.getByRole("button", { name: "Run" }));
+
+      expect(onConfirm).toHaveBeenCalledWith(PUBLISHED_RUN);
+    });
   });
 });

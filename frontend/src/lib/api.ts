@@ -61,6 +61,7 @@ import type {
   UserGroupUpdate,
   UserRead as UserReadModel,
   UserUpdate,
+  WorkflowDesignSource,
   WorkflowExecution as WorkflowExecutionModel,
   WorkflowExecutionStatus,
   WorkflowRead as WorkflowModel,
@@ -533,6 +534,7 @@ export type {
   UserGroupCreate,
   UserGroupUpdate,
   UserUpdate,
+  WorkflowDesignSource,
   WorkflowExecutionStatus,
   WorkflowStatus,
   WorkflowTaskCreate,
@@ -1508,16 +1510,23 @@ export async function deleteWorkflow(id: string): Promise<void> {
  * the workflow.
  *
  * @param id - Identifier of the workflow to run.
- * @param options - `toolMockIds` names the tool mocks the run should apply,
- *   stubbing those tools instead of calling them. Accepted only while the
- *   workflow is still `draft`; the server answers 409 `WORKFLOW_NOT_RUNNABLE`
- *   otherwise.
+ * @param options - `designSource` picks which design a `modified` workflow
+ *   runs: `"published"` (the default) runs the last published version as a real
+ *   request, `"live"` runs the unpublished edits as a draft run. `"live"` needs
+ *   the `developer` role and a `modified` workflow; the server answers 403
+ *   `FORBIDDEN` or 409 `WORKFLOW_NOT_RUNNABLE` otherwise. `toolMockIds` names
+ *   the tool mocks the run should apply, stubbing those tools instead of
+ *   calling them — accepted only for a draft run, meaning a `draft` workflow or
+ *   a `"live"` one; the server answers 409 `WORKFLOW_NOT_RUNNABLE` otherwise.
  */
 export async function executeWorkflow(
   id: string,
-  options: { toolMockIds?: string[] } = {}
+  options: { toolMockIds?: string[]; designSource?: WorkflowDesignSource } = {}
 ): Promise<WorkflowExecution> {
-  const body: ExecuteWorkflowRequest = { toolMockIds: options.toolMockIds ?? [] };
+  const body: ExecuteWorkflowRequest = {
+    toolMockIds: options.toolMockIds ?? [],
+    designSource: options.designSource ?? "published",
+  };
   const session = (await fetchEnvelope(
     apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/execute`, body),
     zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse

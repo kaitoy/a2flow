@@ -16,9 +16,18 @@ Fernet ciphertext) can never become filterable, sortable, or a boolean-oracle
 side channel -- even though its value is never returned directly. A hidden
 field is reported as unknown, identically to a field that does not exist at
 all, so a client cannot distinguish "hidden" from "nonexistent".
+
+A call site whose response does not come straight off the model's own columns
+passes ``columns``, a map of :class:`ColumnOverride` keyed by resolved attribute
+name, so that filtering and sorting evaluate the same value the caller will see.
+Two use it today, both in the workflow read path: a non-``developer`` sees a
+``modified`` workflow's published snapshot rather than its live row, and the
+snapshot's task templates live inside a JSON column rather than in table rows.
+Filtering must never fall back to doing the work in Python -- that would break
+pagination and let the two implementations drift apart.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -50,6 +59,28 @@ class FilterSpec:
     field: str
     op: str
     value: str
+
+
+@dataclass(frozen=True)
+class ColumnOverride:
+    """A SQL expression to evaluate a field with, in place of the model's column.
+
+    Attributes:
+        expression: The expression to filter and sort on. It must yield the
+            value the caller will serialize for that field, or the page a
+            client sees will not match what it searched for.
+        json_text: Whether ``expression`` reads out of a JSON column, and so
+            yields the value as the text pydantic wrote there. When set, the
+            filter value is put through the same JSON serialization before it
+            is compared, which makes the comparison textual on every dialect:
+            a ``datetime`` becomes the same fixed-width ISO-8601 UTC string it
+            was stored as, whose lexicographic order is chronological order. No
+            cast and no dialect-specific date function is needed -- mirroring
+            the rule ``repositories.metrics`` states for its own queries.
+    """
+
+    expression: Any
+    json_text: bool = False
 
 
 def _resolve_column(
@@ -89,27 +120,57 @@ def _resolve_column(
     raise QueryValidationError(f"Unknown field {camel_field!r}")
 
 
-def _coerce(model: type[SQLModel], py_field: str, raw: str) -> Any:
+def _expression_for(
+    model: type[SQLModel],
+    py_field: str,
+    columns: Mapping[str, ColumnOverride] | None,
+) -> Any:
+    """Return the expression a resolved field should be evaluated with.
+
+    Args:
+        model: The SQLModel entity the query targets.
+        py_field: The resolved Python attribute name of the column.
+        columns: Per-field overrides, or ``None`` to use the model's columns.
+
+    Returns:
+        The override's expression when one is declared, else the model column.
+    """
+    override = columns.get(py_field) if columns is not None else None
+    if override is not None:
+        return override.expression
+    return col(getattr(model, py_field))
+
+
+def _coerce(
+    model: type[SQLModel], py_field: str, raw: str, *, json_text: bool = False
+) -> Any:
     """Coerce a raw string value to the Python type of the model's field.
 
     Args:
         model: The SQLModel entity the query targets.
         py_field: The resolved Python attribute name of the column.
         raw: The raw string value from the query.
+        json_text: Whether to return the value as pydantic's JSON serialization
+            of it, rather than the Python object -- see
+            :attr:`ColumnOverride.json_text`.
 
     Returns:
-        The value converted to the field's declared type.
+        The value converted to the field's declared type, or to the JSON text
+        that type is stored as.
 
     Raises:
         QueryValidationError: If the value cannot be coerced to the field type.
     """
-    annotation = model.model_fields[py_field].annotation
+    adapter: TypeAdapter[Any] = TypeAdapter(model.model_fields[py_field].annotation)
     try:
-        return TypeAdapter(annotation).validate_python(raw)
+        value = adapter.validate_python(raw)
     except ValidationError as exc:
         raise QueryValidationError(
             f"Invalid value {raw!r} for field {to_camel(py_field)!r}"
         ) from exc
+    if json_text:
+        return adapter.dump_python(value, mode="json")
+    return value
 
 
 def apply_sort(
@@ -119,6 +180,7 @@ def apply_sort(
     *,
     default: Sequence[Any],
     readable: type[SQLModel],
+    columns: Mapping[str, ColumnOverride] | None = None,
 ) -> SelectOfScalar[Any]:
     """Apply sort specs to a select statement, falling back to a default order.
 
@@ -130,6 +192,8 @@ def apply_sort(
             (e.g. ``col(Workflow.created_at).desc()``).
         readable: The schema the caller serializes results as; a sort field
             must also be present here (see :func:`_resolve_column`).
+        columns: Expressions to sort by instead of the model's own columns,
+            keyed by resolved attribute name (see :class:`ColumnOverride`).
 
     Returns:
         The statement with an ``ORDER BY`` clause applied.
@@ -143,7 +207,7 @@ def apply_sort(
     order_by = []
     for spec in specs:
         py_field = _resolve_column(model, spec.field, readable=readable)
-        column = col(getattr(model, py_field))
+        column = _expression_for(model, py_field, columns)
         order_by.append(column.desc() if spec.descending else column.asc())
     return stmt.order_by(*order_by)
 
@@ -154,6 +218,7 @@ def apply_filters(
     specs: Sequence[FilterSpec],
     *,
     readable: type[SQLModel],
+    columns: Mapping[str, ColumnOverride] | None = None,
 ) -> SelectOfScalar[Any]:
     """Apply filter specs to a select statement as ``WHERE`` clauses.
 
@@ -163,6 +228,8 @@ def apply_filters(
         specs: The requested filter instructions.
         readable: The schema the caller serializes results as; a filter field
             must also be present here (see :func:`_resolve_column`).
+        columns: Expressions to filter on instead of the model's own columns,
+            keyed by resolved attribute name (see :class:`ColumnOverride`).
 
     Returns:
         The statement with the filter conditions applied.
@@ -176,14 +243,19 @@ def apply_filters(
         if spec.op not in FILTER_OPERATORS:
             raise QueryValidationError(f"Unknown operator {spec.op!r}")
         py_field = _resolve_column(model, spec.field, readable=readable)
-        column = col(getattr(model, py_field))
+        override = columns.get(py_field) if columns is not None else None
+        json_text = override.json_text if override is not None else False
+        column = _expression_for(model, py_field, columns)
         if spec.op == "like":
             stmt = stmt.where(column.ilike(f"%{spec.value}%"))
         elif spec.op == "in":
-            values = [_coerce(model, py_field, v) for v in spec.value.split(",")]
+            values = [
+                _coerce(model, py_field, v, json_text=json_text)
+                for v in spec.value.split(",")
+            ]
             stmt = stmt.where(column.in_(values))
         else:
-            value = _coerce(model, py_field, spec.value)
+            value = _coerce(model, py_field, spec.value, json_text=json_text)
             stmt = stmt.where(_COMPARATORS[spec.op](column, value))
     return stmt
 

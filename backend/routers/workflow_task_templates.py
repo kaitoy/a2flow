@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends
 from dependencies import (
     ApiMetaDep,
     CurrentUserIdDep,
+    EffectiveRolesDep,
     WorkflowTaskTemplateReadServiceDep,
     WorkflowTaskTemplateServiceDep,
     require_roles,
@@ -52,10 +53,16 @@ async def create_workflow_task_template(
 async def get_workflow_task_template(
     template_id: str,
     service: WorkflowTaskTemplateReadServiceDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowTaskTemplateRead]:
-    """Return the template with the given ID, or HTTP 404 if missing."""
-    template = await service.get(template_id)
+    """Return the template with the given ID, or HTTP 404 if missing.
+
+    While the parent workflow is ``modified``, a caller who is not a
+    ``developer`` gets the template as it was published; one added since the
+    last publish reads as missing.
+    """
+    template = await service.get(template_id, caller_roles=caller_roles)
     return ApiResponse(meta=meta, data=template)
 
 

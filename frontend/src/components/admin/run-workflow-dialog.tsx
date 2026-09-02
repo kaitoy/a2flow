@@ -1,6 +1,7 @@
 /**
- * @module RunWorkflowDialog — confirms starting a workflow run, and for a draft
- * workflow lets the operator stub individual tools for that run.
+ * @module RunWorkflowDialog — confirms starting a workflow run, lets a developer
+ * pick which design a modified workflow runs, and lets a draft run stub
+ * individual tools.
  */
 "use client";
 
@@ -10,8 +11,22 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Radio } from "@/components/ui/radio";
 import { Spinner } from "@/components/ui/spinner";
-import { listMcpToolMocks, listWorkflowTaskTemplates, type McpToolMock } from "@/lib/api";
+import {
+  listMcpToolMocks,
+  listWorkflowTaskTemplates,
+  type McpToolMock,
+  type WorkflowDesignSource,
+} from "@/lib/api";
+
+/** What the operator confirmed: which design to run, and what to stub in it. */
+export interface RunWorkflowChoice {
+  /** Which design a modified workflow should run. */
+  designSource: WorkflowDesignSource;
+  /** Ids of the mocks to apply (empty when none were chosen or offered). */
+  toolMockIds: string[];
+}
 
 /** Props for {@link RunWorkflowDialog}. */
 export interface RunWorkflowDialogProps {
@@ -22,13 +37,18 @@ export interface RunWorkflowDialogProps {
   /** Name of the workflow about to run, shown in the confirmation sentence. */
   workflowName: string;
   /**
-   * Whether the workflow is still `draft`. Only a draft run may stub its tools,
-   * so the mock picker is hidden entirely otherwise and the dialog is a plain
-   * confirmation.
+   * Whether the workflow is still `draft`. A draft workflow only ever runs its
+   * live design, so it gets the mock picker without the design choice.
    */
   isDraft: boolean;
-  /** Called with the ids of the mocks to apply (empty when none were chosen). */
-  onConfirm: (toolMockIds: string[]) => void;
+  /**
+   * Whether to offer the choice between the published design and the
+   * unpublished edits. True only for a `modified` workflow shown to someone who
+   * may edit it — nobody else can see the edits, let alone run them.
+   */
+  canChooseDesign: boolean;
+  /** Called with the operator's choices when Run is clicked. */
+  onConfirm: (choice: RunWorkflowChoice) => void;
   /** Called on Cancel, Escape, or a backdrop click. */
   onCancel: () => void;
 }
@@ -44,7 +64,13 @@ function toolKey(mcpServerId: string, toolName: string): string {
 }
 
 /**
- * Ask the operator to confirm a run, offering a draft workflow's tool mocks.
+ * Ask the operator to confirm a run, and let them shape it.
+ *
+ * A `modified` workflow holds two designs — the one published, and the edits
+ * since — and a developer picks between them here. The published design is
+ * preselected because it is the one everyone else already gets: running the
+ * edits is a test, and is treated as one, which is why choosing it reveals the
+ * mock picker exactly as a draft workflow does.
  *
  * The mock list and the workflow's task templates are fetched when the dialog
  * opens rather than with the page: a run is a deliberate action and neither is
@@ -53,24 +79,35 @@ function toolKey(mcpServerId: string, toolName: string): string {
  * that stands in for a tool one of the workflow's tasks binds, or a mock of a
  * built-in tool, which every run can reach. A mock for any other tool would
  * never fire in the run, so it is left out. If the templates cannot be loaded
- * the list falls back to every mock rather than hiding all of them. Selections
- * reset every time the dialog opens — a stubbed run is an explicit choice,
- * never a sticky setting that could silently carry into the next run.
+ * the list falls back to every mock rather than hiding all of them. Both
+ * choices reset every time the dialog opens — a stubbed run, or a run of
+ * unpublished work, is an explicit decision, never a sticky setting that could
+ * silently carry into the next run.
  */
 export function RunWorkflowDialog({
   open,
   workflowId,
   workflowName,
   isDraft,
+  canChooseDesign,
   onConfirm,
   onCancel,
 }: RunWorkflowDialogProps) {
   const [mocks, setMocks] = useState<McpToolMock[] | null>(null);
   const [applicable, setApplicable] = useState<McpToolMock[] | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [designSource, setDesignSource] = useState<WorkflowDesignSource>("published");
+
+  // A run of unpublished work is a draft run, so it stubs tools like one.
+  const isDraftRun = isDraft || designSource === "live";
 
   useEffect(() => {
-    if (!open || !isDraft) return;
+    if (!open) return;
+    setDesignSource("published");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !isDraftRun) return;
     setSelected([]);
     setMocks(null);
     setApplicable(null);
@@ -114,7 +151,7 @@ export function RunWorkflowDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, isDraft, workflowId]);
+  }, [open, isDraftRun, workflowId]);
 
   function toggle(id: string) {
     setSelected((current) =>
@@ -129,54 +166,82 @@ export function RunWorkflowDialog({
       panelId="run-workflow-dialog"
       title="Run Workflow"
       description={`Run "${workflowName}"? This starts a new execution.`}
-      size={isDraft ? "md" : "sm"}
+      size={isDraftRun || canChooseDesign ? "md" : "sm"}
       footer={
         <>
           <Button variant="ghost" onClick={onCancel}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => onConfirm(isDraft ? selected : [])}>
+          <Button
+            variant="primary"
+            onClick={() => onConfirm({ designSource, toolMockIds: isDraftRun ? selected : [] })}
+          >
             Run
           </Button>
         </>
       }
     >
-      {isDraft && (
-        <section className="flex flex-col gap-2">
-          <h3 className="text-label-caps text-on-surface-variant">Mock tools</h3>
-          <p className="text-sm text-on-surface-variant">
-            A stubbed tool is not called: it returns the mock&apos;s configured result and has no
-            effect. Leave a tool unchecked to exercise it for real. Only mocks for a tool this
-            workflow&apos;s tasks use, and mocks of a built-in tool, are listed.
-          </p>
-          {applicable === null || mocks === null ? (
-            <div className="flex justify-center py-4">
-              <Spinner size="sm" />
+      <div className="flex flex-col gap-5">
+        {canChooseDesign && (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-label-caps text-on-surface-variant">Which design to run</h3>
+            <p className="text-sm text-on-surface-variant">
+              This workflow has edits that have not been published. Everyone else still gets the
+              published version, so that is what a real request runs.
+            </p>
+            <div className="flex flex-col">
+              <Radio
+                name="run-workflow-design"
+                label="Published version — a real request"
+                checked={designSource === "published"}
+                onChange={() => setDesignSource("published")}
+              />
+              <Radio
+                name="run-workflow-design"
+                label="Unpublished edits — a test run"
+                checked={designSource === "live"}
+                onChange={() => setDesignSource("live")}
+              />
             </div>
-          ) : applicable.length === 0 ? (
-            <EmptyState
-              icon={FlaskConical}
-              compact
-              description={
-                mocks.length === 0
-                  ? "No tool mocks are registered yet."
-                  : "No registered tool mock targets a tool this workflow uses."
-              }
-            />
-          ) : (
-            <div className="flex max-h-64 flex-col overflow-y-auto">
-              {applicable.map((mock) => (
-                <Checkbox
-                  key={mock.id}
-                  label={mockLabel(mock)}
-                  checked={selected.includes(mock.id)}
-                  onChange={() => toggle(mock.id)}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+          </section>
+        )}
+        {isDraftRun && (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-label-caps text-on-surface-variant">Mock tools</h3>
+            <p className="text-sm text-on-surface-variant">
+              A stubbed tool is not called: it returns the mock&apos;s configured result and has no
+              effect. Leave a tool unchecked to exercise it for real. Only mocks for a tool this
+              workflow&apos;s tasks use, and mocks of a built-in tool, are listed.
+            </p>
+            {applicable === null || mocks === null ? (
+              <div className="flex justify-center py-4">
+                <Spinner size="sm" />
+              </div>
+            ) : applicable.length === 0 ? (
+              <EmptyState
+                icon={FlaskConical}
+                compact
+                description={
+                  mocks.length === 0
+                    ? "No tool mocks are registered yet."
+                    : "No registered tool mock targets a tool this workflow uses."
+                }
+              />
+            ) : (
+              <div className="flex max-h-64 flex-col overflow-y-auto">
+                {applicable.map((mock) => (
+                  <Checkbox
+                    key={mock.id}
+                    label={mockLabel(mock)}
+                    checked={selected.includes(mock.id)}
+                    onChange={() => toggle(mock.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+      </div>
     </Dialog>
   );
 }

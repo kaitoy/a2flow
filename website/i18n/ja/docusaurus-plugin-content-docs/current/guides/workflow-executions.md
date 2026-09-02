@@ -18,7 +18,7 @@ sidebar_position: 4
 
 **Mocked** は[ツールモック](./tool-mocks.md)でいずれかのツールを差し替えた実行を示します。
 
-[**Columns** メニュー](./admin-ui.md#choosing-columns)には、既定で隠れている列がもう 2 つあります。**Workflow** はその実行のもとになったワークフローを今の名前で示し、そこへリンクします。行そのものの名前は実行開始時のスナップショットで固定なので、そのワークフローが今どう呼ばれているかはこの列で分かります。**Draft** は `draft` のままのワークフローから始めた実行 — [公開前のテスト実行](./workflows.md#running-a-workflow)で、[運用メトリクス](../operations/metrics.md)には数えられません — にチェックマークを付け、Yes/No のフィルターとしても働くので隠せます。
+[**Columns** メニュー](./admin-ui.md#choosing-columns)には、既定で隠れている列がもう 2 つあります。**Workflow** はその実行のもとになったワークフローを今の名前で示し、そこへリンクします。行そのものの名前は実行開始時のスナップショットで固定なので、そのワークフローが今どう呼ばれているかはこの列で分かります。**Draft** は[テスト実行](./workflows.md#running-a-workflow) — `draft` のままのワークフローから始めた実行か、`modified` のワークフローの[未公開の編集内容](./workflows.md#trying-the-edits-out)を実行したもの — にチェックマークを付けます。どちらも誰も承認していない設計を動かしたものなので、[運用メトリクス](../operations/metrics.md)には数えられません。この列は Yes/No のフィルターとしても働くので隠せます。
 
 ## 実行のステータス {#run-status}
 

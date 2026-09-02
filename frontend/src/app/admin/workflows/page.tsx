@@ -13,7 +13,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
-import { RunWorkflowDialog } from "@/components/admin/run-workflow-dialog";
+import { type RunWorkflowChoice, RunWorkflowDialog } from "@/components/admin/run-workflow-dialog";
 import { tagsColumn } from "@/components/admin/tag-columns";
 import { tenantColumn } from "@/components/admin/tenant-columns";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -41,8 +41,8 @@ import { Role, useHasRole } from "@/lib/roles";
 import {
   canExecuteWorkflow,
   formatWorkflowStatusLabel,
+  visibleWorkflowStatuses,
   WORKFLOW_STATUS_DOT_CLASS,
-  WORKFLOW_STATUSES,
   type WorkflowExecutePermissions,
 } from "@/lib/workflow-status";
 
@@ -80,7 +80,7 @@ function StatusCell({ workflow }: { workflow: Workflow }) {
 function buildColumns(
   skillMap: Map<string, string>,
   names: Map<string, string>,
-  onRun: (id: string, name: string, isDraft: boolean) => void,
+  onRun: (id: string, name: string, isDraft: boolean, isModified: boolean) => void,
   runningId: string | null,
   onDelete: (id: string, name: string) => void,
   onOpenDesign: (id: string) => void,
@@ -127,7 +127,7 @@ function buildColumns(
       sortField: "status",
       filterField: "status",
       filterOp: "eq",
-      filterOptions: WORKFLOW_STATUSES.map((s) => ({
+      filterOptions: visibleWorkflowStatuses(permissions.canEdit).map((s) => ({
         label: formatWorkflowStatusLabel(s),
         value: s,
       })),
@@ -174,7 +174,7 @@ function buildColumns(
             <ActionIconButton
               icon={runningId === w.id ? Loader2 : Play}
               label="Run"
-              onClick={() => onRun(w.id, w.name, w.status === "draft")}
+              onClick={() => onRun(w.id, w.name, w.status === "draft", w.status === "modified")}
               // Published workflows are executable by anyone with Run access;
               // drafts are executable only by someone who can also edit
               // workflows (developer/super_admin), for pre-publish testing.
@@ -220,6 +220,7 @@ export default function WorkflowsPage() {
     id: string;
     name: string;
     isDraft: boolean;
+    isModified: boolean;
   } | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
 
@@ -261,11 +262,11 @@ export default function WorkflowsPage() {
     }
   }
 
-  function handleRun(id: string, name: string, isDraft: boolean) {
-    setRunTarget({ id, name, isDraft });
+  function handleRun(id: string, name: string, isDraft: boolean, isModified: boolean) {
+    setRunTarget({ id, name, isDraft, isModified });
   }
 
-  async function executeRun(toolMockIds: string[]) {
+  async function executeRun({ designSource, toolMockIds }: RunWorkflowChoice) {
     if (!runTarget) return;
     const id = runTarget.id;
     setRunTarget(null);
@@ -273,7 +274,7 @@ export default function WorkflowsPage() {
     try {
       // `toolMockIds` is only ever non-empty for a draft run — the dialog hides
       // the tool-mock picker otherwise and hands back an empty list.
-      const workflowExecution = await executeWorkflow(id, { toolMockIds });
+      const workflowExecution = await executeWorkflow(id, { designSource, toolMockIds });
       router.push(`/workflow-executions/${workflowExecution.id}/session`);
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -354,6 +355,9 @@ export default function WorkflowsPage() {
         workflowId={runTarget?.id ?? ""}
         workflowName={runTarget?.name ?? ""}
         isDraft={runTarget?.isDraft ?? false}
+        // Only a developer ever sees `modified` — for everyone else the backend
+        // reports the workflow as `published` — so the status alone is the gate.
+        canChooseDesign={(runTarget?.isModified ?? false) && canEdit}
         onConfirm={executeRun}
         onCancel={() => setRunTarget(null)}
       />

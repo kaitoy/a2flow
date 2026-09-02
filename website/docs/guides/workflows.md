@@ -42,6 +42,8 @@ stateDiagram-v2
 | `published` | The design is frozen and executable. | Anyone holding `requester` or above |
 | `modified` | Published once, then edited. Runs still use the published version. | Same as `published` |
 
+`modified` is a status only a **Developer** or **Super Admin** ever sees. To everyone else the workflow reads as `published`, showing the name, description and task templates recorded at the last publish — the unpublished edits are not theirs to see, and the design they *can* see is the one their run would execute.
+
 ## The screens
 
 | Screen | How to get there | What you do there |
@@ -107,12 +109,15 @@ Editing a workflow after it has been published does not silently change what run
 
 | While `modified` | |
 |---|---|
-| What runs use | The **last published version** — its name, effective description, and templates — not the edits |
+| What runs use | The **last published version** — its name, effective description, and templates — not the edits, unless a Developer asks for them (see [Trying the edits out](#trying-the-edits-out)) |
 | Who can run it | The same people as while `published`; the Run button is not gated differently |
-| **Publish** | Promotes the edits into future runs |
+| Who sees the edits | Developer and Super Admin only |
+| **Publish** | Promotes the edits into future runs, and into what everyone else sees |
 | **Discard changes** | Throws the edits away: the templates are rewritten from the published version, the name is restored, the published version's description is written back, and the workflow returns to `published` |
 
 **Discard changes** is the undo icon in the detail page's status bar, next to Publish. Discarding a workflow that has no unpublished changes does nothing but report as much.
+
+Everyone without the Developer role is served the published version instead, throughout: the workflow's name and description on the list and detail pages, its **Task Templates** screens, and even what a name search in the list matches. Its status reads `published`, and a task template added since the last publish is simply not there for them. So an unfinished redesign never confuses the people who only need to run the workflow — and what they see always matches what their run would do.
 
 ## Deactivating a workflow
 
@@ -129,14 +134,25 @@ flowchart LR
   X --> C["Workflow session<br/>the chat the run happens in"]
 ```
 
-For a **draft** workflow the Run dialog additionally lists, under **Mock tools**, the [tool mocks](./tool-mocks.md) for a tool one of the workflow's tasks uses, plus every mock of a built-in tool; checking one stubs that tool for this run, so a pre-publish test can be repeated without the tool's side effects. The dialog offers no mocks for a published workflow, and asking for one anyway is refused — a published run that quietly did nothing would be worse than no run at all.
+For a **test run** the Run dialog additionally lists, under **Mock tools**, the [tool mocks](./tool-mocks.md) for a tool one of the workflow's tasks uses, plus every mock of a built-in tool; checking one stubs that tool for this run, so a pre-publish test can be repeated without the tool's side effects. A test run means a `draft` workflow, or the unpublished edits of a `modified` one (below). The dialog offers no mocks otherwise, and asking for one anyway is refused — a run that looked real and quietly did nothing would be worse than no run at all.
+
+### Trying the edits out {#trying-the-edits-out}
+
+While a workflow is `modified` it holds two designs, so the Run dialog asks a **Developer** which one to run:
+
+| Choice | What it runs | How it is recorded |
+|---|---|---|
+| **Published version** | The design captured at the last publish — what everyone else gets | A real request |
+| **Unpublished edits** | The design as it stands in the editor right now | A **test run**: it can stub tools, and it is left out of the [operations metrics](../operations/metrics.md) |
+
+The published version is preselected, because that is what a real request means here. Choosing the edits is how you rehearse a redesign end to end before committing to it — and it is a Developer action, since nobody else can see those edits in the first place. The choice does not appear for a `draft` or `published` workflow: there is only one design to run.
 
 Everything the run needs is copied onto the execution when it starts, so later edits never reach back into it:
 
 | Copied onto the run | Taken from |
 |---|---|
-| Name and effective description | The last published version (the edited rows, for a workflow that was still `draft`) |
-| Task templates, as `pending` tasks with their dependencies and tool bindings | The same version |
+| Name and effective description | The last published version — or the editor's current state, for a `draft` workflow, or when a Developer chose the unpublished edits |
+| Task templates, as `pending` tasks with their dependencies and tool bindings | The same design |
 | The agent skill revision the run is pinned to | The skill's published revision |
 | The chosen tool mocks, by value | The mocks as they read at that moment |
 

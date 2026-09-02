@@ -82,6 +82,39 @@ class WorkflowStatus(StrEnum):
     until the workflow is published again — or the edits are dropped through
     ``POST /workflows/{id}/discard-changes``, which restores the snapshot and
     returns the workflow to ``published``.
+
+    The unpublished edits are visible only to a ``developer`` (or
+    ``super_admin``). Every other caller reads the workflow, its description,
+    and its task templates from the published snapshot, and sees this status
+    reported as ``published`` — see
+    :meth:`services.workflow.WorkflowService.to_read`. A ``developer`` may run
+    the edited design instead of the snapshot by asking for
+    :attr:`WorkflowDesignSource.live`, which produces a draft run.
+    """
+
+
+class WorkflowDesignSource(StrEnum):
+    """Which design a run of a ``modified`` workflow should execute.
+
+    Only meaningful for a ``modified`` workflow, where the live task templates
+    have drifted from the snapshot taken at publish time. Asking for
+    :attr:`live` on any other status is rejected, because there is no drift to
+    choose between.
+    """
+
+    published = "published"
+    """Run the snapshot taken at publish time — the design that was approved.
+
+    The default, and the only choice available to a non-``developer``: a run
+    started this way is a real request, exactly as before.
+    """
+
+    live = "live"
+    """Run the edited, not-yet-published design, as a draft run.
+
+    Restricted to a ``developer`` (or ``super_admin``). The run is recorded
+    with ``is_draft=True`` — so it accepts tool mocks and stays out of the
+    metrics — because it exercises a design nobody has approved yet.
     """
 
 
@@ -245,9 +278,16 @@ class ExecuteWorkflowRequest(SQLModel):
 
     ``tool_mock_ids`` names the :class:`models.mcp_tool_mock.MCPToolMock` records
     the run should apply, stubbing those tools instead of calling them. It is
-    accepted only while the workflow is still ``draft`` -- mocking a published
-    workflow's tools would produce a run that looks real and did nothing.
+    accepted only for a **draft run** -- a ``draft`` workflow, or a ``modified``
+    one run with ``design_source`` set to ``live`` -- because mocking the tools
+    of a design people actually rely on would produce a run that looks real and
+    did nothing.
+
+    ``design_source`` picks which design a ``modified`` workflow runs; see
+    :class:`WorkflowDesignSource`. It defaults to the published snapshot, so a
+    body-less POST behaves exactly as it always has.
     """
 
     model_config = _alias_config
     tool_mock_ids: list[str] = Field(default_factory=list)
+    design_source: WorkflowDesignSource = WorkflowDesignSource.published

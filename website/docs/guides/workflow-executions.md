@@ -18,7 +18,7 @@ Open **Workflow Executions** in the admin sidebar to browse them. Unlike the oth
 
 **Mocked** marks a run that stubbed any of its tools with a [tool mock](./tool-mocks.md).
 
-The [**Columns** menu](./admin-ui.md#choosing-columns) offers two more columns that start hidden. **Workflow** shows the run's parent workflow under its current name and links to it — each row's own name is a snapshot fixed when the run started, so this column is how you see what that workflow is called today. **Draft** shows a checkmark for a run started from a workflow that was still `draft` — a [pre-publish test run](./workflows.md#running-a-workflow), left out of the [operations metrics](../operations/metrics.md) — and works as a Yes/No filter to hide them.
+The [**Columns** menu](./admin-ui.md#choosing-columns) offers two more columns that start hidden. **Workflow** shows the run's parent workflow under its current name and links to it — each row's own name is a snapshot fixed when the run started, so this column is how you see what that workflow is called today. **Draft** shows a checkmark for a [test run](./workflows.md#running-a-workflow) — one started from a workflow that was still `draft`, or from the [unpublished edits](./workflows.md#trying-the-edits-out) of a `modified` one. Either way it exercised a design nobody had approved, so it is left out of the [operations metrics](../operations/metrics.md); the column works as a Yes/No filter to hide them.
 
 ## Run status
 

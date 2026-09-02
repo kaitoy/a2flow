@@ -126,6 +126,22 @@ cd frontend && pnpm test          # vitest + Testing Library + MSW on happy-dom
 
 Both suites also run from the pre-commit hook, gated so a backend-only or frontend-only commit skips the other side. See [backend/README.md](backend/README.md#testing) and [frontend/README.md](frontend/README.md#testing) for the options each takes.
 
+The backend suite runs on in-memory SQLite. One module —
+`backend/tests/test_workflow_published_version_repo.py`, covering the only query
+that reads *into* a JSON column and therefore has a PostgreSQL and a SQLite
+spelling — runs each of its tests against both dialects. The PostgreSQL half is
+skipped unless `A2FLOW_TEST_PG_URL` names a reachable server; set it to exercise
+the `jsonb` path:
+
+```bash
+cd backend && A2FLOW_TEST_PG_URL=postgresql+asyncpg://user:pass@localhost/postgres uv run pytest
+```
+
+Each run creates a throwaway schema of its own and drops it afterwards, so it
+never touches an existing database's tables. Add the variable to CI when a
+PostgreSQL service is available there; without it those tests report as skipped
+rather than passing silently.
+
 ### API contract (OpenAPI → Zod)
 
 The REST endpoints are described by the FastAPI app and exported as OpenAPI 3.1. The frontend consumes that spec to generate Zod schemas and TypeScript types, which are then used for runtime response validation.

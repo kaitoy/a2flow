@@ -10,15 +10,15 @@ Running a workflow does not point a run at the workflow. It **copies** the publi
 ```mermaid
 flowchart LR
   W["Workflow<br/>the published version"] -->|"Run"| X["Workflow execution<br/>the snapshot"]
-  MK["Chosen tool mocks<br/>draft runs only"] -->|"copied by value"| X
+  MK["Chosen tool mocks<br/>test runs only"] -->|"copied by value"| X
   X --> C["Workflow session<br/>the chat the run happens in"]
   C --> T["Tasks<br/>all pending at the start"]
 ```
 
 | Copied onto the run | Taken from |
 |---|---|
-| Name and effective description | The last published version — or the current rows, for a workflow still in `draft` |
-| Tasks, all `pending`, with their dependencies and tool bindings | The same version's task templates |
+| Name and effective description | The last published version — or the current rows, for a workflow still in `draft`, or when a Developer chose to run a `modified` workflow's [unpublished edits](../guides/workflows.md#trying-the-edits-out) |
+| Tasks, all `pending`, with their dependencies and tool bindings | The same design's task templates |
 | The agent skill revision the run follows | The skill's published revision at that moment |
 | The chosen [tool mocks](./mcp-proxy.md#tool-mocks-and-dry-runs), by value | The mocks as they read at that moment |
 

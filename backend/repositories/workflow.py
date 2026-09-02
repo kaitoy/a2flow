@@ -3,7 +3,9 @@
 from collections.abc import Sequence
 from typing import Protocol
 
+from sqlalchemy import and_, case, null
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import aliased
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -15,6 +17,7 @@ from models.workflow import (
     WorkflowStatus,
     WorkflowUpdate,
 )
+from models.workflow_published_version import WorkflowPublishedVersion
 from repositories._integrity import commit_or_translate_user_fk, is_foreign_key_error
 from repositories.agent_skill import AgentSkillRepository
 from repositories.exceptions import (
@@ -22,7 +25,13 @@ from repositories.exceptions import (
     NotFoundError,
     UniqueViolationError,
 )
-from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
+from repositories.query import (
+    ColumnOverride,
+    FilterSpec,
+    SortSpec,
+    apply_filters,
+    apply_sort,
+)
 from repositories.tags import TagLinks
 
 #: Alias for ``list[str]``: the ``list`` method below shadows the builtin
@@ -45,6 +54,7 @@ class WorkflowRepository(Protocol):
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
         tag_ids: Sequence[str] = (),
+        published_view: bool = False,
     ) -> list[Workflow]: ...
 
     async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]: ...
@@ -156,28 +166,100 @@ class SqlWorkflowRepository:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
         tag_ids: Sequence[str] = (),
+        published_view: bool = False,
     ) -> list[Workflow]:
         """Return a page of Workflows, defaulting to ``created_at`` descending.
 
         ``tag_ids`` narrows the page to workflows carrying **every** listed
         tag. It is applied before the page window, so paging stays consistent
         with the filter.
+
+        ``published_view`` filters and sorts on what a non-``developer`` caller
+        will actually be shown -- see :meth:`_published_view_columns`. The rows
+        themselves come back unchanged either way; substituting the displayed
+        values is
+        :func:`models.workflow_published_version.published_workflow_read`'s job,
+        and the two must agree.
         """
         stmt = select(Workflow)
         if self._tenant_id is not None:
             stmt = stmt.where(Workflow.tenant_id == self._tenant_id)
         for clause in self._tags.filter_clauses(col(Workflow.id), tag_ids):
             stmt = stmt.where(clause)
-        stmt = apply_filters(stmt, Workflow, filters, readable=WorkflowRead)
+        columns = None
+        if published_view:
+            version = aliased(WorkflowPublishedVersion)
+            stmt = stmt.outerjoin(version, col(Workflow.id) == version.workflow_id)
+            columns = self._published_view_columns(version)
+        stmt = apply_filters(
+            stmt, Workflow, filters, readable=WorkflowRead, columns=columns
+        )
         stmt = apply_sort(
             stmt,
             Workflow,
             sort,
             default=[col(Workflow.created_at).desc()],
             readable=WorkflowRead,
+            columns=columns,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
+
+    @staticmethod
+    def _published_view_columns(
+        version: type[WorkflowPublishedVersion],
+    ) -> dict[str, ColumnOverride]:
+        """Return the expressions a non-``developer`` caller queries workflows by.
+
+        While a workflow is ``modified``, its live name, description, and
+        status describe edits that caller is not allowed to see, so filtering
+        and sorting read the joined snapshot instead and report the status as
+        ``published``. Every other status already equals its snapshot by
+        construction and passes through, as does a ``modified`` workflow whose
+        snapshot is missing — which should not happen, but is shown rather than
+        blanked, exactly as the projection below does it.
+
+        This is the SQL half of
+        :func:`models.workflow_published_version.published_workflow_read`;
+        change one and the other must change with it, or a client will get a
+        page that does not match what it searched for.
+
+        Args:
+            version: The aliased snapshot table joined onto ``workflows``.
+
+        Returns:
+            Per-field overrides keyed by ``Workflow`` attribute name.
+        """
+        published = and_(
+            col(Workflow.status) == WorkflowStatus.modified,
+            col(version.id).is_not(None),
+        )
+        return {
+            "name": ColumnOverride(
+                expression=case(
+                    (published, col(version.name)),
+                    else_=col(Workflow.name),
+                )
+            ),
+            "description": ColumnOverride(
+                expression=case(
+                    (published, col(version.description)),
+                    else_=col(Workflow.description),
+                )
+            ),
+            "generated_description": ColumnOverride(
+                expression=case(
+                    (published, null()),
+                    else_=col(Workflow.generated_description),
+                )
+            ),
+            "status": ColumnOverride(
+                expression=case(
+                    (published, WorkflowStatus.published.value),
+                    else_=col(Workflow.status),
+                )
+            ),
+        }
 
     async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]:
         """Return every skill revision that workflows of this skill pin.

@@ -64,11 +64,15 @@ class Role(StrEnum):
     admin = "admin"
     #: Secrets CRUD, MCP server CRUD, workflow CRUD, and agent-skill CRUD.
     #: Also grants workflow execution (``POST /workflows/{id}/execute``),
-    #: including on ``draft`` workflows for pre-publish testing — see
-    #: :meth:`services.workflow.WorkflowService.execute`.
+    #: including on ``draft`` workflows and on a ``modified`` workflow's
+    #: unpublished edits, for pre-publish testing — see
+    #: :meth:`services.workflow.WorkflowService.execute`. It is likewise the
+    #: role that can *read* those unpublished edits at all: every other role
+    #: sees a ``modified`` workflow as its last published version.
     developer = "developer"
-    #: Workflow execution (``POST /workflows/{id}/execute``), restricted to
-    #: ``published`` workflows.
+    #: Workflow execution (``POST /workflows/{id}/execute``), restricted to the
+    #: published design — a ``modified`` workflow runs, and reads as, the
+    #: snapshot taken when it was last published.
     requester = "requester"
     #: Eligibility as a designated approver of workflow approvals.
     approver = "approver"

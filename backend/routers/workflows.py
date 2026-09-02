@@ -47,7 +47,12 @@ from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_
 from models.response import ApiResponse
 from models.tag import TagIdsUpdate
 from models.user import Role
-from models.workflow import ExecuteWorkflowRequest, WorkflowRead, WorkflowUpdate
+from models.workflow import (
+    ExecuteWorkflowRequest,
+    WorkflowDesignSource,
+    WorkflowRead,
+    WorkflowUpdate,
+)
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task_template import WorkflowTaskTemplateRead
 from repositories.exceptions import SessionRunInProgressError
@@ -88,7 +93,9 @@ async def list_workflows(
         tag_ids=tags.tag_ids,
         caller_roles=caller_roles,
     )
-    return ApiResponse(meta=meta, data=await service.to_read_many(items))
+    return ApiResponse(
+        meta=meta, data=await service.to_read_many(items, caller_roles=caller_roles)
+    )
 
 
 @router.get("/{workflow_id}", response_model=ApiResponse[WorkflowRead])
@@ -99,9 +106,16 @@ async def get_workflow(
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowRead]:
     """Return a Workflow, raising HTTP 404 if it is a ``draft`` the caller
-    may not see (see ``WorkflowService.get_for_read``)."""
+    may not see (see ``WorkflowService.get_for_read``).
+
+    A caller who is not a ``developer`` reads a ``modified`` workflow through
+    its published snapshot and sees its status as ``published`` — see
+    ``WorkflowService.to_read``.
+    """
     workflow = await service.get_for_read(workflow_id, caller_roles=caller_roles)
-    return ApiResponse(meta=meta, data=await service.to_read(workflow))
+    return ApiResponse(
+        meta=meta, data=await service.to_read(workflow, caller_roles=caller_roles)
+    )
 
 
 @router.get(
@@ -114,6 +128,7 @@ async def list_workflow_task_templates(
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[WorkflowTaskTemplateRead]]:
     """Return the task templates belonging to the given Workflow.
@@ -121,6 +136,10 @@ async def list_workflow_task_templates(
     Raises HTTP 404 (``NotFoundError``) if the workflow does not exist, so
     callers can distinguish "no such workflow" from "workflow has no
     templates".
+
+    A caller who is not a ``developer`` is served the templates recorded in the
+    workflow's published snapshot whenever it is ``modified``, so unpublished
+    edits stay inside the design session.
     """
     items = await service.list_for_workflow(
         workflow_id,
@@ -128,6 +147,7 @@ async def list_workflow_task_templates(
         offset=pagination.offset,
         sort=sort.sort,
         filters=filters.filters,
+        caller_roles=caller_roles,
     )
     return ApiResponse(meta=meta, data=items)
 
@@ -274,6 +294,7 @@ async def update_workflow(
     body: WorkflowUpdate,
     service: WorkflowServiceDep,
     caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowRead]:
     """Apply a partial update to a Workflow.
@@ -283,7 +304,9 @@ async def update_workflow(
     caller who reaches this route.
     """
     workflow = await service.update(workflow_id, body, caller=caller)
-    return ApiResponse(meta=meta, data=await service.to_read(workflow))
+    return ApiResponse(
+        meta=meta, data=await service.to_read(workflow, caller_roles=caller_roles)
+    )
 
 
 @router.delete(
@@ -354,6 +377,7 @@ async def discard_workflow_changes(
     workflow_id: str,
     service: WorkflowServiceDep,
     user_id: CurrentUserIdDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowRead]:
     """Drop a modified workflow's edits, restoring its last published version.
@@ -363,7 +387,9 @@ async def discard_workflow_changes(
     (``WORKFLOW_NOT_MODIFIED``) when the workflow has no unpublished changes.
     """
     workflow = await service.discard_changes(workflow_id, user_id=user_id)
-    return ApiResponse(meta=meta, data=await service.to_read(workflow))
+    return ApiResponse(
+        meta=meta, data=await service.to_read(workflow, caller_roles=caller_roles)
+    )
 
 
 @router.post(
@@ -375,6 +401,7 @@ async def deactivate_workflow(
     workflow_id: str,
     service: WorkflowServiceDep,
     user_id: CurrentUserIdDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowRead]:
     """Deactivate a workflow, returning it to draft.
@@ -383,7 +410,9 @@ async def deactivate_workflow(
     currently ``published`` or ``modified``.
     """
     workflow = await service.deactivate(workflow_id, user_id=user_id)
-    return ApiResponse(meta=meta, data=await service.to_read(workflow))
+    return ApiResponse(
+        meta=meta, data=await service.to_read(workflow, caller_roles=caller_roles)
+    )
 
 
 @router.post(
@@ -409,9 +438,15 @@ async def execute_workflow(
     session is created lazily on the first agent call, which starts executing
     immediately.
 
+    A ``modified`` workflow runs its published snapshot unless the body sets
+    ``designSource`` to ``live``, which runs the unpublished edits as a draft
+    run instead. That is restricted to a ``developer`` (HTTP 403 ``FORBIDDEN``
+    otherwise) and to a ``modified`` workflow (HTTP 409
+    ``WORKFLOW_NOT_RUNNABLE`` otherwise).
+
     The body is optional. When it names ``toolMockIds``, the run stubs those
-    tools instead of calling them; that is accepted only for a ``draft``
-    workflow (HTTP 409 ``WORKFLOW_NOT_RUNNABLE`` otherwise) and HTTP 422
+    tools instead of calling them; that is accepted only for a draft run
+    (HTTP 409 ``WORKFLOW_NOT_RUNNABLE`` otherwise) and HTTP 422
     ``FOREIGN_KEY_VIOLATION`` when an id names no mock.
     """
     execution = await service.execute(
@@ -419,6 +454,9 @@ async def execute_workflow(
         caller=caller,
         caller_roles=caller_roles,
         tool_mock_ids=body.tool_mock_ids if body is not None else (),
+        design_source=(
+            body.design_source if body is not None else WorkflowDesignSource.published
+        ),
     )
     return ApiResponse(meta=meta, data=execution)
 
@@ -432,7 +470,10 @@ async def set_workflow_tags(
     workflow_id: str,
     body: TagIdsUpdate,
     service: WorkflowServiceDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowRead]:
     workflow = await service.set_tags(workflow_id, body.tag_ids)
-    return ApiResponse(meta=meta, data=await service.to_read(workflow))
+    return ApiResponse(
+        meta=meta, data=await service.to_read(workflow, caller_roles=caller_roles)
+    )

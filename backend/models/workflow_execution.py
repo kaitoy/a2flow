@@ -101,11 +101,15 @@ class WorkflowExecution(WorkflowExecutionCreate, TenantScoped, BaseEntity, table
 
     ``is_draft`` is server-managed the same way, but set once at creation rather
     than stamped later: :meth:`services.workflow.WorkflowService.execute` passes
-    ``True`` when the workflow is still :attr:`models.workflow.WorkflowStatus.draft`
-    — a ``developer``/``super_admin`` pre-publish test run — and never updates it
-    afterwards, so publishing the workflow does not reclassify runs that already
-    happened. Draft runs are omitted from every query in ``repositories/metrics.py``
-    so throwaway test data does not skew the operations metrics.
+    ``True`` for a run that executes a design nobody has approved — the workflow
+    is still :attr:`models.workflow.WorkflowStatus.draft`, or it is ``modified``
+    and a ``developer`` asked to run its unpublished edits
+    (:attr:`models.workflow.WorkflowDesignSource.live`). Either way it is a
+    ``developer``/``super_admin`` pre-publish test run, and the flag is never
+    updated afterwards, so publishing the workflow does not reclassify runs that
+    already happened. Draft runs are omitted from every query in
+    ``repositories/metrics.py`` so throwaway test data does not skew the
+    operations metrics.
 
     ``tool_mocks`` and ``tool_mock_calls`` drive the run's mocked tools (see
     :mod:`models.mcp_tool_mock`). ``tool_mocks`` is a **snapshot** of the

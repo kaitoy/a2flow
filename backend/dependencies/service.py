@@ -797,9 +797,10 @@ WorkflowTaskReadServiceDep = Annotated[
 def get_workflow_task_template_service(
     repo: WorkflowTaskTemplateRepositoryDep,
     workflows: WorkflowRepositoryDep,
+    versions: WorkflowPublishedVersionRepositoryDep,
 ) -> WorkflowTaskTemplateService:
     """Create a WorkflowTaskTemplateService wiring the template and workflow repositories."""
-    return WorkflowTaskTemplateService(repo, workflows)
+    return WorkflowTaskTemplateService(repo, workflows, versions)
 
 
 WorkflowTaskTemplateServiceDep = Annotated[
@@ -810,9 +811,10 @@ WorkflowTaskTemplateServiceDep = Annotated[
 def get_workflow_task_template_read_service(
     repo: WorkflowTaskTemplateReadRepositoryDep,
     workflows: WorkflowReadRepositoryDep,
+    versions: WorkflowPublishedVersionReadRepositoryDep,
 ) -> WorkflowTaskTemplateService:
     """Create a WorkflowTaskTemplateService for a read route, possibly across all tenants."""
-    return WorkflowTaskTemplateService(repo, workflows)
+    return WorkflowTaskTemplateService(repo, workflows, versions)
 
 
 WorkflowTaskTemplateReadServiceDep = Annotated[

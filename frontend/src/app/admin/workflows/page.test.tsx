@@ -262,7 +262,9 @@ describe("WorkflowsPage", () => {
     );
     await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
 
-    await waitFor(() => expect(body).toEqual({ toolMockIds: ["mock-1"] }));
+    await waitFor(() =>
+      expect(body).toEqual({ toolMockIds: ["mock-1"], designSource: "published" })
+    );
   });
 
   it("offers no tool mocks in the Run dialog of a published workflow", async () => {
@@ -275,7 +277,12 @@ describe("WorkflowsPage", () => {
     expect(within(dialog).queryByText("Mock tools")).not.toBeInTheDocument();
   });
 
-  it("enables Run for a requester on a modified workflow (its published version runs)", async () => {
+  /**
+   * Serve one `modified` workflow row. Only a developer can ever receive this
+   * status: the backend reports a modified workflow as `published` to everyone
+   * else, along with its last published name and design.
+   */
+  function mockModifiedWorkflowRow() {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows", () =>
         envelope([
@@ -297,9 +304,44 @@ describe("WorkflowsPage", () => {
         ])
       )
     );
-    render(<WorkflowsPage />, { preloadedState: authState(["requester"]) });
+  }
+
+  it("enables Run for a developer on a modified workflow", async () => {
+    mockModifiedWorkflowRow();
+    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-workflow"));
     expect(screen.getByRole("button", { name: "Run" })).not.toBeDisabled();
+  });
+
+  it("lets a developer run a modified workflow's unpublished edits", async () => {
+    mockModifiedWorkflowRow();
+    let body: unknown;
+    server.use(
+      http.post("http://localhost:8000/api/v1/workflows/:id/execute", async ({ request }) => {
+        body = await request.json();
+        return envelope({ id: "execution-1" }, 201);
+      })
+    );
+    const user = userEvent.setup();
+    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-workflow"));
+
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("radio", { name: /Unpublished edits/ }));
+    await user.click(within(dialog).getByRole("button", { name: /^run$/i }));
+
+    await waitFor(() => expect(body).toEqual({ toolMockIds: [], designSource: "live" }));
+  });
+
+  it("offers a requester no design choice, since they cannot see the edits", async () => {
+    const user = userEvent.setup();
+    render(<WorkflowsPage />, { preloadedState: authState(["requester"]) });
+    await waitFor(() => screen.getByText("my-workflow"));
+
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText("Which design to run")).not.toBeInTheDocument();
   });
 
   it("hides the Run button from a user without the requester or developer role", async () => {

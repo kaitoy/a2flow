@@ -15,7 +15,7 @@ from httpx import AsyncClient
 
 from dependencies import APP_NAME
 from infrastructure.agent import tenant_app_name
-from tests._envelope import assert_ok
+from tests._envelope import assert_err, assert_ok
 
 SKILL_BODY = {"name": "skill-a", "repo_url": "https://github.com/x/y"}
 GENERATE_BODY = {"name": "my-workflow", "prompt": "Do the thing"}
@@ -103,3 +103,117 @@ async def create_published_workflow(
     workflow = await generate_workflow(client, skill_id, **overrides)
     await add_template(client, workflow["id"])
     return await publish_workflow(client, workflow["id"])
+
+
+async def create_modified_workflow(
+    client: AsyncClient,
+    skill_id: str,
+    *,
+    published_title: str = "Published step",
+    edited_title: str = "Edited step",
+    edited_name: str = "Renamed",
+    **overrides: object,
+) -> Any:
+    """Publish a workflow, then edit it so it lands in ``modified``.
+
+    The published design has exactly one template titled ``published_title``;
+    the unpublished edits rename that template to ``edited_title``, rename the
+    workflow to ``edited_name``, and add a second template. That gives every
+    caller-visibility test a case where the live rows and the snapshot differ
+    in name, in title, and in count.
+
+    Args:
+        client: The API client to drive.
+        skill_id: The skill to generate the workflow from.
+        published_title: Title of the one template captured at publish time.
+        edited_title: Title that template is renamed to afterwards.
+        edited_name: Name the workflow is renamed to afterwards.
+        **overrides: Extra fields for the generation request.
+
+    Returns:
+        The workflow as it reads *to a developer* after the edits.
+    """
+    workflow = await generate_workflow(client, skill_id, **overrides)
+    template = await add_template(client, workflow["id"], title=published_title)
+    await publish_workflow(client, workflow["id"])
+    assert_ok(
+        await client.patch(
+            f"/api/v1/workflow-task-templates/{template['id']}",
+            json={"title": edited_title},
+        )
+    )
+    await add_template(client, workflow["id"], title="Brand new step")
+    return assert_ok(
+        await client.patch(
+            f"/api/v1/workflows/{workflow['id']}", json={"name": edited_name}
+        )
+    )
+
+
+async def execute_workflow(
+    client: AsyncClient,
+    workflow_id: str,
+    *,
+    headers: dict[str, str] | None = None,
+    **body: object,
+) -> Any:
+    """Execute a workflow, asserting it started.
+
+    Args:
+        client: The API client to drive.
+        workflow_id: The workflow to run.
+        headers: Extra request headers, e.g. to act as another role.
+        **body: Fields of the execute request, such as ``designSource``.
+
+    Returns:
+        The created execution.
+    """
+    return assert_ok(
+        await client.post(
+            f"/api/v1/workflows/{workflow_id}/execute",
+            json=body or None,
+            headers=headers,
+        ),
+        status=201,
+    )
+
+
+async def execute_workflow_err(
+    client: AsyncClient,
+    workflow_id: str,
+    *,
+    code: str,
+    status: int,
+    headers: dict[str, str] | None = None,
+    **body: object,
+) -> dict[str, Any]:
+    """Execute a workflow, asserting it was refused with the given error.
+
+    Args:
+        client: The API client to drive.
+        workflow_id: The workflow to run.
+        code: Expected error code in the envelope.
+        status: Expected HTTP status.
+        headers: Extra request headers, e.g. to act as another role.
+        **body: Fields of the execute request, such as ``designSource``.
+
+    Returns:
+        The error body, so callers can assert on its ``details``.
+    """
+    return assert_err(
+        await client.post(
+            f"/api/v1/workflows/{workflow_id}/execute",
+            json=body or None,
+            headers=headers,
+        ),
+        code,
+        status,
+    )
+
+
+async def execution_task_titles(client: AsyncClient, execution_id: str) -> list[str]:
+    """Return the titles of the tasks copied into a run, in list order."""
+    tasks = assert_ok(
+        await client.get(f"/api/v1/workflow-executions/{execution_id}/workflow-tasks")
+    )
+    return [t["title"] for t in tasks]

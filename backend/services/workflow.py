@@ -39,11 +39,19 @@ from infrastructure.tool_mocks import snapshot_mock
 from models.mcp_tool_mock import MCPToolMock
 from models.message_meta import MessageScope
 from models.user import Role, User, has_any_role
-from models.workflow import Workflow, WorkflowRead, WorkflowStatus, WorkflowUpdate
+from models.workflow import (
+    Workflow,
+    WorkflowDesignSource,
+    WorkflowRead,
+    WorkflowStatus,
+    WorkflowUpdate,
+)
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionCreate
 from models.workflow_published_version import (
+    WorkflowPublishedVersion,
     WorkflowPublishedVersionTemplate,
     parse_templates,
+    published_workflow_read,
     snapshot_template,
 )
 from models.workflow_task import WorkflowTaskCreate, WorkflowTaskStatus
@@ -515,6 +523,12 @@ class WorkflowService:
         ``UserService.list``'s tenant-scoping filter
         (``services/user.py``).
 
+        The same caller is also served the published view (see
+        :meth:`to_read`), so the query is asked to filter and sort on the
+        snapshot's values rather than the live row's. Without that a client
+        could search the name of a ``modified`` workflow it is not allowed to
+        read, and would get a page whose contents did not match what it typed.
+
         Args:
             limit: Maximum number of records to return.
             offset: Number of records to skip.
@@ -533,32 +547,96 @@ class WorkflowService:
                 FilterSpec(field="status", op="ne", value=WorkflowStatus.draft.value),
             )
         return await self._workflows.list(
-            limit=limit, offset=offset, sort=sort, filters=filters, tag_ids=tag_ids
+            limit=limit,
+            offset=offset,
+            sort=sort,
+            filters=filters,
+            tag_ids=tag_ids,
+            published_view=self._published_view(caller_roles),
         )
 
-    async def to_read(self, workflow: Workflow) -> WorkflowRead:
+    @staticmethod
+    def _published_view(caller_roles: Collection[str]) -> bool:
+        """Return whether this caller reads workflows through the published view.
+
+        Args:
+            caller_roles: The caller's effective roles.
+
+        Returns:
+            ``True`` for everyone but a ``developer`` (and, via the
+            ``super_admin`` bypass, a ``super_admin``).
+        """
+        return not has_any_role(caller_roles, Role.developer)
+
+    async def _versions_for(
+        self, workflows: Sequence[Workflow], *, caller_roles: Collection[str]
+    ) -> dict[str, WorkflowPublishedVersion]:
+        """Read the snapshots needed to project these workflows for this caller.
+
+        Args:
+            workflows: The records about to be projected.
+            caller_roles: The caller's effective roles.
+
+        Returns:
+            The snapshots of the ``modified`` workflows among ``workflows``,
+            keyed by workflow id -- empty when the caller reads the live rows.
+        """
+        if not self._published_view(caller_roles):
+            return {}
+        ids = [x.id for x in workflows if x.status is WorkflowStatus.modified]
+        return await self._versions.get_many(ids)
+
+    async def to_read(
+        self, workflow: Workflow, *, caller_roles: Collection[str]
+    ) -> WorkflowRead:
         """Project one Workflow into its API read view, attaching its tags.
+
+        A caller who is not a ``developer`` gets the **published view**: a
+        ``modified`` workflow is reported with the name, description, and status
+        recorded at publish time, so unpublished edits never leave the design
+        session. See
+        :func:`~models.workflow_published_version.published_workflow_read`.
 
         Args:
             workflow: The persisted workflow to project.
+            caller_roles: The caller's effective roles.
 
         Returns:
             The read view, with tag ids attached.
         """
-        return await build_workflow_read(self._workflows, workflow)
+        versions = await self._versions_for([workflow], caller_roles=caller_roles)
+        if not self._published_view(caller_roles):
+            return await build_workflow_read(self._workflows, workflow)
+        return published_workflow_read(
+            workflow,
+            versions.get(workflow.id),
+            tag_ids=await self._workflows.tag_ids_for(workflow.id),
+        )
 
-    async def to_read_many(self, workflows: Sequence[Workflow]) -> _ReadList:
+    async def to_read_many(
+        self, workflows: Sequence[Workflow], *, caller_roles: Collection[str]
+    ) -> _ReadList:
         """Project a page of Workflows into read views, reading their tags in one query.
+
+        Applies the same published view as :meth:`to_read`, resolving every
+        snapshot the page needs in one further query.
 
         Args:
             workflows: The persisted records to project.
+            caller_roles: The caller's effective roles.
 
         Returns:
             The read views, in the order they were given.
         """
         by_id = await self._workflows.tag_ids_for_many([x.id for x in workflows])
+        versions = await self._versions_for(workflows, caller_roles=caller_roles)
+        if not self._published_view(caller_roles):
+            return [
+                WorkflowRead.from_workflow(x, tag_ids=by_id.get(x.id, []))
+                for x in workflows
+            ]
         return [
-            WorkflowRead.from_workflow(x, tag_ids=by_id.get(x.id, []))
+            published_workflow_read(x, versions.get(x.id), tag_ids=by_id.get(x.id, []))
             for x in workflows
         ]
 
@@ -672,6 +750,7 @@ class WorkflowService:
         caller: User,
         caller_roles: Collection[str],
         tool_mock_ids: Sequence[str] = (),
+        design_source: WorkflowDesignSource = WorkflowDesignSource.published,
     ) -> WorkflowExecution:
         """Start a workflow run by creating a WorkflowExecution with its tasks.
 
@@ -684,14 +763,19 @@ class WorkflowService:
         the tasks were approved by publishing the workflow (or, for a
         ``developer``/``super_admin`` caller, is still being tested pre-publish).
 
-        A ``modified`` workflow runs its **last published version**: name,
-        description, and task templates all come from the snapshot taken at
-        publish time, not from the edited live rows. Publishing again is what
-        promotes the edits into runs.
+        A ``modified`` workflow runs its **last published version** by default:
+        name, description, and task templates all come from the snapshot taken
+        at publish time, not from the edited live rows. Publishing again is what
+        promotes the edits into runs. A ``developer`` may instead ask for
+        :attr:`~models.workflow.WorkflowDesignSource.live` to try the edits out
+        before committing to them; nobody else may, since for every other role
+        the unpublished design does not exist (see :meth:`to_read`).
 
-        A run started while the workflow is still ``draft`` is recorded with
-        ``is_draft=True`` and stays so for life — publishing the workflow later
-        does not reclassify it. ``repositories/metrics.py`` excludes such runs
+        A run is a **draft run** when the workflow is still ``draft``, or when it
+        was asked to run the live design of a ``modified`` one — either way it
+        executes a design nobody has approved. Such a run is recorded with
+        ``is_draft=True`` and stays so for life: publishing the workflow later
+        does not reclassify it. ``repositories/metrics.py`` excludes draft runs
         from every operations metric so pre-publish test data does not skew
         them.
 
@@ -699,8 +783,8 @@ class WorkflowService:
         :class:`~models.mcp_tool_mock.MCPToolMock` records, and what each one
         currently says is **copied onto the run** rather than referenced, so
         editing or deleting a mock afterwards can never turn a stubbed call back
-        into a real one. Mocks are rejected outright for a non-draft workflow: a
-        published run that quietly did nothing would be worse than no run.
+        into a real one. Mocks are rejected outright for any other run: one that
+        quietly did nothing while looking real would be worse than no run.
 
         No cloning happens here: the skill's repository was published into the
         shared store when it was registered (and re-published by each pull), so
@@ -718,19 +802,24 @@ class WorkflowService:
                 :func:`~models.user.has_any_role`); ``published`` and
                 ``modified`` workflows are runnable by any caller who reached
                 this route (role-gated to ``requester``/``developer`` at the
-                router).
+                router). ``developer`` is also what ``design_source=live``
+                requires.
             tool_mock_ids: Ids of the tool mocks this run should apply. Only a
-                ``draft`` workflow may be given any.
+                draft run may be given any.
+            design_source: Which design a ``modified`` workflow should run —
+                see :class:`~models.workflow.WorkflowDesignSource`.
 
         Returns:
             The created WorkflowExecution.
 
         Raises:
             NotFoundError: If the workflow or its skill does not exist.
+            ForbiddenError: If a non-``developer`` asks for the live design.
             WorkflowNotRunnableError: If the workflow is neither ``published``
                 nor ``modified`` (and, for a non-``developer`` caller, not
-                ``draft`` either), has no task templates, or is not ``draft``
-                while ``tool_mock_ids`` asks for mocks.
+                ``draft`` either), has no task templates, is not ``modified``
+                while ``design_source`` asks for the live design, or is not a
+                draft run while ``tool_mock_ids`` asks for mocks.
             ForeignKeyViolationError: If a requested mock does not exist.
             SkillNotReadyError: If the skill has no published revision yet.
         """
@@ -746,10 +835,20 @@ class WorkflowService:
             raise WorkflowNotRunnableError(
                 workflow_id, "only published workflows can be executed"
             )
-        is_draft = workflow.status is WorkflowStatus.draft
+        live = design_source is WorkflowDesignSource.live
+        if live and not has_any_role(caller_roles, Role.developer):
+            raise ForbiddenError(
+                "Only developers can run a workflow's unpublished design"
+            )
+        if live and workflow.status is not WorkflowStatus.modified:
+            raise WorkflowNotRunnableError(
+                workflow_id,
+                "only a modified workflow has an unpublished design to run",
+            )
+        is_draft = workflow.status is WorkflowStatus.draft or live
         if tool_mock_ids and not is_draft:
             raise WorkflowNotRunnableError(
-                workflow_id, "tool mocks are only available for draft workflows"
+                workflow_id, "tool mocks are only available for draft runs"
             )
         tool_mocks = [
             snapshot_mock(m) for m in await self._resolve_mocks(tool_mock_ids)
@@ -759,7 +858,9 @@ class WorkflowService:
             raise NotFoundError("AgentSkill", workflow.agent_skill_id)
         if skill.commit_sha is None:
             raise SkillNotReadyError(skill.id)
-        name, description, templates = await self._resolve_design(workflow)
+        name, description, templates = await self._resolve_design(
+            workflow, design_source=design_source
+        )
         if not templates:
             raise WorkflowNotRunnableError(workflow_id, "it has no task templates")
 
@@ -831,24 +932,34 @@ class WorkflowService:
         return f"{name.strip()}-{secrets.token_hex(3)}"
 
     async def _resolve_design(
-        self, workflow: Workflow
+        self,
+        workflow: Workflow,
+        *,
+        design_source: WorkflowDesignSource = WorkflowDesignSource.published,
     ) -> tuple[str, str | None, _SnapshotTemplateList]:
         """Return the name, description, and task templates a run should use.
 
-        A ``modified`` workflow runs its last published snapshot; every other
-        status runs the live rows (for ``published`` the two are identical by
-        construction). A ``modified`` workflow without a snapshot should not
-        exist — the status is only reachable from ``published``, which always
-        writes one — so that case is logged and falls back to the live task templates
-        rather than refusing to run.
+        A ``modified`` workflow runs its last published snapshot unless the
+        caller asked for :attr:`~models.workflow.WorkflowDesignSource.live`;
+        every other status runs the live rows (for ``published`` the two are
+        identical by construction). A ``modified`` workflow without a snapshot
+        should not exist — the status is only reachable from ``published``,
+        which always writes one — so that case is logged and falls back to the
+        live task templates rather than refusing to run.
 
         Args:
             workflow: The workflow being executed.
+            design_source: Which design to resolve. Only meaningful while the
+                workflow is ``modified``; the caller has already rejected
+                ``live`` for any other status.
 
         Returns:
             The workflow name, description, and task templates to copy.
         """
-        if workflow.status is WorkflowStatus.modified:
+        if (
+            workflow.status is WorkflowStatus.modified
+            and design_source is WorkflowDesignSource.published
+        ):
             version = await self._versions.get(workflow.id)
             if version is not None:
                 return version.name, version.description, parse_templates(version)

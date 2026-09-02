@@ -30,7 +30,7 @@ import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
-import { RunWorkflowDialog } from "@/components/admin/run-workflow-dialog";
+import { type RunWorkflowChoice, RunWorkflowDialog } from "@/components/admin/run-workflow-dialog";
 import { StatusCard } from "@/components/admin/status-card";
 import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
@@ -124,9 +124,17 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * Editing a published workflow moves it to `modified` — runs keep using the
  * last published version — so the status bar then also offers "Discard
  * changes", which restores that version and returns the workflow to
- * `published`. A `published`/`modified` workflow can also be "Deactivated"
+ * `published`. The Run dialog then also offers a choice between the two
+ * designs: the published version as a real request, or the unpublished edits
+ * as a test run. A `published`/`modified` workflow can also be "Deactivated"
  * back to `draft`, revoking `requester` execute access until it is published
  * again.
+ *
+ * None of that reaches a viewer without the developer role: the backend serves
+ * them a `modified` workflow as `published`, carrying its last published name,
+ * description, and task templates. So this page never has to hide the edits
+ * itself — it simply never receives them, and `modified` is a status only a
+ * developer ever sees here.
  *
  * A viewer without the developer role (e.g. `requester`, who can only reach
  * this page to check on or run a workflow) gets a read-only rendering: Name
@@ -324,11 +332,14 @@ export default function WorkflowDetailPage() {
     router.push(`/workflows/${encodeURIComponent(workflowId)}/design-session`);
   }
 
-  async function handleRun(toolMockIds: string[]) {
+  async function handleRun({ designSource, toolMockIds }: RunWorkflowChoice) {
     setConfirmRunOpen(false);
     try {
       await run.run(async () => {
-        const workflowExecution = await executeWorkflow(workflowId, { toolMockIds });
+        const workflowExecution = await executeWorkflow(workflowId, {
+          designSource,
+          toolMockIds,
+        });
         router.push(`/workflow-executions/${workflowExecution.id}/session`);
       });
     } catch {
@@ -662,6 +673,9 @@ export default function WorkflowDetailPage() {
         workflowId={workflowId}
         workflowName={workflow.name}
         isDraft={workflow.status === "draft"}
+        // Only a developer ever sees `modified` — for everyone else the backend
+        // reports the workflow as `published` — so the status alone is the gate.
+        canChooseDesign={workflow.status === "modified" && canEdit}
         onConfirm={handleRun}
         onCancel={() => setConfirmRunOpen(false)}
       />
