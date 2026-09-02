@@ -22,6 +22,7 @@ import {
 } from "@/lib/agentActivity";
 import type { WorkflowTask } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
+import type { RenderedMessage } from "@/store/chatSlice";
 import { MessageBubble } from "./MessageBubble";
 import { EmptyState } from "./ui/empty-state";
 import { WorkflowTaskGroup } from "./WorkflowTaskGroup";
@@ -35,7 +36,18 @@ import { WorkflowTaskGroup } from "./WorkflowTaskGroup";
 interface MessageRun {
   taskId: string | null;
   anchorId?: string;
-  messages: Message[];
+  messages: RenderedMessage[];
+}
+
+/**
+ * The React key a message's bubble is rendered under.
+ *
+ * A message the viewer has already watched appear keeps the key it first got,
+ * even once a poll replaces its id with the persisted one — see
+ * `RenderedMessage` for why the two can differ and what remounting costs.
+ */
+function renderKeyOf(message: RenderedMessage | undefined): string | undefined {
+  return message?.renderKey ?? message?.id;
 }
 
 /**
@@ -112,7 +124,7 @@ export function MessageList({
   onApprovalResolved,
   pendingRenderCalls,
 }: {
-  messages: Message[];
+  messages: RenderedMessage[];
   isStreaming?: boolean;
   isRunning?: boolean;
   /**
@@ -321,9 +333,9 @@ export function MessageList({
    * absent a text stream, as still-thinking so a trailing reasoning panel gets
    * the live edge).
    */
-  const renderBubble = (msg: Message): ReactNode => (
+  const renderBubble = (msg: RenderedMessage): ReactNode => (
     <MessageBubble
-      key={msg.id}
+      key={renderKeyOf(msg)}
       message={msg}
       isStreaming={isStreaming && msg.id === lastMessageId}
       isThinking={isRunning && !isStreaming && msg.id === lastMessageId}
@@ -355,7 +367,7 @@ export function MessageList({
           // that happens to lead a task's run can change between renders even
           // though the task itself hasn't — keying on messages[0] there would
           // remount the whole group (e.g. an in-progress ApprovalControls).
-          const key = run.anchorId ?? run.messages[0]?.id;
+          const key = run.anchorId ?? renderKeyOf(run.messages[0]);
           if (!run.taskId) {
             return <Fragment key={key}>{run.messages.map(renderBubble)}</Fragment>;
           }

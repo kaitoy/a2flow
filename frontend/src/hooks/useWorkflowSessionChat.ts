@@ -1,6 +1,7 @@
 "use client";
 
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
+import type { Message } from "@ag-ui/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "react-redux";
 import {
@@ -12,14 +13,12 @@ import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
   createDesignSessionAgent,
   createWorkflowSessionAgent,
-  getDesignSessionMessageSenders,
-  getDesignSessionMessages,
+  getDesignSessionHistory,
   getUsersByIds,
-  getWorkflowSessionMessageSenders,
-  getWorkflowSessionMessages,
-  getWorkflowSessionMessageTasks,
+  getWorkflowSessionHistory,
   isForbiddenError,
   listWorkflowTasks,
+  type SessionHistory,
   SUPPRESS_FORBIDDEN_TOAST,
   type User,
   type WorkflowTask,
@@ -47,6 +46,29 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 /** How often (ms) to poll the shared workflow chat for new messages. */
 const POLL_INTERVAL_MS = 10_000;
+
+/**
+ * A message's identifier as far as comparing two fetches of the same history
+ * goes.
+ *
+ * `tool` messages are the exception: the backend mints them a fresh random id on
+ * every fetch (they are rebuilt from their event, and only the `toolCallId` they
+ * answer survives a round trip), so keying on `id` there would make an unchanged
+ * history look new on every poll.
+ */
+function stableId(message: Message | undefined): string {
+  if (!message) return "";
+  return message.role === "tool" ? `tool:${message.toolCallId}` : message.id;
+}
+
+/**
+ * A signature identifying a fetched history, used to skip re-applying one that
+ * hasn't changed. The shared chat is append-only, so its length plus its last
+ * message's {@link stableId} is enough to tell two fetches apart.
+ */
+function historySignature(messages: Message[]): string {
+  return `${messages.length}:${stableId(messages.at(-1))}`;
+}
 
 /**
  * Build the workflow-execution AG-UI subscriber: the shared subscriber plus an
@@ -117,12 +139,16 @@ export type SessionChatVariant = "workflow" | "design";
  * a reload: a workflow session's execution initiator, its approvers, and the
  * agent all post into it; a design session's is every developer in the tenant,
  * plus the background generation run. Polling pauses while the current viewer's
- * own run is in flight and skips re-applying an unchanged history.
+ * own run is in flight and skips re-applying an unchanged history — see
+ * {@link historySignature} for what counts as unchanged. The viewer's own run
+ * ends with the same re-read, which reconciles the ids the live stream minted
+ * with the persisted ones without disturbing a single bubble.
  *
  * Sender attribution is loaded for both variants so each message can show who
- * sent it. Task association is workflow-session-only — a design session edits
- * task *templates*, which the page fetches itself, rather than working through
- * the status-ful tasks a run produces.
+ * sent it, and it rides on the same `/messages` response as the history rather
+ * than costing a request of its own. Task association is workflow-session-only —
+ * a design session edits task *templates*, which the page fetches itself, rather
+ * than working through the status-ful tasks a run produces.
  */
 export function useWorkflowSessionChat(
   parentId: string,
@@ -132,8 +158,7 @@ export function useWorkflowSessionChat(
   variant: SessionChatVariant = "workflow"
 ) {
   const isDesign = variant === "design";
-  const fetchMessages = isDesign ? getDesignSessionMessages : getWorkflowSessionMessages;
-  const fetchSenders = isDesign ? getDesignSessionMessageSenders : getWorkflowSessionMessageSenders;
+  const fetchHistory = isDesign ? getDesignSessionHistory : getWorkflowSessionHistory;
   const buildAgent = isDesign ? createDesignSessionAgent : createWorkflowSessionAgent;
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
@@ -174,61 +199,91 @@ export function useWorkflowSessionChat(
   // Signature of the message history last applied to the store, so an idle poll
   // (no new messages) skips the redundant resumeSession dispatch and re-render.
   const appliedSignatureRef = useRef<string | null>(null);
+  // Raised after the viewer's own run so the next poll re-applies the history
+  // even though it is unchanged — see resyncAfterRun for why that is needed.
+  const reapplyAfterRunRef = useRef(false);
 
-  const refreshSenders = useCallback(async () => {
-    try {
-      const senders = await fetchSenders(parentId);
-      // The owner is resolved too, even when they sent nothing: unattributed
-      // messages fall back to them.
-      const users = await getUsersByIds([ownerUserId, ...senders.values()]);
-      setMessageSenders(senders);
-      setSenderUsers(users);
-    } catch (err) {
-      logger.error(err, "failed to load message senders");
-    }
-  }, [parentId, ownerUserId, fetchSenders]);
-
-  const refreshTasks = useCallback(async () => {
-    // Design sessions edit the workflow's task templates, which the page
-    // fetches itself; there are no status-ful session tasks to track here.
-    if (isDesign) return;
-    try {
-      const [taskList, taskMap] = await Promise.all([
-        listWorkflowTasks(parentId),
-        getWorkflowSessionMessageTasks(parentId),
+  /**
+   * Apply the attribution a fetched history carries: the sender and task maps
+   * themselves, the User records they name, and the session's WorkflowTasks.
+   *
+   * The two maps come back on the history's own records, so they cost no extra
+   * request; only the User records and the task list are fetched separately.
+   */
+  const applyAttribution = useCallback(
+    async (history: SessionHistory) => {
+      setMessageSenders(history.senders);
+      setMessageTasks(history.tasks);
+      const [users, taskList] = await Promise.all([
+        // The owner is resolved too, even when they sent nothing: unattributed
+        // messages fall back to them.
+        getUsersByIds([ownerUserId, ...history.senders.values()]),
+        // Design sessions edit the workflow's task templates, which the page
+        // fetches itself; there are no status-ful session tasks to track here.
+        isDesign ? Promise.resolve<WorkflowTask[]>([]) : listWorkflowTasks(parentId),
       ]);
-      setTasks(taskList);
-      setMessageTasks(taskMap);
-    } catch (err) {
-      logger.error(err, "failed to load workflow tasks");
-    }
-  }, [parentId, isDesign]);
+      setSenderUsers(users);
+      if (!isDesign) setTasks(taskList);
+    },
+    [parentId, ownerUserId, isDesign]
+  );
 
-  const refreshMessages = useCallback(async () => {
+  /**
+   * Re-read the shared history and reconcile it with what is on screen.
+   *
+   * One `/messages` request serves the transcript, the sender attribution and
+   * the task association alike, since the backend folds all three into the same
+   * records.
+   */
+  const refreshHistory = useCallback(async () => {
     // Never merge mid-run: syncPolledMessages rebuilds the message array from the
     // fetched history and resets the streaming flags, which would clobber a live
     // stream, so polling is only safe between runs.
     if (isRunningRef.current || isStreamingRef.current) return;
     try {
-      const loaded = await fetchMessages(parentId);
+      const history = await fetchHistory(parentId);
       // A run may have started while the fetch was in flight; re-check the guard.
       if (isRunningRef.current || isStreamingRef.current) return;
-      // The shared chat is append-only, so length + last id uniquely identify the
-      // history; skip re-applying an unchanged fetch to avoid a needless scroll.
-      const signature = `${loaded.length}:${loaded.at(-1)?.id ?? ""}`;
-      if (signature === appliedSignatureRef.current) return;
+      // Skip re-applying an unchanged fetch — it costs two more requests and a
+      // re-render for nothing. The run-follow-up below is the one exception.
+      const signature = historySignature(history.messages);
+      if (signature === appliedSignatureRef.current && !reapplyAfterRunRef.current) return;
+      reapplyAfterRunRef.current = false;
       appliedSignatureRef.current = signature;
-      // Merge (don't replace): keep this viewer's optimistically-rendered sends
-      // in place so the auto-sent prompt's bubble isn't remounted and re-animated
-      // out of view when the poll returns its persisted (differently-id'd) twin.
-      dispatch(syncPolledMessages({ sessionId, messages: loaded }));
-      // Keep sender avatars and the task timeline/groups in sync with the newly
-      // visible messages.
-      await Promise.all([refreshSenders(), refreshTasks()]);
+      // Merge (don't replace): every bubble already on screen keeps the React key
+      // it was drawn under, so reconciling the live stream's ids with the
+      // persisted ones costs no remount — see syncPolledMessages.
+      dispatch(syncPolledMessages({ sessionId, messages: history.messages }));
+      await applyAttribution(history);
     } catch (err) {
-      logger.error(err, "failed to poll session messages");
+      logger.error(err, "failed to refresh session history");
     }
-  }, [parentId, sessionId, dispatch, refreshSenders, refreshTasks, fetchMessages]);
+  }, [parentId, sessionId, dispatch, applyAttribution, fetchHistory]);
+
+  /**
+   * Re-read the history the moment the viewer's own run ends, and ask the next
+   * poll to read it once more.
+   *
+   * The backend records sender attribution and task association *after* the last
+   * event of the stream, so this read — which fires as soon as `runAgent`
+   * resolves — can land a beat too early and see the run's messages with neither.
+   * Nothing about the messages changes afterwards, so without the follow-up the
+   * signature guard would skip every later poll and freeze that miss until a
+   * reload: the chat would keep showing the run's messages under the previous
+   * task's heading. The flag is raised only once this read has settled, so the
+   * read itself can't consume it, and re-applying costs nothing visible now that
+   * a poll leaves every bubble in place.
+   */
+  const resyncAfterRun = useCallback(() => {
+    // refreshHistory guards on isRunningRef/isStreamingRef, which only sync to
+    // Redux on the next render; set them directly so the resync doesn't bail out
+    // on the stale pre-finishRun value.
+    isRunningRef.current = false;
+    isStreamingRef.current = false;
+    void refreshHistory().then(() => {
+      reapplyAfterRunRef.current = true;
+    });
+  }, [refreshHistory]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
@@ -263,13 +318,12 @@ export function useWorkflowSessionChat(
       }
 
       dispatch(finishRun());
-      // The message this run sent is now persisted with its sender; refresh the
-      // attribution map so reloaded history shows the correct avatar.
-      void refreshSenders();
-      // Refresh task state and the per-message task association the run produced.
-      void refreshTasks();
+      // Everything the run produced is now persisted with its sender and its
+      // task association; re-read it all in one pass. The rendered bubbles keep
+      // their keys, so reconciling their ids with the persisted ones is invisible.
+      resyncAfterRun();
     },
-    [parentId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks, buildAgent]
+    [parentId, sessionId, isRunning, dispatch, resyncAfterRun, buildAgent]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -305,19 +359,14 @@ export function useWorkflowSessionChat(
       }
 
       dispatch(finishRun());
-      // refreshMessages guards on isRunningRef/isStreamingRef, which only sync
-      // to Redux on the next render; set them directly so the resync below
-      // doesn't bail out on the stale pre-finishRun value.
-      isRunningRef.current = false;
-      isStreamingRef.current = false;
       // Resync the full history (not just the sender map): the just-resolved
       // A2UI card's live-stamped sourceToolCallId can differ from the id the
       // backend persisted (ADK remaps long-running client-tool ids between the
       // streamed and persisted events), so re-deriving it from /messages via
       // the same resumed-history path keeps it consistent with the sender map.
-      void refreshMessages();
+      resyncAfterRun();
     },
-    [parentId, sessionId, isRunning, dispatch, refreshMessages, buildAgent]
+    [parentId, sessionId, isRunning, dispatch, refreshHistory, buildAgent]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -363,15 +412,12 @@ export function useWorkflowSessionChat(
       }
 
       dispatch(finishRun());
-      // The decision's tool result is now persisted with its sender; refresh
-      // the attribution map so the approval bubble shows the decider's avatar
-      // right away instead of waiting for the next poll.
-      void refreshSenders();
-      // The agent may have advanced tasks while resuming after the decision;
-      // refresh task state and the per-message task association.
-      void refreshTasks();
+      // The decision's tool result is now persisted with its sender, and the
+      // agent may have advanced tasks while resuming after it; one resync shows
+      // the decider's avatar and the new task state without waiting for a poll.
+      resyncAfterRun();
     },
-    [parentId, sessionId, isRunning, dispatch, refreshSenders, refreshTasks]
+    [parentId, sessionId, isRunning, dispatch, resyncAfterRun]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and the init guard below prevents double-sends
@@ -383,15 +429,20 @@ export function useWorkflowSessionChat(
     initializedSessionRef.current = sessionId;
     autoSentRef.current = false;
     appliedSignatureRef.current = null;
+    reapplyAfterRunRef.current = false;
     setForbidden(false);
     dispatch(setSession(sessionId));
-    void refreshSenders();
-    void refreshTasks();
-    fetchMessages(parentId, SUPPRESS_FORBIDDEN_TOAST)
-      .then((loadedMessages) => {
+    fetchHistory(parentId, SUPPRESS_FORBIDDEN_TOAST)
+      .then((history) => {
+        const loadedMessages = history.messages;
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
         // Record the loaded history so the first poll doesn't re-apply it.
-        appliedSignatureRef.current = `${loadedMessages.length}:${loadedMessages.at(-1)?.id ?? ""}`;
+        appliedSignatureRef.current = historySignature(loadedMessages);
+        // Catches its own failure: a rejection here must not reach the catch
+        // below, which would read it as a missing session and auto-send.
+        void applyAttribution(history).catch((err: unknown) => {
+          logger.error(err, "failed to load session attribution");
+        });
         if (kickoffPrompt !== null && loadedMessages.length === 0 && !autoSentRef.current) {
           autoSentRef.current = true;
           sendMessage(kickoffPrompt);
@@ -418,13 +469,13 @@ export function useWorkflowSessionChat(
     if (!sessionId) return;
     let active = true;
     const id = setInterval(() => {
-      if (active) void refreshMessages();
+      if (active) void refreshHistory();
     }, POLL_INTERVAL_MS);
     return () => {
       active = false;
       clearInterval(id);
     };
-  }, [sessionId, refreshMessages]);
+  }, [sessionId, refreshHistory]);
 
   return {
     messages,

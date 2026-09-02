@@ -8,10 +8,11 @@ import { A2UI_CATALOG_ID } from "@/lib/a2uiCatalogId";
 import {
   A2UI_SOURCE_TOOL_CALL_ID_KEY,
   CALL_MCP_TOOL_NAME,
+  REASONING_ACTIVITY_TYPE,
   TOOL_CALL_ACTIVITY_TYPE,
   type ToolCallActivityContent,
 } from "@/lib/agentActivity";
-import type { Message } from "./chatSlice";
+import type { Message, RenderedMessage } from "./chatSlice";
 import chatReducer, {
   addActivityMessage,
   addPendingRenderCall,
@@ -325,33 +326,98 @@ describe("chatSlice", () => {
   });
 
   describe("syncPolledMessages", () => {
-    it("reuses an optimistic user message's id when a polled twin has the same content", () => {
-      // The optimistic send carries a client id that never matches the persisted
-      // ADK event id; merging by content must keep the rendered object (stable
-      // React key) so its bubble is not remounted and re-animated out of view.
-      const stateWithOptimistic = {
+    it("keys a rendered message on the id it was drawn under when the polled id differs", () => {
+      // Neither an optimistic send (a client id) nor a live-streamed assistant
+      // reply (an id the stream minted) matches the persisted ADK event id the
+      // history returns. The persisted id wins — the sender and task maps are
+      // keyed by it — while the key the bubble is drawn under is carried over,
+      // so React does not remount and re-animate the bubbles out of view.
+      const stateWithRendered = {
         ...emptyState,
         sessionId: "sess-1",
-        messages: [{ id: "opt-1", role: "user", content: "Do the thing" }] as Message[],
+        messages: [
+          { id: "opt-1", role: "user", content: "Do the thing" },
+          { id: "live-a", role: "assistant", content: "done" },
+        ] as Message[],
       };
       const polled: Message[] = [
         { id: "adk-u", role: "user", content: "Do the thing" },
         { id: "adk-a", role: "assistant", content: "done" },
       ];
       const state = chatReducer(
-        stateWithOptimistic,
+        stateWithRendered,
         syncPolledMessages({ sessionId: "sess-1", messages: polled })
       );
       expect(state.messages).toHaveLength(2);
-      // Stable identity: the prompt keeps the optimistic id, not the polled one.
-      expect(state.messages[0].id).toBe("opt-1");
+      expect(state.messages[0].id).toBe("adk-u");
+      expect(state.messages[0].renderKey).toBe("opt-1");
       expect(state.messages[0].content).toBe("Do the thing");
+      expect(state.messages[1].id).toBe("adk-a");
+      expect(state.messages[1].renderKey).toBe("live-a");
       // No duplicate prompt bubble.
       expect(
         state.messages.filter((m) => m.role === "user" && m.content === "Do the thing")
       ).toHaveLength(1);
-      // The polled assistant reply is included (backend stays authoritative).
-      expect(state.messages[1].id).toBe("adk-a");
+    });
+
+    it("carries an assigned render key forward on the next poll", () => {
+      // The second poll finds the message under the id the first one gave it, so
+      // the match is by id — the key must survive that path too, or the bubble
+      // would remount one poll after being reconciled.
+      const reconciled = {
+        ...emptyState,
+        sessionId: "sess-1",
+        messages: [
+          { id: "adk-u", role: "user", content: "Do the thing", renderKey: "opt-1" },
+          { id: "adk-a", role: "assistant", content: "done", renderKey: "live-a" },
+        ] as RenderedMessage[],
+      };
+      const polled: Message[] = [
+        { id: "adk-u", role: "user", content: "Do the thing" },
+        { id: "adk-a", role: "assistant", content: "done" },
+      ];
+      const state = chatReducer(
+        reconciled,
+        syncPolledMessages({ sessionId: "sess-1", messages: polled })
+      );
+      expect(state.messages.map((m) => m.renderKey)).toEqual(["opt-1", "live-a"]);
+    });
+
+    it("does not let an already-drawn message consume a later twin's key", () => {
+      // Two turns can say the same thing. The earlier reply is already drawn
+      // under its persisted id, so the live-streamed key belongs to the new one.
+      const rendered = {
+        ...emptyState,
+        sessionId: "sess-1",
+        messages: [
+          { id: "adk-a1", role: "assistant", content: "Done." },
+          { id: "live-a2", role: "assistant", content: "Done." },
+        ] as Message[],
+      };
+      const polled: Message[] = [
+        { id: "adk-a1", role: "assistant", content: "Done." },
+        { id: "adk-a2", role: "assistant", content: "Done." },
+      ];
+      const state = chatReducer(
+        rendered,
+        syncPolledMessages({ sessionId: "sess-1", messages: polled })
+      );
+      expect(state.messages[0].renderKey).toBeUndefined();
+      expect(state.messages[1].renderKey).toBe("live-a2");
+    });
+
+    it("leaves a polled message's key alone when nothing was rendered under another id", () => {
+      // A message this browser never watched appear (another participant's, or
+      // anything after a reload) is keyed by its own id, as before.
+      const state = chatReducer(
+        { ...emptyState, sessionId: "sess-1" },
+        syncPolledMessages({
+          sessionId: "sess-1",
+          messages: [{ id: "adk-u", role: "user", content: "from someone else" }],
+        })
+      );
+      expect(state.messages[0].id).toBe("adk-u");
+      expect(state.messages[0].renderKey).toBeUndefined();
     });
 
     it("keeps an optimistic user message with no persisted twin visible", () => {
@@ -481,6 +547,104 @@ describe("chatSlice", () => {
       // Stable identity: same object as the live chip, so its React key is
       // unchanged and the bubble is not remounted.
       expect(activityMsg).toBe(liveChip);
+    });
+
+    it("keeps the rendered A2UI surface instead of a rebuilt one for the same call", () => {
+      // A2uiRenderer re-processes whenever the operations payload changes *by
+      // reference*, so handing it an equivalent rebuild blanks the card and
+      // builds it again — visibly. Re-using the rendered message keeps that
+      // reference (and the React key) exactly as it is.
+      const assistantMsg: Message = {
+        id: "m1",
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "tc-a2ui",
+            type: "function",
+            function: {
+              name: RENDER_A2UI_TOOL_NAME,
+              arguments: JSON.stringify({ surfaceId: "surf-1", components: [] }),
+            },
+          },
+        ],
+      };
+      const liveSurface: Message = {
+        id: "a2ui-surface-tc-a2ui",
+        role: "activity",
+        activityType: A2UIActivityType,
+        content: {
+          [A2UI_OPERATIONS_KEY]: [{ version: "v0.9", createSurface: { surfaceId: "surf-1" } }],
+          [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-a2ui",
+        },
+      } as Message;
+      const state = chatReducer(
+        { ...emptyState, sessionId: "sess-1", messages: [assistantMsg, liveSurface] },
+        syncPolledMessages({ sessionId: "sess-1", messages: [assistantMsg] })
+      );
+      expect(state.messages).toHaveLength(2);
+      expect(state.messages[1]).toBe(liveSurface);
+    });
+
+    it("rebuilds an A2UI surface whose render call the history knows under another id", () => {
+      // ADK can remap a long-running client tool's id between the streamed and
+      // persisted events. With no live surface to match, the synthesized one is
+      // used, exactly as before — which is what keeps the resolved/pending
+      // decision consistent with the persisted ids.
+      const liveSurface: Message = {
+        id: "a2ui-surface-tc-live",
+        role: "activity",
+        activityType: A2UIActivityType,
+        content: {
+          [A2UI_OPERATIONS_KEY]: [{ version: "v0.9", createSurface: { surfaceId: "surf-1" } }],
+          [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-live",
+        },
+      } as Message;
+      const assistantMsg: Message = {
+        id: "m1",
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "tc-persisted",
+            type: "function",
+            function: {
+              name: RENDER_A2UI_TOOL_NAME,
+              arguments: JSON.stringify({ surfaceId: "surf-1", components: [] }),
+            },
+          },
+        ],
+      };
+      const state = chatReducer(
+        { ...emptyState, sessionId: "sess-1", messages: [assistantMsg, liveSurface] },
+        syncPolledMessages({ sessionId: "sess-1", messages: [assistantMsg] })
+      );
+      expect(state.messages).toHaveLength(2);
+      expect(state.messages[1]).not.toBe(liveSurface);
+      expect(state.messages[1].id).toBe("a2ui-surface-surf-1-tc-persisted");
+    });
+
+    it("keeps a live reasoning panel across a poll", () => {
+      // The history returns reasoning as a `reasoning`-role message, which no
+      // bubble renders — without preservation the thinking panel would vanish
+      // (and the column would jump) on the first poll after the agent used it.
+      const livePanel: Message = {
+        id: "reasoning-live",
+        role: "activity",
+        activityType: REASONING_ACTIVITY_TYPE,
+        content: { text: "weighing the options" },
+      } as Message;
+      const polled: Message[] = [
+        { id: "ev-1-reasoning", role: "reasoning", content: "weighing the options" },
+        { id: "ev-1", role: "assistant", content: "here you go" },
+      ];
+      const state = chatReducer(
+        { ...emptyState, sessionId: "sess-1", messages: [livePanel] },
+        syncPolledMessages({ sessionId: "sess-1", messages: polled })
+      );
+      // The raw reasoning message, the preserved panel, then the reply.
+      expect(state.messages).toHaveLength(3);
+      expect(state.messages[1]).toBe(livePanel);
     });
   });
 

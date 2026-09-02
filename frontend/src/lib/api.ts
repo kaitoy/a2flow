@@ -1592,12 +1592,23 @@ export async function deleteWorkflowTaskTemplate(templateId: string): Promise<vo
   );
 }
 
-/** One `/messages` record, as far as the attribution helpers below care. */
-interface MessageSenderRecord {
+/** One `/messages` record: an AG-UI message plus the attribution the backend folds in. */
+interface SessionMessageRecord {
   id?: string;
   role?: string;
   toolCallId?: string;
   senderUserId?: string | null;
+  workflowTaskId?: string | null;
+}
+
+/** A session chat's history and the two attribution maps derived from the same response. */
+export interface SessionHistory {
+  /** The chat history, oldest first. */
+  messages: Message[];
+  /** Sender attribution, keyed as {@link sendersFrom} describes. */
+  senders: Map<string, string>;
+  /** Per-message WorkflowTask association, keyed as {@link tasksFrom} describes. */
+  tasks: Map<string, string>;
 }
 
 /**
@@ -1611,7 +1622,7 @@ interface MessageSenderRecord {
  * correlate it back to its sender. Unattributed records are omitted, so callers
  * fall back to the session's owner.
  */
-function sendersFrom(records: MessageSenderRecord[]): Map<string, string> {
+function sendersFrom(records: SessionMessageRecord[]): Map<string, string> {
   const senders = new Map<string, string>();
   for (const record of records) {
     if (!record.senderUserId) continue;
@@ -1622,43 +1633,61 @@ function sendersFrom(records: MessageSenderRecord[]): Map<string, string> {
 }
 
 /**
- * Fetch the chat history of a workflow's design session.
+ * Reduce raw `/messages` records to a message-id → WorkflowTask-id map.
  *
- * A design session has no record of its own, so it is addressed by its
- * workflow's id. Returns an empty list while the background generation run has
- * not started yet. The records carry `senderUserId` (and `workflowTaskId`,
- * always `null` here — a design session has no status-ful tasks) so the payload
- * shape matches {@link getWorkflowSessionMessages} and the chat components can
- * be reused unchanged.
+ * Keyed by the message id (the ADK event id) alone: the backend records the
+ * association against every event, so there is no tool-message special case
+ * here. Messages produced outside any task (the initial design exchange) are
+ * omitted, and a design session's records carry no task at all, leaving the map
+ * empty there.
  */
-export async function getDesignSessionMessages(
-  workflowId: string,
-  config?: AxiosRequestConfig
-): Promise<Message[]> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/messages`, config),
-    zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse
-  ) as Promise<Message[]>;
+function tasksFrom(records: SessionMessageRecord[]): Map<string, string> {
+  const tasks = new Map<string, string>();
+  for (const record of records) {
+    if (record.id && record.workflowTaskId) tasks.set(record.id, record.workflowTaskId);
+  }
+  return tasks;
 }
 
 /**
- * Fetch the per-message sender attribution for a workflow's design session.
+ * Fetch a session chat's `/messages` response once and derive every view of it.
  *
- * The design chat is shared by every developer in the tenant, so its messages
- * carry the same attribution a workflow session's do. Hits the same `/messages`
- * endpoint as {@link getDesignSessionMessages}, reading the `senderUserId` each
- * record carries; see {@link sendersFrom} for how the map is keyed. Messages
- * from the unattended background generation run have no sender, so callers fall
- * back to the workflow's `createdBy`.
+ * The history, its sender attribution, and its task association are all folded
+ * into the same records by the backend, so they are parsed together rather than
+ * re-fetched one view at a time — one request per poll instead of three, and a
+ * single consistent snapshot behind all three.
  */
-export async function getDesignSessionMessageSenders(
-  workflowId: string
-): Promise<Map<string, string>> {
-  const records = (await fetchEnvelope(
-    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/messages`),
+async function fetchSessionHistory(
+  promise: Promise<AxiosResponse<unknown>>,
+  schema: EnvelopeSchema
+): Promise<SessionHistory> {
+  const records = (await fetchEnvelope(promise, schema)) as SessionMessageRecord[];
+  return {
+    messages: records as unknown as Message[],
+    senders: sendersFrom(records),
+    tasks: tasksFrom(records),
+  };
+}
+
+/**
+ * Fetch the chat history of a workflow's design session, with its attribution.
+ *
+ * A design session has no record of its own, so it is addressed by its
+ * workflow's id. Returns an empty history while the background generation run
+ * has not started yet. The chat is shared by every developer in the tenant, so
+ * its messages carry the same `senderUserId` a workflow session's do; those
+ * from the unattended background generation run have none, so callers fall back
+ * to the workflow's `createdBy`. The returned `tasks` map is always empty — a
+ * design session edits task *templates* and has no status-ful tasks.
+ */
+export async function getDesignSessionHistory(
+  workflowId: string,
+  config?: AxiosRequestConfig
+): Promise<SessionHistory> {
+  return fetchSessionHistory(
+    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/messages`, config),
     zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse
-  )) as MessageSenderRecord[];
-  return sendersFrom(records);
+  );
 }
 
 /** Fetch a WorkflowExecution record by ID. */
@@ -1673,67 +1702,29 @@ export async function getWorkflowExecution(
 }
 
 /**
- * Fetch the chat history of a WorkflowExecution's workflow session.
+ * Fetch the chat history of a WorkflowExecution's workflow session, with its
+ * sender attribution and per-message task association.
  *
  * Unlike {@link getSessionMessages}, the history is keyed by the execution's
  * initiator on the backend, so any viewer (for example a designated approver)
  * sees the same conversation instead of a separate, empty session.
+ *
+ * Agent messages and legacy history written before attribution existed are
+ * absent from `senders`, so callers fall back to the execution's initiator.
+ * `tasks` names, for each message, the WorkflowTask that was in progress when it
+ * was produced; messages produced outside any task are absent.
  */
-export async function getWorkflowSessionMessages(
+export async function getWorkflowSessionHistory(
   executionId: string,
   config?: AxiosRequestConfig
-): Promise<Message[]> {
-  return fetchEnvelope(
+): Promise<SessionHistory> {
+  return fetchSessionHistory(
     apiClient.get(
       `/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`,
       config
     ),
     zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
-  ) as Promise<Message[]>;
-}
-
-/**
- * Fetch the per-message sender attribution for a WorkflowExecution's chat.
- *
- * Hits the same `/messages` endpoint as {@link getWorkflowSessionMessages},
- * reading the `senderUserId` each record carries; see {@link sendersFrom} for
- * how the map is keyed. Agent messages and legacy history sent before
- * attribution existed are absent, so callers fall back to the execution's
- * initiator.
- */
-export async function getWorkflowSessionMessageSenders(
-  executionId: string
-): Promise<Map<string, string>> {
-  const records = (await fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`),
-    zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
-  )) as MessageSenderRecord[];
-  return sendersFrom(records);
-}
-
-/**
- * Fetch the per-message WorkflowTask association for a WorkflowExecution's chat.
- *
- * Returns a map from message id (the ADK event id) to the id of the WorkflowTask
- * that was in progress when the message was produced. Messages produced outside
- * any task (for example the initial design exchange) are absent. Hits the same
- * `/messages` endpoint as {@link getWorkflowSessionMessages}, reading the
- * `workflowTaskId` each record carries alongside its `id`.
- */
-export async function getWorkflowSessionMessageTasks(
-  executionId: string
-): Promise<Map<string, string>> {
-  const records = (await fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`),
-    zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
-  )) as Array<{ id?: string; workflowTaskId?: string | null }>;
-  const tasks = new Map<string, string>();
-  for (const record of records) {
-    if (record.id && record.workflowTaskId) {
-      tasks.set(record.id, record.workflowTaskId);
-    }
-  }
-  return tasks;
+  );
 }
 
 /** List WorkflowExecution records (newest first) with optional pagination, sort, and filters. */

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkflowTask } from "@/lib/api";
+import type { RenderedMessage } from "@/store/chatSlice";
 import { MessageList } from "./MessageList";
 
 const makeTask = (id: string, title: string): WorkflowTask => ({
@@ -449,6 +450,34 @@ describe("MessageList", () => {
     );
 
     expect(mountSpy).not.toHaveBeenCalledWith("appr-1");
+  });
+
+  it("keys a bubble on renderKey, so a polled id swap does not remount it", () => {
+    // A poll replaces the id the live stream minted with the persisted one. The
+    // bubble carries the key it was first drawn under, so React keeps it: no
+    // remount, no replayed entrance animation, no reset internal state.
+    const live: RenderedMessage[] = [{ id: "live-a", role: "assistant", content: "done" }];
+    const { rerender } = render(<MessageList messages={live} />);
+    mountSpy.mockClear();
+
+    const reconciled: RenderedMessage[] = [
+      { id: "adk-a", role: "assistant", content: "done", renderKey: "live-a" },
+    ];
+    rerender(<MessageList messages={reconciled} />);
+
+    expect(mountSpy).not.toHaveBeenCalled();
+    // The bubble is addressed by the new (persisted) id all the same.
+    expect(screen.getByTestId("bubble-adk-a")).toBeInTheDocument();
+  });
+
+  it("remounts a bubble whose id changes with no renderKey to carry over", () => {
+    const before: RenderedMessage[] = [{ id: "m1", role: "assistant", content: "done" }];
+    const { rerender } = render(<MessageList messages={before} />);
+    mountSpy.mockClear();
+
+    rerender(<MessageList messages={[{ id: "m2", role: "assistant", content: "done" }]} />);
+
+    expect(mountSpy).toHaveBeenCalledWith("m2");
   });
 
   it("derives pendingToolCallIds and toolResultContentByCallId for MessageBubble", () => {

@@ -7,11 +7,9 @@ import {
   ApiClientError,
   createChatAgent,
   getAgentSkill,
-  getDesignSessionMessageSenders,
+  getDesignSessionHistory,
   getSessionMessages,
-  getWorkflowSessionMessageSenders,
-  getWorkflowSessionMessages,
-  getWorkflowSessionMessageTasks,
+  getWorkflowSessionHistory,
   isForbiddenError,
   listSessions,
 } from "./api";
@@ -92,7 +90,7 @@ describe("getSessionMessages", () => {
   });
 });
 
-describe("getWorkflowSessionMessages", () => {
+describe("getWorkflowSessionHistory", () => {
   it("fetches the workflow-execution-scoped messages URL", async () => {
     let calledUrl = "";
     server.use(
@@ -101,60 +99,61 @@ describe("getWorkflowSessionMessages", () => {
         return envelope([]);
       })
     );
-    const result = await getWorkflowSessionMessages("execution-1");
-    expect(Array.isArray(result)).toBe(true);
+    const result = await getWorkflowSessionHistory("execution-1");
+    expect(Array.isArray(result.messages)).toBe(true);
     expect(calledUrl).toContain("/workflow-executions/execution-1/messages");
   });
-});
 
-describe("getWorkflowSessionMessageTasks", () => {
-  it("maps message ids to their workflow task id, skipping null", async () => {
+  it("derives the messages, senders and tasks from a single request", async () => {
+    let requests = 0;
     server.use(
-      http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, () =>
-        envelope([
-          { id: "m1", role: "user", content: "go", workflowTaskId: null },
-          { id: "m2", role: "assistant", content: "a", workflowTaskId: "task-a" },
-          { id: "m3", role: "assistant", content: "b", workflowTaskId: "task-b" },
-        ])
-      )
-    );
-    const result = await getWorkflowSessionMessageTasks("execution-1");
-    expect(result.get("m1")).toBeUndefined();
-    expect(result.get("m2")).toBe("task-a");
-    expect(result.get("m3")).toBe("task-b");
-  });
-});
-
-describe("getWorkflowSessionMessageSenders", () => {
-  it("keys user messages by id and tool messages by toolCallId, skipping unattributed", async () => {
-    server.use(
-      http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, () =>
-        envelope([
-          { id: "m1", role: "user", content: "go", senderUserId: "alice" },
-          { id: "m2", role: "assistant", content: "a", senderUserId: null },
+      http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, () => {
+        requests += 1;
+        return envelope([
+          { id: "m1", role: "user", content: "go", senderUserId: "alice", workflowTaskId: null },
           {
+            id: "m2",
+            role: "assistant",
+            content: "a",
+            senderUserId: null,
+            workflowTaskId: "task-a",
+          },
+          {
+            // A tool message's own id is regenerated on every fetch, so its
+            // attribution is keyed by the call it answers instead.
             id: "m3-random",
             role: "tool",
             toolCallId: "tc-1",
             content: "ack",
             senderUserId: "bob",
+            workflowTaskId: "task-a",
           },
-          { id: "m4", role: "user", content: "later", senderUserId: null },
-        ])
-      )
+          {
+            id: "m4",
+            role: "user",
+            content: "later",
+            senderUserId: null,
+            workflowTaskId: null,
+          },
+        ]);
+      })
     );
-    const result = await getWorkflowSessionMessageSenders("execution-1");
-    expect(result.get("m1")).toBe("alice");
-    // Tool messages are keyed by toolCallId, not their own (regenerated) id.
-    expect(result.get("tc-1")).toBe("bob");
-    expect(result.has("m3-random")).toBe(false);
-    expect(result.has("m2")).toBe(false);
-    expect(result.has("m4")).toBe(false);
+    const result = await getWorkflowSessionHistory("execution-1");
+    expect(requests).toBe(1);
+    expect(result.messages).toHaveLength(4);
+    expect(result.senders.get("m1")).toBe("alice");
+    expect(result.senders.get("tc-1")).toBe("bob");
+    expect(result.senders.has("m3-random")).toBe(false);
+    expect(result.senders.has("m2")).toBe(false);
+    expect(result.senders.has("m4")).toBe(false);
+    expect(result.tasks.get("m2")).toBe("task-a");
+    expect(result.tasks.get("m3-random")).toBe("task-a");
+    expect(result.tasks.has("m1")).toBe(false);
   });
 });
 
-describe("getDesignSessionMessageSenders", () => {
-  it("reads attribution off the design session's own messages endpoint", async () => {
+describe("getDesignSessionHistory", () => {
+  it("reads the history and its attribution off the design session's own endpoint", async () => {
     server.use(
       http.get(`${BASE}/api/v1/workflows/:workflowId/messages`, () =>
         envelope([
@@ -165,10 +164,13 @@ describe("getDesignSessionMessageSenders", () => {
         ])
       )
     );
-    const result = await getDesignSessionMessageSenders("wf-1");
-    expect(result.get("m2")).toBe("dev-2");
-    expect(result.has("m1")).toBe(false);
-    expect(result.has("m3")).toBe(false);
+    const result = await getDesignSessionHistory("wf-1");
+    expect(result.messages).toHaveLength(3);
+    expect(result.senders.get("m2")).toBe("dev-2");
+    expect(result.senders.has("m1")).toBe(false);
+    expect(result.senders.has("m3")).toBe(false);
+    // A design session has no status-ful tasks.
+    expect(result.tasks.size).toBe(0);
   });
 });
 
