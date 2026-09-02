@@ -64,6 +64,11 @@ Since any agent-running verification needs a repo with a `SKILL.md` (see
 just default to `$env:SKILLS_DIR = "C:\a2f\sk"` — it clones a2flow without
 overflowing.
 
+Wait for the backend with `GET http://127.0.0.1:8099/api/v1/health`, not
+`/health` — the health router declares `/health` but is mounted under
+`api_router`'s `/api/v1` prefix like every other route, so the bare path answers
+404 forever and reads as "still starting".
+
 Frontend (only needed for UI work):
 
 ```powershell
@@ -164,6 +169,17 @@ workflow in `status: "generating"` and runs the initial design agent in the
 This calls the real LLM configured in `backend/.env` and takes ~30-60s. The
 resulting task templates are on `GET /api/v1/workflows/{id}/task-templates`.
 
+### Running a workflow (the workflow session)
+
+`POST /api/v1/workflows/{id}/execute` only accepts a `published` or `modified`
+workflow, so a freshly generated `draft` needs `POST
+/api/v1/workflows/{id}/publish` first — otherwise it answers `409
+WORKFLOW_NOT_RUNNABLE`. The execution comes back with its own id; its chat lives
+at `/workflow-executions/{executionId}/session` in the UI, and opening that page
+is what auto-sends the kickoff prompt and starts the run. With `DEMO_DATA=true`
+the demo tool mocks stub the side-effecting calls, so the run plays through
+without reaching AWS.
+
 ### Driving the design chat
 
 `POST /api/v1/workflows/{id}/agent` is an AG-UI SSE stream, not an envelope
@@ -200,3 +216,12 @@ calls you observed, not on the ones you hoped for.
   connection with `502 MCP_UNREACHABLE`.
 - The Chrome extension may refuse `localhost:<port>`; if browser automation
   returns `Permission denied by user`, the UI cannot be driven from here.
+- **An agent run's SSE sometimes never closes client-side.** The backend log
+  shows `🏁 Streaming completed via final response` and `Runner closed.`, but the
+  page stays on "Agent is thinking…" forever and — since polling pauses during a
+  run — stops fetching `/messages` entirely. The reply is persisted: reload and
+  it is there. Don't chase it through the app code; the data path is fine. When
+  you need to check post-run behaviour, read the uvicorn access log's request
+  sequence rather than the screen — an applied refresh shows up as `/messages`
+  followed by `/users/{id}` and `/workflow-tasks`, and a skipped one as
+  `/messages` alone.

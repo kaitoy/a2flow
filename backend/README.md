@@ -136,7 +136,7 @@ All REST endpoints are documented interactively by the [Scalar API reference](ht
 - **Identity** — the caller is resolved from the authenticated `a2flow_session` cookie (see [Authentication](#authentication)); calling a protected endpoint with `curl` needs a logged-in cookie jar saved with `curl -c`/`-b`.
 - **CSRF** — state-changing requests (`POST` / `PATCH` / `DELETE`) must echo the `a2flow_csrf` cookie in the `X-CSRF-Token` header.
 - **List parameters** — collection endpoints accept shared `limit` / `offset` / sort (`s`) / filter (`q`) query parameters with camelCase field names. The four taggable collections additionally accept a repeatable `tag` parameter carrying tag ids; a record must carry **every** id listed to match (see [Tags](#tags)).
-- **Envelope** — JSON responses are wrapped in a uniform `{meta, data, error}` shape by middleware (the `POST /agent` SSE stream and `GET /health` are excluded).
+- **Envelope** — JSON responses are wrapped in a uniform `{meta, data, error}` shape by middleware (the `POST /agent` SSE stream and `GET /api/v1/health` are excluded).
 
 ### Session management
 

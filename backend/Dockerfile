@@ -4,7 +4,7 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 WORKDIR /app
 
-# curl is used by compose.yml's backend healthcheck to probe /health.
+# curl is used by compose.yml's backend healthcheck to probe /api/v1/health.
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 

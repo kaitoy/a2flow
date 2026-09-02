@@ -407,7 +407,7 @@ All JSON responses share a uniform envelope. It is **not** applied by middleware
 Two endpoints intentionally skip the `ApiResponse` envelope by simply not using it:
 
 - `POST /agent` — SSE stream (must not be buffered)
-- `GET /health` — returns `{"status":"ok"}` (200) or `{"status":"unavailable"}` (503), after checking database connectivity; used for both liveness and readiness gating. Excluded from the uvicorn access log (`infrastructure/logging_context.py`) since it's polled frequently.
+- `GET /api/v1/health` — returns `{"status":"ok"}` (200) or `{"status":"unavailable"}` (503), after checking database connectivity; used for both liveness and readiness gating. `routers/health.py` declares it as `/health`, but like every other router it is mounted under `api_router`'s `/api/v1` prefix, so that is the path to probe. Excluded from the uvicorn access log (`infrastructure/logging_context.py`, whose `HEALTH_CHECK_PATH` carries the full path) since it's polled frequently.
 
 `RequestContextMiddleware` still runs for both (it has no path exclusions), so they receive a `request_id`, log under it, and get the `X-Request-Id` header like any other request.
 
