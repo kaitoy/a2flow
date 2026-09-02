@@ -562,6 +562,28 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(receivedBody).toEqual({ name: "Renamed", description: null }));
   });
 
+  it("returns to the workflow list after a successful save", async () => {
+    const user = userEvent.setup();
+    const pushMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+      forward: vi.fn(),
+    });
+
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    const nameInput = await screen.findByLabelText(/^name/i);
+    await waitFor(() => expect(nameInput).toHaveValue("my-workflow"));
+    await user.clear(nameInput);
+    await user.type(nameInput, "Renamed");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows"));
+  });
+
   it("shows the generated description as read-only text for a non-super-admin", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows/:id", () =>

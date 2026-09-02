@@ -256,20 +256,19 @@ export default function WorkflowDetailPage() {
   async function onSubmit(values: FormValues) {
     try {
       await save.run(async () => {
-        const updated = await updateWorkflow(workflowId, {
+        await updateWorkflow(workflowId, {
           name: values.name,
           description: values.description || null,
           ...(isSuperAdmin ? { generatedDescription: values.generatedDescription || null } : {}),
         });
         // Tags are a separate sub-resource, so they are only written when the
-        // selection actually changed; its response is the fresher record.
-        let latest = updated;
+        // selection actually changed.
         if (!sameIds(tagIds, savedTagIds)) {
-          latest = await setWorkflowTags(workflowId, tagIds);
-          setSavedTagIds(tagIds);
+          await setWorkflowTags(workflowId, tagIds);
         }
-        applyWorkflow(latest);
         dispatch(showToast({ message: "Workflow updated" }));
+        // Return to the list on success, matching every other admin edit page.
+        router.push("/admin/workflows");
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
