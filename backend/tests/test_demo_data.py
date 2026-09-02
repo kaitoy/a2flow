@@ -758,8 +758,8 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
     }
     targets = {(mock.mcp_server_id, mock.tool_name) for mock in mocks.values()}
     assert targets == {
-        (DEMO_MCP_SERVER_ID, "call_aws"),
-        (DEMO_MCP_SERVER_ID, "run_script"),
+        (DEMO_MCP_SERVER_ID, "aws___call_aws"),
+        (DEMO_MCP_SERVER_ID, "aws__run_script"),
         (None, "request_approval"),
     }
     for mock in mocks.values():
