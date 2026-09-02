@@ -512,6 +512,14 @@ export default function WorkflowDetailPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
+          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+            {canEdit ? (
+              <Input id="name" {...register("name")} />
+            ) : (
+              <ReadOnlyField>{workflow.name}</ReadOnlyField>
+            )}
+          </FormField>
+
           <FormField htmlFor="agentSkill" label="Agent Skill">
             <div className="py-1.5">
               <Tooltip label={skillTooltip} disabled={!skill}>
@@ -523,14 +531,6 @@ export default function WorkflowDetailPage() {
                 </Link>
               </Tooltip>
             </div>
-          </FormField>
-
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            {canEdit ? (
-              <Input id="name" {...register("name")} />
-            ) : (
-              <ReadOnlyField>{workflow.name}</ReadOnlyField>
-            )}
           </FormField>
 
           <FormField
