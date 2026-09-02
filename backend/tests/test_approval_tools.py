@@ -2,7 +2,7 @@
 
 Like the WorkflowTask tools, these open their own ``AsyncSession`` on
 ``infrastructure.database.engine``; each test monkeypatches that engine to an
-isolated in-memory SQLite database and drives the tools with a lightweight fake
+throwaway database and drives the tools with a lightweight fake
 ToolContext exposing only ``session.id`` and ``user_id``.
 """
 
@@ -12,10 +12,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.approval_tools import (
@@ -39,6 +36,7 @@ from repositories import (
     SqlUserGroupRepository,
     SqlUserRepository,
 )
+from tests._engine import make_test_engine
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
@@ -46,15 +44,8 @@ from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 async def engine(
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[AsyncEngine, None]:
-    """Yield an in-memory engine and point the tools' module-level engine at it."""
-    eng = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-
-    @sa_event.listens_for(eng.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with eng.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """Yield a throwaway engine and point the tools' module-level engine at it."""
+    eng = await make_test_engine()
     await seed_users(eng, ids=())  # system user only; Tenant FKs to it
     await seed_tenant(eng)
     await seed_users(eng, tenant_id=DEFAULT_TEST_TENANT_ID)

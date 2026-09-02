@@ -33,6 +33,8 @@ from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 from pydantic.alias_generators import to_camel
+from sqlalchemy import Enum as SaEnum
+from sqlalchemy import Text, case, cast, literal
 from sqlmodel import SQLModel, col
 from sqlmodel.sql.expression import SelectOfScalar
 
@@ -207,9 +209,49 @@ def apply_sort(
     order_by = []
     for spec in specs:
         py_field = _resolve_column(model, spec.field, readable=readable)
-        column = _expression_for(model, py_field, columns)
+        column = _sort_key(_expression_for(model, py_field, columns))
         order_by.append(column.desc() if spec.descending else column.asc())
     return stmt.order_by(*order_by)
+
+
+def _sort_key(column: Any) -> Any:
+    """Return the expression to order by for ``column``.
+
+    Enum-typed columns are ordered by their **declaration position**, not by
+    their stored text: ``pending`` before ``in_progress`` before ``completed``,
+    which is the order that means something to whoever asked for the page.
+    Declare a new enum in the order it should sort. Where the values carry no
+    inherent order (``secrets.type``, ``notifications.type``) the position is
+    arbitrary but stable, which is still worth more than alphabetical.
+
+    Doing so is also what keeps the two dialects agreeing. PostgreSQL stores
+    these as native enum types and already sorts them by declaration order,
+    while SQLite keeps them as text and sorts alphabetically -- so without this,
+    the same deployment would page its statuses differently depending on which
+    database it ran on. Expanding the order into a ``CASE`` puts the decision in
+    the query rather than in the storage, so both produce the same SQL and the
+    same page.
+
+    Args:
+        column: The resolved column or override expression to order by.
+
+    Returns:
+        ``column`` itself, or a ``CASE`` yielding its declaration index when it
+        is enum-typed.
+    """
+    column_type = getattr(column, "type", None)
+    if not isinstance(column_type, SaEnum):
+        return column
+    # Spelled as explicit comparisons rather than ``case({...}, value=column)``:
+    # that form binds its keys as ``VARCHAR``, and PostgreSQL has no
+    # ``<enum> = character varying`` operator. Binding each one with the
+    # column's own type is what makes the comparison legal there.
+    return case(
+        *(
+            (column == literal(value, type_=column_type), position)
+            for position, value in enumerate(column_type.enums)
+        )
+    )
 
 
 def apply_filters(
@@ -247,7 +289,7 @@ def apply_filters(
         json_text = override.json_text if override is not None else False
         column = _expression_for(model, py_field, columns)
         if spec.op == "like":
-            stmt = stmt.where(column.ilike(f"%{spec.value}%"))
+            stmt = stmt.where(_text_operand(column).ilike(f"%{spec.value}%"))
         elif spec.op == "in":
             values = [
                 _coerce(model, py_field, v, json_text=json_text)
@@ -256,8 +298,59 @@ def apply_filters(
             stmt = stmt.where(column.in_(values))
         else:
             value = _coerce(model, py_field, spec.value, json_text=json_text)
+            if spec.op in _ORDERED_OPERATORS:
+                column, value = _ordered_operands(column, value)
             stmt = stmt.where(_COMPARATORS[spec.op](column, value))
     return stmt
+
+
+def _text_operand(column: Any) -> Any:
+    """Return ``column`` in a form ``ILIKE`` can match against.
+
+    PostgreSQL keeps an enum column as a native enum type, which has no
+    ``ILIKE`` operator at all -- a substring filter on one is an error there,
+    while SQLite stores the column as text and matches happily. Casting makes
+    the operator legal on both, and it matches what the client is filtering
+    against in the first place: an enum is a plain string in the JSON it reads.
+
+    Args:
+        column: The resolved column or override expression being filtered.
+
+    Returns:
+        ``column`` itself, or a text cast of it when it is enum-typed.
+    """
+    if isinstance(getattr(column, "type", None), SaEnum):
+        return cast(column, Text)
+    return column
+
+
+def _ordered_operands(column: Any, value: Any) -> tuple[Any, Any]:
+    """Rewrite an ordered comparison so an enum is compared by lifecycle position.
+
+    ``status:gte:completed`` has to mean the same thing as the page
+    ``s=status`` produces, and on an enum that ordering is the declaration
+    order, not the spelling -- see :func:`_sort_key`. Both sides move together:
+    the column becomes its position, and so does the value being compared.
+
+    Equality (``eq`` / ``ne`` / ``in``) is deliberately left alone. It gives the
+    same answer either way, and comparing the stored value directly lets an
+    index on the column do the work.
+
+    Args:
+        column: The resolved column or override expression being filtered.
+        value: The already-coerced comparison value.
+
+    Returns:
+        The pair to hand the comparison operator: unchanged unless ``column``
+        is enum-typed, in which case both become declaration positions.
+    """
+    column_type = getattr(column, "type", None)
+    if not isinstance(column_type, SaEnum):
+        return column, value
+    # ``value`` is the coerced member of a str-valued enum; ``enums`` holds the
+    # stored representation, which is what its ``.value`` is.
+    stored = getattr(value, "value", value)
+    return _sort_key(column), column_type.enums.index(stored)
 
 
 #: Maps comparison operators to the corresponding SQLAlchemy column expression.
@@ -269,3 +362,8 @@ _COMPARATORS = {
     "gt": lambda c, v: c > v,
     "gte": lambda c, v: c >= v,
 }
+
+#: The operators above that ask "which side comes first", rather than "are these
+#: the same". Only these need :func:`_ordered_operands`, since only these depend
+#: on what the ordering *is*.
+_ORDERED_OPERATORS = frozenset({"lt", "lte", "gt", "gte"})

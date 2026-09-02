@@ -1,18 +1,15 @@
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
 from models.user import SYSTEM_USER_ID
+from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
@@ -30,14 +27,7 @@ async def skill_client(
         AgentSkill as _AgentSkill,  # noqa: F401 — registers model
     )
 
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     await seed_users(mem_engine)
     await seed_tenant(mem_engine)
 
@@ -49,7 +39,7 @@ async def skill_client(
     app.dependency_overrides[get_agent_registry] = lambda: mock_agent_registry
     # Without this the router's BackgroundTasks would run the real clone job,
     # which opens its own session on the *application* engine — the developer's
-    # database, not this in-memory one.
+    # database, not this throwaway one.
     app.dependency_overrides[get_skill_sync_job] = lambda: mock_sync_job
     _install_auth_overrides(app)
     try:

@@ -14,10 +14,8 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, col, select
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
@@ -41,6 +39,7 @@ from services.email_queue_worker import (
     EmailQueueWorker,
     backoff_delay,
 )
+from tests._engine import make_test_engine
 
 _TENANT_ID = "tenant-worker"
 _NOW = datetime(2026, 8, 24, 9, 0, tzinfo=UTC)
@@ -115,22 +114,14 @@ class _FakeSender:
 
 @pytest_asyncio.fixture()
 async def sessions() -> AsyncGenerator[async_sessionmaker[AsyncSession], None]:
-    """A session factory over one shared in-memory database.
+    """A session factory over one shared throwaway database.
 
-    ``StaticPool`` is what makes the worker's own per-pass session see the rows
-    the test seeded: without it every connection to ``:memory:`` gets a database
-    of its own.
+    Every session the factory opens has to reach the same database, or the
+    worker's own per-pass session would not see the rows the test seeded.
+    :func:`tests._engine.make_test_engine` is what guarantees that on either
+    backend -- on SQLite by holding the one ``:memory:`` connection open.
     """
-    mem_engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:", poolclass=StaticPool
-    )
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     factory = async_sessionmaker(
         mem_engine, class_=AsyncSession, expire_on_commit=False
     )

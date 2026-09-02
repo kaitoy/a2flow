@@ -12,15 +12,13 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
 from infrastructure.email_sender import SmtpConfig
 from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.user import SYSTEM_USER_ID
+from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests.conftest import _install_auth_overrides
 
@@ -67,21 +65,14 @@ def sender() -> _RecordingSender:
 async def settings_client(
     sender: _RecordingSender,
 ) -> AsyncGenerator[AsyncClient, None]:
-    """Client bound to an in-memory database with the settings row seeded."""
+    """Client bound to a throwaway database with the settings row seeded."""
     from dependencies.singletons import get_email_sender
     from infrastructure.database import get_session
     from main import app
     from models.system_settings import SystemSettings as _SystemSettings  # noqa: F401
     from models.user import User as _User  # noqa: F401 — registers model
 
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     async with AsyncSession(mem_engine) as session:
         await seed_system_user(session)
         await seed_system_settings(session)

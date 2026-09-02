@@ -1,0 +1,82 @@
+# Runs the backend test suite twice: once on the default in-memory SQLite, and
+# once against a real PostgreSQL server, which is what a deployment runs on.
+# The two are not interchangeable -- native enum types, collation-driven sort
+# order, jsonb, and a transaction that stays aborted after a failed statement
+# all behave differently -- so a change that passes on one can still be broken
+# on the other.
+name: Backend tests
+
+on:
+  push:
+    branches: [master]
+    # Repeated under pull_request rather than shared through a YAML anchor:
+    # GitHub Actions does not support anchors in workflow files.
+    paths:
+      - "backend/**"
+      - "mise.toml"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "mise.toml"
+      - ".github/workflows/backend-tests.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: backend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    strategy:
+      # Report both backends on a failure; knowing whether a break is
+      # dialect-specific is most of the diagnosis.
+      fail-fast: false
+      matrix:
+        include:
+          - backend: sqlite
+            # Empty leaves A2FLOW_TEST_PG_URL unset as far as tests/_engine.py
+            # is concerned, which selects in-memory SQLite.
+            pg_url: ""
+          - backend: postgresql
+            pg_url: postgresql+asyncpg://a2flow:a2flow@localhost:5432/a2flow_test
+
+    # Started for both matrix entries -- `services` cannot be made conditional
+    # -- but the SQLite entry simply never connects to it.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: a2flow
+          POSTGRES_PASSWORD: a2flow
+          POSTGRES_DB: a2flow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U a2flow -d a2flow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    name: pytest (${{ matrix.backend }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # mise.toml is the single source of truth for the Python and uv versions,
+      # here as much as on a developer's machine.
+      - name: Install the pinned toolchain
+        uses: jdx/mise-action@v2
+
+      # Runs in parallel across the runner's cores via pytest-xdist (`-n auto`
+      # in backend/pyproject.toml's addopts). Each worker takes a PostgreSQL
+      # schema of its own, so parallelism is safe on either backend.
+      - name: Run the test suite
+        env:
+          A2FLOW_TEST_PG_URL: ${{ matrix.pg_url }}
+        run: uv run pytest

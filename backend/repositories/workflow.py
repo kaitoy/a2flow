@@ -3,7 +3,8 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from sqlalchemy import and_, case, null
+from sqlalchemy import and_, case, literal, null
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 from sqlmodel import col, select
@@ -255,7 +256,18 @@ class SqlWorkflowRepository:
             ),
             "status": ColumnOverride(
                 expression=case(
-                    (published, WorkflowStatus.published.value),
+                    # Bound with the column's own Enum type rather than as a
+                    # bare string: PostgreSQL stores this column as a native
+                    # ``workflowstatus`` enum and refuses a CASE whose branches
+                    # are that enum and ``character varying``. SQLite keeps the
+                    # column as text, so the difference is invisible there.
+                    (
+                        published,
+                        literal(
+                            WorkflowStatus.published,
+                            type_=sa_inspect(Workflow).columns["status"].type,
+                        ),
+                    ),
                     else_=col(Workflow.status),
                 )
             ),

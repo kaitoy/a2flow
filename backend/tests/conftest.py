@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 import math
 import os
@@ -13,15 +14,14 @@ import pytest_asyncio
 from fastapi import Request
 from google.adk.sessions import InMemorySessionService
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.orm import configure_mappers
-from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 import models
 from config import Settings, get_settings
 from models.user import SYSTEM_USER_ID, User
+from tests._engine import drop_schema, make_test_engine, pg_url, provision_schema
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 # Import every model submodule (mirroring alembic/env.py) and configure
@@ -35,6 +35,31 @@ from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 for _finder, _module_name, _is_pkg in pkgutil.iter_modules(models.__path__):
     importlib.import_module(f"models.{_module_name}")
 configure_mappers()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _postgres_schema() -> Iterator[None]:
+    """Own this pytest process's PostgreSQL schema for the length of the session.
+
+    A no-op on the default SQLite backend. When ``A2FLOW_TEST_PG_URL`` selects
+    PostgreSQL (see :mod:`tests._engine`), the schema and all its tables are
+    built once here instead of per test, leaving ``make_test_engine`` only a
+    ``TRUNCATE`` to pay on each one.
+
+    ``asyncio.run`` rather than an async fixture: this is session-scoped, and
+    ``pytest-asyncio`` creates and tears down its event loop around each
+    individual test, so there is no loop here to borrow. The engines it opens
+    are disposed before it returns, so nothing outlives that private loop.
+    """
+    if pg_url() is None:
+        yield
+        return
+    asyncio.run(provision_schema())
+    try:
+        yield
+    finally:
+        asyncio.run(drop_schema())
+
 
 _WORKER_CPU_RATIO = 0.5  # matches frontend-vitest's `--maxWorkers=50%` in lefthook.yml
 
@@ -297,7 +322,7 @@ def mock_sync_job() -> AsyncMock:
     """Stand-in for the background clone job scheduled by the agent-skills router.
 
     The real job opens a database session on the application engine, which a
-    test driving the router over an in-memory database cannot redirect — so it
+    test driving the router over a throwaway database cannot redirect — so it
     is replaced wholesale. ``workflow_client`` gives it a side effect that
     publishes :data:`FAKE_COMMIT_SHA` on the skill, standing in for a successful
     clone, so a skill registered through the API ends up runnable exactly as it
@@ -353,7 +378,7 @@ async def _workflow_client_env(
     mock_generation_job: AsyncMock,
     real_session_service: InMemorySessionService,
 ) -> AsyncIterator[tuple[AsyncClient, AsyncEngine]]:
-    """Set up the workflow API client and its backing in-memory engine.
+    """Set up the workflow API client and its backing throwaway engine.
 
     Shared by the ``workflow_client`` fixture (client only) and
     ``workflow_client_with_engine`` (client plus engine, for tests that need to
@@ -382,14 +407,7 @@ async def _workflow_client_env(
         WorkflowTaskTemplate as _WorkflowTaskTemplate,  # noqa: F401 — registers model
     )
 
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     await seed_users(mem_engine)
     await seed_tenant(mem_engine)
 
@@ -502,7 +520,7 @@ AUTH_PASSWORD = "login-password-123"
 async def auth_client() -> AsyncGenerator[AsyncClient, None]:
     """Yield a client exercising the real auth/CSRF flow (no dependency overrides).
 
-    Backed by an in-memory database seeded with the system user and one enabled
+    Backed by a throwaway database seeded with the system user and one enabled
     login user (:data:`AUTH_USERNAME` / :data:`AUTH_PASSWORD`, password hashed),
     so tests can drive ``/auth/login``, ``/auth/me``, and ``/auth/logout`` end
     to end. The ``httpx`` client keeps a cookie jar across requests, so cookies
@@ -515,14 +533,7 @@ async def auth_client() -> AsyncGenerator[AsyncClient, None]:
     from models.auth_session import AuthSession as _AuthSession  # noqa: F401
     from models.user import User as _User  # noqa: F401
 
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     await seed_users(mem_engine, ids=())
     async with AsyncSession(mem_engine) as session:
         session.add(

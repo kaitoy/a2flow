@@ -13,9 +13,8 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlmodel import SQLModel, col, select
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
@@ -57,6 +56,7 @@ from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from models.user_group import UserGroup, UserGroupMember
 from repositories.effective_roles import SqlEffectiveRoleRepository
+from tests._engine import make_test_engine
 
 #: Fixed id of the ``Default`` tenant the fixture seeds, so tests can assert on
 #: the ``tenant_id`` the demo records land in without re-querying it.
@@ -67,7 +67,7 @@ _DEMO_LOGGER = "infrastructure.demo_data"
 
 
 async def _fresh_engine(*, with_default_tenant: bool = True) -> AsyncEngine:
-    """Create an in-memory SQLite engine with the schema and system user seeded.
+    """Create a throwaway engine with the schema and system user seeded.
 
     Args:
         with_default_tenant: Whether to also insert the seeded ``Default``
@@ -76,14 +76,7 @@ async def _fresh_engine(*, with_default_tenant: bool = True) -> AsyncEngine:
     Returns:
         The prepared engine.
     """
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     async with AsyncSession(mem_engine) as session:
         await seed_system_user(session)
         if with_default_tenant:

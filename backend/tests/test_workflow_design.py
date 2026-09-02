@@ -2,7 +2,7 @@
 
 The job runs outside FastAPI's request scope: it opens database sessions of its
 own on ``infrastructure.database.engine``, so each test monkeypatches that
-engine to an isolated in-memory SQLite database and drives the job with fake
+engine to a throwaway database and drives the job with fake
 singletons (agent registry, session service, skill store) plus a monkeypatched
 summarizer — the LLM never runs.
 """
@@ -16,10 +16,8 @@ import pytest
 import pytest_asyncio
 from ag_ui.core import EventType, RunErrorEvent
 from google.adk.sessions import InMemorySessionService
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, select
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
@@ -32,6 +30,7 @@ from services.workflow_design import (
     _agent_run_failed_reason,
     generate_workflow_design,
 )
+from tests._engine import make_test_engine
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 _SHA = "a" * 40
@@ -41,15 +40,8 @@ _SHA = "a" * 40
 async def engine(
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[AsyncEngine, None]:
-    """Yield an in-memory engine and point the job's module-level engine at it."""
-    eng = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-
-    @sa_event.listens_for(eng.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with eng.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """Yield a throwaway engine and point the job's module-level engine at it."""
+    eng = await make_test_engine()
     await seed_users(eng, ids=("owner",))
     await seed_tenant(eng)
 

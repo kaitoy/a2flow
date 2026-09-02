@@ -108,6 +108,24 @@ cd backend && uv run pytest -v
 cd backend && uv run pytest -n0 -k some_test --pdb
 ```
 
+The suite runs on in-memory SQLite by default. Setting `A2FLOW_TEST_PG_URL`
+points every fixture at a real PostgreSQL server instead, which is what a
+deployment runs on — worth doing for any change to a query, a model, or a
+migration, since the dialects differ on native enum types, sort collation,
+`jsonb`, and post-error transaction state:
+
+```bash
+docker compose -f ../compose.test.yml up -d
+cd backend && A2FLOW_TEST_PG_URL=postgresql+asyncpg://a2flow:a2flow@localhost:5433/a2flow_test uv run pytest
+```
+
+`tests/_engine.py` owns that switch: `make_test_engine()` is where every fixture
+gets its engine, and it hands back an empty database on whichever backend is
+configured. A test that genuinely needs a specific dialect calls
+`make_sqlite_engine()` / `make_postgres_engine()` and says why. See
+[Testing](../README.md#running-the-backend-suite-against-postgresql) in the root
+README for the isolation model and the CI wiring.
+
 ## API
 
 All REST endpoints are documented interactively by the [Scalar API reference](http://localhost:3000/api-doc) (frontend route `/api-doc`), generated from the live OpenAPI spec — paths, request/response schemas, status codes, and a built-in "Test Request" console stay in sync with the running backend automatically. This section does not repeat those per-endpoint signatures; it covers only what the spec does not capture: the conventions shared by every endpoint, each resource's business rules, and the two surfaces intentionally **excluded** from the spec — the agent's AG-UI streaming endpoint and the agent's function tools.

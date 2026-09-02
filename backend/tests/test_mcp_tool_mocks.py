@@ -1,16 +1,14 @@
 """Integration tests for the MCPToolMock CRUD endpoints."""
 
 from collections.abc import AsyncGenerator
-from typing import Any
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.user import SYSTEM_USER_ID
+from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
@@ -18,15 +16,8 @@ from tests.conftest import _install_auth_overrides
 
 @pytest_asyncio.fixture()
 async def mem_engine() -> AsyncGenerator[AsyncEngine, None]:
-    """Yield an isolated in-memory engine with the schema created and users seeded."""
-    eng = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(eng.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with eng.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """Yield a throwaway engine with the schema created and users seeded."""
+    eng = await make_test_engine()
     await seed_users(eng)
     await seed_tenant(eng)
     yield eng

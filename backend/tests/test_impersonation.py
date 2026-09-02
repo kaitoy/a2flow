@@ -13,9 +13,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel, col, select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from dependencies.auth import (
@@ -32,6 +30,7 @@ from repositories.exceptions import ForbiddenError, NotFoundError
 from repositories.impersonation_event import SqlImpersonationEventRepository
 from repositories.user import SqlUserRepository
 from services.impersonation import ImpersonationService
+from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import AUTH_PASSWORD
@@ -103,14 +102,7 @@ async def _seed_impersonation_cast(engine: Any) -> None:
 @pytest_asyncio.fixture()
 async def impersonation_service_engine() -> AsyncGenerator[Any, None]:
     """In-memory engine seeded with the cast, for direct ``ImpersonationService`` calls."""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    engine = await make_test_engine()
     await _seed_impersonation_cast(engine)
     try:
         yield engine
@@ -448,14 +440,7 @@ async def impersonation_client() -> AsyncGenerator[tuple[AsyncClient, Any], None
     from infrastructure.database import get_session
     from main import app
 
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    engine = await make_test_engine()
     await _seed_impersonation_cast(engine)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:

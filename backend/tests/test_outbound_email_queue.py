@@ -12,9 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest_asyncio
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel, col, select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_user
@@ -27,6 +25,7 @@ from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID
 from repositories.outbound_email import SqlOutboundEmailRepository
 from repositories.outbound_email_queue import SqlOutboundEmailQueue
+from tests._engine import make_test_engine
 
 _TENANT_ID = "tenant-queue"
 _OTHER_TENANT_ID = "tenant-other"
@@ -35,15 +34,8 @@ _NOW = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
 
 @pytest_asyncio.fixture()
 async def session() -> AsyncGenerator[AsyncSession, None]:
-    """An in-memory database session with the schema and baseline rows in place."""
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """A throwaway database session with the schema and baseline rows in place."""
+    mem_engine = await make_test_engine()
     async with AsyncSession(mem_engine) as db:
         await seed_system_user(db)
         for tenant_id in (_TENANT_ID, _OTHER_TENANT_ID):

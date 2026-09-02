@@ -13,9 +13,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel, col, select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
@@ -52,6 +50,7 @@ from services.notification_dispatch import (
     build_notification_dispatcher,
 )
 from services.system_settings import SystemSettingsService
+from tests._engine import make_test_engine
 
 _TENANT_ID = "tenant-dispatch"
 _RECIPIENT_ID = "recipient"
@@ -129,15 +128,8 @@ async def _enable_smtp(session: AsyncSession, **overrides: Any) -> None:
 
 @pytest_asyncio.fixture()
 async def session() -> AsyncGenerator[AsyncSession, None]:
-    """An in-memory database session with the schema created."""
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """A throwaway database session with the schema created."""
+    mem_engine = await make_test_engine()
     async with AsyncSession(mem_engine) as db:
         yield db
     await mem_engine.dispose()

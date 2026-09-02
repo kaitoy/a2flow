@@ -2,7 +2,7 @@
 
 Drives the real presenter (:mod:`infrastructure.mcp_credentials`) and the real
 verifier (:class:`infrastructure.mcp_proxy.McpProxy` with the default policy
-chain) against an in-memory database, faking only the remote MCP traffic. That
+chain) against a throwaway database, faking only the remote MCP traffic. That
 is the combination the enforcement claim actually rests on, so the cases here
 are the ones worth reading first:
 
@@ -30,10 +30,8 @@ import pytest_asyncio
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import ec
 from mcp import types
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, col, select
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.mcp_audit import SqlMcpAuditSink
@@ -79,6 +77,7 @@ from repositories.mcp_server import SqlMCPServerRepository
 from repositories.workflow_execution import SqlWorkflowExecutionRepository
 from repositories.workflow_task import SqlWorkflowTaskRepository
 from services.approval_certificate import ApprovalCertificateService
+from tests._engine import make_test_engine
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 SESSION_ID = "sess-approval"
@@ -89,15 +88,8 @@ TOOL = "read_file"
 async def engine(
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[AsyncEngine, None]:
-    """Yield an in-memory engine and point the module-level engine at it."""
-    eng = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-
-    @sa_event.listens_for(eng.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with eng.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """Yield a throwaway engine and point the module-level engine at it."""
+    eng = await make_test_engine()
     await seed_users(eng)
     await seed_tenant(eng)
 

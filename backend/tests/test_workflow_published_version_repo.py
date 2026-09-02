@@ -7,22 +7,18 @@ dialect: ``jsonb_array_elements`` with ``WITH ORDINALITY`` on PostgreSQL,
 spellings cannot drift apart.
 
 SQLite runs always. PostgreSQL runs only when ``A2FLOW_TEST_PG_URL`` names a
-reachable server, and is skipped otherwise -- it creates a throwaway schema of
-its own and drops it afterwards, so it never touches an existing database's
-tables.
+reachable server, and is skipped otherwise. Note that this module names both
+dialects explicitly, where every other module takes whichever one that variable
+selects: a run that covered only one of the two spellings could not show that
+they still agree.
 """
 
-import os
-import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event as sa_event
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
@@ -38,10 +34,13 @@ from repositories.query import FilterSpec, SortSpec
 from repositories.workflow_published_version import (
     SqlWorkflowPublishedVersionRepository,
 )
+from tests._engine import (
+    PG_URL_ENV,
+    make_postgres_engine,
+    make_sqlite_engine,
+    pg_url,
+)
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
-
-#: Environment variable naming a PostgreSQL server to run the jsonb half against.
-PG_URL_ENV = "A2FLOW_TEST_PG_URL"
 
 OTHER_TENANT_ID = "tenant-other"
 WORKFLOW_ID = "wf-published"
@@ -128,30 +127,21 @@ async def _seed(engine: AsyncEngine) -> None:
 async def repo(
     request: pytest.FixtureRequest,
 ) -> AsyncGenerator[SqlWorkflowPublishedVersionRepository, None]:
-    """Yield a repository over a freshly seeded database, once per dialect."""
-    schema: str | None = None
-    if request.param == "sqlite":
-        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    """Yield a repository over a freshly seeded database, once per dialect.
 
-        @sa_event.listens_for(engine.sync_engine, "connect")
-        def _set_fk(dbapi_conn: object, _: object) -> None:
-            dbapi_conn.execute("PRAGMA foreign_keys=ON")  # type: ignore[attr-defined]
+    Both dialects are named explicitly rather than following whichever backend
+    ``A2FLOW_TEST_PG_URL`` selects for the rest of the suite: the point of this
+    module is that the two spellings agree, which a run covering only one of
+    them cannot show.
+    """
+    if request.param == "sqlite":
+        engine = await make_sqlite_engine()
     else:
-        url = os.environ.get(PG_URL_ENV)
-        if not url:
+        if pg_url() is None:
             pytest.skip(f"{PG_URL_ENV} is not set; skipping the PostgreSQL dialect")
-        schema = f"a2flow_test_{uuid.uuid4().hex[:12]}"
-        admin = create_async_engine(url, isolation_level="AUTOCOMMIT")
-        async with admin.connect() as conn:
-            await conn.execute(text(f'CREATE SCHEMA "{schema}"'))
-        await admin.dispose()
-        engine = create_async_engine(
-            url, connect_args={"server_settings": {"search_path": schema}}
-        )
+        engine = await make_postgres_engine()
 
     try:
-        async with engine.begin() as conn:
-            await conn.run_sync(SQLModel.metadata.create_all)
         await _seed(engine)
         async with AsyncSession(engine) as session:
             yield SqlWorkflowPublishedVersionRepository(
@@ -159,13 +149,6 @@ async def repo(
             )
     finally:
         await engine.dispose()
-        if schema is not None:
-            admin = create_async_engine(
-                os.environ[PG_URL_ENV], isolation_level="AUTOCOMMIT"
-            )
-            async with admin.connect() as conn:
-                await conn.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
-            await admin.dispose()
 
 
 async def _titles(

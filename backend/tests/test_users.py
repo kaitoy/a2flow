@@ -3,13 +3,11 @@ from typing import Any
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_user
 from models.user import SYSTEM_USER_ID
+from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant
 from tests.conftest import _install_auth_overrides
@@ -22,14 +20,7 @@ async def user_client() -> AsyncGenerator[AsyncClient, None]:
     from models.tenant import Tenant as _Tenant  # noqa: F401 — registers model
     from models.user import User as _User  # noqa: F401 — registers model
 
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     async with AsyncSession(mem_engine) as session:
         await seed_system_user(session)
     await seed_tenant(mem_engine, DEFAULT_TEST_TENANT_ID)

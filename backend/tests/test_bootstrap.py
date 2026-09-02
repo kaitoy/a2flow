@@ -17,13 +17,12 @@ validation failure, the whole row) untouched.
 
 import logging
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any, get_args
+from typing import get_args
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlmodel import SQLModel, col, select
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import (
@@ -40,22 +39,30 @@ from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from repositories.exceptions import NotFoundError
+from tests._engine import make_sqlite_engine, make_test_engine
 
 _PASSWORD_CONSTRAINTS = get_args(Password)[1]
 
 _BOOTSTRAP_LOGGER = "infrastructure.bootstrap"
 
 
-async def _fresh_seeded_engine() -> AsyncEngine:
-    """Create an in-memory SQLite engine with the schema and system user seeded."""
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+async def _fresh_seeded_engine(*, independent: bool = False) -> AsyncEngine:
+    """Create a throwaway engine with the schema and system user seeded.
 
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
+    Args:
+        independent: Force a private SQLite database even when the suite is
+            running against PostgreSQL, where every engine otherwise shares
+            this process's one schema and the newer one empties it. Only for
+            the rare test that needs two *live*, unrelated databases at once;
+            what such a test asserts (see
+            :func:`test_seed_root_user_two_fresh_databases_get_different_passwords`)
+            has to be dialect-independent, or forcing the dialect would make it
+            a weaker test than it looks.
 
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    Returns:
+        An engine over an empty database holding only the system user.
+    """
+    mem_engine = await (make_sqlite_engine() if independent else make_test_engine())
     async with AsyncSession(mem_engine) as session:
         await seed_system_user(session)
     return mem_engine
@@ -63,7 +70,7 @@ async def _fresh_seeded_engine() -> AsyncEngine:
 
 @pytest_asyncio.fixture()
 async def engine() -> AsyncGenerator[AsyncEngine, None]:
-    """Provide an in-memory SQLite engine with the schema and system user seeded."""
+    """Provide a throwaway engine with the schema and system user seeded."""
     mem_engine = await _fresh_seeded_engine()
     try:
         yield mem_engine
@@ -168,8 +175,8 @@ async def test_seed_root_user_two_fresh_databases_get_different_passwords(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     monkeypatch.delenv("ROOT_PASSWORD", raising=False)
-    engine_a = await _fresh_seeded_engine()
-    engine_b = await _fresh_seeded_engine()
+    engine_a = await _fresh_seeded_engine(independent=True)
+    engine_b = await _fresh_seeded_engine(independent=True)
     try:
         password_a = await _seed_with_generated_password(
             engine_a, caplog, seed_root_user

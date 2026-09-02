@@ -13,8 +13,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -25,6 +24,7 @@ from models.secret import Secret, SecretRead
 from models.tag import MAX_RECORD_TAGS
 from models.user import SYSTEM_USER_ID
 from models.workflow import Workflow, WorkflowRead
+from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
@@ -51,21 +51,11 @@ OUTSIDER: dict[str, str] = {
 
 @pytest_asyncio.fixture()
 async def tag_env() -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None]:
-    """Yield an API client plus the in-memory engine backing it."""
+    """Yield an API client plus the throwaway engine backing it."""
     from infrastructure.database import get_session
     from main import app
 
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    # CASCADE on the join tables is a database-level guarantee, and SQLite only
-    # honours it with foreign keys switched on. Without this the delete tests
-    # would pass for the wrong reason.
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     async with AsyncSession(mem_engine) as session:
         await seed_system_user(session)
     await seed_tenant(mem_engine, DEFAULT_TEST_TENANT_ID)

@@ -126,21 +126,41 @@ cd frontend && pnpm test          # vitest + Testing Library + MSW on happy-dom
 
 Both suites also run from the pre-commit hook, gated so a backend-only or frontend-only commit skips the other side. See [backend/README.md](backend/README.md#testing) and [frontend/README.md](frontend/README.md#testing) for the options each takes.
 
-The backend suite runs on in-memory SQLite. One module —
-`backend/tests/test_workflow_published_version_repo.py`, covering the only query
-that reads *into* a JSON column and therefore has a PostgreSQL and a SQLite
-spelling — runs each of its tests against both dialects. The PostgreSQL half is
-skipped unless `A2FLOW_TEST_PG_URL` names a reachable server; set it to exercise
-the `jsonb` path:
+#### Running the backend suite against PostgreSQL
+
+The backend suite runs on in-memory SQLite by default — no setup, nothing to
+install. A deployment runs on PostgreSQL, though, and the two disagree on more
+than syntax: native enum types, collation-driven sort order, `jsonb` versus
+`JSON`, and a transaction that stays aborted after a failed statement. Setting
+`A2FLOW_TEST_PG_URL` to a reachable server points **the whole suite** at it
+instead. [compose.test.yml](compose.test.yml) brings up a throwaway server for
+exactly that:
 
 ```bash
-cd backend && A2FLOW_TEST_PG_URL=postgresql+asyncpg://user:pass@localhost/postgres uv run pytest
+docker compose -f compose.test.yml up -d          # PostgreSQL 17 on port 5433
+cd backend && A2FLOW_TEST_PG_URL=postgresql+asyncpg://a2flow:a2flow@localhost:5433/a2flow_test uv run pytest
+docker compose -f compose.test.yml down
 ```
 
-Each run creates a throwaway schema of its own and drops it afterwards, so it
-never touches an existing database's tables. Add the variable to CI when a
-PostgreSQL service is available there; without it those tests report as skipped
-rather than passing silently.
+That server keeps nothing on disk and is separate from `compose.yml`'s `db`
+service, which owns a developer's real application data — a test run empties
+every table it can reach, so never aim the variable at a database you care
+about. Within the server, each pytest process takes a schema of its own
+(`backend/tests/_engine.py`), created once and dropped at the end, so
+`pytest-xdist` workers stay isolated and an existing database's tables are never
+touched.
+
+[backend-tests.yml](.github/workflows/backend-tests.yml) runs both backends on
+every push and pull request that touches `backend/`, so a dialect-specific break
+is caught there even though the pre-commit hook only runs the SQLite half.
+
+Two modules do their own thing regardless of that variable, because they exist
+to compare the dialects rather than to run on one:
+`tests/test_workflow_published_version_repo.py` (the only query that reads
+*into* a JSON column, spelled `jsonb_array_elements` on PostgreSQL and
+`json_each` on SQLite) and `tests/test_migrations.py` (`alembic upgrade head`
+must produce the declared schema on both). Each names both dialects explicitly
+and skips its PostgreSQL half when the variable is unset.
 
 ### API contract (OpenAPI → Zod)
 

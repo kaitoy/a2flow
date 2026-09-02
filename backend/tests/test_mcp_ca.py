@@ -7,16 +7,15 @@ ciphertext, and the X.509 shape of both the root and the leaves it signs.
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 import pytest
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlmodel import SQLModel, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 import models  # noqa: F401 — registers every table on SQLModel.metadata
@@ -34,25 +33,20 @@ from infrastructure.mcp_ca import (
 )
 from infrastructure.secret_cipher import get_secret_cipher
 from models.mcp_ca import MCPCertificateAuthority
+from repositories._integrity import is_unique_error
 from repositories.mcp_ca import SqlMcpCertificateAuthorityRepository
+from tests._engine import make_test_engine
 from tests._seed import seed_users
 
 
 @pytest.fixture
 async def engine() -> AsyncIterator[AsyncEngine]:
-    """An in-memory SQLite engine with the full schema and the seeded users.
+    """A throwaway engine with the full schema and the seeded users.
 
     The CA rows carry ``created_by`` / ``updated_by`` foreign keys to
     ``users.id``, so the system user has to exist before anything is written.
     """
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     await seed_users(mem_engine)
     try:
         yield mem_engine
@@ -159,8 +153,11 @@ async def test_only_one_authority_may_be_active(engine: AsyncEngine) -> None:
     )
     async with AsyncSession(engine) as session:
         session.add(duplicate)
-        with pytest.raises(Exception, match="UNIQUE constraint failed"):
+        with pytest.raises(IntegrityError) as exc_info:
             await session.commit()
+    # SQLite and PostgreSQL word the failure differently, so assert through the
+    # same classifier the repositories use rather than matching one dialect's text.
+    assert is_unique_error(exc_info.value)
 
 
 # --------------------------------------------------------------------------

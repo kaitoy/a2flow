@@ -58,6 +58,8 @@ Every section opens on a table, and every table offers the same controls:
 | **Add** | Opens the create form. Hidden without the write role. |
 | **Actions column** | Per-row actions — Delete, and whatever else the record type offers. Hidden without the write role. |
 
+A column holding one of a fixed set of values — a task's status, an MCP server's transport, a tag's colour — sorts in the order those values are meant to be read, not alphabetically. Sorting tasks by status therefore runs `pending`, `in_progress`, `completed`, `failed`, `skipped`, the same lifecycle order the status dots follow everywhere else.
+
 ### Choosing columns
 
 The **▥** button next to Refresh lists every column the table can show:

@@ -299,7 +299,8 @@ async def test_list_session_tasks_sort_multi_field(
 ) -> None:
     execution = await _create_workflow_execution(workflow_client)
     # Same status so the tie between "a" and "b" is broken by the second sort
-    # field (title); "c" sorts first since "failed" < "pending".
+    # field (title); "c" sorts last because a status orders by its position in
+    # the lifecycle, and ``failed`` comes after ``pending`` there.
     await _create_task(workflow_client, execution["id"], title="b", status="pending")
     await _create_task(workflow_client, execution["id"], title="a", status="pending")
     await _create_task(workflow_client, execution["id"], title="c", status="failed")
@@ -308,7 +309,92 @@ async def test_list_session_tasks_sort_multi_field(
         params={"s": "status,title"},
     )
     titles = [t["title"] for t in assert_ok(response)]
-    assert titles == ["c", "a", "b"]
+    assert titles == ["a", "b", "c"]
+
+
+async def test_list_session_tasks_sort_by_status_follows_the_lifecycle(
+    workflow_client: AsyncClient,
+) -> None:
+    """A status sorts by its position in the lifecycle, not by its spelling.
+
+    Alphabetically these five would come back ``completed, failed, in_progress,
+    pending, skipped``, which tells a reader nothing. This is also what keeps
+    the two dialects agreeing: PostgreSQL stores the column as a native enum and
+    orders it this way already, while SQLite would sort the text.
+    """
+    execution = await _create_workflow_execution(workflow_client)
+    lifecycle = ["pending", "in_progress", "completed", "failed", "skipped"]
+    for status in reversed(lifecycle):
+        await _create_task(
+            workflow_client, execution["id"], title=status, status=status
+        )
+
+    response = await workflow_client.get(
+        f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks",
+        params={"s": "status"},
+    )
+    assert [t["status"] for t in assert_ok(response)] == lifecycle
+
+    response = await workflow_client.get(
+        f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks",
+        params={"s": "-status"},
+    )
+    assert [t["status"] for t in assert_ok(response)] == list(reversed(lifecycle))
+
+
+async def test_list_session_tasks_status_range_filter_follows_the_lifecycle(
+    workflow_client: AsyncClient,
+) -> None:
+    """An ordered comparison on a status means the order the sort means.
+
+    ``gte:completed`` takes the tail of the lifecycle. Compared as text it would
+    instead take ``failed``, ``in_progress``, ``pending`` and ``skipped`` — a
+    different set, and a different one again per dialect.
+    """
+    execution = await _create_workflow_execution(workflow_client)
+    for status in ("pending", "in_progress", "completed", "failed", "skipped"):
+        await _create_task(
+            workflow_client, execution["id"], title=status, status=status
+        )
+
+    async def _statuses(query: str) -> list[str]:
+        response = await workflow_client.get(
+            f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks",
+            params={"q": query, "s": "status"},
+        )
+        return [t["status"] for t in assert_ok(response)]
+
+    assert await _statuses("status:gte:completed") == [
+        "completed",
+        "failed",
+        "skipped",
+    ]
+    assert await _statuses("status:lt:completed") == ["pending", "in_progress"]
+    # Equality is unaffected by the rewrite and still selects the one value.
+    assert await _statuses("status:eq:failed") == ["failed"]
+
+
+async def test_list_session_tasks_status_substring_filter_matches(
+    workflow_client: AsyncClient,
+) -> None:
+    """A substring filter reaches a status like it reaches any other string.
+
+    PostgreSQL keeps the column as a native enum, and an enum has no ``ILIKE``
+    operator of its own, so without the text cast this is a 500 there while
+    passing on SQLite — which stores the same column as text.
+    """
+    execution = await _create_workflow_execution(workflow_client)
+    for status in ("pending", "in_progress", "completed"):
+        await _create_task(
+            workflow_client, execution["id"], title=status, status=status
+        )
+
+    response = await workflow_client.get(
+        f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks",
+        # Upper case on purpose: the match is case-insensitive on both dialects.
+        params={"q": "status:like:PEND"},
+    )
+    assert [t["status"] for t in assert_ok(response)] == ["pending"]
 
 
 async def test_list_session_tasks_invalid_filter_value_returns_400(

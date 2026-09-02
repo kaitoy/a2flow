@@ -11,20 +11,18 @@ approvals.
 """
 
 from collections.abc import AsyncGenerator
-from typing import Any
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalStatus
 from models.user import User
 from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
+from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
@@ -36,14 +34,7 @@ async def approval_env() -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None
     from infrastructure.database import get_session
     from main import app
 
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(mem_engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with mem_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    mem_engine = await make_test_engine()
     await seed_users(mem_engine)
     await seed_tenant(mem_engine)
 

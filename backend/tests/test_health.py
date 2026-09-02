@@ -4,17 +4,18 @@ from unittest.mock import AsyncMock
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from tests._engine import make_test_engine
 
 
 @pytest_asyncio.fixture()
 async def db_ok_client() -> AsyncGenerator[AsyncClient, None]:
-    """A client backed by an isolated in-memory database, for the reachable-DB path."""
+    """A client backed by an isolated throwaway database, for the reachable-DB path."""
     from infrastructure.database import get_session
     from main import app
 
-    mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    mem_engine = await make_test_engine()
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine) as session:

@@ -7,9 +7,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel, col, select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from dependencies.auth import (
@@ -26,6 +24,7 @@ from repositories.exceptions import UnauthorizedError
 from repositories.tenant import SqlTenantRepository
 from repositories.user import SqlUserRepository
 from services.auth import AuthService
+from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_users
 from tests.conftest import AUTH_PASSWORD, AUTH_USERNAME
@@ -161,15 +160,8 @@ async def test_invalid_session_clears_auth_cookies(auth_client: AsyncClient) -> 
 
 @pytest_asyncio.fixture()
 async def auth_service_engine() -> AsyncGenerator[Any, None]:
-    """Provide an in-memory engine seeded with the system user for service tests."""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @sa_event.listens_for(engine.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """Provide a throwaway engine seeded with the system user for service tests."""
+    engine = await make_test_engine()
     await seed_users(engine, ids=())
     try:
         yield engine

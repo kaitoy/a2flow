@@ -1,7 +1,7 @@
 """Tests for the MCP proxy agent tools in ``infrastructure.mcp_tools``.
 
 Like the WorkflowTask tool tests, each test monkeypatches the module-level
-database engine to an isolated in-memory SQLite database and drives the tools
+database engine to a throwaway database and drives the tools
 with a lightweight fake ToolContext. Remote MCP traffic is faked by
 monkeypatching ``infrastructure.mcp_client``.
 """
@@ -13,10 +13,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from mcp import types
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
@@ -41,6 +38,7 @@ from models.workflow_task import (
     WorkflowTaskToolBinding,
 )
 from repositories.exceptions import McpConnectionError
+from tests._engine import make_test_engine
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
@@ -92,15 +90,8 @@ async def _seed_design_session(
 async def engine(
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[AsyncEngine, None]:
-    """Yield an in-memory engine and point the tools' module-level engine at it."""
-    eng = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-
-    @sa_event.listens_for(eng.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with eng.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """Yield a throwaway engine and point the tools' module-level engine at it."""
+    eng = await make_test_engine()
     await seed_users(eng)
     await seed_tenant(eng)
 

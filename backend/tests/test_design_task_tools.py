@@ -1,7 +1,7 @@
 """Tests for the design agent tools in ``infrastructure.design_task_tools``.
 
 The tools open their own ``AsyncSession`` on ``infrastructure.database.engine``;
-each test monkeypatches that engine to an isolated in-memory SQLite database and
+each test monkeypatches that engine to a throwaway database and
 drives the tools with a lightweight fake ToolContext exposing only ``session.id``
 and ``user_id`` (the attributes the tools read). Unlike the session-task tools,
 these resolve the Workflow whose design session the run is in, and edit that
@@ -14,10 +14,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import event as sa_event
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.design_task_tools import (
@@ -31,6 +28,7 @@ from infrastructure.design_task_tools import (
 from models.agent_skill import AgentSkill
 from models.workflow import Workflow, WorkflowStatus
 from repositories.tenant_bootstrap import resolve_workflow_design_tenant
+from tests._engine import make_test_engine
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
 
@@ -78,15 +76,8 @@ async def _set_generation_error(
 async def engine(
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[AsyncEngine, None]:
-    """Yield an in-memory engine and point the tools' module-level engine at it."""
-    eng = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
-
-    @sa_event.listens_for(eng.sync_engine, "connect")
-    def _set_fk(dbapi_conn: Any, _: object) -> None:
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with eng.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """Yield a throwaway engine and point the tools' module-level engine at it."""
+    eng = await make_test_engine()
     await seed_users(eng)
     await seed_tenant(eng)
 
