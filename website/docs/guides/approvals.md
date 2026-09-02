@@ -62,6 +62,8 @@ Two things this buys that an instruction to the model could not:
 - **A prompt injection or a bug cannot skip the approval.** The gate is a rule the server checks, not a sentence in the agent's instructions plus a frontend that declines to resume.
 - **The granted tools are frozen at the moment of decision.** The certificate carries the tools the task had bound when the approver clicked Approve. An agent can rewrite its own task's tool bindings mid-run, so a check that re-reads the bindings at call time is a check the agent could widen. Approving a task to read a file does not become approval to delete one.
 
+Both halves — the pause and the unlocked tools — belong to **one task: the one that carries out the approved action**. A workflow often shows the request as a step of its own, as in "Request approval" followed by "Launch instance", and it is the second of those the approval covers, since that is where the tools are. A request that names a step with no tools of its own while a later step in the run has some is refused, so a run cannot end up with an approval that authorizes nothing.
+
 Every decided tool call — allowed or refused — is recorded on the run's [Tool Invocations](./workflow-executions.md#tool-invocations) page with the certificate it presented, so "which approval authorized this, and who granted it" can be answered afterwards.
 
 Nothing needs configuring for any of this; the certificate's lifetime is adjustable in the [configuration reference](../operations/configuration.md#mcp-tools-and-approvals).
@@ -81,4 +83,4 @@ Open **Approvals** in the admin sidebar to browse every approval request. This v
 
 Each row also carries an **Open Workflow Session** action that jumps straight into the run's chat, mirroring the one on the [Workflow Executions](./workflow-executions.md) list.
 
-A granted approval's detail page additionally shows what its certificate authorized: the **Authorized MCP tools**, the validity window, and whether the certificate has been revoked.
+A granted approval's detail page additionally shows what its certificate authorized: the **Authorized MCP tools**, the validity window, and whether the certificate has been revoked. An empty tool list is not a fault — it means the approved step performs its work without calling any MCP tool.

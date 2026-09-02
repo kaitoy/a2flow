@@ -11,6 +11,15 @@ agent then continues or aborts the task based on the recorded decision.
 ties it to the specific task that needs approval. ``response`` records an optional
 free-text comment supplied when the approver resolves the request.
 
+``workflow_task_id`` is optional only because the column has to survive its task
+being deleted (``ON DELETE SET NULL``). Every approval an agent requests names
+one, and it must name the task that *performs* the approved action rather than a
+step that merely asks for the go-ahead: both the gate
+(:class:`infrastructure.mcp_policies.ApprovedTaskCertificatePolicy`) and the
+grant (:class:`services.approval_certificate.ApprovalCertificateService`) are
+that task's. :func:`infrastructure.approval_tools.request_approval` requires the
+argument and rejects the inverted shape.
+
 **A request has exactly one destination**, expressed as one of two mutually
 exclusive fields the agent sets when it creates the approval:
 

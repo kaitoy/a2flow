@@ -44,6 +44,7 @@ from infrastructure.mcp_certificate import (
     arguments_digest as hash_arguments,
 )
 from infrastructure.mcp_certificate import (
+    extract_claims,
     pop_digest_from_parts,
     verify_certificate,
 )
@@ -68,6 +69,7 @@ from models.user import SYSTEM_USER_ID
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import (
     WorkflowTask,
+    WorkflowTaskDependency,
     WorkflowTaskStatus,
     WorkflowTaskToolBinding,
 )
@@ -160,14 +162,20 @@ async def _seed_execution(eng: AsyncEngine, *, session_id: str = SESSION_ID) -> 
 
 
 async def _seed_task(
-    eng: AsyncEngine, execution_id: str, *, bindings: list[tuple[str, str]]
+    eng: AsyncEngine,
+    execution_id: str,
+    *,
+    bindings: list[tuple[str, str]],
+    title: str = "Step",
+    status: WorkflowTaskStatus = WorkflowTaskStatus.in_progress,
+    depends_on: str | None = None,
 ) -> str:
-    """Insert an in-progress WorkflowTask with the given tool bindings."""
+    """Insert a WorkflowTask with the given tool bindings, in progress by default."""
     async with AsyncSession(eng) as db:
         task = WorkflowTask(
             workflow_execution_id=execution_id,
-            title="Step",
-            status=WorkflowTaskStatus.in_progress,
+            title=title,
+            status=status,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
@@ -182,6 +190,8 @@ async def _seed_task(
                     task_id=task_id, mcp_server_id=server_id, tool_name=tool_name
                 )
             )
+        if depends_on is not None:
+            db.add(WorkflowTaskDependency(task_id=task_id, depends_on_id=depends_on))
         await db.commit()
         return task_id
 
@@ -412,6 +422,64 @@ async def test_call_is_denied_once_the_certificate_is_revoked(
     # the "needs an approval" denial rather than a revocation-specific one.
     with pytest.raises(McpPolicyDeniedError, match="requires an approval"):
         await _call(server_id)
+
+
+async def test_an_asking_step_in_front_of_the_acting_task_still_gates_it(
+    engine: AsyncEngine,
+) -> None:
+    """The DAG shape a design agent produces, approved the right way round.
+
+    "Request approval" is a step of its own and binds no tools; the work runs in
+    a later task that does. The approval must name that later task, because the
+    gate and the grant are both the named task's: naming the asking step would
+    freeze an empty grant and leave the acting task with no approval attached,
+    hence ungated. ``request_approval`` refuses that inversion, and this is the
+    end-to-end behaviour it buys.
+    """
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    asking = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[],
+        title="Request approval",
+        status=WorkflowTaskStatus.completed,
+    )
+    acting = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[(server_id, TOOL)],
+        title="Launch",
+        depends_on=asking,
+    )
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=acting,
+        status=ApprovalStatus.pending,
+    )
+
+    with pytest.raises(McpPolicyDeniedError, match="requires an approval"):
+        await _call(server_id)
+
+    async with AsyncSession(engine) as db:
+        approval = await db.get(Approval, approval_id)
+        assert approval is not None
+        approval.status = ApprovalStatus.approved
+        approval.decided_at = datetime.now(UTC)
+        approval.decided_by = "alice"
+        db.add(approval)
+        await db.commit()
+    await _issue(engine, approval_id)
+
+    assert (await _call(server_id)).isError is False
+    async with AsyncSession(engine) as db:
+        certificate = await SqlApprovalCertificateRepository(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        ).get_live_for_task(acting)
+    assert certificate is not None
+    claims = extract_claims(certificate_from_pem(certificate.certificate_pem))
+    assert claims.allowed_tools == frozenset({(server_id, TOOL)})
 
 
 # ---------------------------------------------------------------------------

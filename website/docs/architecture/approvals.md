@@ -42,6 +42,19 @@ Granting an approval issues a short-lived certificate for that task, signed by a
 | Which tenant, run, task and approval it speaks for | A certificate minted for one run is useless in another |
 | **The tools the task had bound at the moment the approver decided** | The agent can rewrite its own task's bindings mid-run, but it cannot re-issue a certificate. Approving a task to read a file never becomes approval to delete one |
 
+### The task an approval covers
+
+Both halves of the mechanism belong to **one task: the one that carries out the approved action**. The gate closes on the task the approval names, and the grant is that same task's tools — so naming the wrong one disables both at once.
+
+That matters because a workflow usually shows the request as a step of its own:
+
+| Step | Tools it uses | What the approval must name |
+|---|---|---|
+| Request approval | None | — |
+| Launch instance | The one that launches | **This one** |
+
+Naming the first step would freeze an empty set of tools into the certificate and leave the second step with no approval on it at all, and therefore unguarded — the gate would be absent on exactly the call it exists for. So a request naming a step that uses no tools while a step after it does is **refused**, and the agent is told which step to name instead. A step with no tools and nothing tool-using after it is accepted: that is an approval covering an action no tool performs.
+
 Every later tool call from that task must present it, and the proxy checks all of the following before the call goes anywhere:
 
 - the certificate speaks for this run and this task,

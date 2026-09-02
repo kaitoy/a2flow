@@ -8,8 +8,10 @@ cannot widen what the task may call.
 
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -20,6 +22,7 @@ from config import get_settings
 from infrastructure.mcp_ca import certificate_from_pem
 from infrastructure.mcp_certificate import extract_claims
 from infrastructure.secret_cipher import get_secret_cipher
+from infrastructure.workflow_task_tools import update_workflow_task
 from models.approval import Approval, ApprovalStatus
 from models.approval_certificate import ApprovalCertificate, RevocationReason
 from models.mcp_server import MCPServer, McpTransport
@@ -316,7 +319,14 @@ async def test_multiple_bound_tools_all_land_in_the_certificate(
 async def test_a_task_with_no_bindings_gets_a_certificate_granting_nothing(
     cert_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """The binding URN alone is a valid certificate; it just grants no tool."""
+    """The binding URN alone is a valid certificate; it just grants no tool.
+
+    This is the shape of an approval gating an action that uses no MCP tool.
+    The other way to reach it -- naming the step that *asks* for the go-ahead
+    while a task downstream of it holds the bindings -- is refused up front by
+    ``infrastructure.approval_tools.request_approval``, since it would leave
+    the acting task with no approval attached and therefore ungated.
+    """
     client, eng = cert_env
     execution_id = await _seed_execution(eng)
     task_id = await _seed_task(eng, execution_id, bindings=[])
@@ -541,6 +551,17 @@ async def test_certificate_endpoint_404s_when_none_was_issued(
 # ---------------------------------------------------------------------------
 
 
+def _tool_context() -> Any:
+    """Build the fake ADK ToolContext the WorkflowTask agent tools read.
+
+    ``session.id`` must match the seeded execution's ``session_id``: that is how
+    a tool call outside FastAPI's request scope resolves which run it belongs to.
+    """
+    return SimpleNamespace(
+        session=SimpleNamespace(id="sess-cert"), user_id="alice", state=None
+    )
+
+
 async def _set_task_status(client: AsyncClient, task_id: str, status: str) -> None:
     """PATCH a task's status as ``alice``, the approval's designated approver."""
     response = await client.patch(
@@ -607,5 +628,59 @@ async def test_a_non_terminal_status_change_leaves_the_certificate_alone(
     await _decide(client, approval_id, "approved")
 
     await _set_task_status(client, task_id, "in_progress")
+
+    assert (await _certificates(eng, approval_id))[0].revoked_at is None
+
+
+async def test_the_agent_tool_also_revokes_a_finished_task(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A real run finishes its tasks through the agent tool, not the REST route.
+
+    ``WorkflowTaskService.update`` covers the REST path only, so revoking there
+    alone would leave every agent-driven run's certificates live until their
+    TTL -- which is every run.
+    """
+    client, eng = cert_env
+    monkeypatch.setattr("infrastructure.database.engine", eng)
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    task_id = await _seed_task(eng, execution_id, bindings=[(server_id, "read_file")])
+    approval_id = await _insert_approval(
+        eng, execution_id=execution_id, task_id=task_id
+    )
+    await _decide(client, approval_id, "approved")
+    assert (await _certificates(eng, approval_id))[0].revoked_at is None
+
+    result = await update_workflow_task(
+        task_id, _tool_context(), status=WorkflowTaskStatus.completed.value
+    )
+    assert "error" not in result, result
+
+    certificate = (await _certificates(eng, approval_id))[0]
+    assert certificate.revoked_at is not None
+    assert certificate.revocation_reason == RevocationReason.task_finished
+
+
+async def test_the_agent_tool_leaves_an_unfinished_task_alone(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only a terminal status spends the grant; an ordinary edit must not."""
+    client, eng = cert_env
+    monkeypatch.setattr("infrastructure.database.engine", eng)
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    task_id = await _seed_task(eng, execution_id, bindings=[(server_id, "read_file")])
+    approval_id = await _insert_approval(
+        eng, execution_id=execution_id, task_id=task_id
+    )
+    await _decide(client, approval_id, "approved")
+
+    result = await update_workflow_task(
+        task_id, _tool_context(), description="still working on it"
+    )
+    assert "error" not in result, result
 
     assert (await _certificates(eng, approval_id))[0].revoked_at is None

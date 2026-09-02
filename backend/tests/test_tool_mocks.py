@@ -526,11 +526,53 @@ def _approval_mock(*statuses: str) -> dict[str, Any]:
     )
 
 
+async def _seed_approval_task(
+    eng: AsyncEngine,
+    execution_id: str,
+    *,
+    title: str = "Act",
+    depends_on: str | None = None,
+    binds: tuple[str, str] | None = None,
+) -> str:
+    """Insert a task for ``request_approval`` to name, returning its id.
+
+    ``request_approval`` requires the id of the task the approval authorizes,
+    so every mocked request needs one even when the mock is what is under test.
+    """
+    from models.workflow_task import WorkflowTaskDependency, WorkflowTaskToolBinding
+
+    async with AsyncSession(eng) as db:
+        task = WorkflowTask(
+            workflow_execution_id=execution_id,
+            title=title,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by="owner",
+            updated_by="owner",
+        )
+        db.add(task)
+        await db.commit()
+        await db.refresh(task)
+        task_id = task.id
+        if depends_on is not None:
+            db.add(WorkflowTaskDependency(task_id=task_id, depends_on_id=depends_on))
+        if binds is not None:
+            db.add(
+                WorkflowTaskToolBinding(
+                    task_id=task_id, mcp_server_id=binds[0], tool_name=binds[1]
+                )
+            )
+        await db.commit()
+        return task_id
+
+
 async def test_mocked_approval_returns_approved_without_recording_anything(
     engine: AsyncEngine,
 ) -> None:
-    await _seed_execution(engine, tool_mocks=[_approval_mock("approved")])
-    result = await request_approval("Deploy", _ctx(), approver="alice")
+    execution_id = await _seed_execution(
+        engine, tool_mocks=[_approval_mock("approved")]
+    )
+    task_id = await _seed_approval_task(engine, execution_id)
+    result = await request_approval("Deploy", _ctx(), task_id, approver="alice")
     assert result["status"] == "approved"
     assert result["mocked"] is True
     assert "render_approval" in result["note"]
@@ -543,9 +585,12 @@ async def test_mocked_approval_returns_approved_without_recording_anything(
 async def test_mocked_approval_walks_successive_decisions(
     engine: AsyncEngine,
 ) -> None:
-    await _seed_execution(engine, tool_mocks=[_approval_mock("approved", "rejected")])
-    first = await request_approval("One", _ctx(), approver="alice")
-    second = await request_approval("Two", _ctx(), approver="alice")
+    execution_id = await _seed_execution(
+        engine, tool_mocks=[_approval_mock("approved", "rejected")]
+    )
+    task_id = await _seed_approval_task(engine, execution_id)
+    first = await request_approval("One", _ctx(), task_id, approver="alice")
+    second = await request_approval("Two", _ctx(), task_id, approver="alice")
     assert first["status"] == "approved"
     assert second["status"] == "rejected"
 
@@ -554,17 +599,47 @@ async def test_mocked_approval_still_validates_the_destination(
     engine: AsyncEngine,
 ) -> None:
     """A mock skips the side effects, not the checks."""
-    await _seed_execution(engine, tool_mocks=[_approval_mock("approved")])
+    execution_id = await _seed_execution(
+        engine, tool_mocks=[_approval_mock("approved")]
+    )
+    task_id = await _seed_approval_task(engine, execution_id)
     both = await request_approval(
-        "Deploy", _ctx(), approver="alice", approver_group_id="g1"
+        "Deploy", _ctx(), task_id, approver="alice", approver_group_id="g1"
     )
     assert "error" in both
-    unknown = await request_approval("Deploy", _ctx(), approver="nobody")
+    unknown = await request_approval("Deploy", _ctx(), task_id, approver="nobody")
     assert "error" in unknown
 
 
+async def test_mocked_approval_still_validates_the_named_task(
+    engine: AsyncEngine,
+) -> None:
+    """Naming the asking step instead of the acting task is refused when mocked too.
+
+    Same reason as the destination check above: a mock skips the side effects,
+    not the checks, so a workflow that would issue a certificate granting
+    nothing fails in a dry run exactly as it would for real.
+    """
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(
+        engine, tool_mocks=[_approval_mock("approved")]
+    )
+    asking = await _seed_approval_task(engine, execution_id, title="Request approval")
+    await _seed_approval_task(
+        engine,
+        execution_id,
+        title="Launch instance",
+        depends_on=asking,
+        binds=(server_id, "search"),
+    )
+    result = await request_approval("Deploy", _ctx(), asking, approver="alice")
+    assert "error" in result
+    assert "binds no MCP tools" in result["error"]
+    assert "mocked" not in result
+
+
 async def test_mocked_approval_accepts_a_text_response(engine: AsyncEngine) -> None:
-    await _seed_execution(
+    execution_id = await _seed_execution(
         engine,
         tool_mocks=[
             _snapshot(
@@ -572,27 +647,30 @@ async def test_mocked_approval_accepts_a_text_response(engine: AsyncEngine) -> N
             )
         ],
     )
-    result = await request_approval("Deploy", _ctx(), approver="alice")
+    task_id = await _seed_approval_task(engine, execution_id)
+    result = await request_approval("Deploy", _ctx(), task_id, approver="alice")
     assert result["status"] == "rejected"
     assert result["mocked"] is True
 
 
 async def test_mocked_approval_can_report_an_error(engine: AsyncEngine) -> None:
-    await _seed_execution(
+    execution_id = await _seed_execution(
         engine,
         tool_mocks=[
             _snapshot(None, REQUEST_APPROVAL_TOOL, [{"kind": "error", "value": "nope"}])
         ],
     )
-    result = await request_approval("Deploy", _ctx(), approver="alice")
+    task_id = await _seed_approval_task(engine, execution_id)
+    result = await request_approval("Deploy", _ctx(), task_id, approver="alice")
     assert result == {"error": "nope"}
 
 
 async def test_unmocked_approval_still_records_a_pending_request(
     engine: AsyncEngine,
 ) -> None:
-    await _seed_execution(engine)
-    result = await request_approval("Deploy", _ctx(), approver="alice")
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_approval_task(engine, execution_id)
+    result = await request_approval("Deploy", _ctx(), task_id, approver="alice")
     assert result["status"] == "pending"
     assert "mocked" not in result
     async with AsyncSession(engine) as db:

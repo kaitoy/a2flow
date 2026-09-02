@@ -35,9 +35,12 @@ Call `list_user_groups` to find groups that can approve. If there's exactly one,
 
 Call `request_approval` with a short `title` (e.g. "Launch EC2 instance: `<name>`") and a `description` containing the finalized configuration from step 1, addressed to exactly one destination — `approver_group_id` for a team, or `approver` for one person, never both. Then explain the request to the user in plain text and call `render_approval` with the returned `approval_id` so the approver sees Approve/Reject controls in chat. When the request goes to a team, every eligible member is notified and the first decision from any of them settles it. Wait for the decision (re-check with `get_approval` if needed).
 
+`workflow_task_id` must be the id of the task that **launches** the instance — the one with the EC2 tool bound to it — not this approval step. The approval authorizes only the task it names, and a step whose job is to ask for a go-ahead binds no tools, so naming it would authorize nothing. Call `list_workflow_tasks` to find the launch task's id.
+
 ```
+list_workflow_tasks()
 list_user_groups()
-request_approval(title="Launch EC2 instance: <name>", approver_group_id=<group_id>, description="<finalized configuration>")
+request_approval(title="Launch EC2 instance: <name>", workflow_task_id=<launch_task_id>, approver_group_id=<group_id>, description="<finalized configuration>")
 render_approval(approval_id=<approval_id>)
 ```
 

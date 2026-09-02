@@ -92,6 +92,17 @@ def _ctx(
     )
 
 
+async def _seed_task(ctx: Any = None, *, title: str = "Act") -> str:
+    """Create a WorkflowTask in the current session and return its id.
+
+    ``request_approval`` requires the id of the task the approval authorizes, so
+    almost every test needs one even when the task itself is not what is being
+    exercised.
+    """
+    created = await create_workflow_task(title, ctx if ctx is not None else _ctx())
+    return str(created["id"])
+
+
 async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notification]:
     """Return all notifications addressed to ``user_id`` via the repository."""
     async with AsyncSession(eng) as db:
@@ -108,9 +119,11 @@ async def test_request_approval_attributes_to_acting_user(engine: AsyncEngine) -
     follow ``alice``.
     """
     await _seed_session(engine, user_id="owner")
+    task_id = await _seed_task()
     result = await request_approval(
         "Deploy to prod",
         _ctx(user_id="owner", state={ACTING_USER_STATE_KEY: "alice"}),
+        task_id,
         approver="bob",
     )
     assert "error" not in result
@@ -123,8 +136,9 @@ async def test_request_approval_attributes_to_acting_user(engine: AsyncEngine) -
 
 async def test_request_approval_creates_pending_record(engine: AsyncEngine) -> None:
     await _seed_session(engine, user_id="owner")
+    task_id = await _seed_task()
     result = await request_approval(
-        "Deploy to prod", _ctx(), approver="alice", description="Are you sure?"
+        "Deploy to prod", _ctx(), task_id, approver="alice", description="Are you sure?"
     )
     assert "error" not in result
     assert result["status"] == "pending"
@@ -136,8 +150,9 @@ async def test_request_approval_creates_pending_record(engine: AsyncEngine) -> N
 
 async def test_request_approval_notifies_approver(engine: AsyncEngine) -> None:
     await _seed_session(engine, user_id="owner")
+    task_id = await _seed_task()
     await request_approval(
-        "Need sign-off", _ctx(), approver="alice", description="please review"
+        "Need sign-off", _ctx(), task_id, approver="alice", description="please review"
     )
     # The notification is addressed to the designated approver, not the owner.
     assert await _notifications_for(engine, "owner") == []
@@ -150,12 +165,15 @@ async def test_request_approval_notifies_approver(engine: AsyncEngine) -> None:
 
 async def test_request_approval_requires_approver(engine: AsyncEngine) -> None:
     await _seed_session(engine)
-    result = await request_approval("No approver", _ctx(), approver="")
+    task_id = await _seed_task()
+    result = await request_approval("No approver", _ctx(), task_id, approver="")
     assert "error" in result
 
 
 async def test_request_approval_without_session_errors(engine: AsyncEngine) -> None:
-    result = await request_approval("X", _ctx("unknown-session"), approver="alice")
+    result = await request_approval(
+        "X", _ctx("unknown-session"), "task-1", approver="alice"
+    )
     assert "error" in result
 
 
@@ -172,7 +190,8 @@ async def test_request_approval_links_valid_task(engine: AsyncEngine) -> None:
 
 async def test_request_approval_records_approver(engine: AsyncEngine) -> None:
     await _seed_session(engine)
-    result = await request_approval("Approve me", _ctx(), approver="alice")
+    task_id = await _seed_task()
+    result = await request_approval("Approve me", _ctx(), task_id, approver="alice")
     assert "error" not in result
     fetched = await get_approval(result["approval_id"], _ctx())
     assert fetched["approver"] == "alice"
@@ -180,7 +199,8 @@ async def test_request_approval_records_approver(engine: AsyncEngine) -> None:
 
 async def test_request_approval_rejects_unknown_approver(engine: AsyncEngine) -> None:
     await _seed_session(engine)
-    result = await request_approval("Approve me", _ctx(), approver="nobody")
+    task_id = await _seed_task()
+    result = await request_approval("Approve me", _ctx(), task_id, approver="nobody")
     assert "error" in result
 
 
@@ -197,7 +217,10 @@ async def test_request_approval_rejects_foreign_task(engine: AsyncEngine) -> Non
 async def test_get_approval_cross_session_guard(engine: AsyncEngine) -> None:
     await _seed_session(engine, session_id="sess-a")
     await _seed_session(engine, session_id="sess-b")
-    created = await request_approval("Owned by A", _ctx("sess-a"), approver="alice")
+    task_id = await _seed_task(_ctx("sess-a"))
+    created = await request_approval(
+        "Owned by A", _ctx("sess-a"), task_id, approver="alice"
+    )
     approval_id = created["approval_id"]
 
     blocked = await get_approval(approval_id, _ctx("sess-b"))
@@ -208,7 +231,8 @@ async def test_get_approval_cross_session_guard(engine: AsyncEngine) -> None:
 
 async def test_get_approval_reflects_resolution(engine: AsyncEngine) -> None:
     await _seed_session(engine)
-    created = await request_approval("Decide", _ctx(), approver="alice")
+    task_id = await _seed_task()
+    created = await request_approval("Decide", _ctx(), task_id, approver="alice")
     # Resolve directly through the repository (the frontend's PATCH path).
     async with AsyncSession(engine) as db:
         repo = SqlApprovalRepository(
@@ -270,7 +294,8 @@ async def test_list_users_id_usable_as_approver(engine: AsyncEngine) -> None:
     await _seed_session(engine)
     users = await list_users(_ctx())
     approver_id = users["users"][0]["id"]
-    result = await request_approval("Approve me", _ctx(), approver=approver_id)
+    task_id = await _seed_task()
+    result = await request_approval("Approve me", _ctx(), task_id, approver=approver_id)
     assert "error" not in result
     fetched = await get_approval(result["approval_id"], _ctx())
     assert fetched["approver"] == approver_id
@@ -294,7 +319,8 @@ async def test_request_approval_rejects_approver_without_role(
         engine, ids=("norole",), roles=(), tenant_id=DEFAULT_TEST_TENANT_ID
     )
     await _seed_session(engine)
-    result = await request_approval("Approve me", _ctx(), approver="norole")
+    task_id = await _seed_task()
+    result = await request_approval("Approve me", _ctx(), task_id, approver="norole")
     assert "error" in result
     assert "approver role" in result["error"]
 
@@ -316,7 +342,8 @@ async def test_request_approval_rejects_super_admin_approver_without_tenant(
         roles=(Role.super_admin,),
     )
     await _seed_session(engine)
-    result = await request_approval("Approve me", _ctx(), approver="boss")
+    task_id = await _seed_task()
+    result = await request_approval("Approve me", _ctx(), task_id, approver="boss")
     assert "error" in result
 
 
@@ -327,7 +354,8 @@ async def test_request_approval_rejects_other_tenant_approver(
     await seed_tenant(engine, tenant_id="tenant-other")
     await seed_users(engine, ids=("dave",), tenant_id="tenant-other")
     await _seed_session(engine)
-    result = await request_approval("Approve me", _ctx(), approver="dave")
+    task_id = await _seed_task()
+    result = await request_approval("Approve me", _ctx(), task_id, approver="dave")
     assert "error" in result
 
 
@@ -384,7 +412,8 @@ async def test_group_inherited_approver_is_eligible(engine: AsyncEngine) -> None
     )
     await _put_in_group(engine, user_id="grouped", roles=[Role.approver.value])
     await _seed_session(engine)
-    result = await request_approval("Approve me", _ctx(), approver="grouped")
+    task_id = await _seed_task()
+    result = await request_approval("Approve me", _ctx(), task_id, approver="grouped")
     assert "error" not in result, result
     assert result["status"] == ApprovalStatus.pending.value
 
@@ -411,7 +440,8 @@ async def test_a_group_granting_another_role_does_not_make_an_approver(
         engine, user_id="grouped", roles=[Role.developer.value], name="Developers"
     )
     await _seed_session(engine)
-    result = await request_approval("Approve me", _ctx(), approver="grouped")
+    task_id = await _seed_task()
+    result = await request_approval("Approve me", _ctx(), task_id, approver="grouped")
     assert "error" in result
     assert "grouped" not in {user["id"] for user in (await list_users(_ctx()))["users"]}
 
@@ -465,27 +495,32 @@ async def _group_with_members(
 
 async def test_request_approval_requires_a_destination(engine: AsyncEngine) -> None:
     await _seed_session(engine)
-    result = await request_approval("Decide", _ctx())
+    task_id = await _seed_task()
+    result = await request_approval("Decide", _ctx(), task_id)
     assert "exactly one" in result["error"]
 
 
 async def test_request_approval_rejects_two_destinations(engine: AsyncEngine) -> None:
     await _seed_session(engine)
+    task_id = await _seed_task()
     group_id = await _group_with_members(
         engine, members={"m1": []}, group_roles=[Role.approver.value]
     )
     result = await request_approval(
-        "Decide", _ctx(), approver="alice", approver_group_id=group_id
+        "Decide", _ctx(), task_id, approver="alice", approver_group_id=group_id
     )
     assert "exactly one" in result["error"]
 
 
 async def test_request_approval_to_a_group_succeeds(engine: AsyncEngine) -> None:
     await _seed_session(engine)
+    task_id = await _seed_task()
     group_id = await _group_with_members(
         engine, members={"m1": [], "m2": []}, group_roles=[Role.approver.value]
     )
-    result = await request_approval("Decide", _ctx(), approver_group_id=group_id)
+    result = await request_approval(
+        "Decide", _ctx(), task_id, approver_group_id=group_id
+    )
     assert "error" not in result, result
     assert result["status"] == ApprovalStatus.pending.value
 
@@ -499,7 +534,8 @@ async def test_request_approval_to_an_unknown_group_is_rejected(
     engine: AsyncEngine,
 ) -> None:
     await _seed_session(engine)
-    result = await request_approval("Decide", _ctx(), approver_group_id="nope")
+    task_id = await _seed_task()
+    result = await request_approval("Decide", _ctx(), task_id, approver_group_id="nope")
     assert "not found" in result["error"]
 
 
@@ -508,10 +544,13 @@ async def test_request_approval_rejects_a_group_with_no_eligible_member(
 ) -> None:
     """A group nobody can approve for would wedge the run, so it is refused."""
     await _seed_session(engine)
+    task_id = await _seed_task()
     group_id = await _group_with_members(
         engine, members={"m1": [], "m2": []}, group_roles=[Role.developer.value]
     )
-    result = await request_approval("Decide", _ctx(), approver_group_id=group_id)
+    result = await request_approval(
+        "Decide", _ctx(), task_id, approver_group_id=group_id
+    )
     assert "no member who can approve" in result["error"]
 
 
@@ -531,7 +570,9 @@ async def test_group_request_notifies_every_eligible_member(
         tenant_id=DEFAULT_TEST_TENANT_ID,
     )
 
-    result = await request_approval("Decide", _ctx(), approver_group_id=group_id)
+    result = await request_approval(
+        "Decide", _ctx(), await _seed_task(), approver_group_id=group_id
+    )
     assert "error" not in result, result
 
     for member in ("m1", "m2"):
@@ -550,7 +591,9 @@ async def test_group_request_skips_members_without_the_approver_role(
         members={"m1": [Role.approver.value], "m2": []},
         group_roles=[],
     )
-    result = await request_approval("Decide", _ctx(), approver_group_id=group_id)
+    result = await request_approval(
+        "Decide", _ctx(), await _seed_task(), approver_group_id=group_id
+    )
     assert "error" not in result, result
     assert len(await _notifications_for(engine, "m1")) == 1
     assert await _notifications_for(engine, "m2") == []
@@ -604,3 +647,130 @@ async def test_list_user_groups_excludes_other_tenants(engine: AsyncEngine) -> N
 
     result = await list_user_groups(_ctx())
     assert result["groups"] == []
+
+
+# ---------- the task an approval authorizes ----------
+
+
+async def _seed_mcp_server(eng: AsyncEngine, *, name: str = "srv") -> str:
+    """Insert an MCPServer owned by the seeded system user and return its id."""
+    from models.mcp_server import MCPServer
+
+    async with AsyncSession(eng) as db:
+        server = MCPServer(
+            name=name,
+            url="https://mcp.example.com/mcp",
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        db.add(server)
+        await db.commit()
+        await db.refresh(server)
+        return server.id
+
+
+async def test_request_approval_rejects_the_asking_step(engine: AsyncEngine) -> None:
+    """A step that only asks for a go-ahead cannot stand in for the acting task.
+
+    This is the shape a design agent naturally produces: "Request approval"
+    followed by the task that actually calls the tool. Naming the asking step
+    would freeze an empty grant into the certificate and leave the acting task
+    with no approval attached, hence ungated -- so it is refused, and the error
+    names the task that should have been passed instead.
+    """
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    asking = await create_workflow_task("Request approval", _ctx())
+    acting = await create_workflow_task(
+        "Launch instance",
+        _ctx(),
+        depends_on_ids=[asking["id"]],
+        tool_bindings=[{"server_id": server_id, "tool_name": "launch"}],
+    )
+    result = await request_approval(
+        "Approve the launch", _ctx(), asking["id"], approver="alice"
+    )
+    assert "error" in result
+    assert acting["id"] in result["error"]
+    assert "Launch instance" in result["error"]
+
+
+async def test_request_approval_walks_the_dag_transitively(
+    engine: AsyncEngine,
+) -> None:
+    """The acting task is found however many steps downstream it sits."""
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    asking = await create_workflow_task("Request approval", _ctx())
+    middle = await create_workflow_task(
+        "Prepare payload", _ctx(), depends_on_ids=[asking["id"]]
+    )
+    acting = await create_workflow_task(
+        "Launch instance",
+        _ctx(),
+        depends_on_ids=[middle["id"]],
+        tool_bindings=[{"server_id": server_id, "tool_name": "launch"}],
+    )
+    result = await request_approval(
+        "Approve the launch", _ctx(), asking["id"], approver="alice"
+    )
+    assert "error" in result
+    assert acting["id"] in result["error"]
+
+
+async def test_request_approval_accepts_the_acting_task(engine: AsyncEngine) -> None:
+    """Naming the task that binds the tools is the shape the gate is built on."""
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    asking = await create_workflow_task("Request approval", _ctx())
+    acting = await create_workflow_task(
+        "Launch instance",
+        _ctx(),
+        depends_on_ids=[asking["id"]],
+        tool_bindings=[{"server_id": server_id, "tool_name": "launch"}],
+    )
+    result = await request_approval(
+        "Approve the launch", _ctx(), acting["id"], approver="alice"
+    )
+    assert "error" not in result, result
+    fetched = await get_approval(result["approval_id"], _ctx())
+    assert fetched["workflow_task_id"] == acting["id"]
+
+
+async def test_request_approval_allows_a_task_with_no_tools_anywhere_downstream(
+    engine: AsyncEngine,
+) -> None:
+    """An approval may gate an action that uses no MCP tool at all."""
+    await _seed_session(engine)
+    asking = await create_workflow_task("Draft the notice", _ctx())
+    await create_workflow_task("Publish it", _ctx(), depends_on_ids=[asking["id"]])
+    result = await request_approval(
+        "Approve the wording", _ctx(), asking["id"], approver="alice"
+    )
+    assert "error" not in result, result
+
+
+async def test_request_approval_ignores_tools_bound_upstream(
+    engine: AsyncEngine,
+) -> None:
+    """Only tasks *downstream* of the named one count.
+
+    A task that already ran its tools before this approval was asked for is not
+    what the approval authorizes, so its bindings must not turn a legitimate
+    request into an error.
+    """
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    earlier = await create_workflow_task(
+        "Gather sources",
+        _ctx(),
+        tool_bindings=[{"server_id": server_id, "tool_name": "search"}],
+    )
+    named = await create_workflow_task(
+        "Approve the summary", _ctx(), depends_on_ids=[earlier["id"]]
+    )
+    result = await request_approval(
+        "Approve the summary", _ctx(), named["id"], approver="alice"
+    )
+    assert "error" not in result, result

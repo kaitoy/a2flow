@@ -47,6 +47,8 @@ from models.workflow_task import (
     WorkflowTaskUpdate,
 )
 from repositories import (
+    ApprovalCertificateRepository,
+    SqlApprovalCertificateRepository,
     SqlMCPServerRepository,
     SqlWorkflowExecutionRepository,
     SqlWorkflowTaskRepository,
@@ -97,6 +99,7 @@ class _Scope:
     tenant_id: str
     execution_repo: WorkflowExecutionRepository
     task_repo: WorkflowTaskRepository
+    certificate_repo: ApprovalCertificateRepository
     # Quoted so the dataclass does not evaluate the name at class-creation
     # time -- it only exists under TYPE_CHECKING (see the import above).
     notifications: "NotificationDispatcher"
@@ -172,6 +175,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
                 SqlMCPServerRepository(db, tenant_id=tenant_id),
                 tenant_id=tenant_id,
             ),
+            certificate_repo=SqlApprovalCertificateRepository(db, tenant_id=tenant_id),
             notifications=build_notification_dispatcher(db, tenant_id=tenant_id),
         )
 
@@ -265,6 +269,43 @@ async def _evaluate_completion(scope: _Scope) -> None:
         notifications=scope.notifications,
         execution_id=scope.execution_id,
     )
+
+
+async def _revoke_certificate_if_finished(
+    scope: _Scope, task: WorkflowTaskRead, user_id: str
+) -> None:
+    """Revoke the task's approval certificate once the task has finished.
+
+    The counterpart of the same call in
+    :meth:`services.workflow_task.WorkflowTaskService.update`, which only covers
+    the REST path. The execution agent drives a run's statuses through
+    :func:`update_workflow_task` instead, so without this a normal run's
+    certificates would never be revoked and would simply age out at their TTL.
+
+    Best-effort, unlike the service's version. The status write has already
+    committed by the time this runs, so raising here would report a failure for
+    a write that succeeded and could derail the run. Nothing about the gate
+    depends on it either: a finished task is no longer ``in_progress``, so
+    ``InProgressToolBindingPolicy`` already refuses its calls. What revoking
+    adds is that the audit trail records *why* the certificate stopped counting.
+
+    The import is deferred to call time for the same reason
+    :func:`_evaluate_completion` defers its own -- reaching into ``services`` at
+    module import time closes a cycle back through ``infrastructure.agent``.
+
+    Args:
+        scope: The current tool call's resolved run and repositories.
+        task: The task as it stands after the write.
+        user_id: The acting user, recorded as ``updated_by``.
+    """
+    from services.approval_certificate import revoke_if_task_finished
+
+    try:
+        await revoke_if_task_finished(scope.certificate_repo, task, user_id=user_id)
+    except Exception:
+        logger.exception(
+            "failed to revoke the approval certificate of finished task %s", task.id
+        )
 
 
 def _task_to_dict(task: WorkflowTaskRead) -> dict[str, Any]:
@@ -580,14 +621,17 @@ async def update_workflow_task(
                 fields["depends_on_ids"] = depends_on_ids
             if bindings is not None:
                 fields["tool_bindings"] = bindings
+            acting_user_id = _user_id(tool_context)
             try:
                 task = await s.task_repo.update(
                     task_id,
                     WorkflowTaskUpdate(**fields),
-                    user_id=_user_id(tool_context),
+                    user_id=acting_user_id,
                 )
             except NotFoundError:
                 return _not_in_session_error(task_id)
+            # A finished task's approval certificate has outlived its purpose.
+            await _revoke_certificate_if_finished(s, task, acting_user_id)
             await _evaluate_completion(s)
             return _task_to_dict(task)
     except NoTenantSessionError:
