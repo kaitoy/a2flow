@@ -13,7 +13,9 @@ when the task has a linked ``Approval`` (``Approval.workflow_task_id``): only
 the execution initiator or an eligible approver of that Approval may do so --
 the named ``approver``, or a member of its ``approver_group_id`` holding the
 ``approver`` role -- not merely any approver of the execution, mirroring
-``ApprovalService.resolve``'s no-bypass rule.
+``ApprovalService.resolve``'s no-bypass rule. Changing a task's
+``tool_bindings`` is refused outright once an approval covers the task, so the
+set an approver was shown is the set their decision goes on to authorize.
 
 Every write that can change the set of unfinished tasks also re-runs the shared
 completion bookkeeping in :mod:`services.workflow_execution_completion`, so a
@@ -26,8 +28,10 @@ tools, exactly as one the agent started does.
 
 from collections.abc import Collection
 
+from infrastructure.approval_scope import active_approval_by_task, governing_approvals
 from models.user import User
 from models.workflow_task import (
+    ToolBinding,
     WorkflowTaskCreate,
     WorkflowTaskRead,
     WorkflowTaskUpdate,
@@ -47,6 +51,10 @@ from services.mcp_tool_certificate import McpToolCertificateService
 from services.notification_dispatch import NotificationDispatcher
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 from services.workflow_execution_completion import evaluate_completion
+
+#: Upper bound on how many of a run's tasks the approval-scope check reads.
+#: Mirrors ``infrastructure.mcp_policies._MAX_TASKS``.
+_MAX_TASKS = 1000
 
 
 class WorkflowTaskService:
@@ -221,6 +229,45 @@ class WorkflowTaskService:
             "approval can change this task's status"
         )
 
+    async def _assert_tool_bindings_change_allowed(
+        self, task: WorkflowTaskRead, bindings: list[ToolBinding]
+    ) -> None:
+        """Refuse to change the bound MCP tools of a task an approval covers.
+
+        A task's certificate freezes its ``tool_bindings`` when the task starts,
+        not when the approval was decided -- that is what lets one approval
+        cover a chain of tasks without them racing a single validity window.
+        The gap it opens is this one: between the decision and the covered
+        task's start, an edit here would widen what the approver's decision goes
+        on to authorize. So it is refused.
+
+        Refused whether or not the approval has been decided. While it is still
+        pending, changing the bindings would move the ground under the person
+        being asked to weigh them.
+
+        Args:
+            task: The task whose bindings are being changed.
+            bindings: The bindings the caller is asking for.
+
+        Raises:
+            ForbiddenError: If an approval governs the task and the requested
+                bindings differ from the ones it already carries.
+        """
+        current = {(b.mcp_server_id, b.tool_name) for b in task.tool_bindings}
+        if {(b.mcp_server_id, b.tool_name) for b in bindings} == current:
+            return
+        tasks = await self._repo.list(
+            limit=_MAX_TASKS, offset=0, workflow_execution_id=task.workflow_execution_id
+        )
+        approvals = await self._approvals.list_for_execution(task.workflow_execution_id)
+        governing = governing_approvals(tasks, active_approval_by_task(approvals))
+        if governing.get(task.id):
+            raise ForbiddenError(
+                "An approval covers this task, so the MCP tools bound to it "
+                "cannot be changed: the approver's decision would end up "
+                "authorizing tools they were never shown"
+            )
+
     async def get(
         self, task_id: str, *, caller: User, caller_roles: Collection[str]
     ) -> WorkflowTaskRead:
@@ -295,7 +342,9 @@ class WorkflowTaskService:
         Changing ``status`` on a task with a linked Approval is further
         restricted to the execution initiator or that Approval's designated
         approver, on top of the general execution-access check — see
-        :meth:`_assert_status_change_allowed`.
+        :meth:`_assert_status_change_allowed`. Changing ``tool_bindings`` on a
+        task an approval covers is refused outright — see
+        :meth:`_assert_tool_bindings_change_allowed`.
 
         Once the write lands, the parent run's completion is re-evaluated, so a
         run finished through these endpoints reaches the same terminal state as
@@ -313,13 +362,16 @@ class WorkflowTaskService:
             NotFoundError: If no task exists with the given ID.
             ForbiddenError: If the caller may not act on the task's execution
                 (a plain admin is rejected, see :meth:`_assert_execution_write_access`),
-                or is changing ``status`` on a task whose linked Approval
-                designates someone else as approver.
+                is changing ``status`` on a task whose linked Approval
+                designates someone else as approver, or is changing
+                ``tool_bindings`` on a task an approval covers.
         """
         task = await self._get_or_404(task_id)
         await self._assert_execution_write_access(task.workflow_execution_id, caller)
         if data.status is not None and data.status != task.status:
             await self._assert_status_change_allowed(task, caller)
+        if data.tool_bindings is not None:
+            await self._assert_tool_bindings_change_allowed(task, data.tool_bindings)
         updated = await self._repo.update(task_id, data, user_id=caller.id)
         await self._settle_certificate(updated, caller)
         await self._evaluate_completion(updated.workflow_execution_id)

@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.approval_tools import (
@@ -23,10 +24,12 @@ from infrastructure.approval_tools import (
 )
 from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
 from models.approval import Approval, ApprovalStatus
+from models.mcp_tool_certificate import McpToolCertificate, RevocationReason
 from models.notification import Notification, NotificationType
 from models.user import SYSTEM_USER_ID, Role
 from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
+from models.workflow_task import WorkflowTaskStatus
 from repositories import (
     SqlApprovalRepository,
     SqlNotificationRepository,
@@ -36,6 +39,7 @@ from repositories import (
 from tests._engine import make_test_engine
 from tests._seed import (
     DEFAULT_TEST_TENANT_ID,
+    grant_tool_certificate,
     seed_tenant,
     seed_users,
     seed_workflow_task,
@@ -100,6 +104,8 @@ async def _seed_task(
     title: str = "Act",
     depends_on_ids: Sequence[str] = (),
     tool_bindings: Sequence[tuple[str, str]] = (),
+    status: WorkflowTaskStatus = WorkflowTaskStatus.pending,
+    grant: bool = False,
 ) -> str:
     """Seed a WorkflowTask in the current session and return its id.
 
@@ -116,13 +122,17 @@ async def _seed_task(
         execution = await _execution_repo(db).get_by_session_id(session_id)
         assert execution is not None
         execution_id = execution.id
-    return await seed_workflow_task(
+    task_id = await seed_workflow_task(
         database.engine,
         execution_id,
         title=title,
+        status=status,
         depends_on_ids=depends_on_ids,
         tool_bindings=tool_bindings,
     )
+    if grant:
+        await grant_tool_certificate(database.engine, execution_id, task_id)
+    return task_id
 
 
 async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notification]:
@@ -671,7 +681,7 @@ async def test_list_user_groups_excludes_other_tenants(engine: AsyncEngine) -> N
     assert result["groups"] == []
 
 
-# ---------- the task an approval authorizes ----------
+# ---------- the tasks an approval authorizes ----------
 
 
 async def _seed_mcp_server(eng: AsyncEngine, *, name: str = "srv") -> str:
@@ -692,19 +702,18 @@ async def _seed_mcp_server(eng: AsyncEngine, *, name: str = "srv") -> str:
         return server.id
 
 
-async def test_request_approval_rejects_the_asking_step(engine: AsyncEngine) -> None:
-    """A step that only asks for a go-ahead cannot stand in for the acting task.
+async def test_request_approval_accepts_the_asking_step(engine: AsyncEngine) -> None:
+    """A step whose whole job is to ask for a go-ahead is a valid gate.
 
     This is the shape a design agent naturally produces: "Request approval"
-    followed by the task that actually calls the tool. Naming the asking step
-    would freeze an empty grant into the certificate and leave the acting task
-    with no approval attached, hence ungated -- so it is refused, and the error
-    names the task that should have been passed instead.
+    followed by the task that actually calls the tool. The approval takes effect
+    from the step it names and covers everything after it, so naming the asking
+    step is the intended usage rather than a mistake to refuse.
     """
     await _seed_session(engine)
     server_id = await _seed_mcp_server(engine)
     asking = await _seed_task(title="Request approval")
-    acting = await _seed_task(
+    await _seed_task(
         title="Launch instance",
         depends_on_ids=[asking],
         tool_bindings=[(server_id, "launch")],
@@ -712,33 +721,13 @@ async def test_request_approval_rejects_the_asking_step(engine: AsyncEngine) -> 
     result = await request_approval(
         "Approve the launch", _ctx(), asking, approver="alice"
     )
-    assert "error" in result
-    assert acting in result["error"]
-    assert "Launch instance" in result["error"]
-
-
-async def test_request_approval_walks_the_dag_transitively(
-    engine: AsyncEngine,
-) -> None:
-    """The acting task is found however many steps downstream it sits."""
-    await _seed_session(engine)
-    server_id = await _seed_mcp_server(engine)
-    asking = await _seed_task(title="Request approval")
-    middle = await _seed_task(title="Prepare payload", depends_on_ids=[asking])
-    acting = await _seed_task(
-        title="Launch instance",
-        depends_on_ids=[middle],
-        tool_bindings=[(server_id, "launch")],
-    )
-    result = await request_approval(
-        "Approve the launch", _ctx(), asking, approver="alice"
-    )
-    assert "error" in result
-    assert acting in result["error"]
+    assert "error" not in result, result
+    fetched = await get_approval(result["approval_id"], _ctx())
+    assert fetched["workflow_task_id"] == asking
 
 
 async def test_request_approval_accepts_the_acting_task(engine: AsyncEngine) -> None:
-    """Naming the task that binds the tools is the shape the gate is built on."""
+    """Naming the task that binds the tools gates that task and its descendants."""
     await _seed_session(engine)
     server_id = await _seed_mcp_server(engine)
     asking = await _seed_task(title="Request approval")
@@ -768,14 +757,74 @@ async def test_request_approval_allows_a_task_with_no_tools_anywhere_downstream(
     assert "error" not in result, result
 
 
+async def test_request_approval_stands_down_grants_across_its_new_scope(
+    engine: AsyncEngine,
+) -> None:
+    """A downstream task already running loses the grant it was running on.
+
+    The approval takes the task over the moment it is requested, so the run
+    initiator's own grant -- taken out when the task started, before anyone was
+    asked to approve anything -- must stop counting.
+    """
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    asking = await _seed_task(title="Request approval")
+    acting = await _seed_task(
+        title="Launch instance",
+        depends_on_ids=[asking],
+        tool_bindings=[(server_id, "launch")],
+        status=WorkflowTaskStatus.in_progress,
+        grant=True,
+    )
+
+    async with AsyncSession(engine) as db:
+        before = (await db.exec(select(McpToolCertificate))).all()
+    assert [c.workflow_task_id for c in before] == [acting]
+    assert before[0].revoked_at is None
+
+    result = await request_approval(
+        "Approve the launch", _ctx(), asking, approver="alice"
+    )
+    assert "error" not in result, result
+
+    async with AsyncSession(engine) as db:
+        after = (await db.exec(select(McpToolCertificate))).all()
+    assert after[0].revoked_at is not None
+    assert after[0].revocation_reason is RevocationReason.superseded_by_approval
+
+
+async def test_request_approval_leaves_grants_outside_its_scope_alone(
+    engine: AsyncEngine,
+) -> None:
+    """A task the approval does not reach keeps running on its own authority."""
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    unrelated = await _seed_task(
+        title="Gather sources",
+        tool_bindings=[(server_id, "search")],
+        status=WorkflowTaskStatus.in_progress,
+        grant=True,
+    )
+    asking = await _seed_task(title="Request approval")
+
+    result = await request_approval(
+        "Approve the launch", _ctx(), asking, approver="alice"
+    )
+    assert "error" not in result, result
+
+    async with AsyncSession(engine) as db:
+        certificates = (await db.exec(select(McpToolCertificate))).all()
+    assert [c.workflow_task_id for c in certificates] == [unrelated]
+    assert certificates[0].revoked_at is None
+
+
 async def test_request_approval_ignores_tools_bound_upstream(
     engine: AsyncEngine,
 ) -> None:
-    """Only tasks *downstream* of the named one count.
+    """A tool-bearing task *above* the named one does not affect the request.
 
-    A task that already ran its tools before this approval was asked for is not
-    what the approval authorizes, so its bindings must not turn a legitimate
-    request into an error.
+    An approval reaches forward, never back: a task that already ran its tools
+    before this approval was asked for is not what the approval authorizes.
     """
     await _seed_session(engine)
     server_id = await _seed_mcp_server(engine)

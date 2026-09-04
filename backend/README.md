@@ -272,7 +272,7 @@ Skill-bound agents are built in one of three roles (`AgentKind` in `infrastructu
 | `list_workflow_tasks` | execution | List the current session's tasks (id, title, status, `dependsOnIds`, `tool_bindings`), in creation order |
 | `get_workflow_task` | execution | Fetch one task in the current session |
 | `update_workflow_task` | execution | Advance a task's status (`pending` → `in_progress` → `completed`/`failed`/`skipped`); on `failed`, also record `errorKind` / `errorMessage`. Status is the only field a run may change |
-| `request_approval` | execution | Create a `pending` [Approval](#approvals) for the current session, linked to the task that performs the approved action (`workflow_task_id`, required — see [MCP tool certificates](#mcp-tool-certificates)), addressed to exactly one of `approver` (a user) or `approver_group_id` (a user group), and raise an `approval_request` notification per eligible recipient; returns the `approval_id` to pass to the client-side `render_approval` tool |
+| `request_approval` | execution | Create a `pending` [Approval](#approvals) for the current session, linked to the task the approval takes effect from (`workflow_task_id`, required — it covers that task and everything downstream of it up to the next approval, see [MCP tool certificates](#mcp-tool-certificates)), addressed to exactly one of `approver` (a user) or `approver_group_id` (a user group), and raise an `approval_request` notification per eligible recipient; returns the `approval_id` to pass to the client-side `render_approval` tool |
 | `get_approval` | execution | Fetch the current state of an approval in the current session (to re-check a decision) |
 | `list_users` | execution | List the registered users (id, username, name, email; system and soft-deleted users excluded) so the agent can choose an `approver` id for `request_approval` |
 | `list_user_groups` | execution | List the tenant's user groups that have at least one member able to approve (id, name, description, `eligible_approver_count`) so the agent can choose an `approver_group_id` for `request_approval` |
@@ -319,7 +319,7 @@ Mocking is **per tool**, not per run. A workflow that searches a system and then
 - **For MCP tools the stub sits inside the proxy, behind the policy chain.** `WorkflowExecutionToolStub` (`infrastructure/tool_mocks.py`) implements the proxy's `McpToolStub` hook, which `call_tool` consults only *after* the [policy chain](#mcp-proxy) has allowed the call. A stubbed run therefore rehearses the real one: the tool must still be bound to a task the run has in progress, and the call must still present that task's certificate. What the mock skips is the one thing with an effect outside A2Flow — the upstream call. The built-in `request_approval` calls `resolve_mock` directly instead, since it writes to `approvals` rather than reaching a server.
 - **A stubbed call leaves no `mcp_tool_invocations` row, allowed or refused.** That table records the calls that reached (or were stopped on their way to) a real MCP server; a row for a call that was always going to be answered from a snapshot would misread in either direction. This is why the stub hook has two methods — the proxy must know whether a call is stubbed *before* deciding whether to audit a refusal, and finding that out must not consume one of the run's ordered responses.
 - **A mocked result is marked.** Every stubbed payload carries `"mocked": true`, which is what the execution agent's instruction keys on (trust the result, follow its `note`) and what the chat UI shows as a `Mocked` badge. `request_approval`'s mocked result adds a `note` telling the agent not to call `render_approval` and not to poll `get_approval`, so a test run reaches a decision without a human.
-- **Validation still runs.** A mocked `request_approval` still checks that the destination is a real, eligible approver and that the named task is the one that would act — a mock skips the side effects, not the checks — so a misconfigured workflow fails in a dry run the same way it would for real.
+- **Validation still runs.** A mocked `request_approval` still checks that the destination is a real, eligible approver and that the named task belongs to the current run — a mock skips the side effects, not the checks — so a misconfigured workflow fails in a dry run the same way it would for real.
 
 Because a mocked call is invisible to the audit table, the place to inspect one is the run's chat transcript: every tool line there expands to show the call's arguments and its result.
 
@@ -331,10 +331,12 @@ Because a mocked call is invisible to the audit table, the place to inspect one 
 
 | `grant_kind` | Issued when | `granted_by` | `approval_id` |
 |---|---|---|---|
-| `approval` | an approver decides `approved` on an approval naming the task | the approver who decided | the approval |
-| `initiator` | the task goes `in_progress` and has no approval attached | the run's `initiator_id` | `NULL` |
+| `approval` | the task goes `in_progress` and every approval **governing** it is granted | the approver who decided | the governing approval |
+| `initiator` | the task goes `in_progress` and no approval governs it | the run's `initiator_id` | `NULL` |
 
-The second path is what "the applicant approved it themselves" means in the schema: nobody was asked to weigh the task, so the person who executed the workflow authorizes its bound tools, and the audit trail says so in as many words. Requesting an approval on a task still **closes** its access until that approval is granted — the initiator's grant is revoked (`superseded_by_approval`) when the approval attaches, and the policy refuses an initiator grant for any task that has one regardless, so a run cannot start a task, pocket its certificate, and only then ask for the decision it was supposed to wait for.
+The second path is what "the applicant approved it themselves" means in the schema: nobody was asked to weigh the task, so the person who executed the workflow authorizes its bound tools, and the audit trail says so in as many words. A governed task still **closes** until its approval is granted — the grants already held by the tasks a new approval covers are revoked (`superseded_by_approval`) when it is requested, and the policy refuses an initiator grant for any governed task regardless, so a run cannot start a task, pocket its certificate, and only then ask for the decision it was supposed to wait for.
+
+Both paths issue at the moment the task starts, not at the moment of the decision. That is what lets one approval cover a chain of tasks: each gets its own validity window, so the chain does not have to finish inside the one opened by the approver's click. `McpToolCertificateService.issue` covers the other end of the same rule — when an approval is granted, any task it governs that is *already* `in_progress` (typically the step that asked and is waiting) is issued its certificate there and then, since nothing else will start it again.
 
 The point is not the transport. The proxy is still in-process, so the presenter (`infrastructure/mcp_credentials.py`) and the verifier (`infrastructure/mcp_proxy.py`) share a process and a database, and the proof-of-possession signature proves nothing an attacker who already owns the backend could not forge. What it buys today is three concrete things, plus the shape the system needs later:
 
@@ -343,12 +345,29 @@ The point is not the transport. The proxy is still in-process, so the presenter 
 3. **A verifiable audit trail.** Each decided call records the certificate serial together with the exact bytes signed for it, so `mcp_tool_invocations` can be re-verified later against the root's public half alone.
 4. **The mTLS seam.** Certificates carry `clientAuth`, so the same material works unchanged as TLS client certificates once the proxy becomes an HTTP endpoint; only the authenticator changes.
 
-**Which task an approval names is load-bearing.** Both halves of the mechanism — the gate and the grant — are the *named* task's: only a task with an `Approval` attached is held to *that approval's* certificate, and `McpToolCertificateService.issue` freezes only that task's `tool_bindings`. So `request_approval`'s `workflow_task_id` is required, and must name the task that **performs** the approved action rather than a step whose job is to ask for the go-ahead. A design agent naturally emits both as separate tasks ("Request approval" → "Launch instance"), and naming the first one would produce a certificate granting nothing while leaving the second to run on its initiator's own grant — the approval would be a no-op precisely on the call it exists for. `request_approval` refuses that inversion: a named task binding no tools while a task downstream of it does is rejected with the acting task's id, so the agent re-addresses the request instead of recording a useless approval. A named task with no tools and nothing tool-bearing downstream is fine — that is an approval gating an action that uses no MCP tool.
+**Which tasks an approval covers** is the nearest-approval rule in `infrastructure/approval_scope.py`, a pure module both the gate and the grant read: a task is governed by the first approval found at or above it in the run's `depends_on` graph. An approval therefore covers the task it names **and every task downstream of it, up to the next approval**.
+
+```
+approval A                     approval B
+    |                              |
+    v                              v
+[ask] --> [launch] --> [tag] --> [ask] --> [delete]
+ {A}        {A}         {A}       {B}        {B}
+```
+
+That is why `request_approval`'s `workflow_task_id` is required but no longer has to name the acting task: a design agent naturally emits the request as a step of its own ("Request approval" → "Launch instance"), and naming that step is now the intended shape — the decision reaches the steps that follow it. Three consequences:
+
+- **A merge is fail-closed.** A task reachable from two gated branches is governed by both approvals, and *every* one of them must be `approved` before it may call anything. One approver clearing their own branch does not speak for the other's.
+- **The graph is re-read on every call**, not trusted from the certificate. An approval requested *after* a certificate was issued takes its task over immediately, and the outer approval's grant is refused from that moment (`the approval this tool certificate carries no longer governs this task`).
+- **A covered task's `tool_bindings` are frozen.** Because a certificate is signed when the task *starts* rather than when the approval was decided, an edit in between would widen what the decision goes on to authorize — so `WorkflowTaskService.update` refuses to change the bindings of a task an approval covers, decided or not.
+
+One row gates one task: a task carrying several `Approval` rows (a rejection followed by a re-request) is gated by the unresolved one, or by the most recent when none is unresolved — the same rule `SqlApprovalRepository.get_for_task` applies, so a rejection cannot wedge a task that has already been re-asked.
 
 | Piece | Where |
 |---|---|
 | Root CA — generation, loading, leaf signing | `infrastructure/mcp_ca.py`, table `mcp_certificate_authorities` |
 | Certificate grammar, digest, verification (all pure) | `infrastructure/mcp_certificate.py` |
+| Which approval governs which task (pure) | `infrastructure/approval_scope.py` |
 | Issuing and revoking | `services/mcp_tool_certificate.py`, table `mcp_tool_certificates` |
 | Presenting (the caller side) | `infrastructure/mcp_credentials.py` |
 | Enforcing | `TaskCertificatePolicy` in `infrastructure/mcp_policies.py` |
@@ -358,9 +377,9 @@ The point is not the transport. The proxy is still in-process, so the presenter 
 
 **What a certificate claims** is carried entirely in `subjectAltName` URI entries — A2Flow holds no private enterprise OID arc, and inventing one would be indistinguishable from someone else's. Exactly one binding URN — `urn:a2flow:binding:tenant/T/execution/E/task/K/approval/A` for an approver's grant, `.../initiator/U` for the run initiator's own — plus one grant URN per tool (`urn:a2flow:tool:SERVER/TOOL`). Both are percent-encoded, because `ToolName` places no character restriction on a tool name.
 
-**Revocation is not the only stop.** Verification also re-reads the grantor on every call — an approval's current status, or the run's current `initiator_id` and whether an approval has since attached to the task — so a grant that stopped applying after issuance is refused even if nothing stamped `revoked_at`. There is no scheduler in this codebase, so nothing here depends on a timer.
+**Revocation is not the only stop.** Verification also re-reads the grantor on every call — which approvals now govern the task and whether all of them are still `approved`, or the run's current `initiator_id` and whether an approval has since claimed the task — so a grant that stopped applying after issuance is refused even if nothing stamped `revoked_at`. There is no scheduler in this codebase, so nothing here depends on a timer.
 
-`GET /api/v1/approvals/{id}/certificate` reports what an approval authorized (approval-backed grants only; `GET /api/v1/mcp-tool-certificates` spans both kinds) — serial, validity window, revocation state, and the granted tools parsed back out of the signed certificate. The private key and the certificate body are never serialized.
+`GET /api/v1/approvals/{id}/certificates` reports what an approval authorized (approval-backed grants only; `GET /api/v1/mcp-tool-certificates` spans both kinds) — one row per covered task, each with its serial, validity window, revocation state, and the granted tools parsed back out of the signed certificate. The private key and the certificate body are never serialized. The list grows as the run advances and is legitimately empty until the first covered task starts, so it returns `[]` rather than a 404.
 
 ---
 
@@ -376,7 +395,7 @@ Three admin-gated, read-only surfaces back the frontend's `/admin/audit` section
 
 None of the three has a Create, Update, or Delete route, which is what keeps the trails append-only. All accept the shared pagination / sort / filter query params and are built on `CurrentTenantScopeDep`, so a platform-scoped `super_admin` may send `X-Tenant-Id: __all__` to read across every tenant.
 
-The narrower views they complement are unchanged: `GET /workflow-executions/{id}/tool-invocations` (one run, open to that run's participants) and `GET /approvals/{id}/certificate` (one approval, open to any authenticated caller — it reaches only approval-backed certificates, never the ones a run's initiator granted itself).
+The narrower views they complement are unchanged: `GET /workflow-executions/{id}/tool-invocations` (one run, open to that run's participants) and `GET /approvals/{id}/certificates` (one approval's covered tasks, open to any authenticated caller — it reaches only approval-backed certificates, never the ones a run's initiator granted itself).
 
 **`mcp_tool_certificates` list.** `SqlMcpToolCertificateRepository.list` passes `readable=McpToolCertificateRead` so `certificate_pem` and `private_key_encrypted` resolve as unknown fields — a client cannot use "which rows match" as a blind oracle on key material it never receives. `McpToolCertificateService.list` parses each row's grants back out of its PEM, the same as the single read, so a page costs a page of X.509 parses and the response can never report a grant that differs from what was signed.
 
@@ -447,7 +466,7 @@ A request carries **exactly one destination**, enforced by `request_approval` an
 
 `services/approver_groups.py::ApproverGroupResolver` is the single place that answers "which groups does this caller count as an approver for", and it applies the role gate. Every consumer — `ApprovalService.resolve` / `.list`, `WorkflowExecutionAccessPolicy`, and `WorkflowTaskService`'s status guard — goes through it, so a plain member of an approver group gains nothing from the membership. It reads **effective** roles, like every other non-`super_admin` role check.
 
-Each approval stores `workflowExecutionId` (FK, `ON DELETE CASCADE`), an optional `workflowTaskId` (FK, `ON DELETE SET NULL`), one of `approver` / `approverGroupId` (both FKs, `ON DELETE RESTRICT` — a destination that could vanish would strand the request), a `title`, optional `description`, a `status` (`pending` / `approved` / `rejected` / `returned`), an optional `response` comment, and the server-managed `decidedAt` / `decidedBy`. The latter two are declared on the table class only, so no client payload can write them; both are stamped once, on the write that first leaves `pending`. `decidedBy` is what identifies the actual decider for a group destination. Because `approverGroupId` restricts, deleting a group an approval is still addressed to returns `409 CONFLICT_REFERENCED`.
+Each approval stores `workflowExecutionId` (FK, `ON DELETE CASCADE`), an optional `workflowTaskId` (FK, `ON DELETE SET NULL`) marking where the approval takes effect rather than the single task it authorizes — see [MCP tool certificates](#mcp-tool-certificates) — one of `approver` / `approverGroupId` (both FKs, `ON DELETE RESTRICT` — a destination that could vanish would strand the request), a `title`, optional `description`, a `status` (`pending` / `approved` / `rejected` / `returned`), an optional `response` comment, and the server-managed `decidedAt` / `decidedBy`. The latter two are declared on the table class only, so no client payload can write them; both are stamped once, on the write that first leaves `pending`. `decidedBy` is what identifies the actual decider for a group destination. Because `approverGroupId` restricts, deleting a group an approval is still addressed to returns `409 CONFLICT_REFERENCED`.
 
 A decision is final: a `PATCH` that would *change* an already-recorded `status` returns `409 APPROVAL_ALREADY_RESOLVED` rather than overwriting it, which is what keeps two racing members of one approver group from clobbering each other. Editing only the `response` comment afterwards is still allowed and moves neither stamp.
 

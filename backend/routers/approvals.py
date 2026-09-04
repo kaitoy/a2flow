@@ -15,11 +15,12 @@ same records into approval-backlog breakdowns for operational dashboards. Both
 are declared before ``/{approval_id}`` so their literal path segment is matched
 first.
 
-``GET /approvals/{id}/certificate`` returns the X.509 certificate issued when
-the approval was granted -- the thing that actually lets the approved task call
-its bound MCP tools (see :mod:`models.mcp_tool_certificate`). It reaches only
-approval-backed certificates; the tenant-wide audit surface that also spans the
-ones a run's initiator granted itself is ``GET /mcp-tool-certificates``.
+``GET /approvals/{id}/certificates`` returns the X.509 certificates issued under
+the approval -- the things that actually let the tasks it covers call their bound
+MCP tools (see :mod:`models.mcp_tool_certificate`). There is one per covered
+task, appearing as each of them starts. It reaches only approval-backed
+certificates; the tenant-wide audit surface that also spans the ones a run's
+initiator granted itself is ``GET /mcp-tool-certificates``.
 """
 
 from fastapi import APIRouter
@@ -125,31 +126,32 @@ async def get_approval(
 
 
 @router.get(
-    "/{approval_id}/certificate", response_model=ApiResponse[McpToolCertificateRead]
+    "/{approval_id}/certificates",
+    response_model=ApiResponse[list[McpToolCertificateRead]],
 )
-async def get_approval_certificate(
+async def list_approval_certificates(
     approval_id: str,
     service: McpToolCertificateReadServiceDep,
     meta: ApiMetaDep,
-) -> ApiResponse[McpToolCertificateRead]:
-    """Return the certificate issued when this approval was granted.
+) -> ApiResponse[list[McpToolCertificateRead]]:
+    """Return the certificates issued under this approval, one per covered task.
 
-    Reports what the approval actually authorized: which tools, until when, and
-    whether the certificate has since been revoked. The granted tools are parsed
-    back out of the signed certificate rather than read from a column, so this
-    can never disagree with what the certificate says. The private key is never
-    part of the response.
+    Reports what the approval actually authorized: for each task it covers,
+    which tools, until when, and whether the certificate has since been revoked.
+    The granted tools are parsed back out of each signed certificate rather than
+    read from a column, so this can never disagree with what the certificates
+    say. The private key is never part of the response.
+
+    The list is empty -- not a 404 -- while nothing has been issued yet: an
+    approval covers the task it names *and* every task downstream of it up to
+    the next approval, and each of those is granted its certificate only when it
+    starts, so a freshly granted approval legitimately has none.
 
     Scoped like ``GET /approvals/{id}``: any authenticated user may fetch it,
     since it discloses nothing the approval record does not already.
-
-    Raises:
-        NotFoundError: If the approval has no certificate -- because it was
-            never granted, or because it named no task and so granted no tool
-            authority.
     """
-    certificate = await service.read_for_approval(approval_id)
-    return ApiResponse(meta=meta, data=certificate)
+    certificates = await service.list_for_approval(approval_id)
+    return ApiResponse(meta=meta, data=certificates)
 
 
 @router.patch("/{approval_id}", response_model=ApiResponse[Approval])

@@ -13,10 +13,11 @@ authenticated.
 
 from datetime import UTC, datetime, timedelta
 
-from sqlmodel import col, select
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
+from infrastructure.approval_scope import active_approval_by_task, governing_approvals
 from infrastructure.mcp_ca import McpCaError, certificate_from_pem
 from infrastructure.mcp_certificate import (
     CertificateBinding,
@@ -62,8 +63,9 @@ _NO_CREDENTIAL = (
     "no tool certificate was presented for this task, so it may not call MCP "
     "tools. A task is granted one when it is marked in_progress, over exactly "
     "the tools bound to it at that moment -- bind a task's tools before or in "
-    "the same call that starts it. A task that requested an approval is instead "
-    "granted one when that approval is granted."
+    "the same call that starts it. A task covered by an approval -- its own, or "
+    "one requested on a task it descends from -- is granted nothing until that "
+    "approval is granted."
 )
 
 
@@ -155,55 +157,61 @@ class InProgressToolBindingPolicy:
             )
 
 
-async def _tasks_with_an_approval(
-    db: AsyncSession, task_ids: list[str], tenant_id: str
-) -> set[str]:
-    """Return which of the given tasks have an Approval attached, in one query.
-
-    Status is deliberately not filtered. A task whose approval is still
-    ``pending`` has asked for authority it has not been granted, so it must be
-    just as unable to call its tools as one whose approval was rejected --
-    treating "an approval exists" as the trigger is what makes the gate
-    fail-closed.
+async def _run_approvals(
+    db: AsyncSession, execution_id: str, tenant_id: str
+) -> list[Approval]:
+    """Return every Approval of the run, in one query.
 
     Args:
         db: The proxy's open database session.
-        task_ids: Tasks to check.
+        execution_id: The WorkflowExecution driving the run.
         tenant_id: Tenant the run belongs to.
 
     Returns:
-        The subset of ``task_ids`` that have at least one Approval.
-    """
-    if not task_ids:
-        return set()
-    result = await db.exec(
-        select(Approval.workflow_task_id).where(
-            col(Approval.workflow_task_id).in_(task_ids),
-            Approval.tenant_id == tenant_id,
-        )
-    )
-    return {task_id for task_id in result.all() if task_id is not None}
-
-
-async def _approval(
-    db: AsyncSession, approval_id: str, tenant_id: str
-) -> Approval | None:
-    """Return one Approval within the tenant, or ``None``.
-
-    Args:
-        db: The proxy's open database session.
-        approval_id: The approval to load.
-        tenant_id: Tenant the run belongs to.
-
-    Returns:
-        The approval, or ``None`` when it does not exist in this tenant.
+        The run's approvals.
     """
     result = await db.exec(
         select(Approval).where(
-            Approval.id == approval_id, Approval.tenant_id == tenant_id
+            Approval.workflow_execution_id == execution_id,
+            Approval.tenant_id == tenant_id,
         )
     )
-    return result.first()
+    return list(result.all())
+
+
+async def _governing_approvals(
+    db: AsyncSession, execution_id: str, tenant_id: str, task_id: str
+) -> list[Approval]:
+    """Return the approvals that govern one task of a run.
+
+    "Govern" is the nearest-approval rule of
+    :mod:`infrastructure.approval_scope`: the task's own approval when it has
+    one, otherwise whatever governs the tasks it depends on, collected across
+    every branch of a merge.
+
+    Args:
+        db: The proxy's open database session.
+        execution_id: The WorkflowExecution driving the run.
+        tenant_id: Tenant the run belongs to.
+        task_id: The task to resolve.
+
+    Returns:
+        The governing approvals, empty when none governs the task.
+    """
+    execution_repo = SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
+    task_repo = SqlWorkflowTaskRepository(
+        db,
+        execution_repo,
+        SqlMCPServerRepository(db, tenant_id=tenant_id),
+        tenant_id=tenant_id,
+    )
+    tasks = await task_repo.list(
+        limit=_MAX_TASKS, offset=0, workflow_execution_id=execution_id
+    )
+    approvals = await _run_approvals(db, execution_id, tenant_id)
+    governing = governing_approvals(tasks, active_approval_by_task(approvals))
+    approval_ids = governing.get(task_id, frozenset())
+    return [approval for approval in approvals if approval.id in approval_ids]
 
 
 async def _execution_initiator(
@@ -250,13 +258,30 @@ async def _assert_grantor_still_authorizes(
             the run and the task.
 
     Raises:
-        McpPolicyDeniedError: If an approval grant's approval is no longer
+        McpPolicyDeniedError: If an approval grant names an approval that no
+            longer governs the task, or any approval that does govern it is not
             ``approved``, or an initiator grant names someone other than the
             run's initiator or belongs to a task an approval has since claimed.
     """
+    governing = await _governing_approvals(
+        db,
+        ctx.identity.execution_id or "",
+        ctx.identity.tenant_id,
+        binding.task_id,
+    )
+
     if binding.approval_id is not None:
-        approval = await _approval(db, binding.approval_id, ctx.identity.tenant_id)
-        if approval is None or approval.status != ApprovalStatus.approved:
+        # Which approval governs the task is re-derived here rather than trusted
+        # from the certificate: a request made *after* this one was issued can
+        # take the task over, and the outer approval's grant must stop counting
+        # the moment it does.
+        if binding.approval_id not in {approval.id for approval in governing}:
+            raise McpPolicyDeniedError(
+                "the approval this tool certificate carries no longer governs this task"
+            )
+        # Every governing approval, not just the one named: a task where two
+        # gated branches merge is authorized by both approvers or by neither.
+        if any(approval.status != ApprovalStatus.approved for approval in governing):
             raise McpPolicyDeniedError(
                 "the approval backing this task is no longer granted"
             )
@@ -269,7 +294,7 @@ async def _assert_grantor_still_authorizes(
         raise McpPolicyDeniedError(
             "the presented tool certificate was not granted by this run's initiator"
         )
-    if await _tasks_with_an_approval(db, [binding.task_id], ctx.identity.tenant_id):
+    if governing:
         raise McpPolicyDeniedError(
             "this task now needs an approval, so the initiator's own grant no "
             "longer authorizes it; wait for the approval to be granted"
@@ -284,8 +309,9 @@ class TaskCertificatePolicy:
     prove it holds that certificate's key, and the certificate's own signed
     grant must cover the tool.
 
-    There is no exemption. A task an approver cleared presents that approval's
-    certificate; a task nobody was asked to approve presents the one the run's
+    There is no exemption. A task an approver cleared -- directly, or by
+    clearing an approval it descends from -- presents that approval's
+    certificate; a task no approval governs presents the one the run's
     initiator took out for themselves when it started (see
     :meth:`services.mcp_tool_certificate.McpToolCertificateService.issue_for_started_task`).
     Either way something signed authorized the call, and the audit row records
@@ -299,10 +325,15 @@ class TaskCertificatePolicy:
     grant does not: it cannot be re-signed after issuance.
 
     The two grantors are not interchangeable, and this is where that is
-    enforced: an initiator grant is refused for a task that has an approval
-    attached, whatever the approval's status. Without that, a run could start a
-    task, pocket the initiator's certificate, and only then request the approval
-    it was supposed to be waiting for.
+    enforced: an initiator grant is refused for any task an approval governs,
+    whatever the approval's status. Without that, a run could start a task,
+    pocket the initiator's certificate, and only then request the approval it
+    was supposed to be waiting for.
+
+    Which approval governs a task is derived from the run's dependency graph on
+    every call (:mod:`infrastructure.approval_scope`) rather than read off the
+    certificate, so an approval requested *after* a certificate was issued takes
+    the task over immediately and the older grant stops counting.
 
     Registered after :class:`InProgressToolBindingPolicy` so the cheap
     binding-scope denial short-circuits before this one's extra queries and
@@ -320,10 +351,11 @@ class TaskCertificatePolicy:
             McpPolicyDeniedError: If the call presents no certificate, presents
                 one bound to a different tenant, run, task, or approval,
                 presents one this deployment did not issue or has revoked,
-                presents an approval grant whose approval is no longer granted,
-                presents an initiator grant that names the wrong user or belongs
-                to a task an approval has since claimed, fails proof of
-                possession, or targets a tool the certificate does not grant.
+                presents an approval grant whose approval no longer governs the
+                task or is no longer granted, presents an initiator grant that
+                names the wrong user or belongs to a task an approval has since
+                claimed, fails proof of possession, or targets a tool the
+                certificate does not grant.
         """
         if ctx.operation is not McpOperation.call_tool:
             return

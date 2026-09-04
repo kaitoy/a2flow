@@ -763,7 +763,7 @@ def get_mcp_tool_certificate_read_service(
 ) -> McpToolCertificateService:
     """Create an McpToolCertificateService for a read route, possibly across all tenants.
 
-    Backs only ``read_for_approval`` (``GET /approvals/{id}/certificate``),
+    Backs only ``list_for_approval`` (``GET /approvals/{id}/certificates``),
     which touches only ``certificates`` -- every other collaborator here must
     still be a read repository, since merely resolving a strict one would itself
     raise regardless of whether this service calls into it.

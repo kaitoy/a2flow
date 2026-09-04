@@ -131,8 +131,9 @@ async def grant_tool_certificate(
     it makes.
 
     A no-op when the service declines to issue -- the task is not in progress,
-    binds no tools, already holds a grant, or has an approval attached -- so it
-    is safe to call unconditionally after seeding a task.
+    binds no tools, already holds a grant, or is covered by an approval that has
+    not been granted -- so it is safe to call unconditionally after seeding a
+    task.
 
     Args:
         engine: The test engine to write through.

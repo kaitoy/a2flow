@@ -130,13 +130,16 @@ class ApprovalService:
         ``update`` so the decision also stamps the server-managed ``decided_at``
         and ``decided_by``.
 
-        Granting an approval that names a task also issues that task's MCP
-        approval certificate (see
-        :class:`services.mcp_tool_certificate.McpToolCertificateService`).
-        Until it exists the task cannot call any of its bound MCP tools, so this
-        is the step that actually turns the decision into authority. Issuing is
-        idempotent: editing the comment on an already-granted approval returns
-        the standing certificate rather than rotating it.
+        Granting an approval also issues the MCP tool certificates of the tasks
+        it covers that are *already* underway (see
+        :class:`services.mcp_tool_certificate.McpToolCertificateService`) --
+        typically the task that asked for the go-ahead and is waiting on this
+        very decision. The rest of the covered tasks are granted theirs as they
+        start. Until a covered task holds one it cannot call any of its bound
+        MCP tools, so this is the step that turns the decision into authority.
+        Issuing is idempotent: editing the comment on an already-granted
+        approval leaves the standing certificates alone rather than rotating
+        them.
 
         Args:
             approval_id: Identifier of the approval to update.

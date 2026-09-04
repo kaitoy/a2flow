@@ -1251,14 +1251,17 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    # One *live* certificate per approval. Partial rather than a plain unique
-    # constraint so a revoked certificate stays in the table: the audit trail
-    # has to keep showing that authority was granted and when it stopped
-    # counting, and a re-issue after revocation must still be possible.
+    # One *live* certificate per approval and task. Keyed on the pair because
+    # an approval covers the task it names plus every task downstream of it up
+    # to the next approval, and each of those is granted its own certificate
+    # when it starts. Partial rather than a plain unique constraint so a revoked
+    # certificate stays in the table: the audit trail has to keep showing that
+    # authority was granted and when it stopped counting, and a re-issue after
+    # revocation must still be possible.
     op.create_index(
         "uq_mcp_tool_certificates_live",
         "mcp_tool_certificates",
-        ["approval_id"],
+        ["approval_id", "workflow_task_id"],
         unique=True,
         postgresql_where=sa.text("revoked_at IS NULL"),
         sqlite_where=sa.text("revoked_at IS NULL"),

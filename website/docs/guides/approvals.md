@@ -5,7 +5,7 @@ sidebar_position: 5
 
 # Approvals
 
-An approval is how a run stops and waits for a person. The agent asks for one mid-execution, the designated approver decides in the chat, and that decision is what unlocks the task's tools.
+An approval is how a run stops and waits for a person. The agent asks for one mid-execution, the designated approver decides in the chat, and that decision is what unlocks the tools of the steps it covers.
 
 ## Human approval {#human-approval}
 
@@ -20,7 +20,7 @@ sequenceDiagram
   F->>P: Notification, and email if it is switched on
   Note over A,P: The run pauses. Approve / Reject / Return appear in the chat
   P->>F: Decides, with an optional comment
-  Note over F: On Approve, a certificate is issued for the task
+  Note over F: On Approve, each covered step is granted a certificate as it starts
   F-->>A: The decision. The run resumes
 ```
 
@@ -43,7 +43,7 @@ The agent explains the request in plain text, and the controls appear in the cha
 
 | Decision | What it means | What the agent does |
 |---|---|---|
-| **Approve** | Go ahead | Proceeds, with the task's tools unlocked |
+| **Approve** | Go ahead | Proceeds, with the covered steps' tools unlocked |
 | **Reject** | Do not do this | Marks the task `failed` or `skipped` |
 | **Return** | Revise and ask again | Sends the work back rather than settling the request |
 
@@ -55,16 +55,19 @@ Only the designated approver may decide, with **no exception — not even a Supe
 
 ### What approval unlocks
 
-**The approval gate is enforced by the server, not by the agent.** A task with an approval attached cannot call any of its bound [MCP tools](./mcp-servers.md) until that approval is granted — the call is refused before it reaches the server. Granting the approval issues a short-lived **certificate** for the task, and every subsequent tool call from that task must present it.
+**The approval gate is enforced by the server, not by the agent.** A step an approval covers cannot call any of its bound [MCP tools](./mcp-servers.md) until that approval is granted — the call is refused before it reaches the server. Each covered step is granted a short-lived **certificate** when it starts, and every subsequent tool call from it must present that certificate.
 
-Every task needs such a certificate, not only the ones somebody was asked to approve. A task with no approval on it is granted one the moment it is marked **In Progress**, on the authority of whoever started the run — so the record always says who a tool call was made on behalf of, and there is no unattributed path to a tool. Approving a task simply replaces that with the approver's own authority.
+Every step needs such a certificate, not only the ones somebody was asked to approve. A step no approval covers is granted one the moment it is marked **In Progress**, on the authority of whoever started the run — so the record always says who a tool call was made on behalf of, and there is no unattributed path to a tool. An approval simply replaces that with the approver's own authority.
 
 Two things this buys that an instruction to the model could not:
 
 - **A prompt injection or a bug cannot skip the approval.** The gate is a rule the server checks, not a sentence in the agent's instructions plus a frontend that declines to resume.
-- **The granted tools are frozen at the moment the certificate is issued.** It carries the tools the task had bound when the approver clicked Approve — or, for a task nobody approved, when the task started. A run's tasks and their tools come from the workflow's published design and the agent cannot change them, and the certificate freezes them again at issuance — so nothing that edits the workflow afterwards can widen a grant already given. Approving a task to read a file does not become approval to delete one, and a running task cannot pick up a tool it did not start with.
+- **The granted tools are frozen.** A certificate carries the tools its step had bound when the step started, and a covered step's tools can no longer be edited at all. A run's steps and their tools come from the workflow's published design and the agent cannot change them, so nothing that happens after the decision can widen a grant. Approving a step to read a file does not become approval to delete one.
 
-Both halves — the pause and the unlocked tools — belong to **one task: the one that carries out the approved action**. A workflow often shows the request as a step of its own, as in "Request approval" followed by "Launch instance", and it is the second of those the approval covers, since that is where the tools are. A request that names a step with no tools of its own while a later step in the run has some is refused, so a run cannot end up with an approval that authorizes nothing.
+**What a decision covers** is the step the request names **and every step after it, up to the next approval**. A workflow usually shows the request as a step of its own — "Request approval" followed by "Launch instance" — and one decision covers both, so the approver is not asked again for each step of the same piece of work. Two consequences worth knowing:
+
+- Where two approved branches meet, the step they meet at needs **both** decisions before it may act.
+- Nothing before the request is ever covered by it. An approval reaches forward only.
 
 Every decided tool call — allowed or refused — is recorded on the run's [Tool Invocations](./workflow-executions.md#tool-invocations) page with the certificate it presented, so "who authorized this, and on what basis" can be answered afterwards.
 
@@ -85,4 +88,6 @@ Open **Approvals** in the admin sidebar to browse every approval request. This v
 
 Each row also carries an **Open Workflow Session** action that jumps straight into the run's chat, mirroring the one on the [Workflow Executions](./workflow-executions.md) list.
 
-A granted approval's detail page additionally shows what its certificate authorized: the **Authorized MCP tools**, the validity window, and whether the certificate has been revoked. An empty tool list is not a fault — it means the approved step performs its work without calling any MCP tool.
+A granted approval's detail page additionally shows what it authorized under **Authorized MCP tools**: one entry per covered step that has started, each with the tools granted to it, the validity window, and whether its certificate has been revoked. The panel filling in gradually is normal — a step gets its certificate when it starts, so a freshly granted approval may show nothing yet. An entry with an empty tool list is not a fault either; it means that step does its work without calling any MCP tool.
+
+The **Takes Effect From** field names the step the approval starts at. Everything after it, up to the next approval, is covered too.

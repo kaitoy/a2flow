@@ -56,15 +56,15 @@ describe("ApprovalDetailPage", () => {
     expect(link).toHaveAttribute("href", "/admin/workflow-executions/execution-1");
   });
 
-  it("shows an empty placeholder for a Related Task when the approval names none", async () => {
+  it("shows an empty placeholder for Takes Effect From when the approval names none", async () => {
     render(<ApprovalDetailPage />);
     await screen.findByRole("heading", { name: "Deploy to production" });
     // APPROVAL_1's workflowTaskId is null in the default MSW fixtures.
-    const dt = screen.getByText("Related Task");
+    const dt = screen.getByText("Takes Effect From");
     expect(dt.nextElementSibling).toHaveTextContent("—");
   });
 
-  it("links the Related Task field to its resolved title", async () => {
+  it("links the Takes Effect From field to its resolved title", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/approvals/appr-1", () =>
         envelope({
@@ -88,12 +88,72 @@ describe("ApprovalDetailPage", () => {
     );
 
     render(<ApprovalDetailPage />);
-    // "Step 1" is WORKFLOW_TASK_1's title in the default MSW fixtures.
-    const link = await screen.findByRole("link", { name: "Step 1" });
-    expect(link).toHaveAttribute(
+    // "Step 1" is WORKFLOW_TASK_1's title in the default MSW fixtures. The
+    // certificate panel links the same task, so more than one link carries it.
+    const links = await screen.findAllByRole("link", { name: "Step 1" });
+    for (const link of links) {
+      expect(link).toHaveAttribute(
+        "href",
+        "/admin/workflow-executions/execution-1/workflow-tasks/task-1"
+      );
+    }
+  });
+
+  it("lists a certificate row per task the approval covers", async () => {
+    render(<ApprovalDetailPage />);
+    await screen.findByRole("heading", { name: "Authorized MCP tools" });
+
+    // TOOL_CERTIFICATE_1 names task-1, whose title resolves through the run's
+    // task list rather than a lookup per certificate.
+    expect(await screen.findByText("Takes Effect From")).toBeInTheDocument();
+    expect(screen.getByText("Task")).toBeInTheDocument();
+    expect(screen.getByText("Certificate Status")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Step 1" })).toHaveAttribute(
       "href",
       "/admin/workflow-executions/execution-1/workflow-tasks/task-1"
     );
+  });
+
+  it("says so when a granted approval has issued no certificate yet", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/approvals/appr-1/certificates", () => envelope([]))
+    );
+
+    render(<ApprovalDetailPage />);
+
+    expect(
+      await screen.findByText("No certificate has been issued under this approval yet.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows no certificate panel while the approval is undecided", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/approvals/appr-1", () =>
+        envelope({
+          id: "appr-1",
+          tenantId: "tenant-1",
+          workflowExecutionId: "execution-1",
+          workflowTaskId: "task-1",
+          title: "Deploy to production",
+          description: null,
+          status: "pending",
+          response: null,
+          approver: "user-1",
+          approverGroupId: null,
+          decidedBy: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "owner",
+          updatedBy: "owner",
+        })
+      )
+    );
+
+    render(<ApprovalDetailPage />);
+    await screen.findByRole("heading", { name: "Deploy to production" });
+
+    expect(screen.queryByRole("heading", { name: "Authorized MCP tools" })).not.toBeInTheDocument();
   });
 
   it("navigates to the chat page from the header action", async () => {

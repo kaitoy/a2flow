@@ -8,7 +8,7 @@ makes the parsed ``allowedTools`` assertions meaningful: they come back out of a
 genuinely signed certificate.
 
 Distinct from ``tests/test_mcp_tool_certificate.py``, which covers issuance,
-revocation, and the per-approval ``GET /approvals/{id}/certificate``. This file
+revocation, and the per-approval ``GET /approvals/{id}/certificates``. This file
 covers only the audit surface: its role gate, tenant scoping, and that key
 material stays out of both the payload and the query surface.
 """
@@ -91,7 +91,7 @@ async def _issue_certificate(
 
     Returns:
         The id of the approval the certificate was issued for. Its certificate
-        is then found through the audit list or ``GET /approvals/{id}/certificate``.
+        is then found through the audit list or ``GET /approvals/{id}/certificates``.
     """
     # ``expire_on_commit=False``: this helper reads ids back after each commit,
     # and an expired attribute would trigger IO outside a greenlet context.

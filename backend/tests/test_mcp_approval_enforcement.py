@@ -243,6 +243,18 @@ async def _seed_approval(
         return approval.id
 
 
+async def _approve(eng: AsyncEngine, approval_id: str) -> None:
+    """Move a pending approval to ``approved``, as its approver's PATCH does."""
+    async with AsyncSession(eng) as db:
+        approval = await db.get(Approval, approval_id)
+        assert approval is not None
+        approval.status = ApprovalStatus.approved
+        approval.decided_at = datetime.now(UTC)
+        approval.decided_by = "alice"
+        db.add(approval)
+        await db.commit()
+
+
 async def _issue(eng: AsyncEngine, approval_id: str) -> None:
     """Issue the certificate for an approval, as ``ApprovalService.resolve`` does.
 
@@ -449,14 +461,12 @@ async def test_call_is_denied_once_the_certificate_is_revoked(
 async def test_an_asking_step_in_front_of_the_acting_task_still_gates_it(
     engine: AsyncEngine,
 ) -> None:
-    """The DAG shape a design agent produces, approved the right way round.
+    """The DAG shape a design agent produces, with the acting task named.
 
     "Request approval" is a step of its own and binds no tools; the work runs in
-    a later task that does. The approval must name that later task, because the
-    gate and the grant are both the named task's: naming the asking step would
-    freeze an empty grant and leave the acting task with no approval attached,
-    hence ungated. ``request_approval`` refuses that inversion, and this is the
-    end-to-end behaviour it buys.
+    a later task that does. Naming that later task gates it directly -- the
+    narrowest case, and still the one to hold onto while the scope rule below
+    widens what else a decision can reach.
     """
     server_id = await _seed_server(engine)
     execution_id = await _seed_execution(engine)
@@ -484,14 +494,7 @@ async def test_an_asking_step_in_front_of_the_acting_task_still_gates_it(
     with pytest.raises(McpPolicyDeniedError, match="no tool certificate"):
         await _call(server_id)
 
-    async with AsyncSession(engine) as db:
-        approval = await db.get(Approval, approval_id)
-        assert approval is not None
-        approval.status = ApprovalStatus.approved
-        approval.decided_at = datetime.now(UTC)
-        approval.decided_by = "alice"
-        db.add(approval)
-        await db.commit()
+    await _approve(engine, approval_id)
     await _issue(engine, approval_id)
 
     assert (await _call(server_id)).isError is False
@@ -502,6 +505,142 @@ async def test_an_asking_step_in_front_of_the_acting_task_still_gates_it(
     assert certificate is not None
     claims = extract_claims(certificate_from_pem(certificate.certificate_pem))
     assert claims.allowed_tools == frozenset({(server_id, TOOL)})
+
+
+async def test_an_approval_on_the_asking_step_gates_the_task_after_it(
+    engine: AsyncEngine,
+) -> None:
+    """The scope rule end to end: the decision reaches the step that acts.
+
+    The approval names the step whose only job is to ask. Before the decision
+    the downstream task can call nothing even though nobody asked to approve
+    *it*; after the decision it calls on the approver's authority, not on the
+    run initiator's.
+    """
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    asking = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[],
+        title="Request approval",
+        status=WorkflowTaskStatus.completed,
+    )
+    acting = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[(server_id, TOOL)],
+        title="Launch",
+        depends_on=asking,
+    )
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=asking,
+        status=ApprovalStatus.pending,
+    )
+
+    # The initiator cannot grant it to itself either: the approval covers it.
+    await _grant(engine, execution_id, acting)
+    with pytest.raises(McpPolicyDeniedError, match="no tool certificate"):
+        await _call(server_id)
+
+    await _approve(engine, approval_id)
+    await _issue(engine, approval_id)
+
+    assert (await _call(server_id)).isError is False
+    async with AsyncSession(engine) as db:
+        certificate = await SqlMcpToolCertificateRepository(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        ).get_live_for_task(acting)
+    assert certificate is not None
+    assert certificate.approval_id == approval_id
+    assert certificate.grant_kind is CertificateGrant.approval
+
+
+async def test_a_nearer_approval_invalidates_the_outer_ones_certificate(
+    engine: AsyncEngine,
+) -> None:
+    """A task claimed by a later request stops counting as the outer one's.
+
+    The certificate is real, un-revoked and issued by this deployment; what
+    changed is the graph. The governing approval is re-derived on every call, so
+    the outer grant is refused the moment a nearer request takes the task over.
+    """
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    asking = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[],
+        title="Request approval",
+        status=WorkflowTaskStatus.completed,
+    )
+    acting = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[(server_id, TOOL)],
+        title="Launch",
+        depends_on=asking,
+    )
+    outer = await _seed_approval(
+        engine, execution_id=execution_id, task_id=asking, status=ApprovalStatus.pending
+    )
+    await _approve(engine, outer)
+    await _issue(engine, outer)
+    assert (await _call(server_id)).isError is False
+
+    # A second request lands on the acting task itself, after the fact.
+    await _seed_approval(
+        engine, execution_id=execution_id, task_id=acting, status=ApprovalStatus.pending
+    )
+
+    with pytest.raises(McpPolicyDeniedError, match="no longer governs this task"):
+        await _call(server_id)
+
+
+async def test_a_merge_waits_for_every_governing_approval(
+    engine: AsyncEngine,
+) -> None:
+    """One approver clearing their branch does not speak for the other's."""
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    left = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[],
+        title="Ask left",
+        status=WorkflowTaskStatus.completed,
+    )
+    right = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[],
+        title="Ask right",
+        status=WorkflowTaskStatus.completed,
+    )
+    merge = await _seed_task(
+        engine, execution_id, bindings=[(server_id, TOOL)], title="Publish"
+    )
+    async with AsyncSession(engine) as db:
+        db.add(WorkflowTaskDependency(task_id=merge, depends_on_id=left))
+        db.add(WorkflowTaskDependency(task_id=merge, depends_on_id=right))
+        await db.commit()
+    left_approval = await _seed_approval(
+        engine, execution_id=execution_id, task_id=left, status=ApprovalStatus.pending
+    )
+    right_approval = await _seed_approval(
+        engine, execution_id=execution_id, task_id=right, status=ApprovalStatus.pending
+    )
+
+    await _approve(engine, left_approval)
+    await _issue(engine, left_approval)
+    with pytest.raises(McpPolicyDeniedError, match="no tool certificate"):
+        await _call(server_id)
+
+    await _approve(engine, right_approval)
+    await _issue(engine, right_approval)
+    assert (await _call(server_id)).isError is False
 
 
 # ---------------------------------------------------------------------------

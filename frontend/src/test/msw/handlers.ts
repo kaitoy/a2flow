@@ -638,6 +638,10 @@ export const handlers = [
     envelope({ ...APPROVAL_1, id: params.approvalId as string })
   ),
 
+  http.get(`${BASE}/api/v1/approvals/:approvalId/certificates`, () =>
+    envelope([TOOL_CERTIFICATE_1])
+  ),
+
   http.patch(`${BASE}/api/v1/approvals/:approvalId`, async ({ params, request }) => {
     const body = (await request.json()) as { status?: string; response?: string | null };
     return envelope({

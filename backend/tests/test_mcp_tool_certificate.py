@@ -36,12 +36,13 @@ from models.mcp_tool_certificate import (
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import (
     WorkflowTask,
+    WorkflowTaskDependency,
     WorkflowTaskStatus,
     WorkflowTaskToolBinding,
 )
 from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
 from tests._engine import make_test_engine
-from tests._envelope import assert_err, assert_ok
+from tests._envelope import assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
 
@@ -123,6 +124,7 @@ async def _seed_task(
     *,
     bindings: list[tuple[str, str]],
     status: WorkflowTaskStatus = WorkflowTaskStatus.in_progress,
+    depends_on: list[str] | None = None,
 ) -> str:
     """Insert a WorkflowTask with the given ``(server_id, tool_name)`` bindings."""
     async with AsyncSession(eng) as db:
@@ -147,6 +149,8 @@ async def _seed_task(
                     task_id=task_id, mcp_server_id=server_id, tool_name=tool_name
                 )
             )
+        for dependency_id in depends_on or []:
+            db.add(WorkflowTaskDependency(task_id=task_id, depends_on_id=dependency_id))
         await db.commit()
         return task_id
 
@@ -322,16 +326,15 @@ async def test_multiple_bound_tools_all_land_in_the_certificate(
     )
 
 
-async def test_a_task_with_no_bindings_gets_a_certificate_granting_nothing(
+async def test_a_task_with_no_bindings_is_granted_nothing(
     cert_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """The binding URN alone is a valid certificate; it just grants no tool.
+    """A gate step that binds no tools needs no certificate of its own.
 
-    This is the shape of an approval gating an action that uses no MCP tool.
-    The other way to reach it -- naming the step that *asks* for the go-ahead
-    while a task downstream of it holds the bindings -- is refused up front by
-    ``infrastructure.approval_tools.request_approval``, since it would leave
-    the acting task with no approval attached and therefore ungated.
+    This is the ordinary shape now: the step that *asks* for the go-ahead binds
+    nothing, and the approval's authority is carried by the certificates of the
+    tasks after it. A certificate here would be a row, a keypair, and an audit
+    entry authorizing nothing.
     """
     client, eng = cert_env
     execution_id = await _seed_execution(eng)
@@ -342,10 +345,93 @@ async def test_a_task_with_no_bindings_gets_a_certificate_granting_nothing(
 
     await _decide(client, approval_id, "approved")
 
-    certificate = (await _certificates(eng, approval_id))[0]
-    claims = extract_claims(certificate_from_pem(certificate.certificate_pem))
-    assert claims.allowed_tools == frozenset()
-    assert claims.binding.task_id == task_id
+    assert await _certificates(eng, approval_id) == []
+
+
+async def test_an_approval_covers_the_tasks_after_the_step_it_names(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """The load-bearing case: naming the asking step authorizes what follows it.
+
+    The gate step binds nothing, so its own certificate would grant nothing --
+    the decision has to reach the step downstream that actually holds the tools.
+    """
+    client, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    gate = await _seed_task(eng, execution_id, bindings=[])
+    acting = await _seed_task(
+        eng, execution_id, bindings=[(server_id, "launch")], depends_on=[gate]
+    )
+    approval_id = await _insert_approval(eng, execution_id=execution_id, task_id=gate)
+
+    await _decide(client, approval_id, "approved")
+
+    certificates = await _certificates(eng, approval_id)
+    assert len(certificates) == 1
+    claims = extract_claims(certificate_from_pem(certificates[0].certificate_pem))
+    assert claims.binding.task_id == acting
+    assert claims.binding.approval_id == approval_id
+    assert claims.allowed_tools == frozenset({(server_id, "launch")})
+
+
+async def test_an_approval_stops_at_the_next_approval(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A nearer approval takes its task over; the outer one no longer reaches it."""
+    client, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    first_gate = await _seed_task(eng, execution_id, bindings=[])
+    middle = await _seed_task(
+        eng, execution_id, bindings=[(server_id, "read_file")], depends_on=[first_gate]
+    )
+    second_gate = await _seed_task(
+        eng, execution_id, bindings=[(server_id, "delete_file")], depends_on=[middle]
+    )
+    outer = await _insert_approval(eng, execution_id=execution_id, task_id=first_gate)
+    inner = await _insert_approval(eng, execution_id=execution_id, task_id=second_gate)
+
+    await _decide(client, outer, "approved")
+
+    assert [c.workflow_task_id for c in await _certificates(eng, outer)] == [middle]
+    assert await _certificates(eng, inner) == []
+
+    await _decide(client, inner, "approved")
+
+    assert [c.workflow_task_id for c in await _certificates(eng, inner)] == [
+        second_gate
+    ]
+
+
+async def test_a_merge_needs_every_governing_approval(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Where two gated branches meet, one approver's decision is not enough."""
+    client, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    left = await _seed_task(eng, execution_id, bindings=[])
+    right = await _seed_task(eng, execution_id, bindings=[])
+    merge = await _seed_task(
+        eng,
+        execution_id,
+        bindings=[(server_id, "publish")],
+        depends_on=[left, right],
+    )
+    left_approval = await _insert_approval(eng, execution_id=execution_id, task_id=left)
+    right_approval = await _insert_approval(
+        eng, execution_id=execution_id, task_id=right
+    )
+
+    await _decide(client, left_approval, "approved")
+    assert await _certificates(eng, left_approval) == []
+
+    await _decide(client, right_approval, "approved")
+    issued = await _certificates(eng, left_approval) + await _certificates(
+        eng, right_approval
+    )
+    assert [certificate.workflow_task_id for certificate in issued] == [merge]
 
 
 # ---------------------------------------------------------------------------
@@ -480,7 +566,7 @@ async def test_certificate_serial_matches_the_signed_certificate(
 
 
 # ---------------------------------------------------------------------------
-# GET /approvals/{id}/certificate
+# GET /approvals/{id}/certificates
 # ---------------------------------------------------------------------------
 
 
@@ -497,15 +583,46 @@ async def test_certificate_endpoint_reports_the_granted_tools(
     await _decide(client, approval_id, "approved")
 
     response = await client.get(
-        f"/api/v1/approvals/{approval_id}/certificate",
+        f"/api/v1/approvals/{approval_id}/certificates",
         headers={"X-User-Id": "alice"},
     )
 
     data = assert_ok(response)
-    assert data["allowedTools"] == [{"mcpServerId": server_id, "toolName": "read_file"}]
-    assert data["revokedAt"] is None
-    assert data["approvalId"] == approval_id
-    assert data["workflowTaskId"] == task_id
+    assert len(data) == 1
+    assert data[0]["allowedTools"] == [
+        {"mcpServerId": server_id, "toolName": "read_file"}
+    ]
+    assert data[0]["revokedAt"] is None
+    assert data[0]["approvalId"] == approval_id
+    assert data[0]["workflowTaskId"] == task_id
+
+
+async def test_certificate_endpoint_lists_one_row_per_covered_task(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """One approval, two covered tasks underway, two certificates."""
+    client, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    gate = await _seed_task(eng, execution_id, bindings=[(server_id, "read_file")])
+    downstream = await _seed_task(
+        eng, execution_id, bindings=[(server_id, "write_file")], depends_on=[gate]
+    )
+    approval_id = await _insert_approval(eng, execution_id=execution_id, task_id=gate)
+
+    await _decide(client, approval_id, "approved")
+
+    response = await client.get(
+        f"/api/v1/approvals/{approval_id}/certificates",
+        headers={"X-User-Id": "alice"},
+    )
+
+    data = assert_ok(response)
+    assert {row["workflowTaskId"] for row in data} == {gate, downstream}
+    granted = {
+        row["workflowTaskId"]: row["allowedTools"][0]["toolName"] for row in data
+    }
+    assert granted == {gate: "read_file", downstream: "write_file"}
 
 
 async def test_certificate_endpoint_never_returns_key_material(
@@ -522,10 +639,11 @@ async def test_certificate_endpoint_never_returns_key_material(
     await _decide(client, approval_id, "approved")
 
     response = await client.get(
-        f"/api/v1/approvals/{approval_id}/certificate",
+        f"/api/v1/approvals/{approval_id}/certificates",
         headers={"X-User-Id": "alice"},
     )
 
+    assert len(assert_ok(response)) == 1
     body = response.text
     assert "privateKeyEncrypted" not in body
     assert "private_key_encrypted" not in body
@@ -533,9 +651,14 @@ async def test_certificate_endpoint_never_returns_key_material(
     assert "certificatePem" not in body
 
 
-async def test_certificate_endpoint_404s_when_none_was_issued(
+async def test_certificate_endpoint_is_empty_when_none_was_issued(
     cert_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
+    """An approval that granted nothing has no certificates, not a 404.
+
+    Nothing being issued yet is an ordinary state now that a covered task is
+    granted only when it starts, so the empty list is the honest answer.
+    """
     client, eng = cert_env
     execution_id = await _seed_execution(eng)
     server_id = await _seed_mcp_server(eng)
@@ -546,11 +669,11 @@ async def test_certificate_endpoint_404s_when_none_was_issued(
     await _decide(client, approval_id, "rejected")
 
     response = await client.get(
-        f"/api/v1/approvals/{approval_id}/certificate",
+        f"/api/v1/approvals/{approval_id}/certificates",
         headers={"X-User-Id": "alice"},
     )
 
-    assert_err(response, "NOT_FOUND", 404)
+    assert assert_ok(response) == []
 
 
 # ---------------------------------------------------------------------------

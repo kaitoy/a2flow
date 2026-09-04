@@ -8,29 +8,35 @@ agent is asked to follow. A row is created by
 two paths, recorded in :attr:`McpToolCertificate.grant_kind`:
 
 ``approval``
-    An approver decided ``approved`` on an approval naming the task. The
-    certificate is minted at that moment and ``approval_id`` names the decision.
+    An approval **governs** the task -- it is the nearest approval at or above
+    the task in the run's dependency graph (see
+    :mod:`infrastructure.approval_scope`) -- and an approver decided
+    ``approved`` on it. ``approval_id`` names that decision.
 
 ``initiator``
-    Nobody was asked to approve the task, so the run's own initiator -- the
-    person who executed the workflow -- grants its bound tools to themselves.
-    The certificate is minted when the task goes ``in_progress``, and
+    No approval governs the task, so the run's own initiator -- the person who
+    executed the workflow -- grants its bound tools to themselves.
     ``approval_id`` is ``NULL``.
 
-Which path applies is not the agent's choice: a task that has an approval
-attached can only be authorized by that approval's certificate, so a run cannot
-take out an initiator grant first and then request the approval it was meant to
-wait for. ``granted_by`` records the human behind either path -- the deciding
-approver, or the run's initiator.
+Either way the certificate is minted when the task goes ``in_progress``, over
+exactly the tools it binds at that moment, so a long chain of tasks covered by
+one approval does not have to finish inside a single certificate's lifetime.
+
+Which path applies is not the agent's choice: a task an approval governs can
+only be authorized by that approval's certificate, so a run cannot take out an
+initiator grant first and then request the approval it was meant to wait for.
+``granted_by`` records the human behind either path -- the deciding approver, or
+the run's initiator.
 
 The certificate's ``subjectAltName`` carries the tools the grant covers,
 snapshotted from the task's ``tool_bindings`` at issuance (see
 :mod:`infrastructure.mcp_certificate` for the URN grammar). That snapshot is the
 point, and it is what makes both paths equally binding: a run's tasks and their
 ``tool_bindings`` come from the workflow's published templates copied at execute
-time and the execution agent cannot edit them, and even a later edit to the
-workflow cannot re-issue a certificate already granted, so nothing widens what a
-task may call once its grant is set.
+time, the execution agent cannot edit them, and
+:class:`services.workflow_task.WorkflowTaskService` refuses to change the
+bindings of a task an approval governs -- so nothing widens what a task may call
+once its grant is set.
 
 ``private_key_encrypted`` follows the write-only pattern of
 :attr:`models.system_settings.SystemSettings.smtp_password`: Fernet ciphertext,
@@ -71,12 +77,12 @@ class CertificateGrant(StrEnum):
     which is the order an auditor scanning the list wants.
     """
 
-    #: An approver decided ``approved`` on an approval naming the task.
+    #: An approver decided ``approved`` on an approval governing the task.
     #: ``approval_id`` names that decision.
     approval = "approval"
 
     #: The run's initiator granted the task's bound tools to themselves, because
-    #: nobody was asked to approve the task. ``approval_id`` is ``NULL``.
+    #: no approval governs the task. ``approval_id`` is ``NULL``.
     initiator = "initiator"
 
 
@@ -84,19 +90,20 @@ class RevocationReason(StrEnum):
     """Why a certificate stopped being usable before its ``not_after``.
 
     Two members, one per thing that actually revokes: the work a certificate
-    authorized finishing, and an initiator grant being displaced by a real
-    approval. An approval cannot be reversed after the fact (it leaves
-    ``pending`` exactly once), and a finished run is a run whose tasks have each
-    already finished, so neither needs its own reason.
+    authorized finishing, and a grant being displaced by an approval that has
+    taken the task over. An approval cannot be reversed after the fact (it
+    leaves ``pending`` exactly once), and a finished run is a run whose tasks
+    have each already finished, so neither needs its own reason.
     """
 
     #: The task the certificate authorizes reached a terminal status
     #: (``completed``, ``failed``, or ``skipped``).
     task_finished = "task_finished"
 
-    #: An approval was attached to the task the certificate authorizes, so the
-    #: initiator's own grant stepped aside for the approver's. Only ever stamped
-    #: on a ``grant_kind="initiator"`` certificate.
+    #: An approval took over the task the certificate authorizes, so the grant
+    #: it was running on stepped aside. Usually an initiator grant giving way to
+    #: the approver's, but also an outer approval's grant giving way to a nearer
+    #: request's -- see :mod:`infrastructure.approval_scope`.
     superseded_by_approval = "superseded_by_approval"
 
 
@@ -137,25 +144,29 @@ class McpToolCertificate(
 ):
     """The certificate authorizing one task's MCP tool calls.
 
-    At most one **live** certificate per approval, enforced by the partial
-    unique index ``uq_mcp_tool_certificates_live``, and at most one live
+    At most one **live** certificate per approval *and task*, enforced by the
+    partial unique index ``uq_mcp_tool_certificates_live``, and at most one live
     *initiator* grant per task, enforced by
     ``uq_mcp_tool_certificates_live_initiator``. Both are partial rather than
     plain unique constraints so a revoked certificate stays in the table: the
     audit trail has to keep showing that authority was granted and when it
     stopped counting, and a re-issue after revocation must still be possible.
 
+    The first index is keyed on the pair rather than on ``approval_id`` alone
+    because one approval covers several tasks: the task it names and every task
+    downstream of it up to the next approval (see
+    :mod:`infrastructure.approval_scope`). Each of those tasks is granted its
+    own certificate when it starts, all naming the same ``approval_id``.
+
     The two indexes do not overlap. ``approval_id`` is ``NULL`` on every
     initiator grant, and NULLs never collide in a unique index on either
     dialect, so those rows pass straight through the first one and are caught by
     the second instead.
 
-    Re-issuing an *approval* grant does not happen today -- an approval leaves
-    ``pending`` exactly once, so a revoked certificate is the end of that
-    approval's authority -- but the index is partial anyway so that adding a
-    rework-and-re-approve flow later is a service-layer change rather than a
-    migration. An initiator grant genuinely is re-issued: a task returned to
-    ``pending`` and started again gets a fresh one once its first was revoked.
+    Both grants are genuinely re-issued in the course of a run. A task returned
+    to ``pending`` and started again gets a fresh certificate once its first was
+    revoked, and the same approval issues one per covered task as each of them
+    starts.
     """
 
     __tablename__ = "mcp_tool_certificates"
@@ -163,6 +174,7 @@ class McpToolCertificate(
         Index(
             "uq_mcp_tool_certificates_live",
             "approval_id",
+            "workflow_task_id",
             unique=True,
             postgresql_where=text("revoked_at IS NULL"),
             sqlite_where=text("revoked_at IS NULL"),

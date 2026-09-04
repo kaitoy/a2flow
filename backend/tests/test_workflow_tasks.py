@@ -848,6 +848,94 @@ async def test_update_task_can_clear_tool_bindings(
     assert assert_ok(response)["toolBindings"] == []
 
 
+# ---------- tool bindings under an approval ----------
+
+
+async def test_update_tool_bindings_refused_on_a_task_an_approval_covers(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """The gap lazy issuance opens, closed.
+
+    A covered task's certificate freezes its bindings when the task *starts*,
+    not when the approval was decided, so an edit in between would widen what
+    the approver's decision goes on to authorize.
+    """
+    client, eng = workflow_client_with_engine
+    execution = await _create_workflow_execution(client)
+    server = await _create_mcp_server(client)
+    gate = await _create_task(client, execution["id"])
+    acting = await _create_task(
+        client,
+        execution["id"],
+        dependsOnIds=[gate["id"]],
+        toolBindings=[{"mcpServerId": server["id"], "toolName": "search"}],
+    )
+    await _insert_approval(
+        eng,
+        workflow_execution_id=execution["id"],
+        workflow_task_id=gate["id"],
+        approver="bob",
+    )
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{acting['id']}",
+        json={"toolBindings": [{"mcpServerId": server["id"], "toolName": "delete"}]},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_resubmitting_the_same_tool_bindings_is_not_a_change(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Only a real widening is refused; a no-op write still goes through."""
+    client, eng = workflow_client_with_engine
+    execution = await _create_workflow_execution(client)
+    server = await _create_mcp_server(client)
+    binding = {"mcpServerId": server["id"], "toolName": "search"}
+    task = await _create_task(client, execution["id"], toolBindings=[binding])
+    await _insert_approval(
+        eng,
+        workflow_execution_id=execution["id"],
+        workflow_task_id=task["id"],
+        approver="bob",
+    )
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{task['id']}",
+        json={"toolBindings": [binding], "title": "renamed"},
+    )
+    assert assert_ok(response)["title"] == "renamed"
+
+
+async def test_update_tool_bindings_allowed_on_an_uncovered_task(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """An approval reaches forward only; a task above it is unaffected."""
+    client, eng = workflow_client_with_engine
+    execution = await _create_workflow_execution(client)
+    server = await _create_mcp_server(client)
+    earlier = await _create_task(
+        client,
+        execution["id"],
+        toolBindings=[{"mcpServerId": server["id"], "toolName": "search"}],
+    )
+    gate = await _create_task(client, execution["id"], dependsOnIds=[earlier["id"]])
+    await _insert_approval(
+        eng,
+        workflow_execution_id=execution["id"],
+        workflow_task_id=gate["id"],
+        approver="bob",
+    )
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{earlier['id']}",
+        json={"toolBindings": [{"mcpServerId": server["id"], "toolName": "fetch"}]},
+    )
+    assert assert_ok(response)["toolBindings"] == [
+        {"mcpServerId": server["id"], "toolName": "fetch"}
+    ]
+
+
 async def test_delete_task_cascades_tool_bindings(
     workflow_client: AsyncClient,
 ) -> None:

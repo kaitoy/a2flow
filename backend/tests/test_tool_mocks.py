@@ -624,11 +624,28 @@ async def test_mocked_approval_still_validates_the_destination(
 async def test_mocked_approval_still_validates_the_named_task(
     engine: AsyncEngine,
 ) -> None:
-    """Naming the asking step instead of the acting task is refused when mocked too.
+    """A task outside the run is refused when mocked too.
 
     Same reason as the destination check above: a mock skips the side effects,
-    not the checks, so a workflow that would issue a certificate granting
-    nothing fails in a dry run exactly as it would for real.
+    not the checks, so a workflow naming a task that does not exist fails in a
+    dry run exactly as it would for real.
+    """
+    execution_id = await _seed_execution(
+        engine, tool_mocks=[_approval_mock("approved")]
+    )
+    await _seed_approval_task(engine, execution_id)
+    result = await request_approval("Deploy", _ctx(), "no-such-task", approver="alice")
+    assert "error" in result
+    assert "not found in the current session" in result["error"]
+    assert "mocked" not in result
+
+
+async def test_mocked_approval_accepts_the_asking_step(engine: AsyncEngine) -> None:
+    """The gate step binds no tools of its own, and that is the intended shape.
+
+    An approval covers the step it names plus everything after it, so a dry run
+    of the two-step "ask, then act" design must go through rather than being
+    turned back the way it once was.
     """
     server_id = await _seed_server(engine)
     execution_id = await _seed_execution(
@@ -643,9 +660,8 @@ async def test_mocked_approval_still_validates_the_named_task(
         binds=(server_id, "search"),
     )
     result = await request_approval("Deploy", _ctx(), asking, approver="alice")
-    assert "error" in result
-    assert "binds no MCP tools" in result["error"]
-    assert "mocked" not in result
+    assert result["status"] == "approved"
+    assert result["mocked"] is True
 
 
 async def test_mocked_approval_accepts_a_text_response(engine: AsyncEngine) -> None:

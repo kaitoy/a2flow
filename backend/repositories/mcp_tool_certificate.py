@@ -33,13 +33,7 @@ class McpToolCertificateRepository(Protocol):
 
     async def get(self, certificate_id: str) -> McpToolCertificate | None: ...
 
-    async def get_live_for_approval(
-        self, approval_id: str
-    ) -> McpToolCertificate | None: ...
-
-    async def get_latest_for_approval(
-        self, approval_id: str
-    ) -> McpToolCertificate | None: ...
+    async def list_for_approval(self, approval_id: str) -> list[McpToolCertificate]: ...
 
     async def get_by_serial(self, serial_number: str) -> McpToolCertificate | None: ...
 
@@ -47,9 +41,9 @@ class McpToolCertificateRepository(Protocol):
         self, workflow_task_id: str
     ) -> McpToolCertificate | None: ...
 
-    async def get_live_initiator_for_task(
+    async def list_live_for_task(
         self, workflow_task_id: str
-    ) -> McpToolCertificate | None: ...
+    ) -> list[McpToolCertificate]: ...
 
     async def list_live_for_execution(
         self, workflow_execution_id: str
@@ -122,43 +116,24 @@ class SqlMcpToolCertificateRepository:
         """
         return await self._get_scoped(certificate_id)
 
-    async def get_live_for_approval(
-        self, approval_id: str
-    ) -> McpToolCertificate | None:
-        """Return the approval's un-revoked certificate, if it has one.
+    async def list_for_approval(self, approval_id: str) -> list[McpToolCertificate]:
+        """Return every certificate issued under one approval, revoked or not.
 
-        At most one can exist, enforced by the partial unique index
-        ``uq_mcp_tool_certificates_live``.
+        Plural because an approval covers the task it names *and* every task
+        downstream of it up to the next approval (see
+        :mod:`infrastructure.approval_scope`), and each of those tasks is
+        granted its own certificate when it starts. The set therefore grows as
+        the run advances.
 
-        Args:
-            approval_id: The approval the certificate was issued for.
-
-        Returns:
-            The un-revoked row, or ``None``. Expiry is not filtered here; see
-            :meth:`get_live_for_task` for why.
-        """
-        result = await self._db.exec(
-            select(McpToolCertificate).where(
-                McpToolCertificate.approval_id == approval_id,
-                McpToolCertificate.tenant_id == self._tenant_id,
-                McpToolCertificate.revoked_at == None,  # noqa: E711
-            )
-        )
-        return result.first()
-
-    async def get_latest_for_approval(
-        self, approval_id: str
-    ) -> McpToolCertificate | None:
-        """Return the approval's most recently issued certificate, revoked or not.
-
-        Backs the read endpoint: an approver looking at a spent approval should
-        still see which tools it granted, not an empty panel.
+        Revoked rows are included: an approver looking at a spent approval
+        should still see what it authorized, not an empty panel.
 
         Args:
-            approval_id: The approval the certificate was issued for.
+            approval_id: The approval the certificates were issued under.
 
         Returns:
-            The newest row, or ``None`` when the approval has no certificate.
+            The rows, newest first, or an empty list when nothing has been
+            issued under the approval yet.
         """
         result = await self._db.exec(
             select(McpToolCertificate)
@@ -168,7 +143,7 @@ class SqlMcpToolCertificateRepository:
             )
             .order_by(col(McpToolCertificate.created_at).desc())
         )
-        return result.first()
+        return list(result.all())
 
     async def get_by_serial(self, serial_number: str) -> McpToolCertificate | None:
         """Return the certificate with the given X.509 serial.
@@ -213,32 +188,35 @@ class SqlMcpToolCertificateRepository:
         )
         return result.first()
 
-    async def get_live_initiator_for_task(
+    async def list_live_for_task(
         self, workflow_task_id: str
-    ) -> McpToolCertificate | None:
-        """Return the task's un-revoked *initiator* grant, if it has one.
+    ) -> list[McpToolCertificate]:
+        """Return every un-revoked certificate a task currently holds.
 
-        Narrower than :meth:`get_live_for_task` on purpose. The supersede path
-        has to revoke the initiator's own grant and leave an approval-backed
-        certificate alone, and a task can briefly carry one of each -- the
-        partial unique indexes forbid two live grants of the *same* kind, not
-        one of each.
+        Plural where :meth:`get_live_for_task` is singular, because the partial
+        unique indexes forbid two live grants of the *same* kind rather than two
+        live grants: a task can briefly carry its run initiator's own grant
+        alongside an approver's. The stand-down path
+        (:meth:`services.mcp_tool_certificate.McpToolCertificateService.supersede_grants_for`)
+        needs to see all of them, since a task whose governing approval has
+        changed must not keep authority granted under the previous one.
 
         Args:
-            workflow_task_id: The task the certificate authorizes.
+            workflow_task_id: The task the certificates authorize.
 
         Returns:
-            The un-revoked initiator grant, or ``None``.
+            The un-revoked rows, oldest first.
         """
         result = await self._db.exec(
-            select(McpToolCertificate).where(
+            select(McpToolCertificate)
+            .where(
                 McpToolCertificate.workflow_task_id == workflow_task_id,
                 McpToolCertificate.tenant_id == self._tenant_id,
-                McpToolCertificate.approval_id == None,  # noqa: E711
                 McpToolCertificate.revoked_at == None,  # noqa: E711
             )
+            .order_by(col(McpToolCertificate.created_at))
         )
-        return result.first()
+        return list(result.all())
 
     async def list_live_for_execution(
         self, workflow_execution_id: str

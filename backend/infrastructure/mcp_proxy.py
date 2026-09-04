@@ -169,7 +169,7 @@ class McpPrincipal:
         credential: The approval certificate and proof of possession backing
             this call, when the caller holds one. ``None`` for a call that
             claims no approval authority -- which the policy layer accepts only
-            for tasks that have no approval attached.
+            for tasks no approval governs.
     """
 
     kind: PrincipalKind

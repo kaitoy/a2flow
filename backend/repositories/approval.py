@@ -23,6 +23,13 @@ class ApprovalRepository(Protocol):
 
     async def get(self, approval_id: str) -> Approval | None: ...
 
+    # Declared before ``list`` so ``list[Approval]`` still resolves to the
+    # builtin: once the class body binds the name ``list`` to a method, later
+    # annotations in the same body see that method instead.
+    async def list_for_execution(
+        self, workflow_execution_id: str
+    ) -> list[Approval]: ...
+
     async def list(
         self,
         *,
@@ -106,6 +113,37 @@ class SqlApprovalRepository:
     async def get(self, approval_id: str) -> Approval | None:
         """Return the Approval with the given ID, or ``None`` if missing."""
         return await self._get_scoped(approval_id)
+
+    # Declared before ``list`` for the reason given on the Protocol above.
+    async def list_for_execution(self, workflow_execution_id: str) -> list[Approval]:
+        """Return every Approval of one run, in one query.
+
+        Backs :mod:`infrastructure.approval_scope`, which decides from the whole
+        run at once which approval governs which task. That question is asked on
+        every proxied tool call and again whenever a task starts, so it has to
+        cost one query rather than one per task.
+
+        The rows themselves are returned rather than their ids: the callers need
+        each approval's ``status`` (an approval authorizes nothing until it is
+        granted) and its ``decided_by`` (the human a certificate issued under it
+        is attributed to).
+
+        Args:
+            workflow_execution_id: The run to collect approvals for.
+
+        Returns:
+            The run's approvals, newest first.
+        """
+        stmt = (
+            select(Approval)
+            .where(
+                Approval.workflow_execution_id == workflow_execution_id,
+                Approval.tenant_id == self._tenant_id,
+            )
+            .order_by(col(Approval.created_at).desc())
+        )
+        result = await self._db.exec(stmt)
+        return list(result.all())
 
     async def list(
         self,

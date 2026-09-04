@@ -14,7 +14,7 @@ after issuance is whether it still counts (see
 :mod:`models.mcp_tool_certificate`).
 
 Every route is gated behind ``admin`` (``super_admin`` passes through
-:func:`models.user.has_role`'s bypass). ``GET /approvals/{id}/certificate`` stays
+:func:`models.user.has_role`'s bypass). ``GET /approvals/{id}/certificates`` stays
 open to any authenticated caller because it discloses nothing the approval record
 does not already; this surface instead spans every approval in the tenant.
 

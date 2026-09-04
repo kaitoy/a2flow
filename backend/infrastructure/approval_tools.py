@@ -10,14 +10,12 @@ record directly from the frontend (``PATCH /approvals/{id}``); the agent learns
 the outcome from that tool's result and can re-check it with
 :func:`get_approval`.
 
-A request also carries the WorkflowTask it authorizes, and that task is the one
-that *performs* the approved action rather than the one that asks for the
-go-ahead: :class:`services.mcp_tool_certificate.McpToolCertificateService`
-freezes exactly that task's ``tool_bindings`` into the grant, and
-:class:`infrastructure.mcp_policies.TaskCertificatePolicy` holds exactly that
-task to it. Naming the asking step instead would leave the acting one running on
-its run initiator's own grant, so :func:`request_approval` rejects the inverted
-shape rather than recording an approval that would authorize nothing.
+A request also carries the WorkflowTask the approval takes effect **from**. It
+covers that task and every task downstream of it, up to the next approval (see
+:mod:`infrastructure.approval_scope`), so a workflow can put the request in a
+step of its own -- "Ask for a go-ahead", then "Launch instance" -- and have the
+decision reach the steps that follow without naming each one. Naming the asking
+step is therefore the natural shape, not a mistake to reject.
 
 A request carries exactly one destination, and each has a discovery tool:
 :func:`list_users` finds individuals eligible as ``approver``, and
@@ -53,6 +51,7 @@ from google.adk.tools.tool_context import ToolContext
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database
+from infrastructure.approval_scope import active_approval_by_task, covered_task_ids
 from infrastructure.tool_mocks import resolve_mock
 from infrastructure.workflow_task_tools import (
     _NO_SESSION,
@@ -68,7 +67,6 @@ from models.mcp_tool_mock import (
 )
 from models.notification import NotificationType
 from models.user import Role, User, has_any_role
-from models.workflow_task import WorkflowTaskRead
 from repositories import (
     ApprovalRepository,
     EffectiveRoleRepository,
@@ -311,59 +309,28 @@ def _mocked_approval(response: MockResponse) -> dict[str, Any]:
 #: turning a pathologically large group into that many separate commits.
 _MAX_NOTIFICATION_FANOUT = 100
 
-#: Upper bound on how many of a run's tasks one shape check reads. Mirrors
+#: Upper bound on how many of a run's tasks one scope computation reads. Mirrors
 #: ``infrastructure.mcp_policies._MAX_TASKS``, which caps the same kind of
 #: whole-run scan on the enforcement side.
 _MAX_TASKS = 1000
 
 
-def _tool_bearing_dependents(
-    tasks: Sequence[WorkflowTaskRead], task_id: str
-) -> list[WorkflowTaskRead]:
-    """Return the tasks downstream of ``task_id`` that bind MCP tools.
-
-    "Downstream" is transitive: a task counts when ``task_id`` is reachable by
-    following its ``depends_on_ids`` edges, at any depth. Used to catch an
-    approval addressed to the step that *asks* for a go-ahead rather than the
-    step that *acts* on it -- the shape that silently produces a certificate
-    granting nothing while leaving the acting task ungated.
-
-    Args:
-        tasks: Every task of the run, in the order they were created.
-        task_id: The task the approval names.
-
-    Returns:
-        The downstream tasks that bind at least one MCP tool, in ``tasks``
-        order so the message built from them is stable.
-    """
-    dependents_of: dict[str, list[str]] = {}
-    for task in tasks:
-        for dep_id in task.depends_on_ids:
-            dependents_of.setdefault(dep_id, []).append(task.id)
-    downstream: set[str] = set()
-    queue = [task_id]
-    while queue:
-        for dependent_id in dependents_of.get(queue.pop(), ()):
-            if dependent_id not in downstream:
-                downstream.add(dependent_id)
-                queue.append(dependent_id)
-    return [t for t in tasks if t.id in downstream and t.tool_bindings]
-
-
-async def _stand_down_initiator_grant(
-    s: _Scope, workflow_task_id: str, user_id: str
+async def _stand_down_superseded_grants(
+    s: _Scope, approval_id: str, user_id: str
 ) -> None:
-    """Revoke the initiator's own tool grant on a task that now needs approving.
+    """Revoke the grants held by the tasks a new approval has just taken over.
 
-    A task can already be ``in_progress`` -- and therefore already holding the
-    certificate its run's initiator took out for it -- when the agent decides it
-    needs a human decision after all. That grant has to stand down, or the audit
-    trail would show two live authorities for one task.
+    A task can already be ``in_progress`` -- and therefore already holding a
+    certificate, its run initiator's or an outer approval's -- when the agent
+    decides a human has to weigh in. Every task the new approval now governs has
+    to stand its old grant down, or the audit trail would show two live
+    authorities for one task.
 
     Best-effort. The approval row has already committed by the time this runs,
     so raising here would report a failure for a write that succeeded. Nothing
-    about the gate depends on it either: ``TaskCertificatePolicy`` refuses an
-    initiator grant for any task that has an approval attached, stamped or not.
+    about the gate depends on it either: ``TaskCertificatePolicy`` re-derives the
+    governing approval on every call and refuses any certificate that does not
+    match it, stamped or not.
 
     The import is deferred to call time for the same reason the ones in
     :func:`_repos` are -- reaching into ``services`` at module import time closes
@@ -371,19 +338,25 @@ async def _stand_down_initiator_grant(
 
     Args:
         s: The current tool call's resolved run and repositories.
-        workflow_task_id: The task the new approval concerns.
+        approval_id: The approval that was just created.
         user_id: The acting user, recorded as ``updated_by``.
     """
     from services.mcp_tool_certificate import build_mcp_tool_certificate_service
 
     try:
+        tasks = await s.task_repo.list(
+            limit=_MAX_TASKS, offset=0, workflow_execution_id=s.execution_id
+        )
+        approvals = await s.approval_repo.list_for_execution(s.execution_id)
+        covered = covered_task_ids(
+            tasks, active_approval_by_task(approvals), approval_id
+        )
         certificates = build_mcp_tool_certificate_service(s.db, tenant_id=s.tenant_id)
-        await certificates.supersede_initiator_grant(workflow_task_id, user_id=user_id)
+        await certificates.supersede_grants_for(sorted(covered), user_id=user_id)
     except Exception:
         logger.exception(
-            "failed to stand down the initiator tool grant of task %s after an "
-            "approval was requested for it",
-            workflow_task_id,
+            "failed to stand down the tool grants covered by approval %s",
+            approval_id,
         )
 
 
@@ -405,14 +378,12 @@ async def request_approval(
     ``approval_id`` to show approve/reject controls. Do NOT proceed with the
     action until the decision is ``approved``.
 
-    ``workflow_task_id`` names **the task that performs the action being
-    approved** -- the one whose ``tool_bindings`` the approval authorizes -- not
-    the step that asks for the go-ahead. That task's bound MCP tools are frozen
-    into the grant when the approver decides, and until then the task cannot
-    call any of them. Naming the wrong task therefore grants nothing and leaves
-    the acting task ungated, so a request naming a task that binds no tools
-    while a task downstream of it does is rejected. Use ``list_workflow_tasks``
-    to find the acting task's id.
+    ``workflow_task_id`` names **the task the approval takes effect from**. The
+    approval covers that task and every task downstream of it, up to the next
+    approval -- so if the workflow has a step whose whole job is to ask for the
+    go-ahead, name that step and the decision will reach the steps that follow
+    it. Until the decision is ``approved``, none of the covered tasks may call
+    any of their bound MCP tools. Use ``list_workflow_tasks`` to find the id.
 
     Address the request to **exactly one** destination:
 
@@ -430,8 +401,8 @@ async def request_approval(
         title: Short headline describing what needs approval (required).
         tool_context: Injected by ADK; identifies the current session. Not shown
             to the model.
-        workflow_task_id: Id of the WorkflowTask that carries out the approved
-            action; must belong to the current session. Required.
+        workflow_task_id: Id of the WorkflowTask the approval takes effect from;
+            must belong to the current session. Required.
         approver: Id of the single user the request is addressed to. Mutually
             exclusive with ``approver_group_id``; it must match an existing,
             enabled user holding the ``approver`` role.
@@ -443,8 +414,8 @@ async def request_approval(
     Returns:
         On success ``{"approval_id": <id>, "status": "pending"}``. On failure
         ``{"error": <message>}`` (no destination or both, unresolved session,
-        unknown task, a task binding no tools while a downstream one does,
-        unknown or ineligible approver or group, or a persistence error). When
+        unknown task, unknown or ineligible approver or group, or a persistence
+        error). When
         the current run mocks this tool the destination and the task are still
         validated but nothing is recorded or notified, and the mock's response
         comes back with ``"mocked": true`` and a ``note`` saying the status is
@@ -466,21 +437,6 @@ async def request_approval(
                     "error": f"WorkflowTask {workflow_task_id!r} "
                     "not found in the current session"
                 }
-            if not task.tool_bindings:
-                tasks = await s.task_repo.list(
-                    limit=_MAX_TASKS, offset=0, workflow_execution_id=s.execution_id
-                )
-                acting = _tool_bearing_dependents(tasks, workflow_task_id)
-                if acting:
-                    candidates = [{"id": t.id, "title": t.title} for t in acting]
-                    return {
-                        "error": f"WorkflowTask {workflow_task_id!r} binds no MCP "
-                        "tools, but a task downstream of it does. An approval "
-                        "authorizes only the task it names, so naming this one "
-                        "would grant nothing and leave the acting task ungated. "
-                        "Pass the id of the task that performs the action being "
-                        f"approved instead: {candidates}"
-                    }
             if approver:
                 candidate = await s.user_repo.get(approver)
                 if not _is_eligible_approver(
@@ -547,10 +503,13 @@ async def request_approval(
                 approval = await s.approval_repo.create(data, user_id=acting_user_id)
             except ForeignKeyViolationError as exc:
                 return {"error": str(exc)}
-            await _stand_down_initiator_grant(s, workflow_task_id, acting_user_id)
-            # Capture the result before _notify commits again, which would expire
-            # these attributes and trigger a lazy reload outside the greenlet context.
+            # Capture the result before the stand-down and _notify commit again,
+            # which would expire these attributes and trigger a lazy reload
+            # outside the greenlet context.
             result = {"approval_id": approval.id, "status": approval.status.value}
+            await _stand_down_superseded_grants(
+                s, str(result["approval_id"]), acting_user_id
+            )
             if len(recipients) > _MAX_NOTIFICATION_FANOUT:
                 logger.warning(
                     "approval %s addressed to group %s has %d eligible members; "

@@ -20,15 +20,16 @@ OID arc, and a made-up one would be indistinguishable from someone else's:
     derived independently from the ADK session id, so a certificate minted for
     one run is useless in another.
 
-    The two forms are not interchangeable. A task that has an approval attached
-    can only be authorized by that approval's certificate -- otherwise a run
-    could take out an initiator-granted certificate first and then request the
-    approval it was supposed to wait for.
+    The two forms are not interchangeable. A task an approval governs -- its
+    own, or one requested on a task it descends from (see
+    :mod:`infrastructure.approval_scope`) -- can only be authorized by that
+    approval's certificate; otherwise a run could take out an initiator-granted
+    certificate first and then request the approval it was supposed to wait for.
 
 ``urn:a2flow:tool:SERVER/TOOL``
     One per tool the grant covers, snapshotted from the task's
-    ``tool_bindings`` at the moment the approver decided, or at the moment the
-    task went ``in_progress``. This is the frozen grant: a run's tasks and their
+    ``tool_bindings`` at the moment the task went ``in_progress``. This is the
+    frozen grant: a run's tasks and their
     ``tool_bindings`` are copied from the workflow's published templates at
     execute time and the execution agent cannot change them, but even a later
     edit to the workflow (a re-publish, a discard of unpublished changes) does

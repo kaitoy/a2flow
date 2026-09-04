@@ -109,7 +109,6 @@ import {
   zGenerateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
-  zGetApprovalCertificateApiV1ApprovalsApprovalIdCertificateGetResponse,
   zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse,
   zGetImpersonationEventApiV1ImpersonationEventsEventIdGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
@@ -131,6 +130,7 @@ import {
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
+  zListApprovalCertificatesApiV1ApprovalsApprovalIdCertificatesGetResponse,
   zListApprovalsApiV1ApprovalsGetResponse,
   zListGroupsForUserApiV1UsersUserIdGroupsGetResponse,
   zListImpersonationEventsApiV1ImpersonationEventsGetResponse,
@@ -930,9 +930,9 @@ export async function listMcpToolCertificates(
 /**
  * Fetch a single tool certificate by its own ID.
  *
- * Distinct from {@link getApprovalCertificate}, which reaches an approval-backed
- * record through the approval it was issued for and cannot see the ones a run's
- * initiator granted itself.
+ * Distinct from {@link listApprovalCertificates}, which reaches approval-backed
+ * records through the approval they were issued under and cannot see the ones a
+ * run's initiator granted itself.
  */
 export async function getMcpToolCertificateById(
   id: string,
@@ -1867,20 +1867,22 @@ export async function getApproval(id: string, config?: AxiosRequestConfig): Prom
 }
 
 /**
- * Fetch the certificate issued when an approval was granted.
+ * Fetch the certificates issued under an approval, one per task it covers.
  *
- * Reports what the approval actually authorized -- which MCP tools, until when,
- * and whether it has since been revoked. Rejects with a 404 when the approval
- * granted no tool authority: it was never approved, or it named no task.
+ * Reports what the approval actually authorized -- for each covered task, which
+ * MCP tools, until when, and whether the grant has since been revoked. An
+ * approval covers the task it names plus every task after it up to the next
+ * approval, and each is granted its certificate only when it starts, so an
+ * empty list is an ordinary state rather than an error.
  */
-export async function getApprovalCertificate(
+export async function listApprovalCertificates(
   id: string,
   config?: AxiosRequestConfig
-): Promise<McpToolCertificateRead> {
+): Promise<McpToolCertificateRead[]> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}/certificate`, config),
-    zGetApprovalCertificateApiV1ApprovalsApprovalIdCertificateGetResponse
-  ) as Promise<McpToolCertificateRead>;
+    apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}/certificates`, config),
+    zListApprovalCertificatesApiV1ApprovalsApprovalIdCertificatesGetResponse
+  ) as Promise<McpToolCertificateRead[]>;
 }
 
 /**

@@ -2,32 +2,44 @@
 
 :class:`infrastructure.mcp_policies.TaskCertificatePolicy` requires a valid
 certificate on **every** MCP ``call_tool``, so every task that is going to call
-a tool needs one. There are two ways to get one, and this module owns both:
+a tool needs one. A task gets exactly one, when it goes ``in_progress``, and who
+granted it is decided by :mod:`infrastructure.approval_scope`:
 
-:meth:`McpToolCertificateService.issue`
-    An approver decided ``approved`` on an approval naming the task. Minted at
-    that moment, ``granted_by`` the approver who decided.
+**An approval governs the task** -- it is the nearest approval at or above the
+task in the run's dependency graph. Then the certificate is that approval's,
+``granted_by`` the approver who decided it. Until every approval governing the
+task is granted, no certificate is issued at all and the task can call nothing.
 
-:meth:`McpToolCertificateService.issue_for_started_task`
-    Nobody was asked to approve the task, so the run's initiator grants its
-    bound tools to themselves. Minted when the task goes ``in_progress``,
-    ``granted_by`` the initiator.
+**No approval governs it.** Then the run's initiator grants the task's bound
+tools to themselves, ``granted_by`` the initiator.
+
+Both cases run through :meth:`McpToolCertificateService.issue_for_started_task`.
+:meth:`McpToolCertificateService.issue` is the other end of the same rule: when
+an approval is granted, any task it governs that is *already* ``in_progress``
+-- waiting on exactly that decision -- is issued its certificate there and then,
+since nothing else will start it again.
+
+Issuing at task start rather than at the decision is what lets one approval
+cover a long chain of tasks: each covered task's certificate gets its own
+validity window, so the chain does not have to finish inside the window opened
+by the approver's click.
 
 The tools a certificate grants are read from the task's ``tool_bindings`` **at
 issuance** and signed into the certificate's ``subjectAltName``. That snapshot
 is the point of the whole mechanism, and it applies to both paths equally: a
 run's tasks and their ``tool_bindings`` are copied from the workflow's published
-templates at execute time and the execution agent cannot edit them, and even a
-later edit to the workflow cannot re-issue a certificate already granted, so
-nothing widens what a task may call once its grant is set. Tools have to be
-bound into the template *before* the workflow is published.
+templates at execute time, the execution agent cannot edit them, and
+:class:`services.workflow_task.WorkflowTaskService` refuses to change them on a
+task an approval governs -- so nothing widens what a task may call once its
+grant is set. Tools have to be bound into the template *before* the workflow is
+published.
 
-The two paths never both authorize one task. Requesting an approval for a task
-revokes the initiator grant it already had
-(:meth:`McpToolCertificateService.supersede_initiator_grant`), and
-:meth:`issue_for_started_task` declines to issue for a task that has an
-approval. The policy layer re-checks the same rule at call time, so neither
-bookkeeping step is what the guarantee rests on.
+The two grantors never both authorize one task. Requesting an approval stands
+down every grant already held by the tasks it now governs
+(:meth:`McpToolCertificateService.supersede_grants_for`), and issuance refuses
+to hand a task an initiator grant while an approval governs it. The policy layer
+re-checks the same rule at call time, so neither bookkeeping step is what the
+guarantee rests on.
 
 Failure to issue never fails the write that triggered it. If the task has
 vanished between an approval's decision and this call, the approval still
@@ -37,7 +49,7 @@ silent.
 """
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 
 from cryptography import x509
@@ -45,6 +57,7 @@ from cryptography.x509.oid import NameOID
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
+from infrastructure.approval_scope import active_approval_by_task, governing_approvals
 from infrastructure.mcp_ca import (
     certificate_to_pem,
     generate_key,
@@ -87,6 +100,11 @@ from repositories.workflow_execution import SqlWorkflowExecutionRepository
 from repositories.workflow_task import SqlWorkflowTaskRepository, WorkflowTaskRepository
 
 logger = logging.getLogger(__name__)
+
+#: Upper bound on how many of a run's tasks one issuance decision reads. Mirrors
+#: ``infrastructure.mcp_policies._MAX_TASKS``, which caps the same whole-run scan
+#: on the enforcement side.
+_MAX_TASKS = 1000
 
 #: Task statuses that end the work a certificate authorized.
 TERMINAL_TASK_STATUSES = frozenset(
@@ -152,9 +170,10 @@ class McpToolCertificateService:
             authorities: Repository the signing root is loaded through.
             cipher: Cipher the leaf's private key is encrypted with before it
                 is persisted.
-            approvals: Repository used to tell the two issuance paths apart --
-                a task with an approval attached is the approver's to authorize,
-                never the initiator's.
+            approvals: Repository the run's approvals are read from, so
+                :mod:`infrastructure.approval_scope` can tell the two issuance
+                paths apart -- a task an approval governs is the approver's to
+                authorize, never the initiator's.
         """
         self._certificates = certificates
         self._approvals = approvals
@@ -162,70 +181,119 @@ class McpToolCertificateService:
         self._authorities = authorities
         self._cipher = cipher
 
+    async def _run_scope(
+        self, execution_id: str
+    ) -> tuple[list[WorkflowTaskRead], dict[str, frozenset[str]], dict[str, Approval]]:
+        """Load one run's task graph and work out which approval governs what.
+
+        Two queries for the whole run, not one per task: both callers below need
+        the same answer for several tasks at once.
+
+        Args:
+            execution_id: The run to resolve.
+
+        Returns:
+            The run's tasks, the governing-approval ids keyed by task id, and
+            the run's approvals keyed by their own id.
+        """
+        tasks = await self._tasks.list(
+            limit=_MAX_TASKS, offset=0, workflow_execution_id=execution_id
+        )
+        approvals = await self._approvals.list_for_execution(execution_id)
+        governing = governing_approvals(tasks, active_approval_by_task(approvals))
+        return tasks, governing, {approval.id: approval for approval in approvals}
+
+    @staticmethod
+    def _governing_of(
+        task_id: str,
+        governing: Mapping[str, frozenset[str]],
+        approvals_by_id: Mapping[str, Approval],
+    ) -> list[Approval] | None:
+        """Resolve a task's governing approval ids to their rows.
+
+        Args:
+            task_id: The task to resolve for.
+            governing: Governing-approval ids keyed by task id.
+            approvals_by_id: The run's approvals keyed by their own id.
+
+        Returns:
+            The governing approvals, empty when none governs the task -- or
+            ``None`` when an id has no row behind it, which can only mean the
+            approval vanished between the two queries and is treated as a
+            refusal rather than as "ungoverned".
+        """
+        approval_ids = governing.get(task_id, frozenset())
+        approvals = [
+            approvals_by_id[approval_id]
+            for approval_id in approval_ids
+            if approval_id in approvals_by_id
+        ]
+        return approvals if len(approvals) == len(approval_ids) else None
+
     async def issue(
         self, approval: Approval, *, user_id: str
-    ) -> McpToolCertificate | None:
-        """Issue the certificate for a newly granted approval.
+    ) -> list[McpToolCertificate]:
+        """Issue certificates for the tasks a newly granted approval unblocks.
 
-        A no-op returning ``None`` when the approval is not ``approved`` or
-        names no task: neither grants any tool authority. A task left in the
-        first case can call nothing until its approval is granted, which is the
-        whole point of asking; a task in the second was never gated by this
-        approval at all and takes its authority from
-        :meth:`issue_for_started_task` instead.
+        Returns an empty list when the approval is not ``approved`` or names no
+        task: neither grants any tool authority. A task left in the first case
+        can call nothing until its approval is granted, which is the whole point
+        of asking.
+
+        Only tasks already ``in_progress`` are issued for. The rest of the
+        approval's scope has not started yet, and each will be granted its own
+        certificate when it does (:meth:`issue_for_started_task`) -- which is
+        what keeps one approval's authority from having to fit inside a single
+        certificate's validity window.
+
+        Idempotent: ``resolve`` also runs when an approver merely edits their
+        comment on an already-granted request, and a task already holding this
+        approval's certificate keeps it rather than having its key and granted
+        tool set silently rotated underneath it.
 
         Args:
             approval: The resolved approval.
             user_id: The acting user, recorded as ``created_by``/``updated_by``.
 
         Returns:
-            The issued certificate, or ``None`` when nothing was issued.
+            The certificates newly issued, empty when none was -- including on a
+            repeat call, whose covered tasks all already hold theirs.
         """
         if approval.status != ApprovalStatus.approved:
-            return None
+            return []
         if approval.workflow_task_id is None:
-            return None
+            return []
 
-        task = await self._tasks.get(approval.workflow_task_id)
-        if task is None:
+        tasks, governing, approvals_by_id = await self._run_scope(
+            approval.workflow_execution_id
+        )
+        covered = [
+            task for task in tasks if approval.id in governing.get(task.id, frozenset())
+        ]
+        if not covered:
             logger.warning(
-                "Approval %s was granted but its task %s no longer exists; no "
-                "certificate issued, so the task cannot call any MCP tool",
+                "Approval %s was granted but governs no task of run %s; no "
+                "certificate issued, so nothing it was meant to authorize can "
+                "call an MCP tool",
                 approval.id,
-                approval.workflow_task_id,
+                approval.workflow_execution_id,
             )
-            return None
+            return []
 
-        live = await self._certificates.get_live_for_approval(approval.id)
-        if live is not None:
-            # ``resolve`` also runs when an approver only edits their comment on
-            # an already-approved request. Returning the standing certificate
-            # keeps that from silently rotating the key and the granted tool set
-            # under a task that is already running against them.
-            return live
-
-        # The approver's grant displaces any grant the initiator had already
-        # given themselves for this task, so the audit trail shows one live
-        # authority at a time rather than two overlapping ones.
-        await self.supersede_initiator_grant(task.id, user_id=user_id)
-
-        return await self._sign_and_store(
-            task=task,
-            tenant_id=approval.tenant_id,
-            binding=CertificateBinding(
+        issued: list[McpToolCertificate] = []
+        for task in covered:
+            certificate = await self._issue_for_task(
+                task,
                 tenant_id=approval.tenant_id,
                 execution_id=approval.workflow_execution_id,
-                task_id=task.id,
-                approval_id=approval.id,
-            ),
-            grant_kind=CertificateGrant.approval,
-            approval_id=approval.id,
-            granted_by=user_id,
-            # Anchored on the decision, not on now: the window an approval buys
-            # is measured from when the human granted it.
-            not_before=approval.decided_at or datetime.now(UTC),
-            user_id=user_id,
-        )
+                initiator_id=None,
+                governing=governing,
+                approvals_by_id=approvals_by_id,
+                user_id=user_id,
+            )
+            if certificate is not None:
+                issued.append(certificate)
+        return issued
 
     async def issue_for_started_task(
         self,
@@ -234,26 +302,24 @@ class McpToolCertificateService:
         *,
         user_id: str,
     ) -> McpToolCertificate | None:
-        """Issue the run initiator's own grant for a task that just started.
+        """Issue the grant a task needs when it starts, from whoever may give it.
 
-        This is what lets a task nobody was asked to approve call the tools it
-        binds: the person who executed the workflow authorizes them, at the
-        moment the task goes ``in_progress``, over exactly the bindings the task
-        carries right then. Adding a binding afterwards does not extend the
-        grant -- the certificate is signed and cannot be re-issued while it
-        stands, which is the same freeze an approval-backed certificate imposes.
+        This is the ordinary path: at the moment a task goes ``in_progress`` it
+        is granted exactly the tools it binds right then, on the authority of
+        the nearest approval above it in the run's graph -- or, when no approval
+        governs it, on the run initiator's own.
 
         Four conditions have to hold, and any of them failing is an ordinary
         ``None``, not an error:
 
         1. The task is ``in_progress``. Nothing else needs tool authority.
-        2. It has no live certificate yet, so a repeated write -- an agent that
-           re-sends ``in_progress``, or a title edit on a running task -- does
-           not rotate the key and the grant underneath a task already calling
-           against them.
-        3. It has no approval attached. That task's authority is the approver's
-           to grant, and issuing here would let a run get ahead of the decision
-           it was told to wait for.
+        2. It already holds a certificate from the authority that would grant it
+           now, so a repeated write -- an agent that re-sends ``in_progress``,
+           or a title edit on a running task -- does not rotate the key and the
+           grant underneath a task already calling against them.
+        3. Every approval governing it is granted. While one is still undecided
+           (or was rejected) the task is gated, and issuing here would let a run
+           get ahead of the decision it was told to wait for.
         4. It binds at least one tool. A task binding none can call nothing
            anyway (``InProgressToolBindingPolicy`` refuses first), so a
            certificate for it would be a row, a keypair, and an audit entry that
@@ -262,39 +328,130 @@ class McpToolCertificateService:
         Args:
             task: The task as it stands after the write that started it.
             execution: The run it belongs to, supplying the tenant and the
-                initiator the grant is attributed to.
+                initiator an ungoverned task's grant is attributed to.
             user_id: The acting user, recorded as ``created_by``/``updated_by``.
-                Not necessarily the initiator -- an approver driving someone
+                Not necessarily the grantor -- an approver driving someone
                 else's run through the REST endpoints is also a legitimate
-                caller -- which is why ``granted_by`` is read off the execution.
+                caller -- which is why ``granted_by`` is read off the execution
+                or off the approval instead.
 
         Returns:
-            The issued certificate, or ``None`` when nothing was issued.
+            The newly signed certificate, or ``None`` when nothing was issued.
         """
         if task.status != WorkflowTaskStatus.in_progress:
             return None
         if not task.tool_bindings:
             return None
-        if await self._certificates.get_live_for_task(task.id) is not None:
+
+        _, governing, approvals_by_id = await self._run_scope(execution.id)
+        return await self._issue_for_task(
+            task,
+            tenant_id=execution.tenant_id,
+            execution_id=execution.id,
+            initiator_id=execution.initiator_id,
+            governing=governing,
+            approvals_by_id=approvals_by_id,
+            user_id=user_id,
+        )
+
+    async def _issue_for_task(
+        self,
+        task: WorkflowTaskRead,
+        *,
+        tenant_id: str,
+        execution_id: str,
+        initiator_id: str | None,
+        governing: Mapping[str, frozenset[str]],
+        approvals_by_id: Mapping[str, Approval],
+        user_id: str,
+    ) -> McpToolCertificate | None:
+        """Give one task the certificate its current authority allows, if any.
+
+        The single place that answers "what may this task hold right now", so
+        the two entry points above cannot drift into granting different things.
+        A task holding a certificate from an authority that no longer applies --
+        its run initiator's, after an approval claimed it; an outer approval's,
+        after a nearer one was requested -- has that certificate revoked here
+        before the new one is signed, so the record shows one live authority per
+        task rather than two overlapping ones.
+
+        Args:
+            task: The task to grant.
+            tenant_id: Tenant the run belongs to.
+            execution_id: The run the task belongs to.
+            initiator_id: The run's initiator, or ``None`` when the caller did
+                not resolve the run row. An ungoverned task cannot be granted
+                without it, and is skipped.
+            governing: Governing-approval ids keyed by task id.
+            approvals_by_id: The run's approvals keyed by their own id.
+            user_id: The acting user, recorded as ``created_by``/``updated_by``.
+
+        Returns:
+            The newly signed certificate, or ``None`` when nothing was issued --
+            including when the task already holds one from the same authority,
+            which is left exactly as it stands.
+        """
+        if task.status != WorkflowTaskStatus.in_progress or not task.tool_bindings:
             return None
-        if await self._approvals.get_for_task(task.id) is not None:
+        gate = self._governing_of(task.id, governing, approvals_by_id)
+        if gate is None:
             return None
+        if any(approval.status != ApprovalStatus.approved for approval in gate):
+            return None
+        # A merge can be governed by several approvals at once, and a
+        # certificate names exactly one grantor. The oldest is chosen so the
+        # attribution is deterministic rather than dependent on query order;
+        # the policy layer independently re-checks that *every* governing
+        # approval still stands, so which one is named does not weaken the gate.
+        approval = min(gate, key=lambda item: item.id) if gate else None
+        if approval is None and initiator_id is None:
+            return None
+
+        live = await self._certificates.list_live_for_task(task.id)
+        approval_id = approval.id if approval is not None else None
+        if any(certificate.approval_id == approval_id for certificate in live):
+            # The task already holds this authority's grant. Signing another
+            # would rotate the key and the frozen tool set underneath a task
+            # that may already be calling against them.
+            return None
+        for certificate in live:
+            await self._certificates.revoke(
+                certificate.id,
+                RevocationReason.superseded_by_approval,
+                user_id=user_id,
+            )
+
+        if approval is not None:
+            binding = CertificateBinding(
+                tenant_id=tenant_id,
+                execution_id=execution_id,
+                task_id=task.id,
+                approval_id=approval.id,
+            )
+            grant_kind = CertificateGrant.approval
+            granted_by = approval.decided_by or user_id
+        else:
+            # ``initiator_id`` is not None here -- checked above.
+            binding = CertificateBinding(
+                tenant_id=tenant_id,
+                execution_id=execution_id,
+                task_id=task.id,
+                initiator_id=initiator_id,
+            )
+            grant_kind = CertificateGrant.initiator
+            granted_by = initiator_id or ""
 
         return await self._sign_and_store(
             task=task,
-            tenant_id=execution.tenant_id,
-            binding=CertificateBinding(
-                tenant_id=execution.tenant_id,
-                execution_id=execution.id,
-                task_id=task.id,
-                initiator_id=execution.initiator_id,
-            ),
-            grant_kind=CertificateGrant.initiator,
-            approval_id=None,
-            granted_by=execution.initiator_id,
-            # Anchored on now, unlike the approval path: there is no earlier
-            # decision to measure the window from -- the task starting *is* the
-            # moment the authority is taken.
+            tenant_id=tenant_id,
+            binding=binding,
+            grant_kind=grant_kind,
+            approval_id=approval_id,
+            granted_by=granted_by,
+            # Anchored on now for both grantors: the task starting is the moment
+            # the authority is taken, and measuring an approval's window from
+            # its decision instead would make a long chain of covered tasks race
+            # a single TTL.
             not_before=datetime.now(UTC),
             user_id=user_id,
         )
@@ -418,34 +575,35 @@ class McpToolCertificateService:
             task.id, RevocationReason.task_finished, user_id=user_id
         )
 
-    async def supersede_initiator_grant(
-        self, workflow_task_id: str, *, user_id: str
+    async def supersede_grants_for(
+        self, workflow_task_ids: Sequence[str], *, user_id: str
     ) -> None:
-        """Revoke a task's initiator grant, if it has one, for an approval's sake.
+        """Stand down every grant the given tasks hold, for a new approval's sake.
 
-        Called from both ends of the race between starting a task and requesting
-        an approval for it: when an approval is created for a task already
-        running under its initiator's own grant, and again when that approval is
-        granted. Approval-backed certificates on the task are deliberately left
-        alone -- this only stands the initiator's grant down.
+        Called when an approval is requested: from that moment the approval
+        governs its own task and everything downstream of it up to the next
+        approval, and whatever authority those tasks were running on no longer
+        speaks for them. That is the run initiator's own grant for a task that
+        had already started, and equally an *outer* approval's grant for a task
+        a nearer request has just claimed.
 
-        The gate does not depend on it. ``TaskCertificatePolicy`` refuses an
-        initiator grant for any task that has an approval attached, whether or
-        not the row was stamped. What this adds is that the audit trail shows
-        one live authority per task instead of two overlapping ones.
+        The gate does not depend on it. ``TaskCertificatePolicy`` re-derives the
+        governing approval on every call and refuses a certificate that does not
+        match it, whether or not the row was stamped. What this adds is that the
+        audit trail shows one live authority per task instead of two overlapping
+        ones.
 
         Args:
-            workflow_task_id: The task whose initiator grant should stand down.
+            workflow_task_ids: The tasks whose grants should stand down.
             user_id: The acting user, recorded as ``updated_by``.
         """
-        certificate = await self._certificates.get_live_initiator_for_task(
-            workflow_task_id
-        )
-        if certificate is None:
-            return
-        await self._certificates.revoke(
-            certificate.id, RevocationReason.superseded_by_approval, user_id=user_id
-        )
+        for task_id in workflow_task_ids:
+            for certificate in await self._certificates.list_live_for_task(task_id):
+                await self._certificates.revoke(
+                    certificate.id,
+                    RevocationReason.superseded_by_approval,
+                    user_id=user_id,
+                )
 
     async def revoke_for_task(
         self, workflow_task_id: str, reason: RevocationReason, *, user_id: str
@@ -466,28 +624,31 @@ class McpToolCertificateService:
             return
         await self._certificates.revoke(certificate.id, reason, user_id=user_id)
 
-    async def read_for_approval(self, approval_id: str) -> McpToolCertificateRead:
-        """Return the public view of an approval's certificate.
+    async def list_for_approval(self, approval_id: str) -> list[McpToolCertificateRead]:
+        """Return the public view of every certificate issued under an approval.
 
-        The granted tools are parsed back out of the signed certificate rather
+        Plural because an approval covers the task it names *and* every task
+        downstream of it up to the next approval, each of which is granted its
+        own certificate when it starts -- so the set grows as the run advances,
+        and is empty until the first covered task starts. An empty result is an
+        ordinary state, not a missing record, which is why this does not raise.
+
+        The granted tools are parsed back out of each signed certificate rather
         than read from a separate column, so the API can never report a grant
         that differs from what the certificate actually says.
 
         Args:
-            approval_id: The approval whose certificate to read.
+            approval_id: The approval whose certificates to read.
 
         Returns:
-            The read view, including the granted tools.
+            The read views, newest first, including the granted tools.
 
         Raises:
-            NotFoundError: If the approval has no certificate.
-            CertificateVerificationError: If the stored certificate is
+            CertificateVerificationError: If a stored certificate is
                 unparseable or carries claims that do not fit the grammar.
         """
-        certificate = await self._certificates.get_latest_for_approval(approval_id)
-        if certificate is None:
-            raise NotFoundError("McpToolCertificate", approval_id)
-        return _to_read(certificate)
+        certificates = await self._certificates.list_for_approval(approval_id)
+        return [_to_read(certificate) for certificate in certificates]
 
     async def read(self, certificate_id: str) -> McpToolCertificateRead:
         """Return the public view of one certificate by its own id.

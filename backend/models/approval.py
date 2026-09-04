@@ -13,13 +13,14 @@ free-text comment supplied when the approver resolves the request.
 
 ``workflow_task_id`` is optional only because the column has to survive its task
 being deleted (``ON DELETE SET NULL``). Every approval an agent requests names
-one, and it must name the task that *performs* the approved action rather than a
-step that merely asks for the go-ahead: both the gate
+one, and it marks where the approval takes effect rather than the single task it
+authorizes: the approval covers that task **and every task downstream of it up
+to the next approval** (:mod:`infrastructure.approval_scope`). Both the gate
 (:class:`infrastructure.mcp_policies.TaskCertificatePolicy`) and the grant
-(:class:`services.mcp_tool_certificate.McpToolCertificateService`) are that
-task's. Naming the asking step leaves the acting one running on its run
-initiator's own grant instead of the approver's. :func:`infrastructure.approval_tools.request_approval` requires the
-argument and rejects the inverted shape.
+(:class:`services.mcp_tool_certificate.McpToolCertificateService`) work from
+that scope, so naming a step whose whole job is to ask for a go-ahead is the
+natural shape -- the decision reaches the steps that follow it.
+:func:`infrastructure.approval_tools.request_approval` requires the argument.
 
 **A request has exactly one destination**, expressed as one of two mutually
 exclusive fields the agent sets when it creates the approval:

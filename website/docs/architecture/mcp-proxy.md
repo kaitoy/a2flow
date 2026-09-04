@@ -31,7 +31,7 @@ flowchart LR
 | Order | Policy | What it requires |
 |---|---|---|
 | 1 | **In-progress tool binding** | The `(server, tool)` pair must be bound to a task the run currently has `in_progress`. Listing what a server advertises is deliberately unrestricted — that is how the design agent decides what to bind |
-| 2 | **Tool certificate** | The call must present the task's certificate — see [Who authorized a call](#who-authorized-a-call) — and that certificate's signed grant must cover the tool. There is no exemption: a task nobody was asked to approve presents the grant its run's initiator holds |
+| 2 | **Tool certificate** | The call must present the task's certificate — see [Who authorized a call](#who-authorized-a-call) — and that certificate's signed grant must cover the tool. There is no exemption: a task no approval covers presents the grant its run's initiator holds |
 
 The chain stops at the first veto and is ordered cheapest first, so a call that already fails the binding rule never pays for a signature check. Adding a rule means adding a policy to the chain rather than editing the proxy, which is what keeps "what may run" readable as one ordered list.
 
@@ -39,19 +39,20 @@ Refusals are written for the caller rather than for a log: a denied call comes b
 
 ## Who authorized a call {#who-authorized-a-call}
 
-Every tool call a run makes carries a **certificate** naming the person whose authority it runs on. A task is granted one at exactly one moment, and which moment depends on whether anyone was asked to approve it.
+Every tool call a run makes carries a **certificate** naming the person whose authority it runs on. A task is granted one when it is marked **In Progress**; whose authority it carries depends on whether an [approval](./approvals.md) covers it.
 
 | The task | Gets its certificate | On whose authority |
 |---|---|---|
-| Has an [approval](./approvals.md) attached | when that approval is granted | the approver who granted it |
-| Has none | when it is marked **In Progress** | whoever started the run |
+| Is covered by an approval — its own, or one requested on a task it follows | when it starts, and only once that approval is granted | the approver who granted it |
+| Is covered by none | when it is marked **In Progress** | whoever started the run |
 
 The second row is the ordinary case: nobody was asked to weigh the task, so the person who ran the workflow authorizes the tools it binds, and the audit trail records that in as many words rather than leaving the call unattributed.
 
-Two rules follow from *when* the certificate is issued, and both are visible to whoever operates a workflow:
+Three rules follow, and all are visible to whoever operates a workflow:
 
-- **The tools are fixed at that moment.** A certificate covers exactly the tools bound to the task when it was issued. A workflow that binds a tool to a task only after the task has started finds that tool refused — the design agent is told to bind first, but a hand-edited task can still get this wrong.
-- **Asking for an approval closes the door again.** If an approval is requested for a task already running on its initiator's authority, that authority stands down immediately; the task waits for the decision like any other.
+- **The tools are fixed when the task starts.** A certificate covers exactly the tools bound to the task at that moment. A workflow that binds a tool to a task only after the task has started finds that tool refused — the design agent is told to bind first, but a hand-edited task can still get this wrong. A task an approval covers cannot have its tools edited at all.
+- **Asking for an approval closes the door again.** If an approval is requested that covers a task already running on someone's authority, that authority stands down immediately; the task waits for the decision like any other.
+- **Each covered task gets its own certificate.** One approval covering a chain of tasks does not put them all on one clock — each is granted its own when it starts.
 
 ## What is recorded
 
