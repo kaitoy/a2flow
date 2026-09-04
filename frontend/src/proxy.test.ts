@@ -34,12 +34,12 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBe("http://localhost:3000/login");
   });
 
-  it("redirects authenticated visitors away from /login", () => {
+  it("redirects authenticated visitors away from /login to the welcome page", () => {
     const request = new NextRequest("http://localhost:3000/login");
     request.cookies.set("a2flow_session", "abc");
     const res = proxy(request);
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe("http://localhost:3000/sessions/new");
+    expect(res.headers.get("location")).toBe("http://localhost:3000/admin");
   });
 
   it("passes through authenticated requests to non-login pages", () => {

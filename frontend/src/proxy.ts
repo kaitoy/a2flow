@@ -68,7 +68,10 @@ export function proxy(request: NextRequest): NextResponse {
   }
   if (hasSession && isLogin) {
     const url = request.nextUrl.clone();
-    url.pathname = "/sessions/new";
+    // Match the post-sign-in destination the login form and the site root both
+    // use (`router.replace("/admin")`); the welcome page is reachable by every
+    // authenticated role, whereas `/sessions/new` is super_admin-only.
+    url.pathname = "/admin";
     return NextResponse.redirect(url);
   }
   return NextResponse.next();
