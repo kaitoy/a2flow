@@ -19,6 +19,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import get_settings
 from infrastructure.mcp_ca import McpCaError, certificate_from_pem
 from infrastructure.mcp_certificate import (
+    CertificateBinding,
     CertificateVerificationError,
     pop_digest,
     verify_pop_signature,
@@ -30,13 +31,14 @@ from infrastructure.mcp_proxy import (
     McpPolicyDeniedError,
 )
 from models.approval import Approval, ApprovalStatus
+from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead, WorkflowTaskStatus
 from repositories import (
     SqlMCPServerRepository,
     SqlWorkflowExecutionRepository,
     SqlWorkflowTaskRepository,
 )
-from repositories.approval_certificate import SqlApprovalCertificateRepository
+from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
 
 #: Denial message when the run has no WorkflowExecution to take bindings from.
 _NO_EXECUTION = (
@@ -52,11 +54,16 @@ _NO_TASK_IN_PROGRESS = (
 #: Upper bound on how many of a run's tasks one authorization check reads.
 _MAX_TASKS = 1000
 
-#: Denial message when every task binding the target tool needs an approval
-#: certificate and the caller presented none.
+#: Denial message when the caller presented no certificate at all. Every call
+#: needs one, so this is what an agent sees when the task it is working on never
+#: got a grant: it is not ``in_progress``, it bound its tools only after it
+#: started, or it is waiting on an approval nobody has granted yet.
 _NO_CREDENTIAL = (
-    "this task requires an approval before its MCP tools can be used, and no "
-    "approval certificate was presented; wait for the approval to be granted"
+    "no tool certificate was presented for this task, so it may not call MCP "
+    "tools. A task is granted one when it is marked in_progress, over exactly "
+    "the tools bound to it at that moment -- bind a task's tools before or in "
+    "the same call that starts it. A task that requested an approval is instead "
+    "granted one when that approval is granted."
 )
 
 
@@ -199,22 +206,101 @@ async def _approval(
     return result.first()
 
 
-class ApprovedTaskCertificatePolicy:
-    """Requires a valid approval certificate for tasks that have an approval.
+async def _execution_initiator(
+    db: AsyncSession, execution_id: str, tenant_id: str
+) -> str | None:
+    """Return who started the run, or ``None`` when it cannot be resolved.
 
-    The rule in one sentence: if every ``in_progress`` task that binds the
-    target tool has an Approval attached, the call must present that approval's
-    certificate, and the certificate's own signed grant must cover the tool.
+    Read straight off the row rather than trusted from the certificate: an
+    initiator grant claims a user id, and this is what that claim is checked
+    against.
 
-    Scoped that precisely on purpose. A run may have several tasks underway; if
-    any of the ones binding this tool needs no approval, the call is already
-    legitimate under :class:`InProgressToolBindingPolicy`, and demanding a
-    certificate would break a workflow that never asked for one.
+    Args:
+        db: The proxy's open database session.
+        execution_id: The WorkflowExecution driving the run.
+        tenant_id: Tenant the run belongs to.
+
+    Returns:
+        The run's ``initiator_id``, or ``None`` when no such run exists in this
+        tenant.
+    """
+    result = await db.exec(
+        select(WorkflowExecution.initiator_id).where(
+            WorkflowExecution.id == execution_id,
+            WorkflowExecution.tenant_id == tenant_id,
+        )
+    )
+    return result.first()
+
+
+async def _assert_grantor_still_authorizes(
+    ctx: McpCallContext, db: AsyncSession, binding: CertificateBinding
+) -> None:
+    """Re-check, at call time, that the grantor named in the binding still stands.
+
+    A certificate is signed once and lives for its whole TTL, so everything that
+    could have changed since has to be read fresh here. What "changed" means
+    differs per grantor, which is why the two forms are checked separately
+    rather than through one shared rule.
+
+    Args:
+        ctx: The operation being attempted.
+        db: The proxy's open database session.
+        binding: The presented certificate's binding, already matched against
+            the run and the task.
+
+    Raises:
+        McpPolicyDeniedError: If an approval grant's approval is no longer
+            ``approved``, or an initiator grant names someone other than the
+            run's initiator or belongs to a task an approval has since claimed.
+    """
+    if binding.approval_id is not None:
+        approval = await _approval(db, binding.approval_id, ctx.identity.tenant_id)
+        if approval is None or approval.status != ApprovalStatus.approved:
+            raise McpPolicyDeniedError(
+                "the approval backing this task is no longer granted"
+            )
+        return
+
+    initiator_id = await _execution_initiator(
+        db, ctx.identity.execution_id or "", ctx.identity.tenant_id
+    )
+    if initiator_id is None or binding.initiator_id != initiator_id:
+        raise McpPolicyDeniedError(
+            "the presented tool certificate was not granted by this run's initiator"
+        )
+    if await _tasks_with_an_approval(db, [binding.task_id], ctx.identity.tenant_id):
+        raise McpPolicyDeniedError(
+            "this task now needs an approval, so the initiator's own grant no "
+            "longer authorizes it; wait for the approval to be granted"
+        )
+
+
+class TaskCertificatePolicy:
+    """Requires a valid tool certificate on every call, whoever granted it.
+
+    The rule in one sentence: the call must present a certificate issued by this
+    deployment for one of the ``in_progress`` tasks that bind the target tool,
+    prove it holds that certificate's key, and the certificate's own signed
+    grant must cover the tool.
+
+    There is no exemption. A task an approver cleared presents that approval's
+    certificate; a task nobody was asked to approve presents the one the run's
+    initiator took out for themselves when it started (see
+    :meth:`services.mcp_tool_certificate.McpToolCertificateService.issue_for_started_task`).
+    Either way something signed authorized the call, and the audit row records
+    which.
 
     What the certificate adds over the binding policy is that its grant was
-    **signed at decision time**. The execution agent can rewrite its own task's
+    **signed at issuance**. The execution agent can rewrite its own task's
     ``tool_bindings`` mid-run, so a rule that reads bindings at call time is a
     rule the agent can widen. It cannot re-sign a certificate.
+
+    The two grantors are not interchangeable, and this is where that is
+    enforced: an initiator grant is refused for a task that has an approval
+    attached, whatever the approval's status. Without that, a run could start a
+    task, pocket the initiator's certificate, and only then request the approval
+    it was supposed to be waiting for.
 
     Registered after :class:`InProgressToolBindingPolicy` so the cheap
     binding-scope denial short-circuits before this one's extra queries and
@@ -222,17 +308,19 @@ class ApprovedTaskCertificatePolicy:
     """
 
     async def authorize(self, ctx: McpCallContext, db: AsyncSession) -> None:
-        """Allow the call only if the approval it depends on backs it.
+        """Allow the call only if a signed grant still backs it.
 
         Args:
             ctx: The operation being attempted.
             db: The proxy's open database session.
 
         Raises:
-            McpPolicyDeniedError: If an approval-gated call presents no
-                certificate, presents one bound to a different tenant, run,
-                task, or approval, presents one whose approval is no longer
-                granted or whose certificate was revoked, fails proof of
+            McpPolicyDeniedError: If the call presents no certificate, presents
+                one bound to a different tenant, run, task, or approval,
+                presents one this deployment did not issue or has revoked,
+                presents an approval grant whose approval is no longer granted,
+                presents an initiator grant that names the wrong user or belongs
+                to a task an approval has since claimed, fails proof of
                 possession, or targets a tool the certificate does not grant.
         """
         if ctx.operation is not McpOperation.call_tool:
@@ -257,13 +345,6 @@ class ApprovedTaskCertificatePolicy:
             # policy in front of it. Leave the denial to that one's message.
             return
 
-        gated = await _tasks_with_an_approval(
-            db, [task.id for task in binding_tasks], ctx.identity.tenant_id
-        )
-        if len(gated) < len(binding_tasks):
-            # At least one task binding this tool needs no approval.
-            return
-
         verified = ctx.identity.credential
         presented = ctx.principal.credential
         if verified is None or presented is None:
@@ -275,35 +356,34 @@ class ApprovedTaskCertificatePolicy:
             or binding.execution_id != ctx.identity.execution_id
         ):
             raise McpPolicyDeniedError(
-                "the presented approval certificate belongs to a different run"
+                "the presented tool certificate belongs to a different run"
             )
         if binding.task_id not in {task.id for task in binding_tasks}:
             raise McpPolicyDeniedError(
-                "the presented approval certificate authorizes a different task"
+                "the presented tool certificate authorizes a different task"
             )
 
-        certificates = SqlApprovalCertificateRepository(
+        certificates = SqlMcpToolCertificateRepository(
             db, tenant_id=ctx.identity.tenant_id
         )
         row = await certificates.get_by_serial(verified.claims.serial_number)
         if row is None:
             raise McpPolicyDeniedError(
-                "the presented approval certificate is not one this deployment issued"
+                "the presented tool certificate is not one this deployment issued"
             )
         if row.revoked_at is not None:
             raise McpPolicyDeniedError(
-                "the approval certificate for this task has been revoked"
+                "the tool certificate for this task has been revoked"
             )
         if row.approval_id != binding.approval_id:
+            # Both are ``None`` for an initiator grant, so this one comparison
+            # also catches a certificate claiming a grantor its row disagrees
+            # with -- an approval URN on an initiator row, or the reverse.
             raise McpPolicyDeniedError(
-                "the presented approval certificate does not match its recorded approval"
+                "the presented tool certificate does not match its recorded grant"
             )
 
-        approval = await _approval(db, binding.approval_id, ctx.identity.tenant_id)
-        if approval is None or approval.status != ApprovalStatus.approved:
-            raise McpPolicyDeniedError(
-                "the approval backing this task is no longer granted"
-            )
+        await _assert_grantor_still_authorizes(ctx, db, binding)
 
         settings = get_settings()
         digest = pop_digest(
@@ -322,7 +402,7 @@ class ApprovedTaskCertificatePolicy:
                 timestamp=presented.timestamp,
                 now=datetime.now(UTC),
                 window=timedelta(
-                    seconds=settings.mcp_approval_cert_signature_window_seconds
+                    seconds=settings.mcp_tool_cert_signature_window_seconds
                 ),
             )
         except (McpCaError, CertificateVerificationError) as exc:
@@ -346,9 +426,9 @@ def default_policies() -> list[McpPolicy]:
     """Return the policy chain the process-wide proxy is built with.
 
     Two rules are enforced. First, an agent may invoke only the MCP tools bound
-    to a task currently in progress in its run. Second, a task that has an
-    approval attached must additionally present that approval's certificate,
-    whose signed grant covers the tool.
+    to a task currently in progress in its run. Second, every call must present
+    a valid certificate for that task -- an approver's, or the run initiator's
+    own -- whose signed grant covers the tool.
 
     Ordered cheapest first -- the chain short-circuits on the first denial, and
     the binding check is a subset of what the certificate check would otherwise
@@ -358,4 +438,4 @@ def default_policies() -> list[McpPolicy]:
     Returns:
         The ordered policy chain.
     """
-    return [InProgressToolBindingPolicy(), ApprovedTaskCertificatePolicy()]
+    return [InProgressToolBindingPolicy(), TaskCertificatePolicy()]

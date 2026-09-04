@@ -1,9 +1,5 @@
 from .agent_skill import AgentSkillRepository, SqlAgentSkillRepository
 from .approval import ApprovalRepository, SqlApprovalRepository
-from .approval_certificate import (
-    ApprovalCertificateRepository,
-    SqlApprovalCertificateRepository,
-)
 from .auth_session import AuthSessionRepository, SqlAuthSessionRepository
 from .effective_roles import EffectiveRoleRepository, SqlEffectiveRoleRepository
 from .exceptions import (
@@ -24,6 +20,10 @@ from .mcp_ca import (
     SqlMcpCertificateAuthorityRepository,
 )
 from .mcp_server import MCPServerRepository, SqlMCPServerRepository
+from .mcp_tool_certificate import (
+    McpToolCertificateRepository,
+    SqlMcpToolCertificateRepository,
+)
 from .mcp_tool_invocation import (
     McpToolInvocationRepository,
     SqlMcpToolInvocationRepository,
@@ -63,7 +63,7 @@ from .workflow_task_template import (
 
 __all__ = [
     "AgentSkillRepository",
-    "ApprovalCertificateRepository",
+    "McpToolCertificateRepository",
     "ApprovalRepository",
     "AuthSessionRepository",
     "ClaimedEmail",
@@ -85,7 +85,7 @@ __all__ = [
     "RepositoryError",
     "SecretRepository",
     "SqlAgentSkillRepository",
-    "SqlApprovalCertificateRepository",
+    "SqlMcpToolCertificateRepository",
     "SqlApprovalRepository",
     "SqlAuthSessionRepository",
     "SqlEffectiveRoleRepository",

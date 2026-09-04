@@ -114,12 +114,12 @@ The encryption key is resolved at first use, in order:
 
 ## MCP tools and approvals {#mcp-tools-and-approvals}
 
-A task that has an [approval](../guides/approvals.md#human-approval) attached cannot call its bound MCP tools until the approver grants it: granting issues a short-lived X.509 certificate, and the MCP proxy refuses a call that does not present one. The signing root is generated on first use and stored encrypted with the same key as local secrets, so nothing here needs configuring for the feature to work.
+Every MCP tool call must present a short-lived X.509 certificate issued for the task making it — granted when the task's [approval](../guides/approvals.md#human-approval) is, or when a task nobody was asked to approve starts. The signing root is generated on first use and stored encrypted with the same key as local secrets, so nothing here needs configuring for the feature to work.
 
 | Variable | Default | What it bounds |
 |---|---|---|
-| `MCP_APPROVAL_CERT_TTL_SECONDS` | `3600` | How long a granted approval's certificate stays valid — the window in which the approved task may call its tools |
-| `MCP_APPROVAL_CERT_SIGNATURE_WINDOW_SECONDS` | `60` | Clock-skew tolerance for the proof-of-possession signature accompanying each proxied call |
+| `MCP_TOOL_CERT_TTL_SECONDS` | `3600` | How long a task's certificate stays valid — the window in which it may call its tools |
+| `MCP_TOOL_CERT_SIGNATURE_WINDOW_SECONDS` | `60` | Clock-skew tolerance for the proof-of-possession signature accompanying each proxied call |
 | `MCP_CA_COMMON_NAME` / `MCP_CA_VALIDITY_DAYS` | `A2Flow MCP Approval CA` / `3650` | Subject and lifetime of the generated root. Read only when the root is first generated; changing them later has no effect on an existing root |
 | `MCP_REGISTRY_URL` | `https://registry.modelcontextprotocol.io` | Base URL of the registry the [Browse registry](../guides/mcp-servers.md#registering-from-the-mcp-registry) dialog searches |
 

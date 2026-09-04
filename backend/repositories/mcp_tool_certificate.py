@@ -1,11 +1,11 @@
-"""ApprovalCertificate repository: Protocol interface and SQLModel implementation.
+"""MCP tool certificate repository: Protocol interface and SQLModel implementation.
 
 Tenant-scoped like every other resource repository: the filter is applied
 explicitly on each query rather than through an ORM listener, because the MCP
 proxy and the agent tools open their own sessions outside FastAPI's request
 scope where a request-scoped listener would silently not apply.
 
-There is no ``update`` beyond :meth:`SqlApprovalCertificateRepository.revoke`.
+There is no ``update`` beyond :meth:`SqlMcpToolCertificateRepository.revoke`.
 A certificate's contents are signed, so the only thing that can change after
 issuance is whether it still counts.
 """
@@ -17,10 +17,10 @@ from typing import Protocol
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from models.approval_certificate import (
-    ApprovalCertificate,
-    ApprovalCertificateCreate,
-    ApprovalCertificateRead,
+from models.mcp_tool_certificate import (
+    McpToolCertificate,
+    McpToolCertificateCreate,
+    McpToolCertificateRead,
     RevocationReason,
 )
 from repositories._integrity import commit_or_translate_user_fk
@@ -28,28 +28,32 @@ from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
 
-class ApprovalCertificateRepository(Protocol):
+class McpToolCertificateRepository(Protocol):
     """Interface for approval-certificate persistence operations."""
 
-    async def get(self, certificate_id: str) -> ApprovalCertificate | None: ...
+    async def get(self, certificate_id: str) -> McpToolCertificate | None: ...
 
     async def get_live_for_approval(
         self, approval_id: str
-    ) -> ApprovalCertificate | None: ...
+    ) -> McpToolCertificate | None: ...
 
     async def get_latest_for_approval(
         self, approval_id: str
-    ) -> ApprovalCertificate | None: ...
+    ) -> McpToolCertificate | None: ...
 
-    async def get_by_serial(self, serial_number: str) -> ApprovalCertificate | None: ...
+    async def get_by_serial(self, serial_number: str) -> McpToolCertificate | None: ...
 
     async def get_live_for_task(
         self, workflow_task_id: str
-    ) -> ApprovalCertificate | None: ...
+    ) -> McpToolCertificate | None: ...
+
+    async def get_live_initiator_for_task(
+        self, workflow_task_id: str
+    ) -> McpToolCertificate | None: ...
 
     async def list_live_for_execution(
         self, workflow_execution_id: str
-    ) -> list[ApprovalCertificate]: ...
+    ) -> list[McpToolCertificate]: ...
 
     async def list(
         self,
@@ -58,19 +62,19 @@ class ApprovalCertificateRepository(Protocol):
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
-    ) -> list[ApprovalCertificate]: ...
+    ) -> list[McpToolCertificate]: ...
 
     async def create(
-        self, data: ApprovalCertificateCreate, *, user_id: str
-    ) -> ApprovalCertificate: ...
+        self, data: McpToolCertificateCreate, *, user_id: str
+    ) -> McpToolCertificate: ...
 
     async def revoke(
         self, certificate_id: str, reason: RevocationReason, *, user_id: str
-    ) -> ApprovalCertificate: ...
+    ) -> McpToolCertificate: ...
 
 
-class SqlApprovalCertificateRepository:
-    """SQLModel-backed implementation of ApprovalCertificateRepository."""
+class SqlMcpToolCertificateRepository:
+    """SQLModel-backed implementation of McpToolCertificateRepository."""
 
     def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the session and the tenant these operations are scoped to.
@@ -94,22 +98,20 @@ class SqlApprovalCertificateRepository:
             )
         return self._tenant_id
 
-    async def _get_scoped(self, certificate_id: str) -> ApprovalCertificate | None:
+    async def _get_scoped(self, certificate_id: str) -> McpToolCertificate | None:
         """Fetch one certificate by id, filtered by tenant.
 
         Uses a filtered ``select`` rather than ``session.get`` so a
         cross-tenant id returns ``None`` (surfacing as a 404) instead of a row
         the caller may not see.
         """
-        stmt = select(ApprovalCertificate).where(
-            ApprovalCertificate.id == certificate_id
-        )
+        stmt = select(McpToolCertificate).where(McpToolCertificate.id == certificate_id)
         if self._tenant_id is not None:
-            stmt = stmt.where(ApprovalCertificate.tenant_id == self._tenant_id)
+            stmt = stmt.where(McpToolCertificate.tenant_id == self._tenant_id)
         result = await self._db.exec(stmt)
         return result.first()
 
-    async def get(self, certificate_id: str) -> ApprovalCertificate | None:
+    async def get(self, certificate_id: str) -> McpToolCertificate | None:
         """Return a certificate by id within the tenant, or ``None``.
 
         Args:
@@ -122,11 +124,11 @@ class SqlApprovalCertificateRepository:
 
     async def get_live_for_approval(
         self, approval_id: str
-    ) -> ApprovalCertificate | None:
+    ) -> McpToolCertificate | None:
         """Return the approval's un-revoked certificate, if it has one.
 
         At most one can exist, enforced by the partial unique index
-        ``uq_approval_certificates_live``.
+        ``uq_mcp_tool_certificates_live``.
 
         Args:
             approval_id: The approval the certificate was issued for.
@@ -136,17 +138,17 @@ class SqlApprovalCertificateRepository:
             :meth:`get_live_for_task` for why.
         """
         result = await self._db.exec(
-            select(ApprovalCertificate).where(
-                ApprovalCertificate.approval_id == approval_id,
-                ApprovalCertificate.tenant_id == self._tenant_id,
-                ApprovalCertificate.revoked_at == None,  # noqa: E711
+            select(McpToolCertificate).where(
+                McpToolCertificate.approval_id == approval_id,
+                McpToolCertificate.tenant_id == self._tenant_id,
+                McpToolCertificate.revoked_at == None,  # noqa: E711
             )
         )
         return result.first()
 
     async def get_latest_for_approval(
         self, approval_id: str
-    ) -> ApprovalCertificate | None:
+    ) -> McpToolCertificate | None:
         """Return the approval's most recently issued certificate, revoked or not.
 
         Backs the read endpoint: an approver looking at a spent approval should
@@ -159,16 +161,16 @@ class SqlApprovalCertificateRepository:
             The newest row, or ``None`` when the approval has no certificate.
         """
         result = await self._db.exec(
-            select(ApprovalCertificate)
+            select(McpToolCertificate)
             .where(
-                ApprovalCertificate.approval_id == approval_id,
-                ApprovalCertificate.tenant_id == self._tenant_id,
+                McpToolCertificate.approval_id == approval_id,
+                McpToolCertificate.tenant_id == self._tenant_id,
             )
-            .order_by(col(ApprovalCertificate.created_at).desc())
+            .order_by(col(McpToolCertificate.created_at).desc())
         )
         return result.first()
 
-    async def get_by_serial(self, serial_number: str) -> ApprovalCertificate | None:
+    async def get_by_serial(self, serial_number: str) -> McpToolCertificate | None:
         """Return the certificate with the given X.509 serial.
 
         This is how verification gets from a presented certificate to the row
@@ -181,16 +183,16 @@ class SqlApprovalCertificateRepository:
             The row, or ``None`` when no certificate in this tenant has it.
         """
         result = await self._db.exec(
-            select(ApprovalCertificate).where(
-                ApprovalCertificate.serial_number == serial_number,
-                ApprovalCertificate.tenant_id == self._tenant_id,
+            select(McpToolCertificate).where(
+                McpToolCertificate.serial_number == serial_number,
+                McpToolCertificate.tenant_id == self._tenant_id,
             )
         )
         return result.first()
 
     async def get_live_for_task(
         self, workflow_task_id: str
-    ) -> ApprovalCertificate | None:
+    ) -> McpToolCertificate | None:
         """Return the task's un-revoked certificate, if it has one.
 
         Args:
@@ -203,17 +205,44 @@ class SqlApprovalCertificateRepository:
             different and more confusing failure for whoever reads the log.
         """
         result = await self._db.exec(
-            select(ApprovalCertificate).where(
-                ApprovalCertificate.workflow_task_id == workflow_task_id,
-                ApprovalCertificate.tenant_id == self._tenant_id,
-                ApprovalCertificate.revoked_at == None,  # noqa: E711
+            select(McpToolCertificate).where(
+                McpToolCertificate.workflow_task_id == workflow_task_id,
+                McpToolCertificate.tenant_id == self._tenant_id,
+                McpToolCertificate.revoked_at == None,  # noqa: E711
+            )
+        )
+        return result.first()
+
+    async def get_live_initiator_for_task(
+        self, workflow_task_id: str
+    ) -> McpToolCertificate | None:
+        """Return the task's un-revoked *initiator* grant, if it has one.
+
+        Narrower than :meth:`get_live_for_task` on purpose. The supersede path
+        has to revoke the initiator's own grant and leave an approval-backed
+        certificate alone, and a task can briefly carry one of each -- the
+        partial unique indexes forbid two live grants of the *same* kind, not
+        one of each.
+
+        Args:
+            workflow_task_id: The task the certificate authorizes.
+
+        Returns:
+            The un-revoked initiator grant, or ``None``.
+        """
+        result = await self._db.exec(
+            select(McpToolCertificate).where(
+                McpToolCertificate.workflow_task_id == workflow_task_id,
+                McpToolCertificate.tenant_id == self._tenant_id,
+                McpToolCertificate.approval_id == None,  # noqa: E711
+                McpToolCertificate.revoked_at == None,  # noqa: E711
             )
         )
         return result.first()
 
     async def list_live_for_execution(
         self, workflow_execution_id: str
-    ) -> list[ApprovalCertificate]:
+    ) -> list[McpToolCertificate]:
         """Return every un-revoked certificate issued within one run.
 
         Backs the caller-side lookup in
@@ -228,13 +257,13 @@ class SqlApprovalCertificateRepository:
             The un-revoked rows, oldest first.
         """
         result = await self._db.exec(
-            select(ApprovalCertificate)
+            select(McpToolCertificate)
             .where(
-                ApprovalCertificate.workflow_execution_id == workflow_execution_id,
-                ApprovalCertificate.tenant_id == self._tenant_id,
-                ApprovalCertificate.revoked_at == None,  # noqa: E711
+                McpToolCertificate.workflow_execution_id == workflow_execution_id,
+                McpToolCertificate.tenant_id == self._tenant_id,
+                McpToolCertificate.revoked_at == None,  # noqa: E711
             )
-            .order_by(col(ApprovalCertificate.created_at))
+            .order_by(col(McpToolCertificate.created_at))
         )
         return list(result.all())
 
@@ -245,7 +274,7 @@ class SqlApprovalCertificateRepository:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
-    ) -> list[ApprovalCertificate]:
+    ) -> list[McpToolCertificate]:
         """Return a page of the tenant's certificates, newest first by default.
 
         Backs the admin audit list, which spans every approval rather than
@@ -253,7 +282,7 @@ class SqlApprovalCertificateRepository:
         answers a question the verification path asks about a specific approval,
         task, run, or serial.
 
-        ``readable=ApprovalCertificateRead`` keeps ``certificate_pem`` and
+        ``readable=McpToolCertificateRead`` keeps ``certificate_pem`` and
         ``private_key_encrypted`` out of the filter and sort surface: they are
         absent from that schema, so a client cannot use "which rows match" as a
         blind oracle on key material it never receives (see
@@ -268,25 +297,25 @@ class SqlApprovalCertificateRepository:
         Returns:
             The requested page of certificates.
         """
-        stmt = select(ApprovalCertificate)
+        stmt = select(McpToolCertificate)
         if self._tenant_id is not None:
-            stmt = stmt.where(ApprovalCertificate.tenant_id == self._tenant_id)
+            stmt = stmt.where(McpToolCertificate.tenant_id == self._tenant_id)
         stmt = apply_filters(
-            stmt, ApprovalCertificate, filters, readable=ApprovalCertificateRead
+            stmt, McpToolCertificate, filters, readable=McpToolCertificateRead
         )
         stmt = apply_sort(
             stmt,
-            ApprovalCertificate,
+            McpToolCertificate,
             sort,
-            default=[col(ApprovalCertificate.created_at).desc()],
-            readable=ApprovalCertificateRead,
+            default=[col(McpToolCertificate.created_at).desc()],
+            readable=McpToolCertificateRead,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 
     async def create(
-        self, data: ApprovalCertificateCreate, *, user_id: str
-    ) -> ApprovalCertificate:
+        self, data: McpToolCertificateCreate, *, user_id: str
+    ) -> McpToolCertificate:
         """Persist a freshly signed certificate.
 
         Args:
@@ -299,7 +328,7 @@ class SqlApprovalCertificateRepository:
         Raises:
             ForeignKeyViolationError: If the acting user does not exist.
         """
-        certificate = ApprovalCertificate(
+        certificate = McpToolCertificate(
             **data.model_dump(),
             tenant_id=self._require_tenant(),
             created_by=user_id,
@@ -312,7 +341,7 @@ class SqlApprovalCertificateRepository:
 
     async def revoke(
         self, certificate_id: str, reason: RevocationReason, *, user_id: str
-    ) -> ApprovalCertificate:
+    ) -> McpToolCertificate:
         """Mark a certificate revoked, stamping the reason and the instant.
 
         Revoking an already-revoked certificate leaves the original
@@ -334,7 +363,7 @@ class SqlApprovalCertificateRepository:
         self._require_tenant()
         certificate = await self._get_scoped(certificate_id)
         if certificate is None:
-            raise NotFoundError("ApprovalCertificate", certificate_id)
+            raise NotFoundError("McpToolCertificate", certificate_id)
         if certificate.revoked_at is None:
             certificate.revoked_at = datetime.now(UTC)
             certificate.revocation_reason = reason

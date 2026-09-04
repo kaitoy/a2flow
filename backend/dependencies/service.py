@@ -14,12 +14,12 @@ from config import get_settings
 from infrastructure.secret_resolver import SecretResolver
 from services import (
     AgentSkillService,
-    ApprovalCertificateService,
     ApprovalService,
     ApproverGroupResolver,
     ImpersonationEventService,
     MCPRegistryService,
     MCPServerService,
+    McpToolCertificateService,
     McpToolInvocationService,
     MCPToolMockService,
     MetricsService,
@@ -47,8 +47,6 @@ from .context import APP_NAME
 from .repository import (
     AgentSkillReadRepositoryDep,
     AgentSkillRepositoryDep,
-    ApprovalCertificateReadRepositoryDep,
-    ApprovalCertificateRepositoryDep,
     ApprovalReadRepositoryDep,
     ApprovalRepositoryDep,
     DBSessionDep,
@@ -57,6 +55,8 @@ from .repository import (
     McpCertificateAuthorityRepositoryDep,
     MCPServerReadRepositoryDep,
     MCPServerRepositoryDep,
+    McpToolCertificateReadRepositoryDep,
+    McpToolCertificateRepositoryDep,
     McpToolInvocationReadRepositoryDep,
     McpToolInvocationRepositoryDep,
     MCPToolMockReadRepositoryDep,
@@ -736,6 +736,48 @@ WorkflowExecutionReadServiceDep = Annotated[
 ]
 
 
+def get_mcp_tool_certificate_service(
+    certificates: McpToolCertificateRepositoryDep,
+    tasks: WorkflowTaskRepositoryDep,
+    authorities: McpCertificateAuthorityRepositoryDep,
+    cipher: SecretCipherDep,
+    approvals: ApprovalRepositoryDep,
+) -> McpToolCertificateService:
+    """Create an McpToolCertificateService backed by the request's repositories."""
+    return McpToolCertificateService(
+        certificates, tasks, authorities, cipher, approvals
+    )
+
+
+McpToolCertificateServiceDep = Annotated[
+    McpToolCertificateService, Depends(get_mcp_tool_certificate_service)
+]
+
+
+def get_mcp_tool_certificate_read_service(
+    certificates: McpToolCertificateReadRepositoryDep,
+    tasks: WorkflowTaskReadRepositoryDep,
+    authorities: McpCertificateAuthorityRepositoryDep,
+    cipher: SecretCipherDep,
+    approvals: ApprovalReadRepositoryDep,
+) -> McpToolCertificateService:
+    """Create an McpToolCertificateService for a read route, possibly across all tenants.
+
+    Backs only ``read_for_approval`` (``GET /approvals/{id}/certificate``),
+    which touches only ``certificates`` -- every other collaborator here must
+    still be a read repository, since merely resolving a strict one would itself
+    raise regardless of whether this service calls into it.
+    """
+    return McpToolCertificateService(
+        certificates, tasks, authorities, cipher, approvals
+    )
+
+
+McpToolCertificateReadServiceDep = Annotated[
+    McpToolCertificateService, Depends(get_mcp_tool_certificate_read_service)
+]
+
+
 def get_workflow_task_service(
     repo: WorkflowTaskRepositoryDep,
     execution_repo: WorkflowExecutionRepositoryDep,
@@ -743,7 +785,7 @@ def get_workflow_task_service(
     approvals: ApprovalRepositoryDep,
     notifications: NotificationDispatcherDep,
     approver_groups: ApproverGroupResolverDep,
-    certificates: ApprovalCertificateRepositoryDep,
+    certificates: McpToolCertificateServiceDep,
 ) -> WorkflowTaskService:
     """Create a WorkflowTaskService wiring the task, session, and approval repositories, the notification dispatcher, the access policy, and the approver-group resolver."""
     return WorkflowTaskService(
@@ -769,7 +811,7 @@ def get_workflow_task_read_service(
     approvals: ApprovalReadRepositoryDep,
     notifications: NotificationDispatcherReadDep,
     approver_groups: ApproverGroupResolverReadDep,
-    certificates: ApprovalCertificateReadRepositoryDep,
+    certificates: McpToolCertificateReadServiceDep,
 ) -> WorkflowTaskService:
     """Create a WorkflowTaskService for a read route, possibly across all tenants.
 
@@ -822,45 +864,10 @@ WorkflowTaskTemplateReadServiceDep = Annotated[
 ]
 
 
-def get_approval_certificate_service(
-    certificates: ApprovalCertificateRepositoryDep,
-    tasks: WorkflowTaskRepositoryDep,
-    authorities: McpCertificateAuthorityRepositoryDep,
-    cipher: SecretCipherDep,
-) -> ApprovalCertificateService:
-    """Create an ApprovalCertificateService backed by the request's repositories."""
-    return ApprovalCertificateService(certificates, tasks, authorities, cipher)
-
-
-ApprovalCertificateServiceDep = Annotated[
-    ApprovalCertificateService, Depends(get_approval_certificate_service)
-]
-
-
-def get_approval_certificate_read_service(
-    certificates: ApprovalCertificateReadRepositoryDep,
-    tasks: WorkflowTaskReadRepositoryDep,
-    authorities: McpCertificateAuthorityRepositoryDep,
-    cipher: SecretCipherDep,
-) -> ApprovalCertificateService:
-    """Create an ApprovalCertificateService for a read route, possibly across all tenants.
-
-    Backs only ``read_for_approval`` (``GET /approvals/{id}/certificate``),
-    which touches only ``certificates`` -- ``tasks`` must still be the read
-    repository, since merely resolving the strict one would itself raise.
-    """
-    return ApprovalCertificateService(certificates, tasks, authorities, cipher)
-
-
-ApprovalCertificateReadServiceDep = Annotated[
-    ApprovalCertificateService, Depends(get_approval_certificate_read_service)
-]
-
-
 def get_approval_service(
     repo: ApprovalRepositoryDep,
     approver_groups: ApproverGroupResolverDep,
-    certificates: ApprovalCertificateServiceDep,
+    certificates: McpToolCertificateServiceDep,
 ) -> ApprovalService:
     """Create an ApprovalService backed by the request's repository."""
     return ApprovalService(repo, approver_groups, certificates)
@@ -872,7 +879,7 @@ ApprovalServiceDep = Annotated[ApprovalService, Depends(get_approval_service)]
 def get_approval_read_service(
     repo: ApprovalReadRepositoryDep,
     approver_groups: ApproverGroupResolverReadDep,
-    certificates: ApprovalCertificateReadServiceDep,
+    certificates: McpToolCertificateReadServiceDep,
 ) -> ApprovalService:
     """Create an ApprovalService for a read route, possibly across all tenants."""
     return ApprovalService(repo, approver_groups, certificates)

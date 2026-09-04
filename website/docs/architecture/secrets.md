@@ -29,7 +29,7 @@ Values are encrypted with a single key belonging to the deployment. The entry ke
 
 The encryption key is resolved once per process: taken from the environment if it is set there, otherwise read from a key file, otherwise generated on first use and written to that file with a warning in the log.
 
-**Back that key up.** Losing it makes every stored local secret undecryptable — and, because the same key protects the signing key of the authority that issues [approval certificates](./approvals.md), it also stops certificates from being issued or verified. Both live in the [configuration reference](../operations/configuration.md#secret-management).
+**Back that key up.** Losing it makes every stored local secret undecryptable — and, because the same key protects the signing key of the authority that issues [tool certificates](./approvals.md), it also stops certificates from being issued or verified — which stops every MCP tool call. Both live in the [configuration reference](../operations/configuration.md#secret-management).
 
 ## HashiCorp Vault secrets
 

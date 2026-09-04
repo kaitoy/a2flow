@@ -37,10 +37,12 @@ A prompt injection or a bug therefore cannot talk its way past the gate, because
 
 Granting an approval issues a short-lived certificate for that task, signed by a certificate authority the deployment generates for itself on first use.
 
+The certificate is not what an approval adds — **every** task that calls a tool has one. What an approval changes is who it comes from: a task nobody was asked to approve is granted one when it starts, on the authority of whoever started the run, and an approval replaces that with the approver's own. So the question the record answers is never "was this call authorized" but "by whom".
+
 | The certificate carries | Why it matters |
 |---|---|
-| Which tenant, run, task and approval it speaks for | A certificate minted for one run is useless in another |
-| **The tools the task had bound at the moment the approver decided** | The agent can rewrite its own task's bindings mid-run, but it cannot re-issue a certificate. Approving a task to read a file never becomes approval to delete one |
+| Which tenant, run and task it speaks for, and whose authority it carries — an approver's, or the run initiator's | A certificate minted for one run is useless in another, and one kind of authority cannot stand in for the other |
+| **The tools the task had bound at the moment the certificate was issued** | The agent can rewrite its own task's bindings mid-run, but it cannot re-issue a certificate. Approving a task to read a file never becomes approval to delete one, and a task that has already started cannot pick up a tool it did not start with |
 
 ### The task an approval covers
 
@@ -53,7 +55,7 @@ That matters because a workflow usually shows the request as a step of its own:
 | Request approval | None | — |
 | Launch instance | The one that launches | **This one** |
 
-Naming the first step would freeze an empty set of tools into the certificate and leave the second step with no approval on it at all, and therefore unguarded — the gate would be absent on exactly the call it exists for. So a request naming a step that uses no tools while a step after it does is **refused**, and the agent is told which step to name instead. A step with no tools and nothing tool-using after it is accepted: that is an approval covering an action no tool performs.
+Naming the first step would freeze an empty set of tools into the certificate and leave the second step running on its initiator's own authority instead of the approver's — the decision would count for nothing on exactly the call it exists for. So a request naming a step that uses no tools while a step after it does is **refused**, and the agent is told which step to name instead. A step with no tools and nothing tool-using after it is accepted: that is an approval covering an action no tool performs.
 
 Every later tool call from that task must present it, and the proxy checks all of the following before the call goes anywhere:
 
@@ -67,6 +69,6 @@ A certificate is revoked once its task reaches a terminal status. Safety does no
 
 ## What the record answers
 
-Every decided call — allowed or refused — is recorded together with the certificate it presented, so "which approval authorized this, and who granted it" can be answered long after the run has finished. Arguments are kept only as a digest; the raw values are never stored. The run's Tool Invocations page is where that record is read.
+Every decided call — allowed or refused — is recorded together with the certificate it presented, so "who authorized this, and on what basis" can be answered long after the run has finished. Arguments are kept only as a digest; the raw values are never stored. The run's Tool Invocations page is where that record is read.
 
 **Scope of the guarantee.** The proxy runs inside the backend process, so a certificate proves possession to a verifier sharing that process — it is not a defence against an attacker who already controls the backend. What it does provide is a single fail-closed enforcement point, a grant that cannot be widened after the fact, and a record that can be checked afterwards.

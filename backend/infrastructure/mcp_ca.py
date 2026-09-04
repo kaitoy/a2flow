@@ -1,7 +1,7 @@
 """Generation, loading, and signing operations of the internal MCP root CA.
 
 The root signs one short-lived leaf certificate per approved workflow task.
-:mod:`services.approval_certificate` decides *when* to issue; this module owns
+:mod:`services.mcp_tool_certificate` decides *when* to issue; this module owns
 the X.509 mechanics and the key material.
 
 **Key custody.** The root's private key is stored as Fernet ciphertext in

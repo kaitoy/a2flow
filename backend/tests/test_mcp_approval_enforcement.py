@@ -1,4 +1,4 @@
-"""End-to-end tests of the approval gate on MCP tool calls.
+"""End-to-end tests of the certificate gate on MCP tool calls.
 
 Drives the real presenter (:mod:`infrastructure.mcp_credentials`) and the real
 verifier (:class:`infrastructure.mcp_proxy.McpProxy` with the default policy
@@ -6,12 +6,16 @@ chain) against a throwaway database, faking only the remote MCP traffic. That
 is the combination the enforcement claim actually rests on, so the cases here
 are the ones worth reading first:
 
-* `test_call_is_denied_without_a_certificate_once_an_approval_exists` -- the
-  gate itself.
-* `test_widening_bindings_after_approval_does_not_widen_the_grant` -- the
-  escalation path that the plain tool-binding policy cannot close.
-* `test_task_without_an_approval_still_works` -- the compatibility promise:
-  workflows that never request an approval are untouched.
+* `test_a_task_with_no_grant_at_all_cannot_call` -- the rule itself: every call
+  needs a certificate, with no exemption.
+* `test_task_without_an_approval_calls_on_its_initiators_grant` -- how a task
+  nobody approved satisfies that rule.
+* `test_widening_bindings_after_approval_does_not_widen_the_grant` and
+  `test_widening_bindings_after_the_grant_does_not_widen_it` -- the escalation
+  path the plain tool-binding policy cannot close, on both grant kinds.
+* `test_a_grant_is_not_issued_for_a_task_that_has_an_approval` and
+  `test_an_approval_arriving_later_stands_the_initiator_grant_down` -- the two
+  orderings in which a run must not talk its way past an approval.
 * `test_a_recorded_call_can_be_verified_from_the_audit_row_alone` -- the
   non-repudiation claim, checked the way an auditor would.
 
@@ -60,10 +64,13 @@ from infrastructure.mcp_proxy import (
     McpProxy,
     PrincipalKind,
 )
-from infrastructure.secret_cipher import get_secret_cipher
 from models.approval import Approval, ApprovalStatus
-from models.approval_certificate import ApprovalCertificate, RevocationReason
 from models.mcp_server import MCPServer, McpTransport
+from models.mcp_tool_certificate import (
+    CertificateGrant,
+    McpToolCertificate,
+    RevocationReason,
+)
 from models.mcp_tool_invocation import McpAuditDecision, MCPToolInvocation
 from models.user import SYSTEM_USER_ID
 from models.workflow_execution import WorkflowExecution
@@ -73,12 +80,12 @@ from models.workflow_task import (
     WorkflowTaskStatus,
     WorkflowTaskToolBinding,
 )
-from repositories.approval_certificate import SqlApprovalCertificateRepository
 from repositories.mcp_ca import SqlMcpCertificateAuthorityRepository
 from repositories.mcp_server import SqlMCPServerRepository
+from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
 from repositories.workflow_execution import SqlWorkflowExecutionRepository
 from repositories.workflow_task import SqlWorkflowTaskRepository
-from services.approval_certificate import ApprovalCertificateService
+from services.mcp_tool_certificate import build_mcp_tool_certificate_service
 from tests._engine import make_test_engine
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
@@ -246,34 +253,49 @@ async def _issue(eng: AsyncEngine, approval_id: str) -> None:
     async with AsyncSession(eng, expire_on_commit=False) as db:
         approval = await db.get(Approval, approval_id)
         assert approval is not None
-        execution_repo = SqlWorkflowExecutionRepository(
+        service = build_mcp_tool_certificate_service(
             db, tenant_id=DEFAULT_TEST_TENANT_ID
         )
-        service = ApprovalCertificateService(
-            SqlApprovalCertificateRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID),
-            SqlWorkflowTaskRepository(
-                db,
-                execution_repo,
-                SqlMCPServerRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID),
-                tenant_id=DEFAULT_TEST_TENANT_ID,
-            ),
-            SqlMcpCertificateAuthorityRepository(db),
-            get_secret_cipher(),
-        )
         await service.issue(approval, user_id=SYSTEM_USER_ID)
+
+
+async def _grant(eng: AsyncEngine, execution_id: str, task_id: str) -> None:
+    """Take out the run initiator's own grant, as starting the task does.
+
+    Stands in for the ``_settle_certificate`` call both task-write paths make;
+    the tests here seed tasks straight into the table, so nothing would
+    otherwise issue the certificate a started task normally carries.
+    """
+    async with AsyncSession(eng, expire_on_commit=False) as db:
+        service = build_mcp_tool_certificate_service(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        )
+        executions = SqlWorkflowExecutionRepository(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        )
+        tasks = SqlWorkflowTaskRepository(
+            db,
+            executions,
+            SqlMCPServerRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID),
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+        )
+        execution = await executions.get(execution_id)
+        task = await tasks.get(task_id)
+        assert execution is not None and task is not None
+        await service.issue_for_started_task(task, execution, user_id=SYSTEM_USER_ID)
 
 
 async def _revoke(eng: AsyncEngine, approval_id: str) -> None:
     """Revoke the certificate issued for an approval."""
     async with AsyncSession(eng, expire_on_commit=False) as db:
         result = await db.exec(
-            select(ApprovalCertificate).where(
-                ApprovalCertificate.approval_id == approval_id
+            select(McpToolCertificate).where(
+                McpToolCertificate.approval_id == approval_id
             )
         )
         certificate = result.first()
         assert certificate is not None
-        await SqlApprovalCertificateRepository(
+        await SqlMcpToolCertificateRepository(
             db, tenant_id=DEFAULT_TEST_TENANT_ID
         ).revoke(certificate.id, RevocationReason.task_finished, user_id=SYSTEM_USER_ID)
 
@@ -361,7 +383,7 @@ async def test_call_is_denied_without_a_certificate_once_an_approval_exists(
     await _seed_approval(engine, execution_id=execution_id, task_id=task_id)
     # Deliberately not issued.
 
-    with pytest.raises(McpPolicyDeniedError, match="requires an approval"):
+    with pytest.raises(McpPolicyDeniedError, match="no tool certificate"):
         await _call(server_id)
 
 
@@ -379,7 +401,7 @@ async def test_call_is_denied_while_the_approval_is_still_pending(
         status=ApprovalStatus.pending,
     )
 
-    with pytest.raises(McpPolicyDeniedError, match="requires an approval"):
+    with pytest.raises(McpPolicyDeniedError, match="no tool certificate"):
         await _call(server_id)
 
 
@@ -419,8 +441,8 @@ async def test_call_is_denied_once_the_certificate_is_revoked(
     await _revoke(engine, approval_id)
 
     # With the certificate revoked the presenter finds none, so the caller gets
-    # the "needs an approval" denial rather than a revocation-specific one.
-    with pytest.raises(McpPolicyDeniedError, match="requires an approval"):
+    # the "no certificate" denial rather than a revocation-specific one.
+    with pytest.raises(McpPolicyDeniedError, match="no tool certificate"):
         await _call(server_id)
 
 
@@ -459,7 +481,7 @@ async def test_an_asking_step_in_front_of_the_acting_task_still_gates_it(
         status=ApprovalStatus.pending,
     )
 
-    with pytest.raises(McpPolicyDeniedError, match="requires an approval"):
+    with pytest.raises(McpPolicyDeniedError, match="no tool certificate"):
         await _call(server_id)
 
     async with AsyncSession(engine) as db:
@@ -474,7 +496,7 @@ async def test_an_asking_step_in_front_of_the_acting_task_still_gates_it(
 
     assert (await _call(server_id)).isError is False
     async with AsyncSession(engine) as db:
-        certificate = await SqlApprovalCertificateRepository(
+        certificate = await SqlMcpToolCertificateRepository(
             db, tenant_id=DEFAULT_TEST_TENANT_ID
         ).get_live_for_task(acting)
     assert certificate is not None
@@ -595,39 +617,165 @@ async def test_a_certificate_from_another_run_is_refused(
 
 
 # ---------------------------------------------------------------------------
-# Compatibility
+# The initiator's own grant
 # ---------------------------------------------------------------------------
 
 
-async def test_task_without_an_approval_still_works(engine: AsyncEngine) -> None:
-    """Workflows that never request an approval are untouched by the gate."""
+async def test_task_without_an_approval_calls_on_its_initiators_grant(
+    engine: AsyncEngine,
+) -> None:
+    """A task nobody approved still calls -- on the run initiator's authority."""
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    await _grant(engine, execution_id, task_id)
+
+    result = await _call(server_id)
+
+    assert result.isError is False
+    async with AsyncSession(engine) as db:
+        certificate = await SqlMcpToolCertificateRepository(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        ).get_live_for_task(task_id)
+    assert certificate is not None
+    assert certificate.grant_kind is CertificateGrant.initiator
+    assert certificate.approval_id is None
+    assert certificate.granted_by == "owner"
+
+
+async def test_a_task_with_no_grant_at_all_cannot_call(engine: AsyncEngine) -> None:
+    """The rule with no exemption: a bound tool alone authorizes nothing.
+
+    This is the case that used to be allowed -- an in-progress task binding the
+    tool, with no approval anywhere near it -- and closing it is the point of
+    requiring a certificate on every call.
+    """
     server_id = await _seed_server(engine)
     execution_id = await _seed_execution(engine)
     await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
 
-    result = await _call(server_id, present_credential=False)
+    with pytest.raises(McpPolicyDeniedError, match="no tool certificate"):
+        await _call(server_id)
 
-    assert result.isError is False
+
+async def test_widening_bindings_after_the_grant_does_not_widen_it(
+    engine: AsyncEngine,
+) -> None:
+    """The freeze applies to an initiator grant exactly as to an approved one.
+
+    The agent starts a task, then binds another tool to it and tries to call
+    that. The grant was signed over the bindings the task had when it started.
+    """
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    await _grant(engine, execution_id, task_id)
+
+    await _bind_tool(engine, task_id, server_id, "delete_everything")
+
+    with pytest.raises(McpPolicyDeniedError, match="was not granted"):
+        await _call(server_id, tool="delete_everything")
+
+    assert (await _call(server_id)).isError is False
 
 
-async def test_an_unapproved_task_binding_the_same_tool_keeps_it_callable(
+async def test_a_grant_is_not_issued_for_a_task_that_has_an_approval(
+    engine: AsyncEngine,
+) -> None:
+    """A task with an approval is the approver's to authorize, not the initiator's.
+
+    Otherwise a run could start a task, pocket its initiator grant, and only
+    then request the approval it was supposed to be waiting for.
+    """
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        status=ApprovalStatus.pending,
+    )
+
+    await _grant(engine, execution_id, task_id)
+
+    async with AsyncSession(engine) as db:
+        certificate = await SqlMcpToolCertificateRepository(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        ).get_live_for_task(task_id)
+    assert certificate is None
+    with pytest.raises(McpPolicyDeniedError, match="no tool certificate"):
+        await _call(server_id)
+
+
+async def test_an_approval_arriving_later_stands_the_initiator_grant_down(
+    engine: AsyncEngine,
+) -> None:
+    """The other order: the task starts first, the approval is requested after.
+
+    The policy refuses the standing initiator grant on its own -- this asserts
+    that, not merely that ``supersede_initiator_grant`` stamped the row.
+    """
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    await _grant(engine, execution_id, task_id)
+    assert (await _call(server_id)).isError is False
+
+    await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        status=ApprovalStatus.pending,
+    )
+
+    with pytest.raises(McpPolicyDeniedError, match="now needs an approval"):
+        await _call(server_id)
+
+
+async def test_an_initiator_grant_naming_the_wrong_user_is_refused(
+    engine: AsyncEngine,
+) -> None:
+    """The claimed initiator is compared against the run's own ``initiator_id``."""
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    await _grant(engine, execution_id, task_id)
+
+    async with AsyncSession(engine) as db:
+        execution = await db.get(WorkflowExecution, execution_id)
+        assert execution is not None
+        execution.initiator_id = "alice"
+        db.add(execution)
+        await db.commit()
+
+    with pytest.raises(McpPolicyDeniedError, match="not granted by this run"):
+        await _call(server_id)
+
+
+async def test_a_second_task_binding_the_same_tool_supplies_its_own_grant(
     engine: AsyncEngine,
 ) -> None:
     """The gate is per-tool, not per-run.
 
     Two tasks are underway and both bind this tool; only one needs an approval.
-    The other legitimately authorizes the call under the plain binding rule, so
-    demanding a certificate would break a workflow that never asked for one.
+    The other carries its initiator's grant, which legitimately authorizes the
+    call -- so a workflow that never asked for an approval keeps working, and
+    the certificate it presents is that task's, not the gated one's.
     """
     server_id = await _seed_server(engine)
     execution_id = await _seed_execution(engine)
     gated_task = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
-    await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    open_task = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
     await _seed_approval(engine, execution_id=execution_id, task_id=gated_task)
+    await _grant(engine, execution_id, open_task)
 
-    result = await _call(server_id, present_credential=False)
+    result = await _call(server_id)
 
     assert result.isError is False
+    row = (await _invocations(engine))[0]
+    assert row.workflow_task_id == open_task
+    assert row.approval_id is None
 
 
 async def test_unbound_tool_is_still_refused_by_the_binding_policy(
@@ -636,10 +784,11 @@ async def test_unbound_tool_is_still_refused_by_the_binding_policy(
     """The cheaper rule still runs first and still produces its own message."""
     server_id = await _seed_server(engine)
     execution_id = await _seed_execution(engine)
-    await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    task_id = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    await _grant(engine, execution_id, task_id)
 
     with pytest.raises(McpPolicyDeniedError, match="is not bound to"):
-        await _call(server_id, tool="something_else", present_credential=False)
+        await _call(server_id, tool="something_else")
 
 
 # ---------------------------------------------------------------------------
@@ -696,23 +845,28 @@ async def test_a_denied_call_is_recorded_with_the_reason(engine: AsyncEngine) ->
     rows = await _invocations(engine)
     assert len(rows) == 1
     assert rows[0].decision is McpAuditDecision.denied
-    assert "requires an approval" in (rows[0].denial_reason or "")
+    assert "no tool certificate" in (rows[0].denial_reason or "")
     assert rows[0].certificate_serial is None
 
 
 async def test_a_call_without_a_certificate_is_still_recorded(
     engine: AsyncEngine,
 ) -> None:
-    """An unauthenticated call is still tied to what it asked for."""
+    """A call presenting nothing is refused, and still tied to what it asked for.
+
+    The row is what makes the refusal investigable: it names the tool and the
+    arguments digest even though no certificate identified the caller.
+    """
     server_id = await _seed_server(engine)
     execution_id = await _seed_execution(engine)
     await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
 
-    await _call(server_id, present_credential=False)
+    with pytest.raises(McpPolicyDeniedError):
+        await _call(server_id, present_credential=False)
 
     rows = await _invocations(engine)
     assert len(rows) == 1
-    assert rows[0].decision is McpAuditDecision.allowed
+    assert rows[0].decision is McpAuditDecision.denied
     assert rows[0].certificate_serial is None
     assert rows[0].signature is None
     assert rows[0].arguments_digest
@@ -722,9 +876,10 @@ async def test_arguments_are_recorded_only_as_a_digest(engine: AsyncEngine) -> N
     """Tool arguments carry the very data the approval was needed for."""
     server_id = await _seed_server(engine)
     execution_id = await _seed_execution(engine)
-    await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    task_id = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    await _grant(engine, execution_id, task_id)
 
-    await _call(server_id, arguments={"secret": "hunter2"}, present_credential=False)
+    await _call(server_id, arguments={"secret": "hunter2"})
 
     row = (await _invocations(engine))[0]
     assert "hunter2" not in row.model_dump_json()
@@ -770,7 +925,7 @@ async def test_a_recorded_call_can_be_verified_from_the_audit_row_alone(
     assert row.certificate_serial is not None
 
     async with AsyncSession(engine) as db:
-        certificates = SqlApprovalCertificateRepository(
+        certificates = SqlMcpToolCertificateRepository(
             db, tenant_id=DEFAULT_TEST_TENANT_ID
         )
         stored = await certificates.get_by_serial(row.certificate_serial)
@@ -817,13 +972,14 @@ async def test_an_audit_failure_does_not_break_the_call(
     """A broken sink must not turn an allowed call into a refused one."""
     server_id = await _seed_server(engine)
     execution_id = await _seed_execution(engine)
-    await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    task_id = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
+    await _grant(engine, execution_id, task_id)
 
     async def boom(*args: Any, **kwargs: Any) -> None:
         raise RuntimeError("audit backend is down")
 
     monkeypatch.setattr(SqlMcpAuditSink, "record", boom)
 
-    result = await _call(server_id, present_credential=False)
+    result = await _call(server_id)
 
     assert result.isError is False

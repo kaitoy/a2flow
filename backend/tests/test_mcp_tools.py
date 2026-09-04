@@ -39,7 +39,12 @@ from models.workflow_task import (
 )
 from repositories.exceptions import McpConnectionError
 from tests._engine import make_test_engine
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+from tests._seed import (
+    DEFAULT_TEST_TENANT_ID,
+    grant_tool_certificate,
+    seed_tenant,
+    seed_users,
+)
 
 
 async def _seed_design_session(
@@ -207,7 +212,10 @@ async def _seed_task(
                 )
             )
         await db.commit()
-        return task_id
+    # Seeding a task skips the service that would have granted it a certificate,
+    # without which every proxied call it makes is refused.
+    await grant_tool_certificate(eng, execution_id, task_id)
+    return task_id
 
 
 def _tool_result(

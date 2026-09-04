@@ -44,7 +44,12 @@ from models.workflow_task import (
     WorkflowTaskToolBinding,
 )
 from tests._engine import make_test_engine
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+from tests._seed import (
+    DEFAULT_TEST_TENANT_ID,
+    grant_tool_certificate,
+    seed_tenant,
+    seed_users,
+)
 
 
 @pytest_asyncio.fixture()
@@ -122,7 +127,9 @@ async def _seed_task(
     """Insert an ``in_progress`` WorkflowTask binding the given tools.
 
     A mocked MCP call is authorized before it is answered, so without one of
-    these the binding policy refuses it and the stub is never asked.
+    these the binding policy refuses it and the stub is never asked. The task is
+    granted its tool certificate here for the same reason: a mocked run
+    rehearses a real one's authorization, certificate included.
     """
     async with AsyncSession(eng) as db:
         task = WorkflowTask(
@@ -144,7 +151,8 @@ async def _seed_task(
                 )
             )
         await db.commit()
-        return task_id
+    await grant_tool_certificate(eng, execution_id, task_id)
+    return task_id
 
 
 def _snapshot(
@@ -486,8 +494,10 @@ async def test_mocked_call_on_an_approved_task_still_needs_the_certificate(
     """The certificate policy applies to a stubbed call too.
 
     A draft run that mocks the tool but *not* ``request_approval`` records a
-    real Approval, and the call must then carry that approval's certificate.
-    None was issued here, so the call is refused rather than quietly stubbed.
+    real Approval, and the call must then carry that approval's certificate --
+    the grant the run's initiator was already holding for the task stops
+    counting the moment the approval attaches. None was issued here, so the call
+    is refused rather than quietly stubbed.
     """
     server_id = await _seed_server(engine)
     execution_id = await _seed_mocked_run(
@@ -510,7 +520,7 @@ async def test_mocked_call_on_an_approved_task_still_needs_the_certificate(
         await db.commit()
     result = await call_mcp_tool(server_id, "search", {}, _ctx())
     assert "error" in result
-    assert "approval certificate" in result["error"]
+    assert "needs an approval" in result["error"]
     assert "mocked" not in result
 
 

@@ -1,13 +1,13 @@
-"""Tests for the admin-only tenant-wide ``/approval-certificates`` List/Get API.
+"""Tests for the admin-only tenant-wide ``/mcp-tool-certificates`` List/Get API.
 
 Certificates are minted only by
-:class:`services.approval_certificate.ApprovalCertificateService` when an
+:class:`services.mcp_tool_certificate.McpToolCertificateService` when an
 approval is granted, so every row here is created by driving a real approval
 decision through the API rather than by inserting one -- which is also what
 makes the parsed ``allowedTools`` assertions meaningful: they come back out of a
 genuinely signed certificate.
 
-Distinct from ``tests/test_approval_certificate.py``, which covers issuance,
+Distinct from ``tests/test_mcp_tool_certificate.py``, which covers issuance,
 revocation, and the per-approval ``GET /approvals/{id}/certificate``. This file
 covers only the audit surface: its role gate, tenant scoping, and that key
 material stays out of both the payload and the query surface.
@@ -34,7 +34,7 @@ from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
 
-_PATH = "/api/v1/approval-certificates"
+_PATH = "/api/v1/mcp-tool-certificates"
 
 #: A second tenant used by the isolation tests.
 OTHER_TENANT_ID = "tenant-other"

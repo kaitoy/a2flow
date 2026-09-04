@@ -18,7 +18,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 export const AUDIT_TABS = [
   { value: "tool-invocations", label: "Tool Invocations" },
   { value: "impersonations", label: "Impersonations" },
-  { value: "approval-certificates", label: "Certificates" },
+  { value: "tool-certificates", label: "Certificates" },
   { value: "outbound-emails", label: "Emails" },
 ] as const;
 

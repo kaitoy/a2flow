@@ -9,11 +9,11 @@ import type {
   AgentSkillUpdate,
   ApiError,
   ApiMeta,
-  ApprovalCertificateRead,
   Approval as ApprovalModel,
   ApprovalStatus,
   ApprovalUpdate,
   AvatarConfig,
+  CertificateGrant,
   ExecuteWorkflowRequest,
   GenerateWorkflowRequest,
   ImpersonationEventRead,
@@ -26,6 +26,7 @@ import type {
   McpServerCreate,
   McpServerRead as McpServerModel,
   McpServerUpdate,
+  McpToolCertificateRead,
   McpToolInfo,
   McpToolInvocation as McpToolInvocationModel,
   McpToolMockCreate,
@@ -109,10 +110,10 @@ import {
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
   zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
   zGetApprovalCertificateApiV1ApprovalsApprovalIdCertificateGetResponse,
-  zGetApprovalCertificateByIdApiV1ApprovalCertificatesCertificateIdGetResponse,
   zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse,
   zGetImpersonationEventApiV1ImpersonationEventsEventIdGetResponse,
   zGetMcpServerApiV1McpServersServerIdGetResponse,
+  zGetMcpToolCertificateByIdApiV1McpToolCertificatesCertificateIdGetResponse,
   zGetMcpToolInvocationApiV1McpToolInvocationsInvocationIdGetResponse,
   zGetMcpToolMockApiV1McpToolMocksMockIdGetResponse,
   zGetOutboundEmailApiV1OutboundEmailsEmailIdGetResponse,
@@ -130,12 +131,12 @@ import {
   zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
   zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse,
   zListAgentSkillsApiV1AgentSkillsGetResponse,
-  zListApprovalCertificatesApiV1ApprovalCertificatesGetResponse,
   zListApprovalsApiV1ApprovalsGetResponse,
   zListGroupsForUserApiV1UsersUserIdGroupsGetResponse,
   zListImpersonationEventsApiV1ImpersonationEventsGetResponse,
   zListMcpServersApiV1McpServersGetResponse,
   zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse,
+  zListMcpToolCertificatesApiV1McpToolCertificatesGetResponse,
   zListMcpToolInvocationsApiV1McpToolInvocationsGetResponse,
   zListMcpToolMocksApiV1McpToolMocksGetResponse,
   zListNotificationsApiV1NotificationsGetResponse,
@@ -469,7 +470,7 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
 
 export type AgentSkill = WithAudit<AgentSkillModel>;
 export type Approval = WithAudit<ApprovalModel>;
-export type ApprovalCertificate = WithAudit<ApprovalCertificateRead>;
+export type McpToolCertificate = WithAudit<McpToolCertificateRead>;
 export type McpServer = WithAudit<McpServerModel>;
 export type McpToolMock = WithAudit<McpToolMockModel>;
 export type McpToolInvocation = WithAudit<McpToolInvocationModel>;
@@ -497,10 +498,10 @@ export type Session = SessionModel;
 export type {
   AgentSkillCreate,
   AgentSkillUpdate,
-  ApprovalCertificateRead,
   ApprovalStatus,
   ApprovalUpdate,
   AvatarConfig,
+  CertificateGrant,
   GenerateWorkflowRequest,
   ImpersonationEventRead,
   LoginRequest,
@@ -511,6 +512,7 @@ export type {
   McpRegistryServerEntry,
   McpServerCreate,
   McpServerUpdate,
+  McpToolCertificateRead,
   McpToolInfo,
   McpToolMockCreate,
   McpToolMockUpdate,
@@ -908,35 +910,38 @@ export async function getImpersonationEvent(
 }
 
 /**
- * List the certificates issued for granted approvals (createdAt DESC by default).
+ * List the certificates authorizing tasks' MCP tool calls (createdAt DESC by default).
  *
- * Each row's `allowedTools` is parsed back out of the signed certificate, so it
- * can never disagree with what the approval actually authorized. Key material is
- * never part of the response.
+ * Every proxied tool call is backed by one of these, so the list spans both
+ * grant kinds: the ones approvers granted and the ones a run's initiator granted
+ * itself. Each row's `allowedTools` is parsed back out of the signed
+ * certificate, so it can never disagree with what was actually authorized. Key
+ * material is never part of the response.
  */
-export async function listApprovalCertificates(
+export async function listMcpToolCertificates(
   query: ListQuery = {}
-): Promise<ApprovalCertificate[]> {
+): Promise<McpToolCertificate[]> {
   return fetchEnvelope(
-    apiClient.get("/api/v1/approval-certificates", listConfig(query)),
-    zListApprovalCertificatesApiV1ApprovalCertificatesGetResponse
-  ) as Promise<ApprovalCertificate[]>;
+    apiClient.get("/api/v1/mcp-tool-certificates", listConfig(query)),
+    zListMcpToolCertificatesApiV1McpToolCertificatesGetResponse
+  ) as Promise<McpToolCertificate[]>;
 }
 
 /**
- * Fetch a single approval certificate by its own ID.
+ * Fetch a single tool certificate by its own ID.
  *
- * Distinct from {@link getApprovalCertificate}, which reaches the same record
- * through the approval it was issued for.
+ * Distinct from {@link getApprovalCertificate}, which reaches an approval-backed
+ * record through the approval it was issued for and cannot see the ones a run's
+ * initiator granted itself.
  */
-export async function getApprovalCertificateById(
+export async function getMcpToolCertificateById(
   id: string,
   config?: AxiosRequestConfig
-): Promise<ApprovalCertificate> {
+): Promise<McpToolCertificate> {
   return fetchEnvelope(
-    apiClient.get(`/api/v1/approval-certificates/${encodeURIComponent(id)}`, config),
-    zGetApprovalCertificateByIdApiV1ApprovalCertificatesCertificateIdGetResponse
-  ) as Promise<ApprovalCertificate>;
+    apiClient.get(`/api/v1/mcp-tool-certificates/${encodeURIComponent(id)}`, config),
+    zGetMcpToolCertificateByIdApiV1McpToolCertificatesCertificateIdGetResponse
+  ) as Promise<McpToolCertificate>;
 }
 
 /** List the outgoing notification-email queue (createdAt DESC by default). */
@@ -1871,11 +1876,11 @@ export async function getApproval(id: string, config?: AxiosRequestConfig): Prom
 export async function getApprovalCertificate(
   id: string,
   config?: AxiosRequestConfig
-): Promise<ApprovalCertificateRead> {
+): Promise<McpToolCertificateRead> {
   return fetchEnvelope(
     apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}/certificate`, config),
     zGetApprovalCertificateApiV1ApprovalsApprovalIdCertificateGetResponse
-  ) as Promise<ApprovalCertificateRead>;
+  ) as Promise<McpToolCertificateRead>;
 }
 
 /**

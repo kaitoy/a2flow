@@ -114,12 +114,12 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 ## MCP ツールと承認 {#mcp-tools-and-approvals}
 
-[承認](../guides/approvals.md#human-approval)が紐づいたタスクは、承認者が許可するまで、割り当てられた MCP ツールを呼べません。許可すると短命の X.509 証明書が発行され、MCP プロキシは証明書を提示しない呼び出しを拒否します。署名のルートは最初の使用時に生成され、ローカルシークレットと同じキーで暗号化して保存されるので、この機能を動かすためにここを設定する必要はありません。
+MCP ツールの呼び出しはどれも、そのタスク向けに発行された短命の X.509 証明書を提示しなければなりません。証明書が出るのは、そのタスクの[承認](../guides/approvals.md#human-approval)が許可されたとき、あるいは誰にも承認を求めないタスクが始まったときです。署名のルートは最初の使用時に生成され、ローカルシークレットと同じキーで暗号化して保存されるので、この機能を動かすためにここを設定する必要はありません。
 
 | 変数 | 既定値 | 何を決めるか |
 |---|---|---|
-| `MCP_APPROVAL_CERT_TTL_SECONDS` | `3600` | 許可された承認の証明書が有効な時間。承認されたタスクがツールを呼べる窓の長さです |
-| `MCP_APPROVAL_CERT_SIGNATURE_WINDOW_SECONDS` | `60` | プロキシ経由の各呼び出しに付く所持証明の署名について、許容する時刻のずれ |
+| `MCP_TOOL_CERT_TTL_SECONDS` | `3600` | タスクの証明書が有効な時間。そのタスクがツールを呼べる窓の長さです |
+| `MCP_TOOL_CERT_SIGNATURE_WINDOW_SECONDS` | `60` | プロキシ経由の各呼び出しに付く所持証明の署名について、許容する時刻のずれ |
 | `MCP_CA_COMMON_NAME` / `MCP_CA_VALIDITY_DAYS` | `A2Flow MCP Approval CA` / `3650` | 生成されるルートのサブジェクトと有効期間。ルートの初回生成時にだけ読まれ、あとから変えても既存のルートには影響しません |
 | `MCP_REGISTRY_URL` | `https://registry.modelcontextprotocol.io` | [レジストリを見る](../guides/mcp-servers.md#registering-from-the-mcp-registry)ダイアログが検索するレジストリのベース URL |
 

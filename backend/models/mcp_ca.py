@@ -1,7 +1,7 @@
 """The internal certificate authority that signs MCP approval certificates.
 
 A2Flow issues one short-lived X.509 certificate per approved workflow task (see
-:mod:`models.approval_certificate`) and requires it on every MCP ``call_tool``
+:mod:`models.mcp_tool_certificate`) and requires it on every MCP ``call_tool``
 that belongs to an approved task. Those certificates need an issuer, and this
 table holds it: a self-signed root whose private key never leaves the backend.
 
@@ -24,7 +24,7 @@ to any client. There is no read DTO because no route exposes a CA row; the
 public half is reachable through ``certificate_pem`` alone.
 
 Rotation is deliberately out of scope for this version. The ``active`` flag and
-the ``ca_id`` foreign key on :class:`models.approval_certificate.ApprovalCertificate`
+the ``ca_id`` foreign key on :class:`models.mcp_tool_certificate.McpToolCertificate`
 exist so a superseded root can be retired while the certificates it signed stay
 verifiable, but nothing writes a second row yet.
 """

@@ -13,7 +13,7 @@ Open **Audit Logs** in the admin sidebar. Four tabs sit above the table:
 |---|---|
 | **Tool Invocations** | One decision the tool proxy made about one tool call |
 | **Impersonations** | One session where an administrator acted as another user |
-| **Certificates** | The authority issued when one approval was granted |
+| **Certificates** | The authority behind each task's tool calls |
 | **Emails** | One notification message queued for delivery |
 
 Each list behaves like every other admin table — sorting, filtering, the column picker, paging — see [Admin UI](./admin-ui.md#the-list-screen). Clicking a row's first cell opens a read-only detail page that shows the long values a table cell clips.
@@ -22,7 +22,7 @@ Each list behaves like every other admin table — sorting, filtering, the colum
 
 The section is shown to **Admin** and **Super Admin** only. Everyone else gets an access-denied screen, and it does not appear in their sidebar.
 
-That is stricter than most sections, whose reads stay open to anyone signed in. These lists span every run, account and message in the tenant, so the participant-level access that lets you see *your own* run's records is not enough here. The narrower views remain where they were: a run's own tool calls are still on its [Tool Invocations](./workflow-executions.md#tool-invocations) page, and an approval's certificate is still on the [approval](./approvals.md) itself.
+That is stricter than most sections, whose reads stay open to anyone signed in. These lists span every run, account and message in the tenant, so the participant-level access that lets you see *your own* run's records is not enough here. The narrower views remain where they were: a run's own tool calls are still on its [Tool Invocations](./workflow-executions.md#tool-invocations) page, and an approval's certificate is still on the [approval](./approvals.md) itself — though only this list also shows the certificates granted to tasks nobody was asked to approve.
 
 A Super Admin sees whichever tenant the tenant switcher has selected, and can select **All tenants** to browse across all of them at once. In that mode each list gains a **Tenant** column.
 
@@ -36,7 +36,7 @@ The tool calls that reached the proxy, and what it decided about each: `allowed`
 | **Decision** | `allowed` or `denied` |
 | **Denial Reason** | Why a refused call was refused, in the rule's own words |
 | **Workflow Execution** | The run the call belonged to — links to it |
-| **Approval** / **Certificate** | Which approval authorized the call, when one did |
+| **Approval** / **Certificate** | The certificate the call presented, and the approval behind it when one granted it |
 | **Arguments Digest** | A fingerprint of what the call asked for |
 
 The arguments themselves are never stored — only the fingerprint the presented signature covers, which is what lets a recorded call be re-checked later without keeping what it carried. The detail page shows the full fingerprint, the signature, and the exact instant that was signed.
@@ -58,18 +58,27 @@ Rows are scoped by the **impersonated** account's tenant, not the actor's. That 
 
 ## Certificates
 
-What each granted approval actually authorized. A certificate is issued the moment an approval on a task is approved, and it is what lets that task call its bound tools — so this list is the record of tool authority granted and spent.
+What each task was actually authorized to call. Every tool call presents a certificate, so this list is the complete record of tool authority granted and spent — including the tasks nobody was asked to approve.
+
+A task is granted its certificate at one of two moments, and the **Authority** column says which:
+
+| Authority | Issued | Granted By |
+|---|---|---|
+| **Approver** | when an [approval](./approvals.md) on the task was granted | the approver who granted it |
+| **Run initiator** | when the task was marked **In Progress**, no approval having been requested | whoever started the run |
 
 | Column | Notes |
 |---|---|
 | **Serial** | Identifies the certificate — the value the Tool Invocations list shows against calls that presented it |
-| **Approval** | The approval it was issued for — links to it |
+| **Authority** | **Approver** or **Run initiator** — where the grant came from |
+| **Granted By** | The person it is attributed to |
+| **Approval** | The approval it was issued for, and a link to it. Empty for a run initiator's grant, which has no approval behind it |
 | **State** | **Live**, or **Revoked** once the authority is spent |
-| **Allowed Tools** | The tools this approval granted |
+| **Allowed Tools** | The tools this certificate grants |
 | **Not Before** / **Not After** | The window it is valid in |
 | **Revoked At** / **Revocation Reason** | When and why it stopped counting |
 
-**Allowed Tools** is read back out of the issued certificate itself rather than from a separate copy, so what this screen shows can never differ from what the approval actually authorized — even if the run's task bindings were rewritten afterwards. No key material is ever shown or downloadable.
+**Allowed Tools** is read back out of the issued certificate itself rather than from a separate copy, so what this screen shows can never differ from what was actually authorized — even if the run's task bindings were rewritten afterwards. No key material is ever shown or downloadable.
 
 ## Emails
 

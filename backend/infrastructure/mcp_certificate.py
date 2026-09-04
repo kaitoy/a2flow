@@ -11,17 +11,27 @@ URI entries rather than a custom extension -- A2Flow holds no private enterprise
 OID arc, and a made-up one would be indistinguishable from someone else's:
 
 ``urn:a2flow:binding:tenant/T/execution/E/task/K/approval/A``
-    Exactly one per certificate. Says which approval, on which task, of which
-    run, in which tenant this certificate speaks for. Verification compares
-    every segment against the context the proxy derived independently from the
-    ADK session id, so a certificate minted for one run is useless in another.
+``urn:a2flow:binding:tenant/T/execution/E/task/K/initiator/U``
+    Exactly one per certificate. Says which task, of which run, in which tenant
+    this certificate speaks for, and **where its authority came from**: an
+    approval a human granted (``approval/A``), or the run's own initiator
+    granting it to themselves (``initiator/U``) for a task nobody was asked to
+    approve. Verification compares every segment against the context the proxy
+    derived independently from the ADK session id, so a certificate minted for
+    one run is useless in another.
+
+    The two forms are not interchangeable. A task that has an approval attached
+    can only be authorized by that approval's certificate -- otherwise a run
+    could take out an initiator-granted certificate first and then request the
+    approval it was supposed to wait for.
 
 ``urn:a2flow:tool:SERVER/TOOL``
-    One per tool the approval granted, snapshotted from the task's
-    ``tool_bindings`` at the moment the approver decided. This is the frozen
-    grant: the execution agent can still rewrite a task's bindings mid-run
-    through ``update_workflow_task``, but the certificate it must present does
-    not change, so rewriting them cannot widen what it may call.
+    One per tool the grant covers, snapshotted from the task's
+    ``tool_bindings`` at the moment the approver decided, or at the moment the
+    task went ``in_progress``. This is the frozen grant: the execution agent can
+    still rewrite a task's bindings mid-run through ``update_workflow_task``,
+    but the certificate it must present does not change, so rewriting them
+    cannot widen what it may call.
 
 Both segments are percent-encoded. ``mcp_server_id`` is a UUID, but
 :data:`models.constraints.ToolName` places no character restriction on a tool
@@ -61,8 +71,18 @@ TOOL_URN_PREFIX = "urn:a2flow:tool:"
 #: against the new one.
 POP_CONTEXT = "a2flow-mcp-pop-v1"
 
-#: Ordered segment labels of the binding URN, e.g. ``tenant/T/execution/E/...``.
-_BINDING_LABELS = ("tenant", "execution", "task", "approval")
+#: Ordered segment labels every binding URN opens with, before the grantor.
+_BINDING_PREFIX_LABELS = ("tenant", "execution", "task")
+
+#: Final binding segment label when a human approver granted the authority.
+APPROVAL_LABEL = "approval"
+
+#: Final binding segment label when the run's initiator granted it themselves.
+INITIATOR_LABEL = "initiator"
+
+#: Message every malformed-binding rejection uses. One wording on purpose: which
+#: part of the URN was wrong is exactly the kind of detail a forger would like.
+_MALFORMED_BINDING = "Certificate binding URN is malformed"
 
 
 class CertificateVerificationError(Exception):
@@ -75,12 +95,42 @@ class CertificateVerificationError(Exception):
 
 @dataclass(frozen=True)
 class CertificateBinding:
-    """Which approval, task, run, and tenant a certificate speaks for."""
+    """Which task, run, and tenant a certificate speaks for, and who granted it.
+
+    ``approval_id`` and ``initiator_id`` are the two mutually exclusive forms
+    the grantor takes, checked here rather than at the call sites: this object
+    is built both when signing a certificate and when parsing one back out of a
+    presented leaf, and a binding naming two grantors -- or none -- must be
+    impossible to construct in either direction.
+
+    Attributes:
+        tenant_id: Tenant the run belongs to.
+        execution_id: The WorkflowExecution the certificate was issued within.
+        task_id: The task whose bound tools the certificate authorizes.
+        approval_id: The approval whose decision granted the authority, or
+            ``None`` when the run's initiator granted it themselves.
+        initiator_id: The run initiator who granted the authority to
+            themselves, or ``None`` when an approval granted it.
+    """
 
     tenant_id: str
     execution_id: str
     task_id: str
-    approval_id: str
+    approval_id: str | None = None
+    initiator_id: str | None = None
+
+    def __post_init__(self) -> None:
+        """Reject a binding that does not name exactly one grantor.
+
+        Raises:
+            CertificateVerificationError: If both ``approval_id`` and
+                ``initiator_id`` are set, or neither is.
+        """
+        if (self.approval_id is None) == (self.initiator_id is None):
+            raise CertificateVerificationError(
+                "A certificate binding names exactly one grantor: an approval "
+                "or a run initiator"
+            )
 
 
 @dataclass(frozen=True)
@@ -92,7 +142,7 @@ class CertificateClaims:
         allowed_tools: ``(mcp_server_id, tool_name)`` pairs the approval
             granted, frozen at decision time.
         serial_number: Decimal serial, matching
-            ``approval_certificates.serial_number``.
+            ``mcp_tool_certificates.serial_number``.
         not_before: Start of the validity window.
         not_after: End of the validity window.
     """
@@ -125,21 +175,23 @@ def build_binding_urn(binding: CertificateBinding) -> str:
     """Render a binding as its URN.
 
     Args:
-        binding: The tenant/execution/task/approval tuple.
+        binding: The tenant/execution/task tuple plus its single grantor.
 
     Returns:
-        The ``urn:a2flow:binding:...`` string.
+        The ``urn:a2flow:binding:...`` string, ending in either
+        ``approval/<id>`` or ``initiator/<id>``.
     """
-    values = (
-        binding.tenant_id,
-        binding.execution_id,
-        binding.task_id,
-        binding.approval_id,
-    )
+    if binding.approval_id is not None:
+        grantor_label, grantor_id = APPROVAL_LABEL, binding.approval_id
+    else:
+        # ``__post_init__`` guarantees the other half is set when this one is not.
+        grantor_label, grantor_id = INITIATOR_LABEL, binding.initiator_id or ""
+    values = (binding.tenant_id, binding.execution_id, binding.task_id)
     segments = [
         f"{label}/{quote(value, safe='')}"
-        for label, value in zip(_BINDING_LABELS, values, strict=True)
+        for label, value in zip(_BINDING_PREFIX_LABELS, values, strict=True)
     ]
+    segments.append(f"{grantor_label}/{quote(grantor_id, safe='')}")
     return BINDING_URN_PREFIX + "/".join(segments)
 
 
@@ -153,22 +205,37 @@ def parse_binding_urn(urn: str) -> CertificateBinding:
         The parsed binding.
 
     Raises:
-        CertificateVerificationError: If the URN is not a well-formed binding.
+        CertificateVerificationError: If the URN is not a well-formed binding,
+            including when its final segment names neither of the two
+            recognized grantors.
     """
     if not urn.startswith(BINDING_URN_PREFIX):
-        raise CertificateVerificationError("Certificate binding URN is malformed")
+        raise CertificateVerificationError(_MALFORMED_BINDING)
     parts = urn[len(BINDING_URN_PREFIX) :].split("/")
-    if len(parts) != 2 * len(_BINDING_LABELS):
-        raise CertificateVerificationError("Certificate binding URN is malformed")
+    if len(parts) != 2 * (len(_BINDING_PREFIX_LABELS) + 1):
+        raise CertificateVerificationError(_MALFORMED_BINDING)
     labels = tuple(parts[0::2])
     values = [unquote(value) for value in parts[1::2]]
-    if labels != _BINDING_LABELS or not all(values):
-        raise CertificateVerificationError("Certificate binding URN is malformed")
+    grantor_label = labels[-1]
+    if (
+        labels[:-1] != _BINDING_PREFIX_LABELS
+        or grantor_label not in (APPROVAL_LABEL, INITIATOR_LABEL)
+        or not all(values)
+    ):
+        raise CertificateVerificationError(_MALFORMED_BINDING)
+    tenant_id, execution_id, task_id, grantor_id = values
+    if grantor_label == APPROVAL_LABEL:
+        return CertificateBinding(
+            tenant_id=tenant_id,
+            execution_id=execution_id,
+            task_id=task_id,
+            approval_id=grantor_id,
+        )
     return CertificateBinding(
-        tenant_id=values[0],
-        execution_id=values[1],
-        task_id=values[2],
-        approval_id=values[3],
+        tenant_id=tenant_id,
+        execution_id=execution_id,
+        task_id=task_id,
+        initiator_id=grantor_id,
     )
 
 

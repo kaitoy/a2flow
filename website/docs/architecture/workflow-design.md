@@ -51,7 +51,7 @@ Choosing tools and calling them are governed differently, on purpose.
 | **Listing** what a server advertises | The design agent, while deciding | Not restricted — discovering tools is the whole point of a design run |
 | **Calling** a tool | The execution agent, mid-run | Restricted to the tools bound to a task the run currently has in progress — see [MCP proxy](./mcp-proxy.md) |
 
-So a binding written here is not a hint to the model. It is the grant the [proxy](./mcp-proxy.md) enforces at run time, and the set an [approval certificate](./approvals.md) freezes if the task turns out to need one.
+So a binding written here is not a hint to the model. It is the grant the [proxy](./mcp-proxy.md) enforces at run time, and the set the task's [certificate](./approvals.md) freezes the moment the task starts — or the moment its approval is granted, if it turns out to need one.
 
 ## Publishing
 

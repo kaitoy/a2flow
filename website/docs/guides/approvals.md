@@ -55,16 +55,18 @@ Only the designated approver may decide, with **no exception — not even a Supe
 
 ### What approval unlocks
 
-**The approval gate is enforced by the server, not by the agent.** A task with an approval attached cannot call any of its bound [MCP tools](./mcp-servers.md) until that approval is granted — the call is refused before it reaches the server. Granting the approval issues a short-lived **certificate** for the task, and every subsequent tool call from that task must present it. Tasks with no approval attached are unaffected and keep running under the ordinary [tool-binding rule](./workflows.md#mcp-tools-for-tasks).
+**The approval gate is enforced by the server, not by the agent.** A task with an approval attached cannot call any of its bound [MCP tools](./mcp-servers.md) until that approval is granted — the call is refused before it reaches the server. Granting the approval issues a short-lived **certificate** for the task, and every subsequent tool call from that task must present it.
+
+Every task needs such a certificate, not only the ones somebody was asked to approve. A task with no approval on it is granted one the moment it is marked **In Progress**, on the authority of whoever started the run — so the record always says who a tool call was made on behalf of, and there is no unattributed path to a tool. Approving a task simply replaces that with the approver's own authority.
 
 Two things this buys that an instruction to the model could not:
 
 - **A prompt injection or a bug cannot skip the approval.** The gate is a rule the server checks, not a sentence in the agent's instructions plus a frontend that declines to resume.
-- **The granted tools are frozen at the moment of decision.** The certificate carries the tools the task had bound when the approver clicked Approve. An agent can rewrite its own task's tool bindings mid-run, so a check that re-reads the bindings at call time is a check the agent could widen. Approving a task to read a file does not become approval to delete one.
+- **The granted tools are frozen at the moment the certificate is issued.** It carries the tools the task had bound when the approver clicked Approve — or, for a task nobody approved, when the task started. An agent can rewrite its own task's tool bindings mid-run, so a check that re-reads the bindings at call time is a check the agent could widen. Approving a task to read a file does not become approval to delete one, and a running task cannot pick up a tool it did not start with.
 
 Both halves — the pause and the unlocked tools — belong to **one task: the one that carries out the approved action**. A workflow often shows the request as a step of its own, as in "Request approval" followed by "Launch instance", and it is the second of those the approval covers, since that is where the tools are. A request that names a step with no tools of its own while a later step in the run has some is refused, so a run cannot end up with an approval that authorizes nothing.
 
-Every decided tool call — allowed or refused — is recorded on the run's [Tool Invocations](./workflow-executions.md#tool-invocations) page with the certificate it presented, so "which approval authorized this, and who granted it" can be answered afterwards.
+Every decided tool call — allowed or refused — is recorded on the run's [Tool Invocations](./workflow-executions.md#tool-invocations) page with the certificate it presented, so "who authorized this, and on what basis" can be answered afterwards.
 
 Nothing needs configuring for any of this; the certificate's lifetime is adjustable in the [configuration reference](../operations/configuration.md#mcp-tools-and-approvals).
 

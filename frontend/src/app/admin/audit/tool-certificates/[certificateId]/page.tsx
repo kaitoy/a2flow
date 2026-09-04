@@ -1,4 +1,4 @@
-/** @module AuditApprovalCertificateDetailPage — Read-only detail of one approval certificate. */
+/** @module AuditToolCertificateDetailPage — Read-only detail of one MCP tool certificate. */
 "use client";
 
 import { BadgeCheck } from "lucide-react";
@@ -17,35 +17,42 @@ import { Chip } from "@/components/ui/chip";
 import { DateTime } from "@/components/ui/date-time";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { StatusDot } from "@/components/ui/status-dot";
+import { useUserNames } from "@/hooks/useUserNames";
 import {
-  type ApprovalCertificate,
-  getApprovalCertificateById,
+  getMcpToolCertificateById,
   isForbiddenError,
   listMcpServers,
+  type McpToolCertificate,
   SUPPRESS_FORBIDDEN_TOAST,
 } from "@/lib/api";
+import { CERTIFICATE_GRANT_DOT_CLASS, CERTIFICATE_GRANT_LABEL } from "@/lib/certificate-grant";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
 /** Upper bound used to fetch the MCP server registry for tool-chip labels. */
 const SERVER_LIMIT = 1000;
 
 /**
- * Read-only detail of one approval certificate.
+ * Read-only detail of one MCP tool certificate.
  *
  * The granted tools are parsed back out of the signed certificate, so what this
- * page shows is what the approval actually authorized — not a separately stored
- * copy that could drift from it. Key material never reaches the client at all.
+ * page shows is what the task was actually authorized to call — not a separately
+ * stored copy that could drift from it. Key material never reaches the client at
+ * all.
  */
-export default function AuditApprovalCertificateDetailPage() {
+export default function AuditToolCertificateDetailPage() {
   const { certificateId } = useParams<{ certificateId: string }>();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
-  const [certificate, setCertificate] = useState<ApprovalCertificate | null>(null);
+  const [certificate, setCertificate] = useState<McpToolCertificate | null>(null);
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
+  // Resolved separately from AuditMeta's created/updated pair: the grantor is a
+  // claim of the certificate, not one of the record's audit fields.
+  const grantorNames = useUserNames(certificate ? [certificate.grantedBy] : []);
+  const grantorName = certificate ? grantorNames.get(certificate.grantedBy) : undefined;
 
   useEffect(() => {
     let active = true;
-    getApprovalCertificateById(certificateId, SUPPRESS_FORBIDDEN_TOAST)
+    getMcpToolCertificateById(certificateId, SUPPRESS_FORBIDDEN_TOAST)
       .then((c) => {
         if (active) setCertificate(c);
       })
@@ -74,7 +81,7 @@ export default function AuditApprovalCertificateDetailPage() {
   const breadcrumbItems = [
     { label: "Admin", href: "/admin" },
     { label: "Audit Logs", href: "/admin/audit" },
-    { label: "Certificates", href: "/admin/audit/approval-certificates" },
+    { label: "Certificates", href: "/admin/audit/tool-certificates" },
     { label: certificate?.serialNumber || "…" },
   ];
 
@@ -102,7 +109,7 @@ export default function AuditApprovalCertificateDetailPage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title="Approval Certificate" icon={BadgeCheck} />}
+        header={<AdminPageHeader title="Tool Certificate" icon={BadgeCheck} />}
         aside={
           <AuditMeta
             createdBy={certificate.createdBy}
@@ -143,14 +150,30 @@ export default function AuditApprovalCertificateDetailPage() {
               }
             />
             <DetailItem
+              label="Authority"
+              value={
+                <StatusDot
+                  dotClass={CERTIFICATE_GRANT_DOT_CLASS[certificate.grantKind]}
+                  label={CERTIFICATE_GRANT_LABEL[certificate.grantKind]}
+                />
+              }
+            />
+            <DetailItem label="Granted By" value={grantorName ?? certificate.grantedBy} />
+            <DetailItem
               label="Approval"
               value={
-                <Link
-                  href={`/admin/approvals/${certificate.approvalId}`}
-                  className="text-accent transition-colors hover:underline"
-                >
-                  {certificate.approvalId}
-                </Link>
+                certificate.approvalId ? (
+                  <Link
+                    href={`/admin/approvals/${certificate.approvalId}`}
+                    className="text-accent transition-colors hover:underline"
+                  >
+                    {certificate.approvalId}
+                  </Link>
+                ) : (
+                  // No approval record exists for a grant the run's initiator
+                  // gave itself.
+                  EMPTY_VALUE
+                )
               }
             />
             <DetailItem

@@ -47,8 +47,6 @@ from models.workflow_task import (
     WorkflowTaskUpdate,
 )
 from repositories import (
-    ApprovalCertificateRepository,
-    SqlApprovalCertificateRepository,
     SqlMCPServerRepository,
     SqlWorkflowExecutionRepository,
     SqlWorkflowTaskRepository,
@@ -71,6 +69,7 @@ if TYPE_CHECKING:
     # ``infrastructure.agent`` -> this module, a cycle at import time. The
     # runtime import is deferred into :func:`_scope`, the same way
     # :func:`_evaluate_completion` defers its own.
+    from services.mcp_tool_certificate import McpToolCertificateService
     from services.notification_dispatch import NotificationDispatcher
 
 logger = logging.getLogger(__name__)
@@ -99,7 +98,7 @@ class _Scope:
     tenant_id: str
     execution_repo: WorkflowExecutionRepository
     task_repo: WorkflowTaskRepository
-    certificate_repo: ApprovalCertificateRepository
+    certificates: "McpToolCertificateService"
     # Quoted so the dataclass does not evaluate the name at class-creation
     # time -- it only exists under TYPE_CHECKING (see the import above).
     notifications: "NotificationDispatcher"
@@ -160,6 +159,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
     Raises:
         NoTenantSessionError: If no WorkflowExecution is bound to the current run.
     """
+    from services.mcp_tool_certificate import build_mcp_tool_certificate_service
     from services.notification_dispatch import build_notification_dispatcher
 
     async with AsyncSession(database.engine) as db:
@@ -175,7 +175,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
                 SqlMCPServerRepository(db, tenant_id=tenant_id),
                 tenant_id=tenant_id,
             ),
-            certificate_repo=SqlApprovalCertificateRepository(db, tenant_id=tenant_id),
+            certificates=build_mcp_tool_certificate_service(db, tenant_id=tenant_id),
             notifications=build_notification_dispatcher(db, tenant_id=tenant_id),
         )
 
@@ -271,40 +271,42 @@ async def _evaluate_completion(scope: _Scope) -> None:
     )
 
 
-async def _revoke_certificate_if_finished(
+async def _settle_certificate(
     scope: _Scope, task: WorkflowTaskRead, user_id: str
 ) -> None:
-    """Revoke the task's approval certificate once the task has finished.
+    """Bring the task's tool certificate in line with the status it now has.
 
-    The counterpart of the same call in
-    :meth:`services.workflow_task.WorkflowTaskService.update`, which only covers
-    the REST path. The execution agent drives a run's statuses through
-    :func:`update_workflow_task` instead, so without this a normal run's
-    certificates would never be revoked and would simply age out at their TTL.
+    The counterpart of
+    :meth:`services.workflow_task.WorkflowTaskService._settle_certificate`,
+    which only covers the REST path. The execution agent drives a run's statuses
+    through :func:`create_workflow_task` and :func:`update_workflow_task`
+    instead, so without this a normal run's tasks would never be granted a
+    certificate at all -- and every MCP call they made would be refused.
 
     Best-effort, unlike the service's version. The status write has already
     committed by the time this runs, so raising here would report a failure for
-    a write that succeeded and could derail the run. Nothing about the gate
-    depends on it either: a finished task is no longer ``in_progress``, so
-    ``InProgressToolBindingPolicy`` already refuses its calls. What revoking
-    adds is that the audit trail records *why* the certificate stopped counting.
-
-    The import is deferred to call time for the same reason
-    :func:`_evaluate_completion` defers its own -- reaching into ``services`` at
-    module import time closes a cycle back through ``infrastructure.agent``.
+    a write that succeeded and could derail the run. A failure to *issue* leaves
+    the task unable to call its tools, which the denial message explains and the
+    agent can recover from by starting the task again; a failure to *revoke*
+    costs nothing the gate depends on, since a finished task is no longer
+    ``in_progress`` and ``InProgressToolBindingPolicy`` already refuses its
+    calls.
 
     Args:
-        scope: The current tool call's resolved run and repositories.
+        scope: The current tool call's resolved run and services.
         task: The task as it stands after the write.
-        user_id: The acting user, recorded as ``updated_by``.
+        user_id: The acting user, recorded on the certificate's audit fields.
     """
-    from services.approval_certificate import revoke_if_task_finished
-
     try:
-        await revoke_if_task_finished(scope.certificate_repo, task, user_id=user_id)
+        execution = await scope.execution_repo.get(scope.execution_id)
+        if execution is not None:
+            await scope.certificates.issue_for_started_task(
+                task, execution, user_id=user_id
+            )
+        await scope.certificates.revoke_if_task_finished(task, user_id=user_id)
     except Exception:
         logger.exception(
-            "failed to revoke the approval certificate of finished task %s", task.id
+            "failed to settle the MCP tool certificate of task %s", task.id
         )
 
 
@@ -458,7 +460,10 @@ async def create_workflow_task(
         tool_bindings: Optional MCP tools to bind to the task, each
             ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``.
             Bound tools are the only MCP tools the task may invoke via
-            ``call_mcp_tool`` while in progress.
+            ``call_mcp_tool`` while in progress. **Bind every tool the task
+            needs before or in the same call that marks it "in_progress"**: the
+            task's permission to call tools is fixed at that moment, so a tool
+            bound afterwards cannot be called.
 
     Returns:
         The created task dict, or ``{"error": <message>}`` on an invalid status,
@@ -480,7 +485,11 @@ async def create_workflow_task(
                 status=status_enum or WorkflowTaskStatus.pending,
                 tool_bindings=bindings,
             )
-            task = await s.task_repo.create(data, user_id=_user_id(tool_context))
+            acting_user_id = _user_id(tool_context)
+            task = await s.task_repo.create(data, user_id=acting_user_id)
+            # A task can be created already in_progress, which is the same edge
+            # ``update_workflow_task`` handles -- just at insert time instead.
+            await _settle_certificate(s, task, acting_user_id)
             return _task_to_dict(task)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
@@ -552,7 +561,9 @@ async def update_workflow_task(
     Only the arguments you pass are changed. Use ``status`` to drive the
     lifecycle (``pending`` -> ``in_progress`` -> ``completed``/``failed``/
     ``skipped``): mark a task ``in_progress`` before working on it and
-    ``completed``/``failed`` afterwards. Whenever you set ``status`` to
+    ``completed``/``failed`` afterwards. Marking it ``in_progress`` is also what
+    grants it permission to call the MCP tools bound to it *at that moment*, so
+    bind them first. Whenever you set ``status`` to
     "failed", also pass ``error_kind`` and ``error_message`` so the failure can
     be triaged later. Passing ``depends_on_ids`` replaces the task's full
     dependency set, letting you edit the DAG after creation; ``tool_bindings``
@@ -583,7 +594,12 @@ async def update_workflow_task(
             if changing.
         tool_bindings: Replacement MCP tool bindings, each
             ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``,
-            if changing.
+            if changing. **Only takes effect while the task is not yet
+            "in_progress"**, or if passed in the same call that starts it: the
+            task's permission to call tools is fixed the moment it becomes
+            "in_progress", so a tool bound after that is rejected by
+            ``call_mcp_tool``. To widen a running task's tools, set it back to
+            "pending", pass the new bindings, then start it again.
 
     Returns:
         The updated task dict, or ``{"error": <message>}`` on an invalid status
@@ -630,8 +646,9 @@ async def update_workflow_task(
                 )
             except NotFoundError:
                 return _not_in_session_error(task_id)
-            # A finished task's approval certificate has outlived its purpose.
-            await _revoke_certificate_if_finished(s, task, acting_user_id)
+            # A task that just started needs a tool certificate; one that
+            # just finished no longer needs the certificate it had.
+            await _settle_certificate(s, task, acting_user_id)
             await _evaluate_completion(s)
             return _task_to_dict(task)
     except NoTenantSessionError:

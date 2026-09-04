@@ -13,13 +13,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.database import get_session
 from repositories import (
     AgentSkillRepository,
-    ApprovalCertificateRepository,
     ApprovalRepository,
     AuthSessionRepository,
     EffectiveRoleRepository,
     ImpersonationEventRepository,
     McpCertificateAuthorityRepository,
     MCPServerRepository,
+    McpToolCertificateRepository,
     McpToolInvocationRepository,
     MCPToolMockRepository,
     MessageMetaRepository,
@@ -28,13 +28,13 @@ from repositories import (
     OutboundEmailRepository,
     SecretRepository,
     SqlAgentSkillRepository,
-    SqlApprovalCertificateRepository,
     SqlApprovalRepository,
     SqlAuthSessionRepository,
     SqlEffectiveRoleRepository,
     SqlImpersonationEventRepository,
     SqlMcpCertificateAuthorityRepository,
     SqlMCPServerRepository,
+    SqlMcpToolCertificateRepository,
     SqlMcpToolInvocationRepository,
     SqlMcpToolMockRepository,
     SqlMessageMetaRepository,
@@ -277,27 +277,27 @@ OutboundEmailReadRepositoryDep = Annotated[
 ]
 
 
-def get_approval_certificate_repository(
+def get_mcp_tool_certificate_repository(
     db: DBSessionDep, tenant_id: CurrentTenantIdDep
-) -> ApprovalCertificateRepository:
-    """Create an ApprovalCertificateRepository backed by the current session."""
-    return SqlApprovalCertificateRepository(db, tenant_id=tenant_id)
+) -> McpToolCertificateRepository:
+    """Create an McpToolCertificateRepository backed by the current session."""
+    return SqlMcpToolCertificateRepository(db, tenant_id=tenant_id)
 
 
-ApprovalCertificateRepositoryDep = Annotated[
-    ApprovalCertificateRepository, Depends(get_approval_certificate_repository)
+McpToolCertificateRepositoryDep = Annotated[
+    McpToolCertificateRepository, Depends(get_mcp_tool_certificate_repository)
 ]
 
 
-def get_approval_certificate_read_repository(
+def get_mcp_tool_certificate_read_repository(
     db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> ApprovalCertificateRepository:
-    """Create an ApprovalCertificateRepository for a read route, possibly across all tenants."""
-    return SqlApprovalCertificateRepository(db, tenant_id=tenant_id)
+) -> McpToolCertificateRepository:
+    """Create an McpToolCertificateRepository for a read route, possibly across all tenants."""
+    return SqlMcpToolCertificateRepository(db, tenant_id=tenant_id)
 
 
-ApprovalCertificateReadRepositoryDep = Annotated[
-    ApprovalCertificateRepository, Depends(get_approval_certificate_read_repository)
+McpToolCertificateReadRepositoryDep = Annotated[
+    McpToolCertificateRepository, Depends(get_mcp_tool_certificate_read_repository)
 ]
 
 

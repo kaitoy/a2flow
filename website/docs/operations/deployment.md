@@ -79,6 +79,6 @@ Three things outlive a container and have to sit on durable storage for a deploy
 |---|---|---|
 | **The database** | The database named by `DB_URL` | Everything — every record lives there. See [Database](../architecture/database.md) |
 | **The agent skill store** | `SKILLS_DIR` | Executions cannot load the skill revision they are pinned to (HTTP 409 `SKILL_NOT_READY`). It is durable state, not a cache — see [Agent skill store](./configuration.md#agent-skill-store) |
-| **The secret encryption key** | `SECRET_ENCRYPTION_KEY`, or the file at `SECRET_KEY_FILE` | Every stored local secret becomes undecryptable, and the approval CA can no longer issue or verify certificates. See [Secret management](./configuration.md#secret-management) |
+| **The secret encryption key** | `SECRET_ENCRYPTION_KEY`, or the file at `SECRET_KEY_FILE` | Every stored local secret becomes undecryptable, and the certificate authority can no longer issue or verify the certificates every MCP tool call needs. See [Secret management](./configuration.md#secret-management) |
 
 How to take and restore each of them is in [Backup and restore](./backup.md).

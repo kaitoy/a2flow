@@ -11,10 +11,10 @@ would bury the calls that do. A call a draft run answers from its
 neither its approval nor its refusal is recorded -- a row either way would
 misdescribe what happened.
 
-**What makes it non-repudiable.** When the call presented an approval
-certificate, the row keeps the certificate's serial together with the exact
-bytes that were signed for it -- ``arguments_digest``, ``nonce``, ``signed_at``
--- and the signature itself. Anyone holding the root CA's public half can
+**What makes it non-repudiable.** Every allowed call presents a certificate,
+and the row keeps that certificate's serial together with the exact bytes that
+were signed for it -- ``arguments_digest``, ``nonce``, ``signed_at`` -- and the
+signature itself. Anyone holding the root CA's public half can
 recompute the digest and check the signature later, without the private key and
 without trusting this table. A tampered row stops verifying.
 
@@ -71,7 +71,9 @@ class McpToolInvocationCreate(SQLModel):
     #: Decimal serial of the presented certificate, or ``None`` when the call
     #: presented none.
     certificate_serial: str | None = None
-    #: The approval that certificate spoke for.
+    #: The approval that certificate spoke for, or ``None`` when the run's
+    #: initiator granted it themselves -- look the serial up in
+    #: ``mcp_tool_certificates`` for who that was.
     approval_id: str | None = None
     mcp_server_id: str
     tool_name: ToolName

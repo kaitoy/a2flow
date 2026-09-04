@@ -17,26 +17,28 @@ first.
 
 ``GET /approvals/{id}/certificate`` returns the X.509 certificate issued when
 the approval was granted -- the thing that actually lets the approved task call
-its bound MCP tools (see :mod:`models.approval_certificate`).
+its bound MCP tools (see :mod:`models.mcp_tool_certificate`). It reaches only
+approval-backed certificates; the tenant-wide audit surface that also spans the
+ones a run's initiator granted itself is ``GET /mcp-tool-certificates``.
 """
 
 from fastapi import APIRouter
 
 from dependencies import (
     ApiMetaDep,
-    ApprovalCertificateReadServiceDep,
     ApprovalReadServiceDep,
     ApprovalServiceDep,
     BacklogThresholdDep,
     CurrentUserDep,
     EffectiveRolesDep,
     FilterDep,
+    McpToolCertificateReadServiceDep,
     MetricsServiceDep,
     PaginationDep,
     SortDep,
 )
 from models.approval import Approval, ApprovalUpdate
-from models.approval_certificate import ApprovalCertificateRead
+from models.mcp_tool_certificate import McpToolCertificateRead
 from models.metrics import ApprovalBacklogEntry
 from models.response import ApiResponse
 
@@ -123,13 +125,13 @@ async def get_approval(
 
 
 @router.get(
-    "/{approval_id}/certificate", response_model=ApiResponse[ApprovalCertificateRead]
+    "/{approval_id}/certificate", response_model=ApiResponse[McpToolCertificateRead]
 )
 async def get_approval_certificate(
     approval_id: str,
-    service: ApprovalCertificateReadServiceDep,
+    service: McpToolCertificateReadServiceDep,
     meta: ApiMetaDep,
-) -> ApiResponse[ApprovalCertificateRead]:
+) -> ApiResponse[McpToolCertificateRead]:
     """Return the certificate issued when this approval was granted.
 
     Reports what the approval actually authorized: which tools, until when, and

@@ -281,10 +281,12 @@ export const IMPERSONATION_EVENT_1 = {
   targetTenantId: "tenant-1",
 };
 
-export const APPROVAL_CERTIFICATE_1 = {
+export const TOOL_CERTIFICATE_1 = {
   id: "certificate-1",
   tenantId: "tenant-1",
+  grantKind: "approval",
   approvalId: "appr-1",
+  grantedBy: "user-1",
   workflowExecutionId: "execution-1",
   workflowTaskId: "task-1",
   caId: "ca-1",
@@ -298,6 +300,14 @@ export const APPROVAL_CERTIFICATE_1 = {
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
   updatedBy: "",
+};
+
+export const TOOL_CERTIFICATE_INITIATOR = {
+  ...TOOL_CERTIFICATE_1,
+  id: "certificate-2",
+  grantKind: "initiator",
+  approvalId: null,
+  serialNumber: "987654321",
 };
 
 export const OUTBOUND_EMAIL_1 = {
@@ -651,10 +661,12 @@ export const handlers = [
     envelope({ ...IMPERSONATION_EVENT_1, id: params.eventId as string })
   ),
 
-  http.get(`${BASE}/api/v1/approval-certificates`, () => envelope([APPROVAL_CERTIFICATE_1])),
+  http.get(`${BASE}/api/v1/mcp-tool-certificates`, () =>
+    envelope([TOOL_CERTIFICATE_1, TOOL_CERTIFICATE_INITIATOR])
+  ),
 
-  http.get(`${BASE}/api/v1/approval-certificates/:certificateId`, ({ params }) =>
-    envelope({ ...APPROVAL_CERTIFICATE_1, id: params.certificateId as string })
+  http.get(`${BASE}/api/v1/mcp-tool-certificates/:certificateId`, ({ params }) =>
+    envelope({ ...TOOL_CERTIFICATE_1, id: params.certificateId as string })
   ),
 
   http.get(`${BASE}/api/v1/outbound-emails`, () => envelope([OUTBOUND_EMAIL_1])),

@@ -1,9 +1,12 @@
-"""Tests for issuing the certificate that carries a granted approval's authority.
+"""Tests for issuing the certificate that carries a task's MCP tool authority.
 
-The load-bearing case is `test_certificate_grant_is_frozen_at_decision_time`:
-the execution agent can rewrite a task's ``tool_bindings`` mid-run, and the
-whole point of signing the granted tools into the certificate is that doing so
-cannot widen what the task may call.
+Two issuance paths are covered: an approver granting an approval, and the run's
+initiator granting a task's tools to themselves when it goes ``in_progress``.
+The load-bearing cases are `test_certificate_grant_is_frozen_at_decision_time`
+and its initiator twin `test_an_initiator_grant_is_frozen_at_start`: the
+execution agent can rewrite a task's ``tool_bindings`` mid-run, and the whole
+point of signing the granted tools into the certificate is that doing so cannot
+widen what the task may call.
 """
 
 from collections.abc import AsyncGenerator
@@ -24,14 +27,19 @@ from infrastructure.mcp_certificate import extract_claims
 from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.workflow_task_tools import update_workflow_task
 from models.approval import Approval, ApprovalStatus
-from models.approval_certificate import ApprovalCertificate, RevocationReason
 from models.mcp_server import MCPServer, McpTransport
+from models.mcp_tool_certificate import (
+    CertificateGrant,
+    McpToolCertificate,
+    RevocationReason,
+)
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import (
     WorkflowTask,
     WorkflowTaskStatus,
     WorkflowTaskToolBinding,
 )
+from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
@@ -180,14 +188,12 @@ async def _insert_approval(
         return approval.id
 
 
-async def _certificates(
-    eng: AsyncEngine, approval_id: str
-) -> list[ApprovalCertificate]:
+async def _certificates(eng: AsyncEngine, approval_id: str) -> list[McpToolCertificate]:
     """Return every certificate row issued for an approval."""
     async with AsyncSession(eng) as db:
         result = await db.exec(
-            select(ApprovalCertificate).where(
-                ApprovalCertificate.approval_id == approval_id
+            select(McpToolCertificate).where(
+                McpToolCertificate.approval_id == approval_id
             )
         )
         return list(result.all())
@@ -419,7 +425,7 @@ async def test_validity_window_is_anchored_on_the_decision(
     await _decide(client, approval_id, "approved")
 
     certificate = (await _certificates(eng, approval_id))[0]
-    ttl = timedelta(seconds=get_settings().mcp_approval_cert_ttl_seconds)
+    ttl = timedelta(seconds=get_settings().mcp_tool_cert_ttl_seconds)
 
     # The certificate itself is what verification reads, so assert on it first.
     parsed = certificate_from_pem(certificate.certificate_pem)
@@ -684,3 +690,199 @@ async def test_the_agent_tool_leaves_an_unfinished_task_alone(
     assert "error" not in result, result
 
     assert (await _certificates(eng, approval_id))[0].revoked_at is None
+
+
+# ---------------------------------------------------------------------------
+# The initiator's own grant
+# ---------------------------------------------------------------------------
+
+
+async def _initiator_grant(
+    eng: AsyncEngine, execution_id: str, task_id: str
+) -> McpToolCertificate | None:
+    """Run the issuance path a task write takes and return what it produced."""
+    from repositories.mcp_server import SqlMCPServerRepository
+    from repositories.workflow_execution import SqlWorkflowExecutionRepository
+    from repositories.workflow_task import SqlWorkflowTaskRepository
+    from services.mcp_tool_certificate import build_mcp_tool_certificate_service
+
+    async with AsyncSession(eng, expire_on_commit=False) as db:
+        executions = SqlWorkflowExecutionRepository(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        )
+        tasks = SqlWorkflowTaskRepository(
+            db,
+            executions,
+            SqlMCPServerRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID),
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+        )
+        execution = await executions.get(execution_id)
+        task = await tasks.get(task_id)
+        assert execution is not None and task is not None
+        service = build_mcp_tool_certificate_service(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        )
+        return await service.issue_for_started_task(task, execution, user_id="owner")
+
+
+async def test_starting_a_task_grants_it_the_initiators_authority(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    _, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    task_id = await _seed_task(eng, execution_id, bindings=[(server_id, "read_file")])
+
+    certificate = await _initiator_grant(eng, execution_id, task_id)
+
+    assert certificate is not None
+    assert certificate.grant_kind is CertificateGrant.initiator
+    assert certificate.approval_id is None
+    # The run's initiator, not the user who happened to make the write.
+    assert certificate.granted_by == "owner"
+    claims = extract_claims(certificate_from_pem(certificate.certificate_pem))
+    assert claims.allowed_tools == frozenset({(server_id, "read_file")})
+    assert claims.binding.initiator_id == "owner"
+    assert claims.binding.approval_id is None
+
+
+@pytest.mark.parametrize(
+    ("status", "bindings_kind"),
+    [
+        (WorkflowTaskStatus.pending, "some"),
+        (WorkflowTaskStatus.completed, "some"),
+        (WorkflowTaskStatus.in_progress, "none"),
+    ],
+    ids=["not started", "already finished", "binds nothing"],
+)
+async def test_no_grant_is_issued_when_there_is_nothing_to_authorize(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+    status: WorkflowTaskStatus,
+    bindings_kind: str,
+) -> None:
+    """Three of the four no-op conditions, each for its own reason.
+
+    A task that has not started or has finished needs no tool authority, and one
+    binding no tools can call nothing anyway -- so a certificate for it would be
+    a row, a keypair, and an audit entry that authorize nothing.
+    """
+    _, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    bindings = [(server_id, "read_file")] if bindings_kind == "some" else []
+    task_id = await _seed_task(eng, execution_id, bindings=bindings, status=status)
+
+    assert await _initiator_grant(eng, execution_id, task_id) is None
+
+
+async def test_starting_a_task_twice_does_not_rotate_its_grant(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """The fourth no-op: an agent re-sending ``in_progress`` must change nothing.
+
+    Rotating would swap the key and the frozen tool set underneath a task that
+    is already calling against them.
+    """
+    _, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    task_id = await _seed_task(eng, execution_id, bindings=[(server_id, "read_file")])
+
+    first = await _initiator_grant(eng, execution_id, task_id)
+    assert first is not None
+
+    assert await _initiator_grant(eng, execution_id, task_id) is None
+
+
+async def test_an_initiator_grant_is_frozen_at_start(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Binding a tool after the task started does not extend its grant."""
+    _, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    task_id = await _seed_task(eng, execution_id, bindings=[(server_id, "read_file")])
+
+    certificate = await _initiator_grant(eng, execution_id, task_id)
+    assert certificate is not None
+    await _bind_tool(eng, task_id, server_id, "delete_everything")
+
+    claims = extract_claims(certificate_from_pem(certificate.certificate_pem))
+    assert claims.allowed_tools == frozenset({(server_id, "read_file")})
+    assert await _initiator_grant(eng, execution_id, task_id) is None
+
+
+async def test_a_task_with_an_approval_gets_no_initiator_grant(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """That task's authority is the approver's to grant, whatever its status."""
+    _, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    task_id = await _seed_task(eng, execution_id, bindings=[(server_id, "read_file")])
+    await _insert_approval(eng, execution_id=execution_id, task_id=task_id)
+
+    assert await _initiator_grant(eng, execution_id, task_id) is None
+
+
+async def test_granting_an_approval_stands_the_initiator_grant_down(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A task started before its approval was requested ends up with one grant.
+
+    The initiator's is revoked with a reason that says why, rather than left
+    live alongside the approver's.
+    """
+    client, eng = cert_env
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    task_id = await _seed_task(eng, execution_id, bindings=[(server_id, "read_file")])
+    initiator = await _initiator_grant(eng, execution_id, task_id)
+    assert initiator is not None
+
+    approval_id = await _insert_approval(
+        eng, execution_id=execution_id, task_id=task_id
+    )
+    await _decide(client, approval_id, "approved")
+
+    async with AsyncSession(eng) as db:
+        stood_down = await db.get(McpToolCertificate, initiator.id)
+        assert stood_down is not None
+        assert stood_down.revoked_at is not None
+        assert stood_down.revocation_reason is RevocationReason.superseded_by_approval
+    granted = await _certificates(eng, approval_id)
+    assert len(granted) == 1
+    assert granted[0].grant_kind is CertificateGrant.approval
+    assert granted[0].granted_by == "alice"
+
+
+async def test_the_agent_tool_grants_a_task_it_starts(
+    cert_env: tuple[AsyncClient, AsyncEngine],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The path a real run takes: ``update_workflow_task`` moves it to in_progress.
+
+    ``WorkflowTaskService`` covers the REST path only, so issuing there alone
+    would leave every agent-driven run -- which is every run -- unable to call
+    any tool at all.
+    """
+    _, eng = cert_env
+    monkeypatch.setattr("infrastructure.database.engine", eng)
+    execution_id = await _seed_execution(eng)
+    server_id = await _seed_mcp_server(eng)
+    task_id = await _seed_task(
+        eng,
+        execution_id,
+        bindings=[(server_id, "read_file")],
+        status=WorkflowTaskStatus.pending,
+    )
+
+    result = await update_workflow_task(task_id, _tool_context(), status="in_progress")
+
+    assert "error" not in result
+    async with AsyncSession(eng) as db:
+        certificate = await SqlMcpToolCertificateRepository(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        ).get_live_for_task(task_id)
+    assert certificate is not None
+    assert certificate.grant_kind is CertificateGrant.initiator

@@ -20,7 +20,6 @@ import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
   type Approval,
-  type ApprovalCertificateRead,
   getApproval,
   getApprovalCertificate,
   getUserGroup,
@@ -29,6 +28,7 @@ import {
   getWorkflowTask,
   isForbiddenError,
   listMcpServers,
+  type McpToolCertificateRead,
   SUPPRESS_FORBIDDEN_TOAST,
 } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
@@ -55,7 +55,7 @@ export default function ApprovalDetailPage() {
   const [executionName, setExecutionName] = useState<string | null>(null);
   const [taskTitle, setTaskTitle] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
-  const [certificate, setCertificate] = useState<ApprovalCertificateRead | null>(null);
+  const [certificate, setCertificate] = useState<McpToolCertificateRead | null>(null);
   const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
   const isAllTenantsView = useIsAllTenantsView();
 

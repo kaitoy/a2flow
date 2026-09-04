@@ -63,14 +63,17 @@ request?"
 
 </IntroAct>
 
-<IntroAct step="03 — Control" icon="control" title="Every tool call carries a signed approval">
+<IntroAct step="03 — Control" icon="control" title="Every tool call carries a signed grant">
 
 An [approval](./guides/approvals.md) is not advice the agent is asked to follow.
-Granting one mints a short-lived X.509 certificate over exactly the tools that
-task held at the moment of the decision, and the MCP proxy refuses any call that
-does not present it, signed. A prompt injection cannot talk its way past it, and
-the agent cannot widen it afterwards. Every call — allowed or refused — is
-recorded with the certificate's serial and the exact bytes signed for it.
+Every task that calls a tool holds a short-lived X.509 certificate over exactly
+the tools it held when that certificate was issued, and the MCP proxy refuses
+any call that does not present one, signed. Approving a task is what puts an
+approver's name on its certificate; a task nobody was asked to approve carries
+the authority of whoever started the run. A prompt injection cannot talk its way
+past either, and the agent cannot widen one afterwards. Every call — allowed or
+refused — is recorded with the certificate's serial and the exact bytes signed
+for it.
 
 </IntroAct>
 
@@ -89,7 +92,7 @@ hands everything in between to the agent.
 - **[Terminology](./concepts/terminology.md)** — workflows, design sessions, executions, and workflow sessions.
 - **[Agent Skills](./guides/agent-skills.md)** — the Git-backed procedures a workflow is designed from.
 - **[Workflows](./guides/workflows.md)** — generate a workflow from a skill, adjust it, publish it, run it.
-- **[Approvals](./guides/approvals.md)** — how a run stops for a person, and what the certificate authorizes.
+- **[Approvals](./guides/approvals.md)** — how a run stops for a person, and what a certificate authorizes.
 - **[Configuration reference](./operations/configuration.md)** — every environment variable the backend reads.
 
 </IntroNext>

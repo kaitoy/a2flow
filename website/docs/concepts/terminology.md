@@ -19,4 +19,4 @@ The concepts that carry most of the domain, worth keeping straight:
 | **[Agent Skill](../guides/agent-skills.md)** | A `SKILL.md` procedure in a Git repository, versioned like code; a workflow is generated from one, and a run executes its published revision. |
 | **[MCP server](../guides/mcp-servers.md)** | A registered Model Context Protocol server whose tools the agent can bind to a workflow's tasks. |
 | **[Secret](../guides/secrets.md)** | A named bundle of key/value credential entries, referenced elsewhere as `name/key` and resolved lazily at use time. |
-| **[Approval certificate](../guides/approvals.md#human-approval)** | The short-lived X.509 certificate minted when an approval is granted; it freezes the task's tool set at the moment of decision, and the MCP proxy refuses any tool call that does not present it, signed. |
+| **[Tool certificate](../guides/approvals.md#human-approval)** | The short-lived X.509 certificate a task must present on every MCP tool call. It freezes the task's tool set at the moment it is issued — when an approval is granted, or when a task nobody was asked to approve starts — and names whose authority it carries. |

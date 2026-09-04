@@ -4,13 +4,13 @@ from dependencies import get_current_user, verify_csrf
 from routers import (
     agent,
     agent_skills,
-    approval_certificates,
     approvals,
     auth,
     health,
     impersonation_events,
     mcp_registry,
     mcp_servers,
+    mcp_tool_certificates,
     mcp_tool_invocations,
     mcp_tool_mocks,
     metrics,
@@ -44,7 +44,7 @@ api_router.include_router(health.router)
 # Protected resource routers.
 api_router.include_router(agent.router, dependencies=_protected)
 api_router.include_router(agent_skills.router, dependencies=_protected)
-api_router.include_router(approval_certificates.router, dependencies=_protected)
+api_router.include_router(mcp_tool_certificates.router, dependencies=_protected)
 api_router.include_router(approvals.router, dependencies=_protected)
 api_router.include_router(impersonation_events.router, dependencies=_protected)
 api_router.include_router(mcp_registry.router, dependencies=_protected)

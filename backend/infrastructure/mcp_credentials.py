@@ -1,4 +1,4 @@
-"""The caller side of the approval-certificate exchange: presenting one.
+"""The caller side of the tool-certificate exchange: presenting one.
 
 :mod:`infrastructure.mcp_proxy` and :mod:`infrastructure.mcp_policies` are the
 *verifier*. This module is the *presenter*: it finds the certificate that
@@ -21,9 +21,10 @@ learns only whether the call was allowed.
 
 **Choosing among a run's certificates.** The agent tool knows a session id and
 a target tool, not a task id. So the provider takes every live certificate in
-the run and prefers one whose signed grant covers the target. When none does it
-still presents one, so the denial the caller gets back says "that tool is not
-granted" rather than the far less useful "no certificate".
+the run -- whoever granted them -- and prefers one whose signed grant covers the
+target. When none does it still presents one, so the denial the caller gets back
+says "that tool is not granted" rather than the far less useful "no
+certificate".
 """
 
 import logging
@@ -50,8 +51,8 @@ from infrastructure.mcp_certificate import (
 )
 from infrastructure.mcp_proxy import McpClientCredential
 from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
-from models.approval_certificate import ApprovalCertificate
-from repositories.approval_certificate import SqlApprovalCertificateRepository
+from models.mcp_tool_certificate import McpToolCertificate
+from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
 from repositories.tenant_bootstrap import resolve_workflow_execution_tenant
 
 logger = logging.getLogger(__name__)
@@ -104,10 +105,11 @@ class ApprovalCredentialProvider:
     ) -> McpClientCredential | None:
         """Return the credential backing this call, or ``None`` if there is none.
 
-        Returning ``None`` is not a failure: a task with no approval attached
-        has no certificate, and the policy layer allows those calls under the
-        ordinary tool-binding rule. It is the policy layer, not this one, that
-        decides whether a missing credential is fatal.
+        Returning ``None`` is not a failure here even though the policy layer
+        refuses every call that presents nothing: a task that never got a
+        certificate has none to find, and saying so plainly lets that layer
+        produce the denial -- which explains *why* the task has no grant -- in
+        one place instead of two.
 
         Args:
             session_id: The ADK session the call belongs to.
@@ -131,7 +133,7 @@ class ApprovalCredentialProvider:
             # clean denial from the policy layer; the detail stays in the log
             # rather than travelling back to the model.
             logger.warning(
-                "Cannot load the private key of approval certificate %s; "
+                "Cannot load the private key of tool certificate %s; "
                 "proceeding without a credential",
                 certificate.id,
                 exc_info=True,
@@ -157,7 +159,7 @@ class ApprovalCredentialProvider:
 
     async def _find(
         self, session_id: str, mcp_server_id: str, tool_name: str
-    ) -> ApprovalCertificate | None:
+    ) -> McpToolCertificate | None:
         """Pick the run's live certificate that best covers the target tool.
 
         Args:
@@ -174,7 +176,7 @@ class ApprovalCredentialProvider:
             if resolved is None:
                 return None
             execution_id, tenant_id = resolved
-            repo = SqlApprovalCertificateRepository(db, tenant_id=tenant_id)
+            repo = SqlMcpToolCertificateRepository(db, tenant_id=tenant_id)
             candidates = await repo.list_live_for_execution(execution_id)
 
         if not candidates:
@@ -184,7 +186,7 @@ class ApprovalCredentialProvider:
                 claims = extract_claims(certificate_from_pem(candidate.certificate_pem))
             except (McpCaError, CertificateVerificationError):
                 logger.warning(
-                    "Approval certificate %s is unreadable; skipping it when "
+                    "Tool certificate %s is unreadable; skipping it when "
                     "choosing a credential",
                     candidate.id,
                     exc_info=True,

@@ -1,7 +1,6 @@
 from .agent_skill import AgentSkillService
 from .agent_skill_sync import AgentSkillSyncService, sync_agent_skill
 from .approval import ApprovalService
-from .approval_certificate import ApprovalCertificateService
 from .approver_groups import ApproverGroupResolver
 from .auth import AuthService
 from .email_queue_worker import (
@@ -13,6 +12,7 @@ from .impersonation import ImpersonationService
 from .impersonation_event import ImpersonationEventService
 from .mcp_registry import MCPRegistryService
 from .mcp_server import MCPServerService
+from .mcp_tool_certificate import McpToolCertificateService
 from .mcp_tool_invocation import McpToolInvocationService
 from .mcp_tool_mock import MCPToolMockService
 from .metrics import MetricsService, MetricsWindow
@@ -39,7 +39,7 @@ from .workflow_task_template import WorkflowTaskTemplateService
 __all__ = [
     "AgentSkillService",
     "AgentSkillSyncService",
-    "ApprovalCertificateService",
+    "McpToolCertificateService",
     "ApprovalService",
     "ApproverGroupResolver",
     "AuthService",

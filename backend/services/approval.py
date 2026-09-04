@@ -16,8 +16,8 @@ from repositories.exceptions import (
     NotFoundError,
 )
 from repositories.query import FilterSpec, SortSpec
-from services.approval_certificate import ApprovalCertificateService
 from services.approver_groups import ApproverGroupResolver
+from services.mcp_tool_certificate import McpToolCertificateService
 
 
 class ApprovalService:
@@ -27,7 +27,7 @@ class ApprovalService:
         self,
         repo: ApprovalRepository,
         approver_groups: ApproverGroupResolver,
-        certificates: ApprovalCertificateService,
+        certificates: McpToolCertificateService,
     ) -> None:
         """Initialize the service.
 
@@ -132,7 +132,7 @@ class ApprovalService:
 
         Granting an approval that names a task also issues that task's MCP
         approval certificate (see
-        :class:`services.approval_certificate.ApprovalCertificateService`).
+        :class:`services.mcp_tool_certificate.McpToolCertificateService`).
         Until it exists the task cannot call any of its bound MCP tools, so this
         is the step that actually turns the decision into authority. Issuing is
         idempotent: editing the comment on an already-granted approval returns

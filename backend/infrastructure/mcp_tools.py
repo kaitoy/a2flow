@@ -12,9 +12,9 @@ generic tools:
   run's tasks (``create_workflow_task`` / ``update_workflow_task``).
 * :func:`call_mcp_tool` -- invoke one tool on one registered server. The call is
   validated server-side: it must target a tool bound to a task that is currently
-  ``in_progress`` in the session, otherwise it is rejected. This enforces the
-  per-task tool scoping that a shared, skill-cached agent cannot express through
-  its static toolset.
+  ``in_progress`` in the session, and must present that task's signed tool
+  certificate, otherwise it is rejected. This enforces the per-task tool scoping
+  that a shared, skill-cached agent cannot express through its static toolset.
 
 Neither tool reaches an MCP server itself. Both hand a request to
 :class:`infrastructure.mcp_proxy.McpProxy`, which authenticates the caller, runs
@@ -220,10 +220,12 @@ async def call_mcp_tool(
     allowed tools. When several tasks are in progress at once, the union of
     their bindings is allowed.
 
-    A task that has an approval attached must additionally present that
-    approval's certificate. The certificate and its signature are attached here,
-    beneath the model: they never appear in an argument or a result, so the
-    model can ask for a call but cannot manufacture the authority for one.
+    Every call must also present the task's tool certificate -- the one granted
+    when the task was marked ``in_progress``, or the one its approval granted
+    when that approval was decided. The certificate and its signature are
+    attached here, beneath the model: they never appear in an argument or a
+    result, so the model can ask for a call but cannot manufacture the authority
+    for one.
 
     Args:
         server_id: Id of the registered MCP server (as bound to the task).

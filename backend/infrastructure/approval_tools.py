@@ -12,11 +12,12 @@ the outcome from that tool's result and can re-check it with
 
 A request also carries the WorkflowTask it authorizes, and that task is the one
 that *performs* the approved action rather than the one that asks for the
-go-ahead: :class:`services.approval_certificate.ApprovalCertificateService`
+go-ahead: :class:`services.mcp_tool_certificate.McpToolCertificateService`
 freezes exactly that task's ``tool_bindings`` into the grant, and
-:class:`infrastructure.mcp_policies.ApprovedTaskCertificatePolicy` gates exactly
-that task. :func:`request_approval` rejects the inverted shape rather than
-recording an approval that would authorize nothing.
+:class:`infrastructure.mcp_policies.TaskCertificatePolicy` holds exactly that
+task to it. Naming the asking step instead would leave the acting one running on
+its run initiator's own grant, so :func:`request_approval` rejects the inverted
+shape rather than recording an approval that would authorize nothing.
 
 A request carries exactly one destination, and each has a discovery tool:
 :func:`list_users` finds individuals eligible as ``approver``, and
@@ -349,6 +350,43 @@ def _tool_bearing_dependents(
     return [t for t in tasks if t.id in downstream and t.tool_bindings]
 
 
+async def _stand_down_initiator_grant(
+    s: _Scope, workflow_task_id: str, user_id: str
+) -> None:
+    """Revoke the initiator's own tool grant on a task that now needs approving.
+
+    A task can already be ``in_progress`` -- and therefore already holding the
+    certificate its run's initiator took out for it -- when the agent decides it
+    needs a human decision after all. That grant has to stand down, or the audit
+    trail would show two live authorities for one task.
+
+    Best-effort. The approval row has already committed by the time this runs,
+    so raising here would report a failure for a write that succeeded. Nothing
+    about the gate depends on it either: ``TaskCertificatePolicy`` refuses an
+    initiator grant for any task that has an approval attached, stamped or not.
+
+    The import is deferred to call time for the same reason the ones in
+    :func:`_repos` are -- reaching into ``services`` at module import time closes
+    a cycle back through ``infrastructure.agent``.
+
+    Args:
+        s: The current tool call's resolved run and repositories.
+        workflow_task_id: The task the new approval concerns.
+        user_id: The acting user, recorded as ``updated_by``.
+    """
+    from services.mcp_tool_certificate import build_mcp_tool_certificate_service
+
+    try:
+        certificates = build_mcp_tool_certificate_service(s.db, tenant_id=s.tenant_id)
+        await certificates.supersede_initiator_grant(workflow_task_id, user_id=user_id)
+    except Exception:
+        logger.exception(
+            "failed to stand down the initiator tool grant of task %s after an "
+            "approval was requested for it",
+            workflow_task_id,
+        )
+
+
 async def request_approval(
     title: str,
     tool_context: ToolContext,
@@ -504,12 +542,12 @@ async def request_approval(
                 approver=approver or None,
                 approver_group_id=approver_group_id or None,
             )
+            acting_user_id = _user_id(tool_context)
             try:
-                approval = await s.approval_repo.create(
-                    data, user_id=_user_id(tool_context)
-                )
+                approval = await s.approval_repo.create(data, user_id=acting_user_id)
             except ForeignKeyViolationError as exc:
                 return {"error": str(exc)}
+            await _stand_down_initiator_grant(s, workflow_task_id, acting_user_id)
             # Capture the result before _notify commits again, which would expire
             # these attributes and trigger a lazy reload outside the greenlet context.
             result = {"approval_id": approval.id, "status": approval.status.value}

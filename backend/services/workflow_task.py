@@ -18,7 +18,10 @@ the named ``approver``, or a member of its ``approver_group_id`` holding the
 Every write that can change the set of unfinished tasks also re-runs the shared
 completion bookkeeping in :mod:`services.workflow_execution_completion`, so a
 run driven through these endpoints ends up in the same terminal state as one
-driven by the agent's own task tools.
+driven by the agent's own task tools. A write that starts or finishes a task
+likewise settles its MCP tool certificate (:meth:`WorkflowTaskService._settle_certificate`),
+for the same reason: a task started from here has to end up able to call its
+tools, exactly as one the agent started does.
 """
 
 from collections.abc import Collection
@@ -34,14 +37,13 @@ from repositories import (
     WorkflowExecutionRepository,
     WorkflowTaskRepository,
 )
-from repositories.approval_certificate import ApprovalCertificateRepository
 from repositories.exceptions import (
     ForbiddenError,
     ForeignKeyViolationError,
     NotFoundError,
 )
-from services.approval_certificate import revoke_if_task_finished
 from services.approver_groups import ApproverGroupResolver
+from services.mcp_tool_certificate import McpToolCertificateService
 from services.notification_dispatch import NotificationDispatcher
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 from services.workflow_execution_completion import evaluate_completion
@@ -58,7 +60,7 @@ class WorkflowTaskService:
         approvals: ApprovalRepository,
         notifications: NotificationDispatcher,
         approver_groups: ApproverGroupResolver,
-        certificates: ApprovalCertificateRepository,
+        certificates: McpToolCertificateService,
     ) -> None:
         """Initialize the service.
 
@@ -76,6 +78,10 @@ class WorkflowTaskService:
                 emit the one-shot ``execution_completed`` notification.
             approver_groups: Resolver backing the status-change guard when the
                 linked Approval is addressed to a group rather than one user.
+            certificates: Service issuing a task's MCP tool certificate when it
+                starts and revoking it when it finishes, so a run driven through
+                these endpoints carries the same signed authority as one the
+                agent drives itself.
         """
         self._repo = repo
         self._execution_repo = execution_repo
@@ -273,7 +279,13 @@ class WorkflowTaskService:
         await self._access.assert_access(
             data.workflow_execution_id, execution.initiator_id, caller
         )
-        return await self._repo.create(data, user_id=caller.id)
+        created = await self._repo.create(data, user_id=caller.id)
+        # A task can be created already ``in_progress``, which is the same edge
+        # :meth:`update` handles -- it just happens at insert time instead.
+        await self._certificates.issue_for_started_task(
+            created, execution, user_id=caller.id
+        )
+        return created
 
     async def update(
         self, task_id: str, data: WorkflowTaskUpdate, *, caller: User
@@ -309,10 +321,30 @@ class WorkflowTaskService:
         if data.status is not None and data.status != task.status:
             await self._assert_status_change_allowed(task, caller)
         updated = await self._repo.update(task_id, data, user_id=caller.id)
-        # A finished task's approval certificate has outlived its purpose.
-        await revoke_if_task_finished(self._certificates, updated, user_id=caller.id)
+        await self._settle_certificate(updated, caller)
         await self._evaluate_completion(updated.workflow_execution_id)
         return updated
+
+    async def _settle_certificate(self, task: WorkflowTaskRead, caller: User) -> None:
+        """Bring the task's tool certificate in line with the status it now has.
+
+        A task that has just started needs one before it can call anything; a
+        task that has just finished no longer needs the one it had. Both edges
+        are handled here so the two callers below do not each have to remember
+        which way the write went, and so a run driven through the REST endpoints
+        ends up with the same certificates as one the agent drives through its
+        own task tools.
+
+        Args:
+            task: The task as it stands after the write.
+            caller: The authenticated user who performed the write.
+        """
+        execution = await self._execution_repo.get(task.workflow_execution_id)
+        if execution is not None:
+            await self._certificates.issue_for_started_task(
+                task, execution, user_id=caller.id
+            )
+        await self._certificates.revoke_if_task_finished(task, user_id=caller.id)
 
     async def delete(self, task_id: str, *, caller: User) -> None:
         """Delete a WorkflowTask.

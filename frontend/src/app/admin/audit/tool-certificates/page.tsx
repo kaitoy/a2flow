@@ -1,4 +1,4 @@
-/** @module AuditApprovalCertificatesPage — Audit list of the certificates granted approvals carry. */
+/** @module AuditToolCertificatesPage — Audit list of the certificates authorizing MCP tool calls. */
 "use client";
 
 import { BadgeCheck } from "lucide-react";
@@ -21,7 +21,8 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
-import { type ApprovalCertificate, listApprovalCertificates, listMcpServers } from "@/lib/api";
+import { listMcpServers, listMcpToolCertificates, type McpToolCertificate } from "@/lib/api";
+import { CERTIFICATE_GRANT_DOT_CLASS, CERTIFICATE_GRANT_LABEL } from "@/lib/certificate-grant";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
 /** Page size for the audit list. */
@@ -31,16 +32,17 @@ const LIMIT = 50;
 const SERVER_LIMIT = 1000;
 
 /**
- * Audit list of the certificates issued when approvals were granted.
+ * Audit list of the certificates authorizing tasks' MCP tool calls.
  *
- * A certificate is what actually lets an approved task call its bound tools, so
- * this is the record of what each approval authorized: which tools, until when,
- * and whether the grant has since been revoked. The tools are parsed back out of
- * the signed certificate rather than read from a column, so the list can never
- * report a grant that differs from what was signed. Key material is never part
- * of the response.
+ * A certificate is what actually lets a task call its bound tools, and every
+ * proxied call presents one — so this is the complete record of what each run
+ * was authorized to do: which tools, on whose authority, until when, and whether
+ * the grant has since been revoked. The tools are parsed back out of the signed
+ * certificate rather than read from a column, so the list can never report a
+ * grant that differs from what was signed. Key material is never part of the
+ * response.
  */
-export default function AuditApprovalCertificatesPage() {
+export default function AuditToolCertificatesPage() {
   const {
     rows,
     loading,
@@ -52,7 +54,7 @@ export default function AuditApprovalCertificatesPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<ApprovalCertificate>(listApprovalCertificates, { limit: LIMIT });
+  } = useTableQuery<McpToolCertificate>(listMcpToolCertificates, { limit: LIMIT });
 
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
 
@@ -64,23 +66,23 @@ export default function AuditApprovalCertificatesPage() {
       });
   }, []);
 
-  const names = useUserNames(rows.flatMap((c) => [c.createdBy, c.updatedBy]));
+  const names = useUserNames(rows.flatMap((c) => [c.grantedBy, c.createdBy, c.updatedBy]));
   const isAllTenantsView = useIsAllTenantsView();
   // Only resolved when the Tenant column is actually rendered: the lookup goes
   // through the super_admin-only tenants list, so asking for it as a plain
   // admin spends a request that can only come back 403 — and toasts.
   const tenantNames = useTenantNames(isAllTenantsView ? rows.map((c) => c.tenantId) : []);
 
-  const columns = useMemo<ColumnDef<ApprovalCertificate>[]>(
+  const columns = useMemo<ColumnDef<McpToolCertificate>[]>(
     () => [
-      idColumn<ApprovalCertificate>(),
+      idColumn<McpToolCertificate>(),
       {
         header: "Serial",
         filterField: "serialNumber",
         visibility: "always",
         cell: (c) => (
           <Link
-            href={`/admin/audit/approval-certificates/${c.id}`}
+            href={`/admin/audit/tool-certificates/${c.id}`}
             className="font-mono font-medium text-accent transition-colors hover:underline"
           >
             {c.serialNumber}
@@ -88,15 +90,37 @@ export default function AuditApprovalCertificatesPage() {
         ),
       },
       {
-        header: "Approval",
+        header: "Authority",
+        filterField: "grantKind",
+        sortField: "grantKind",
+        noTruncate: true,
         cell: (c) => (
-          <Link
-            href={`/admin/approvals/${c.approvalId}`}
-            className="font-medium text-accent transition-colors hover:underline"
-          >
-            {`${c.approvalId.slice(0, 8)}…`}
-          </Link>
+          <StatusDot
+            dotClass={CERTIFICATE_GRANT_DOT_CLASS[c.grantKind]}
+            label={CERTIFICATE_GRANT_LABEL[c.grantKind]}
+          />
         ),
+      },
+      {
+        header: "Granted By",
+        cell: (c) => names.get(c.grantedBy) ?? c.grantedBy,
+      },
+      {
+        // Null for a grant the run's initiator gave itself: there is no
+        // approval record to link to, which is the point of that grant kind.
+        header: "Approval",
+        visibility: "optional",
+        cell: (c) =>
+          c.approvalId ? (
+            <Link
+              href={`/admin/approvals/${c.approvalId}`}
+              className="font-medium text-accent transition-colors hover:underline"
+            >
+              {`${c.approvalId.slice(0, 8)}…`}
+            </Link>
+          ) : (
+            EMPTY_VALUE
+          ),
       },
       {
         // Revocation is derived from `revokedAt` rather than shown as a stored
@@ -175,14 +199,14 @@ export default function AuditApprovalCertificatesPage() {
         visibility: "optional",
         cell: (c) => `${c.workflowTaskId.slice(0, 8)}…`,
       },
-      ...(isAllTenantsView ? [tenantColumn<ApprovalCertificate>(tenantNames)] : []),
-      ...auditColumns<ApprovalCertificate>(names),
+      ...(isAllTenantsView ? [tenantColumn<McpToolCertificate>(tenantNames)] : []),
+      ...auditColumns<McpToolCertificate>(names),
     ],
     [serverNameById, names, tenantNames, isAllTenantsView]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
-    "auditApprovalCertificates",
+    "auditToolCertificates",
     columns
   );
 
@@ -195,9 +219,9 @@ export default function AuditApprovalCertificatesPage() {
           { label: "Certificates" },
         ]}
       />
-      <AuditTabs active="approval-certificates" />
+      <AuditTabs active="tool-certificates" />
       <AdminPageHeader
-        title="Approval Certificates"
+        title="Tool Certificates"
         icon={BadgeCheck}
         onRefresh={reload}
         refreshing={loading || refreshing}
@@ -215,7 +239,7 @@ export default function AuditApprovalCertificatesPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No approval has granted tool authority yet."
+        emptyMessage="No task has been granted tool authority yet."
         emptyIcon={BadgeCheck}
         getRowKey={(c) => c.id}
         sort={sort}

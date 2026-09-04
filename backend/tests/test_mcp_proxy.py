@@ -22,6 +22,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database
 from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
+from infrastructure.mcp_credentials import ApprovalCredentialProvider
 from infrastructure.mcp_policies import (
     InProgressToolBindingPolicy,
     PassThroughPolicy,
@@ -34,6 +35,7 @@ from infrastructure.mcp_proxy import (
     ListToolsRequest,
     McpAuthenticationError,
     McpCallContext,
+    McpClientCredential,
     McpIdentity,
     McpOperation,
     McpPolicyDeniedError,
@@ -59,7 +61,12 @@ from models.workflow_task import (
 )
 from repositories.exceptions import McpConnectionError
 from tests._engine import make_test_engine
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+from tests._seed import (
+    DEFAULT_TEST_TENANT_ID,
+    grant_tool_certificate,
+    seed_tenant,
+    seed_users,
+)
 
 
 @pytest_asyncio.fixture()
@@ -76,10 +83,18 @@ async def engine(
     await eng.dispose()
 
 
-def _principal(session_id: str = "sess-abc", user_id: str = "tester") -> McpPrincipal:
+def _principal(
+    session_id: str = "sess-abc",
+    user_id: str = "tester",
+    *,
+    credential: McpClientCredential | None = None,
+) -> McpPrincipal:
     """Build an agent-run principal for the given ADK session id."""
     return McpPrincipal(
-        kind=PrincipalKind.agent_run, session_id=session_id, user_id=user_id
+        kind=PrincipalKind.agent_run,
+        session_id=session_id,
+        user_id=user_id,
+        credential=credential,
     )
 
 
@@ -216,7 +231,10 @@ async def _seed_task(
                 )
             )
         await db.commit()
-        return task_id
+    # Seeding a task skips the service that would have granted it a certificate,
+    # without which the default policy chain refuses every call it makes.
+    await grant_tool_certificate(eng, execution_id, task_id)
+    return task_id
 
 
 async def _seed_local_secret(eng: AsyncEngine, name: str, value: str) -> None:
@@ -504,8 +522,16 @@ async def test_binding_policy_allows_the_union_of_in_progress_tasks(
     )
     proxy = McpProxy(policies=default_policies())
     for tool_name in ("alpha", "beta"):
+        # The full chain runs here, so each call presents its own task's
+        # certificate the way the real agent-side caller does.
+        credential = await ApprovalCredentialProvider().credential_for(
+            session_id="sess-abc",
+            mcp_server_id=server_id,
+            tool_name=tool_name,
+            arguments={},
+        )
         result = await proxy.call_tool(
-            CallToolRequest(_principal(), server_id, tool_name, {})
+            CallToolRequest(_principal(credential=credential), server_id, tool_name, {})
         )
         assert result.isError is False
 

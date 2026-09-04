@@ -95,6 +95,38 @@ def test_binding_urn_round_trip() -> None:
     assert parse_binding_urn(build_binding_urn(BINDING)) == BINDING
 
 
+def test_initiator_binding_urn_round_trip() -> None:
+    """The second grantor form, which carries a user id instead of an approval."""
+    binding = CertificateBinding(
+        tenant_id="tenant-1",
+        execution_id="exec-1",
+        task_id="task-1",
+        initiator_id="user-1",
+    )
+    urn = build_binding_urn(binding)
+    assert urn.endswith("/initiator/user-1")
+    assert parse_binding_urn(urn) == binding
+
+
+def test_a_binding_names_exactly_one_grantor() -> None:
+    """Neither and both are rejected where the object is built, not at each use.
+
+    A binding is constructed both when signing a certificate and when parsing a
+    presented one, so the invariant has to hold in both directions.
+    """
+    for kwargs in (
+        {},
+        {"approval_id": "a1", "initiator_id": "u1"},
+    ):
+        with pytest.raises(CertificateVerificationError, match="exactly one grantor"):
+            CertificateBinding(
+                tenant_id="tenant-1",
+                execution_id="exec-1",
+                task_id="task-1",
+                **kwargs,
+            )
+
+
 def test_tool_urn_round_trip() -> None:
     assert parse_tool_urn(build_tool_urn("server-1", "read_file")) == (
         "server-1",
@@ -120,6 +152,10 @@ def test_tool_urn_survives_exotic_tool_names() -> None:
         "urn:a2flow:binding:tenant/t1/execution/e1/task/k1/approval/a1/extra/x",
         "urn:a2flow:binding:renant/t1/execution/e1/task/k1/approval/a1",  # bad label
         "urn:a2flow:binding:tenant//execution/e1/task/k1/approval/a1",  # empty value
+        # An unrecognized grantor label, which is the failure a future third
+        # grant kind would produce against a verifier that predates it.
+        "urn:a2flow:binding:tenant/t1/execution/e1/task/k1/somebody/s1",
+        "urn:a2flow:binding:tenant/t1/execution/e1/task/k1/initiator/",
         "urn:something:else",
     ],
 )

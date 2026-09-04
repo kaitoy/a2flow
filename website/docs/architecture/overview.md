@@ -24,7 +24,7 @@ flowchart LR
 | **Design** | A skill becomes a workflow: an AI design run breaks the request into steps and binds the tools each step needs. | [Designing a workflow](./workflow-design.md) |
 | **Run** | Running a workflow copies the published design onto a new workflow execution and opens its chat. | [Running a workflow](./workflow-execution.md) |
 | **Converse** | The agent and several people share that chat, and the agent can draw interactive surfaces into it rather than only writing text. | [Sessions](./sessions.md) |
-| **Approve** | A task that needs a human decision cannot act until someone decides, and the decision is signed into a certificate. | [Approval gate](./approvals.md) |
+| **Approve** | A task that needs a human decision cannot act until someone decides, and the decision is signed into a certificate. Every other task carries one too, on the authority of whoever started the run. | [Approval gate](./approvals.md) |
 | **Act** | Every tool call is decided by a policy chain before it leaves A2Flow, and recorded once it has been. | [MCP proxy](./mcp-proxy.md) |
 
 Behind all of it sit two stores: the [database](./database.md) every record lives in, and the [secret storage](./secrets.md) credentials are resolved from.

@@ -1,9 +1,14 @@
-"""Test helpers for seeding the users that the audit foreign keys require.
+"""Test helpers for seeding the state a write needs before it can happen.
 
 Every persistent entity records ``created_by`` / ``updated_by`` as a foreign key
 to ``users.id``. Tests therefore need the acting users to exist before they write
 any record. These helpers seed the system user plus a small set of named test
 actors so existing tests can keep using ``X-User-Id: alice`` style headers.
+
+:func:`grant_tool_certificate` covers the other precondition a test that drives
+MCP tool calls has to reproduce: the certificate a task is granted when it goes
+``in_progress``. A test that inserts a task straight into the table skips the
+service that would have issued it, and without it every proxied call is refused.
 """
 
 from collections.abc import Sequence
@@ -102,3 +107,49 @@ async def seed_users(
                     )
                 )
         await session.commit()
+
+
+async def grant_tool_certificate(
+    engine: AsyncEngine,
+    execution_id: str,
+    task_id: str,
+    *,
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
+) -> None:
+    """Take out the run initiator's tool grant for a task seeded in progress.
+
+    Stands in for the ``_settle_certificate`` call both task-write paths make.
+    Tests that seed tasks straight into the table bypass those paths, so without
+    this the task holds no certificate and
+    :class:`infrastructure.mcp_policies.TaskCertificatePolicy` refuses every call
+    it makes.
+
+    A no-op when the service declines to issue -- the task is not in progress,
+    binds no tools, already holds a grant, or has an approval attached -- so it
+    is safe to call unconditionally after seeding a task.
+
+    Args:
+        engine: The test engine to write through.
+        execution_id: The run the task belongs to.
+        task_id: The task to grant.
+        tenant_id: Tenant both belong to.
+    """
+    from repositories.mcp_server import SqlMCPServerRepository
+    from repositories.workflow_execution import SqlWorkflowExecutionRepository
+    from repositories.workflow_task import SqlWorkflowTaskRepository
+    from services.mcp_tool_certificate import build_mcp_tool_certificate_service
+
+    async with AsyncSession(engine, expire_on_commit=False) as db:
+        executions = SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
+        tasks = SqlWorkflowTaskRepository(
+            db,
+            executions,
+            SqlMCPServerRepository(db, tenant_id=tenant_id),
+            tenant_id=tenant_id,
+        )
+        execution = await executions.get(execution_id)
+        task = await tasks.get(task_id)
+        if execution is None or task is None:
+            return
+        service = build_mcp_tool_certificate_service(db, tenant_id=tenant_id)
+        await service.issue_for_started_task(task, execution, user_id=SYSTEM_USER_ID)

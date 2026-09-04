@@ -31,11 +31,27 @@ flowchart LR
 | Order | Policy | What it requires |
 |---|---|---|
 | 1 | **In-progress tool binding** | The `(server, tool)` pair must be bound to a task the run currently has `in_progress`. Listing what a server advertises is deliberately unrestricted — that is how the design agent decides what to bind |
-| 2 | **Approval certificate** | If every in-progress task binding this tool has an [approval](./approvals.md) attached, the call must present that approval's certificate, and its signed grant must cover the tool |
+| 2 | **Tool certificate** | The call must present the task's certificate — see [Who authorized a call](#who-authorized-a-call) — and that certificate's signed grant must cover the tool. There is no exemption: a task nobody was asked to approve presents the grant its run's initiator holds |
 
 The chain stops at the first veto and is ordered cheapest first, so a call that already fails the binding rule never pays for a signature check. Adding a rule means adding a policy to the chain rather than editing the proxy, which is what keeps "what may run" readable as one ordered list.
 
 Refusals are written for the caller rather than for a log: a denied call comes back naming the tools that *are* allowed, so the model can correct itself instead of guessing.
+
+## Who authorized a call {#who-authorized-a-call}
+
+Every tool call a run makes carries a **certificate** naming the person whose authority it runs on. A task is granted one at exactly one moment, and which moment depends on whether anyone was asked to approve it.
+
+| The task | Gets its certificate | On whose authority |
+|---|---|---|
+| Has an [approval](./approvals.md) attached | when that approval is granted | the approver who granted it |
+| Has none | when it is marked **In Progress** | whoever started the run |
+
+The second row is the ordinary case: nobody was asked to weigh the task, so the person who ran the workflow authorizes the tools it binds, and the audit trail records that in as many words rather than leaving the call unattributed.
+
+Two rules follow from *when* the certificate is issued, and both are visible to whoever operates a workflow:
+
+- **The tools are fixed at that moment.** A certificate covers exactly the tools bound to the task when it was issued. A workflow that binds a tool to a task only after the task has started finds that tool refused — the design agent is told to bind first, but a hand-edited task can still get this wrong.
+- **Asking for an approval closes the door again.** If an approval is requested for a task already running on its initiator's authority, that authority stands down immediately; the task waits for the decision like any other.
 
 ## What is recorded
 
@@ -43,9 +59,9 @@ Refusals are written for the caller rather than for a log: a denied call comes b
 |---|---|
 | The tool, the server, and whether it was allowed or denied | The arguments themselves — only a digest of them is kept |
 | The refusal reason, when denied | |
-| The certificate presented, when the call was approval-gated | |
+| The certificate presented, and therefore who authorized the call | |
 
-That record is the run's Tool Invocations page, and it is what makes "which approval authorized this call" answerable after the fact.
+That record is the run's Tool Invocations page, and it is what makes "who authorized this call" answerable after the fact. The certificates themselves are listed under **Audit Logs → Certificates**, one row per grant.
 
 ## Tool mocks and dry runs {#tool-mocks-and-dry-runs}
 
@@ -60,7 +76,7 @@ flowchart LR
   K -->|"no"| S["The MCP server<br/>the real side effect"]
 ```
 
-The stub is consulted **after** the policy chain, never before it. A dry run therefore rehearses the same authorization a real run faces: the tool must still be bound to a task in progress, and a task with an approval attached must still present its certificate. The only thing a mock skips is the part that has an effect outside A2Flow.
+The stub is consulted **after** the policy chain, never before it. A dry run therefore rehearses the same authorization a real run faces: the tool must still be bound to a task in progress, and the call must still present that task's certificate. The only thing a mock skips is the part that has an effect outside A2Flow.
 
 Two consequences are worth knowing:
 

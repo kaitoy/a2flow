@@ -13,7 +13,7 @@ export default function Loading() {
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Audit Logs", href: "/admin/audit" },
-          { label: "Certificates", href: "/admin/audit/approval-certificates" },
+          { label: "Certificates", href: "/admin/audit/tool-certificates" },
           { label: "…" },
         ]}
       />

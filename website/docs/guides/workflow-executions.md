@@ -82,7 +82,7 @@ Each task carries a status — `pending`, `in_progress`, `completed`, `failed` o
 
 ## Tool Invocations
 
-This page lists the MCP tool calls made during the run and what the [proxy](./workflows.md#mcp-tools-for-tasks) decided about each one: `allowed` calls that went upstream, and `denied` ones a rule vetoed — with the tool, the server, the denial reason, and the [approval certificate](./approvals.md#human-approval) presented. Arguments appear only as a digest; the raw values are never stored.
+This page lists the MCP tool calls made during the run and what the [proxy](./workflows.md#mcp-tools-for-tasks) decided about each one: `allowed` calls that went upstream, and `denied` ones a rule vetoed — with the tool, the server, the denial reason, and the [tool certificate](./approvals.md#human-approval) presented. Arguments appear only as a digest; the raw values are never stored.
 
 Calls to a [mocked](./tool-mocks.md) tool are absent here whichever way they went. The proxy checks a mocked call like any other, but a call that was always going to be answered from a stored response reaches no server, so neither its approval nor its refusal belongs in this record. The run's chat transcript is where a stubbed call is inspected.
 

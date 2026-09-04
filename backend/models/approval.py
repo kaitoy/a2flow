@@ -15,9 +15,10 @@ free-text comment supplied when the approver resolves the request.
 being deleted (``ON DELETE SET NULL``). Every approval an agent requests names
 one, and it must name the task that *performs* the approved action rather than a
 step that merely asks for the go-ahead: both the gate
-(:class:`infrastructure.mcp_policies.ApprovedTaskCertificatePolicy`) and the
-grant (:class:`services.approval_certificate.ApprovalCertificateService`) are
-that task's. :func:`infrastructure.approval_tools.request_approval` requires the
+(:class:`infrastructure.mcp_policies.TaskCertificatePolicy`) and the grant
+(:class:`services.mcp_tool_certificate.McpToolCertificateService`) are that
+task's. Naming the asking step leaves the acting one running on its run
+initiator's own grant instead of the approver's. :func:`infrastructure.approval_tools.request_approval` requires the
 argument and rejects the inverted shape.
 
 **A request has exactly one destination**, expressed as one of two mutually

@@ -87,7 +87,7 @@ _DEFAULT_EMAIL_SENT_RETENTION_DAYS = 30
 #: is granted. It bounds the window in which an approved task may call its bound
 #: MCP tools: long enough for a task that waits on a slow upstream, short enough
 #: that a leaked certificate stops being useful the same working hour.
-_DEFAULT_APPROVAL_CERT_TTL_SECONDS = 3600
+_DEFAULT_TOOL_CERT_TTL_SECONDS = 3600
 
 #: Clock-skew tolerance (60 seconds) for the proof-of-possession signature that
 #: accompanies each proxied tool call. The signature covers a timestamp; a
@@ -106,8 +106,8 @@ _DEFAULT_MCP_CA_COMMON_NAME = "A2Flow MCP Approval CA"
 #: A validator shared across fields cannot read each field's own default, so
 #: the mapping supplies it.
 _POSITIVE_INT_DEFAULTS = {
-    "mcp_approval_cert_ttl_seconds": _DEFAULT_APPROVAL_CERT_TTL_SECONDS,
-    "mcp_approval_cert_signature_window_seconds": _DEFAULT_POP_SIGNATURE_WINDOW_SECONDS,
+    "mcp_tool_cert_ttl_seconds": _DEFAULT_TOOL_CERT_TTL_SECONDS,
+    "mcp_tool_cert_signature_window_seconds": _DEFAULT_POP_SIGNATURE_WINDOW_SECONDS,
     "mcp_ca_validity_days": _DEFAULT_MCP_CA_VALIDITY_DAYS,
 }
 
@@ -257,10 +257,8 @@ class Settings(BaseSettings):
 
     mcp_registry_url: str = "https://registry.modelcontextprotocol.io"
 
-    mcp_approval_cert_ttl_seconds: int = _DEFAULT_APPROVAL_CERT_TTL_SECONDS
-    mcp_approval_cert_signature_window_seconds: int = (
-        _DEFAULT_POP_SIGNATURE_WINDOW_SECONDS
-    )
+    mcp_tool_cert_ttl_seconds: int = _DEFAULT_TOOL_CERT_TTL_SECONDS
+    mcp_tool_cert_signature_window_seconds: int = _DEFAULT_POP_SIGNATURE_WINDOW_SECONDS
     mcp_ca_common_name: str = _DEFAULT_MCP_CA_COMMON_NAME
     mcp_ca_validity_days: int = _DEFAULT_MCP_CA_VALIDITY_DAYS
 
@@ -331,8 +329,8 @@ class Settings(BaseSettings):
         return value
 
     @field_validator(
-        "mcp_approval_cert_ttl_seconds",
-        "mcp_approval_cert_signature_window_seconds",
+        "mcp_tool_cert_ttl_seconds",
+        "mcp_tool_cert_signature_window_seconds",
         "mcp_ca_validity_days",
         mode="before",
     )

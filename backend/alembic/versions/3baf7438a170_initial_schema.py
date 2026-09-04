@@ -1185,14 +1185,23 @@ def upgrade() -> None:
     # workflow_executions, tenants, and mcp_certificate_authorities, so every
     # one of those tables has to exist first.
     op.create_table(
-        "approval_certificates",
+        "mcp_tool_certificates",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("approval_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        # Named ``grant_kind`` rather than ``grant``: ``GRANT`` is a reserved
+        # word in SQL, and the check constraint below has to spell it unquoted.
+        sa.Column(
+            "grant_kind",
+            sa.Enum("approval", "initiator", name="certificategrant"),
+            nullable=False,
+        ),
+        # Nullable: an initiator grant speaks for no approval at all.
+        sa.Column("approval_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("granted_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column(
             "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
         ),
@@ -1208,13 +1217,20 @@ def upgrade() -> None:
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "revocation_reason",
-            sa.Enum("task_finished", name="revocationreason"),
+            sa.Enum(
+                "task_finished",
+                "superseded_by_approval",
+                name="revocationreason",
+            ),
             nullable=True,
         ),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["approval_id"], ["approvals.id"], ondelete="CASCADE"),
+        # RESTRICT, matching the audit user FKs: the person a grant is
+        # attributed to cannot be hard-deleted out from under the certificate.
+        sa.ForeignKeyConstraint(["granted_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["workflow_execution_id"], ["workflow_executions.id"], ondelete="CASCADE"
         ),
@@ -1226,6 +1242,13 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["ca_id"], ["mcp_certificate_authorities.id"], ondelete="RESTRICT"
         ),
+        # ``approval_id`` and ``grant_kind`` say the same thing two ways, so the
+        # table refuses a row where they disagree.
+        sa.CheckConstraint(
+            "(grant_kind = 'approval' AND approval_id IS NOT NULL)"
+            " OR (grant_kind = 'initiator' AND approval_id IS NULL)",
+            name="ck_mcp_tool_certificates_grant_shape",
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     # One *live* certificate per approval. Partial rather than a plain unique
@@ -1233,29 +1256,40 @@ def upgrade() -> None:
     # has to keep showing that authority was granted and when it stopped
     # counting, and a re-issue after revocation must still be possible.
     op.create_index(
-        "uq_approval_certificates_live",
-        "approval_certificates",
+        "uq_mcp_tool_certificates_live",
+        "mcp_tool_certificates",
         ["approval_id"],
         unique=True,
         postgresql_where=sa.text("revoked_at IS NULL"),
         sqlite_where=sa.text("revoked_at IS NULL"),
     )
+    # And one *live* initiator grant per task. Separate from the index above
+    # because ``approval_id`` is NULL on every one of those rows, and NULLs
+    # never collide in a unique index on either dialect.
     op.create_index(
-        "ix_approval_certificates_tenant_id", "approval_certificates", ["tenant_id"]
+        "uq_mcp_tool_certificates_live_initiator",
+        "mcp_tool_certificates",
+        ["workflow_task_id"],
+        unique=True,
+        postgresql_where=sa.text("revoked_at IS NULL AND approval_id IS NULL"),
+        sqlite_where=sa.text("revoked_at IS NULL AND approval_id IS NULL"),
     )
     op.create_index(
-        "ix_approval_certificates_workflow_execution_id",
-        "approval_certificates",
+        "ix_mcp_tool_certificates_tenant_id", "mcp_tool_certificates", ["tenant_id"]
+    )
+    op.create_index(
+        "ix_mcp_tool_certificates_workflow_execution_id",
+        "mcp_tool_certificates",
         ["workflow_execution_id"],
     )
     op.create_index(
-        "ix_approval_certificates_workflow_task_id",
-        "approval_certificates",
+        "ix_mcp_tool_certificates_workflow_task_id",
+        "mcp_tool_certificates",
         ["workflow_task_id"],
     )
     op.create_index(
-        "ix_approval_certificates_serial_number",
-        "approval_certificates",
+        "ix_mcp_tool_certificates_serial_number",
+        "mcp_tool_certificates",
         ["serial_number"],
         unique=True,
     )
@@ -1335,21 +1369,24 @@ def downgrade() -> None:
         table_name="mcp_tool_invocations",
     )
     op.drop_table("mcp_tool_invocations")
-    op.drop_index("uq_approval_certificates_live", table_name="approval_certificates")
     op.drop_index(
-        "ix_approval_certificates_serial_number", table_name="approval_certificates"
+        "uq_mcp_tool_certificates_live_initiator", table_name="mcp_tool_certificates"
+    )
+    op.drop_index("uq_mcp_tool_certificates_live", table_name="mcp_tool_certificates")
+    op.drop_index(
+        "ix_mcp_tool_certificates_serial_number", table_name="mcp_tool_certificates"
     )
     op.drop_index(
-        "ix_approval_certificates_workflow_task_id", table_name="approval_certificates"
+        "ix_mcp_tool_certificates_workflow_task_id", table_name="mcp_tool_certificates"
     )
     op.drop_index(
-        "ix_approval_certificates_workflow_execution_id",
-        table_name="approval_certificates",
+        "ix_mcp_tool_certificates_workflow_execution_id",
+        table_name="mcp_tool_certificates",
     )
     op.drop_index(
-        "ix_approval_certificates_tenant_id", table_name="approval_certificates"
+        "ix_mcp_tool_certificates_tenant_id", table_name="mcp_tool_certificates"
     )
-    op.drop_table("approval_certificates")
+    op.drop_table("mcp_tool_certificates")
     for link_table in (
         "agent_skill_tags",
         "mcp_server_tags",
