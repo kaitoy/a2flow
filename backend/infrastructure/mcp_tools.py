@@ -5,11 +5,12 @@ generic tools:
 
 * :func:`list_mcp_tools` -- discover the tools advertised by every MCP server
   registered in A2Flow, so the agent can bind the ones a task needs. It is
-  available in every phase: the design agents call it before registering the task templates
-  (binding through the ``tools`` entries of ``register_design_tasks`` or the
-  ``tool_bindings`` argument of ``create_design_task`` /
-  ``update_design_task``), and the execution agent calls it when adjusting a
-  run's tasks (``create_workflow_task`` / ``update_workflow_task``).
+  available in every phase: the design agents call it before registering the
+  task templates (binding through the ``tools`` entries of
+  ``register_task_templates`` or the ``tool_bindings`` argument of
+  ``create_task_template`` / ``update_task_template``), and the execution agent
+  calls it while working a run to see which bound tools a task may invoke
+  through ``call_mcp_tool``.
 * :func:`call_mcp_tool` -- invoke one tool on one registered server. The call is
   validated server-side: it must target a tool bound to a task that is currently
   ``in_progress`` in the session, and must present that task's signed tool
@@ -182,9 +183,10 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
 
     Call this during design to discover what external tools exist before
     binding them to tasks: while designing a workflow, bind them through the
-    ``tools`` entries of ``register_design_tasks`` or the ``tool_bindings``
-    argument of ``create_design_task``/``update_design_task``; while
-    executing a run, through ``create_workflow_task``/``update_workflow_task``.
+    ``tools`` entries of ``register_task_templates`` or the ``tool_bindings``
+    argument of ``create_task_template``/``update_task_template``. Tools are
+    bound only at design time; while executing a run, call this to see which
+    bound tools the in-progress task may invoke through ``call_mcp_tool``.
     Each server is queried live and concurrently; a server that cannot be
     reached is reported with an ``error`` field instead of failing the whole
     listing.

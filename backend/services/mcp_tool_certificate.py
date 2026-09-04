@@ -15,11 +15,12 @@ a tool needs one. There are two ways to get one, and this module owns both:
 
 The tools a certificate grants are read from the task's ``tool_bindings`` **at
 issuance** and signed into the certificate's ``subjectAltName``. That snapshot
-is the point of the whole mechanism, and it applies to both paths equally: the
-execution agent can rewrite a task's bindings mid-run through
-``update_workflow_task``, but it cannot re-issue the certificate, so rewriting
-them cannot widen what it may call. Tools have to be bound *before or as* the
-task starts.
+is the point of the whole mechanism, and it applies to both paths equally: a
+run's tasks and their ``tool_bindings`` are copied from the workflow's published
+templates at execute time and the execution agent cannot edit them, and even a
+later edit to the workflow cannot re-issue a certificate already granted, so
+nothing widens what a task may call once its grant is set. Tools have to be
+bound into the template *before* the workflow is published.
 
 The two paths never both authorize one task. Requesting an approval for a task
 revokes the initiator grant it already had

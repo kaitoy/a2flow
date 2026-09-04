@@ -42,7 +42,7 @@ The certificate is not what an approval adds — **every** task that calls a too
 | The certificate carries | Why it matters |
 |---|---|
 | Which tenant, run and task it speaks for, and whose authority it carries — an approver's, or the run initiator's | A certificate minted for one run is useless in another, and one kind of authority cannot stand in for the other |
-| **The tools the task had bound at the moment the certificate was issued** | The agent can rewrite its own task's bindings mid-run, but it cannot re-issue a certificate. Approving a task to read a file never becomes approval to delete one, and a task that has already started cannot pick up a tool it did not start with |
+| **The tools the task had bound at the moment the certificate was issued** | A run's tasks and their bindings are fixed at execute time from the workflow's published design, and the certificate freezes them again at issuance — so neither the agent nor a later edit to the workflow can widen a grant. Approving a task to read a file never becomes approval to delete one, and a task that has already started cannot pick up a tool it did not start with |
 
 ### The task an approval covers
 

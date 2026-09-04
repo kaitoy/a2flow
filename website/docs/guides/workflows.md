@@ -162,7 +162,7 @@ You are then taken to the **workflow session** — the chat the run happens in. 
 
 The execution agent lists the run's tasks, picks the next runnable one — a `pending` task whose dependencies have all completed — marks it `in_progress`, does the work as the skill directs, and marks it `completed`, `failed` or `skipped`. When every task has reached a terminal state, a [notification](./notifications.md) says the run is done.
 
-You can watch the statuses update live in the read-only **Workflow Tasks** view of the run, as a Table or a Graph. The agent can also adjust the run's task list mid-flight when the work calls for it.
+You can watch the statuses update live in the read-only **Workflow Tasks** view of the run, as a Table or a Graph. The run's task list is fixed — it is the one frozen when the workflow was published — so the agent only moves each task through its statuses, never adds or removes one.
 
 ## MCP tools for tasks {#mcp-tools-for-tasks}
 

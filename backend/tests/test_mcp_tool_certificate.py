@@ -3,10 +3,10 @@
 Two issuance paths are covered: an approver granting an approval, and the run's
 initiator granting a task's tools to themselves when it goes ``in_progress``.
 The load-bearing cases are `test_certificate_grant_is_frozen_at_decision_time`
-and its initiator twin `test_an_initiator_grant_is_frozen_at_start`: the
-execution agent can rewrite a task's ``tool_bindings`` mid-run, and the whole
-point of signing the granted tools into the certificate is that doing so cannot
-widen what the task may call.
+and its initiator twin `test_an_initiator_grant_is_frozen_at_start`: a task's
+``tool_bindings`` can still change after a certificate is issued (a workflow
+re-publish, say), and the whole point of signing the granted tools into the
+certificate is that any such change cannot widen what the task may call.
 """
 
 from collections.abc import AsyncGenerator
@@ -358,10 +358,11 @@ async def test_certificate_grant_is_frozen_at_decision_time(
 ) -> None:
     """Widening a task's bindings after approval must not widen the grant.
 
-    This is the escalation path the certificate exists to close: the execution
-    agent can call ``update_workflow_task(tool_bindings=[...])`` on its own
-    task, so a rule that reads the bindings at call time is a rule the agent
-    can rewrite. The certificate is signed once and cannot be.
+    This is the escalation path the certificate exists to close: a task's
+    ``tool_bindings`` can change after the approval was decided -- a workflow
+    re-publish, or any write outside the run -- so a rule that read the bindings
+    at call time could be widened out from under the approver. The certificate
+    is signed once and cannot be.
     """
     client, eng = cert_env
     execution_id = await _seed_execution(eng)
@@ -673,7 +674,7 @@ async def test_the_agent_tool_leaves_an_unfinished_task_alone(
     cert_env: tuple[AsyncClient, AsyncEngine],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Only a terminal status spends the grant; an ordinary edit must not."""
+    """Only a terminal status spends the grant; a non-terminal update must not."""
     client, eng = cert_env
     monkeypatch.setattr("infrastructure.database.engine", eng)
     execution_id = await _seed_execution(eng)
@@ -684,9 +685,7 @@ async def test_the_agent_tool_leaves_an_unfinished_task_alone(
     )
     await _decide(client, approval_id, "approved")
 
-    result = await update_workflow_task(
-        task_id, _tool_context(), description="still working on it"
-    )
+    result = await update_workflow_task(task_id, _tool_context(), status="in_progress")
     assert "error" not in result, result
 
     assert (await _certificates(eng, approval_id))[0].revoked_at is None

@@ -1,4 +1,4 @@
-"""Tests for the design agent tools in ``infrastructure.design_task_tools``.
+"""Tests for the design agent tools in ``infrastructure.task_template_tools``.
 
 The tools open their own ``AsyncSession`` on ``infrastructure.database.engine``;
 each test monkeypatches that engine to a throwaway database and
@@ -17,13 +17,13 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.design_task_tools import (
-    create_design_task,
-    delete_design_task,
-    get_design_task,
-    list_design_tasks,
-    register_design_tasks,
-    update_design_task,
+from infrastructure.task_template_tools import (
+    create_task_template,
+    delete_task_template,
+    get_task_template,
+    list_task_templates,
+    register_task_templates,
+    update_task_template,
 )
 from models.agent_skill import AgentSkill
 from models.workflow import Workflow, WorkflowStatus
@@ -146,9 +146,9 @@ def _ctx(
 # ---------- register ----------
 
 
-async def test_register_design_tasks_creates_dag(engine: AsyncEngine) -> None:
+async def test_register_task_templates_creates_dag(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await register_design_tasks(
+    result = await register_task_templates(
         [
             {"key": "t0", "title": "First"},
             {"key": "t1", "title": "Second", "depends_on": ["t0"]},
@@ -161,7 +161,7 @@ async def test_register_design_tasks_creates_dag(engine: AsyncEngine) -> None:
     assert [c["key"] for c in created] == ["t0", "t1", "t2"]
     ids = {c["key"]: c["id"] for c in created}
 
-    listed = await list_design_tasks(_ctx())
+    listed = await list_task_templates(_ctx())
     tasks = {t["title"]: t for t in listed["tasks"]}
     assert tasks["Second"]["depends_on_ids"] == [ids["t0"]]
     assert sorted(tasks["Third"]["depends_on_ids"]) == sorted([ids["t0"], ids["t1"]])
@@ -173,17 +173,17 @@ async def test_register_design_tasks_creates_dag(engine: AsyncEngine) -> None:
 
 async def test_register_rejects_unknown_dependency(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await register_design_tasks(
+    result = await register_task_templates(
         [{"key": "a", "title": "A", "depends_on": ["missing"]}], _ctx()
     )
     assert "error" in result
-    listed = await list_design_tasks(_ctx())
+    listed = await list_task_templates(_ctx())
     assert listed["tasks"] == []
 
 
 async def test_register_rejects_duplicate_key(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await register_design_tasks(
+    result = await register_task_templates(
         [{"key": "a", "title": "A"}, {"key": "a", "title": "B"}], _ctx()
     )
     assert "error" in result
@@ -191,7 +191,7 @@ async def test_register_rejects_duplicate_key(engine: AsyncEngine) -> None:
 
 async def test_register_rejects_cycle(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await register_design_tasks(
+    result = await register_task_templates(
         [
             {"key": "a", "title": "A", "depends_on": ["b"]},
             {"key": "b", "title": "B", "depends_on": ["a"]},
@@ -204,7 +204,7 @@ async def test_register_rejects_cycle(engine: AsyncEngine) -> None:
 
 async def test_register_rejects_missing_title(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await register_design_tasks([{"key": "a"}], _ctx())
+    result = await register_task_templates([{"key": "a"}], _ctx())
     assert "error" in result
 
 
@@ -213,7 +213,7 @@ async def test_register_rejects_overlong_title(engine: AsyncEngine) -> None:
     # correctable error payload, with nothing written — not as a Pydantic
     # ValidationError escaping the tool and failing the whole agent run.
     await _seed_design_session(engine)
-    result = await register_design_tasks(
+    result = await register_task_templates(
         [
             {"key": "a", "title": "Gather sources"},
             {
@@ -225,38 +225,38 @@ async def test_register_rejects_overlong_title(engine: AsyncEngine) -> None:
     )
     assert "error" in result
     assert "53 characters" in result["error"]
-    listed = await list_design_tasks(_ctx())
+    listed = await list_task_templates(_ctx())
     assert listed["tasks"] == []
 
 
 async def test_register_accepts_a_title_at_the_limit(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
     at_limit = "T" * 30
-    result = await register_design_tasks([{"key": "a", "title": at_limit}], _ctx())
+    result = await register_task_templates([{"key": "a", "title": at_limit}], _ctx())
     assert "error" not in result
-    listed = await list_design_tasks(_ctx())
+    listed = await list_task_templates(_ctx())
     assert [t["title"] for t in listed["tasks"]] == [at_limit]
 
 
 async def test_create_rejects_overlong_title(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await create_design_task("T" * 31, _ctx())
+    result = await create_task_template("T" * 31, _ctx())
     assert "error" in result
-    listed = await list_design_tasks(_ctx())
+    listed = await list_task_templates(_ctx())
     assert listed["tasks"] == []
 
 
 async def test_update_rejects_overlong_title(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    created = await create_design_task("Original", _ctx())
-    result = await update_design_task(created["id"], _ctx(), title="T" * 31)
+    created = await create_task_template("Original", _ctx())
+    result = await update_task_template(created["id"], _ctx(), title="T" * 31)
     assert "error" in result
-    unchanged = await get_design_task(created["id"], _ctx())
+    unchanged = await get_task_template(created["id"], _ctx())
     assert unchanged["title"] == "Original"
 
 
 async def test_register_without_session_errors(engine: AsyncEngine) -> None:
-    result = await register_design_tasks(
+    result = await register_task_templates(
         [{"key": "a", "title": "A"}], _ctx("unknown-session")
     )
     assert "error" in result
@@ -265,14 +265,14 @@ async def test_register_without_session_errors(engine: AsyncEngine) -> None:
 # ---------- single-template CRUD ----------
 
 
-async def test_create_design_task(engine: AsyncEngine) -> None:
+async def test_create_task_template(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await create_design_task("Solo", _ctx())
+    result = await create_task_template("Solo", _ctx())
     assert result["title"] == "Solo"
     assert "status" not in result
 
 
-async def test_create_design_task_attributes_to_acting_user(
+async def test_create_task_template_attributes_to_acting_user(
     engine: AsyncEngine,
 ) -> None:
     """The router-stamped acting user, not the session's fixed owner, is recorded.
@@ -285,7 +285,7 @@ async def test_create_design_task_attributes_to_acting_user(
     from models.workflow_task_template import WorkflowTaskTemplate
 
     await _seed_design_session(engine, user_id="owner")
-    result = await create_design_task(
+    result = await create_task_template(
         "Solo", _ctx(user_id="owner", state={ACTING_USER_STATE_KEY: "alice"})
     )
     async with AsyncSession(engine) as db:
@@ -298,64 +298,64 @@ async def test_create_design_task_attributes_to_acting_user(
 async def test_list_isolates_workflows(engine: AsyncEngine) -> None:
     await _seed_design_session(engine, session_id="design-a")
     await _seed_design_session(engine, session_id="design-b")
-    await create_design_task("In A", _ctx("design-a"))
-    await create_design_task("In B", _ctx("design-b"))
-    listed_a = await list_design_tasks(_ctx("design-a"))
+    await create_task_template("In A", _ctx("design-a"))
+    await create_task_template("In B", _ctx("design-b"))
+    listed_a = await list_task_templates(_ctx("design-a"))
     assert [t["title"] for t in listed_a["tasks"]] == ["In A"]
 
 
-async def test_get_design_task_cross_workflow_guard(engine: AsyncEngine) -> None:
+async def test_get_task_template_cross_workflow_guard(engine: AsyncEngine) -> None:
     await _seed_design_session(engine, session_id="design-a")
     await _seed_design_session(engine, session_id="design-b")
-    created = await create_design_task("Owned by A", _ctx("design-a"))
+    created = await create_task_template("Owned by A", _ctx("design-a"))
     template_id = created["id"]
 
-    blocked = await get_design_task(template_id, _ctx("design-b"))
+    blocked = await get_task_template(template_id, _ctx("design-b"))
     assert "error" in blocked
-    allowed = await get_design_task(template_id, _ctx("design-a"))
+    allowed = await get_task_template(template_id, _ctx("design-a"))
     assert allowed["id"] == template_id
 
 
 async def test_update_dependencies(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    a = await create_design_task("A", _ctx())
-    b = await create_design_task("B", _ctx())
-    updated = await update_design_task(b["id"], _ctx(), depends_on_ids=[a["id"]])
+    a = await create_task_template("A", _ctx())
+    b = await create_task_template("B", _ctx())
+    updated = await update_task_template(b["id"], _ctx(), depends_on_ids=[a["id"]])
     assert updated["depends_on_ids"] == [a["id"]]
 
 
 async def test_update_dependency_cycle_rejected(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    a = await create_design_task("A", _ctx())
-    b = await create_design_task("B", _ctx(), depends_on_ids=[a["id"]])
-    result = await update_design_task(a["id"], _ctx(), depends_on_ids=[b["id"]])
+    a = await create_task_template("A", _ctx())
+    b = await create_task_template("B", _ctx(), depends_on_ids=[a["id"]])
+    result = await update_task_template(a["id"], _ctx(), depends_on_ids=[b["id"]])
     assert "error" in result
 
 
 async def test_update_preserves_unset_fields(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    created = await create_design_task("Original", _ctx(), description="desc")
-    updated = await update_design_task(
+    created = await create_task_template("Original", _ctx(), description="desc")
+    updated = await update_task_template(
         created["id"], _ctx(), description="updated desc"
     )
     assert updated["title"] == "Original"
     assert updated["description"] == "updated desc"
 
 
-async def test_delete_design_task(engine: AsyncEngine) -> None:
+async def test_delete_task_template(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    created = await create_design_task("Temp", _ctx())
-    result = await delete_design_task(created["id"], _ctx())
+    created = await create_task_template("Temp", _ctx())
+    result = await delete_task_template(created["id"], _ctx())
     assert result == {"deleted": created["id"]}
-    listed = await list_design_tasks(_ctx())
+    listed = await list_task_templates(_ctx())
     assert listed["tasks"] == []
 
 
 async def test_delete_cross_workflow_guard(engine: AsyncEngine) -> None:
     await _seed_design_session(engine, session_id="design-a")
     await _seed_design_session(engine, session_id="design-b")
-    created = await create_design_task("A", _ctx("design-a"))
-    result = await delete_design_task(created["id"], _ctx("design-b"))
+    created = await create_task_template("A", _ctx("design-a"))
+    result = await delete_task_template(created["id"], _ctx("design-b"))
     assert "error" in result
 
 
@@ -397,7 +397,7 @@ async def _seed_mcp_server(eng: AsyncEngine, *, name: str = "srv") -> str:
 async def test_register_with_tools_binds_them(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
     server_id = await _seed_mcp_server(engine)
-    result = await register_design_tasks(
+    result = await register_task_templates(
         [
             {
                 "key": "t0",
@@ -408,7 +408,7 @@ async def test_register_with_tools_binds_them(engine: AsyncEngine) -> None:
         _ctx(),
     )
     assert "error" not in result
-    listed = await list_design_tasks(_ctx())
+    listed = await list_task_templates(_ctx())
     assert listed["tasks"][0]["tool_bindings"] == [
         {"server_id": server_id, "tool_name": "search"}
     ]
@@ -416,17 +416,17 @@ async def test_register_with_tools_binds_them(engine: AsyncEngine) -> None:
 
 async def test_register_with_malformed_tools_errors(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await register_design_tasks(
+    result = await register_task_templates(
         [{"key": "t0", "title": "Bad", "tools": [{"server_id": "only"}]}], _ctx()
     )
     assert "error" in result
-    listed = await list_design_tasks(_ctx())
+    listed = await list_task_templates(_ctx())
     assert listed["tasks"] == []
 
 
 async def test_register_with_unknown_server_errors(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await register_design_tasks(
+    result = await register_task_templates(
         [
             {
                 "key": "t0",
@@ -442,12 +442,12 @@ async def test_register_with_unknown_server_errors(engine: AsyncEngine) -> None:
 async def test_update_replaces_tool_bindings(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
     server_id = await _seed_mcp_server(engine)
-    created = await create_design_task(
+    created = await create_task_template(
         "Solo",
         _ctx(),
         tool_bindings=[{"server_id": server_id, "tool_name": "search"}],
     )
-    result = await update_design_task(
+    result = await update_task_template(
         created["id"],
         _ctx(),
         tool_bindings=[{"server_id": server_id, "tool_name": "fetch"}],
@@ -460,42 +460,42 @@ async def test_update_replaces_tool_bindings(engine: AsyncEngine) -> None:
 
 async def test_register_marks_published_workflow_modified(engine: AsyncEngine) -> None:
     workflow_id = await _seed_design_session(engine, status=WorkflowStatus.published)
-    result = await register_design_tasks([{"key": "t0", "title": "First"}], _ctx())
+    result = await register_task_templates([{"key": "t0", "title": "First"}], _ctx())
     assert "error" not in result
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.modified
 
 
 async def test_create_marks_published_workflow_modified(engine: AsyncEngine) -> None:
     workflow_id = await _seed_design_session(engine, status=WorkflowStatus.published)
-    await create_design_task("Solo", _ctx())
+    await create_task_template("Solo", _ctx())
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.modified
 
 
 async def test_update_marks_published_workflow_modified(engine: AsyncEngine) -> None:
     workflow_id = await _seed_design_session(engine)
-    created = await create_design_task("Solo", _ctx())
+    created = await create_task_template("Solo", _ctx())
     await _set_workflow_status(engine, workflow_id, WorkflowStatus.published)
 
-    await update_design_task(created["id"], _ctx(), title="Renamed")
+    await update_task_template(created["id"], _ctx(), title="Renamed")
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.modified
 
 
 async def test_delete_marks_published_workflow_modified(engine: AsyncEngine) -> None:
     workflow_id = await _seed_design_session(engine)
-    created = await create_design_task("Temp", _ctx())
+    created = await create_task_template("Temp", _ctx())
     await _set_workflow_status(engine, workflow_id, WorkflowStatus.published)
 
-    await delete_design_task(created["id"], _ctx())
+    await delete_task_template(created["id"], _ctx())
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.modified
 
 
 async def test_reads_leave_published_workflow_alone(engine: AsyncEngine) -> None:
     workflow_id = await _seed_design_session(engine)
-    created = await create_design_task("Solo", _ctx())
+    created = await create_task_template("Solo", _ctx())
     await _set_workflow_status(engine, workflow_id, WorkflowStatus.published)
 
-    await list_design_tasks(_ctx())
-    await get_design_task(created["id"], _ctx())
+    await list_task_templates(_ctx())
+    await get_task_template(created["id"], _ctx())
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.published
 
 
@@ -503,14 +503,14 @@ async def test_failed_write_leaves_published_workflow_alone(
     engine: AsyncEngine,
 ) -> None:
     workflow_id = await _seed_design_session(engine, status=WorkflowStatus.published)
-    result = await create_design_task("Bad", _ctx(), depends_on_ids=["ghost"])
+    result = await create_task_template("Bad", _ctx(), depends_on_ids=["ghost"])
     assert "error" in result
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.published
 
 
 async def test_draft_workflow_stays_draft(engine: AsyncEngine) -> None:
     workflow_id = await _seed_design_session(engine)
-    await create_design_task("Solo", _ctx())
+    await create_task_template("Solo", _ctx())
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.draft
 
 
@@ -518,7 +518,7 @@ async def test_generating_workflow_stays_generating(engine: AsyncEngine) -> None
     # The initial background design run registers the task templates while the workflow
     # is still ``generating``; that status is owned by the generation job.
     workflow_id = await _seed_design_session(engine, status=WorkflowStatus.generating)
-    result = await register_design_tasks([{"key": "t0", "title": "First"}], _ctx())
+    result = await register_task_templates([{"key": "t0", "title": "First"}], _ctx())
     assert "error" not in result
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.generating
 
@@ -537,7 +537,7 @@ async def test_register_recovers_a_failed_workflow(engine: AsyncEngine) -> None:
     workflow_id = await _seed_design_session(engine, status=WorkflowStatus.failed)
     await _set_generation_error(engine, workflow_id, "The design agent run failed.")
 
-    result = await register_design_tasks([{"key": "t0", "title": "First"}], _ctx())
+    result = await register_task_templates([{"key": "t0", "title": "First"}], _ctx())
     assert "error" not in result
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.draft
     assert await _generation_error(engine, workflow_id) is None
@@ -545,11 +545,11 @@ async def test_register_recovers_a_failed_workflow(engine: AsyncEngine) -> None:
 
 async def test_update_recovers_a_failed_workflow(engine: AsyncEngine) -> None:
     workflow_id = await _seed_design_session(engine)
-    created = await create_design_task("Solo", _ctx())
+    created = await create_task_template("Solo", _ctx())
     await _set_workflow_status(engine, workflow_id, WorkflowStatus.failed)
     await _set_generation_error(engine, workflow_id, "The design agent run failed.")
 
-    await update_design_task(created["id"], _ctx(), title="Renamed")
+    await update_task_template(created["id"], _ctx(), title="Renamed")
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.draft
     assert await _generation_error(engine, workflow_id) is None
 
@@ -561,7 +561,7 @@ async def test_failed_write_leaves_a_failed_workflow_failed(
     workflow_id = await _seed_design_session(engine, status=WorkflowStatus.failed)
     await _set_generation_error(engine, workflow_id, "The design agent run failed.")
 
-    result = await create_design_task("Bad", _ctx(), depends_on_ids=["ghost"])
+    result = await create_task_template("Bad", _ctx(), depends_on_ids=["ghost"])
     assert "error" in result
     assert await _workflow_status(engine, workflow_id) is WorkflowStatus.failed
     assert (

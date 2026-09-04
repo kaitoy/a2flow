@@ -28,10 +28,12 @@ OID arc, and a made-up one would be indistinguishable from someone else's:
 ``urn:a2flow:tool:SERVER/TOOL``
     One per tool the grant covers, snapshotted from the task's
     ``tool_bindings`` at the moment the approver decided, or at the moment the
-    task went ``in_progress``. This is the frozen grant: the execution agent can
-    still rewrite a task's bindings mid-run through ``update_workflow_task``,
-    but the certificate it must present does not change, so rewriting them
-    cannot widen what it may call.
+    task went ``in_progress``. This is the frozen grant: a run's tasks and their
+    ``tool_bindings`` are copied from the workflow's published templates at
+    execute time and the execution agent cannot change them, but even a later
+    edit to the workflow (a re-publish, a discard of unpublished changes) does
+    not reach a certificate already issued, so nothing can widen what a task
+    may call after its grant is set.
 
 Both segments are percent-encoded. ``mcp_server_id`` is a UUID, but
 :data:`models.constraints.ToolName` places no character restriction on a tool

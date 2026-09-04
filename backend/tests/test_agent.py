@@ -634,7 +634,11 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
     # Known allowed values (e.g. listed in the workflow description) must be
     # offered as ChoicePicker options rather than typed into a TextField.
     assert "list every allowed value as an option" in rendered
-    assert "register_design_tasks" not in rendered
+    assert "register_task_templates" not in rendered
+    # The execution agent only advances statuses; it cannot restructure tasks.
+    assert "task list is fixed" in rendered
+    assert "create_workflow_task" not in rendered
+    assert "delete_workflow_task" not in rendered
 
 
 def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None:
@@ -649,7 +653,7 @@ def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None
     ctx = MagicMock()
     ctx.state.get.return_value = []
     rendered = provider(ctx)
-    assert "register_design_tasks" in rendered
+    assert "register_task_templates" in rendered
     assert "Never execute a task" in rendered
     assert "A2UI Rules" in rendered
     # Titles are listed as chips, so the shared rules ask for short ones.
@@ -666,7 +670,7 @@ def test_create_agent_initial_design_kind_has_no_a2ui(tmp_path: Any) -> None:
         skill_dir=_write_skill_md(tmp_path), kind=AgentKind.initial_design
     )
     assert isinstance(agent.instruction, str)
-    assert "register_design_tasks" in agent.instruction
+    assert "register_task_templates" in agent.instruction
     assert "unattended" in agent.instruction
     assert "at most 30 characters" in agent.instruction
     assert not any(isinstance(t, AGUIToolset) for t in agent.tools)
@@ -676,8 +680,6 @@ def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
     from infrastructure.agent import create_agent
     from infrastructure.approval_tools import get_approval, list_users, request_approval
     from infrastructure.workflow_task_tools import (
-        create_workflow_task,
-        delete_workflow_task,
         get_workflow_task,
         list_workflow_tasks,
         update_workflow_task,
@@ -685,39 +687,42 @@ def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
 
     agent = create_agent(skill_dir=_write_skill_md(tmp_path))
     for tool in (
-        create_workflow_task,
         list_workflow_tasks,
         get_workflow_task,
         update_workflow_task,
-        delete_workflow_task,
         request_approval,
         get_approval,
         list_users,
     ):
         assert tool in agent.tools
+    # The execution agent can only advance a task's status, never add or remove
+    # tasks, so these two tools are no longer attached.
+    names = {getattr(t, "__name__", "") for t in agent.tools}
+    assert "create_workflow_task" not in names
+    assert "delete_workflow_task" not in names
 
 
 def test_create_agent_design_kind_attaches_design_tools(tmp_path: Any) -> None:
     from infrastructure.agent import AgentKind, create_agent
     from infrastructure.approval_tools import request_approval
-    from infrastructure.design_task_tools import (
-        create_design_task,
-        delete_design_task,
-        get_design_task,
-        list_design_tasks,
-        register_design_tasks,
-        update_design_task,
-    )
     from infrastructure.mcp_tools import call_mcp_tool
+    from infrastructure.task_template_tools import (
+        create_task_template,
+        delete_task_template,
+        get_task_template,
+        list_task_templates,
+        register_task_templates,
+        update_task_template,
+    )
 
     agent = create_agent(skill_dir=_write_skill_md(tmp_path), kind=AgentKind.design)
     for tool in (
-        register_design_tasks,
-        create_design_task,
-        list_design_tasks,
-        get_design_task,
-        update_design_task,
-        delete_design_task,
+        register_task_templates,
+        create_task_template,
+        list_task_templates,
+        get_task_template,
+        update_task_template,
+        delete_task_template,
     ):
         assert tool in agent.tools
     # Design never executes: no MCP invocation and no approval flow.
@@ -728,7 +733,7 @@ def test_create_agent_design_kind_attaches_design_tools(tmp_path: Any) -> None:
 def test_register_tool_excludes_tool_context_from_declaration() -> None:
     from google.adk.tools.function_tool import FunctionTool
 
-    from infrastructure.design_task_tools import register_design_tasks
+    from infrastructure.task_template_tools import register_task_templates
 
-    tool = FunctionTool(func=register_design_tasks)
+    tool = FunctionTool(func=register_task_templates)
     assert tool._context_param_name == "tool_context"

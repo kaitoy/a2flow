@@ -2,10 +2,12 @@
 
 These callables are attached to the skill-driven execution agent (see
 :func:`infrastructure.agent.create_agent`) so it can iterate the run's tasks —
-copied from the workflow's published templates at execute time — updating
-their status as it works, and adjust the task list mid-run when needed. Bulk template
-registration lives in :mod:`infrastructure.design_task_tools`, which the
-design agents use to write the workflow's templates.
+copied from the workflow's published templates at execute time — advancing
+their status as it works. The run's task list is fixed: the agent can neither
+add, remove, nor restructure tasks, only move each one through its statuses.
+Bulk template registration lives in
+:mod:`infrastructure.task_template_tools`, which the design agents use to write
+the workflow's templates.
 
 Two facts shape the implementation:
 
@@ -41,7 +43,6 @@ from models.notification import NotificationCreate, NotificationType
 from models.workflow_task import (
     TaskErrorKind,
     ToolBinding,
-    WorkflowTaskCreate,
     WorkflowTaskRead,
     WorkflowTaskStatus,
     WorkflowTaskUpdate,
@@ -54,8 +55,6 @@ from repositories import (
     WorkflowTaskRepository,
 )
 from repositories.exceptions import (
-    DependencyCycleError,
-    ForeignKeyViolationError,
     NotFoundError,
 )
 from repositories.tenant_bootstrap import (
@@ -86,7 +85,7 @@ _NO_SESSION = "no workflow execution is bound to the current run; cannot manage 
 #: out of the session's persisted state, so it never leaks into another
 #: participant's later turn on the same shared session. Read by :func:`_user_id`
 #: below, and (via that helper) by every write tool in this module and in
-#: ``approval_tools.py``/``design_task_tools.py``.
+#: ``approval_tools.py``/``task_template_tools.py``.
 ACTING_USER_STATE_KEY = "temp:actingUserId"
 
 
@@ -279,9 +278,9 @@ async def _settle_certificate(
     The counterpart of
     :meth:`services.workflow_task.WorkflowTaskService._settle_certificate`,
     which only covers the REST path. The execution agent drives a run's statuses
-    through :func:`create_workflow_task` and :func:`update_workflow_task`
-    instead, so without this a normal run's tasks would never be granted a
-    certificate at all -- and every MCP call they made would be refused.
+    through :func:`update_workflow_task` instead, so without this a normal run's
+    tasks would never be granted a certificate at all -- and every MCP call they
+    made would be refused.
 
     Best-effort, unlike the service's version. The status write has already
     committed by the time this runs, so raising here would report a failure for
@@ -434,69 +433,6 @@ def _topo_sort(keys: list[str], by_key: dict[str, dict[str, Any]]) -> list[str] 
     return order if len(order) == len(keys) else None
 
 
-async def create_workflow_task(
-    title: str,
-    tool_context: ToolContext,
-    description: str | None = None,
-    depends_on_ids: list[str] | None = None,
-    status: str | None = None,
-    tool_bindings: list[dict[str, str]] | None = None,
-) -> dict[str, Any]:
-    """Create a single WorkflowTask in the current session.
-
-    Use this to add a task incrementally after the initial task templates were registered.
-    ``depends_on_ids`` must reference ids of tasks that already exist in the same
-    session (use :func:`list_workflow_tasks` to find them).
-
-    Args:
-        title: The task title (required).
-        tool_context: Injected by ADK; identifies the current session. Not shown
-            to the model.
-        description: Optional longer description.
-        depends_on_ids: Optional ids of existing same-session tasks this task
-            depends on.
-        status: Optional initial status; defaults to ``pending``. One of
-            "pending", "in_progress", "completed", "failed", "skipped".
-        tool_bindings: Optional MCP tools to bind to the task, each
-            ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``.
-            Bound tools are the only MCP tools the task may invoke via
-            ``call_mcp_tool`` while in progress. **Bind every tool the task
-            needs before or in the same call that marks it "in_progress"**: the
-            task's permission to call tools is fixed at that moment, so a tool
-            bound afterwards cannot be called.
-
-    Returns:
-        The created task dict, or ``{"error": <message>}`` on an invalid status,
-        unknown dependency, unknown MCP server, cycle, or unresolved session.
-    """
-    status_enum = _parse_status(status)
-    if status is not None and status_enum is None:
-        return _invalid_status_error(status)
-    bindings = _parse_tool_bindings(tool_bindings or [])
-    if bindings is None:
-        return _invalid_tools_error("tool_bindings")
-    try:
-        async with _repos(tool_context) as s:
-            data = WorkflowTaskCreate(
-                workflow_execution_id=s.execution_id,
-                title=title,
-                description=description,
-                depends_on_ids=depends_on_ids or [],
-                status=status_enum or WorkflowTaskStatus.pending,
-                tool_bindings=bindings,
-            )
-            acting_user_id = _user_id(tool_context)
-            task = await s.task_repo.create(data, user_id=acting_user_id)
-            # A task can be created already in_progress, which is the same edge
-            # ``update_workflow_task`` handles -- just at insert time instead.
-            await _settle_certificate(s, task, acting_user_id)
-            return _task_to_dict(task)
-    except NoTenantSessionError:
-        return {"error": _NO_SESSION}
-    except (ForeignKeyViolationError, DependencyCycleError) as exc:
-        return {"error": str(exc)}
-
-
 async def list_workflow_tasks(tool_context: ToolContext) -> dict[str, Any]:
     """List all WorkflowTasks in the current session, in creation order.
 
@@ -548,35 +484,30 @@ async def get_workflow_task(task_id: str, tool_context: ToolContext) -> dict[str
 async def update_workflow_task(
     task_id: str,
     tool_context: ToolContext,
-    title: str | None = None,
-    description: str | None = None,
     status: str | None = None,
     error_kind: str | None = None,
     error_message: str | None = None,
-    depends_on_ids: list[str] | None = None,
-    tool_bindings: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Update fields of a WorkflowTask in the current session.
+    """Advance a WorkflowTask's status in the current session.
 
-    Only the arguments you pass are changed. Use ``status`` to drive the
-    lifecycle (``pending`` -> ``in_progress`` -> ``completed``/``failed``/
-    ``skipped``): mark a task ``in_progress`` before working on it and
-    ``completed``/``failed`` afterwards. Marking it ``in_progress`` is also what
-    grants it permission to call the MCP tools bound to it *at that moment*, so
-    bind them first. Whenever you set ``status`` to
-    "failed", also pass ``error_kind`` and ``error_message`` so the failure can
-    be triaged later. Passing ``depends_on_ids`` replaces the task's full
-    dependency set, letting you edit the DAG after creation; ``tool_bindings``
-    likewise replaces the task's full set of bound MCP tools.
+    Status is the only task field the execution agent may change: the run's
+    task list is fixed at execute time (copied from the workflow's published
+    templates), so titles, descriptions, dependencies, and tool bindings cannot
+    be edited from a run.
+
+    Use ``status`` to drive the lifecycle (``pending`` -> ``in_progress`` ->
+    ``completed``/``failed``/``skipped``): mark a task ``in_progress`` before
+    working on it and ``completed``/``failed`` afterwards. Marking it
+    ``in_progress`` is what grants it permission to call the MCP tools bound to
+    it. Whenever you set ``status`` to "failed", also pass ``error_kind`` and
+    ``error_message`` so the failure can be triaged later.
 
     Args:
         task_id: Id of the task to update.
         tool_context: Injected by ADK; identifies the current session. Not shown
             to the model.
-        title: New title, if changing.
-        description: New description, if changing.
-        status: New status, if changing. One of "pending", "in_progress",
-            "completed", "failed", "skipped".
+        status: New status. One of "pending", "in_progress", "completed",
+            "failed", "skipped".
         error_kind: Why the task failed. Set this together with
             ``status="failed"``. Must be exactly one of these seven values:
             "api_error" (an external API or MCP tool returned an error
@@ -590,21 +521,10 @@ async def update_workflow_task(
         error_message: One-sentence description of the failure, up to 200
             characters. Include the concrete detail ``error_kind`` cannot carry,
             such as the tool or endpoint that failed and what it reported.
-        depends_on_ids: Replacement dependency ids (existing same-session tasks),
-            if changing.
-        tool_bindings: Replacement MCP tool bindings, each
-            ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``,
-            if changing. **Only takes effect while the task is not yet
-            "in_progress"**, or if passed in the same call that starts it: the
-            task's permission to call tools is fixed the moment it becomes
-            "in_progress", so a tool bound after that is rejected by
-            ``call_mcp_tool``. To widen a running task's tools, set it back to
-            "pending", pass the new bindings, then start it again.
 
     Returns:
         The updated task dict, or ``{"error": <message>}`` on an invalid status
-        or error kind, unknown task, cross-session task, unknown dependency,
-        unknown MCP server, cycle, or unresolved session.
+        or error kind, unknown task, cross-session task, or unresolved session.
     """
     status_enum = _parse_status(status)
     if status is not None and status_enum is None:
@@ -612,31 +532,18 @@ async def update_workflow_task(
     error_kind_enum = _parse_error_kind(error_kind)
     if error_kind is not None and error_kind_enum is None:
         return _invalid_error_kind_error(error_kind)
-    bindings = (
-        _parse_tool_bindings(tool_bindings) if tool_bindings is not None else None
-    )
-    if tool_bindings is not None and bindings is None:
-        return _invalid_tools_error("tool_bindings")
     try:
         async with _repos(tool_context) as s:
             existing = await s.task_repo.get(task_id)
             if existing is None or existing.workflow_execution_id != s.execution_id:
                 return _not_in_session_error(task_id)
             fields: dict[str, Any] = {}
-            if title is not None:
-                fields["title"] = title
-            if description is not None:
-                fields["description"] = description
             if status_enum is not None:
                 fields["status"] = status_enum
             if error_kind_enum is not None:
                 fields["error_kind"] = error_kind_enum
             if error_message is not None:
                 fields["error_message"] = error_message
-            if depends_on_ids is not None:
-                fields["depends_on_ids"] = depends_on_ids
-            if bindings is not None:
-                fields["tool_bindings"] = bindings
             acting_user_id = _user_id(tool_context)
             try:
                 task = await s.task_repo.update(
@@ -651,32 +558,5 @@ async def update_workflow_task(
             await _settle_certificate(s, task, acting_user_id)
             await _evaluate_completion(s)
             return _task_to_dict(task)
-    except NoTenantSessionError:
-        return {"error": _NO_SESSION}
-    except (ForeignKeyViolationError, DependencyCycleError) as exc:
-        return {"error": str(exc)}
-
-
-async def delete_workflow_task(
-    task_id: str, tool_context: ToolContext
-) -> dict[str, Any]:
-    """Delete a WorkflowTask from the current session.
-
-    Args:
-        task_id: Id of the task to delete.
-        tool_context: Injected by ADK; identifies the current session. Not shown
-            to the model.
-
-    Returns:
-        ``{"deleted": <task_id>}`` on success, or ``{"error": <message>}`` if the
-        session cannot be resolved or the task does not belong to it.
-    """
-    try:
-        async with _repos(tool_context) as s:
-            existing = await s.task_repo.get(task_id)
-            if existing is None or existing.workflow_execution_id != s.execution_id:
-                return _not_in_session_error(task_id)
-            await s.task_repo.delete(task_id)
-            return {"deleted": task_id}
     except NoTenantSessionError:
         return {"error": _NO_SESSION}

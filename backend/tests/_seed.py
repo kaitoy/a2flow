@@ -19,6 +19,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
+from models.workflow_task import (
+    WorkflowTask,
+    WorkflowTaskDependency,
+    WorkflowTaskStatus,
+    WorkflowTaskToolBinding,
+)
 
 #: Named test actors seeded with ``id == username`` so ``X-User-Id: alice`` works.
 DEFAULT_TEST_USER_IDS: tuple[str, ...] = ("alice", "bob", "carol", "owner", "tester")
@@ -153,3 +159,71 @@ async def grant_tool_certificate(
             return
         service = build_mcp_tool_certificate_service(db, tenant_id=tenant_id)
         await service.issue_for_started_task(task, execution, user_id=SYSTEM_USER_ID)
+
+
+async def seed_workflow_task(
+    engine: AsyncEngine,
+    execution_id: str,
+    *,
+    title: str = "Task",
+    description: str | None = None,
+    status: WorkflowTaskStatus = WorkflowTaskStatus.pending,
+    depends_on_ids: Sequence[str] = (),
+    tool_bindings: Sequence[tuple[str, str]] = (),
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
+    user_id: str = "owner",
+) -> str:
+    """Insert a WorkflowTask, its dependency edges, and its tool bindings.
+
+    Stands in for the ``create_workflow_task`` agent tool that tests once called
+    for setup. A run's tasks are copied from the workflow's published templates
+    at execute time, so the execution agent can no longer create them; a test
+    that needs a task to already exist seeds it straight into the table here.
+
+    Certificate issuance is left to the caller (:func:`grant_tool_certificate`),
+    which is a no-op unless the task is in progress and binds tools.
+
+    Args:
+        engine: The async engine bound to the test database.
+        execution_id: The WorkflowExecution the task belongs to.
+        title: The task title.
+        description: Optional longer description.
+        status: The task's lifecycle status.
+        depends_on_ids: Ids of same-run tasks this task depends on; one
+            dependency edge is written per id.
+        tool_bindings: ``(mcp_server_id, tool_name)`` pairs to bind to the task.
+        tenant_id: Tenant the task belongs to.
+        user_id: Actor recorded in ``created_by`` / ``updated_by``.
+
+    Returns:
+        The new task's id.
+    """
+    async with AsyncSession(engine) as session:
+        task = WorkflowTask(
+            workflow_execution_id=execution_id,
+            title=title,
+            description=description,
+            status=status,
+            tenant_id=tenant_id,
+            created_by=user_id,
+            updated_by=user_id,
+        )
+        session.add(task)
+        await session.commit()
+        await session.refresh(task)
+        # Captured before the second commit: that commit expires ``task``, and
+        # reading an expired attribute outside a greenlet context raises
+        # MissingGreenlet on an async session.
+        task_id = task.id
+        for depends_on_id in depends_on_ids:
+            session.add(
+                WorkflowTaskDependency(task_id=task_id, depends_on_id=depends_on_id)
+            )
+        for server_id, tool_name in tool_bindings:
+            session.add(
+                WorkflowTaskToolBinding(
+                    task_id=task_id, mcp_server_id=server_id, tool_name=tool_name
+                )
+            )
+        await session.commit()
+        return task_id

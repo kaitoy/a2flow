@@ -107,8 +107,8 @@ def _fakes(
     """Build the (registry, session_service, skills_store) fakes for the job.
 
     When ``run_registers`` is set the fake agent run inserts one template into
-    the workflow's task templates, standing in for the ``register_design_tasks`` call a
-    real initial-design run makes.
+    the workflow's task templates, standing in for the ``register_task_templates``
+    call a real initial-design run makes.
 
     When ``run_error`` is set the fake run yields it and ends normally, which is
     how ``ADKAgent`` reports an LLM failure — it does not raise.

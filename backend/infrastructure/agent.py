@@ -23,19 +23,17 @@ from infrastructure.approval_tools import (
     list_users,
     request_approval,
 )
-from infrastructure.design_task_tools import (
-    create_design_task,
-    delete_design_task,
-    get_design_task,
-    list_design_tasks,
-    register_design_tasks,
-    update_design_task,
-)
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
+from infrastructure.task_template_tools import (
+    create_task_template,
+    delete_task_template,
+    get_task_template,
+    list_task_templates,
+    register_task_templates,
+    update_task_template,
+)
 from infrastructure.workflow_task_tools import (
     ACTING_USER_STATE_KEY,
-    create_workflow_task,
-    delete_workflow_task,
     get_workflow_task,
     list_workflow_tasks,
     update_workflow_task,
@@ -244,10 +242,10 @@ _DESIGN_REGISTRATION_RULES = (
     "can only use an MCP tool at run time if you bind it here, so decide this "
     "now: if a step needs an external tool, bind it by adding a `tools` entry "
     '(`[{"server_id": ..., "tool_name": ...}]`) to that task in '
-    "`register_design_tasks`. Bind only the tools a task actually needs. If "
+    "`register_task_templates`. Bind only the tools a task actually needs. If "
     "the listing comes back with no servers, or none of the tools fit, simply "
     "register the task templates without any `tools` entries. Express the steps "
-    "as a DAG and register them in ONE call to `register_design_tasks`, using "
+    "as a DAG and register them in ONE call to `register_task_templates`, using "
     "each task's `key` and `depends_on` to encode ordering.\n\n"
     "Title each task as a terse imperative label: 2 to 4 words, at most 30 "
     'characters (e.g. "Gather sources", "Validate schema", "Publish report"). '
@@ -276,9 +274,9 @@ DESIGN_AGENT_INSTRUCTION = (
     "Workflow: the task templates you manage here are the workflow's reusable "
     "design, executed later (and possibly many times) in separate workflow "
     "sessions once the workflow is published.\n\n"
-    "Use `list_design_tasks` to see the current task templates. Refine them as "
-    "the user asks with `create_design_task`, `update_design_task`, and "
-    "`delete_design_task`; when there are no task templates yet (or the user "
+    "Use `list_task_templates` to see the current task templates. Refine them as "
+    "the user asks with `create_task_template`, `update_task_template`, and "
+    "`delete_task_template`; when there are no task templates yet (or the user "
     "asks to rebuild them from scratch), follow the Skill's instructions to "
     "break the request into concrete steps. " + _DESIGN_REGISTRATION_RULES + "\n\n"
     "After changing the task templates, present the result and ask whether "
@@ -309,9 +307,10 @@ EXECUTION_AGENT_INSTRUCTION = (
     "be done; use `skipped` only when the Skill says to skip).\n"
     "6. Repeat from step 1.\n\n"
     "Never start a task before its dependencies are completed. When every task is "
-    "completed, failed, or skipped, summarize the outcome. Use "
-    "`create_workflow_task`, `get_workflow_task`, and `delete_workflow_task` to "
-    "adjust the task list when needed.\n\n"
+    "completed, failed, or skipped, summarize the outcome. The task list is "
+    "fixed -- it was copied from the workflow's published templates -- so you "
+    "cannot add, remove, or restructure tasks; you only advance their statuses. "
+    "Use `list_workflow_tasks` and `get_workflow_task` to inspect them.\n\n"
     "Human approval: when a task requires a person's explicit go-ahead before you "
     "act (for example a destructive or irreversible operation), call "
     "`request_approval(title, description, workflow_task_id, ...)` to record a "
@@ -429,30 +428,29 @@ def resolve_model() -> LiteLlm | str:
 
 
 #: Task-management toolset per skill-backed agent kind. Design kinds edit the
-#: workflow's task templates through the design tools; the execution kind
-#: manages the run's WorkflowTasks (with no bulk registration — the tasks come
-#: pre-copied from the templates) plus the approval and MCP invocation tools.
+#: workflow's task templates through the task-template tools; the execution kind
+#: only advances the run's WorkflowTasks through their statuses -- the tasks are
+#: pre-copied from the published templates and cannot be added, removed, or
+#: restructured mid-run -- plus the approval and MCP invocation tools.
 _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
     AgentKind.initial_design: [
-        register_design_tasks,
-        list_design_tasks,
+        register_task_templates,
+        list_task_templates,
         list_mcp_tools,
     ],
     AgentKind.design: [
-        register_design_tasks,
-        create_design_task,
-        list_design_tasks,
-        get_design_task,
-        update_design_task,
-        delete_design_task,
+        register_task_templates,
+        create_task_template,
+        list_task_templates,
+        get_task_template,
+        update_task_template,
+        delete_task_template,
         list_mcp_tools,
     ],
     AgentKind.execution: [
-        create_workflow_task,
         list_workflow_tasks,
         get_workflow_task,
         update_workflow_task,
-        delete_workflow_task,
         request_approval,
         get_approval,
         list_users,
@@ -471,8 +469,9 @@ def create_agent(
     When ``skill_dir`` is provided, the directory is loaded as an ADK Skill and
     exposed to the agent via SkillToolset, and ``kind`` selects the instruction
     and task toolset: design kinds manage the workflow's task templates
-    (``*_design_task`` tools), while the execution kind manages the run's
-    WorkflowTasks plus the approval and MCP invocation tools. The
+    (``*_task_template`` tools), while the execution kind advances the run's
+    WorkflowTasks through their statuses plus the approval and MCP invocation
+    tools. The
     ``initial_design`` kind is built without the A2UI toolset (and without
     the A2UI instruction rules) because its run happens in the background with
     no client connected to execute frontend tools. Without ``skill_dir`` the

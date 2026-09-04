@@ -11,7 +11,7 @@ task templates have drifted from the snapshot taken at publish time, and runs
 keep using that snapshot until the workflow is published again), and one left
 ``failed`` by its design run recovers to ``draft``, since rebuilding the
 templates is what repairs a failed design. The design agent's tools
-(``infrastructure/design_task_tools.py``) go straight to the repository, so
+(``infrastructure/task_template_tools.py``) go straight to the repository, so
 they make the same call themselves — task templates refined by chat are no
 more published, and no more broken, than ones edited here.
 """

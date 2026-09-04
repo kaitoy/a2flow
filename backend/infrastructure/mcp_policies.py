@@ -292,9 +292,11 @@ class TaskCertificatePolicy:
     which.
 
     What the certificate adds over the binding policy is that its grant was
-    **signed at issuance**. The execution agent can rewrite its own task's
-    ``tool_bindings`` mid-run, so a rule that reads bindings at call time is a
-    rule the agent can widen. It cannot re-sign a certificate.
+    **signed at issuance**. A run's ``tool_bindings`` come from the workflow's
+    published templates copied at execute time and the execution agent cannot
+    edit them, but a rule that re-read bindings at call time would still trust
+    whatever the row says now -- a later edit to the workflow, say. The signed
+    grant does not: it cannot be re-signed after issuance.
 
     The two grantors are not interchangeable, and this is where that is
     enforced: an initiator grant is refused for a task that has an approval

@@ -189,14 +189,14 @@ def _template_to_dict(template: WorkflowTaskTemplateRead) -> dict[str, Any]:
     }
 
 
-def _not_in_design_error(template_id: str) -> dict[str, Any]:
+def _not_in_template_error(template_id: str) -> dict[str, Any]:
     """Build the error payload for a template absent from the current workflow's task templates."""
     return {
-        "error": f"design task {template_id!r} not found in the current workflow's task templates"
+        "error": f"task template {template_id!r} not found in the current workflow's task templates"
     }
 
 
-async def register_design_tasks(
+async def register_task_templates(
     tasks: list[dict[str, Any]], tool_context: ToolContext
 ) -> dict[str, Any]:
     """Register a whole set of task templates (a DAG) for the current workflow at once.
@@ -223,7 +223,7 @@ async def register_design_tasks(
 
     Templates are created in dependency order; ``depends_on`` keys are resolved
     to the real template ids before edges are written, and that creation order
-    is what :func:`list_design_tasks` later returns. ``tools`` binds MCP tools
+    is what :func:`list_task_templates` later returns. ``tools`` binds MCP tools
     to the task: when the workflow is executed, the task copied from the
     template may invoke those tools (and only those) via ``call_mcp_tool``.
     Discover the available servers and tools with ``list_mcp_tools`` first, and
@@ -330,7 +330,7 @@ async def register_design_tasks(
         return {"error": _NO_SESSION}
 
 
-async def create_design_task(
+async def create_task_template(
     title: str,
     tool_context: ToolContext,
     description: str | None = None,
@@ -341,7 +341,7 @@ async def create_design_task(
 
     Use this to add a task incrementally after the initial task templates were registered.
     ``depends_on_ids`` must reference ids of templates that already exist in the
-    same workflow (use :func:`list_design_tasks` to find them).
+    same workflow (use :func:`list_task_templates` to find them).
 
     Moves a ``published`` parent workflow to ``modified``.
 
@@ -390,7 +390,7 @@ async def create_design_task(
         return {"error": str(exc)}
 
 
-async def list_design_tasks(tool_context: ToolContext) -> dict[str, Any]:
+async def list_task_templates(tool_context: ToolContext) -> dict[str, Any]:
     """List all task templates of the current workflow, in creation order.
 
     Args:
@@ -412,7 +412,7 @@ async def list_design_tasks(tool_context: ToolContext) -> dict[str, Any]:
         return {"error": _NO_SESSION}
 
 
-async def get_design_task(
+async def get_task_template(
     template_id: str, tool_context: ToolContext
 ) -> dict[str, Any]:
     """Fetch a single task template from the current workflow's task templates.
@@ -430,13 +430,13 @@ async def get_design_task(
         async with _repos(tool_context) as s:
             template = await s.template_repo.get(template_id)
             if template is None or template.workflow_id != s.workflow_id:
-                return _not_in_design_error(template_id)
+                return _not_in_template_error(template_id)
             return _template_to_dict(template)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
 
 
-async def update_design_task(
+async def update_task_template(
     template_id: str,
     tool_context: ToolContext,
     title: str | None = None,
@@ -486,7 +486,7 @@ async def update_design_task(
         async with _repos(tool_context) as s:
             existing = await s.template_repo.get(template_id)
             if existing is None or existing.workflow_id != s.workflow_id:
-                return _not_in_design_error(template_id)
+                return _not_in_template_error(template_id)
             fields: dict[str, Any] = {}
             if title is not None:
                 fields["title"] = title
@@ -503,7 +503,7 @@ async def update_design_task(
                     user_id=_user_id(tool_context),
                 )
             except NotFoundError:
-                return _not_in_design_error(template_id)
+                return _not_in_template_error(template_id)
             await s.mark_design_edited(tool_context)
             return _template_to_dict(template)
     except NoTenantSessionError:
@@ -512,7 +512,7 @@ async def update_design_task(
         return {"error": str(exc)}
 
 
-async def delete_design_task(
+async def delete_task_template(
     template_id: str, tool_context: ToolContext
 ) -> dict[str, Any]:
     """Delete a task template from the current workflow's task templates.
@@ -533,7 +533,7 @@ async def delete_design_task(
         async with _repos(tool_context) as s:
             existing = await s.template_repo.get(template_id)
             if existing is None or existing.workflow_id != s.workflow_id:
-                return _not_in_design_error(template_id)
+                return _not_in_template_error(template_id)
             await s.template_repo.delete(template_id)
             await s.mark_design_edited(tool_context)
             return {"deleted": template_id}

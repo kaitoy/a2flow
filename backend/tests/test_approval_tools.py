@@ -6,7 +6,7 @@ throwaway database and drives the tools with a lightweight fake
 ToolContext exposing only ``session.id`` and ``user_id``.
 """
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from types import SimpleNamespace
 from typing import Any
 
@@ -21,10 +21,7 @@ from infrastructure.approval_tools import (
     list_users,
     request_approval,
 )
-from infrastructure.workflow_task_tools import (
-    ACTING_USER_STATE_KEY,
-    create_workflow_task,
-)
+from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
 from models.approval import Approval, ApprovalStatus
 from models.notification import Notification, NotificationType
 from models.user import SYSTEM_USER_ID, Role
@@ -37,7 +34,12 @@ from repositories import (
     SqlUserRepository,
 )
 from tests._engine import make_test_engine
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+from tests._seed import (
+    DEFAULT_TEST_TENANT_ID,
+    seed_tenant,
+    seed_users,
+    seed_workflow_task,
+)
 
 
 @pytest_asyncio.fixture()
@@ -92,15 +94,35 @@ def _ctx(
     )
 
 
-async def _seed_task(ctx: Any = None, *, title: str = "Act") -> str:
-    """Create a WorkflowTask in the current session and return its id.
+async def _seed_task(
+    ctx: Any = None,
+    *,
+    title: str = "Act",
+    depends_on_ids: Sequence[str] = (),
+    tool_bindings: Sequence[tuple[str, str]] = (),
+) -> str:
+    """Seed a WorkflowTask in the current session and return its id.
 
     ``request_approval`` requires the id of the task the approval authorizes, so
     almost every test needs one even when the task itself is not what is being
-    exercised.
+    exercised. The execution agent can no longer create tasks, so this inserts
+    straight into the table via :func:`tests._seed.seed_workflow_task`, reading
+    the monkeypatched engine the tools themselves use.
     """
-    created = await create_workflow_task(title, ctx if ctx is not None else _ctx())
-    return str(created["id"])
+    from infrastructure import database
+
+    session_id = (ctx if ctx is not None else _ctx()).session.id
+    async with AsyncSession(database.engine) as db:
+        execution = await _execution_repo(db).get_by_session_id(session_id)
+        assert execution is not None
+        execution_id = execution.id
+    return await seed_workflow_task(
+        database.engine,
+        execution_id,
+        title=title,
+        depends_on_ids=depends_on_ids,
+        tool_bindings=tool_bindings,
+    )
 
 
 async def _notifications_for(eng: AsyncEngine, user_id: str) -> list[Notification]:
@@ -179,13 +201,13 @@ async def test_request_approval_without_session_errors(engine: AsyncEngine) -> N
 
 async def test_request_approval_links_valid_task(engine: AsyncEngine) -> None:
     await _seed_session(engine)
-    task = await create_workflow_task("A task", _ctx())
+    task_id = await _seed_task(title="A task")
     result = await request_approval(
-        "Approve task", _ctx(), approver="alice", workflow_task_id=task["id"]
+        "Approve task", _ctx(), approver="alice", workflow_task_id=task_id
     )
     assert "error" not in result
     fetched = await get_approval(result["approval_id"], _ctx())
-    assert fetched["workflow_task_id"] == task["id"]
+    assert fetched["workflow_task_id"] == task_id
 
 
 async def test_request_approval_records_approver(engine: AsyncEngine) -> None:
@@ -207,9 +229,9 @@ async def test_request_approval_rejects_unknown_approver(engine: AsyncEngine) ->
 async def test_request_approval_rejects_foreign_task(engine: AsyncEngine) -> None:
     await _seed_session(engine, session_id="sess-a")
     await _seed_session(engine, session_id="sess-b")
-    task = await create_workflow_task("In A", _ctx("sess-a"))
+    task_id = await _seed_task(_ctx("sess-a"), title="In A")
     result = await request_approval(
-        "Approve", _ctx("sess-b"), approver="alice", workflow_task_id=task["id"]
+        "Approve", _ctx("sess-b"), approver="alice", workflow_task_id=task_id
     )
     assert "error" in result
 
@@ -681,18 +703,17 @@ async def test_request_approval_rejects_the_asking_step(engine: AsyncEngine) -> 
     """
     await _seed_session(engine)
     server_id = await _seed_mcp_server(engine)
-    asking = await create_workflow_task("Request approval", _ctx())
-    acting = await create_workflow_task(
-        "Launch instance",
-        _ctx(),
-        depends_on_ids=[asking["id"]],
-        tool_bindings=[{"server_id": server_id, "tool_name": "launch"}],
+    asking = await _seed_task(title="Request approval")
+    acting = await _seed_task(
+        title="Launch instance",
+        depends_on_ids=[asking],
+        tool_bindings=[(server_id, "launch")],
     )
     result = await request_approval(
-        "Approve the launch", _ctx(), asking["id"], approver="alice"
+        "Approve the launch", _ctx(), asking, approver="alice"
     )
     assert "error" in result
-    assert acting["id"] in result["error"]
+    assert acting in result["error"]
     assert "Launch instance" in result["error"]
 
 
@@ -702,40 +723,36 @@ async def test_request_approval_walks_the_dag_transitively(
     """The acting task is found however many steps downstream it sits."""
     await _seed_session(engine)
     server_id = await _seed_mcp_server(engine)
-    asking = await create_workflow_task("Request approval", _ctx())
-    middle = await create_workflow_task(
-        "Prepare payload", _ctx(), depends_on_ids=[asking["id"]]
-    )
-    acting = await create_workflow_task(
-        "Launch instance",
-        _ctx(),
-        depends_on_ids=[middle["id"]],
-        tool_bindings=[{"server_id": server_id, "tool_name": "launch"}],
+    asking = await _seed_task(title="Request approval")
+    middle = await _seed_task(title="Prepare payload", depends_on_ids=[asking])
+    acting = await _seed_task(
+        title="Launch instance",
+        depends_on_ids=[middle],
+        tool_bindings=[(server_id, "launch")],
     )
     result = await request_approval(
-        "Approve the launch", _ctx(), asking["id"], approver="alice"
+        "Approve the launch", _ctx(), asking, approver="alice"
     )
     assert "error" in result
-    assert acting["id"] in result["error"]
+    assert acting in result["error"]
 
 
 async def test_request_approval_accepts_the_acting_task(engine: AsyncEngine) -> None:
     """Naming the task that binds the tools is the shape the gate is built on."""
     await _seed_session(engine)
     server_id = await _seed_mcp_server(engine)
-    asking = await create_workflow_task("Request approval", _ctx())
-    acting = await create_workflow_task(
-        "Launch instance",
-        _ctx(),
-        depends_on_ids=[asking["id"]],
-        tool_bindings=[{"server_id": server_id, "tool_name": "launch"}],
+    asking = await _seed_task(title="Request approval")
+    acting = await _seed_task(
+        title="Launch instance",
+        depends_on_ids=[asking],
+        tool_bindings=[(server_id, "launch")],
     )
     result = await request_approval(
-        "Approve the launch", _ctx(), acting["id"], approver="alice"
+        "Approve the launch", _ctx(), acting, approver="alice"
     )
     assert "error" not in result, result
     fetched = await get_approval(result["approval_id"], _ctx())
-    assert fetched["workflow_task_id"] == acting["id"]
+    assert fetched["workflow_task_id"] == acting
 
 
 async def test_request_approval_allows_a_task_with_no_tools_anywhere_downstream(
@@ -743,10 +760,10 @@ async def test_request_approval_allows_a_task_with_no_tools_anywhere_downstream(
 ) -> None:
     """An approval may gate an action that uses no MCP tool at all."""
     await _seed_session(engine)
-    asking = await create_workflow_task("Draft the notice", _ctx())
-    await create_workflow_task("Publish it", _ctx(), depends_on_ids=[asking["id"]])
+    asking = await _seed_task(title="Draft the notice")
+    await _seed_task(title="Publish it", depends_on_ids=[asking])
     result = await request_approval(
-        "Approve the wording", _ctx(), asking["id"], approver="alice"
+        "Approve the wording", _ctx(), asking, approver="alice"
     )
     assert "error" not in result, result
 
@@ -762,15 +779,12 @@ async def test_request_approval_ignores_tools_bound_upstream(
     """
     await _seed_session(engine)
     server_id = await _seed_mcp_server(engine)
-    earlier = await create_workflow_task(
-        "Gather sources",
-        _ctx(),
-        tool_bindings=[{"server_id": server_id, "tool_name": "search"}],
+    earlier = await _seed_task(
+        title="Gather sources",
+        tool_bindings=[(server_id, "search")],
     )
-    named = await create_workflow_task(
-        "Approve the summary", _ctx(), depends_on_ids=[earlier["id"]]
-    )
+    named = await _seed_task(title="Approve the summary", depends_on_ids=[earlier])
     result = await request_approval(
-        "Approve the summary", _ctx(), named["id"], approver="alice"
+        "Approve the summary", _ctx(), named, approver="alice"
     )
     assert "error" not in result, result

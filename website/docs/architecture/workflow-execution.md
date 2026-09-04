@@ -44,4 +44,4 @@ A run ends `completed` when every task reached a terminal status with no failure
 
 Marking a task `in_progress` is not bookkeeping. It is what unlocks that task's tools: the [proxy](./mcp-proxy.md) allows a call only when the tool is bound to a task the run currently has in progress. A task that has ended can no longer act, and one not yet started never could.
 
-The agent may also rewrite the run's task list mid-flight when the work calls for it — including the tool bindings of the task it is working on. That is exactly why an [approval](./approvals.md) does not re-read those bindings when it matters: it signs the set it saw at the moment the approver decided.
+The run's task list and every task's tool bindings are fixed when the run starts — copied from the workflow's published design — and the agent only advances statuses. It cannot add, remove, or re-bind a task. That is also why an [approval](./approvals.md) does not re-read a task's bindings when it matters: it signs the set it saw at the moment the approver decided, so no later change to the workflow can widen a grant already given.

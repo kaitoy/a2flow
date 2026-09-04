@@ -26,10 +26,11 @@ approver, or the run's initiator.
 The certificate's ``subjectAltName`` carries the tools the grant covers,
 snapshotted from the task's ``tool_bindings`` at issuance (see
 :mod:`infrastructure.mcp_certificate` for the URN grammar). That snapshot is the
-point, and it is what makes both paths equally binding: the execution agent can
-rewrite a task's bindings mid-run through ``update_workflow_task``, but it
-cannot re-issue the certificate, so rewriting them cannot widen what it may
-call.
+point, and it is what makes both paths equally binding: a run's tasks and their
+``tool_bindings`` come from the workflow's published templates copied at execute
+time and the execution agent cannot edit them, and even a later edit to the
+workflow cannot re-issue a certificate already granted, so nothing widens what a
+task may call once its grant is set.
 
 ``private_key_encrypted`` follows the write-only pattern of
 :attr:`models.system_settings.SystemSettings.smtp_password`: Fernet ciphertext,

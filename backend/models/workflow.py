@@ -172,7 +172,7 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     ``POST /workflows/{id}/publish``, ``.../discard-changes``, and
     ``.../deactivate``, and by any edit to a workflow or one of its task
     templates, whether it arrives through the API or through the design
-    agent's tools (``infrastructure/design_task_tools.py``) — such an edit
+    agent's tools (``infrastructure/task_template_tools.py``) — such an edit
     moves a ``published`` workflow to ``modified``, and a task-template write
     additionally recovers a ``failed`` one to ``draft``.
 
