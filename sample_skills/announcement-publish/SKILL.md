@@ -1,13 +1,13 @@
 ---
 name: announcement-publish
-description: Draft an announcement and publish it after human approval. Use this skill whenever the user wants to write and put out a notice, announcement, or heads-up — including requests phrased as "draft an announcement and publish it", "write a release note and post it", "compose a heads-up about the maintenance window", "let everyone know we shipped the new feature", or "post a public notice for the outage". Also use it when the user describes a message they want communicated to others (a release, an outage, a policy change, an event) and the implied action is to write it up and publish it, even if they don't say the word "announce". This skill produces text only — it never runs external commands or external tools; "publishing" means presenting the finalized text.
+description: Draft an announcement and publish it after human approval. Use this skill whenever the user wants to write and put out a notice, announcement, or heads-up — including requests phrased as "draft an announcement and publish it", "write a release note and post it", "compose a heads-up about the maintenance window", "let everyone know we shipped the new feature", or "post a public notice for the outage". Also use it when the user describes a message they want communicated to others (a release, an outage, a policy change, an event) and the implied action is to write it up and publish it, even if they don't say the word "announce". This skill produces text only: nothing is sent anywhere, and "publishing" means presenting the finalized text.
 ---
 
 # Announcement Publish
 
 Draft an announcement, get it approved by a human, then publish it. The core principle: an announcement goes out to other people, so a wrong or premature one is hard to take back. You **draft it, get explicit approval of the wording, finalize the format, get explicit approval to publish, then publish, then confirm**. Never publish without both approvals.
 
-This skill is self-contained: every step is something you do by writing text. Do not run shell commands or call any external tool. "Publishing" here means presenting the finalized announcement as your final output — nothing leaves this conversation.
+This skill is self-contained: every step is something you do by writing text, and it needs no external system. "Publishing" here means presenting the finalized announcement as your final output — nothing leaves this conversation.
 
 ## Workflow
 

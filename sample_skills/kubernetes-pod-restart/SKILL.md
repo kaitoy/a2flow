@@ -1,21 +1,23 @@
 ---
 name: kubernetes-pod-restart
-description: Restart Kubernetes pods safely using kubectl. Use this skill whenever the user wants to restart, recycle, bounce, or cycle pods, deployments, statefulsets, or daemonsets — including requests phrased as "restart the api pods", "my pod is stuck in CrashLoopBackOff, restart it", "roll the deployment", "kill that pod so it comes back fresh", or "pods need a restart after the config change". Also use it when the user describes a symptom (a hung, crashing, OOMKilled, or stale pod) and the implied fix is a restart, even if they don't say the word "restart".
+description: Restart Kubernetes pods safely. Use this skill whenever the user wants to restart, recycle, bounce, or cycle pods, deployments, statefulsets, or daemonsets — including requests phrased as "restart the api pods", "my pod is stuck in CrashLoopBackOff, restart it", "roll the deployment", "kill that pod so it comes back fresh", or "pods need a restart after the config change". Also use it when the user describes a symptom (a hung, crashing, OOMKilled, or stale pod) and the implied fix is a restart, even if they don't say the word "restart".
 ---
 
 # Kubernetes Pod Restart
 
 Restart Kubernetes workloads safely. The core principle: a restart in the wrong namespace can take down production, so you **identify the exact target, show it to the user, get confirmation, then act, then verify**. Never skip the confirmation step.
 
+Each operation below is named in its `kubectl` form, because that is the vocabulary the Kubernetes API is documented in. Perform it however you can reach the cluster.
+
 ## Two restart methods
 
-There is no `kubectl restart pod` command. Choose the right approach:
+There is no "restart pod" operation. Choose the right approach:
 
-**`kubectl rollout restart`** — the default and preferred method. Works on Deployments, StatefulSets, and DaemonSets. It does a rolling restart: new pods come up before old ones terminate, so there is no downtime. Use this whenever the user refers to a workload, a service, or "the pods" of an app in general.
+**A rolling restart of the workload** (`kubectl rollout restart`) — the default and preferred method. Works on Deployments, StatefulSets, and DaemonSets. New pods come up before old ones terminate, so there is no downtime. Use this whenever the user refers to a workload, a service, or "the pods" of an app in general.
 
-**`kubectl delete pod <name>`** — deletes a single pod; its controller (ReplicaSet/Deployment/etc.) recreates it. Use this only when the user genuinely wants one specific pod gone — e.g. a single stuck pod among many healthy replicas. The replacement pod is created fresh, but for a brief moment that replica is down. A bare pod with no controller will NOT come back — warn the user if you detect this.
+**Deleting a single pod** (`kubectl delete pod <name>`) — its controller (ReplicaSet/Deployment/etc.) recreates it. Use this only when the user genuinely wants one specific pod gone — e.g. a single stuck pod among many healthy replicas. The replacement pod is created fresh, but for a brief moment that replica is down. A bare pod with no controller will NOT come back — warn the user if you detect this.
 
-When in doubt, prefer `rollout restart` on the owning workload. It is the safe, standard answer.
+When in doubt, prefer a rolling restart of the owning workload. It is the safe, standard answer.
 
 ## Workflow
 
@@ -23,20 +25,20 @@ When in doubt, prefer `rollout restart` on the owning workload. It is the safe, 
 
 The user specifies the target one of two ways:
 
-**By name** — they name the resource and (ideally) the namespace: "restart the `api` deployment in `prod`". If the namespace is missing, ask for it rather than guessing — defaulting to `default` is a common cause of "nothing happened" or, worse, hitting the wrong environment. Confirm the resource exists:
+**By name** — they name the resource and (ideally) the namespace: "restart the `api` deployment in `prod`". If the namespace is missing, ask for it rather than guessing — defaulting to `default` is a common cause of "nothing happened" or, worse, hitting the wrong environment. Confirm the resource exists before going further:
 
 ```
 kubectl get deployment <name> -n <namespace>
 ```
 
-**By symptom** — they describe a problem: "restart whatever is CrashLoopBackOff-ing", "the OOMKilled pod". Investigate first:
+**By symptom** — they describe a problem: "restart whatever is CrashLoopBackOff-ing", "the OOMKilled pod". List the pods and investigate first:
 
 ```
 kubectl get pods -n <namespace>
-kubectl get pods -A   # if namespace is unknown
+kubectl get pods -A   # if the namespace is unknown
 ```
 
-Find the matching pod(s), then trace each one to its owning workload so you can do a clean `rollout restart`:
+Find the matching pod(s), then trace each one to its owning workload so you can do a clean rolling restart — the owner is on the pod's `metadata.ownerReferences`:
 
 ```
 kubectl get pod <pod> -n <namespace> -o jsonpath='{.metadata.ownerReferences[0].kind}/{.metadata.ownerReferences[0].name}'
@@ -46,12 +48,12 @@ A pod owned by a ReplicaSet belongs to a Deployment — restart the Deployment, 
 
 ### 2. Confirm before acting
 
-This step is mandatory. Show the user exactly what you found and what you intend to run, then wait for explicit approval:
+This step is mandatory. Show the user exactly what you found and what you intend to do, then wait for explicit approval:
 
 ```
 Target: deployment/api  (namespace: prod)
   Current pods: api-7d4f8-abc12 (Running), api-7d4f8-xyz89 (Running)
-Planned command: kubectl rollout restart deployment/api -n prod
+Planned action: rolling restart of deployment/api in prod
 
 Proceed?
 ```
@@ -60,7 +62,7 @@ Be especially deliberate when the namespace or context looks like production (`p
 
 ### 3. Execute
 
-After approval, run the chosen command:
+After approval, perform the chosen restart:
 
 ```
 kubectl rollout restart deployment/<name> -n <namespace>
@@ -74,19 +76,19 @@ kubectl delete pod <pod> -n <namespace>
 
 ### 4. Verify the restart completed
 
-Don't stop at "command ran". A restart that leaves pods crashing is not a successful restart. Watch it land:
+Don't stop at "it was accepted". A restart that leaves pods crashing is not a successful restart. Watch it land:
 
 ```
 kubectl rollout status deployment/<name> -n <namespace> --timeout=120s
 ```
 
-For a deleted pod, confirm the replacement is Ready:
+For a deleted pod, poll the pod list until the replacement is Ready:
 
 ```
-kubectl get pods -n <namespace> -w   # or poll kubectl get pods until Ready
+kubectl get pods -n <namespace>
 ```
 
-Then report the outcome: which pods are now running, that they reached Ready, and how long it took. If `rollout status` times out or pods are crashing, say so clearly and show the relevant `kubectl describe` / `kubectl logs` output so the user can debug — a failed rollout is important news, not something to gloss over.
+Then report the outcome: which pods are now running, that they reached Ready, and how long it took. If the rollout times out or pods are crashing, say so clearly and show the relevant `kubectl describe` / `kubectl logs` output so the user can debug — a failed rollout is important news, not something to gloss over.
 
 ## Reporting format
 

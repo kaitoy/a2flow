@@ -635,6 +635,12 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
     # offered as ChoicePicker options rather than typed into a TextField.
     assert "list every allowed value as an option" in rendered
     assert "register_task_templates" not in rendered
+    # The Skill is generic, so the instruction owns the A2Flow half: how a
+    # go-ahead in the Skill maps onto an approval, and an external step onto
+    # the task's bound MCP tools.
+    assert "never names your tools" in rendered
+    assert "address the request to the one eligible group" in rendered
+    assert "never assume either" in rendered
     # The execution agent only advances statuses; it cannot restructure tasks.
     assert "task list is fixed" in rendered
     assert "create_workflow_task" not in rendered
@@ -655,6 +661,9 @@ def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None
     rendered = provider(ctx)
     assert "register_task_templates" in rendered
     assert "Never execute a task" in rendered
+    # A go-ahead the Skill asks for has to become a step of its own, since
+    # that is what an approval at run time takes effect from.
+    assert "register that ask as a task of its own" in rendered
     assert "A2UI Rules" in rendered
     # Titles are listed as chips, so the shared rules ask for short ones.
     assert "at most 30 characters" in rendered
@@ -672,6 +681,7 @@ def test_create_agent_initial_design_kind_has_no_a2ui(tmp_path: Any) -> None:
     assert isinstance(agent.instruction, str)
     assert "register_task_templates" in agent.instruction
     assert "unattended" in agent.instruction
+    assert "register that ask as a task of its own" in agent.instruction
     assert "at most 30 characters" in agent.instruction
     assert not any(isinstance(t, AGUIToolset) for t in agent.tools)
 

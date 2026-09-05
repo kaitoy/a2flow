@@ -234,9 +234,18 @@ def keep_a2ui_context(context: Sequence[Context]) -> list[Context]:
     return [entry for entry in context if entry.description in allowed]
 
 
-#: Shared description of the bulk-registration call, used by both design
-#: instructions so the DAG/tool-binding rules stay identical.
+#: Shared rules for turning a Skill into task templates, used by both design
+#: instructions so the translation, DAG, and tool-binding rules stay identical.
 _DESIGN_REGISTRATION_RULES = (
+    "The Skill describes the work in plain terms. It knows nothing about "
+    "A2Flow's tasks, approvals, or MCP servers and never names a tool of "
+    "yours, so translating it is your job. Where the Skill says a person must "
+    "approve, sign off, or give a go-ahead before a step, register that ask as "
+    "a task of its own, ordered before every step it gates: at run time an "
+    "approval covers the task it names and every task after it up to the next "
+    "approval, so a step of its own is what makes the gate land in the right "
+    "place. Where the Skill says to act on an external system, that is the "
+    "task that needs an MCP tool binding.\n\n"
     "ALWAYS call `list_mcp_tools` exactly once before registering the task "
     "templates, to see the tools available on the registered MCP servers. A task "
     "can only use an MCP tool at run time if you bind it here, so decide this "
@@ -292,6 +301,10 @@ EXECUTION_AGENT_INSTRUCTION = (
     "copied from the workflow's published templates (the workflow's description "
     "is provided as context). Begin executing immediately — do NOT redesign the "
     "tasks and do NOT ask for approval of them.\n\n"
+    "The Skill describes the work in plain terms and never names your tools. "
+    "Read it that way: where it says a person must approve, sign off, or give "
+    "a go-ahead, use the approval flow below; where it says to act on an "
+    "external system, use the current task's bound MCP tools.\n\n"
     "Execute: loop until no `pending` tasks remain:\n"
     "1. Call `list_workflow_tasks` to see the current tasks and their statuses.\n"
     "2. Pick the next runnable task: a `pending` task whose `depends_on_ids` are "
@@ -302,7 +315,12 @@ EXECUTION_AGENT_INSTRUCTION = (
     "tools (its `tool_bindings`), invoke them with "
     "`call_mcp_tool(server_id, tool_name, arguments)`; only tools bound to the "
     "current `in_progress` task are allowed, and calls to unbound tools are "
-    "rejected.\n"
+    "rejected. Call `list_mcp_tools` to read a bound tool's exact name and "
+    "input schema — never assume either — then map the values the Skill "
+    "gathered onto the fields that schema actually declares, translating names "
+    "and units as needed and passing only fields it accepts. If a call returns "
+    "an error, report it verbatim and mark the task `failed`; never retry with "
+    "silently altered arguments.\n"
     "5. Call `update_workflow_task` to set `completed` (or `failed` if it cannot "
     "be done; use `skipped` only when the Skill says to skip).\n"
     "6. Repeat from step 1.\n\n"
@@ -326,7 +344,13 @@ EXECUTION_AGENT_INSTRUCTION = (
     "`approver_group_id` (one group's `id`, looked up with `list_user_groups`). "
     "Prefer a group when any member of a team may decide, so the request is not "
     "blocked on one person's availability; name a single user when the Skill "
-    "calls for a specific person. Everyone eligible is notified, but one decision "
+    "calls for a specific person. Choose that destination yourself: call "
+    "`list_user_groups` first and address the request to the one eligible group "
+    "when there is exactly one; when several are eligible, ask the user which "
+    "team with `render_a2ui` rather than guessing. Fall back to `list_users` "
+    "only when no group is eligible, applying the same rule. If neither yields "
+    "an eligible destination, mark the task `failed` and tell the user no "
+    "eligible approver exists. Everyone eligible is notified, but one decision "
     "from any eligible member completes the request. Then briefly explain the "
     "request in plain text "
     "and call the `render_approval` tool with the returned `approval_id` to show "
