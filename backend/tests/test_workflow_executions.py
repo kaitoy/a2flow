@@ -978,7 +978,7 @@ async def test_initiator_id_must_reference_an_existing_user(
 async def test_tool_invocations_lists_the_runs_recorded_decisions(
     workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """Rows are written by the MCP proxy, so this seeds them directly."""
+    """Rows are written by the MCP gateway, so this seeds them directly."""
     from models.mcp_tool_invocation import McpAuditDecision, MCPToolInvocation
 
     client, engine = workflow_client_with_engine

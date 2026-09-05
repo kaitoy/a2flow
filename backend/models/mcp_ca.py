@@ -8,7 +8,7 @@ table holds it: a self-signed root whose private key never leaves the backend.
 **One root for the whole platform, not one per tenant.** A tenant-scoped CA
 would add a key per tenant without adding a boundary: verification already
 compares the tenant recorded in the certificate's ``subjectAltName`` binding
-URN against the tenant the proxy independently derived from the ADK session id
+URN against the tenant the gateway independently derived from the ADK session id
 (:func:`repositories.tenant_bootstrap.resolve_workflow_execution_tenant`), so a
 certificate minted for tenant A is rejected in tenant B on the binding check
 regardless of which key signed it. Splitting the CA would only multiply the

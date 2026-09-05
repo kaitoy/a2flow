@@ -1,6 +1,6 @@
-"""Tests for the MCP proxy layer and its policy chain.
+"""Tests for the MCP gateway layer and its policy chain.
 
-Covers ``infrastructure.mcp_proxy`` (authentication, the policy chain, secret
+Covers ``infrastructure.mcp_gateway`` (authentication, the policy chain, secret
 expansion, session lifetime) and ``infrastructure.mcp_policies`` (the
 in-progress tool-binding rule) directly, below the ADK tool functions that
 ``tests/test_mcp_tools.py`` drives.
@@ -23,12 +23,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure import database
 from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
 from infrastructure.mcp_credentials import ApprovalCredentialProvider
-from infrastructure.mcp_policies import (
-    InProgressToolBindingPolicy,
-    PassThroughPolicy,
-    default_policies,
-)
-from infrastructure.mcp_proxy import (
+from infrastructure.mcp_gateway import (
     MOCKED_META_KEY,
     AgentRunAuthenticator,
     CallToolRequest,
@@ -36,15 +31,20 @@ from infrastructure.mcp_proxy import (
     McpAuthenticationError,
     McpCallContext,
     McpClientCredential,
+    McpGateway,
     McpIdentity,
     McpOperation,
     McpPolicyDeniedError,
     McpPrincipal,
-    McpProxy,
     McpServerUnknownError,
     McpServerUnusableError,
     McpUpstreamError,
     PrincipalKind,
+)
+from infrastructure.mcp_policies import (
+    InProgressToolBindingPolicy,
+    PassThroughPolicy,
+    default_policies,
 )
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
@@ -73,7 +73,7 @@ from tests._seed import (
 async def engine(
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[AsyncEngine, None]:
-    """Yield a throwaway engine and point the proxy's module-level engine at it."""
+    """Yield a throwaway engine and point the gateway's module-level engine at it."""
     eng = await make_test_engine()
     await seed_users(eng)
     await seed_tenant(eng)
@@ -324,7 +324,7 @@ async def test_call_tool_restates_an_auth_failure_for_its_operation(
     engine: AsyncEngine,
 ) -> None:
     with pytest.raises(McpAuthenticationError) as excinfo:
-        await McpProxy().call_tool(
+        await McpGateway().call_tool(
             CallToolRequest(_principal("nope"), "srv", "search", {})
         )
     assert "cannot use MCP tools" in excinfo.value.message
@@ -334,7 +334,7 @@ async def test_list_tools_restates_an_auth_failure_for_its_operation(
     engine: AsyncEngine,
 ) -> None:
     with pytest.raises(McpAuthenticationError) as excinfo:
-        await McpProxy().list_tools(ListToolsRequest(_principal("nope")))
+        await McpGateway().list_tools(ListToolsRequest(_principal("nope")))
     assert "cannot list MCP tools" in excinfo.value.message
 
 
@@ -344,7 +344,7 @@ async def test_list_tools_restates_an_auth_failure_for_its_operation(
 async def test_empty_chain_allows_an_unbound_tool(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The binding rule is genuinely a policy, not something baked into the proxy."""
+    """The binding rule is genuinely a policy, not something baked into the gateway."""
     server_id = await _seed_server(engine)
     await _seed_session(engine)
 
@@ -356,7 +356,7 @@ async def test_empty_chain_allows_an_unbound_tool(
     monkeypatch.setattr(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
     )
-    result = await McpProxy(policies=[]).call_tool(
+    result = await McpGateway(policies=[]).call_tool(
         CallToolRequest(_principal(), server_id, "anything", {})
     )
     assert result.isError is False
@@ -373,7 +373,7 @@ async def test_policies_run_in_order_and_the_first_denial_short_circuits(
     last = _RecordingPolicy(log, "last")
 
     with pytest.raises(McpPolicyDeniedError) as excinfo:
-        await McpProxy(policies=[first, denier, last]).call_tool(
+        await McpGateway(policies=[first, denier, last]).call_tool(
             CallToolRequest(_principal(), server_id, "search", {})
         )
     assert excinfo.value.message == "denied by denier"
@@ -397,7 +397,7 @@ async def test_a_denial_never_opens_a_connection(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
     )
     with pytest.raises(McpPolicyDeniedError):
-        await McpProxy(policies=[_RecordingPolicy([], "no", deny=True)]).call_tool(
+        await McpGateway(policies=[_RecordingPolicy([], "no", deny=True)]).call_tool(
             CallToolRequest(_principal(), server_id, "search", {})
         )
     assert called == []
@@ -409,7 +409,7 @@ async def test_call_context_carries_the_whole_operation(engine: AsyncEngine) -> 
     spy = _RecordingPolicy([], "spy", deny=True)
 
     with pytest.raises(McpPolicyDeniedError):
-        await McpProxy(policies=[spy]).call_tool(
+        await McpGateway(policies=[spy]).call_tool(
             CallToolRequest(_principal(), server_id, "search", {"q": "a2flow"})
         )
     ctx = spy.contexts[0]
@@ -436,7 +436,7 @@ async def test_listing_consults_the_chain_with_its_own_operation(
     monkeypatch.setattr(
         "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
     )
-    await McpProxy(policies=[spy]).list_tools(ListToolsRequest(_principal()))
+    await McpGateway(policies=[spy]).list_tools(ListToolsRequest(_principal()))
     assert [c.operation for c in spy.contexts] == [McpOperation.list_tools]
     assert spy.contexts[0].server_id == server_id
     assert spy.contexts[0].server_name == "visible"
@@ -466,7 +466,7 @@ async def test_binding_policy_denies_a_design_run(engine: AsyncEngine) -> None:
     await _seed_design_session(engine, session_id="design-only")
     server_id = await _seed_server(engine)
     with pytest.raises(McpPolicyDeniedError) as excinfo:
-        await McpProxy(policies=default_policies()).call_tool(
+        await McpGateway(policies=default_policies()).call_tool(
             CallToolRequest(_principal("design-only"), server_id, "search", {})
         )
     assert "no workflow execution" in excinfo.value.message
@@ -484,7 +484,7 @@ async def test_binding_policy_denies_when_no_task_is_in_progress(
         bindings=[(server_id, "search")],
     )
     with pytest.raises(McpPolicyDeniedError) as excinfo:
-        await McpProxy(policies=default_policies()).call_tool(
+        await McpGateway(policies=default_policies()).call_tool(
             CallToolRequest(_principal(), server_id, "search", {})
         )
     assert "in_progress" in excinfo.value.message
@@ -497,7 +497,7 @@ async def test_binding_policy_denies_an_unbound_tool_and_lists_the_bound_ones(
     execution_id = await _seed_session(engine)
     await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
     with pytest.raises(McpPolicyDeniedError) as excinfo:
-        await McpProxy(policies=default_policies()).call_tool(
+        await McpGateway(policies=default_policies()).call_tool(
             CallToolRequest(_principal(), server_id, "delete_everything", {})
         )
     assert "not bound" in excinfo.value.message
@@ -520,7 +520,7 @@ async def test_binding_policy_allows_the_union_of_in_progress_tasks(
     monkeypatch.setattr(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
     )
-    proxy = McpProxy(policies=default_policies())
+    gateway = McpGateway(policies=default_policies())
     for tool_name in ("alpha", "beta"):
         # The full chain runs here, so each call presents its own task's
         # certificate the way the real agent-side caller does.
@@ -530,7 +530,7 @@ async def test_binding_policy_allows_the_union_of_in_progress_tasks(
             tool_name=tool_name,
             arguments={},
         )
-        result = await proxy.call_tool(
+        result = await gateway.call_tool(
             CallToolRequest(_principal(credential=credential), server_id, tool_name, {})
         )
         assert result.isError is False
@@ -556,7 +556,7 @@ async def test_binding_policy_ignores_listings(engine: AsyncEngine) -> None:
 async def test_call_tool_rejects_an_unregistered_server(engine: AsyncEngine) -> None:
     await _seed_session(engine)
     with pytest.raises(McpServerUnknownError) as excinfo:
-        await McpProxy(policies=[]).call_tool(
+        await McpGateway(policies=[]).call_tool(
             CallToolRequest(_principal(), "srv-missing", "search", {})
         )
     assert "is not registered" in excinfo.value.message
@@ -569,7 +569,7 @@ async def test_call_tool_cannot_reach_another_tenants_server(
     theirs = await _seed_server(engine, name="theirs", tenant_id="tenant-other")
     await _seed_session(engine)
     with pytest.raises(McpServerUnknownError):
-        await McpProxy(policies=[]).call_tool(
+        await McpGateway(policies=[]).call_tool(
             CallToolRequest(_principal(), theirs, "search", {})
         )
 
@@ -593,7 +593,7 @@ async def test_call_tool_reports_an_unresolvable_secret_without_connecting(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
     )
     with pytest.raises(McpServerUnusableError) as excinfo:
-        await McpProxy(policies=[]).call_tool(
+        await McpGateway(policies=[]).call_tool(
             CallToolRequest(_principal(), server_id, "search", {})
         )
     assert "cannot resolve secret 'nope'" in excinfo.value.message
@@ -615,7 +615,7 @@ async def test_call_tool_wraps_an_unreachable_server_naming_it(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
     )
     with pytest.raises(McpUpstreamError) as excinfo:
-        await McpProxy(policies=[]).call_tool(
+        await McpGateway(policies=[]).call_tool(
             CallToolRequest(_principal(), server_id, "search", {})
         )
     assert "'flaky'" in excinfo.value.message
@@ -625,7 +625,7 @@ async def test_call_tool_wraps_an_unreachable_server_naming_it(
 async def test_call_tool_returns_a_tool_level_error_untouched(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A server reporting a failure is a successful proxy operation."""
+    """A server reporting a failure is a successful gateway operation."""
     server_id = await _seed_server(engine)
     await _seed_session(engine)
 
@@ -637,7 +637,7 @@ async def test_call_tool_returns_a_tool_level_error_untouched(
     monkeypatch.setattr(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
     )
-    result = await McpProxy(policies=[]).call_tool(
+    result = await McpGateway(policies=[]).call_tool(
         CallToolRequest(_principal(), server_id, "search", {})
     )
     assert result.isError is True
@@ -664,7 +664,7 @@ async def test_call_tool_expands_secrets_and_env_placeholders_for_stdio(
     monkeypatch.setattr(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
     )
-    await McpProxy(policies=[]).call_tool(
+    await McpGateway(policies=[]).call_tool(
         CallToolRequest(_principal(), server_id, "read_file", {})
     )
     assert seen["connection"] == StdioConnection(
@@ -697,7 +697,7 @@ async def test_call_tool_closes_the_session_before_the_outbound_call(
     monkeypatch.setattr(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
     )
-    await McpProxy(policies=[], session_factory=tracking_session).call_tool(
+    await McpGateway(policies=[], session_factory=tracking_session).call_tool(
         CallToolRequest(_principal(), server_id, "search", {})
     )
     assert closed == [True]
@@ -772,7 +772,7 @@ async def test_call_tool_reaches_the_server_when_nothing_is_stubbed(
         "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
     )
     audit = _CountingAuditSink()
-    result = await McpProxy(policies=[], audit=audit).call_tool(
+    result = await McpGateway(policies=[], audit=audit).call_tool(
         CallToolRequest(_principal(), server_id, "search", {})
     )
     assert called == ["search"]
@@ -793,7 +793,7 @@ async def test_a_stubbed_call_skips_the_server_and_the_audit(
     monkeypatch.setattr("infrastructure.mcp_client.call_server_tool", _explode)
     stub = _RecordingStub(stubbed=True)
     audit = _CountingAuditSink()
-    result = await McpProxy(policies=[], audit=audit, stub=stub).call_tool(
+    result = await McpGateway(policies=[], audit=audit, stub=stub).call_tool(
         CallToolRequest(_principal(), server_id, "search", {})
     )
     assert (result.meta or {}).get(MOCKED_META_KEY) is True
@@ -811,11 +811,11 @@ async def test_a_stubbed_call_is_still_run_through_the_policy_chain(
     log: list[str] = []
     policy = _RecordingPolicy(log, "gate", deny=True)
     with pytest.raises(McpPolicyDeniedError):
-        await McpProxy(policies=[policy], stub=stub).call_tool(
+        await McpGateway(policies=[policy], stub=stub).call_tool(
             CallToolRequest(_principal(), server_id, "search", {})
         )
     assert log == ["gate"]
-    # Asked, so the proxy could tell the refusal was of a stubbed call, but
+    # Asked, so the gateway could tell the refusal was of a stubbed call, but
     # never asked to answer -- which is what keeps a response unconsumed.
     assert len(stub.asked) == 1
     assert stub.answered == []
@@ -829,7 +829,7 @@ async def test_a_refused_stubbed_call_is_not_audited(
     await _seed_session(engine)
     audit = _CountingAuditSink()
     with pytest.raises(McpPolicyDeniedError):
-        await McpProxy(
+        await McpGateway(
             policies=[_RecordingPolicy([], "gate", deny=True)],
             audit=audit,
             stub=_RecordingStub(stubbed=True),
@@ -845,7 +845,7 @@ async def test_a_refused_unstubbed_call_is_still_audited(
     await _seed_session(engine)
     audit = _CountingAuditSink()
     with pytest.raises(McpPolicyDeniedError):
-        await McpProxy(
+        await McpGateway(
             policies=[_RecordingPolicy([], "gate", deny=True)],
             audit=audit,
             stub=_RecordingStub(stubbed=False),
@@ -858,7 +858,7 @@ async def test_the_stub_is_not_consulted_for_a_listing(engine: AsyncEngine) -> N
     await _seed_server(engine)
     await _seed_session(engine)
     stub = _RecordingStub(stubbed=True)
-    await McpProxy(policies=[], stub=stub).list_tools(ListToolsRequest(_principal()))
+    await McpGateway(policies=[], stub=stub).list_tools(ListToolsRequest(_principal()))
     assert stub.asked == []
 
 
@@ -867,7 +867,7 @@ async def test_the_stub_is_not_consulted_for_a_listing(engine: AsyncEngine) -> N
 
 async def test_list_tools_on_an_empty_registry(engine: AsyncEngine) -> None:
     await _seed_session(engine)
-    assert await McpProxy().list_tools(ListToolsRequest(_principal())) == []
+    assert await McpGateway().list_tools(ListToolsRequest(_principal())) == []
 
 
 async def test_list_tools_isolates_an_unreachable_server(
@@ -887,7 +887,7 @@ async def test_list_tools_isolates_an_unreachable_server(
     )
     by_id = {
         entry.server_id: entry
-        for entry in await McpProxy().list_tools(ListToolsRequest(_principal()))
+        for entry in await McpGateway().list_tools(ListToolsRequest(_principal()))
     }
     assert [tool.name for tool in by_id[good_id].tools] == ["search"]
     assert by_id[good_id].error is None
@@ -923,7 +923,7 @@ async def test_list_tools_isolates_a_secret_failure_without_connecting(
     )
     by_id = {
         entry.server_id: entry
-        for entry in await McpProxy().list_tools(ListToolsRequest(_principal()))
+        for entry in await McpGateway().list_tools(ListToolsRequest(_principal()))
     }
     assert by_id[good_id].error is None
     assert "cannot resolve secret 'missing'" in (by_id[bad_id].error or "")
@@ -948,5 +948,5 @@ async def test_list_tools_stays_tenant_scoped(
     monkeypatch.setattr(
         "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
     )
-    listings = await McpProxy().list_tools(ListToolsRequest(_principal()))
+    listings = await McpGateway().list_tools(ListToolsRequest(_principal()))
     assert [entry.server_id for entry in listings] == [mine]

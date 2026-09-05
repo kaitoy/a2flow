@@ -58,7 +58,7 @@ class SqlMcpToolInvocationRepository:
         """Store the session and the tenant these records belong to.
 
         Args:
-            session: The proxy's open database session.
+            session: The gateway's open database session.
             tenant_id: Tenant the audited run belongs to, or ``None`` for a
                 super_admin read across every tenant. Recording always needs a
                 concrete tenant -- see :meth:`_require_tenant`.
@@ -84,7 +84,7 @@ class SqlMcpToolInvocationRepository:
         """Append one decision record and commit it.
 
         Commits rather than leaving the transaction open because the caller is
-        the proxy, which writes a denial on its way out through an exception:
+        the gateway, which writes a denial on its way out through an exception:
         an uncommitted row would be rolled back by the session's ``__aexit__``
         and the refusal would go unrecorded.
 

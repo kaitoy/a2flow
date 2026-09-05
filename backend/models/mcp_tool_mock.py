@@ -19,8 +19,8 @@ lets one mock express a scenario -- approve the first request, reject the second
 -- rather than only a fixed value.
 
 Mocks are resolved by :mod:`infrastructure.tool_mocks`, which is consulted
-*before* the MCP proxy. A mocked call therefore never reaches
-:class:`infrastructure.mcp_proxy.McpProxy` and is deliberately absent from the
+*before* the MCP gateway. A mocked call therefore never reaches
+:class:`infrastructure.mcp_gateway.McpGateway` and is deliberately absent from the
 ``mcp_tool_invocations`` audit trail: that table records real, authorized calls,
 and a stub that never went upstream is not one.
 """

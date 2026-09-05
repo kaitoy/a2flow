@@ -1,15 +1,15 @@
 """The caller side of the tool-certificate exchange: presenting one.
 
-:mod:`infrastructure.mcp_proxy` and :mod:`infrastructure.mcp_policies` are the
+:mod:`infrastructure.mcp_gateway` and :mod:`infrastructure.mcp_policies` are the
 *verifier*. This module is the *presenter*: it finds the certificate that
 covers the call the agent is about to make, signs a proof-of-possession
-challenge with that certificate's private key, and hands both to the proxy.
+challenge with that certificate's private key, and hands both to the gateway.
 
-**Why it lives outside the proxy.** Today verifier and presenter run in one
+**Why it lives outside the gateway.** Today verifier and presenter run in one
 process against one database, so the split is a boundary in the code rather
 than in the deployment -- and the proof of possession accordingly proves
 nothing an attacker who owns this process could not also forge. The split is
-still where the value is: it is the shape the system takes when the proxy is
+still where the value is: it is the shape the system takes when the gateway is
 lifted to an HTTP endpoint, at which point this module is what remains on the
 agent's side of the wire and the signature starts carrying real weight. Keeping
 the two apart now means that lift does not have to disentangle them.
@@ -49,7 +49,7 @@ from infrastructure.mcp_certificate import (
     pop_digest,
     sign_pop_digest,
 )
-from infrastructure.mcp_proxy import McpClientCredential
+from infrastructure.mcp_gateway import McpClientCredential
 from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
 from models.mcp_tool_certificate import McpToolCertificate
 from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
@@ -69,7 +69,7 @@ async def _default_session() -> AsyncIterator[AsyncSession]:
 
     Referenced through the :mod:`infrastructure.database` module rather than by
     importing ``engine`` directly so a test can monkeypatch ``database.engine``
-    -- the same reason :class:`infrastructure.mcp_proxy.McpProxy` does it.
+    -- the same reason :class:`infrastructure.mcp_gateway.McpGateway` does it.
     """
     async with AsyncSession(database.engine) as session:
         yield session
@@ -202,7 +202,7 @@ def get_approval_credential_provider() -> ApprovalCredentialProvider:
     """Return the process-wide credential provider.
 
     Cached here rather than in :mod:`dependencies.singletons` for the same
-    reason :func:`infrastructure.mcp_proxy.get_mcp_proxy` is: the agent tool
+    reason :func:`infrastructure.mcp_gateway.get_mcp_gateway` is: the agent tool
     path must reach it without importing the dependencies package, which would
     cycle back through :mod:`infrastructure.agent`.
 

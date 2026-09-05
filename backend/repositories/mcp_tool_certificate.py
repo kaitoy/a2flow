@@ -2,7 +2,7 @@
 
 Tenant-scoped like every other resource repository: the filter is applied
 explicitly on each query rather than through an ORM listener, because the MCP
-proxy and the agent tools open their own sessions outside FastAPI's request
+gateway and the agent tools open their own sessions outside FastAPI's request
 scope where a request-scoped listener would silently not apply.
 
 There is no ``update`` beyond :meth:`SqlMcpToolCertificateRepository.revoke`.

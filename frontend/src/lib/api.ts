@@ -841,9 +841,9 @@ export async function deleteMcpToolMock(id: string): Promise<void> {
 /**
  * List the MCP tool-call decisions recorded for one workflow execution.
  *
- * Only calls that reached the MCP proxy appear here — allowed ones that went
+ * Only calls that reached the MCP gateway appear here — allowed ones that went
  * upstream and denied ones a policy vetoed. A call answered by a tool mock never
- * reaches the proxy, so it shows in the chat transcript instead.
+ * reaches the gateway, so it shows in the chat transcript instead.
  */
 export async function listWorkflowExecutionToolInvocations(
   executionId: string,

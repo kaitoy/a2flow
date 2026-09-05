@@ -240,7 +240,7 @@ class WorkflowExecutionService:
         """Return the MCP tool-call decisions recorded for an execution.
 
         These are the calls that actually reached
-        :class:`infrastructure.mcp_proxy.McpProxy` — allowed ones that went
+        :class:`infrastructure.mcp_gateway.McpGateway` — allowed ones that went
         upstream and denied ones that a policy vetoed. A call answered by a mock
         (see :mod:`infrastructure.tool_mocks`) never reaches the proxy and so is
         deliberately absent here; the chat transcript is where a mocked call is

@@ -3,7 +3,7 @@
 Everything here is pure: no database session, no ORM row, no settings lookup
 beyond what a caller passes in. That keeps the rules an approval certificate
 encodes testable on their own, and it is what lets the same code run unchanged
-when the proxy is lifted to an HTTP endpoint and the certificate arrives from a
+when the gateway is lifted to an HTTP endpoint and the certificate arrives from a
 TLS handshake rather than from a local lookup.
 
 **What a certificate claims.** Two things, both carried as ``subjectAltName``
@@ -16,7 +16,7 @@ OID arc, and a made-up one would be indistinguishable from someone else's:
     this certificate speaks for, and **where its authority came from**: an
     approval a human granted (``approval/A``), or the run's own initiator
     granting it to themselves (``initiator/U``) for a task nobody was asked to
-    approve. Verification compares every segment against the context the proxy
+    approve. Verification compares every segment against the context the gateway
     derived independently from the ADK session id, so a certificate minted for
     one run is useless in another.
 

@@ -1,8 +1,8 @@
-"""Append-only audit of every MCP tool call the proxy decided on.
+"""Append-only audit of every MCP tool call the gateway decided on.
 
 One row per ``call_tool`` that reached a registered MCP server, or was stopped
 on its way to one, written by
-:class:`infrastructure.mcp_audit.SqlMcpAuditSink` before the proxy releases its
+:class:`infrastructure.mcp_audit.SqlMcpAuditSink` before the gateway releases its
 database session.
 
 Two kinds of operation are deliberately absent. Listings have no side effect and
@@ -47,7 +47,7 @@ _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
 
 class McpAuditDecision(StrEnum):
-    """Whether the proxy let the call through."""
+    """Whether the gateway let the call through."""
 
     allowed = "allowed"
     denied = "denied"

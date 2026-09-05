@@ -1,7 +1,7 @@
 """A2Flow's own gateway to the MCP servers a tenant has registered.
 
 Every call the agent makes to a user-registered MCP server passes through
-:class:`McpProxy`. The proxy owns the four things the ADK tool functions in
+:class:`McpGateway`. The gateway owns the four things the ADK tool functions in
 :mod:`infrastructure.mcp_tools` used to each own a copy of:
 
 1. **Authentication** -- turning the caller's claimed :class:`McpPrincipal`
@@ -26,17 +26,17 @@ very process is driving, so there is no channel to forge a session id over).
 
 **Shaped for a future HTTP lift.** Every value this module's public surface
 accepts or returns is a plain, serializable value object or an MCP wire type --
-no ``ToolContext``, no ``AsyncSession``, no ORM row. Re-exposing the proxy as
+no ``ToolContext``, no ``AsyncSession``, no ORM row. Re-exposing the gateway as
 an MCP/HTTP endpoint therefore means parsing a request body into
 :class:`CallToolRequest` and replacing the body of
 :meth:`McpAuthenticator.authenticate`; nothing downstream changes. That is also
-when :class:`McpProxyError` earns rows in ``routers/exception_handlers.py``
+when :class:`McpGatewayError` earns rows in ``routers/exception_handlers.py``
 (``McpPolicyDeniedError`` -> 403, ``McpServerUnknownError`` -> 404, the rest ->
 502).
 
-Note for tests: :func:`get_mcp_proxy` is ``lru_cache``d, so a test that needs a
-different policy chain must construct :class:`McpProxy` directly or call
-``get_mcp_proxy.cache_clear()``.
+Note for tests: :func:`get_mcp_gateway` is ``lru_cache``d, so a test that needs a
+different policy chain must construct :class:`McpGateway` directly or call
+``get_mcp_gateway.cache_clear()``.
 """
 
 import asyncio
@@ -95,7 +95,7 @@ _MAX_SERVERS = 1000
 
 
 class PrincipalKind(StrEnum):
-    """How the caller identified itself to the proxy."""
+    """How the caller identified itself to the gateway."""
 
     agent_run = "agent_run"
 
@@ -113,7 +113,7 @@ class McpClientCredential:
 
     Deliberately unverified, exactly like :class:`McpPrincipal`: this is what a
     TLS client certificate plus a signed request header would carry once the
-    proxy speaks HTTP. :meth:`McpAuthenticator.authenticate` turns it into a
+    gateway speaks HTTP. :meth:`McpAuthenticator.authenticate` turns it into a
     :class:`VerifiedCredential`.
 
     Attributes:
@@ -134,7 +134,7 @@ class McpClientCredential:
 class VerifiedCredential:
     """A presented credential whose chain and validity window checked out.
 
-    Carries the PEM rather than a parsed ``x509.Certificate`` so the proxy's
+    Carries the PEM rather than a parsed ``x509.Certificate`` so the gateway's
     public surface stays plainly serializable; a policy that needs the public
     key re-parses it, which costs far less than the signature check it is about
     to do anyway.
@@ -242,7 +242,7 @@ class McpCallContext:
         server_name: The target server's name. Filled for a listing entry, but
             ``None`` while authorizing a call: the row is deliberately loaded
             only after the policy chain allows the call (see
-            :meth:`McpProxy.call_tool`).
+            :meth:`McpGateway.call_tool`).
         tool_name: The target tool, or ``None`` for a listing.
         arguments: The call's arguments, or ``None`` for a listing.
     """
@@ -277,11 +277,11 @@ class ServerToolListing:
     error: str | None = None
 
 
-class McpProxyError(Exception):
-    """Base for every failure the proxy attributes to the caller or the target.
+class McpGatewayError(Exception):
+    """Base for every failure the gateway attributes to the caller or the target.
 
     ``message`` is safe to return to the caller verbatim. Raw underlying
-    reasons are logged by the proxy and reachable through ``__cause__``; they
+    reasons are logged by the gateway and reachable through ``__cause__``; they
     are never folded into ``message`` beyond what the agent-facing contract
     already exposed.
     """
@@ -296,11 +296,11 @@ class McpProxyError(Exception):
         super().__init__(message)
 
 
-class McpAuthenticationError(McpProxyError):
+class McpAuthenticationError(McpGatewayError):
     """Raised when a principal cannot be verified or maps to no known run."""
 
 
-class McpCredentialError(McpProxyError):
+class McpCredentialError(McpGatewayError):
     """Raised when a presented approval certificate does not verify.
 
     Separate from :class:`McpAuthenticationError`, which means "this caller maps
@@ -309,19 +309,19 @@ class McpCredentialError(McpProxyError):
     """
 
 
-class McpPolicyDeniedError(McpProxyError):
+class McpPolicyDeniedError(McpGatewayError):
     """Raised by a policy to veto an operation."""
 
 
-class McpServerUnknownError(McpProxyError):
+class McpServerUnknownError(McpGatewayError):
     """Raised when the target server is not registered in the caller's tenant."""
 
 
-class McpServerUnusableError(McpProxyError):
+class McpServerUnusableError(McpGatewayError):
     """Raised when a registered server's connection spec cannot be built."""
 
 
-class McpUpstreamError(McpProxyError):
+class McpUpstreamError(McpGatewayError):
     """Raised when the target server cannot be reached, launched, or times out."""
 
 
@@ -335,7 +335,7 @@ class McpAuthenticator(Protocol):
 
         Args:
             principal: The caller's claimed identity.
-            db: The proxy's open database session. Valid only for the duration
+            db: The gateway's open database session. Valid only for the duration
                 of this call; do not retain it.
 
         Returns:
@@ -364,7 +364,7 @@ class AgentRunAuthenticator:
     see it.
 
     This is still the seam the transport-level security layer lands in: when the
-    proxy is lifted to an MCP/HTTP endpoint, the mTLS check replaces the session
+    gateway is lifted to an MCP/HTTP endpoint, the mTLS check replaces the session
     id's unconditional trust and nothing downstream changes -- the certificate
     handling here already produces the same :class:`VerifiedCredential`.
     """
@@ -376,7 +376,7 @@ class AgentRunAuthenticator:
 
         Args:
             credential: What the caller presented, or ``None``.
-            db: The proxy's open database session, used to load the root CA.
+            db: The gateway's open database session, used to load the root CA.
 
         Returns:
             The verified credential, or ``None`` when none was presented.
@@ -417,7 +417,7 @@ class AgentRunAuthenticator:
 
         Args:
             principal: The caller's claimed identity.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Returns:
             The verified identity.
@@ -452,10 +452,10 @@ class AgentRunAuthenticator:
 
 
 class McpAuditSink(Protocol):
-    """Receives every ``call_tool`` decision the proxy makes.
+    """Receives every ``call_tool`` decision the gateway makes.
 
     Called once per call, after authentication and either side of the policy
-    chain's verdict, while the proxy's session is still open. Implementations
+    chain's verdict, while the gateway's session is still open. Implementations
     must not raise: an audit failure has to be visible in the logs without
     turning an allowed call into a refused one, or a refusal into a crash.
 
@@ -475,7 +475,7 @@ class McpAuditSink(Protocol):
 
         Args:
             ctx: The operation that was decided on.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
             decision: Whether the call was allowed.
             reason: The refusal message when denied, else ``None``.
         """
@@ -485,9 +485,9 @@ class McpAuditSink(Protocol):
 class NullAuditSink:
     """Discards every decision.
 
-    The default, so a directly constructed :class:`McpProxy` (as in tests) does
-    not need a database table. The process-wide proxy from
-    :func:`get_mcp_proxy` is built with the SQL sink instead.
+    The default, so a directly constructed :class:`McpGateway` (as in tests) does
+    not need a database table. The process-wide gateway from
+    :func:`get_mcp_gateway` is built with the SQL sink instead.
     """
 
     async def record(
@@ -502,14 +502,14 @@ class NullAuditSink:
 
         Args:
             ctx: The operation that was decided on.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
             decision: Whether the call was allowed.
             reason: The refusal message when denied, else ``None``.
         """
 
 
 class McpPolicy(Protocol):
-    """A decision point consulted before every operation the proxy performs.
+    """A decision point consulted before every operation the gateway performs.
 
     Implementations veto by raising :class:`McpPolicyDeniedError` and allow by
     returning. They must not mutate the context, perform the call, or swallow
@@ -528,7 +528,7 @@ class McpPolicy(Protocol):
         Args:
             ctx: The operation being attempted, with the caller already
                 authenticated.
-            db: The proxy's open session, for policies that must query. Valid
+            db: The gateway's open session, for policies that must query. Valid
                 only for the duration of this call; do not retain it.
 
         Raises:
@@ -541,7 +541,7 @@ class McpPolicy(Protocol):
 #: Key set in a stubbed result's ``_meta`` so the ADK boundary can tell the
 #: model its call was answered by a mock. ``_meta`` is the MCP wire type's own
 #: extension slot, which is what keeps the marker on the same value an HTTP
-#: proxy would hand back rather than in a parallel return channel.
+#: gateway would hand back rather than in a parallel return channel.
 MOCKED_META_KEY = "a2flow/mocked"
 
 
@@ -555,7 +555,7 @@ class McpToolStub(Protocol):
     therefore earns no ``mcp_tool_invocations`` row.
 
     **Two methods on purpose.** :meth:`stubs` must be answerable without side
-    effects, because the proxy asks it before the chain runs and on the denial
+    effects, because the gateway asks it before the chain runs and on the denial
     path, while :meth:`answer` consumes one of the run's recorded responses.
     Merging them would make a refused call burn a response it never received.
     """
@@ -568,7 +568,7 @@ class McpToolStub(Protocol):
 
         Args:
             ctx: The operation being attempted.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Returns:
             ``True`` when :meth:`answer` should be called instead of the server.
@@ -586,7 +586,7 @@ class McpToolStub(Protocol):
 
         Args:
             ctx: The operation being attempted.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Returns:
             The result to hand back in place of calling the server, carrying
@@ -598,9 +598,9 @@ class McpToolStub(Protocol):
 class NullToolStub:
     """Stubs nothing.
 
-    The default, so a directly constructed :class:`McpProxy` (as in tests) does
-    not need a run carrying mock snapshots. The process-wide proxy from
-    :func:`get_mcp_proxy` is built with the WorkflowExecution-backed stub.
+    The default, so a directly constructed :class:`McpGateway` (as in tests) does
+    not need a run carrying mock snapshots. The process-wide gateway from
+    :func:`get_mcp_gateway` is built with the WorkflowExecution-backed stub.
     """
 
     async def stubs(self, ctx: McpCallContext, db: AsyncSession) -> bool:
@@ -608,7 +608,7 @@ class NullToolStub:
 
         Args:
             ctx: The operation being attempted.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Returns:
             Always ``False``.
@@ -622,7 +622,7 @@ class NullToolStub:
 
         Args:
             ctx: The operation being attempted.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Raises:
             RuntimeError: Always.
@@ -659,10 +659,10 @@ def _with_error(base: ServerToolListing, error: str) -> ServerToolListing:
     )
 
 
-class McpProxy:
+class McpGateway:
     """Single gateway through which callers reach registered MCP servers.
 
-    The database session is opened by the proxy and **closed before any network
+    The database session is opened by the gateway and **closed before any network
     or subprocess call**: a stdio server spawn can hold the caller for two
     minutes, which must not pin a database connection for the duration. A
     policy's ``db`` is therefore valid only while its ``authorize`` runs.
@@ -678,21 +678,21 @@ class McpProxy:
         session_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]]
         | None = None,
     ) -> None:
-        """Initialize the proxy.
+        """Initialize the gateway.
 
         Args:
             authenticator: Verifies callers. Defaults to
                 :class:`AgentRunAuthenticator`.
             policies: The authorization chain, consulted in order. Defaults to
                 an empty chain, which allows everything -- the process-wide
-                proxy built by :func:`get_mcp_proxy` passes
+                gateway built by :func:`get_mcp_gateway` passes
                 :func:`infrastructure.mcp_policies.default_policies` instead.
             audit: Receives every ``call_tool`` decision that reaches a server.
-                Defaults to :class:`NullAuditSink`; the process-wide proxy built
-                by :func:`get_mcp_proxy` passes the SQL-backed sink instead.
+                Defaults to :class:`NullAuditSink`; the process-wide gateway built
+                by :func:`get_mcp_gateway` passes the SQL-backed sink instead.
             stub: Answers a call from a run's recorded tool mocks. Defaults to
                 :class:`NullToolStub`, which stubs nothing; the process-wide
-                proxy built by :func:`get_mcp_proxy` passes the
+                gateway built by :func:`get_mcp_gateway` passes the
                 WorkflowExecution-backed stub instead.
             session_factory: Opens the database session each operation runs
                 against. Defaults to a session on the module-level engine.
@@ -757,7 +757,7 @@ class McpProxy:
 
         Tool-level failures are *not* raised: they come back inside the returned
         result with ``isError`` set, so the caller can relay them verbatim. Only
-        proxy-level failures raise.
+        gateway-level failures raise.
 
         A call the run stubs (see :class:`McpToolStub`) is authorized exactly
         like any other and then answered from the run's recorded mocks, without
@@ -782,7 +782,7 @@ class McpProxy:
             identity = await self._authenticate(db, request.principal, NO_SESSION)
             # The policy chain runs before the server row is loaded, so a call
             # naming an unregistered *and* unbound server is reported as unbound
-            # rather than as unregistered. That ordering is the pre-proxy
+            # rather than as unregistered. That ordering is the pre-gateway
             # behavior and is deliberately preserved.
             ctx = McpCallContext(
                 operation=McpOperation.call_tool,
@@ -799,7 +799,7 @@ class McpProxy:
             stubbed = await self._stub.stubs(ctx, db)
             try:
                 await self._authorize(ctx, db)
-            except McpProxyError as exc:
+            except McpGatewayError as exc:
                 if not stubbed:
                     await self._record(ctx, db, McpAuditDecision.denied, exc.message)
                 raise
@@ -873,7 +873,7 @@ class McpProxy:
         """Authenticate the caller, restating a failure in the operation's terms.
 
         Args:
-            db: The proxy's open database session.
+            db: The gateway's open database session.
             principal: The caller's claimed identity.
             message: Caller-facing message to report an authentication failure
                 as, which differs per operation.
@@ -894,7 +894,7 @@ class McpProxy:
 
         Args:
             ctx: The operation being attempted.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Raises:
             McpPolicyDeniedError: If any policy vetoes the operation.
@@ -918,7 +918,7 @@ class McpProxy:
 
         Args:
             ctx: The operation that was decided on.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
             decision: Whether the call was allowed.
             reason: The refusal message when denied, else ``None``.
         """
@@ -930,11 +930,11 @@ class McpProxy:
     def _build_resolver(self, db: AsyncSession, tenant_id: str) -> SecretResolver:
         """Build the secret resolver a connection's placeholders expand through.
 
-        Credential injection is the proxy's job: this is the one method that
+        Credential injection is the gateway's job: this is the one method that
         changes when per-caller credentials replace a server's stored headers.
 
         Args:
-            db: The proxy's open database session.
+            db: The gateway's open database session.
             tenant_id: Tenant the resolved secrets must belong to.
 
         Returns:
@@ -997,8 +997,8 @@ class McpProxy:
 
 
 @lru_cache(maxsize=1)
-def get_mcp_proxy() -> McpProxy:
-    """Return the process-wide MCP proxy singleton.
+def get_mcp_gateway() -> McpGateway:
+    """Return the process-wide MCP gateway singleton.
 
     Defined here rather than in ``dependencies/singletons.py`` for the same
     reason :func:`infrastructure.vault_client.get_vault_client` is:
@@ -1008,14 +1008,14 @@ def get_mcp_proxy() -> McpProxy:
     reason -- :mod:`infrastructure.mcp_policies` imports this module.
 
     Returns:
-        The shared proxy, built with the default policy chain, the
+        The shared gateway, built with the default policy chain, the
         database-backed audit sink, and the run's tool-mock stub.
     """
     from infrastructure.mcp_audit import SqlMcpAuditSink
     from infrastructure.mcp_policies import default_policies
     from infrastructure.tool_mocks import WorkflowExecutionToolStub
 
-    return McpProxy(
+    return McpGateway(
         policies=default_policies(),
         audit=SqlMcpAuditSink(),
         stub=WorkflowExecutionToolStub(),

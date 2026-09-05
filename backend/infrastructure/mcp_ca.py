@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 #: Curve used for both the root and every leaf. P-256 is the curve every current
 #: TLS stack accepts, which matters because leaves carry the ``clientAuth``
 #: extended key usage so they can be presented over mTLS unchanged once the
-#: proxy is lifted to an HTTP endpoint.
+#: gateway is lifted to an HTTP endpoint.
 CURVE = ec.SECP256R1()
 
 #: Hash used for every signature this module produces or verifies.
@@ -227,7 +227,7 @@ def sign_leaf_certificate(
 
     The leaf carries ``digitalSignature`` (it signs proof-of-possession
     challenges) and ``clientAuth`` (so the same certificate works unchanged as a
-    TLS client certificate once the proxy becomes an HTTP endpoint). Everything
+    TLS client certificate once the gateway becomes an HTTP endpoint). Everything
     that identifies *what* the certificate authorizes lives in ``sans`` -- see
     :mod:`infrastructure.mcp_certificate` for the URN grammar.
 

@@ -1,6 +1,6 @@
 """Tests for the admin-only tenant-wide ``/mcp-tool-invocations`` List/Get API.
 
-Rows are written only by the MCP proxy's audit sink, so every record here is
+Rows are written only by the MCP gateway's audit sink, so every record here is
 inserted directly through
 :class:`repositories.mcp_tool_invocation.SqlMcpToolInvocationRepository` rather
 than through the API. Covers the role gate (``admin``, with ``super_admin``

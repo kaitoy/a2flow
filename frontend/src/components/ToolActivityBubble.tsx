@@ -27,7 +27,7 @@ function DetailBlock({ label, value }: { label: string; value: unknown }) {
  * Once the call has arguments or a result, the pill becomes a disclosure
  * button: expanding it shows what the tool was called with and what came back,
  * which is the only place a mocked call's details can be inspected — a stub
- * never reaches the MCP proxy, so it leaves no audit row behind.
+ * never reaches the MCP gateway, so it leaves no audit row behind.
  */
 export function ToolActivityBubble({ content }: { content: ToolCallActivityContent }) {
   const [expanded, setExpanded] = useState(false);

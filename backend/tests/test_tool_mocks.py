@@ -3,7 +3,7 @@
 Three things are worth proving here. A mocked call produces the configured
 result; it never reaches the machinery behind the tool (no MCP client traffic,
 no ``mcp_tool_invocations`` row, no ``approvals`` row, no notifications); and --
-for MCP tools, whose stub sits *inside* the proxy behind its policy chain -- it
+for MCP tools, whose stub sits *inside* the gateway behind its policy chain -- it
 is still subject to the same authorization a real call faces. That last part is
 why the MCP cases here seed an ``in_progress`` WorkflowTask binding the target
 tool: without one the call is refused before the stub is ever asked to answer.
@@ -407,7 +407,7 @@ async def test_mocked_mcp_call_can_report_an_error(engine: AsyncEngine) -> None:
 async def test_mocked_mcp_call_reaches_no_server_and_leaves_no_audit_row(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """It goes through the proxy, but stops at the stub inside it."""
+    """It goes through the gateway, but stops at the stub inside it."""
     server_id = await _seed_server(engine)
     await _seed_mocked_run(engine, server_id, [{"kind": "text", "value": "ok"}])
 
@@ -479,7 +479,7 @@ async def test_unmocked_tool_on_a_mocked_run_still_goes_through_the_proxy(
         tool_mocks=[_snapshot(server_id, "write", [{"kind": "text", "value": "ok"}])],
     )
     result = await call_mcp_tool(server_id, "search", {}, _ctx())
-    # Denied by the binding policy, which is exactly the proxy being consulted.
+    # Denied by the binding policy, which is exactly the gateway being consulted.
     assert "error" in result
     assert "mocked" not in result
     # And, unlike a refused *mocked* call, this one is audited: nothing about it

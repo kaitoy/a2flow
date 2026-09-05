@@ -18,22 +18,22 @@ generic tools:
   that a shared, skill-cached agent cannot express through its static toolset.
 
 Neither tool reaches an MCP server itself. Both hand a request to
-:class:`infrastructure.mcp_proxy.McpProxy`, which authenticates the caller, runs
-the policy chain that owns the rule above (see
+:class:`infrastructure.mcp_gateway.McpGateway`, which authenticates the caller,
+runs the policy chain that owns the rule above (see
 :mod:`infrastructure.mcp_policies`), expands the server's secrets, and only then
 calls :mod:`infrastructure.mcp_client`. What is left here is the ADK boundary:
-turn a ``ToolContext`` into a plain principal on the way in, and turn proxy
+turn a ``ToolContext`` into a plain principal on the way in, and turn gateway
 results and errors into the JSON-serializable dicts the LLM consumes on the way
 out -- including mapping every failure to an ``{"error": ...}`` payload the
 model can react to instead of raising.
 
 A draft run may **mock** the tool (see :mod:`infrastructure.tool_mocks`), but
-nothing about that is handled here: the proxy applies the mock itself, behind
+nothing about that is handled here: the gateway applies the mock itself, behind
 its policy chain, and hands back an ordinary result carrying a marker in
 ``_meta``. All this module does is turn that marker into the ``"mocked": true``
 the model sees, through the same ``_result_to_dict`` a real result goes through.
 
-The two tools differ in what the proxy demands of them. ``list_mcp_tools`` only
+The two tools differ in what the gateway demands of them. ``list_mcp_tools`` only
 needs the tenant, so it works in both an execution run (keyed on a
 WorkflowExecution) and a design run (keyed on a Workflow's design session).
 ``call_mcp_tool`` has to check the run's in-progress tasks, so it still requires
@@ -50,15 +50,15 @@ from google.adk.tools.tool_context import ToolContext
 from mcp import types
 
 from infrastructure.mcp_credentials import get_approval_credential_provider
-from infrastructure.mcp_proxy import (
+from infrastructure.mcp_gateway import (
     MOCKED_META_KEY,
     CallToolRequest,
     ListToolsRequest,
+    McpGatewayError,
     McpPrincipal,
-    McpProxyError,
     PrincipalKind,
     ServerToolListing,
-    get_mcp_proxy,
+    get_mcp_gateway,
 )
 from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
 
@@ -66,9 +66,9 @@ logger = logging.getLogger(__name__)
 
 
 def _principal(tool_context: ToolContext) -> McpPrincipal:
-    """Build the proxy principal from the ADK tool context.
+    """Build the gateway principal from the ADK tool context.
 
-    ADK types stop here: the proxy is handed plain scalars, which is what lets
+    ADK types stop here: the gateway is handed plain scalars, which is what lets
     the same call arrive over HTTP later. The acting user is read the same way
     :func:`infrastructure.workflow_task_tools._user_id` reads it -- the
     impersonation-aware per-turn state entry first, the ADK session's fixed
@@ -79,7 +79,7 @@ def _principal(tool_context: ToolContext) -> McpPrincipal:
 
     Returns:
         The caller's claimed identity. ``session_id`` is empty when the context
-        exposes no session, which the proxy rejects.
+        exposes no session, which the gateway rejects.
     """
     session = getattr(tool_context, "session", None)
     state = getattr(tool_context, "state", None)
@@ -96,7 +96,7 @@ def _coerce_arguments(arguments: object) -> dict[str, Any] | None:
 
     Some models emit the arguments object as a JSON string; tolerate that by
     parsing it. This stays at the ADK boundary rather than moving into the
-    proxy: an HTTP proxy would reject a non-object at its schema.
+    gateway: an HTTP endpoint would reject a non-object at its schema.
 
     Args:
         arguments: The raw ``arguments`` value from the model.
@@ -120,7 +120,7 @@ def _coerce_arguments(arguments: object) -> dict[str, Any] | None:
 def _result_to_dict(result: types.CallToolResult) -> dict[str, Any]:
     """Convert a ``tools/call`` result into a plain dict the LLM can consume.
 
-    One function for real and stubbed results alike: the proxy answers a mocked
+    One function for real and stubbed results alike: the gateway answers a mocked
     call with the same wire type, so the two shapes cannot drift apart. The
     ``mocked`` marker it sets in ``_meta`` is the only difference the model sees.
 
@@ -201,10 +201,10 @@ async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
         "error"}, ...]}``. An empty registry yields ``{"servers": []}``.
     """
     try:
-        listings = await get_mcp_proxy().list_tools(
+        listings = await get_mcp_gateway().list_tools(
             ListToolsRequest(principal=_principal(tool_context))
         )
-    except McpProxyError as exc:
+    except McpGatewayError as exc:
         return {"error": exc.message}
     return {"servers": [_listing_to_dict(listing) for listing in listings]}
 
@@ -257,7 +257,7 @@ async def call_mcp_tool(
             tool_name=tool_name,
             arguments=args,
         )
-        result = await get_mcp_proxy().call_tool(
+        result = await get_mcp_gateway().call_tool(
             CallToolRequest(
                 principal=replace(principal, credential=credential),
                 server_id=server_id,
@@ -265,6 +265,6 @@ async def call_mcp_tool(
                 arguments=args,
             )
         )
-    except McpProxyError as exc:
+    except McpGatewayError as exc:
         return {"error": exc.message}
     return _result_to_dict(result)

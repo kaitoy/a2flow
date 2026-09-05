@@ -1,13 +1,13 @@
-"""Access-control policies the MCP proxy consults before every operation.
+"""Access-control policies the MCP gateway consults before every operation.
 
-Kept apart from :mod:`infrastructure.mcp_proxy` on purpose. A policy queries
-the database, so this module depends on :mod:`repositories`; the proxy itself
+Kept apart from :mod:`infrastructure.mcp_gateway` on purpose. A policy queries
+the database, so this module depends on :mod:`repositories`; the gateway itself
 does not need those imports and would turn back into the same god-module the
-proxy was extracted from if it carried them. Adding a rule means adding a class
-here and a line to :func:`default_policies` -- never an edit to the proxy.
+gateway was extracted from if it carried them. Adding a rule means adding a class
+here and a line to :func:`default_policies` -- never an edit to the gateway.
 
 A policy never re-resolves the caller: everything it needs about who is calling
-arrives on :class:`infrastructure.mcp_proxy.McpCallContext`, already
+arrives on :class:`infrastructure.mcp_gateway.McpCallContext`, already
 authenticated.
 """
 
@@ -25,7 +25,7 @@ from infrastructure.mcp_certificate import (
     pop_digest,
     verify_pop_signature,
 )
-from infrastructure.mcp_proxy import (
+from infrastructure.mcp_gateway import (
     McpCallContext,
     McpOperation,
     McpPolicy,
@@ -75,7 +75,7 @@ async def _in_progress_tasks(
     """Return the run's tasks currently in the ``in_progress`` status.
 
     Args:
-        db: The proxy's open database session.
+        db: The gateway's open database session.
         execution_id: The WorkflowExecution driving the run.
         tenant_id: Tenant the run belongs to.
 
@@ -107,7 +107,7 @@ class PassThroughPolicy:
 
         Args:
             ctx: The operation being attempted.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
         """
 
 
@@ -130,7 +130,7 @@ class InProgressToolBindingPolicy:
 
         Args:
             ctx: The operation being attempted.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Raises:
             McpPolicyDeniedError: If the run has no WorkflowExecution, no task
@@ -163,7 +163,7 @@ async def _run_approvals(
     """Return every Approval of the run, in one query.
 
     Args:
-        db: The proxy's open database session.
+        db: The gateway's open database session.
         execution_id: The WorkflowExecution driving the run.
         tenant_id: Tenant the run belongs to.
 
@@ -190,7 +190,7 @@ async def _governing_approvals(
     every branch of a merge.
 
     Args:
-        db: The proxy's open database session.
+        db: The gateway's open database session.
         execution_id: The WorkflowExecution driving the run.
         tenant_id: Tenant the run belongs to.
         task_id: The task to resolve.
@@ -224,7 +224,7 @@ async def _execution_initiator(
     against.
 
     Args:
-        db: The proxy's open database session.
+        db: The gateway's open database session.
         execution_id: The WorkflowExecution driving the run.
         tenant_id: Tenant the run belongs to.
 
@@ -253,7 +253,7 @@ async def _assert_grantor_still_authorizes(
 
     Args:
         ctx: The operation being attempted.
-        db: The proxy's open database session.
+        db: The gateway's open database session.
         binding: The presented certificate's binding, already matched against
             the run and the task.
 
@@ -345,7 +345,7 @@ class TaskCertificatePolicy:
 
         Args:
             ctx: The operation being attempted.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Raises:
             McpPolicyDeniedError: If the call presents no certificate, presents
@@ -457,7 +457,7 @@ class TaskCertificatePolicy:
 
 
 def default_policies() -> list[McpPolicy]:
-    """Return the policy chain the process-wide proxy is built with.
+    """Return the policy chain the process-wide gateway is built with.
 
     Two rules are enforced. First, an agent may invoke only the MCP tools bound
     to a task currently in progress in its run. Second, every call must present

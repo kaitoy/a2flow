@@ -1,7 +1,7 @@
 """End-to-end tests of the certificate gate on MCP tool calls.
 
 Drives the real presenter (:mod:`infrastructure.mcp_credentials`) and the real
-verifier (:class:`infrastructure.mcp_proxy.McpProxy` with the default policy
+verifier (:class:`infrastructure.mcp_gateway.McpGateway` with the default policy
 chain) against a throwaway database, faking only the remote MCP traffic. That
 is the combination the enforcement claim actually rests on, so the cases here
 are the ones worth reading first:
@@ -54,16 +54,16 @@ from infrastructure.mcp_certificate import (
 )
 from infrastructure.mcp_client import McpConnection
 from infrastructure.mcp_credentials import ApprovalCredentialProvider
-from infrastructure.mcp_policies import default_policies
-from infrastructure.mcp_proxy import (
+from infrastructure.mcp_gateway import (
     CallToolRequest,
     ListToolsRequest,
     McpClientCredential,
+    McpGateway,
     McpPolicyDeniedError,
     McpPrincipal,
-    McpProxy,
     PrincipalKind,
 )
+from infrastructure.mcp_policies import default_policies
 from models.approval import Approval, ApprovalStatus
 from models.mcp_server import MCPServer, McpTransport
 from models.mcp_tool_certificate import (
@@ -361,7 +361,7 @@ async def _call(
             flipped = bytearray(credential.signature)
             flipped[-1] ^= 0xFF
             credential = replace(credential, signature=bytes(flipped))
-    return await McpProxy(
+    return await McpGateway(
         policies=default_policies(), audit=SqlMcpAuditSink()
     ).call_tool(CallToolRequest(_principal(credential), server_id, tool, args))
 
@@ -716,7 +716,9 @@ async def test_a_signature_does_not_transfer_to_a_different_call(
     assert credential is not None
 
     with pytest.raises(McpPolicyDeniedError, match="not proven to belong"):
-        await McpProxy(policies=default_policies(), audit=SqlMcpAuditSink()).call_tool(
+        await McpGateway(
+            policies=default_policies(), audit=SqlMcpAuditSink()
+        ).call_tool(
             CallToolRequest(
                 _principal(credential), server_id, TOOL, {"path": "/etc/shadow"}
             )
@@ -726,7 +728,7 @@ async def test_a_signature_does_not_transfer_to_a_different_call(
 async def test_a_certificate_from_another_run_is_refused(
     engine: AsyncEngine,
 ) -> None:
-    """The binding URN is compared against the run the proxy resolved itself."""
+    """The binding URN is compared against the run the gateway resolved itself."""
     server_id = await _seed_server(engine)
 
     other_execution = await _seed_execution(engine, session_id="sess-other")
@@ -750,7 +752,9 @@ async def test_a_certificate_from_another_run_is_refused(
     assert stolen is not None
 
     with pytest.raises(McpPolicyDeniedError, match="different run"):
-        await McpProxy(policies=default_policies(), audit=SqlMcpAuditSink()).call_tool(
+        await McpGateway(
+            policies=default_policies(), audit=SqlMcpAuditSink()
+        ).call_tool(
             CallToolRequest(_principal(stolen), server_id, TOOL, {"path": "/etc/hosts"})
         )
 
@@ -1030,7 +1034,7 @@ async def test_listings_are_not_recorded(engine: AsyncEngine) -> None:
     await _seed_server(engine)
     await _seed_execution(engine)
 
-    await McpProxy(policies=default_policies(), audit=SqlMcpAuditSink()).list_tools(
+    await McpGateway(policies=default_policies(), audit=SqlMcpAuditSink()).list_tools(
         ListToolsRequest(_principal())
     )
 

@@ -1,8 +1,8 @@
 """The database-backed audit sink for MCP tool-call decisions.
 
-Kept out of :mod:`infrastructure.mcp_proxy` for the same reason
+Kept out of :mod:`infrastructure.mcp_gateway` for the same reason
 :mod:`infrastructure.mcp_policies` is: writing a row means importing
-:mod:`repositories`, and the proxy stays free of those imports so its public
+:mod:`repositories`, and the gateway stays free of those imports so its public
 surface remains the plain value objects an HTTP handler would rebuild.
 
 What lands in a row is described in :mod:`models.mcp_tool_invocation`. The part
@@ -16,7 +16,7 @@ import base64
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.mcp_certificate import arguments_digest as hash_arguments
-from infrastructure.mcp_proxy import McpCallContext
+from infrastructure.mcp_gateway import McpCallContext
 from models.mcp_tool_invocation import McpAuditDecision, McpToolInvocationCreate
 from models.user import SYSTEM_USER_ID
 from repositories.mcp_tool_invocation import SqlMcpToolInvocationRepository
@@ -37,7 +37,7 @@ class SqlMcpAuditSink:
 
         Args:
             ctx: The operation that was decided on.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
             decision: Whether the call was allowed.
             reason: The refusal message when denied, else ``None``.
         """

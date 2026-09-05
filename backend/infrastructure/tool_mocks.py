@@ -7,10 +7,10 @@ can be mocked asks this module, before doing anything with a side effect,
 whether the current run stubs it. There are two askers, and they sit at
 different depths for a reason.
 
-**MCP tools ask from inside the proxy.**
+**MCP tools ask from inside the gateway.**
 :class:`WorkflowExecutionToolStub` implements
-:class:`infrastructure.mcp_proxy.McpToolStub`, which
-:class:`~infrastructure.mcp_proxy.McpProxy` consults *after* its policy chain
+:class:`infrastructure.mcp_gateway.McpToolStub`, which
+:class:`~infrastructure.mcp_gateway.McpGateway` consults *after* its policy chain
 has allowed the call. So a stubbed run rehearses the real one: the tool must
 still be bound to a task the run has in progress, and a task with an approval
 attached must still present its certificate. What the stub skips is only what
@@ -20,13 +20,13 @@ has an effect outside A2Flow -- the upstream call itself.
 refused. That table records the calls that reached (or were stopped on their way
 to) a real MCP server, and a row for a call that was always going to be answered
 from a snapshot would make it lie in either direction. This is why the stub
-protocol has two methods: the proxy has to know whether a call is stubbed
+protocol has two methods: the gateway has to know whether a call is stubbed
 *before* it decides whether to audit a refusal, and finding that out must not
 consume one of the run's responses.
 
 **The built-in approval tool asks directly.**
 :func:`infrastructure.approval_tools.request_approval` never goes through the
-proxy -- it writes to ``approvals`` rather than calling a server -- so it calls
+gateway -- it writes to ``approvals`` rather than calling a server -- so it calls
 :func:`resolve_mock` itself, after validating its destination.
 
 Which response a call receives depends on how many times the run has already
@@ -42,7 +42,7 @@ from typing import Any
 from mcp import types
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.mcp_proxy import MOCKED_META_KEY, McpCallContext
+from infrastructure.mcp_gateway import MOCKED_META_KEY, McpCallContext
 from models.mcp_tool_mock import MCPToolMock, MockResponse, MockResponseKind
 from repositories.workflow_execution import SqlWorkflowExecutionRepository
 
@@ -179,11 +179,11 @@ async def resolve_mock(
 
 
 def mock_result_to_call_result(response: MockResponse) -> types.CallToolResult:
-    """Convert a mocked response into the MCP result the proxy hands back.
+    """Convert a mocked response into the MCP result the gateway hands back.
 
     Building the wire type rather than the LLM-facing dict is what makes a
     stubbed call travel the same path as a real one: it flows out of
-    :meth:`infrastructure.mcp_proxy.McpProxy.call_tool` and through
+    :meth:`infrastructure.mcp_gateway.McpGateway.call_tool` and through
     :func:`infrastructure.mcp_tools._result_to_dict` like any other result, so
     the two shapes cannot drift apart. ``_meta`` carries the marker that tells
     that function to add ``"mocked": true``.
@@ -192,7 +192,7 @@ def mock_result_to_call_result(response: MockResponse) -> types.CallToolResult:
         response: The mocked response selected for this call.
 
     Returns:
-        The stubbed result, with :data:`~infrastructure.mcp_proxy.MOCKED_META_KEY`
+        The stubbed result, with :data:`~infrastructure.mcp_gateway.MOCKED_META_KEY`
         set in its ``_meta``.
     """
     meta = {MOCKED_META_KEY: True}
@@ -210,22 +210,22 @@ def mock_result_to_call_result(response: MockResponse) -> types.CallToolResult:
 class WorkflowExecutionToolStub:
     """Answers a proxied call from the mocks its run recorded when it started.
 
-    The proxy's :class:`~infrastructure.mcp_proxy.McpToolStub`, wired in by
-    :func:`~infrastructure.mcp_proxy.get_mcp_proxy`. Kept here rather than in
-    ``mcp_proxy`` for the same reason
+    The gateway's :class:`~infrastructure.mcp_gateway.McpToolStub`, wired in by
+    :func:`~infrastructure.mcp_gateway.get_mcp_gateway`. Kept here rather than in
+    ``mcp_gateway`` for the same reason
     :class:`infrastructure.mcp_audit.SqlMcpAuditSink` is: answering means
-    importing :mod:`repositories`, and the proxy stays free of those imports.
+    importing :mod:`repositories`, and the gateway stays free of those imports.
     """
 
     async def stubs(self, ctx: McpCallContext, db: AsyncSession) -> bool:
         """Report whether the run answers this call from a mock.
 
         Reads the run's snapshot only -- no counter is advanced, because the
-        proxy asks this for calls that go on to be refused.
+        gateway asks this for calls that go on to be refused.
 
         Args:
             ctx: The operation being attempted.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Returns:
             ``True`` when the run stubs the target tool. ``False`` for a design
@@ -249,11 +249,11 @@ class WorkflowExecutionToolStub:
         Args:
             ctx: The operation being attempted, already allowed by the policy
                 chain and confirmed stubbed by :meth:`stubs`.
-            db: The proxy's open database session.
+            db: The gateway's open database session.
 
         Returns:
             The stubbed result. A snapshot that vanished between :meth:`stubs`
-            and here yields an ``error`` result rather than ``None``: the proxy
+            and here yields an ``error`` result rather than ``None``: the gateway
             would read ``None`` as "call it for real", and performing the real
             side effect is never the safe reading of a broken stub.
         """
