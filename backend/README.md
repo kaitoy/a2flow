@@ -173,11 +173,11 @@ A registry of [MCP](https://modelcontextprotocol.io/) servers whose tools the wo
 | `transport` | Fields | Connection |
 |---|---|---|
 | `streamable_http` (default) | `url`, `headers` | One streamable HTTP session per operation, 30-second timeout. SSE-transport servers are not supported. |
-| `stdio` | `command`, `args`, `env` | One child process per operation, 120-second timeout — the larger budget covers a cold `npx -y pkg@version` / `uvx pkg` download. `command` is restricted to `npx`/`uvx`, the only two runtimes the backend image ships. |
+| `stdio` | `command`, `args`, `env` | One child process per operation, 120-second timeout — the larger budget covers a cold `npx -y pkg@version` / `uvx pkg` download. `command` is restricted to `npx`/`uvx`, the only two runtimes the image that launches it ships. |
 
 Literal `headers` / `env` values are stored in plaintext; to keep a credential out of the record, embed a `${secret:NAME/KEY}` placeholder referencing a registered [secret](#secrets) — placeholders are expanded only when connecting, and a reference that no longer resolves fails the connection attempt (`502 SECRET_RESOLUTION_FAILED` on the REST path; a per-server `error` entry on the agent path, where the expansion is done by the [MCP gateway](#mcp-gateway)).
 
-A stdio server runs its `command` inside the backend container. `args` is handed to the process as a list and never through a shell, and the child inherits only the variables `mcp.client.stdio.get_default_environment()` deems safe (`PATH`, `HOME`, …) merged with the configured `env` — the backend's own secrets are not visible to it. Writes are gated behind the same `developer` role as any other MCP server write.
+A stdio server runs its `command` in the [MCP proxy](#mcp-proxy) container — a local `uvicorn main:app` runs it in the backend process instead, since it has no proxy configured. `args` is handed to the process as a list and never through a shell, and the child inherits only the variables `mcp.client.stdio.get_default_environment()` deems safe (`PATH`, `HOME`, …) merged with the configured `env`. Writes are gated behind the same `developer` role as any other MCP server write.
 
 An `args` entry may also embed `${env:NAME}`, referencing a key of that same server's own `env` — useful for a launcher that expects a value as a CLI flag rather than reading it from the process environment. `NAME` must be a key of `env`; the reference is checked eagerly against the *merged* result on both create (`MCPServerCreate`'s validator) and update (`MCPServerService.update`, `422 INVALID_MCP_SERVER`) — including a PATCH that removes the `env` key an existing `args` entry still names. Expansion itself happens in `resolve_connection` after `env`'s own `${secret:NAME/KEY}` placeholders resolve, so `${env:NAME}` transparently picks up a secret-backed value; `StdioConnection.label` (used in `MCP_UNREACHABLE` error details and logs) is built from the *unexpanded* `args`, so an expanded value never leaks there.
 
@@ -289,9 +289,9 @@ The task CRUD endpoints — create, list-for-an-execution (ordered `created_at` 
 
 #### MCP gateway
 
-`infrastructure/mcp_gateway.py` is the single point through which the agent reaches a tenant's [registered MCP servers](#mcp-servers). It owns the four things the two ADK tools each used to own a copy of: **authentication** (which tenant and which run is calling), **authorization** (a chain of policies consulted before every operation), **stubbing** (answering an authorized call from the run's [tool mocks](#tool-mocks)), and **credential injection** (expanding the server's `${secret:NAME/KEY}` placeholders). Only the transport is left to `mcp_client.py`.
+`infrastructure/mcp_gateway.py` is the single point through which the agent reaches a tenant's [registered MCP servers](#mcp-servers). It owns the four things the two ADK tools each used to own a copy of: **authentication** (which tenant and which run is calling), **authorization** (a chain of policies consulted before every operation), **stubbing** (answering an authorized call from the run's [tool mocks](#tool-mocks)), and **credential injection** (expanding the server's `${secret:NAME/KEY}` placeholders, through `mcp_connection.py`).
 
-It is an internal layer — no endpoint, no container of its own — but everything on its public surface is a plain serializable value object or an MCP wire type, with no `ToolContext`, `AsyncSession`, or ORM row crossing it. Re-exposing it as an MCP/HTTP endpoint therefore means parsing a request body into a `CallToolRequest` and replacing the authenticator's body; that is also when the `McpGatewayError` hierarchy earns rows in `routers/exception_handlers.py`.
+It decides *whether* a call may happen. *Where* it happens is `infrastructure/mcp_executor.py`'s question — see [the MCP proxy](#mcp-proxy) below. Everything on the gateway's public surface is a plain serializable value object or an MCP wire type, with no `ToolContext`, `AsyncSession`, or ORM row crossing it, which is what let that seam be added without reshaping anything.
 
 - **Authentication** is the `McpAuthenticator` protocol. The only implementation, `AgentRunAuthenticator`, trusts the caller's ADK session id without verification — the caller is a run this very process is driving, so the id has no channel to be forged over — and maps it to a tenant (and, for an execution run rather than a design session, to a `WorkflowExecution`) through `repositories/tenant_bootstrap.py`. What it *does* verify is the [tool certificate](#mcp-tool-certificates), when one is presented: the chain back to this deployment's root, the validity window, and the certificate's shape. This is still the seam a transport-level mTLS check lands in; the certificate handling already produces the same verified credential either way.
 - **Authorization** is the `McpPolicy` protocol: veto-only (allow by returning, refuse by raising `McpPolicyDeniedError`), consulted in registration order, short-circuiting on the first denial. Policies live in `infrastructure/mcp_policies.py` and are registered in `default_policies()`. There is one `authorize` method rather than one per operation so that a policy cannot accidentally guard only half the surface — skipping an operation is an explicit early return.
@@ -301,9 +301,32 @@ It is an internal layer — no endpoint, no container of its own — but everyth
 - **Every call that reaches a server is audited.** The `McpAuditSink` protocol receives each `call_tool` verdict, allowed or refused; `infrastructure/mcp_audit.py` appends it to `mcp_tool_invocations`. Two things are deliberately absent: listings, which have no side effect and would bury the calls that do, and stubbed calls in either direction, which were never going to reach a server. A sink that raises is logged and swallowed: auditing must never turn an allowed call into a refused one.
 - **The gateway owns the database session** and closes it before any network or subprocess call — a stdio spawn can hold the caller for two minutes, which must not pin a database connection. A policy's `db` is valid only while its `authorize` runs.
 
-`GET /api/v1/mcp-servers/{id}/tools` — the admin tool catalog — is deliberately **not** routed through the gateway yet and still calls `mcp_client.py` directly.
+`GET /api/v1/mcp-servers/{id}/tools` — the admin tool catalog — does not go through the gateway (nothing about it belongs to a run), but it does go through the same **executor**, so a stdio server it queries is launched wherever the deployment launches them.
 
 The run's own audit trail is readable at `GET /api/v1/workflow-executions/{id}/tool-invocations`, gated by the same read access as the run's tasks. It lists exactly what the gateway decided on — the raw arguments are never stored, only their digest.
+
+#### MCP proxy
+
+A registered MCP server is third-party code: a stdio one is launched as a child process, a remote one is reached over the network. Doing either in the backend process puts that code beside `DB_URL`, the secret encryption key, the Vault credentials and the LLM API keys. `compose.yml` therefore runs it in a container of its own, which holds none of them.
+
+| Module | Role |
+|---|---|
+| `infrastructure/mcp_executor.py` | The seam. `LocalMcpExecutor` opens the connection in this process — the default, and what a local `uvicorn main:app` and the test suite use. `RemoteMcpExecutor` hands the operation to the proxy. Selected by `MCP_PROXY_URL` |
+| `infrastructure/mcp_connection.py` | Resolves an `MCPServer` row and its `${secret:…}` placeholders into a connection spec. Stays on this side: only the resolved values for the one server being called cross over, which is why the far side needs neither the Fernet key nor Vault |
+| `infrastructure/mcp_client.py` | The transport, and the module that actually runs in the proxy. Deliberately free of the ORM — its imports are the MCP SDK, httpx, and two dependency-free modules of ours |
+| `infrastructure/mcp_transport_tls.py` | Issues the TLS material for the hop, at backend startup, from the same root that signs tool certificates |
+| `mcp_proxy/` | The proxy process itself: `app.py` (two endpoints and a health probe), `auth.py` (what it checks), `__main__.py` (the listener) |
+
+**Two things guard the hop, and neither is redundant.** The listener runs with `CERT_REQUIRED` against the root CA, so nothing without a certificate this deployment issued opens a connection at all. But TLS authenticates a *connection*, not the operations flowing down it — and uvicorn does not implement the ASGI TLS extension, so a handler cannot read the peer certificate anyway. Every request therefore carries its own evidence:
+
+- **a sender block** on every request: the backend's own service certificate (SAN `urn:a2flow:service:backend`) and a signature over `request_digest`, which includes the connection spec;
+- **a tool certificate** on every call, with the proof of possession covering that call, whose signed grant must name the target `(server, tool)`.
+
+The two are made by different keys and answer different questions. A tool certificate's grant names an `mcp_server_id`, which says nothing about the command or URL the proxy would run — without the sender signature a request could keep a valid grant while pointing the proxy at someone else's `npx` package.
+
+**The proxy is not a second authority.** It re-checks what is answerable without state — issuer, validity window, possession, grant — and cannot answer the rest: whether the task is still `in_progress`, whether the approval still stands, whether the certificate was revoked. Those stay with the gateway, next to the database that knows.
+
+`backend/Dockerfile` builds both images, selected by `target:`; only the `mcp-proxy` stage carries Node.js, since only it launches an MCP server.
 
 ---
 
@@ -338,12 +361,12 @@ The second path is what "the applicant approved it themselves" means in the sche
 
 Both paths issue at the moment the task starts, not at the moment of the decision. That is what lets one approval cover a chain of tasks: each gets its own validity window, so the chain does not have to finish inside the one opened by the approver's click. `McpToolCertificateService.issue` covers the other end of the same rule — when an approval is granted, any task it governs that is *already* `in_progress` (typically the step that asked and is waiting) is issued its certificate there and then, since nothing else will start it again.
 
-The point is not the transport. The gateway is still in-process, so the presenter (`infrastructure/mcp_credentials.py`) and the verifier (`infrastructure/mcp_gateway.py`) share a process and a database, and the proof-of-possession signature proves nothing an attacker who already owns the backend could not forge. What it buys today is three concrete things, plus the shape the system needs later:
+The gateway is still in-process, so the presenter (`infrastructure/mcp_credentials.py`) and the verifier (`infrastructure/mcp_gateway.py`) share a process and a database, and the proof-of-possession signature proves nothing there that an attacker who already owns the backend could not forge. What it buys is four concrete things:
 
 1. **A fail-closed enforcement point.** The approval gate used to consist of the LLM's system instruction and the frontend declining to resume the run. Neither is a server rule. This is.
 2. **A frozen grant.** The certificate's `subjectAltName` carries the tools the task had bound *at the moment it was issued* — when the approver decided, or when the task went `in_progress`. A run's tasks and their `tool_bindings` are copied from the workflow's published templates at execute time and the execution agent cannot edit them, but a rule that re-read the bindings at call time would still trust whatever the row said then — a later re-publish or a `discard-changes` restore, say — so it could be widened out from under the approver. The signed grant cannot: it is never re-signed. This closes a real escalation path, and it closes it on both grant kinds. The practical consequence, spelled out in the agent-facing docs of `register_task_templates` / `update_task_template`: **bind a task's tools into the template before the workflow is published**, because a run cannot add them afterwards.
 3. **A verifiable audit trail.** Each decided call records the certificate serial together with the exact bytes signed for it, so `mcp_tool_invocations` can be re-verified later against the root's public half alone.
-4. **The mTLS seam.** Certificates carry `clientAuth`, so the same material works unchanged as TLS client certificates once the gateway becomes an HTTP endpoint; only the authenticator changes.
+4. **A credential that crosses a real boundary.** Certificates carry `clientAuth` and a P-256 key, so the same material a task presents to the gateway is what authenticates the connection to the [MCP proxy](#mcp-proxy) and is re-verified there — across a container boundary, where the signature does carry weight.
 
 **Which tasks an approval covers** is the nearest-approval rule in `infrastructure/approval_scope.py`, a pure module both the gate and the grant read: a task is governed by the first approval found at or above it in the run's `depends_on` graph. An approval therefore covers the task it names **and every task downstream of it, up to the next approval**.
 

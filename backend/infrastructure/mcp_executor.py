@@ -44,26 +44,36 @@ not care which executor it is holding.
 import base64
 import logging
 import os
+import secrets
 import ssl
 import tempfile
 from collections import OrderedDict
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
 import httpx
 from mcp import types
-from models.mcp_execution import (
-    ExecutorCallToolRequest,
-    ExecutorCredential,
-    ExecutorListToolsRequest,
-    connection_to_spec,
-)
 
 from config import get_settings
 from infrastructure import mcp_client
-from infrastructure.mcp_certificate import McpClientCredential
+from infrastructure.mcp_ca import McpCaError, private_key_from_pem
+from infrastructure.mcp_certificate import (
+    McpClientCredential,
+    arguments_digest,
+    request_digest,
+    sign_pop_digest,
+)
 from infrastructure.mcp_client import McpConnection
 from infrastructure.mcp_transport_tls import backend_client_credentials
+from models.mcp_execution import (
+    ConnectionSpec,
+    ExecutorCallToolRequest,
+    ExecutorCredential,
+    ExecutorListToolsRequest,
+    ExecutorSender,
+    connection_to_spec,
+)
 from repositories.exceptions import McpConnectionError
 
 logger = logging.getLogger(__name__)
@@ -80,6 +90,14 @@ _PROXY_LABEL = "MCP proxy"
 #: the space of PEM texts, which are ASCII-armoured, so it can never collide
 #: with a certificate's own key.
 _SERVICE_CACHE_KEY = "\0service"
+
+#: Bytes of randomness in the per-request nonce. Matches the presenter's.
+_NONCE_BYTES = 16
+
+#: Operation names the request signature is domain-separated by, so a signature
+#: made for a listing can never stand in for one made for a call.
+LIST_OPERATION = "list_tools"
+CALL_OPERATION = "call_tool"
 
 
 class McpExecutor(Protocol):
@@ -109,6 +127,7 @@ class McpExecutor(Protocol):
         tool_name: str,
         arguments: dict[str, Any],
         *,
+        mcp_server_id: str,
         session_id: str,
         credential: McpClientCredential | None,
     ) -> types.CallToolResult:
@@ -118,6 +137,8 @@ class McpExecutor(Protocol):
             connection: The server to call, with secrets already resolved.
             tool_name: Name of the tool to invoke.
             arguments: Arguments matching the tool's input schema.
+            mcp_server_id: Id of the registered server, as the certificate's
+                grant names it.
             session_id: The ADK session the call belongs to. Covered by the
                 proof-of-possession signature, so the far side needs it to
                 recompute the digest.
@@ -167,6 +188,7 @@ class LocalMcpExecutor:
         tool_name: str,
         arguments: dict[str, Any],
         *,
+        mcp_server_id: str,
         session_id: str,
         credential: McpClientCredential | None,
     ) -> types.CallToolResult:
@@ -176,6 +198,8 @@ class LocalMcpExecutor:
             connection: The server to call.
             tool_name: Name of the tool to invoke.
             arguments: Arguments matching the tool's input schema.
+            mcp_server_id: Id of the registered server, as the certificate's
+                grant names it.
             session_id: Unused; there is no far side to prove anything to.
             credential: Unused, for the same reason.
 
@@ -364,6 +388,54 @@ class RemoteMcpExecutor:
             raise McpConnectionError(_PROXY_LABEL, "answered without a result")
         return data
 
+    def _sign(
+        self,
+        *,
+        operation: str,
+        spec: ConnectionSpec,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> ExecutorSender:
+        """Sign one outgoing request with the backend's own service key.
+
+        Args:
+            operation: Which endpoint is being asked.
+            spec: The connection spec the request carries, signed as sent so
+                the far side can tell it was not altered.
+            tool_name: The tool being invoked, empty for a listing.
+            arguments: The call's arguments, empty for a listing.
+
+        Returns:
+            The sender block to put on the request.
+
+        Raises:
+            McpConnectionError: If the backend's own identity cannot be loaded.
+        """
+        paths = backend_client_credentials()
+        try:
+            certificate_pem = paths.certificate.read_text(encoding="ascii")
+            key = private_key_from_pem(paths.private_key.read_text(encoding="ascii"))
+        except (OSError, McpCaError, UnicodeDecodeError) as exc:
+            raise McpConnectionError(
+                _PROXY_LABEL, f"cannot load this deployment's TLS material: {exc}"
+            ) from exc
+        nonce = secrets.token_urlsafe(_NONCE_BYTES)
+        timestamp = datetime.now(UTC)
+        digest = request_digest(
+            operation=operation,
+            connection_hash=arguments_digest(spec.model_dump(mode="json")),
+            tool_name=tool_name,
+            arguments_hash=arguments_digest(arguments),
+            nonce=nonce,
+            timestamp=timestamp,
+        )
+        return ExecutorSender(
+            certificate_pem=certificate_pem,
+            signature=base64.b64encode(sign_pop_digest(key, digest)).decode("ascii"),
+            nonce=nonce,
+            timestamp=timestamp,
+        )
+
     async def list_tools(self, connection: McpConnection) -> list[types.Tool]:
         """Ask the proxy for the server's tool catalog.
 
@@ -376,7 +448,13 @@ class RemoteMcpExecutor:
         Raises:
             McpConnectionError: If the proxy or the server cannot be reached.
         """
-        request = ExecutorListToolsRequest(connection=connection_to_spec(connection))
+        spec = connection_to_spec(connection)
+        request = ExecutorListToolsRequest(
+            connection=spec,
+            sender=self._sign(
+                operation=LIST_OPERATION, spec=spec, tool_name="", arguments={}
+            ),
+        )
         data = await self._post(
             "/list-tools",
             request.model_dump(mode="json", by_alias=True),
@@ -391,6 +469,7 @@ class RemoteMcpExecutor:
         tool_name: str,
         arguments: dict[str, Any],
         *,
+        mcp_server_id: str,
         session_id: str,
         credential: McpClientCredential | None,
     ) -> types.CallToolResult:
@@ -400,6 +479,8 @@ class RemoteMcpExecutor:
             connection: The server to call, with secrets already resolved.
             tool_name: Name of the tool to invoke.
             arguments: Arguments matching the tool's input schema.
+            mcp_server_id: Id of the registered server, as the certificate's
+                grant names it.
             session_id: The ADK session, needed to recompute the signed digest.
             credential: The tool certificate backing the call.
 
@@ -410,11 +491,19 @@ class RemoteMcpExecutor:
             McpConnectionError: If the proxy refuses the call, or the server
                 cannot be reached.
         """
+        spec = connection_to_spec(connection)
         request = ExecutorCallToolRequest(
-            connection=connection_to_spec(connection),
+            connection=spec,
+            mcp_server_id=mcp_server_id,
             tool_name=tool_name,
             arguments=arguments,
             session_id=session_id,
+            sender=self._sign(
+                operation=CALL_OPERATION,
+                spec=spec,
+                tool_name=tool_name,
+                arguments=arguments,
+            ),
             credential=(
                 None
                 if credential is None

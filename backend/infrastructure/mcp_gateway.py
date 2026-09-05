@@ -808,6 +808,7 @@ class McpGateway:
                 connection,
                 request.tool_name,
                 request.arguments,
+                mcp_server_id=request.server_id,
                 session_id=request.principal.session_id,
                 credential=request.principal.credential,
             )

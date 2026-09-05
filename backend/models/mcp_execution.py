@@ -90,34 +90,79 @@ class ExecutorCredential(_Wire):
     timestamp: datetime
 
 
+class ExecutorSender(_Wire):
+    """Who sent this request, and proof that its contents are what they sent.
+
+    Present on *every* request. The certificate is a service certificate —
+    :func:`infrastructure.mcp_certificate.service_name` reads which component —
+    and the signature covers
+    :func:`infrastructure.mcp_certificate.request_digest`, which includes the
+    connection spec.
+
+    That last part is why this exists alongside :class:`ExecutorCredential` on a
+    call. A tool certificate's grant names an ``mcp_server_id``; it says nothing
+    about the command or URL the proxy would actually reach. Signing the
+    resolved spec is what stops a request from keeping a valid grant while
+    pointing the proxy somewhere else.
+
+    Attributes:
+        certificate_pem: The sending component's service certificate.
+        signature: Base64 of the DER-encoded ECDSA signature over the request
+            digest.
+        nonce: The per-request random value that went into the digest.
+        timestamp: When the signature was made; bounds replay.
+    """
+
+    certificate_pem: str
+    signature: str
+    nonce: str
+    timestamp: datetime
+
+
 class ExecutorListToolsRequest(_Wire):
     """Ask the proxy what one registered server advertises.
 
+    No tool certificate: a listing is not authorized by any task's grant. What
+    it does need is the sender block — the proxy will launch a command from
+    this spec, so the request has to be provably one the backend sent.
+
     Attributes:
         connection: The server to query.
+        sender: Who is asking, and proof the spec is unaltered.
     """
 
     connection: ConnectionSpec
+    sender: ExecutorSender
 
 
 class ExecutorCallToolRequest(_Wire):
     """Ask the proxy to invoke one tool on one registered server.
 
+    Two signatures, answering two questions. ``sender`` says the backend sent
+    exactly this request; ``credential`` says a live task grant covers exactly
+    this tool. Neither implies the other.
+
     Attributes:
         connection: The server to call.
+        mcp_server_id: Id of the registered server, as the grant names it. Not
+            in the sender's digest and it does not need to be: the
+            proof-of-possession digest covers it, so altering it in flight
+            invalidates the credential's own signature.
         tool_name: Name of the tool to invoke.
-        arguments: Arguments matching the tool's input schema. Also covered by
-            the credential's signature, so the proxy can tell that the call it
-            was asked to make is the call that was signed for.
+        arguments: Arguments matching the tool's input schema, covered by both
+            signatures.
         session_id: The ADK session the call belongs to, needed to recompute
-            the signed digest.
-        credential: The certificate backing the call.
+            the proof-of-possession digest.
+        sender: Who is asking, and proof the request is unaltered.
+        credential: The tool certificate backing the call.
     """
 
     connection: ConnectionSpec
+    mcp_server_id: str
     tool_name: str
     arguments: dict[str, Any] = Field(default_factory=dict)
     session_id: str
+    sender: ExecutorSender
     credential: ExecutorCredential | None = None
 
 

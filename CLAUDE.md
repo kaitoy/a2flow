@@ -26,7 +26,7 @@ When bumping a version in `mise.toml`, update the places that pin the same tool 
 | `mise.toml` entry | Also update |
 |---|---|
 | `python` | `backend/.python-version`, `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
-| `node` | `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
+| `node` | `backend/Dockerfile` (its `mcp-proxy` stage only — the `backend` stage has no Node.js) and `frontend/Dockerfile` base image tags |
 | `pnpm` | `packageManager` in `frontend/package.json` and `website/package.json` (corepack reads it during the Docker build, and pnpm self-switches to it) |
 
 `backend/pyproject.toml` sets `[tool.uv] python-preference = "only-system"` so `uv sync` builds `backend/.venv` from the mise-pinned interpreter on `PATH` instead of downloading its own. `requires-python`, ruff's `target-version`, and mypy's `python_version` stay at the 3.11 support floor and are deliberately not bumped alongside `mise.toml`.

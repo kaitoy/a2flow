@@ -11,8 +11,18 @@ A chat application that connects a [Google ADK](https://google.github.io/adk-doc
 │   @ag-ui/a2ui-middleware         │   A2UIMiddleware)                 │  AGUIToolset         │
 │   Redux Toolkit                  │                                   │  DB SessionService   │
 │   Admin UI (/admin)              │ ◄─────────────────────────────── │  SQLite/PostgreSQL   │
-└──────────────────────────────────┘  AG-UI events (SSE) incl.        └──────────────────────┘
-     :3000                            A2UI (TOOL_CALL_*)                    :8000
+└──────────────────────────────────┘  AG-UI events (SSE) incl.        └──────────┬───────────┘
+     :3000                            A2UI (TOOL_CALL_*)                    :8000 │
+                                                                                  │ HTTPS, client
+                                                                                  │ authentication
+                                                        ┌─────────────────────────▼───────────┐
+                                                        │  MCP proxy                          │
+                                                        │  launches the MCP servers a tenant   │
+                                                        │  registered — third-party code, so   │
+                                                        │  it runs here and not next to the    │
+                                                        │  database credentials or API keys    │
+                                                        └──────────────────────────────────────┘
+                                                             :8443 (internal only)
 ```
 
 ## Documentation
@@ -92,12 +102,16 @@ Pre-commit / pre-push hooks run linters, formatters, type checkers, and tests. `
 
 ### Or: Docker Compose
 
-The whole stack — PostgreSQL 17, the backend, the outgoing-email worker, and the frontend — comes up with [compose.yml](compose.yml):
+The whole stack — PostgreSQL 17, the backend, the outgoing-email worker, the MCP proxy, and the frontend — comes up with [compose.yml](compose.yml):
 
 ```bash
 echo GOOGLE_API_KEY=your_google_api_key_here > .env
 docker compose up --build
 ```
+
+`backend/Dockerfile` builds two images from one source tree, selected by `target:`. `backend` (used by the `backend` and `worker` services) serves the API; `mcp-proxy` adds Node.js and is the only image that launches a registered MCP server. That is also why the backend image no longer carries Node.js: it stopped launching them.
+
+Running a local `uvicorn main:app` instead reaches MCP servers from the backend process, as it always did — the proxy is selected by `MCP_PROXY_URL`, which only `compose.yml` sets.
 
 See [Run with Docker Compose](https://kaitoy.github.io/a2flow/docs/getting-started/docker-compose) for the details.
 
@@ -112,7 +126,7 @@ Bumping a version there means updating the places that pin the same tool indepen
 | `mise.toml` entry | Also update |
 |---|---|
 | `python` | `backend/.python-version`, `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
-| `node` | `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
+| `node` | `backend/Dockerfile` (its `mcp-proxy` stage, the only one that needs Node.js) and `frontend/Dockerfile` base image tags |
 | `pnpm` | `packageManager` in `frontend/package.json` and `website/package.json` (corepack reads it during the Docker build, and pnpm self-switches to it) |
 
 `backend/pyproject.toml` sets `[tool.uv] python-preference = "only-system"` so `uv sync` builds `backend/.venv` from the mise-pinned interpreter on `PATH` instead of downloading its own. `requires-python`, ruff's `target-version`, and mypy's `python_version` stay at the 3.11 support floor and are deliberately not bumped alongside `mise.toml`.

@@ -97,6 +97,12 @@ BACKEND_SERVICE_NAME = "backend"
 #: against the new one.
 POP_CONTEXT = "a2flow-mcp-pop-v1"
 
+#: Domain-separation tag for the signature a component puts on a request to the
+#: MCP proxy. Separate from :data:`POP_CONTEXT` so a signature made for one can
+#: never be replayed as the other -- they are made by different keys and answer
+#: different questions.
+REQUEST_CONTEXT = "a2flow-mcp-request-v1"
+
 #: Ordered segment labels every binding URN opens with, before the grantor.
 _BINDING_PREFIX_LABELS = ("tenant", "execution", "task")
 
@@ -606,6 +612,60 @@ def pop_digest(
         nonce=nonce,
         timestamp=timestamp,
     )
+
+
+def request_digest(
+    *,
+    operation: str,
+    connection_hash: str,
+    tool_name: str,
+    arguments_hash: str,
+    nonce: str,
+    timestamp: datetime,
+) -> bytes:
+    """Compute the digest a request to the MCP proxy is signed under.
+
+    Distinct from :func:`pop_digest` in both purpose and domain tag. Proof of
+    possession answers "does this caller hold the grant it presents"; this
+    answers "is this request the one the backend meant to send, unaltered".
+    Two questions, because the two are established by different keys: the
+    backend's own service certificate signs this, while a task's tool
+    certificate signs the other.
+
+    The connection spec is in here and deliberately not in
+    :func:`pop_digest` — a tool certificate's grant names an
+    ``mcp_server_id``, which says nothing about *where* the proxy will
+    actually connect. Signing the resolved spec is what ties the two together,
+    so a request cannot keep a valid grant while pointing the proxy at a
+    different command or URL.
+
+    Args:
+        operation: Which endpoint is being asked, e.g. ``"call_tool"``.
+        connection_hash: :func:`arguments_digest` of the serialized connection
+            spec the proxy is asked to use.
+        tool_name: Name of the tool to invoke, empty for a listing.
+        arguments_hash: :func:`arguments_digest` of the call's arguments, empty
+            for a listing.
+        nonce: A per-request random value.
+        timestamp: When the signature was made; normalized to UTC.
+
+    Returns:
+        The SHA-256 digest to sign or verify.
+    """
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=UTC)
+    payload = "\n".join(
+        (
+            REQUEST_CONTEXT,
+            operation,
+            connection_hash,
+            tool_name,
+            arguments_hash,
+            nonce,
+            timestamp.astimezone(UTC).isoformat(),
+        )
+    )
+    return hashlib.sha256(payload.encode("utf-8")).digest()
 
 
 def sign_pop_digest(key: ec.EllipticCurvePrivateKey, digest: bytes) -> bytes:

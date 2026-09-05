@@ -38,7 +38,9 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      target: backend
     environment:
       DB_URL: postgresql://a2flow:a2flow@db:5432/a2flow
       LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash}
@@ -78,8 +80,22 @@ services:
       # advisory lock still elects one sender -- but it would put SMTP work in
       # the process serving requests.
       EMAIL_WORKER_IN_PROCESS: "false"
+      # Reach registered MCP servers through the `mcp-proxy` service below
+      # rather than from this container. Unset, the backend would launch them
+      # itself -- which is what a local `uvicorn main:app` still does, and what
+      # this deployment deliberately does not.
+      MCP_PROXY_URL: https://mcp-proxy:8443
+      # The backend issues the TLS material for that hop at startup: the root's
+      # public certificate plus the proxy's server certificate and key go here,
+      # where the proxy mounts them read-only.
+      MCP_PROXY_TLS_DIR: /var/lib/a2flow/mcp-tls
+      # Its own client identity goes somewhere the proxy cannot read. A
+      # container path rather than a volume: it is reissued on every start that
+      # finds it missing, so there is nothing to keep.
+      MCP_BACKEND_TLS_DIR: /app/.mcp-tls-backend
     volumes:
       - skills:/var/lib/a2flow/skills
+      - mcp-tls:/var/lib/a2flow/mcp-tls
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/health || exit 1"]
       interval: 10s
@@ -100,7 +116,9 @@ services:
   # is what keeps the rate limit exact. A second replica buys failover, not
   # capacity.
   worker:
-    build: ./backend
+    build:
+      context: ./backend
+      target: backend
     command: ["uv", "run", "--no-sync", "python", "-m", "worker"]
     environment:
       DB_URL: postgresql://a2flow:a2flow@db:5432/a2flow
@@ -108,6 +126,53 @@ services:
       # Not just for the database: the API applies the Alembic migrations and
       # seeds the settings row on startup, and the worker does neither. Waiting
       # for it to report healthy is what guarantees the schema is there.
+      backend:
+        condition: service_healthy
+
+  # Runs the MCP servers a tenant has registered. They are third-party code --
+  # a stdio server is launched here as a child process, a remote one is reached
+  # from here over the network -- so the isolation is the point of the service,
+  # and what it does *not* have is as deliberate as what it does: no DB_URL, no
+  # secret encryption key, no Vault credentials, no LLM API keys, no skill
+  # store. Everything it needs for one call arrives in that call.
+  #
+  # The channel from the backend is HTTPS with client authentication, and each
+  # call additionally carries the task's tool certificate. See
+  # backend/mcp_proxy/auth.py for what is checked and why both are needed.
+  #
+  # No published port: only the backend has any business reaching it.
+  mcp-proxy:
+    build:
+      context: ./backend
+      target: mcp-proxy
+    command: ["uv", "run", "--no-sync", "python", "-m", "mcp_proxy"]
+    environment:
+      MCP_PROXY_TLS_DIR: /var/lib/a2flow/mcp-tls
+      MCP_PROXY_PORT: "8443"
+    volumes:
+      # Read-only: the backend issues this material, and nothing that runs in
+      # here should be able to replace it.
+      - mcp-tls:/var/lib/a2flow/mcp-tls:ro
+    healthcheck:
+      # The listener demands a client certificate, so curl cannot probe it
+      # without one. Checking that the port accepts a connection is what can be
+      # established from inside the container.
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket;socket.create_connection(('127.0.0.1',8443),2).close()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      # Waits for the certificate, not for the database: the backend writes the
+      # TLS material during startup, before it reports healthy. The reverse edge
+      # is deliberately absent -- it would be a cycle, and the backend does not
+      # call the proxy until an agent run asks it to.
       backend:
         condition: service_healthy
 
@@ -130,3 +195,4 @@ services:
 volumes:
   pgdata:
   skills:
+  mcp-tls:

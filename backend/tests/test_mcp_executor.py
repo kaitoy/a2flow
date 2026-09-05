@@ -97,6 +97,7 @@ async def test_the_local_executor_ignores_the_credential(
         HttpConnection(url="https://mcp.example.com/mcp"),
         "read_file",
         {"path": "/etc/hosts"},
+        mcp_server_id="srv-1",
         session_id="sess-1",
         credential=None,
     )
@@ -167,6 +168,7 @@ async def test_a_remote_failure_uses_the_same_error_type_as_a_local_one(
             StdioConnection(command="npx"),
             "read_file",
             {},
+            mcp_server_id="srv-1",
             session_id="sess-1",
             credential=None,
         )
