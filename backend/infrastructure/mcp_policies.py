@@ -18,6 +18,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
 from infrastructure.approval_scope import active_approval_by_task, governing_approvals
+from infrastructure.approved_calls import match_call
 from infrastructure.mcp_ca import McpCaError, certificate_from_pem
 from infrastructure.mcp_certificate import (
     CertificateBinding,
@@ -31,7 +32,7 @@ from infrastructure.mcp_gateway import (
     McpPolicy,
     McpPolicyDeniedError,
 )
-from models.approval import Approval, ApprovalStatus
+from models.approval import Approval, ApprovalStatus, ApprovedCall
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead, WorkflowTaskStatus
 from repositories import (
@@ -456,20 +457,127 @@ class TaskCertificatePolicy:
             )
 
 
+class ApprovedArgumentsPolicy:
+    """Holds a call to the arguments the approver actually approved.
+
+    :class:`TaskCertificatePolicy` establishes that *something* signed
+    authorized this tool for this task. It says nothing about what the call
+    carries -- the certificate's grant is a set of ``(server, tool)`` pairs, and
+    a decision made on "terminate instance i-123" would equally authorize
+    ``terminate_instances(["i-456"])``. This policy closes that gap: the
+    approval's own ``approved_calls`` declaration, recorded when the request was
+    made and shown to the approver before they decided, is matched against the
+    call's arguments by :mod:`infrastructure.approved_calls`.
+
+    **Every** governing approval must permit the call, not merely one, matching
+    the rule :func:`_assert_grantor_still_authorizes` already applies to their
+    statuses: a task where two gated branches merge is authorized by both
+    approvers or by neither, and the laxer declaration must not speak for the
+    stricter one.
+
+    **An initiator grant is untouched.** A task no approval governs has no
+    declaration, and no approver to have deviated from; what bounds it is
+    unchanged. The two grantors cannot be confused here because
+    :class:`TaskCertificatePolicy` has already refused an initiator grant for
+    any approval-governed task.
+
+    **A tool the workflow's design exempted from input approval is skipped
+    too**, but not by this policy resolving anything: the request path already
+    recorded it in the declaration as an entry permitting any arguments, and
+    :func:`infrastructure.approved_calls.match_call` reads it there. So this
+    rule needs no notion of a binding's flag, and the declaration on the row
+    stays the only thing it consults. The approval itself still applies to such
+    a tool -- :class:`TaskCertificatePolicy` above has already required a
+    granted approval's certificate for it.
+
+    **An approval with an empty declaration is skipped**, which is what makes
+    this safe to deploy over a running system: a request recorded before this
+    field existed has nothing to match, and there is no path by which an
+    approver could supply one after the fact. Nothing new can reach that state
+    -- :func:`infrastructure.approval_tools.request_approval` now requires a
+    declaration covering every tool the covered tasks bind, and no other writer
+    can reach the column.
+
+    Registered last. It is the most expensive rule in the chain, and it is the
+    only one that needs a task id it can trust: the binding policy allows the
+    *union* of every in-progress task's bindings, so only after
+    :class:`TaskCertificatePolicy` has checked the presented certificate against
+    the run, the task, the certificate row and the proof of possession is
+    ``binding.task_id`` something to resolve an approval from. Running it last
+    also keeps a caller with no authority at all from learning what a
+    declaration says.
+    """
+
+    async def authorize(self, ctx: McpCallContext, db: AsyncSession) -> None:
+        """Allow the call only if it fits every governing approval's declaration.
+
+        Args:
+            ctx: The operation being attempted.
+            db: The gateway's open database session.
+
+        Raises:
+            McpPolicyDeniedError: If any approval governing the task declares a
+                set of calls this one falls outside -- a tool it does not name,
+                an argument it does not mention, an argument it requires but the
+                call omits, or a value outside the declared bounds.
+        """
+        if ctx.operation is not McpOperation.call_tool:
+            return
+        if ctx.identity.execution_id is None:
+            # InProgressToolBindingPolicy already denied this; nothing to add.
+            return
+        verified = ctx.identity.credential
+        if verified is None:
+            # TaskCertificatePolicy already denied this; leave it its message.
+            return
+        binding = verified.claims.binding
+        if binding.approval_id is None:
+            return
+
+        governing = await _governing_approvals(
+            db,
+            ctx.identity.execution_id,
+            ctx.identity.tenant_id,
+            binding.task_id,
+        )
+        for approval in governing:
+            if not approval.approved_calls:
+                continue
+            declaration = [
+                ApprovedCall.model_validate(entry) for entry in approval.approved_calls
+            ]
+            reason = match_call(
+                declaration,
+                server_id=ctx.server_id or "",
+                tool_name=ctx.tool_name or "",
+                arguments=ctx.arguments or {},
+            )
+            if reason is not None:
+                raise McpPolicyDeniedError(reason)
+
+
 def default_policies() -> list[McpPolicy]:
     """Return the policy chain the process-wide gateway is built with.
 
-    Two rules are enforced. First, an agent may invoke only the MCP tools bound
-    to a task currently in progress in its run. Second, every call must present
-    a valid certificate for that task -- an approver's, or the run initiator's
-    own -- whose signed grant covers the tool.
+    Three rules are enforced. First, an agent may invoke only the MCP tools
+    bound to a task currently in progress in its run. Second, every call must
+    present a valid certificate for that task -- an approver's, or the run
+    initiator's own -- whose signed grant covers the tool. Third, a call made
+    under an approver's authority must carry the arguments that approver
+    approved.
 
     Ordered cheapest first -- the chain short-circuits on the first denial, and
-    the binding check is a subset of what the certificate check would otherwise
-    have to establish. Further policies (rate limits, per-caller authorization)
-    are appended here.
+    each check is a subset of what the next would otherwise have to establish:
+    the binding check narrows what the certificate check must consider, and the
+    certificate check is what makes the task id the argument check resolves from
+    trustworthy. Further policies (rate limits, per-caller authorization) are
+    appended here.
 
     Returns:
         The ordered policy chain.
     """
-    return [InProgressToolBindingPolicy(), TaskCertificatePolicy()]
+    return [
+        InProgressToolBindingPolicy(),
+        TaskCertificatePolicy(),
+        ApprovedArgumentsPolicy(),
+    ]

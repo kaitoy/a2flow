@@ -123,6 +123,50 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     );
   });
 
+  it("shows a stored input-approval exemption as checked", async () => {
+    setup({
+      ...TEMPLATE,
+      toolBindings: [{ mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: false }],
+    });
+
+    render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
+
+    await waitFor(() => screen.getByDisplayValue("Template Step 1"));
+    expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeChecked();
+  });
+
+  it("submits the input-approval choice alongside the binding", async () => {
+    setup();
+    const captured = capturePatch();
+
+    render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() => screen.getByDisplayValue("Template Step 1"));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "my-mcp-server: search" }));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(captured.body).toMatchObject({
+        toolBindings: [{ mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: false }],
+      })
+    );
+  });
+
+  it("submits a tool as needing input approval unless it was checked", async () => {
+    // The safe default has to survive a save that never touched the checkbox.
+    setup();
+    const captured = capturePatch();
+
+    render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() => screen.getByDisplayValue("Template Step 1"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(captured.body).toMatchObject({
+        toolBindings: [{ mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: true }],
+      })
+    );
+  });
+
   it("submits an empty list when the operator unbinds every tool", async () => {
     setup();
     const captured = capturePatch();

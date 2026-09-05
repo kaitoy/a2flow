@@ -12,7 +12,8 @@ edges live in :class:`WorkflowTaskTemplateDependency` and are surfaced on read
 models as ``depends_on_ids``. Templates are listed in ``created_at`` order;
 there is no separate layout/ordering field. MCP tool bindings live in
 :class:`WorkflowTaskTemplateToolBinding` and are surfaced as ``tool_bindings``;
-they are copied onto the run's tasks at execute time. Templates carry no
+they are copied onto the run's tasks at execute time, ``requires_input_approval``
+included. Templates carry no
 ``status`` — status is a property of a run, not of the design.
 """
 
@@ -139,6 +140,11 @@ class WorkflowTaskTemplateToolBinding(SQLModel, table=True):
     while it is in progress. Bindings cascade-delete with their template; the
     server side is ``RESTRICT`` so a registered server cannot be deleted while
     templates still bind its tools.
+
+    ``requires_input_approval`` is copied onto the run's task alongside the pair
+    it qualifies. This is the only place it can be set -- a run cannot -- which
+    is what makes it a property of the *design*. See
+    :class:`models.workflow_task.ToolBinding`.
     """
 
     __tablename__ = "workflow_task_template_tool_bindings"
@@ -159,3 +165,4 @@ class WorkflowTaskTemplateToolBinding(SQLModel, table=True):
     template_id: str = Field(primary_key=True)
     mcp_server_id: str = Field(primary_key=True)
     tool_name: str = Field(primary_key=True)
+    requires_input_approval: bool = Field(default=True)

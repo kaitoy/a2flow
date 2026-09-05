@@ -23,6 +23,13 @@
  * server is unreachable or which the server no longer advertises — since
  * `value` alone is authoritative and needs no live option to stay visible.
  *
+ * Below the chips sits the input-approval choice for each bound tool. It is a
+ * {@link CheckboxGroup} — the same control the sibling **Depends on** field uses
+ * — rather than a per-chip toggle, because a chip in toggle mode cannot also
+ * carry a remove button, and a bound tool has to stay removable. Checked means
+ * *exempt*, so a tool just added is bounded by default and nothing has to be
+ * kept in two places.
+ *
  * The single-select sibling — one `(server, tool)` pair rather than a list — is
  * {@link McpToolField}.
  */
@@ -34,6 +41,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormField } from "@/components/admin/form-field";
 import { McpServerPickerDialog } from "@/components/admin/mcp-server-picker-dialog";
 import { Button } from "@/components/ui/button";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select, type SelectOption } from "@/components/ui/select";
@@ -59,6 +67,15 @@ export interface McpToolPickerProps {
   value: string[];
   /** Called with the next selection whenever a tool is added or removed. */
   onChange: (next: string[]) => void;
+  /**
+   * The subset of {@link McpToolPickerProps.value} whose input needs no
+   * approval — tools that only read. A tool absent from this list keeps the safe
+   * default: an approval covering its task bounds the values it may be called
+   * with.
+   */
+  exempt: string[];
+  /** Called with the next exempt subset whenever one is checked or unchecked. */
+  onExemptChange: (next: string[]) => void;
 }
 
 /**
@@ -72,7 +89,7 @@ export interface McpToolPickerProps {
  * unreachable) each name themselves in the select rather than all collapsing
  * into an empty dropdown.
  */
-export function McpToolPicker({ value, onChange }: McpToolPickerProps) {
+export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpToolPickerProps) {
   const [registry, setRegistry] = useState<RegistryState>({ phase: "loading" });
   const [picked, setPicked] = useState<{ id: string; name: string } | null>(null);
   const [open, setOpen] = useState(false);
@@ -168,6 +185,9 @@ export function McpToolPicker({ value, onChange }: McpToolPickerProps) {
   /** Drop one binding, whether or not its server is still reachable. */
   function removeTool(composite: string) {
     onChange(value.filter((v) => v !== composite));
+    // A tool nobody binds has nothing to be exempt from, and leaving it behind
+    // would silently re-exempt it if the same tool were bound again later.
+    onExemptChange(exempt.filter((v) => v !== composite));
   }
 
   /** Opens the picker dialog, mounting it on the first call. */
@@ -277,6 +297,22 @@ export function McpToolPicker({ value, onChange }: McpToolPickerProps) {
           </div>
         )}
       </div>
+
+      {chips.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-label-caps">Skip Input Approval</span>
+          <p className="text-sm text-on-surface-variant">
+            A checked tool may be called with any input. Check only tools that read — an approval
+            covering the task still has to be granted either way.
+          </p>
+          <CheckboxGroup
+            name="mcpToolInputApproval"
+            options={chips.map((chip) => ({ value: chip.value, label: chip.label }))}
+            value={exempt}
+            onChange={onExemptChange}
+          />
+        </div>
+      )}
 
       {/* Mounted on the first open and then kept mounted, so the server list
           costs nothing until asked for and the leave animation still has a

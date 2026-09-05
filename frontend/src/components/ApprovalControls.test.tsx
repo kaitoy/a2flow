@@ -320,3 +320,58 @@ describe("ApprovalControls", () => {
     });
   });
 });
+
+describe("the calls an approval authorizes", () => {
+  it("shows the declaration the approver is deciding on", async () => {
+    vi.mocked(api.getApproval).mockResolvedValue({
+      status: "pending",
+      approver: "u1",
+      approvedCalls: [
+        {
+          mcpServerId: "srv-1",
+          toolName: "run_instances",
+          arguments: { region: { eq: "ap-northeast-1" }, count: { lte: 2 } },
+        },
+      ],
+    } as never);
+
+    render(<ApprovalControls approvalId="a1" toolCallId="t1" />, {
+      preloadedState: authState("u1", ["approver"] as Role[]),
+    });
+
+    expect(await screen.findByText("This authorizes")).toBeInTheDocument();
+    expect(screen.getByText("srv-1: run_instances")).toBeInTheDocument();
+    expect(screen.getByText('is "ap-northeast-1"')).toBeInTheDocument();
+    expect(screen.getByText("is at most 2")).toBeInTheDocument();
+  });
+
+  it("keeps showing it after the decision, as the record of what was approved", async () => {
+    vi.mocked(api.getApproval).mockResolvedValue({
+      status: "approved",
+      approver: "u1",
+      approvedCalls: [{ mcpServerId: "srv-1", toolName: "run_instances", arguments: {} }],
+    } as never);
+
+    render(<ApprovalControls approvalId="a1" toolCallId="t1" />, {
+      preloadedState: authState("u1", ["approver"] as Role[]),
+    });
+
+    expect(await screen.findByText("srv-1: run_instances")).toBeInTheDocument();
+  });
+
+  it("shows no such section for an approval carrying no declaration", async () => {
+    // Approvals predating argument constraints bounded no arguments, and an
+    // empty section would imply otherwise.
+    vi.mocked(api.getApproval).mockResolvedValue({
+      status: "pending",
+      approver: "u1",
+    } as never);
+
+    render(<ApprovalControls approvalId="a1" toolCallId="t1" />, {
+      preloadedState: authState("u1", ["approver"] as Role[]),
+    });
+
+    await waitFor(() => expect(api.getApproval).toHaveBeenCalled());
+    expect(screen.queryByText("This authorizes")).not.toBeInTheDocument();
+  });
+});

@@ -198,6 +198,7 @@ class SqlWorkflowTaskRepository:
                     task_id=task.id,
                     mcp_server_id=binding.mcp_server_id,
                     tool_name=binding.tool_name,
+                    requires_input_approval=binding.requires_input_approval,
                 )
             )
         await commit_or_translate_user_fk(self._db, user_id=user_id)
@@ -265,7 +266,11 @@ class SqlWorkflowTaskRepository:
         result = await self._db.exec(stmt)
         return _sorted_bindings(
             [
-                ToolBinding(mcp_server_id=row.mcp_server_id, tool_name=row.tool_name)
+                ToolBinding(
+                    mcp_server_id=row.mcp_server_id,
+                    tool_name=row.tool_name,
+                    requires_input_approval=row.requires_input_approval,
+                )
                 for row in result.all()
             ]
         )
@@ -283,7 +288,11 @@ class SqlWorkflowTaskRepository:
         result = await self._db.exec(stmt)
         for row in result.all():
             out.setdefault(row.task_id, []).append(
-                ToolBinding(mcp_server_id=row.mcp_server_id, tool_name=row.tool_name)
+                ToolBinding(
+                    mcp_server_id=row.mcp_server_id,
+                    tool_name=row.tool_name,
+                    requires_input_approval=row.requires_input_approval,
+                )
             )
         return {tid: _sorted_bindings(bindings) for tid, bindings in out.items()}
 
@@ -302,6 +311,7 @@ class SqlWorkflowTaskRepository:
                     task_id=task_id,
                     mcp_server_id=binding.mcp_server_id,
                     tool_name=binding.tool_name,
+                    requires_input_approval=binding.requires_input_approval,
                 )
             )
 
@@ -437,10 +447,25 @@ def _dedupe(ids: Iterable[str]) -> list[str]:
 
 
 def _dedupe_bindings(bindings: Iterable[ToolBinding]) -> list[ToolBinding]:
-    """Return the bindings with duplicate (server, tool) pairs removed, order preserved."""
+    """Return the bindings with duplicate (server, tool) pairs removed, order preserved.
+
+    Where a pair appears twice with disagreeing ``requires_input_approval``, the
+    survivor requires it. A duplicate is a caller mistake either way, and
+    resolving it towards the stricter reading is what keeps the mistake from
+    quietly widening what a run may call without an approver's say.
+
+    Args:
+        bindings: The bindings to deduplicate.
+
+    Returns:
+        One binding per (server, tool) pair, in first-seen order.
+    """
     seen: dict[tuple[str, str], ToolBinding] = {}
     for binding in bindings:
-        seen.setdefault((binding.mcp_server_id, binding.tool_name), binding)
+        key = (binding.mcp_server_id, binding.tool_name)
+        kept = seen.setdefault(key, binding)
+        if binding.requires_input_approval and not kept.requires_input_approval:
+            seen[key] = binding
     return list(seen.values())
 
 

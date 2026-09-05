@@ -37,7 +37,7 @@ The prompt is not kept as a field of the workflow. It lives on as the first mess
 |---|---|
 | **Title and description** | The step as the execution agent will read it. Titles are held short so they read as chips in the task lists. |
 | **Depends on** | Edges to other templates of the same workflow. An edge that would close a cycle is refused. |
-| **MCP tools** | The `(server, tool)` pairs this step is allowed to call. |
+| **MCP tools** | The `(server, tool)` pairs this step is allowed to call, each saying whether an [approval](./approvals.md) covering the step must bound the values it is called with. Read-only tools are marked as needing no input approval; this is the only place that choice can be made, since a run cannot edit its own bindings. |
 | *No status* | The lifecycle belongs to a run, not to the design. |
 
 Templates are refined from the design chat, from the admin forms, or in any mix of the two — [Workflows](../guides/workflows.md#adjusting-the-task-templates) covers those screens. The design agent edits the templates directly and executes nothing, which is what makes the design session safe to share with a whole team.

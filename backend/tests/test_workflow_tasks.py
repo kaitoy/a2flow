@@ -751,12 +751,22 @@ async def test_create_task_with_tool_bindings_round_trips(
         execution["id"],
         toolBindings=[{"mcpServerId": server["id"], "toolName": "search"}],
     )
-    assert body["toolBindings"] == [{"mcpServerId": server["id"], "toolName": "search"}]
+    assert body["toolBindings"] == [
+        {
+            "mcpServerId": server["id"],
+            "toolName": "search",
+            "requiresInputApproval": True,
+        }
+    ]
     fetched = assert_ok(
         await workflow_client.get(f"/api/v1/workflow-tasks/{body['id']}")
     )
     assert fetched["toolBindings"] == [
-        {"mcpServerId": server["id"], "toolName": "search"}
+        {
+            "mcpServerId": server["id"],
+            "toolName": "search",
+            "requiresInputApproval": True,
+        }
     ]
 
 
@@ -792,7 +802,7 @@ async def test_create_task_dedupes_tool_bindings(
     body = await _create_task(
         workflow_client, execution["id"], toolBindings=[binding, binding]
     )
-    assert body["toolBindings"] == [binding]
+    assert body["toolBindings"] == [{**binding, "requiresInputApproval": True}]
 
 
 async def test_update_task_replaces_tool_bindings(
@@ -810,7 +820,11 @@ async def test_update_task_replaces_tool_bindings(
         json={"toolBindings": [{"mcpServerId": server["id"], "toolName": "fetch"}]},
     )
     assert assert_ok(response)["toolBindings"] == [
-        {"mcpServerId": server["id"], "toolName": "fetch"}
+        {
+            "mcpServerId": server["id"],
+            "toolName": "fetch",
+            "requiresInputApproval": True,
+        }
     ]
 
 
@@ -828,7 +842,11 @@ async def test_update_task_without_tool_bindings_leaves_them_unchanged(
         f"/api/v1/workflow-tasks/{created['id']}", json={"title": "Renamed"}
     )
     assert assert_ok(response)["toolBindings"] == [
-        {"mcpServerId": server["id"], "toolName": "search"}
+        {
+            "mcpServerId": server["id"],
+            "toolName": "search",
+            "requiresInputApproval": True,
+        }
     ]
 
 
@@ -884,6 +902,91 @@ async def test_update_tool_bindings_refused_on_a_task_an_approval_covers(
     assert_err(response, "FORBIDDEN", 403)
 
 
+async def test_clearing_input_approval_is_refused_on_a_task_an_approval_covers(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """The same widening by a quieter route.
+
+    The tool set is untouched here — only the flag moves — so a guard comparing
+    ``(server, tool)`` pairs alone would wave this through, and the tool would
+    drop out of what the approver's declaration bounds.
+    """
+    client, eng = workflow_client_with_engine
+    execution = await _create_workflow_execution(client)
+    server = await _create_mcp_server(client)
+    gate = await _create_task(client, execution["id"])
+    acting = await _create_task(
+        client,
+        execution["id"],
+        dependsOnIds=[gate["id"]],
+        toolBindings=[{"mcpServerId": server["id"], "toolName": "search"}],
+    )
+    await _insert_approval(
+        eng,
+        workflow_execution_id=execution["id"],
+        workflow_task_id=gate["id"],
+        approver="bob",
+    )
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{acting['id']}",
+        json={
+            "toolBindings": [
+                {
+                    "mcpServerId": server["id"],
+                    "toolName": "search",
+                    "requiresInputApproval": False,
+                }
+            ]
+        },
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_a_task_can_bind_a_tool_exempt_from_input_approval(
+    workflow_client: AsyncClient,
+) -> None:
+    """The flag survives the write, since the gate is built from what it reads."""
+    execution = await _create_workflow_execution(workflow_client)
+    server = await _create_mcp_server(workflow_client)
+    body = await _create_task(
+        workflow_client,
+        execution["id"],
+        toolBindings=[
+            {
+                "mcpServerId": server["id"],
+                "toolName": "search",
+                "requiresInputApproval": False,
+            }
+        ],
+    )
+    assert body["toolBindings"] == [
+        {
+            "mcpServerId": server["id"],
+            "toolName": "search",
+            "requiresInputApproval": False,
+        }
+    ]
+
+
+async def test_a_duplicated_binding_keeps_the_stricter_flag(
+    workflow_client: AsyncClient,
+) -> None:
+    """A caller contradicting itself must not buy the laxer reading."""
+    execution = await _create_workflow_execution(workflow_client)
+    server = await _create_mcp_server(workflow_client)
+    lax = {
+        "mcpServerId": server["id"],
+        "toolName": "search",
+        "requiresInputApproval": False,
+    }
+    strict = {**lax, "requiresInputApproval": True}
+    body = await _create_task(
+        workflow_client, execution["id"], toolBindings=[lax, strict]
+    )
+    assert body["toolBindings"] == [strict]
+
+
 async def test_resubmitting_the_same_tool_bindings_is_not_a_change(
     workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
 ) -> None:
@@ -932,7 +1035,11 @@ async def test_update_tool_bindings_allowed_on_an_uncovered_task(
         json={"toolBindings": [{"mcpServerId": server["id"], "toolName": "fetch"}]},
     )
     assert assert_ok(response)["toolBindings"] == [
-        {"mcpServerId": server["id"], "toolName": "fetch"}
+        {
+            "mcpServerId": server["id"],
+            "toolName": "fetch",
+            "requiresInputApproval": True,
+        }
     ]
 
 

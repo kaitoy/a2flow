@@ -36,18 +36,28 @@ function serveToolsPerServer() {
  */
 function Harness({
   initial = [],
+  initialExempt = [],
   onChange,
+  onExemptChange,
 }: {
   initial?: string[];
+  initialExempt?: string[];
   onChange?: (next: string[]) => void;
+  onExemptChange?: (next: string[]) => void;
 }) {
   const [value, setValue] = useState(initial);
+  const [exempt, setExempt] = useState(initialExempt);
   return (
     <McpToolPicker
       value={value}
       onChange={(next) => {
         setValue(next);
         onChange?.(next);
+      }}
+      exempt={exempt}
+      onExemptChange={(next) => {
+        setExempt(next);
+        onExemptChange?.(next);
       }}
     />
   );
@@ -207,6 +217,58 @@ describe("McpToolPicker", () => {
     expect(
       await screen.findByRole("button", { name: "Remove my-mcp-server: search" })
     ).toBeInTheDocument();
+  });
+
+  it("offers no input-approval choice until a tool is bound", async () => {
+    render(<Harness />);
+
+    expect(await screen.findByRole("button", { name: "Select MCP server…" })).toBeInTheDocument();
+    expect(screen.queryByText("Skip Input Approval")).not.toBeInTheDocument();
+  });
+
+  it("bounds a newly added tool's input by default", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await pickServer(user, "my-mcp-server");
+    await pickTool(user, "search");
+
+    expect(await screen.findByText("Skip Input Approval")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "my-mcp-server: search" })).not.toBeChecked();
+  });
+
+  it("reports the tool checked as needing no input approval", async () => {
+    const onExemptChange = vi.fn();
+    render(<Harness initial={["mcp-1::search"]} onExemptChange={onExemptChange} />);
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: "my-mcp-server: search" }));
+
+    expect(onExemptChange).toHaveBeenCalledWith(["mcp-1::search"]);
+  });
+
+  it("shows a prefilled exemption as checked", async () => {
+    render(<Harness initial={["mcp-1::search"]} initialExempt={["mcp-1::search"]} />);
+
+    expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeChecked();
+  });
+
+  it("drops the exemption when its tool is unbound", async () => {
+    const onExemptChange = vi.fn();
+    render(
+      <Harness
+        initial={["mcp-1::search"]}
+        initialExempt={["mcp-1::search"]}
+        onExemptChange={onExemptChange}
+      />
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Remove my-mcp-server: search" })
+    );
+
+    // Otherwise re-binding the same tool later would silently bring the
+    // exemption back with it.
+    expect(onExemptChange).toHaveBeenCalledWith([]);
+    expect(screen.queryByText("Skip Input Approval")).not.toBeInTheDocument();
   });
 
   it("surfaces a registry failure and recovers on retry", async () => {

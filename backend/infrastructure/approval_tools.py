@@ -48,10 +48,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from google.adk.tools.tool_context import ToolContext
+from pydantic import ValidationError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database
 from infrastructure.approval_scope import active_approval_by_task, covered_task_ids
+from infrastructure.approved_calls import declared_tools, validate_declaration
 from infrastructure.tool_mocks import resolve_mock
 from infrastructure.workflow_task_tools import (
     _NO_SESSION,
@@ -59,7 +61,7 @@ from infrastructure.workflow_task_tools import (
     _resolve_scope,
     _user_id,
 )
-from models.approval import ApprovalCreate, ApprovalStatus
+from models.approval import ApprovalCreate, ApprovalStatus, ApprovedCall
 from models.mcp_tool_mock import (
     REQUEST_APPROVAL_TOOL,
     MockResponse,
@@ -314,6 +316,132 @@ _MAX_NOTIFICATION_FANOUT = 100
 #: whole-run scan on the enforcement side.
 _MAX_TASKS = 1000
 
+#: Stands in for the approval that does not exist yet while its coverage is
+#: computed. Any id no real approval can hold works; it never leaves
+#: :func:`_prospective_tool_bindings`.
+_PROSPECTIVE = "<prospective>"
+
+
+async def _prospective_tool_bindings(
+    s: _Scope, workflow_task_id: str
+) -> tuple[frozenset[tuple[str, str]], frozenset[tuple[str, str]]]:
+    """Return the MCP tools an approval on this task would end up governing.
+
+    The declaration a request must carry is checked against this, so the check
+    has to know the coverage *before* the approval row exists. Rather than
+    inventing a second notion of coverage, this runs the same walk
+    :func:`_stand_down_superseded_grants` runs afterwards
+    (:func:`infrastructure.approval_scope.covered_task_ids`) over an
+    ``active_approval_by_task`` mapping with the named task pointed at a
+    placeholder.
+
+    Overriding the mapping rather than synthesizing an ``Approval`` row is what
+    keeps this honest: a fresh ``pending`` request outranks whatever gated the
+    task before it (:func:`infrastructure.approval_scope._outranks` prefers a
+    pending approval, then the newer one), so the placeholder wins that task
+    exactly as the real row will, and the tasks downstream follow from there.
+
+    The pairs come back split by what the covered bindings ask for. A pair is
+    exempt only when **every** covered binding of it clears
+    ``requires_input_approval``: where one step wants the arguments approved and
+    another does not, the stricter step decides, since the approval is a single
+    decision covering both.
+
+    Args:
+        s: The current tool call's resolved run and repositories.
+        workflow_task_id: The task the approval would take effect from.
+
+    Returns:
+        ``(constrained, exempt)`` -- the ``(mcp_server_id, tool_name)`` pairs the
+        declaration must name, and the ones it must leave out because the
+        workflow's design exempted them from input approval.
+    """
+    tasks = await s.task_repo.list(
+        limit=_MAX_TASKS, offset=0, workflow_execution_id=s.execution_id
+    )
+    approvals = await s.approval_repo.list_for_execution(s.execution_id)
+    active = active_approval_by_task(approvals) | {workflow_task_id: _PROSPECTIVE}
+    covered = covered_task_ids(tasks, active, _PROSPECTIVE)
+    requires: dict[tuple[str, str], bool] = {}
+    for task in tasks:
+        if task.id not in covered:
+            continue
+        for binding in task.tool_bindings:
+            key = (binding.mcp_server_id, binding.tool_name)
+            requires[key] = requires.get(key, False) or binding.requires_input_approval
+    return (
+        frozenset(pair for pair, needed in requires.items() if needed),
+        frozenset(pair for pair, needed in requires.items() if not needed),
+    )
+
+
+def _render_tools(pairs: Collection[tuple[str, str]]) -> str:
+    """Render ``(server, tool)`` pairs the way an error message names them.
+
+    Args:
+        pairs: The pairs to render.
+
+    Returns:
+        The pairs as a list of objects, sorted for a stable message.
+    """
+    return str([{"mcp_server_id": s, "tool_name": n} for s, n in sorted(pairs)])
+
+
+def _declaration_mismatch_error(
+    missing: Collection[tuple[str, str]],
+    extra: Collection[tuple[str, str]],
+    exempt: Collection[tuple[str, str]],
+) -> str:
+    """Explain a declaration that does not line up with the covered tools.
+
+    An extra that is exempt gets its own clause. It is the one mistake the agent
+    cannot diagnose from the tool list alone -- the tool *is* bound to a covered
+    task, so "no task this approval covers is bound to it" would read as simply
+    wrong -- and it is the mistake this exemption invites.
+
+    Args:
+        missing: Bound tools requiring input approval that the declaration fails
+            to cover.
+        extra: Declared tools that should not have been declared.
+        exempt: Covered tools the workflow's design exempted from input
+            approval, used to tell the two kinds of extra apart.
+
+    Returns:
+        The error message the agent is handed.
+    """
+    exempt_set = set(exempt)
+    parts: list[str] = []
+    if missing:
+        parts.append(
+            "it does not declare "
+            + _render_tools(missing)
+            + ", which the tasks this approval covers are bound to"
+        )
+    declared_exempt = [pair for pair in extra if pair in exempt_set]
+    unbound = [pair for pair in extra if pair not in exempt_set]
+    if declared_exempt:
+        parts.append(
+            "it declares "
+            + _render_tools(declared_exempt)
+            + ", which this workflow's design exempted from input approval -- "
+            "leave those out and they are recorded as authorized with any "
+            "arguments"
+        )
+    if unbound:
+        parts.append(
+            "it declares "
+            + _render_tools(unbound)
+            + ", which no task this approval covers is bound to"
+        )
+    return (
+        "approved_calls must name exactly the MCP tools that are bound to the "
+        "tasks this approval covers and require input approval, so the approver "
+        "decides on every call it authorizes and on nothing that cannot happen: "
+        + "; and ".join(parts)
+        + ". Use list_workflow_tasks to see what those tasks bind, and which of "
+        "their bindings have requires_input_approval set to false."
+    )
+
 
 async def _stand_down_superseded_grants(
     s: _Scope, approval_id: str, user_id: str
@@ -364,6 +492,7 @@ async def request_approval(
     title: str,
     tool_context: ToolContext,
     workflow_task_id: str,
+    approved_calls: list[dict[str, Any]] | None = None,
     approver: str | None = None,
     approver_group_id: str | None = None,
     description: str | None = None,
@@ -385,6 +514,46 @@ async def request_approval(
     it. Until the decision is ``approved``, none of the covered tasks may call
     any of their bound MCP tools. Use ``list_workflow_tasks`` to find the id.
 
+    ``approved_calls`` declares **exactly which MCP tool calls this approval
+    authorizes**, argument by argument. The approver is shown this declaration
+    and decides on it, and every later call is matched against it: a call naming
+    an argument the declaration does not mention, omitting one it requires, or
+    passing a value outside the declared bounds is **refused by the server**. So
+    declare the calls you actually intend to make, then make exactly those.
+
+    One entry per (server, tool) pair, and the declaration must name **every**
+    tool bound to the tasks this approval covers **that requires input
+    approval**, and no others. Each argument you will send maps to an object
+    holding **exactly one** operator:
+
+    * ``{"eq": <value>}`` -- must equal this value.
+    * ``{"in": [<v>, ...]}`` -- must be one of these values.
+    * ``{"lte": <number>}`` / ``{"gte": <number>}`` -- numeric bound, inclusive.
+    * ``{"matches": "<regex>"}`` -- string matching this regular expression,
+      unanchored, so write ``^`` and ``$`` yourself when you mean them.
+
+    Add ``"optional": true`` beside the operator for an argument you may omit.
+    The operator is always written out, never a bare value, so a literal that is
+    itself an object or a list is never ambiguous. For example::
+
+        [{"mcp_server_id": "<id>", "tool_name": "run_instances",
+          "arguments": {"region": {"eq": "ap-northeast-1"},
+                        "instance_type": {"in": ["t3.micro", "t3.small"]},
+                        "count": {"lte": 2},
+                        "name": {"matches": "^dev-"}}}]
+
+    Call ``list_mcp_tools`` first to read each tool's input schema, and declare
+    the narrowest values that still let the work succeed: a wider declaration is
+    a wider grant, and a human is reading it.
+
+    A bound tool whose ``requires_input_approval`` is false -- the workflow's
+    design saying it only reads, so its arguments need nobody's agreement -- is
+    the exception: **leave it out of the declaration**. Declaring one is
+    refused. It is still covered by the approval and still cannot be called
+    until the decision is ``approved``; it is simply recorded as authorized with
+    any arguments, and shown to the approver that way. ``list_workflow_tasks``
+    reports the flag on each binding.
+
     Address the request to **exactly one** destination:
 
     * ``approver`` -- one specific person. Only they are notified and only they
@@ -403,6 +572,12 @@ async def request_approval(
             to the model.
         workflow_task_id: Id of the WorkflowTask the approval takes effect from;
             must belong to the current session. Required.
+        approved_calls: The MCP tool calls this approval authorizes, each
+            ``{"mcp_server_id": ..., "tool_name": ..., "arguments": {<name>:
+            {<operator>: <value>}}}``. Required whenever any task this approval
+            covers binds an MCP tool requiring input approval; omit it when none
+            does. Never name a tool the design exempted, and never set
+            ``unconstrained_arguments`` yourself.
         approver: Id of the single user the request is addressed to. Mutually
             exclusive with ``approver_group_id``; it must match an existing,
             enabled user holding the ``approver`` role.
@@ -414,9 +589,12 @@ async def request_approval(
     Returns:
         On success ``{"approval_id": <id>, "status": "pending"}``. On failure
         ``{"error": <message>}`` (no destination or both, unresolved session,
-        unknown task, unknown or ineligible approver or group, or a persistence
-        error). When
-        the current run mocks this tool the destination and the task are still
+        unknown task, unknown or ineligible approver or group, a declaration
+        that is malformed, sets ``unconstrained_arguments``, or does not name
+        exactly the tools the covered tasks bind that require input approval, or
+        a persistence error). When
+        the current run mocks this tool the destination, the task and the
+        declaration are still
         validated but nothing is recorded or notified, and the mock's response
         comes back with ``"mocked": true`` and a ``note`` saying the status is
         final -- typically already ``approved``, so the run continues unattended.
@@ -437,6 +615,44 @@ async def request_approval(
                     "error": f"WorkflowTask {workflow_task_id!r} "
                     "not found in the current session"
                 }
+            try:
+                declaration = [ApprovedCall(**entry) for entry in approved_calls or []]
+            except (TypeError, ValidationError) as exc:
+                return {
+                    "error": "each entry of approved_calls must be "
+                    '{"mcp_server_id": ..., "tool_name": ..., "arguments": '
+                    "{<name>: {<operator>: <value>}}}: " + str(exc)
+                }
+            if any(call.unconstrained_arguments for call in declaration):
+                return {
+                    "error": "approved_calls entries may not set "
+                    "unconstrained_arguments: which tools may be called with "
+                    "any arguments is decided by the workflow's design, not by "
+                    "this request. Leave those tools out of the declaration "
+                    "entirely and they are recorded that way for you."
+                }
+            problems = validate_declaration(declaration)
+            if problems:
+                return {"error": "approved_calls is malformed: " + "; ".join(problems)}
+            bound, exempt = await _prospective_tool_bindings(s, workflow_task_id)
+            declared = declared_tools(declaration)
+            if declared != bound:
+                return {
+                    "error": _declaration_mismatch_error(
+                        bound - declared, declared - bound, exempt
+                    )
+                }
+            # Recorded rather than resolved from the bindings at call time, so
+            # the approver reads one list naming every tool the decision
+            # authorizes and the gate matches against that same list.
+            declaration += [
+                ApprovedCall(
+                    mcp_server_id=server_id,
+                    tool_name=tool_name,
+                    unconstrained_arguments=True,
+                )
+                for server_id, tool_name in sorted(exempt)
+            ]
             if approver:
                 candidate = await s.user_repo.get(approver)
                 if not _is_eligible_approver(
@@ -497,6 +713,7 @@ async def request_approval(
                 workflow_task_id=workflow_task_id,
                 approver=approver or None,
                 approver_group_id=approver_group_id or None,
+                approved_calls=declaration,
             )
             acting_user_id = _user_id(tool_context)
             try:

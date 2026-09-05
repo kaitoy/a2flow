@@ -25,8 +25,10 @@ from models.agent_skill import AgentSkill
 from models.user import SYSTEM_USER_ID
 from models.workflow import Workflow, WorkflowStatus
 from models.workflow_published_version import (
+    WorkflowPublishedVersion,
     WorkflowPublishedVersionTemplate,
     dump_templates,
+    parse_templates,
 )
 from models.workflow_task import ToolBinding
 from repositories.exceptions import QueryValidationError
@@ -310,6 +312,40 @@ async def test_list_templates_restores_the_whole_payload(
     assert template.created_by == "alice"
     assert template.created_at == datetime(2026, 1, 1, 0, 10, tzinfo=UTC)
     assert [b.tool_name for b in template.tool_bindings] == ["tool-alpha"]
+
+
+def test_publishing_freezes_whether_a_tool_needs_input_approval() -> None:
+    """The flag is part of the design, so it is part of what publishing freezes.
+
+    A run reads its tools from this snapshot, and the approval it later asks for
+    is built from what the run's tasks carry — so a flag lost in the JSON column
+    would quietly put a tool back under bounds the design said it did not need.
+    """
+    template = WorkflowPublishedVersionTemplate(
+        id="t-read-only",
+        title="Look around",
+        tool_bindings=[
+            ToolBinding(
+                mcp_server_id="srv-1",
+                tool_name="list_instances",
+                requires_input_approval=False,
+            ),
+            ToolBinding(mcp_server_id="srv-1", tool_name="launch"),
+        ],
+    )
+    version = WorkflowPublishedVersion(
+        workflow_id=WORKFLOW_ID,
+        name="wf",
+        templates=dump_templates([template]),
+        tenant_id=DEFAULT_TEST_TENANT_ID,
+        created_by=SYSTEM_USER_ID,
+        updated_by=SYSTEM_USER_ID,
+    )
+
+    (restored,) = parse_templates(version)
+    assert [
+        (b.tool_name, b.requires_input_approval) for b in restored.tool_bindings
+    ] == [("list_instances", False), ("launch", True)]
 
 
 async def test_list_templates_of_an_unpublished_workflow_is_empty(

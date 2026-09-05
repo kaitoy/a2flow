@@ -18,7 +18,14 @@ export interface TaskToolsDialogProps {
   onClose: () => void;
 }
 
-/** Modal dialog listing the MCP tools bound to a task, and each tool's owning server. */
+/**
+ * Modal dialog listing the MCP tools bound to a task, and each tool's owning
+ * server.
+ *
+ * A tool the workflow's design exempted from input approval is labelled as
+ * such: it is the one thing about a binding that a reader cannot infer from the
+ * tool's name, and it changes what an approval covering the task bounds.
+ */
 export function TaskToolsDialog({
   task,
   serverNames,
@@ -92,6 +99,11 @@ export function TaskToolsDialog({
                           ? "Loading server…"
                           : (serverNames.get(binding.mcpServerId) ?? "Unknown server")}
                       </p>
+                      {binding.requiresInputApproval === false && (
+                        <p className="mt-0.5 text-xs text-on-surface-variant">
+                          Input needs no approval
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

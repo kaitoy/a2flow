@@ -410,7 +410,11 @@ async def test_register_with_tools_binds_them(engine: AsyncEngine) -> None:
     assert "error" not in result
     listed = await list_task_templates(_ctx())
     assert listed["tasks"][0]["tool_bindings"] == [
-        {"server_id": server_id, "tool_name": "search"}
+        {
+            "server_id": server_id,
+            "tool_name": "search",
+            "requires_input_approval": True,
+        }
     ]
 
 
@@ -452,7 +456,9 @@ async def test_update_replaces_tool_bindings(engine: AsyncEngine) -> None:
         _ctx(),
         tool_bindings=[{"server_id": server_id, "tool_name": "fetch"}],
     )
-    assert result["tool_bindings"] == [{"server_id": server_id, "tool_name": "fetch"}]
+    assert result["tool_bindings"] == [
+        {"server_id": server_id, "tool_name": "fetch", "requires_input_approval": True}
+    ]
 
 
 # ---------- published -> modified ----------
@@ -567,3 +573,86 @@ async def test_failed_write_leaves_a_failed_workflow_failed(
     assert (
         await _generation_error(engine, workflow_id) == "The design agent run failed."
     )
+
+
+# ---------- input approval on a binding ----------
+
+
+async def test_register_can_exempt_a_tool_from_input_approval(
+    engine: AsyncEngine,
+) -> None:
+    """The design agent's judgement about a read-only tool, recorded.
+
+    This is the only surface that can set the flag — a run cannot — so if it
+    does not survive registration there is no way to express the exemption at
+    all.
+    """
+    await _seed_design_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    result = await register_task_templates(
+        [
+            {
+                "key": "t0",
+                "title": "Look around",
+                "tools": [
+                    {
+                        "server_id": server_id,
+                        "tool_name": "list_instances",
+                        "requires_input_approval": False,
+                    },
+                    {"server_id": server_id, "tool_name": "launch"},
+                ],
+            }
+        ],
+        _ctx(),
+    )
+    assert "error" not in result, result
+
+    listed = await list_task_templates(_ctx())
+    assert listed["tasks"][0]["tool_bindings"] == [
+        {
+            "server_id": server_id,
+            "tool_name": "launch",
+            "requires_input_approval": True,
+        },
+        {
+            "server_id": server_id,
+            "tool_name": "list_instances",
+            "requires_input_approval": False,
+        },
+    ]
+
+
+async def test_a_binding_without_the_flag_still_requires_input_approval(
+    engine: AsyncEngine,
+) -> None:
+    """Silence is not consent: an unqualified binding keeps its arguments bounded."""
+    await _seed_design_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    created = await create_task_template(
+        "Launch",
+        _ctx(),
+        tool_bindings=[{"server_id": server_id, "tool_name": "launch"}],
+    )
+    assert created["tool_bindings"][0]["requires_input_approval"] is True
+
+
+async def test_a_non_boolean_input_approval_flag_is_rejected(
+    engine: AsyncEngine,
+) -> None:
+    """A truthy string would otherwise read as an exemption nobody asked for."""
+    await _seed_design_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    result = await create_task_template(
+        "Launch",
+        _ctx(),
+        tool_bindings=[
+            {
+                "server_id": server_id,
+                "tool_name": "launch",
+                "requires_input_approval": "no",
+            }
+        ],
+    )
+    assert "error" in result
+    assert "requires_input_approval" in result["error"]

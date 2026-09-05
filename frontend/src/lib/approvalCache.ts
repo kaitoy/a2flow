@@ -1,9 +1,9 @@
 /** @module approvalCache — Dedupes and caches per-approval GET requests. */
 
-import { type Approval, getApproval } from "@/lib/api";
+import { type ApprovalDetail, getApproval } from "@/lib/api";
 
-const resolvedCache = new Map<string, Approval>();
-const inFlight = new Map<string, Promise<Approval>>();
+const resolvedCache = new Map<string, ApprovalDetail>();
+const inFlight = new Map<string, Promise<ApprovalDetail>>();
 
 /**
  * Fetch an approval, reusing an in-flight request for the same id and skipping
@@ -13,7 +13,7 @@ const inFlight = new Map<string, Promise<Approval>>();
  * deduped — since their status can still change while a viewer keeps the
  * bubble mounted.
  */
-export function getApprovalCached(id: string): Promise<Approval> {
+export function getApprovalCached(id: string): Promise<ApprovalDetail> {
   const cached = resolvedCache.get(id);
   if (cached) return Promise.resolve(cached);
 

@@ -34,19 +34,36 @@ exclusive fields the agent sets when it creates the approval:
 
 ``decided_by`` records which user actually made the decision -- for a group
 destination that is not knowable from ``approver_group_id`` alone.
+
+``approved_calls`` is what the decision is *about*. An approval used to grant a
+capability and nothing more: the tool certificate it mints freezes *which* tools
+the covered tasks may call, never *with what*, so a decision made on a
+description of one action authorized every other use of the same tool. The
+declaration closes that gap. It names each MCP call the request authorizes and
+constrains the arguments it may carry, the approver reads it before deciding,
+and :class:`infrastructure.mcp_policies.ApprovedArgumentsPolicy` refuses any call
+that deviates from it. The constraint vocabulary and the matching rules live in
+:mod:`infrastructure.approved_calls`, shared by the request path and the gate so
+the two cannot disagree about what a declaration means.
+
+A tool the workflow's design marked as not requiring input approval is named in
+the declaration too, as an entry carrying ``unconstrained_arguments`` -- so the
+list stays the complete account of what the decision authorizes, and the
+approver can see which tools were left unbounded. See :class:`ApprovedCall`.
 """
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import field_serializer, model_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index
+from sqlalchemy import CheckConstraint, Column, ForeignKeyConstraint, Index
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity, TZDateTime, iso_z_or_none
-from models.constraints import BodyText, ShortText
+from models.base import BaseEntity, JSONColumn, TZDateTime, iso_z_or_none
+from models.constraints import BodyText, ShortText, ToolName
 from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -77,6 +94,49 @@ class ApprovalStatus(StrEnum):
     re-submitted, so a high ``returned`` rate points at an upstream quality
     problem rather than at work that should not have been requested at all.
     """
+
+
+class ApprovedCall(SQLModel):
+    """One MCP call an approval authorizes, and the arguments it may carry.
+
+    ``arguments`` maps an argument name to the constraint its value must
+    satisfy. A constraint is an object holding exactly one operator -- ``eq``,
+    ``in``, ``lte``, ``gte`` or ``matches`` -- optionally alongside the
+    ``optional`` modifier, which lets that argument be absent altogether. The
+    operator is always spelled out rather than a bare literal standing in for
+    equality, so an argument whose own value is an object or a list is never
+    mistaken for a constraint.
+
+    ``unconstrained_arguments`` says the opposite of everything above: this
+    tool may be called with **any** arguments. It is set only by
+    :func:`infrastructure.approval_tools.request_approval`, for a tool the
+    workflow's design marked as not requiring input approval
+    (:class:`models.workflow_task.ToolBinding`), and an entry the requesting
+    agent supplies carrying it is rejected -- otherwise a run could exempt
+    itself. Recording it here rather than resolving the binding at call time is
+    what keeps the declaration the whole picture: the approver reads one list
+    naming every tool the decision authorizes, and the gate matches against that
+    same list and nothing else. ``arguments`` is empty on such an entry; a
+    declaration setting both is refused as contradictory.
+
+    The vocabulary is deliberately not modelled as a Pydantic union here.
+    :func:`infrastructure.approved_calls.validate_declaration` checks it on the
+    write path, where it can report every problem at once and name the tool to
+    fix -- which is what the requesting agent needs. A model validator would
+    instead also run on the way *out*, over rows written before this field
+    existed, turning them from readable into an HTTP 500. That is the same split
+    :meth:`ApprovalCreate._reject_two_destinations` documents.
+    """
+
+    model_config = _alias_config
+    mcp_server_id: str
+    tool_name: ToolName
+    #: Argument name to its constraint. An argument absent from this mapping may
+    #: not be passed at all: the approver never saw it.
+    arguments: dict[str, dict[str, Any]] = {}
+    #: Whether this tool may be called with any arguments at all. Server-set,
+    #: for a tool the workflow's design exempted from input approval.
+    unconstrained_arguments: bool = False
 
 
 class ApprovalUpdate(SQLModel):
@@ -127,6 +187,10 @@ class ApprovalCreate(ApprovalUpdate):
     #: role may resolve the request.
     approver_group_id: str | None = None
     status: ApprovalStatus = ApprovalStatus.pending
+    #: The MCP calls this approval authorizes. Empty only for an approval
+    #: gating an action no MCP tool performs, or one recorded before the field
+    #: existed -- see the module docstring.
+    approved_calls: list[ApprovedCall] = []
 
     @model_validator(mode="after")
     def _reject_two_destinations(self) -> "ApprovalCreate":
@@ -188,6 +252,15 @@ class Approval(ApprovalCreate, TenantScoped, BaseEntity, table=True):
     """
 
     __tablename__ = "approvals"
+    #: Stored as plain dicts, unlike the typed declaration this class inherits:
+    #: SQLAlchemy's JSON serializer has no way to encode a Pydantic model, the
+    #: same reason :class:`models.mcp_tool_mock.MCPToolMock` declares its
+    #: ``responses`` column this way. :class:`ApprovalRead` restores the typed
+    #: shape on the way out, so the generated frontend bindings still describe
+    #: it.
+    approved_calls: list[dict[str, Any]] = Field(  # type: ignore[assignment]
+        default_factory=list, sa_column=Column(JSONColumn, nullable=False)
+    )
     decided_at: datetime | None = Field(default=None, sa_type=TZDateTime)
     #: Id of the user who made the decision, stamped alongside ``decided_at``.
     #: ``None`` while the request is still ``pending``.
@@ -234,6 +307,37 @@ class Approval(ApprovalCreate, TenantScoped, BaseEntity, table=True):
             name="ck_approvals_single_destination",
         ),
     )
+
+    @field_serializer("decided_at", when_used="json")
+    def _serialize_decided_at(self, dt: datetime | None) -> str | None:
+        """Serialize ``decided_at`` as ISO-8601 with a ``Z`` suffix, or ``None``.
+
+        Args:
+            dt: The decision timestamp, or ``None`` while still pending.
+
+        Returns:
+            The ISO-8601 string with a ``Z`` suffix, or ``None``.
+        """
+        return iso_z_or_none(dt)
+
+
+class ApprovalRead(ApprovalCreate, TenantScoped, BaseEntity):
+    """Read view of an Approval returned by the API.
+
+    Mirrors :class:`Approval` field for field, restoring ``approved_calls`` to
+    the typed shape :class:`ApprovalCreate` declares. The table class stores
+    plain dicts, which would otherwise reach the OpenAPI schema as untyped
+    objects and leave the approval UI nothing to render the approved calls from.
+
+    Used as the routes' ``response_model`` rather than replacing
+    :class:`Approval` in the repository: filtering and sorting still resolve
+    against the table class, and ``approved_calls`` is a JSON column no query
+    orders by.
+    """
+
+    model_config = _alias_config
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
     @field_serializer("decided_at", when_used="json")
     def _serialize_decided_at(self, dt: datetime | None) -> str | None:

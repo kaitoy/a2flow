@@ -5,6 +5,7 @@ import { CheckCircle2, MessageSquareText, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ApprovedCallList } from "@/components/ApprovedCallList";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ApprovalStatusLabel } from "@/components/admin/approval-status";
@@ -19,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import {
-  type Approval,
+  type ApprovalDetail,
   getApproval,
   getUserGroup,
   getUserNames,
@@ -49,7 +50,7 @@ export default function ApprovalDetailPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
-  const [approval, setApproval] = useState<Approval | null>(null);
+  const [approval, setApproval] = useState<ApprovalDetail | null>(null);
   const [approverName, setApproverName] = useState<string | null>(null);
   const [approverGroupName, setApproverGroupName] = useState<string | null>(null);
   const [deciderName, setDeciderName] = useState<string | null>(null);
@@ -241,6 +242,19 @@ export default function ApprovalDetailPage() {
                 >
                   {executionName ?? approval.workflowExecutionId}
                 </Link>
+              }
+            />
+            <DetailItem
+              label="Authorized Calls"
+              value={
+                approval.approvedCalls && approval.approvedCalls.length > 0 ? (
+                  <ApprovedCallList
+                    calls={approval.approvedCalls}
+                    serverName={(id) => serverNames.get(id)}
+                  />
+                ) : (
+                  EMPTY_VALUE
+                )
               }
             />
             <DetailItem

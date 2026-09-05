@@ -86,6 +86,7 @@ async def _insert_approval(
     user_id: str = "owner",
     approver: str | None = None,
     approver_group_id: str | None = None,
+    approved_calls: list[dict[str, object]] | None = None,
 ) -> str:
     """Insert an Approval for the given session and return its id."""
     async with AsyncSession(eng) as db:
@@ -93,6 +94,7 @@ async def _insert_approval(
             workflow_execution_id=workflow_execution_id,
             title=title,
             status=status,
+            approved_calls=approved_calls or [],
             approver=approver,
             approver_group_id=approver_group_id,
             tenant_id=DEFAULT_TEST_TENANT_ID,
@@ -251,6 +253,59 @@ async def test_get_approval(
     data = assert_ok(res)
     assert data["id"] == approval_id
     assert data["status"] == ApprovalStatus.pending.value
+
+
+async def test_get_approval_returns_the_declared_calls(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """The detail route serializes through ApprovalRead, keeping the shape typed.
+
+    The table class stores the declaration as plain dicts, so without that read
+    model the approval UI would receive untyped objects and have nothing to
+    render the bounds from.
+    """
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(
+        eng,
+        workflow_execution_id=execution_id,
+        approved_calls=[
+            {
+                "mcp_server_id": "srv-1",
+                "tool_name": "run_instances",
+                "arguments": {"region": {"eq": "ap-northeast-1"}},
+            }
+        ],
+    )
+
+    res = await client.get(
+        f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}
+    )
+
+    data = assert_ok(res)
+    assert data["approvedCalls"] == [
+        {
+            "mcpServerId": "srv-1",
+            "toolName": "run_instances",
+            "arguments": {"region": {"eq": "ap-northeast-1"}},
+            "unconstrainedArguments": False,
+        }
+    ]
+
+
+async def test_get_approval_reports_no_declaration_as_empty(
+    approval_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """An approval predating argument constraints stays readable."""
+    client, eng = approval_env
+    execution_id = await _seed_session(eng)
+    approval_id = await _insert_approval(eng, workflow_execution_id=execution_id)
+
+    res = await client.get(
+        f"/api/v1/approvals/{approval_id}", headers={"X-User-Id": "owner"}
+    )
+
+    assert assert_ok(res)["approvedCalls"] == []
 
 
 async def test_get_unknown_approval_is_404(

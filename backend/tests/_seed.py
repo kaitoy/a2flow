@@ -171,6 +171,7 @@ async def seed_workflow_task(
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending,
     depends_on_ids: Sequence[str] = (),
     tool_bindings: Sequence[tuple[str, str]] = (),
+    input_approval_exempt: Sequence[tuple[str, str]] = (),
     tenant_id: str = DEFAULT_TEST_TENANT_ID,
     user_id: str = "owner",
 ) -> str:
@@ -193,6 +194,10 @@ async def seed_workflow_task(
         depends_on_ids: Ids of same-run tasks this task depends on; one
             dependency edge is written per id.
         tool_bindings: ``(mcp_server_id, tool_name)`` pairs to bind to the task.
+        input_approval_exempt: Which of ``tool_bindings`` to write with
+            ``requires_input_approval`` cleared — the workflow design saying that
+            tool only reads. Named separately rather than widening the pairs so
+            the many callers that never exempt anything stay as they are.
         tenant_id: Tenant the task belongs to.
         user_id: Actor recorded in ``created_by`` / ``updated_by``.
 
@@ -220,10 +225,14 @@ async def seed_workflow_task(
             session.add(
                 WorkflowTaskDependency(task_id=task_id, depends_on_id=depends_on_id)
             )
+        exempt = set(input_approval_exempt)
         for server_id, tool_name in tool_bindings:
             session.add(
                 WorkflowTaskToolBinding(
-                    task_id=task_id, mcp_server_id=server_id, tool_name=tool_name
+                    task_id=task_id,
+                    mcp_server_id=server_id,
+                    tool_name=tool_name,
+                    requires_input_approval=(server_id, tool_name) not in exempt,
                 )
             )
         await session.commit()

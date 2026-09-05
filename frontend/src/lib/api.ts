@@ -10,8 +10,10 @@ import type {
   ApiError,
   ApiMeta,
   Approval as ApprovalModel,
+  ApprovalRead as ApprovalReadModel,
   ApprovalStatus,
   ApprovalUpdate,
+  ApprovedCall,
   AvatarConfig,
   CertificateGrant,
   ExecuteWorkflowRequest,
@@ -470,6 +472,15 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
 
 export type AgentSkill = WithAudit<AgentSkillModel>;
 export type Approval = WithAudit<ApprovalModel>;
+/**
+ * One approval with its `approvedCalls` typed.
+ *
+ * `GET /approvals/{id}` serializes through the backend's `ApprovalRead`, which
+ * restores the declaration's shape that the table class stores as plain JSON.
+ * The list endpoint returns {@link Approval}, where `approvedCalls` is opaque —
+ * a declaration is detail, and nothing filters or sorts on it.
+ */
+export type ApprovalDetail = WithAudit<ApprovalReadModel>;
 export type McpToolCertificate = WithAudit<McpToolCertificateRead>;
 export type McpServer = WithAudit<McpServerModel>;
 export type McpToolMock = WithAudit<McpToolMockModel>;
@@ -500,6 +511,7 @@ export type {
   AgentSkillUpdate,
   ApprovalStatus,
   ApprovalUpdate,
+  ApprovedCall,
   AvatarConfig,
   CertificateGrant,
   GenerateWorkflowRequest,
@@ -1859,11 +1871,14 @@ export async function listApprovals(query: ListQuery = {}): Promise<Approval[]> 
 }
 
 /** Fetch a single approval request by ID. */
-export async function getApproval(id: string, config?: AxiosRequestConfig): Promise<Approval> {
+export async function getApproval(
+  id: string,
+  config?: AxiosRequestConfig
+): Promise<ApprovalDetail> {
   return fetchEnvelope(
     apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}`, config),
     zGetApprovalApiV1ApprovalsApprovalIdGetResponse
-  ) as Promise<Approval>;
+  ) as Promise<ApprovalDetail>;
 }
 
 /**

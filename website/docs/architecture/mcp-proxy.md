@@ -68,8 +68,9 @@ The sandbox is a second line, not the decision-maker. Whether the task is still 
 |---|---|---|
 | 1 | **In-progress tool binding** | The `(server, tool)` pair must be bound to a task the run currently has `in_progress`. Listing what a server advertises is deliberately unrestricted — that is how the design agent decides what to bind |
 | 2 | **Tool certificate** | The call must present the task's certificate — see [Who authorized a call](#who-authorized-a-call) — and that certificate's signed grant must cover the tool. There is no exemption: a task no approval covers presents the grant its run's initiator holds |
+| 3 | **Approved call** | When an approver's decision is what authorizes the task, the call must match the calls that decision listed — see [The calls a decision covers](./approvals.md#the-calls-a-decision-covers). A tool the decision listed as taking any input passes this rule whatever it carries, having already been stopped by rule 2 until the decision was granted. A task running on its initiator's own grant has no such list and is not checked here |
 
-The chain stops at the first veto and is ordered cheapest first, so a call that already fails the binding rule never pays for a signature check. Adding a rule means adding a policy to the chain rather than editing the proxy, which is what keeps "what may run" readable as one ordered list.
+The chain stops at the first veto and is ordered cheapest first, so a call that already fails the binding rule never pays for a signature check. The last rule runs last for a second reason as well: it is the only one that needs to know *which* task is calling, and the rule before it is what establishes that. It also keeps a caller holding no authority at all from learning what an approver agreed to. Adding a rule means adding a policy to the chain rather than editing the proxy, which is what keeps "what may run" readable as one ordered list.
 
 Refusals are written for the caller rather than for a log: a denied call comes back naming the tools that *are* allowed, so the model can correct itself instead of guessing.
 
@@ -95,7 +96,7 @@ Three rules follow, and all are visible to whoever operates a workflow:
 | Recorded per decided call | Deliberately not recorded |
 |---|---|
 | The tool, the server, and whether it was allowed or denied | The arguments themselves — only a digest of them is kept |
-| The refusal reason, when denied | |
+| The refusal reason, when denied — for a call outside what was approved, the input at fault and the bound the approver agreed to | The refused input's actual value |
 | The certificate presented, and therefore who authorized the call | |
 
 That record is the run's Tool Invocations page, and it is what makes "who authorized this call" answerable after the fact. The certificates themselves are listed under **Audit Logs → Certificates**, one row per grant.

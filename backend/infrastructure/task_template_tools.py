@@ -183,7 +183,11 @@ def _template_to_dict(template: WorkflowTaskTemplateRead) -> dict[str, Any]:
         "description": template.description,
         "depends_on_ids": list(template.depends_on_ids),
         "tool_bindings": [
-            {"server_id": b.mcp_server_id, "tool_name": b.tool_name}
+            {
+                "server_id": b.mcp_server_id,
+                "tool_name": b.tool_name,
+                "requires_input_approval": b.requires_input_approval,
+            }
             for b in template.tool_bindings
         ],
     }
@@ -211,7 +215,8 @@ async def register_task_templates(
           "description": "...",        # optional, where the detail belongs
           "depends_on": ["t0"],        # optional, other entries' "key" values
           "tools": [                   # optional MCP tools this task will use
-            {"server_id": "<registered MCP server id>", "tool_name": "<tool>"}
+            {"server_id": "<registered MCP server id>", "tool_name": "<tool>",
+             "requires_input_approval": true}   # optional, default true
           ]
         }
 
@@ -228,6 +233,16 @@ async def register_task_templates(
     template may invoke those tools (and only those) via ``call_mcp_tool``.
     Discover the available servers and tools with ``list_mcp_tools`` first, and
     only bind tools a task actually needs.
+
+    Set ``"requires_input_approval": false`` on a bound tool that only **reads**
+    -- a listing, a lookup, a status check. At run time an approval covering
+    this task has to spell out the arguments of every other bound tool before a
+    human decides on it, and for a read-only tool that is both pointless (there
+    is no consequence to weigh) and often impossible (the agent may be
+    exploring, and cannot know the arguments in advance). The tool is still
+    covered by the approval and still waits for it; only the argument bounds
+    fall away. Leave the default of ``true`` for anything that writes, deletes,
+    spends, or sends.
 
     Moves a ``published`` parent workflow to ``modified``.
 
@@ -357,7 +372,9 @@ async def create_task_template(
         depends_on_ids: Optional ids of existing same-workflow templates this task
             depends on.
         tool_bindings: Optional MCP tools to bind to the task, each
-            ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``.
+            ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``,
+            optionally with ``"requires_input_approval": false`` for a tool that
+            only reads -- see ``register_task_templates`` for when that applies.
 
     Returns:
         The created task dict, or ``{"error": <message>}`` on an unknown
@@ -399,7 +416,9 @@ async def list_task_templates(tool_context: ToolContext) -> dict[str, Any]:
 
     Returns:
         ``{"tasks": [{"id", "title", "description", "depends_on_ids",
-        "tool_bindings"}, ...]}`` ordered by creation time, or
+        "tool_bindings"}, ...]}`` ordered by creation time -- each binding
+        carrying ``server_id``, ``tool_name`` and ``requires_input_approval`` --
+        or
         ``{"error": <message>}`` if the session cannot be resolved.
     """
     try:
@@ -467,7 +486,8 @@ async def update_task_template(
             templates), if changing.
         tool_bindings: Replacement MCP tool bindings, each
             ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``,
-            if changing.
+            optionally with ``"requires_input_approval": false`` for a tool that
+            only reads, if changing.
 
     Returns:
         The updated task dict, or ``{"error": <message>}`` on an unknown

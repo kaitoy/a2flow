@@ -109,6 +109,32 @@ describe("TaskToolsDialog", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
+  it("marks a tool whose input needs no approval", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <TaskToolsDialog
+          task={{
+            title: "Gather sources",
+            toolBindings: [
+              { mcpServerId: "mcp-1", toolName: "list_files", requiresInputApproval: false },
+              { mcpServerId: "mcp-2", toolName: "ocr_scan" },
+            ],
+          }}
+          serverNames={SERVER_NAMES}
+          serverNamesLoading={false}
+          onClose={vi.fn()}
+        />
+      </>
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    // Only the exempt one is labelled; the flag is the one thing about a
+    // binding a reader cannot infer from the tool's name.
+    expect(within(dialog).getAllByText("Input needs no approval")).toHaveLength(1);
+    await user.keyboard("{Escape}");
+  });
+
   it("renders nothing when task is null", () => {
     render(
       <TaskToolsDialog

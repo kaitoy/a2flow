@@ -220,14 +220,22 @@ async def _seed_approval(
     execution_id: str,
     task_id: str,
     status: ApprovalStatus = ApprovalStatus.approved,
+    approved_calls: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Insert an Approval on a task, decided when ``status`` is not pending."""
+    """Insert an Approval on a task, decided when ``status`` is not pending.
+
+    ``approved_calls`` defaults to empty, which is what an approval recorded
+    before argument constraints existed looks like -- the state most of this
+    file's tests want, since they are about the certificate gate rather than
+    what a call carries.
+    """
     async with AsyncSession(eng) as db:
         approval = Approval(
             workflow_execution_id=execution_id,
             workflow_task_id=task_id,
             title="Approve me",
             status=status,
+            approved_calls=approved_calls or [],
             approver="alice",
             decided_at=(
                 datetime.now(UTC) if status != ApprovalStatus.pending else None
@@ -1126,3 +1134,340 @@ async def test_an_audit_failure_does_not_break_the_call(
     result = await _call(server_id)
 
     assert result.isError is False
+
+
+# ---------------------------------------------------------------------------
+# The approved arguments
+# ---------------------------------------------------------------------------
+
+
+def _declaration(server_id: str, **arguments: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build a declaration over ``TOOL`` on one server.
+
+    Args:
+        server_id: The MCP server the declared call targets.
+        **arguments: Argument name to its constraint object.
+
+    Returns:
+        The ``approved_calls`` payload an Approval row carries.
+    """
+    return [{"mcp_server_id": server_id, "tool_name": TOOL, "arguments": arguments}]
+
+
+async def test_a_conforming_call_passes_the_argument_gate(
+    engine: AsyncEngine,
+) -> None:
+    """The whole point: the arguments the approver approved go through."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        approved_calls=_declaration(srv, path={"eq": "/etc/hosts"}),
+    )
+    await _issue(engine, approval_id)
+
+    assert (await _call(srv, arguments={"path": "/etc/hosts"})).isError is False
+
+
+async def test_a_deviating_argument_value_is_denied(engine: AsyncEngine) -> None:
+    """The gap this closes: the tool is granted, this argument is not."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        approved_calls=_declaration(srv, path={"eq": "/etc/hosts"}),
+    )
+    await _issue(engine, approval_id)
+
+    with pytest.raises(McpPolicyDeniedError, match="outside what the approver"):
+        await _call(srv, arguments={"path": "/etc/shadow"})
+
+
+async def test_an_undeclared_argument_is_denied(engine: AsyncEngine) -> None:
+    """The strict allowlist, end to end."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        approved_calls=_declaration(srv, path={"eq": "/etc/hosts"}),
+    )
+    await _issue(engine, approval_id)
+
+    with pytest.raises(McpPolicyDeniedError, match="follow_symlinks"):
+        await _call(srv, arguments={"path": "/etc/hosts", "follow_symlinks": True})
+
+
+async def test_a_declared_argument_the_call_omits_is_denied(
+    engine: AsyncEngine,
+) -> None:
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        approved_calls=_declaration(srv, path={"eq": "/etc/hosts"}),
+    )
+    await _issue(engine, approval_id)
+
+    with pytest.raises(McpPolicyDeniedError, match="omits it"):
+        await _call(srv, arguments={})
+
+
+async def test_a_granted_tool_the_declaration_omits_is_denied(
+    engine: AsyncEngine,
+) -> None:
+    """The certificate is no longer the last word once a declaration exists."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        # Names a different tool than the one the task binds, and that the
+        # certificate therefore grants.
+        approved_calls=[
+            {"mcp_server_id": srv, "tool_name": "write_file", "arguments": {}}
+        ],
+    )
+    await _issue(engine, approval_id)
+
+    with pytest.raises(McpPolicyDeniedError, match="does not authorize tool"):
+        await _call(srv, arguments={"path": "/etc/hosts"})
+
+
+async def test_an_approval_with_no_declaration_does_not_constrain_arguments(
+    engine: AsyncEngine,
+) -> None:
+    """A request recorded before this rule existed keeps working.
+
+    No path exists by which an approver could supply a declaration after the
+    fact, so denying here would wedge every approval in flight at deploy time.
+    """
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    approval_id = await _seed_approval(
+        engine, execution_id=execution_id, task_id=task_id
+    )
+    await _issue(engine, approval_id)
+
+    assert (await _call(srv, arguments={"anything": "at all"})).isError is False
+
+
+async def test_an_initiator_grant_is_not_argument_constrained(
+    engine: AsyncEngine,
+) -> None:
+    """No approver, so nothing to have deviated from."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    await _grant(engine, execution_id, task_id)
+
+    assert (await _call(srv, arguments={"path": "/anything"})).isError is False
+
+
+async def test_a_merge_must_satisfy_every_governing_declaration(
+    engine: AsyncEngine,
+) -> None:
+    """The laxer approver's declaration must not speak for the stricter one's."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    left = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[],
+        title="Ask left",
+        status=WorkflowTaskStatus.completed,
+    )
+    right = await _seed_task(
+        engine,
+        execution_id,
+        bindings=[],
+        title="Ask right",
+        status=WorkflowTaskStatus.completed,
+    )
+    merge = await _seed_task(
+        engine, execution_id, bindings=[(srv, TOOL)], title="Publish"
+    )
+    async with AsyncSession(engine) as db:
+        db.add(WorkflowTaskDependency(task_id=merge, depends_on_id=left))
+        db.add(WorkflowTaskDependency(task_id=merge, depends_on_id=right))
+        await db.commit()
+
+    left_approval = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=left,
+        approved_calls=_declaration(srv, path={"in": ["/etc/hosts", "/etc/motd"]}),
+    )
+    right_approval = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=right,
+        approved_calls=_declaration(srv, path={"eq": "/etc/motd"}),
+    )
+    await _issue(engine, left_approval)
+    await _issue(engine, right_approval)
+
+    # Inside the left approval's set, outside the right's.
+    with pytest.raises(McpPolicyDeniedError, match="outside what the approver"):
+        await _call(srv, arguments={"path": "/etc/hosts"})
+
+    # Inside both.
+    assert (await _call(srv, arguments={"path": "/etc/motd"})).isError is False
+
+
+async def test_a_denied_argument_is_audited_without_its_value(
+    engine: AsyncEngine,
+) -> None:
+    """The reason is stored raw beside a digest that exists to withhold the value."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        approved_calls=_declaration(srv, path={"eq": "/etc/hosts"}),
+    )
+    await _issue(engine, approval_id)
+
+    secret = "/etc/very-secret-path"
+    with pytest.raises(McpPolicyDeniedError):
+        await _call(srv, arguments={"path": secret})
+
+    async with AsyncSession(engine) as db:
+        rows = (await db.exec(select(MCPToolInvocation))).all()
+    assert len(rows) == 1
+    assert rows[0].decision is McpAuditDecision.denied
+    assert rows[0].denial_reason is not None
+    assert "path" in rows[0].denial_reason
+    assert secret not in rows[0].denial_reason
+
+
+# ---------------------------------------------------------------------------
+# Tools the workflow design exempted from input approval
+# ---------------------------------------------------------------------------
+
+
+def _unconstrained(server_id: str, tool_name: str = TOOL) -> dict[str, Any]:
+    """Build the entry the request path writes for an exempt tool.
+
+    Args:
+        server_id: The MCP server the entry covers.
+        tool_name: The tool the entry covers.
+
+    Returns:
+        One ``approved_calls`` entry permitting any arguments.
+    """
+    return {
+        "mcp_server_id": server_id,
+        "tool_name": tool_name,
+        "arguments": {},
+        "unconstrained_arguments": True,
+    }
+
+
+async def test_an_exempt_tool_accepts_arguments_nobody_declared(
+    engine: AsyncEngine,
+) -> None:
+    """What the exemption buys: a read-only tool the run may explore with."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        approved_calls=[_unconstrained(srv)],
+    )
+    await _issue(engine, approval_id)
+
+    assert (await _call(srv, arguments={"path": "/anything/at/all"})).isError is False
+
+
+async def test_an_exempt_tool_is_still_gated_by_the_approval(
+    engine: AsyncEngine,
+) -> None:
+    """The exemption drops the argument bounds, never the decision itself.
+
+    Nothing issues a certificate while the approval is pending, so the call has
+    none to present and the certificate policy refuses it before the argument
+    rule is ever reached.
+    """
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        status=ApprovalStatus.pending,
+        approved_calls=[_unconstrained(srv)],
+    )
+    await _issue(engine, approval_id)
+
+    with pytest.raises(McpPolicyDeniedError):
+        await _call(srv, arguments={"path": "/anything/at/all"})
+
+
+async def test_exempting_one_tool_leaves_the_others_bounded(
+    engine: AsyncEngine,
+) -> None:
+    """The declaration is per tool, so the destructive one keeps its bounds."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(
+        engine, execution_id, bindings=[(srv, TOOL), (srv, "write_file")]
+    )
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        approved_calls=[
+            _unconstrained(srv),
+            {
+                "mcp_server_id": srv,
+                "tool_name": "write_file",
+                "arguments": {"path": {"eq": "/tmp/report"}},
+            },
+        ],
+    )
+    await _issue(engine, approval_id)
+
+    assert (await _call(srv, arguments={"path": "/etc/shadow"})).isError is False
+    with pytest.raises(McpPolicyDeniedError, match="outside what the approver"):
+        await _call(srv, tool="write_file", arguments={"path": "/etc/passwd"})
+
+
+async def test_an_exempt_tool_does_not_authorize_a_tool_beside_it(
+    engine: AsyncEngine,
+) -> None:
+    """An entry permitting any arguments still permits only its own tool."""
+    srv = await _seed_server(engine)
+    execution_id = await _seed_execution(engine)
+    task_id = await _seed_task(
+        engine, execution_id, bindings=[(srv, TOOL), (srv, "write_file")]
+    )
+    approval_id = await _seed_approval(
+        engine,
+        execution_id=execution_id,
+        task_id=task_id,
+        approved_calls=[_unconstrained(srv)],
+    )
+    await _issue(engine, approval_id)
+
+    with pytest.raises(McpPolicyDeniedError, match="does not authorize tool"):
+        await _call(srv, tool="write_file", arguments={"path": "/tmp/report"})

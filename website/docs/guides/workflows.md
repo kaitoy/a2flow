@@ -182,6 +182,24 @@ At execution time every call is checked before it reaches a server: the `(server
 
 **Binding tools by hand.** The template forms carry an **MCP Tools** picker that works in two steps: choose a server through a paged dialog, then add one of its tools from a dropdown, each added tool becoming a removable chip. Only the chosen server is queried, so opening the form does not go out to every registered server; one that cannot be reached says so in place of its tool list, and an already-bound tool keeps its chip either way. Bound tools appear as chips in the **Tools** column of the Task Templates and Workflow Tasks lists.
 
+**Tools that need no input approval.** Beside the picker, **Skip Input Approval** lists
+the tools bound to this step, one checkbox each. Check a tool and the values it is called
+with are no longer part of what an [approval](./approvals.md) covering the step asks a
+person to agree to — the approval itself still applies, and the step still waits for it.
+
+Check a tool only when it **reads**: a listing, a lookup, a status check. Two reasons this
+exists, and both are about read-only work:
+
+| | |
+|---|---|
+| There is nothing to weigh | Nobody needs to agree to the arguments of a query that changes nothing |
+| The values are not knowable yet | A step may look something up to decide what to do next, so it cannot say in advance what it will ask for |
+
+Leave it unchecked for anything that writes, deletes, spends, or sends. The default is
+unchecked, so a tool added and left alone keeps its input bounded. A checked tool is
+labelled **Any input** on the approval the run later asks for, so the approver sees which
+tools were left unbounded rather than having to infer it.
+
 **Task titles.** Both of those lists show every record instead of paginating, which lets the **Depends on** column work as a cross-reference: each dependency is named by its title, and hovering that chip highlights the row it points at. The design agent is held to terse imperative titles — 2 to 4 words, 30 characters — so they read cleanly as chips; a longer one is refused with a note telling it to move the detail into the description. The limit binds the agent, not people: a title edited through the admin form may run to 200 characters, and one that overflows its chip is clipped and revealed on hover.
 
 ## Deleting a workflow

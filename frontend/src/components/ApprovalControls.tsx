@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
-  type Approval,
+  type ApprovalDetail,
   type ApprovalStatus,
+  type ApprovedCall,
   getApproval,
   getUserNames,
   isApprovalAlreadyResolvedError,
@@ -14,6 +15,7 @@ import { getApprovalCached } from "@/lib/approvalCache";
 import logger from "@/lib/logger";
 import { effectiveRoles, Role } from "@/lib/roles";
 import { useAppSelector } from "@/store/hooks";
+import { ApprovedCallList } from "./ApprovedCallList";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
@@ -42,6 +44,11 @@ const DECISION_DISPLAY: Record<Decision, { label: string; className: string }> =
  * member holding the `approver` role as its approver, and the first decision
  * from any of them settles it, so several viewers may see the controls at once
  * and one of them can lose the race (handled below as a 409).
+ *
+ * The calls the approval authorizes are listed above the controls, so the
+ * decision is made on the actual MCP calls and their argument bounds rather
+ * than on a description of them — the backend then refuses any call that
+ * deviates from what is shown here.
  *
  * On click it writes the decision directly to the backend
  * (`PATCH /approvals/{id}`) and then notifies the chat via {@link onResolved} so
@@ -73,6 +80,10 @@ export function ApprovalControls({
   const [comment, setComment] = useState("");
   const [resolvedComment, setResolvedComment] = useState<string | null>(null);
   const [decidedBy, setDecidedBy] = useState<string | null>(null);
+  // What the approval authorizes, shown while pending and kept afterwards as
+  // the record of what was decided on. Empty for an approval predating
+  // argument constraints.
+  const [approvedCalls, setApprovedCalls] = useState<ApprovedCall[]>([]);
   const [deciderName, setDeciderName] = useState<string | null>(null);
   const action = useAsyncAction({ showDone: false });
   // Which decision is in flight, so only the clicked button shows the pending
@@ -83,8 +94,9 @@ export function ApprovalControls({
   useEffect(() => {
     let active = true;
     getApprovalCached(approvalId)
-      .then((approval: Approval) => {
+      .then((approval: ApprovalDetail) => {
         if (!active) return;
+        setApprovedCalls(approval.approvedCalls ?? []);
         setApprover(approval.approver ?? null);
         setApproverGroupId(approval.approverGroupId ?? null);
         if (approval.status) setStatus(approval.status);
@@ -227,6 +239,8 @@ export function ApprovalControls({
         {title ?? "Approval requested"}
       </h3>
       {description && <p className="mt-1 text-sm text-on-surface-variant">{description}</p>}
+
+      <ApprovedCallList calls={approvedCalls} />
 
       {status === "pending" ? (
         pendingControls

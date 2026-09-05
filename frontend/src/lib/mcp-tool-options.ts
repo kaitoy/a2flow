@@ -31,6 +31,40 @@ export function valueToBinding(value: string): ToolBinding {
 }
 
 /**
+ * Build the API's binding list from the two arrays the forms hold.
+ *
+ * The forms keep the bound tools and the input-approval exemption as separate
+ * `string[]`s — one is a multi-select, the other a checkbox group over the same
+ * options — and this is where the two are folded back into one list. A tool
+ * absent from `exempt` keeps the safe default: an approval covering its task
+ * bounds the values it may be called with.
+ *
+ * @param values - Composite values of every bound tool.
+ * @param exempt - Composite values of the tools whose input needs no approval.
+ * @returns The bindings to send.
+ */
+export function toBindings(values: string[], exempt: string[]): ToolBinding[] {
+  const exemptSet = new Set(exempt);
+  return values.map((value) => ({
+    ...valueToBinding(value),
+    requiresInputApproval: !exemptSet.has(value),
+  }));
+}
+
+/**
+ * The composite values of the bindings that need no input approval.
+ *
+ * The inverse of {@link toBindings}' second argument, used to seed the edit
+ * form from what the API returned.
+ *
+ * @param bindings - The bindings as the API returned them.
+ * @returns Composite values of the exempt ones, in the given order.
+ */
+export function exemptValues(bindings: ToolBinding[]): string[] {
+  return bindings.filter((b) => b.requiresInputApproval === false).map(bindingToValue);
+}
+
+/**
  * Human-readable label for a binding: `"<serverName>: <toolName>"`.
  *
  * A binding stores only the server's id, so a label needs the registry to

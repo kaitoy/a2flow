@@ -522,6 +522,7 @@ def upgrade() -> None:
         sa.Column("template_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("mcp_server_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("tool_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("requires_input_approval", sa.Boolean(), nullable=False),
         sa.ForeignKeyConstraint(
             ["mcp_server_id"], ["mcp_servers.id"], ondelete="RESTRICT"
         ),
@@ -868,6 +869,11 @@ def upgrade() -> None:
         sa.Column(
             "approver_group_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
+        sa.Column(
+            "approved_calls",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
         sa.Column("decided_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("decided_by", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
@@ -1052,6 +1058,7 @@ def upgrade() -> None:
         sa.Column("task_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("mcp_server_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("tool_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("requires_input_approval", sa.Boolean(), nullable=False),
         sa.ForeignKeyConstraint(
             ["mcp_server_id"], ["mcp_servers.id"], ondelete="RESTRICT"
         ),

@@ -245,6 +245,11 @@ class WorkflowTaskService:
         pending, changing the bindings would move the ground under the person
         being asked to weigh them.
 
+        ``requires_input_approval`` counts as part of a binding here, not merely
+        the ``(server, tool)`` pair: flipping it alone would drop the tool out of
+        what the approver's declaration bounds, which is the same widening by a
+        quieter route.
+
         Args:
             task: The task whose bindings are being changed.
             bindings: The bindings the caller is asking for.
@@ -253,8 +258,13 @@ class WorkflowTaskService:
             ForbiddenError: If an approval governs the task and the requested
                 bindings differ from the ones it already carries.
         """
-        current = {(b.mcp_server_id, b.tool_name) for b in task.tool_bindings}
-        if {(b.mcp_server_id, b.tool_name) for b in bindings} == current:
+        current = {
+            (b.mcp_server_id, b.tool_name, b.requires_input_approval)
+            for b in task.tool_bindings
+        }
+        if {
+            (b.mcp_server_id, b.tool_name, b.requires_input_approval) for b in bindings
+        } == current:
             return
         tasks = await self._repo.list(
             limit=_MAX_TASKS, offset=0, workflow_execution_id=task.workflow_execution_id

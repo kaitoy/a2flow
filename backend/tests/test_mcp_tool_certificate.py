@@ -590,7 +590,11 @@ async def test_certificate_endpoint_reports_the_granted_tools(
     data = assert_ok(response)
     assert len(data) == 1
     assert data[0]["allowedTools"] == [
-        {"mcpServerId": server_id, "toolName": "read_file"}
+        {
+            "mcpServerId": server_id,
+            "toolName": "read_file",
+            "requiresInputApproval": True,
+        }
     ]
     assert data[0]["revokedAt"] is None
     assert data[0]["approvalId"] == approval_id

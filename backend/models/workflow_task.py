@@ -15,7 +15,9 @@ A task may also have MCP tools bound to it: each binding names a registered
 stored in the :class:`WorkflowTaskToolBinding` join table and surfaced on read
 models as ``tool_bindings``; at execution time the agent may only invoke MCP
 tools bound to the task currently in progress (enforced by ``call_mcp_tool`` in
-:mod:`infrastructure.mcp_tools`).
+:mod:`infrastructure.mcp_tools`). A binding also carries
+``requires_input_approval``, which says whether an approval covering the task
+must bound the arguments this tool is called with -- see :class:`ToolBinding`.
 """
 
 from enum import StrEnum
@@ -80,11 +82,35 @@ class TaskErrorKind(StrEnum):
 
 
 class ToolBinding(SQLModel):
-    """One MCP tool bound to a WorkflowTask: which server and which tool name."""
+    """One MCP tool bound to a WorkflowTask: which server and which tool name.
+
+    ``requires_input_approval`` is the design-time answer to "must a human agree
+    to the values this tool is called with?". It defaults to ``True``, which is
+    the rule an approval-covered task is held to: every call the approval
+    authorizes is declared argument by argument and matched against that
+    declaration (:mod:`infrastructure.approved_calls`).
+
+    Clearing it exempts the tool from that matching alone -- **not** from the
+    approval. A covered task still calls nothing until its approval is granted;
+    what changes is that once it is, this tool may be called with any arguments.
+    It is meant for a tool that only reads: there is no consequence for an
+    approver to weigh, and an agent exploring with it cannot know its arguments
+    at the moment the request is made, so demanding a declaration would only
+    produce a dishonest one.
+
+    The flag is set on the workflow's task templates and copied onto a run's
+    tasks at execute time. A run cannot set it: the execution agent may change
+    only a task's ``status`` (:func:`infrastructure.workflow_task_tools.update_workflow_task`),
+    and :meth:`services.workflow_task.WorkflowTaskService._assert_tool_bindings_change_allowed`
+    refuses to change the bindings of a task an approval covers.
+    """
 
     model_config = _alias_config
     mcp_server_id: str
     tool_name: ToolName
+    #: Whether a call to this tool must fit the approver's declaration. ``False``
+    #: exempts its arguments from that check; the approval itself still applies.
+    requires_input_approval: bool = True
 
 
 class WorkflowTaskUpdate(SQLModel):
@@ -218,6 +244,10 @@ class WorkflowTaskToolBinding(SQLModel, table=True):
     invoke tool ``N`` on registered server ``S`` while it is in progress.
     Bindings cascade-delete with their task; the server side is ``RESTRICT`` so
     a registered server cannot be deleted while tasks still bind its tools.
+
+    ``requires_input_approval`` is not part of the key: it describes the one
+    binding the key already identifies. See :class:`ToolBinding` for what it
+    means.
     """
 
     __tablename__ = "workflow_task_tool_bindings"
@@ -238,3 +268,4 @@ class WorkflowTaskToolBinding(SQLModel, table=True):
     task_id: str = Field(primary_key=True)
     mcp_server_id: str = Field(primary_key=True)
     tool_name: str = Field(primary_key=True)
+    requires_input_approval: bool = Field(default=True)

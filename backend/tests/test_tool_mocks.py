@@ -659,9 +659,45 @@ async def test_mocked_approval_accepts_the_asking_step(engine: AsyncEngine) -> N
         depends_on=asking,
         binds=(server_id, "search"),
     )
-    result = await request_approval("Deploy", _ctx(), asking, approver="alice")
+    result = await request_approval(
+        "Deploy",
+        _ctx(),
+        asking,
+        approved_calls=[
+            {"mcp_server_id": server_id, "tool_name": "search", "arguments": {}}
+        ],
+        approver="alice",
+    )
     assert result["status"] == "approved"
     assert result["mocked"] is True
+
+
+async def test_mocked_approval_still_validates_the_declaration(
+    engine: AsyncEngine,
+) -> None:
+    """A mock skips the side effects, not the validation.
+
+    The same rule the destination check already follows. A dry run that omitted
+    the declaration would rehearse a request the real one would refuse, which is
+    the one thing a dry run must not do.
+    """
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_execution(
+        engine, tool_mocks=[_approval_mock("approved")]
+    )
+    asking = await _seed_approval_task(engine, execution_id, title="Request approval")
+    await _seed_approval_task(
+        engine,
+        execution_id,
+        title="Launch instance",
+        depends_on=asking,
+        binds=(server_id, "search"),
+    )
+
+    result = await request_approval("Deploy", _ctx(), asking, approver="alice")
+
+    assert "error" in result
+    assert "search" in result["error"]
 
 
 async def test_mocked_approval_accepts_a_text_response(engine: AsyncEngine) -> None:

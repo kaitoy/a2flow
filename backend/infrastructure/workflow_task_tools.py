@@ -320,7 +320,11 @@ def _task_to_dict(task: WorkflowTaskRead) -> dict[str, Any]:
         "error_message": task.error_message,
         "depends_on_ids": list(task.depends_on_ids),
         "tool_bindings": [
-            {"server_id": b.mcp_server_id, "tool_name": b.tool_name}
+            {
+                "server_id": b.mcp_server_id,
+                "tool_name": b.tool_name,
+                "requires_input_approval": b.requires_input_approval,
+            }
             for b in task.tool_bindings
         ],
     }
@@ -329,12 +333,17 @@ def _task_to_dict(task: WorkflowTaskRead) -> dict[str, Any]:
 def _parse_tool_bindings(raw: object) -> list[ToolBinding] | None:
     """Coerce ``[{"server_id", "tool_name"}, ...]`` into ToolBindings, or ``None``.
 
+    ``requires_input_approval`` is optional and defaults to ``True``, the safe
+    reading: a binding written without an opinion is one whose arguments an
+    approver still bounds.
+
     Args:
         raw: The model-supplied tool list to validate.
 
     Returns:
         The parsed bindings, or ``None`` when ``raw`` is not a list of objects
-        with non-empty string ``server_id`` and ``tool_name`` fields.
+        with non-empty string ``server_id`` and ``tool_name`` fields and, where
+        present, a boolean ``requires_input_approval``.
     """
     if not isinstance(raw, list):
         return None
@@ -344,14 +353,22 @@ def _parse_tool_bindings(raw: object) -> list[ToolBinding] | None:
             return None
         server_id = entry.get("server_id")
         tool_name = entry.get("tool_name")
+        requires_input_approval = entry.get("requires_input_approval", True)
         if (
             not isinstance(server_id, str)
             or not server_id
             or not isinstance(tool_name, str)
             or not tool_name
+            or not isinstance(requires_input_approval, bool)
         ):
             return None
-        bindings.append(ToolBinding(mcp_server_id=server_id, tool_name=tool_name))
+        bindings.append(
+            ToolBinding(
+                mcp_server_id=server_id,
+                tool_name=tool_name,
+                requires_input_approval=requires_input_approval,
+            )
+        )
     return bindings
 
 
@@ -359,7 +376,8 @@ def _invalid_tools_error(label: str) -> dict[str, Any]:
     """Build the error payload for a malformed tools/tool_bindings argument."""
     return {
         "error": f"{label} must be a list of "
-        '{"server_id": <registered MCP server id>, "tool_name": <tool name>} objects'
+        '{"server_id": <registered MCP server id>, "tool_name": <tool name>, '
+        '"requires_input_approval": <true|false, optional, default true>} objects'
     }
 
 

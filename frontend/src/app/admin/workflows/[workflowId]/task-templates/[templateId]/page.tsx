@@ -35,7 +35,7 @@ import {
   updateWorkflowTaskTemplate,
   type WorkflowTaskTemplate,
 } from "@/lib/api";
-import { bindingToValue, valueToBinding } from "@/lib/mcp-tool-options";
+import { bindingToValue, exemptValues, toBindings } from "@/lib/mcp-tool-options";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -43,7 +43,9 @@ import { showToast } from "@/store/toastSlice";
 // Generated schema carries the title/description constraints. The parent
 // workflow id comes from the URL, and the form edits dependencies and tool
 // bindings as plain string arrays (encoded values), so omit those and re-add
-// them in the form's shape.
+// them in the form's shape. `inputApprovalExempt` is the checkbox-group half of
+// the tool picker — a subset of `toolBindings` — folded back into the bindings
+// on submit by `toBindings`.
 const schema = zWorkflowTaskTemplateCreate
   .omit({
     workflowId: true,
@@ -53,6 +55,7 @@ const schema = zWorkflowTaskTemplateCreate
   .extend({
     dependsOnIds: z.array(z.string()),
     toolBindings: z.array(z.string()),
+    inputApprovalExempt: z.array(z.string()),
   });
 
 type FormValues = z.infer<typeof schema>;
@@ -105,6 +108,7 @@ export default function WorkflowTaskTemplateDetailPage() {
       description: "",
       dependsOnIds: [] as string[],
       toolBindings: [] as string[],
+      inputApprovalExempt: [] as string[],
     },
   });
 
@@ -117,6 +121,7 @@ export default function WorkflowTaskTemplateDetailPage() {
           description: template.description ?? "",
           dependsOnIds: template.dependsOnIds ?? [],
           toolBindings: (template.toolBindings ?? []).map(bindingToValue),
+          inputApprovalExempt: exemptValues(template.toolBindings ?? []),
         });
         setAudit({
           createdBy: template.createdBy,
@@ -159,7 +164,7 @@ export default function WorkflowTaskTemplateDetailPage() {
           title: values.title,
           description: values.description || null,
           dependsOnIds: values.dependsOnIds,
-          toolBindings: values.toolBindings.map(valueToBinding),
+          toolBindings: toBindings(values.toolBindings, values.inputApprovalExempt),
         });
         dispatch(showToast({ message: "Template updated" }));
         router.push(`/admin/workflows/${workflowId}/task-templates`);
@@ -286,8 +291,19 @@ export default function WorkflowTaskTemplateDetailPage() {
               <Controller
                 control={control}
                 name="toolBindings"
-                render={({ field }) => (
-                  <McpToolPicker value={field.value} onChange={field.onChange} />
+                render={({ field: tools }) => (
+                  <Controller
+                    control={control}
+                    name="inputApprovalExempt"
+                    render={({ field: exempt }) => (
+                      <McpToolPicker
+                        value={tools.value}
+                        onChange={tools.onChange}
+                        exempt={exempt.value}
+                        onExemptChange={exempt.onChange}
+                      />
+                    )}
+                  />
                 )}
               />
             </FormField>

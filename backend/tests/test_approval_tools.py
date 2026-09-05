@@ -104,6 +104,7 @@ async def _seed_task(
     title: str = "Act",
     depends_on_ids: Sequence[str] = (),
     tool_bindings: Sequence[tuple[str, str]] = (),
+    input_approval_exempt: Sequence[tuple[str, str]] = (),
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending,
     grant: bool = False,
 ) -> str:
@@ -129,6 +130,7 @@ async def _seed_task(
         status=status,
         depends_on_ids=depends_on_ids,
         tool_bindings=tool_bindings,
+        input_approval_exempt=input_approval_exempt,
     )
     if grant:
         await grant_tool_certificate(database.engine, execution_id, task_id)
@@ -702,6 +704,28 @@ async def _seed_mcp_server(eng: AsyncEngine, *, name: str = "srv") -> str:
         return server.id
 
 
+def _declare(
+    server_id: str, tool_name: str, **arguments: dict[str, object]
+) -> list[dict[str, object]]:
+    """Build the one-tool declaration a request over that tool must carry.
+
+    Args:
+        server_id: The MCP server the declared call targets.
+        tool_name: The tool the declared call targets.
+        **arguments: Argument name to its constraint object.
+
+    Returns:
+        The ``approved_calls`` payload.
+    """
+    return [
+        {
+            "mcp_server_id": server_id,
+            "tool_name": tool_name,
+            "arguments": arguments,
+        }
+    ]
+
+
 async def test_request_approval_accepts_the_asking_step(engine: AsyncEngine) -> None:
     """A step whose whole job is to ask for a go-ahead is a valid gate.
 
@@ -719,7 +743,11 @@ async def test_request_approval_accepts_the_asking_step(engine: AsyncEngine) -> 
         tool_bindings=[(server_id, "launch")],
     )
     result = await request_approval(
-        "Approve the launch", _ctx(), asking, approver="alice"
+        "Approve the launch",
+        _ctx(),
+        asking,
+        approved_calls=_declare(server_id, "launch"),
+        approver="alice",
     )
     assert "error" not in result, result
     fetched = await get_approval(result["approval_id"], _ctx())
@@ -737,7 +765,11 @@ async def test_request_approval_accepts_the_acting_task(engine: AsyncEngine) -> 
         tool_bindings=[(server_id, "launch")],
     )
     result = await request_approval(
-        "Approve the launch", _ctx(), acting, approver="alice"
+        "Approve the launch",
+        _ctx(),
+        acting,
+        approved_calls=_declare(server_id, "launch"),
+        approver="alice",
     )
     assert "error" not in result, result
     fetched = await get_approval(result["approval_id"], _ctx())
@@ -783,7 +815,11 @@ async def test_request_approval_stands_down_grants_across_its_new_scope(
     assert before[0].revoked_at is None
 
     result = await request_approval(
-        "Approve the launch", _ctx(), asking, approver="alice"
+        "Approve the launch",
+        _ctx(),
+        asking,
+        approved_calls=_declare(server_id, "launch"),
+        approver="alice",
     )
     assert "error" not in result, result
 
@@ -837,3 +873,338 @@ async def test_request_approval_ignores_tools_bound_upstream(
         "Approve the summary", _ctx(), named, approver="alice"
     )
     assert "error" not in result, result
+
+
+# ---------- the calls an approval declares ----------
+
+
+async def test_request_approval_requires_a_declaration_over_the_bound_tools(
+    engine: AsyncEngine,
+) -> None:
+    """Declaring nothing over a task that binds a tool is refused.
+
+    Without this the gate has a hole the agent can walk through: an approval
+    with no declaration constrains no argument, so omitting one would buy back
+    exactly the authority the declaration exists to bound.
+    """
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Launch instance", tool_bindings=[(server_id, "launch")]
+    )
+    result = await request_approval(
+        "Approve the launch", _ctx(), task_id, approver="alice"
+    )
+    assert "error" in result
+    assert "launch" in result["error"]
+
+
+async def test_request_approval_requires_a_declaration_for_downstream_tools(
+    engine: AsyncEngine,
+) -> None:
+    """The declaration follows the approval's scope, not just the named task."""
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    asking = await _seed_task(title="Request approval")
+    await _seed_task(
+        title="Launch instance",
+        depends_on_ids=[asking],
+        tool_bindings=[(server_id, "launch")],
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        asking,
+        approved_calls=[],
+        approver="alice",
+    )
+    assert "error" in result
+    assert "launch" in result["error"]
+
+
+async def test_request_approval_rejects_a_declaration_naming_an_unbound_tool(
+    engine: AsyncEngine,
+) -> None:
+    """Showing the approver a call that can never happen is refused too."""
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Launch instance", tool_bindings=[(server_id, "launch")]
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        task_id,
+        approved_calls=_declare(server_id, "launch") + _declare(server_id, "terminate"),
+        approver="alice",
+    )
+    assert "error" in result
+    assert "terminate" in result["error"]
+
+
+async def test_request_approval_ignores_tools_bound_upstream_when_declaring(
+    engine: AsyncEngine,
+) -> None:
+    """An approval reaches forward only, so upstream tools need no declaration."""
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    upstream = await _seed_task(
+        title="Gather sources", tool_bindings=[(server_id, "search")]
+    )
+    asking = await _seed_task(title="Request approval", depends_on_ids=[upstream])
+    result = await request_approval(
+        "Approve the wording", _ctx(), asking, approver="alice"
+    )
+    assert "error" not in result, result
+
+
+async def test_request_approval_rejects_a_malformed_constraint(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Launch instance", tool_bindings=[(server_id, "launch")]
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        task_id,
+        approved_calls=_declare(server_id, "launch", region={"eq": "a", "in": ["a"]}),
+        approver="alice",
+    )
+    assert "error" in result
+    assert "exactly one" in result["error"]
+
+
+async def test_request_approval_reports_every_malformed_constraint_at_once(
+    engine: AsyncEngine,
+) -> None:
+    """One round trip should be enough for the agent to fix the whole thing."""
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Launch instance", tool_bindings=[(server_id, "launch")]
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        task_id,
+        approved_calls=_declare(server_id, "launch", region={}, count={"lte": "many"}),
+        approver="alice",
+    )
+    assert "error" in result
+    assert "region" in result["error"]
+    assert "count" in result["error"]
+
+
+async def test_request_approval_rejects_a_declaration_of_the_wrong_shape(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Launch instance", tool_bindings=[(server_id, "launch")]
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        task_id,
+        approved_calls=[{"tool_name": "launch"}],  # no mcp_server_id
+        approver="alice",
+    )
+    assert "error" in result
+
+
+async def test_request_approval_stores_the_declaration(engine: AsyncEngine) -> None:
+    """What the approver reads and what the gate enforces are the same bytes."""
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Launch instance", tool_bindings=[(server_id, "launch")]
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        task_id,
+        approved_calls=_declare(
+            server_id, "launch", region={"eq": "ap-northeast-1"}, count={"lte": 2}
+        ),
+        approver="alice",
+    )
+    assert "error" not in result, result
+
+    async with AsyncSession(engine) as db:
+        approval = await db.get(Approval, result["approval_id"])
+    assert approval is not None
+    assert approval.approved_calls == [
+        {
+            "mcp_server_id": server_id,
+            "tool_name": "launch",
+            "arguments": {"region": {"eq": "ap-northeast-1"}, "count": {"lte": 2}},
+            "unconstrained_arguments": False,
+        }
+    ]
+
+
+# ---------- tools the design exempted from input approval ----------
+
+
+async def test_request_approval_does_not_require_an_exempt_tool_to_be_declared(
+    engine: AsyncEngine,
+) -> None:
+    """A read-only tool has no arguments worth an approver's agreement.
+
+    This is the whole point of the exemption: the agent may still be exploring
+    when it asks, so there is no honest declaration it could write for such a
+    tool, and demanding one would only produce a made-up bound.
+    """
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Look and launch",
+        tool_bindings=[(server_id, "launch"), (server_id, "list_instances")],
+        input_approval_exempt=[(server_id, "list_instances")],
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        task_id,
+        approved_calls=_declare(server_id, "launch", region={"eq": "ap-northeast-1"}),
+        approver="alice",
+    )
+    assert "error" not in result, result
+
+
+async def test_request_approval_records_an_exempt_tool_as_unconstrained(
+    engine: AsyncEngine,
+) -> None:
+    """Left out of the request, the tool is still named in what was approved.
+
+    The approver reads one list, and the gate matches against that same list, so
+    a covered tool missing from it would be a hole in both.
+    """
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Look and launch",
+        tool_bindings=[(server_id, "launch"), (server_id, "list_instances")],
+        input_approval_exempt=[(server_id, "list_instances")],
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        task_id,
+        approved_calls=_declare(server_id, "launch", region={"eq": "ap-northeast-1"}),
+        approver="alice",
+    )
+    assert "error" not in result, result
+
+    async with AsyncSession(engine) as db:
+        approval = await db.get(Approval, result["approval_id"])
+    assert approval is not None
+    assert approval.approved_calls == [
+        {
+            "mcp_server_id": server_id,
+            "tool_name": "launch",
+            "arguments": {"region": {"eq": "ap-northeast-1"}},
+            "unconstrained_arguments": False,
+        },
+        {
+            "mcp_server_id": server_id,
+            "tool_name": "list_instances",
+            "arguments": {},
+            "unconstrained_arguments": True,
+        },
+    ]
+
+
+async def test_request_approval_rejects_a_declaration_naming_an_exempt_tool(
+    engine: AsyncEngine,
+) -> None:
+    """One rule, both ways: the declaration names the constrained tools exactly.
+
+    The error has to say *why* this one is extra — the tool really is bound to a
+    covered task, so the ordinary "nothing binds it" message would read as wrong.
+    """
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Look and launch",
+        tool_bindings=[(server_id, "launch"), (server_id, "list_instances")],
+        input_approval_exempt=[(server_id, "list_instances")],
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        task_id,
+        approved_calls=_declare(server_id, "launch")
+        + _declare(server_id, "list_instances"),
+        approver="alice",
+    )
+    assert "error" in result
+    assert "list_instances" in result["error"]
+    assert "exempted from input approval" in result["error"]
+
+
+async def test_request_approval_refuses_a_run_that_exempts_itself(
+    engine: AsyncEngine,
+) -> None:
+    """Which tools go unbounded is the design's call, never the requesting run's."""
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    task_id = await _seed_task(
+        title="Launch instance", tool_bindings=[(server_id, "launch")]
+    )
+    result = await request_approval(
+        "Approve the launch",
+        _ctx(),
+        task_id,
+        approved_calls=[
+            {
+                "mcp_server_id": server_id,
+                "tool_name": "launch",
+                "arguments": {},
+                "unconstrained_arguments": True,
+            }
+        ],
+        approver="alice",
+    )
+    assert "error" in result
+    assert "unconstrained_arguments" in result["error"]
+
+
+async def test_request_approval_lets_the_stricter_covered_task_decide(
+    engine: AsyncEngine,
+) -> None:
+    """One approval, two steps disagreeing: the one wanting bounds wins.
+
+    The decision covers both steps at once, so the laxer binding must not speak
+    for the stricter one.
+    """
+    await _seed_session(engine)
+    server_id = await _seed_mcp_server(engine)
+    asking = await _seed_task(
+        title="Read only",
+        tool_bindings=[(server_id, "run")],
+        input_approval_exempt=[(server_id, "run")],
+    )
+    await _seed_task(
+        title="Run for real",
+        depends_on_ids=[asking],
+        tool_bindings=[(server_id, "run")],
+    )
+    omitted = await request_approval(
+        "Approve the run", _ctx(), asking, approved_calls=[], approver="alice"
+    )
+    assert "error" in omitted
+    assert "run" in omitted["error"]
+
+    declared = await request_approval(
+        "Approve the run",
+        _ctx(),
+        asking,
+        approved_calls=_declare(server_id, "run", target={"eq": "job-1"}),
+        approver="alice",
+    )
+    assert "error" not in declared, declared

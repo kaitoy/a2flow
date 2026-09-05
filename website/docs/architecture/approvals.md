@@ -44,6 +44,38 @@ The certificate is not what an approval adds — **every** step that calls a too
 | Which tenant, run and step it speaks for, and whose authority it carries — an approver's, or the run initiator's | A certificate minted for one run is useless in another, and one kind of authority cannot stand in for the other |
 | **The tools the step had bound at the moment it started** | A run's steps and their tools are fixed at execute time from the workflow's published design, the certificate freezes them again at issuance, and a covered step's tools can no longer be edited at all — so neither the agent nor a later change can widen a grant. Approving a step to read a file never becomes approval to delete one |
 
+### The calls a decision covers
+
+The certificate answers *which tool*, never *called with what* — and the inputs are
+usually where the consequence lives. So the request carries a second thing the
+certificate does not: the calls it authorizes, each naming a tool and bounding the values
+its inputs may take. It is recorded when the request is made, shown to the approver
+before they decide, and never editable afterwards by anyone, including the agent.
+
+Every proxied call is then held to it, alongside the certificate:
+
+| Checked | Refused when |
+|---|---|
+| The tool | The decision does not list it, even where the certificate grants it |
+| Each input supplied | The decision does not name it — an input the approver never saw |
+| Each input the decision names | It is missing, unless the decision marked it optional |
+| Each value | It falls outside the bound the approver agreed to |
+
+A step where two approved branches meet must satisfy **both** decisions, for the same
+reason it needs both in the first place: the more permissive approver does not speak for
+the other. Where the two disagree about whether a tool needs its inputs approved, the
+stricter one decides.
+
+A tool the workflow's design marked as reading only is listed too, as **Any input** — not
+left out. The decision stays the complete account of what it authorizes, so the approver
+can see which tools were left unbounded, and the gate has one list to consult rather than
+a second rule that reads the step's tools afresh. Only the request path writes such an
+entry; an agent that tries to declare one for itself is refused.
+
+A step running on the run initiator's own authority is not checked this way — there was no
+approver, and so nothing to have departed from. What bounds it is unchanged: its own
+tools, and the certificate's signed grant.
+
 ### The steps an approval covers
 
 An approval covers **the step it names and every step after it, up to the next approval**. So a workflow can put the request in a step of its own and let the decision reach the work that follows:
@@ -81,5 +113,7 @@ A certificate is revoked once its step reaches a terminal status. Safety does no
 ## What the record answers
 
 Every decided call — allowed or refused — is recorded together with the certificate it presented, so "who authorized this, and on what basis" can be answered long after the run has finished. Arguments are kept only as a digest; the raw values are never stored. The run's Tool Invocations page is where that record is read.
+
+A call refused for departing from the decision records why, naming the input at fault and the bound the approver agreed to — but never the value that was actually passed. The reason is stored as written, on the same record that keeps arguments only as a digest, so quoting the refused value there would put back exactly what the digest exists to leave out.
 
 **Scope of the guarantee.** The proxy runs inside the backend process, so a certificate proves possession to a verifier sharing that process — it is not a defence against an attacker who already controls the backend. What it does provide is a single fail-closed enforcement point, a grant that cannot be widened after the fact, and a record that can be checked afterwards.

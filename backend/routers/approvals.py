@@ -38,7 +38,7 @@ from dependencies import (
     PaginationDep,
     SortDep,
 )
-from models.approval import Approval, ApprovalUpdate
+from models.approval import Approval, ApprovalRead, ApprovalUpdate
 from models.mcp_tool_certificate import McpToolCertificateRead
 from models.metrics import ApprovalBacklogEntry
 from models.response import ApiResponse
@@ -114,15 +114,22 @@ async def approval_backlog_by_workflow(
     return ApiResponse(meta=meta, data=entries)
 
 
-@router.get("/{approval_id}", response_model=ApiResponse[Approval])
+@router.get("/{approval_id}", response_model=ApiResponse[ApprovalRead])
 async def get_approval(
     approval_id: str,
     service: ApprovalReadServiceDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Approval]:
-    """Return the Approval record for the given ID."""
+) -> ApiResponse[ApprovalRead]:
+    """Return the Approval record for the given ID.
+
+    Serialized through :class:`~models.approval.ApprovalRead` rather than the
+    table class so ``approvedCalls`` keeps its typed shape: the column stores
+    plain dicts, and the approval UI renders the declaration from this response.
+    The list endpoint deliberately keeps the table class -- a declaration is
+    detail, and nothing filters or sorts on it.
+    """
     approval = await service.get(approval_id)
-    return ApiResponse(meta=meta, data=approval)
+    return ApiResponse(meta=meta, data=ApprovalRead.model_validate(approval))
 
 
 @router.get(
