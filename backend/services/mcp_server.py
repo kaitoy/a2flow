@@ -11,7 +11,8 @@ server to list the tools it advertises.
 from collections.abc import Sequence
 from typing import Any
 
-from infrastructure import mcp_client
+from infrastructure.mcp_connection import resolve_connection
+from infrastructure.mcp_executor import get_mcp_executor
 from infrastructure.secret_resolver import SecretResolver
 from models.mcp_server import (
     MCPServer,
@@ -232,6 +233,12 @@ class MCPServerService:
     async def list_tools(self, server_id: str) -> _McpToolInfoList:
         """Connect to a registered server and return its advertised tools.
 
+        Goes through the same executor as the agent's own listings, so a stdio
+        server is launched wherever the deployment launches them -- in the MCP
+        proxy container, when one is configured. Nothing about *this* call is
+        authorized by a task, so no tool certificate is presented; the backend
+        authenticates as itself.
+
         Args:
             server_id: Identifier of the registered server to query.
 
@@ -245,8 +252,8 @@ class MCPServerService:
                 server's headers or environment cannot be resolved.
         """
         server = await self.get(server_id)
-        connection = await mcp_client.resolve_connection(server, self._resolver)
-        tools = await mcp_client.list_server_tools(connection)
+        connection = await resolve_connection(server, self._resolver)
+        tools = await get_mcp_executor().list_tools(connection)
         return [
             McpToolInfo(
                 name=tool.name,

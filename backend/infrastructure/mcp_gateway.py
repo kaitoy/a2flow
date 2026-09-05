@@ -15,22 +15,31 @@ Every call the agent makes to a user-registered MCP server passes through
    Deliberately *behind* the policy chain, so a stubbed run rehearses the same
    authorization a real one faces.
 4. **Credential injection** -- expanding the registered server's
-   ``${secret:NAME/KEY}`` placeholders into a connection spec.
+   ``${secret:NAME/KEY}`` placeholders into a connection spec, through
+   :func:`infrastructure.mcp_connection.resolve_connection`.
 
-The transport itself still belongs to :mod:`infrastructure.mcp_client`, which
-this module calls and never bypasses.
+**Deciding is all it does.** *Whether* a call may happen is settled here;
+*where* it happens is settled by :mod:`infrastructure.mcp_executor` -- in this
+process, or in the MCP proxy container, depending on ``MCP_PROXY_URL``. The
+gateway hands over a connection whose secrets are already resolved and the
+credential the caller presented, and never opens a connection itself.
+
+That split is what lets a registered MCP server -- third-party code, launched
+as a child process or reached over the network -- run somewhere that holds
+neither the database credentials nor the secret encryption key, while every
+rule about what it may be asked to do stays here, next to the database that
+answers those questions.
 
 Why a layer at all: the hooks above are the seams a real security layer lands
 in later. Today the authenticator is a pass-through (the caller is a run this
 very process is driving, so there is no channel to forge a session id over).
 
-**Shaped for a future HTTP lift.** Every value this module's public surface
-accepts or returns is a plain, serializable value object or an MCP wire type --
-no ``ToolContext``, no ``AsyncSession``, no ORM row. Re-exposing the gateway as
-an MCP/HTTP endpoint therefore means parsing a request body into
-:class:`CallToolRequest` and replacing the body of
-:meth:`McpAuthenticator.authenticate`; nothing downstream changes. That is also
-when :class:`McpGatewayError` earns rows in ``routers/exception_handlers.py``
+**Plainly serializable.** Every value this module's public surface accepts or
+returns is a plain value object or an MCP wire type -- no ``ToolContext``, no
+``AsyncSession``, no ORM row. That is what let the executor seam be added
+without reshaping anything, and it is what a future move of the gateway itself
+behind an endpoint would rest on. That move is also when
+:class:`McpGatewayError` would earn rows in ``routers/exception_handlers.py``
 (``McpPolicyDeniedError`` -> 403, ``McpServerUnknownError`` -> 404, the rest ->
 502).
 
@@ -52,19 +61,22 @@ from typing import Any, Protocol
 from mcp import types
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure import database, mcp_client
+from infrastructure import database
 from infrastructure.mcp_ca import (
     McpCaError,
     certificate_from_pem,
     load_or_create_root_ca,
 )
 from infrastructure.mcp_certificate import (
-    CertificateClaims,
     CertificateVerificationError,
+    McpClientCredential,
+    VerifiedCredential,
     extract_claims,
     verify_certificate,
 )
 from infrastructure.mcp_client import McpConnection
+from infrastructure.mcp_connection import resolve_connection
+from infrastructure.mcp_executor import McpExecutor, get_mcp_executor
 from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.secret_resolver import SecretResolver
 from infrastructure.vault_client import get_vault_client
@@ -105,51 +117,6 @@ class McpOperation(StrEnum):
 
     list_tools = "list_tools"
     call_tool = "call_tool"
-
-
-@dataclass(frozen=True)
-class McpClientCredential:
-    """An approval certificate and proof of possession, as *presented*.
-
-    Deliberately unverified, exactly like :class:`McpPrincipal`: this is what a
-    TLS client certificate plus a signed request header would carry once the
-    gateway speaks HTTP. :meth:`McpAuthenticator.authenticate` turns it into a
-    :class:`VerifiedCredential`.
-
-    Attributes:
-        certificate_pem: The leaf certificate the caller presents.
-        signature: DER-encoded ECDSA signature over
-            :func:`infrastructure.mcp_certificate.pop_digest`.
-        nonce: The per-call random value that went into the digest.
-        timestamp: When the signature was made; bounds replay.
-    """
-
-    certificate_pem: str
-    signature: bytes
-    nonce: str
-    timestamp: datetime
-
-
-@dataclass(frozen=True)
-class VerifiedCredential:
-    """A presented credential whose chain and validity window checked out.
-
-    Carries the PEM rather than a parsed ``x509.Certificate`` so the gateway's
-    public surface stays plainly serializable; a policy that needs the public
-    key re-parses it, which costs far less than the signature check it is about
-    to do anyway.
-
-    Proof of possession is **not** checked here. It covers the specific call
-    being made, which authentication does not see, so it is verified in the
-    policy layer alongside the binding and grant checks.
-
-    Attributes:
-        certificate_pem: The verified leaf certificate.
-        claims: The binding and tool grants read out of it.
-    """
-
-    certificate_pem: str
-    claims: CertificateClaims
 
 
 @dataclass(frozen=True)
@@ -675,6 +642,7 @@ class McpGateway:
         policies: Sequence[McpPolicy] | None = None,
         audit: McpAuditSink | None = None,
         stub: McpToolStub | None = None,
+        executor: McpExecutor | None = None,
         session_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]]
         | None = None,
     ) -> None:
@@ -694,6 +662,10 @@ class McpGateway:
                 :class:`NullToolStub`, which stubs nothing; the process-wide
                 gateway built by :func:`get_mcp_gateway` passes the
                 WorkflowExecution-backed stub instead.
+            executor: Carries out the operations this gateway allows -- in this
+                process, or in the MCP proxy container. Defaults to whichever
+                :func:`infrastructure.mcp_executor.get_mcp_executor` selects
+                from the configuration.
             session_factory: Opens the database session each operation runs
                 against. Defaults to a session on the module-level engine.
         """
@@ -701,6 +673,7 @@ class McpGateway:
         self._authenticator: McpAuthenticator = authenticator or AgentRunAuthenticator()
         self._policies: tuple[McpPolicy, ...] = tuple(policies or ())
         self._stub: McpToolStub = stub or NullToolStub()
+        self._executor: McpExecutor = executor or get_mcp_executor()
         self._session_factory = session_factory or _default_session
 
     async def list_tools(self, request: ListToolsRequest) -> list[ServerToolListing]:
@@ -831,8 +804,12 @@ class McpGateway:
             server_name = server.name
         # The session is closed: the call below may take up to two minutes.
         try:
-            return await mcp_client.call_server_tool(
-                connection, request.tool_name, request.arguments
+            return await self._executor.call_tool(
+                connection,
+                request.tool_name,
+                request.arguments,
+                session_id=request.principal.session_id,
+                credential=request.principal.credential,
             )
         except McpConnectionError as exc:
             logger.warning("MCP server %s unreachable: %s", server_name, exc.reason)
@@ -857,7 +834,7 @@ class McpGateway:
         if connection is None:
             return base
         try:
-            tools = await mcp_client.list_server_tools(connection)
+            tools = await self._executor.list_tools(connection)
         except McpConnectionError as exc:
             logger.warning(
                 "MCP server %s unreachable: %s", base.server_name, exc.reason
@@ -970,7 +947,7 @@ class McpGateway:
                 the row is missing the field its transport requires.
         """
         try:
-            return await mcp_client.resolve_connection(server, resolver)
+            return await resolve_connection(server, resolver)
         except SecretResolutionError as exc:
             logger.warning(
                 "Secret %s resolution failed for MCP server %s: %s",

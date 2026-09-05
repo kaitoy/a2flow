@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database
+from infrastructure.mcp_certificate import McpClientCredential
 from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
 from infrastructure.mcp_credentials import ApprovalCredentialProvider
 from infrastructure.mcp_gateway import (
@@ -30,7 +31,6 @@ from infrastructure.mcp_gateway import (
     ListToolsRequest,
     McpAuthenticationError,
     McpCallContext,
-    McpClientCredential,
     McpGateway,
     McpIdentity,
     McpOperation,

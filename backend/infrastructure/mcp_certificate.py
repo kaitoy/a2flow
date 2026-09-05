@@ -192,6 +192,65 @@ class CertificateClaims:
         return (mcp_server_id, tool_name) in self.allowed_tools
 
 
+@dataclass(frozen=True)
+class McpClientCredential:
+    """A tool certificate and proof of possession, as *presented*.
+
+    Deliberately unverified: this is the material a caller hands over, before
+    anything has checked it.
+    :meth:`infrastructure.mcp_gateway.McpAuthenticator.authenticate` turns it
+    into a :class:`VerifiedCredential`.
+
+    Lives here rather than beside its consumers because three of them share it
+    -- :mod:`infrastructure.mcp_credentials` builds one,
+    :mod:`infrastructure.mcp_gateway` verifies it, and
+    :mod:`infrastructure.mcp_executor` presents it onward to the MCP proxy --
+    and because the fields are exactly the shape :func:`pop_digest` and
+    :func:`verify_pop_signature` define right here.
+
+    Attributes:
+        certificate_pem: The leaf certificate the caller presents.
+        signature: DER-encoded ECDSA signature over :func:`pop_digest`.
+        nonce: The per-call random value that went into the digest.
+        timestamp: When the signature was made; bounds replay.
+        private_key_pem: The leaf's own key, held by the *presenter* alone. A
+            TLS client certificate is useless without it, which is why the
+            presenter carries it here; nothing on the verifying side reads it,
+            it is never serialized into a request body, and
+            :class:`VerifiedCredential` deliberately has no counterpart field.
+            ``None`` when the presenter could not load the key, which reduces
+            to presenting nothing at all.
+    """
+
+    certificate_pem: str
+    signature: bytes
+    nonce: str
+    timestamp: datetime
+    private_key_pem: str | None = None
+
+
+@dataclass(frozen=True)
+class VerifiedCredential:
+    """A presented credential whose chain and validity window checked out.
+
+    Carries the PEM rather than a parsed ``x509.Certificate`` so the gateway's
+    public surface stays plainly serializable; a policy that needs the public
+    key re-parses it, which costs far less than the signature check it is about
+    to do anyway.
+
+    Proof of possession is **not** checked here. It covers the specific call
+    being made, which authentication does not see, so it is verified in the
+    policy layer alongside the binding and grant checks.
+
+    Attributes:
+        certificate_pem: The verified leaf certificate.
+        claims: The binding and tool grants read out of it.
+    """
+
+    certificate_pem: str
+    claims: CertificateClaims
+
+
 # ---------------------------------------------------------------------------
 # URN grammar
 # ---------------------------------------------------------------------------

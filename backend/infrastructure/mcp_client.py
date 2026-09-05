@@ -1,31 +1,36 @@
 """Thin client adapter for MCP servers, over streamable HTTP or stdio.
 
-Wraps the ``mcp`` Python SDK so the rest of the backend never touches its
-connection machinery directly. Used by :meth:`services.mcp_server.MCPServerService.list_tools`
-(admin tool catalog) and by the agent proxy tools in
-:mod:`infrastructure.mcp_tools`.
+Wraps the ``mcp`` Python SDK so the rest of A2Flow never touches its connection
+machinery directly. This is the module that actually reaches a third-party MCP
+server, so it is the module that runs inside the MCP proxy container — reached
+from the backend through :mod:`infrastructure.mcp_executor`.
 
 Design notes:
 
 * **Connection specs, not transports.** Callers build an :data:`McpConnection`
-  once — normally via :func:`resolve_connection`, which also expands
+  once — normally via
+  :func:`infrastructure.mcp_connection.resolve_connection`, which also expands
   ``${secret:NAME/KEY}`` placeholders — and hand it to :func:`list_server_tools` /
   :func:`call_server_tool`. Nothing outside this module branches on transport.
+* **Nothing of A2Flow's own world.** Deliberately no ORM row, no session, no
+  settings: resolution lives in :mod:`infrastructure.mcp_connection` precisely
+  so this module's imports are the MCP SDK, httpx, and two dependency-free
+  modules of ours. What runs beside a user-registered MCP server should be as
+  small as it can be.
 * **One connection per operation.** Both ``streamablehttp_client`` and
   ``stdio_client`` run an anyio task group that must be entered and exited in
   the same asyncio task; opening and closing the session inside a single
   ``async with`` stack per call guarantees that, at the cost of a handshake
   (for stdio: a process spawn) per tool call.
 * **Two transports.** Streamable HTTP for remote servers; stdio for servers
-  launched as a child process of the backend. SSE-transport servers are not
-  supported in this version.
+  launched as a child process. SSE-transport servers are not supported in this
+  version.
 * Any connection, protocol, or timeout failure is normalized to
   :class:`repositories.exceptions.McpConnectionError` so callers map it to one
   error shape (HTTP 502 for the API, an ``{"error": ...}`` dict for the agent).
 """
 
 import asyncio
-import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -38,9 +43,7 @@ from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.shared.message import SessionMessage
 
-from infrastructure.secret_resolver import SecretResolver
 from infrastructure.url_safety import assert_public_http_url
-from models.mcp_server import ENV_ARG_PLACEHOLDER_PATTERN, MCPServer, McpTransport
 from repositories.exceptions import McpConnectionError
 
 #: Upper bound, in seconds, for one whole streamable-HTTP MCP operation
@@ -93,8 +96,8 @@ class StdioConnection:
             nothing here is word-split or interpreted by a shell.
         env: Environment variables merged over the small safe-to-inherit set
             :func:`mcp.client.stdio.get_default_environment` provides, with any
-            ``${secret:NAME/KEY}`` placeholders already resolved. The backend's own
-            environment (API keys, ``DB_URL``, …) is *not* inherited.
+            ``${secret:NAME/KEY}`` placeholders already resolved. The launching
+            process's own environment is *not* inherited.
         raw_args: ``args`` before ``${env:NAME}`` expansion — used only for
             :attr:`label`, so an expanded value that came from a secret-backed
             ``env`` entry never appears in an error message or log line.
@@ -127,78 +130,6 @@ class StdioConnection:
 
 #: Everything needed to open a session against one registered MCP server.
 McpConnection = HttpConnection | StdioConnection
-
-
-def _expand_env_args(
-    args: list[str], env: dict[str, str], server_name: str
-) -> list[str]:
-    """Substitute ``${env:NAME}`` in each ``args`` entry with its ``env`` value.
-
-    Args:
-        args: The raw ``argv`` entries, possibly containing placeholders.
-        env: The server's *resolved* env mapping (secrets already expanded).
-        server_name: Identifies the server in a raised error.
-
-    Returns:
-        ``args`` with every placeholder replaced by its ``env`` value.
-
-    Raises:
-        McpConnectionError: If a placeholder names a key absent from ``env``
-            — only reachable for a row written outside the API, since both
-            create and update validate every reference against the server's
-            own ``env`` keys.
-    """
-
-    def _replace(match: re.Match[str]) -> str:
-        name = match.group(1)
-        if name not in env:
-            raise McpConnectionError(
-                server_name, f"args reference unknown env var: {name}"
-            )
-        return env[name]
-
-    return [ENV_ARG_PLACEHOLDER_PATTERN.sub(_replace, arg) for arg in args]
-
-
-async def resolve_connection(
-    server: MCPServer, resolver: SecretResolver
-) -> McpConnection:
-    """Build the connection spec for a registered server, resolving its secrets.
-
-    Args:
-        server: The registered MCP server row.
-        resolver: Resolver expanding ``${secret:NAME/KEY}`` placeholders in the
-            server's header (remote) or environment (stdio) values.
-
-    Returns:
-        An :data:`McpConnection` ready to hand to :func:`list_server_tools` or
-        :func:`call_server_tool`.
-
-    Raises:
-        McpConnectionError: If the row is missing the field its transport
-            requires, or a stdio row's ``args`` embed a ``${env:NAME}``
-            placeholder naming a key absent from ``env`` — both only
-            reachable for a row written outside the API, since create and
-            update validate the per-transport shape and env references.
-        repositories.exceptions.SecretResolutionError: If a referenced secret
-            cannot be resolved.
-    """
-    if server.transport is McpTransport.stdio:
-        if not server.command:
-            raise McpConnectionError(server.name, "stdio server has no command")
-        resolved_env = await resolver.resolve_mapping(server.env)
-        return StdioConnection(
-            command=server.command,
-            args=_expand_env_args(list(server.args), resolved_env, server.name),
-            env=resolved_env,
-            raw_args=list(server.args),
-        )
-    if not server.url:
-        raise McpConnectionError(server.name, "streamable_http server has no url")
-    return HttpConnection(
-        url=server.url,
-        headers=await resolver.resolve_mapping(server.headers),
-    )
 
 
 def _create_no_redirect_http_client(

@@ -45,11 +45,11 @@ from infrastructure.mcp_ca import (
 )
 from infrastructure.mcp_certificate import (
     CertificateVerificationError,
+    McpClientCredential,
     extract_claims,
     pop_digest,
     sign_pop_digest,
 )
-from infrastructure.mcp_gateway import McpClientCredential
 from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
 from models.mcp_tool_certificate import McpToolCertificate
 from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
@@ -125,9 +125,8 @@ class ApprovalCredentialProvider:
             return None
 
         try:
-            key = private_key_from_pem(
-                self._cipher.decrypt(certificate.private_key_encrypted)
-            )
+            key_pem = self._cipher.decrypt(certificate.private_key_encrypted)
+            key = private_key_from_pem(key_pem)
         except (ValueError, McpCaError):
             # A rotated Fernet key or a corrupt row. Presenting nothing gets a
             # clean denial from the policy layer; the detail stays in the log
@@ -155,6 +154,12 @@ class ApprovalCredentialProvider:
             signature=sign_pop_digest(key, digest),
             nonce=nonce,
             timestamp=timestamp,
+            # Carried, not sent. When the gateway runs operations in the MCP
+            # proxy container this is what presents the certificate at the TLS
+            # handshake; it is never serialized into the request body, and the
+            # verifying side builds a ``VerifiedCredential`` that has nowhere
+            # to put it.
+            private_key_pem=key_pem,
         )
 
     async def _find(

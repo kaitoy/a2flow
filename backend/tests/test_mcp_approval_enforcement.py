@@ -45,19 +45,19 @@ from infrastructure.mcp_ca import (
     load_or_create_root_ca,
 )
 from infrastructure.mcp_certificate import (
-    arguments_digest as hash_arguments,
-)
-from infrastructure.mcp_certificate import (
+    McpClientCredential,
     extract_claims,
     pop_digest_from_parts,
     verify_certificate,
+)
+from infrastructure.mcp_certificate import (
+    arguments_digest as hash_arguments,
 )
 from infrastructure.mcp_client import McpConnection
 from infrastructure.mcp_credentials import ApprovalCredentialProvider
 from infrastructure.mcp_gateway import (
     CallToolRequest,
     ListToolsRequest,
-    McpClientCredential,
     McpGateway,
     McpPolicyDeniedError,
     McpPrincipal,
