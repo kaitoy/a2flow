@@ -4,6 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FlaskConical } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -16,10 +17,11 @@ import {
   mcpToolMockFormSchema,
   toMcpToolMockBody,
 } from "@/components/admin/mcp-tool-mock-fields";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { createMcpToolMock } from "@/lib/api";
+import { createMcpToolMock, setMcpToolMockTags } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -29,6 +31,11 @@ export default function NewMcpToolMockPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
+
+  // Tags live outside the form state: the picker is a controlled multi-select
+  // rather than a registered input, and tags are a sub-resource written after
+  // the mock exists.
+  const [tagIds, setTagIds] = useState<string[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -47,7 +54,10 @@ export default function NewMcpToolMockPage() {
   async function onSubmit(values: McpToolMockFormValues) {
     try {
       await save.run(async () => {
-        await createMcpToolMock(toMcpToolMockBody(values));
+        const created = await createMcpToolMock(toMcpToolMockBody(values));
+        if (tagIds.length > 0) {
+          await setMcpToolMockTags(created.id, tagIds);
+        }
         dispatch(showToast({ message: "Tool mock created" }));
         router.push("/admin/mcp-tool-mocks");
       });
@@ -90,6 +100,8 @@ export default function NewMcpToolMockPage() {
             target={target}
             showPlaceholders
           />
+
+          <TagPicker value={tagIds} onChange={setTagIds} />
 
           <div className="flex gap-2">
             <Button

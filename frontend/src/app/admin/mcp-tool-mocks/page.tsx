@@ -18,6 +18,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tagsColumn } from "@/components/admin/tag-columns";
 import { tenantColumn } from "@/components/admin/tenant-columns";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -25,6 +26,7 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTags } from "@/hooks/useTags";
 import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
 import { deleteMcpToolMock, listMcpServers, listMcpToolMocks, type McpToolMock } from "@/lib/api";
@@ -100,8 +102,11 @@ export default function McpToolMocksPage() {
     setOffset,
     setSort,
     setFilters,
+    tagIds,
+    setTagIds,
     reload,
   } = useTableQuery<McpToolMock>(listMcpToolMocks, { limit: LIMIT });
+  const { byId: tagsById } = useTags();
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
   const names = useUserNames(rows.flatMap((mock) => [mock.createdBy, mock.updatedBy]));
   const isAllTenantsView = useIsAllTenantsView();
@@ -133,6 +138,7 @@ export default function McpToolMocksPage() {
 
   const columns: ColumnDef<McpToolMock>[] = [
     ...buildColumns(serverNameById, names, tenantNames, isAllTenantsView),
+    tagsColumn<McpToolMock>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [
           {
@@ -187,6 +193,8 @@ export default function McpToolMocksPage() {
         onSortChange={setSort}
         filters={filters}
         onFilterChange={setFilters}
+        tagIds={tagIds}
+        onTagIdsChange={setTagIds}
       />
       <PaginationControls
         offset={offset}

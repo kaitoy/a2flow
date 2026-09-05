@@ -61,6 +61,7 @@ class UserGroupService:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> _GroupList:
         """Return a page of UserGroup records in the acting tenant.
 
@@ -69,13 +70,33 @@ class UserGroupService:
             offset: Number of records to skip.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
+            tag_ids: Narrows the page to groups carrying every listed tag.
 
         Returns:
-            The requested page of groups, each with its membership attached.
+            The requested page of groups, each with its membership and tags
+            attached.
         """
         return await self._repo.list(
-            limit=limit, offset=offset, sort=sort, filters=filters
+            limit=limit, offset=offset, sort=sort, filters=filters, tag_ids=tag_ids
         )
+
+    async def set_tags(self, group_id: str, tag_ids: Sequence[str]) -> UserGroupRead:
+        """Replace a UserGroup's tag attachments wholesale.
+
+        Args:
+            group_id: Identifier of the group to retag.
+            tag_ids: Ids of the tags it should carry.
+
+        Returns:
+            The updated group with its membership and tags attached.
+
+        Raises:
+            NotFoundError: If no group exists with the given ID in the acting
+                tenant.
+            ForeignKeyViolationError: If any id does not name a tag of the
+                acting tenant.
+        """
+        return await self._repo.set_tags(group_id, tag_ids)
 
     async def create(self, data: UserGroupCreate, *, user_id: str) -> UserGroupRead:
         """Create a new UserGroup.

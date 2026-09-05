@@ -5,7 +5,7 @@ sidebar_position: 10
 
 # Tags
 
-Tags are the labels records are classified by. One vocabulary is shared by all four taggable registries, so an `aws` tag narrows secrets and MCP servers alike.
+Tags are the labels records are classified by. One vocabulary is shared by all six taggable registries, so an `aws` tag narrows secrets and MCP servers alike.
 
 ```mermaid
 flowchart LR
@@ -13,11 +13,13 @@ flowchart LR
   T --> M["MCP Servers"]
   T --> A["Agent Skills"]
   T --> W["Workflows"]
+  T --> K["Tool Mocks"]
+  T --> G["User Groups"]
 ```
 
 Open **Tags** in the admin sidebar to curate the vocabulary. Each tag has a **Name**, unique within the tenant, an optional **Description**, and a **color** picked from a fixed eight-slot palette — an arbitrary color value is refused.
 
-Creating a tag requires `admin` **or** `developer`, matching the union of the roles that can write to any of the four taggable resources, so a tag can always be minted by whoever is about to need it. Reads stay open like every other section.
+Creating a tag requires `admin` **or** `developer`, matching the union of the roles that can write to any of the six taggable resources, so a tag can always be minted by whoever is about to need it. Reads stay open like every other section.
 
 ## Attaching tags to a record
 

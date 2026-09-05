@@ -1,31 +1,34 @@
 """Tag data models: the tag master table and the join rows that attach tags to records.
 
 A Tag is a tenant-scoped label that can be attached to a Secret, a Workflow, an
-MCPServer, or an AgentSkill. One tag set is shared by all four resource types,
-so filtering a list by ``aws`` narrows secrets and MCP servers alike.
+MCPServer, an AgentSkill, an MCPToolMock, or a UserGroup. One tag set is shared
+by all six resource types, so filtering a list by ``aws`` narrows secrets and
+MCP servers alike.
 
 Attachment lives in one join table per resource type
 (:class:`SecretTag`, :class:`WorkflowTag`, :class:`McpServerTag`,
-:class:`AgentSkillTag`), each keyed by the record's id and the tag's **id** —
-never its name. That indirection is the point: renaming a tag changes only the
-``tags`` row, so every record already carrying it follows along.
+:class:`AgentSkillTag`, :class:`McpToolMockTag`, :class:`UserGroupTag`), each
+keyed by the record's id and the tag's **id** — never its name. That
+indirection is the point: renaming a tag changes only the ``tags`` row, so
+every record already carrying it follows along.
 
-Four join tables rather than one polymorphic ``(resource_type, resource_id)``
+Six join tables rather than one polymorphic ``(resource_type, resource_id)``
 table, because a polymorphic owner column cannot carry a real foreign key. Every
 other join table in this codebase (``user_group_members``,
 ``workflow_task_template_dependencies``, ``workflow_task_template_tool_bindings``)
 declares real constraints, and so do these — which is also what makes
 ``ondelete="CASCADE"`` clean up attachments when either side disappears.
 
-Tags are **not** a field of the four resources' payload models. Those table
-classes inherit their ``...Create`` schema (e.g.
-``Secret(SecretCreate, TenantScoped, BaseEntity, table=True)``), so a
-``list[str]`` field added there would have to become a column of the resource's
-own table — the same constraint documented on
-:class:`models.user_group.UserGroup`. Attachment is therefore written through a
-sub-resource, ``PUT /{resource}/{id}/tags``, whose body is
-:class:`TagIdsUpdate`, and read back through each resource's ``...Read``
-projection.
+Tags are **not** a field of the six resources' payload models. Those table
+classes either inherit their ``...Create`` schema (e.g.
+``Secret(SecretCreate, TenantScoped, BaseEntity, table=True)``) or are declared
+apart from it (``MCPToolMock``, ``UserGroup``), so a ``list[str]`` field added
+there would either have to become a column of the resource's own table or be
+mirrored onto a table class that deliberately keeps its columns scalar — the
+same constraint documented on :class:`models.user_group.UserGroup`. Attachment
+is therefore written through a sub-resource, ``PUT /{resource}/{id}/tags``,
+whose body is :class:`TagIdsUpdate`, and read back through each resource's
+``...Read`` projection.
 """
 
 from enum import StrEnum
@@ -177,6 +180,20 @@ class AgentSkillTag(TagLink, table=True):
 
     __tablename__ = "agent_skill_tags"
     __table_args__ = _link_table_args("agent_skill_tags", "agent_skills")
+
+
+class McpToolMockTag(TagLink, table=True):
+    """Join row attaching one Tag to one MCPToolMock."""
+
+    __tablename__ = "mcp_tool_mock_tags"
+    __table_args__ = _link_table_args("mcp_tool_mock_tags", "mcp_tool_mocks")
+
+
+class UserGroupTag(TagLink, table=True):
+    """Join row attaching one Tag to one UserGroup."""
+
+    __tablename__ = "user_group_tags"
+    __table_args__ = _link_table_args("user_group_tags", "user_groups")
 
 
 class TagIdsUpdate(SQLModel):

@@ -20,11 +20,13 @@ from dependencies import (
     FilterDep,
     PaginationDep,
     SortDep,
+    TagFilterDep,
     UserGroupReadServiceDep,
     UserGroupServiceDep,
     require_roles,
 )
 from models.response import ApiResponse
+from models.tag import TagIdsUpdate
 from models.user import Role
 from models.user_group import UserGroupCreate, UserGroupRead, UserGroupUpdate
 
@@ -63,18 +65,22 @@ async def list_user_groups(
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
+    tags: TagFilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[UserGroupRead]]:
-    """Return a page of the acting tenant's user groups with their members.
+    """Return a page of the acting tenant's user groups with their members and tags.
 
-    ``memberIds`` is not a column, so it can be read but never filtered or
-    sorted on — naming it in ``q`` or ``s`` is rejected as an unknown field.
+    ``memberIds`` and ``tagIds`` are not columns, so they can be read but never
+    filtered or sorted on — naming either in ``q`` or ``s`` is rejected as an
+    unknown field. Tags filter on their own axis: ``?tag=<id>`` is conjunctive,
+    so repeating it narrows the result.
     """
     items = await service.list(
         limit=pagination.limit,
         offset=pagination.offset,
         sort=sort.sort,
         filters=filters.filters,
+        tag_ids=tags.tag_ids,
     )
     return ApiResponse(meta=meta, data=items)
 
@@ -134,3 +140,24 @@ async def delete_user_group(
     """
     await service.delete(group_id)
     return ApiResponse(meta=meta, data=None)
+
+
+@router.put(
+    "/{group_id}/tags",
+    response_model=ApiResponse[UserGroupRead],
+    dependencies=_requires_admin,
+)
+async def set_user_group_tags(
+    group_id: str,
+    body: TagIdsUpdate,
+    service: UserGroupServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[UserGroupRead]:
+    """Replace a user group's tag set wholesale.
+
+    An empty list detaches every tag. Attaching is gated by ``admin``, the same
+    role every other group write needs; the tag itself may have been minted by
+    an ``admin`` or a ``developer``.
+    """
+    group = await service.set_tags(group_id, body.tag_ids)
+    return ApiResponse(meta=meta, data=group)

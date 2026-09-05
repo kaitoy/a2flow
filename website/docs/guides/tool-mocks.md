@@ -54,6 +54,10 @@ The first response answers the run's first call to that tool, the second its sec
 
 When the tool declares an output format, a `structured` response offers **Insert from schema**: it fills the box with that shape, keys and all, so you edit values instead of transcribing the structure. It replaces whatever is in the box, and asks first if you have already written something there.
 
+## Tags
+
+A tool mock's create form and detail page carry a **Tags** picker, and the list has a filterable **Tags** column. Tags are the same tenant-wide vocabulary secrets, MCP servers, and the other taggable registries share — see [Tags](./tags.md) for how to attach and filter by them.
+
 ## What a mock does not skip
 
 A mock buys past the side effect, not past the rules. A mocked call is still checked against the tools the run's current task is allowed to use, and against any [approval](./approvals.md) that task is waiting on, so a workflow that would be refused in production is refused in its dry run too. It is checked against the **inputs** that approval allowed as well, so a dry run catches a call the approver would not have authorized rather than sailing through it. A mocked approval request still validates its destination and the calls it declares, so a workflow naming an ineligible approver — or declaring calls that do not match what its steps would make — fails in a dry run exactly as it would for real.

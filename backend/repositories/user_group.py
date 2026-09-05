@@ -12,6 +12,10 @@ wholesale, the same shape as the tool bindings in
 group's own tenant, which is what keeps a platform-scoped ``super_admin`` out
 of every group and therefore keeps ``super_admin`` un-grantable through group
 inheritance.
+
+Tags are attached through :class:`~models.tag.UserGroupTag` and delegated to
+:class:`repositories.tags.TagLinks`, the same helper every other taggable
+repository composes; every read view this module builds carries them.
 """
 
 from collections.abc import Sequence
@@ -21,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.tag import UserGroupTag
 from models.user import SYSTEM_USER_ID
 from models.user_group import (
     UserGroup,
@@ -37,6 +42,7 @@ from repositories.exceptions import (
     UniqueViolationError,
 )
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
+from repositories.tags import TagLinks
 from repositories.user import UserRepository
 
 #: Aliases for the builtin generics used in return annotations below. Both
@@ -59,6 +65,7 @@ class UserGroupRepository(Protocol):
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> _GroupList: ...
 
     async def create(self, data: UserGroupCreate, *, user_id: str) -> UserGroupRead: ...
@@ -70,6 +77,10 @@ class UserGroupRepository(Protocol):
     async def delete(self, group_id: str) -> None: ...
 
     async def exists(self, group_id: str) -> bool: ...
+
+    async def set_tags(
+        self, group_id: str, tag_ids: Sequence[str]
+    ) -> UserGroupRead: ...
 
     async def group_ids_for_user(self, user_id: str) -> _StrList: ...
 
@@ -94,6 +105,7 @@ class SqlUserGroupRepository:
         self._db = session
         self._users = users
         self._tenant_id = tenant_id
+        self._tags = TagLinks(session, UserGroupTag, tenant_id=tenant_id)
 
     def _require_tenant(self) -> str:
         """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
@@ -121,7 +133,9 @@ class SqlUserGroupRepository:
         if group is None:
             return None
         return UserGroupRead.from_group(
-            group, member_ids=await self._members_for(group_id)
+            group,
+            member_ids=await self._members_for(group_id),
+            tag_ids=await self._tags.for_one(group_id),
         )
 
     async def exists(self, group_id: str) -> bool:
@@ -134,10 +148,13 @@ class SqlUserGroupRepository:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> _GroupList:
         stmt = select(UserGroup)
         if self._tenant_id is not None:
             stmt = stmt.where(UserGroup.tenant_id == self._tenant_id)
+        for clause in self._tags.filter_clauses(col(UserGroup.id), tag_ids):
+            stmt = stmt.where(clause)
         stmt = apply_filters(stmt, UserGroup, filters, readable=UserGroupRead)
         stmt = apply_sort(
             stmt,
@@ -147,11 +164,7 @@ class SqlUserGroupRepository:
             readable=UserGroupRead,
         )
         groups = list((await self._db.exec(stmt.limit(limit).offset(offset))).all())
-        members = await self._members_for_many([g.id for g in groups])
-        return [
-            UserGroupRead.from_group(g, member_ids=members.get(g.id, []))
-            for g in groups
-        ]
+        return await self._project_many(groups)
 
     # -- writes --------------------------------------------------------------
 
@@ -186,7 +199,9 @@ class SqlUserGroupRepository:
             self._db.add(UserGroupMember(group_id=group.id, user_id=member_id))
         await self._commit(user_id=user_id, name=data.name)
         await self._db.refresh(group)
-        return UserGroupRead.from_group(group, member_ids=sorted(member_ids))
+        return UserGroupRead.from_group(
+            group, member_ids=sorted(member_ids), tag_ids=[]
+        )
 
     async def update(
         self, group_id: str, data: UserGroupUpdate, *, user_id: str
@@ -222,7 +237,9 @@ class SqlUserGroupRepository:
         await self._commit(user_id=user_id, name=data.name or group.name)
         await self._db.refresh(group)
         return UserGroupRead.from_group(
-            group, member_ids=await self._members_for(group_id)
+            group,
+            member_ids=await self._members_for(group_id),
+            tag_ids=await self._tags.for_one(group_id),
         )
 
     async def delete(self, group_id: str) -> None:
@@ -254,6 +271,36 @@ class SqlUserGroupRepository:
             raise ReferencedError(
                 f"UserGroup {group_id} is still referenced by an approval"
             ) from exc
+
+    async def set_tags(self, group_id: str, tag_ids: Sequence[str]) -> UserGroupRead:
+        """Replace a UserGroup's tag attachments wholesale.
+
+        Args:
+            group_id: Id of the group to retag.
+            tag_ids: Ids of the tags it should carry; an empty sequence detaches
+                every tag.
+
+        Returns:
+            The group with its membership and refreshed tags attached.
+
+        Raises:
+            NotFoundError: If no group with that id exists in this tenant.
+            ForeignKeyViolationError: If any id does not name a tag of this
+                tenant.
+        """
+        self._require_tenant()
+        group = await self._get_scoped(group_id)
+        if group is None:
+            raise NotFoundError("UserGroup", group_id)
+        await self._tags.validate(tag_ids)
+        await self._tags.replace(group_id, tag_ids)
+        await self._db.commit()
+        await self._db.refresh(group)
+        return UserGroupRead.from_group(
+            group,
+            member_ids=await self._members_for(group_id),
+            tag_ids=await self._tags.for_one(group_id),
+        )
 
     async def _commit(self, *, user_id: str, name: str) -> None:
         """Commit, translating the two constraint failures a group write can hit.
@@ -326,11 +373,7 @@ class SqlUserGroupRepository:
             .order_by(col(UserGroup.name))
         )
         groups = list((await self._db.exec(stmt)).all())
-        members = await self._members_for_many([g.id for g in groups])
-        return [
-            UserGroupRead.from_group(g, member_ids=members.get(g.id, []))
-            for g in groups
-        ]
+        return await self._project_many(groups)
 
     async def set_groups_for_user(self, user_id: str, group_ids: Sequence[str]) -> None:
         """Replace the set of this tenant's groups ``user_id`` belongs to.
@@ -366,6 +409,29 @@ class SqlUserGroupRepository:
         for group_id in group_ids:
             self._db.add(UserGroupMember(group_id=group_id, user_id=user_id))
         await self._db.commit()
+
+    # -- projection helpers ------------------------------------------------
+
+    async def _project_many(self, groups: Sequence[UserGroup]) -> _GroupList:
+        """Attach each group's members and tags in one query apiece.
+
+        Reading them per group would be an N+1; both list paths go through here.
+
+        Args:
+            groups: The persisted rows to project, in the order to return them.
+
+        Returns:
+            The read views, carrying members and tag ids.
+        """
+        ids = [g.id for g in groups]
+        members = await self._members_for_many(ids)
+        tags = await self._tags.for_many(ids)
+        return [
+            UserGroupRead.from_group(
+                g, member_ids=members.get(g.id, []), tag_ids=tags.get(g.id, [])
+            )
+            for g in groups
+        ]
 
     # -- membership helpers --------------------------------------------------
 

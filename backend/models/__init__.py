@@ -33,6 +33,7 @@ from .tag import (
     MAX_RECORD_TAGS,
     AgentSkillTag,
     McpServerTag,
+    McpToolMockTag,
     SecretTag,
     Tag,
     TagColor,
@@ -40,6 +41,7 @@ from .tag import (
     TagIdsUpdate,
     TagLink,
     TagUpdate,
+    UserGroupTag,
     WorkflowTag,
 )
 from .tenant import Tenant, TenantCreate, TenantUpdate
@@ -111,6 +113,7 @@ __all__ = [
     "McpServerRead",
     "McpServerTag",
     "McpToolInfo",
+    "McpToolMockTag",
     "McpToolMockCreate",
     "McpToolMockRead",
     "McpToolMockUpdate",
@@ -146,6 +149,7 @@ __all__ = [
     "UserGroupMember",
     "UserGroupMembershipUpdate",
     "UserGroupRead",
+    "UserGroupTag",
     "UserGroupUpdate",
     "Workflow",
     "WorkflowCreate",

@@ -7,28 +7,26 @@
 "use client";
 
 import { UsersRound } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { RecordPickerField } from "@/components/admin/record-picker-field";
-import { USER_GROUP_SHARED_COLUMNS } from "@/components/admin/user-group-columns";
+import { userGroupSharedColumns } from "@/components/admin/user-group-columns";
 import type { ColumnDef } from "@/components/ui/data-table";
+import { useTags } from "@/hooks/useTags";
 import { listUserGroups, type UserGroup } from "@/lib/api";
 
 /**
- * Columns of the picker dialog. Name is local — the dialog does not link
- * off to the group's detail page — the rest is shared with the user-groups
- * list page via {@link USER_GROUP_SHARED_COLUMNS}.
+ * The picker dialog's Name column. Local — the dialog does not link off to the
+ * group's detail page — while the rest is shared with the user-groups list page
+ * via {@link userGroupSharedColumns}.
  */
-const COLUMNS: ColumnDef<UserGroup>[] = [
-  {
-    header: "Name",
-    sortField: "name",
-    filterField: "name",
-    visibility: "always",
-    cell: (g) => g.name,
-  },
-  ...USER_GROUP_SHARED_COLUMNS,
-];
+const NAME_COLUMN: ColumnDef<UserGroup> = {
+  header: "Name",
+  sortField: "name",
+  filterField: "name",
+  visibility: "always",
+  cell: (g) => g.name,
+};
 
 /** Props for {@link GroupPicker}. */
 export interface GroupPickerProps {
@@ -49,6 +47,14 @@ export function GroupPicker({
   readOnly = false,
   initialOptions,
 }: GroupPickerProps) {
+  const { byId: tagsById } = useTags();
+  // The dialog table has no `onTagIdsChange`, so the Tags column here shows
+  // read-only chips — a group's tags are picked on its own detail page.
+  const columns = useMemo<ColumnDef<UserGroup>[]>(
+    () => [NAME_COLUMN, ...userGroupSharedColumns(tagsById)],
+    [tagsById]
+  );
+
   const resolveLabels = useCallback(async (ids: string[]): Promise<PickerOption[]> => {
     const groups = await listUserGroups({
       limit: ids.length,
@@ -66,7 +72,7 @@ export function GroupPicker({
       initialOptions={initialOptions}
       resolveLabels={resolveLabels}
       listRecords={listUserGroups}
-      columns={COLUMNS}
+      columns={columns}
       getId={(group) => group.id}
       getLabel={(group) => group.name}
       panelId="group-picker-dialog"

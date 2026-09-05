@@ -16,6 +16,7 @@ from dependencies import (
     MCPToolMockServiceDep,
     PaginationDep,
     SortDep,
+    TagFilterDep,
     require_roles,
 )
 from models.mcp_tool_mock import (
@@ -24,6 +25,7 @@ from models.mcp_tool_mock import (
     McpToolMockUpdate,
 )
 from models.response import ApiResponse
+from models.tag import TagIdsUpdate
 from models.user import Role
 
 router = APIRouter(prefix="/mcp-tool-mocks", tags=["mcp-tool-mocks"])
@@ -45,7 +47,7 @@ async def create_mcp_tool_mock(
     meta: ApiMetaDep,
 ) -> ApiResponse[McpToolMockRead]:
     mock = await service.create(body, user_id=user_id)
-    return ApiResponse(meta=meta, data=service.to_read(mock))
+    return ApiResponse(meta=meta, data=await service.to_read(mock))
 
 
 @router.get("", response_model=ApiResponse[list[McpToolMockRead]])
@@ -54,6 +56,7 @@ async def list_mcp_tool_mocks(
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
+    tags: TagFilterDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[McpToolMockRead]]:
     items = await service.list(
@@ -61,8 +64,9 @@ async def list_mcp_tool_mocks(
         offset=pagination.offset,
         sort=sort.sort,
         filters=filters.filters,
+        tag_ids=tags.tag_ids,
     )
-    return ApiResponse(meta=meta, data=service.to_read_many(items))
+    return ApiResponse(meta=meta, data=await service.to_read_many(items))
 
 
 @router.get("/{mock_id}", response_model=ApiResponse[McpToolMockRead])
@@ -72,7 +76,7 @@ async def get_mcp_tool_mock(
     meta: ApiMetaDep,
 ) -> ApiResponse[McpToolMockRead]:
     mock = await service.get(mock_id)
-    return ApiResponse(meta=meta, data=service.to_read(mock))
+    return ApiResponse(meta=meta, data=await service.to_read(mock))
 
 
 @router.patch(
@@ -88,7 +92,7 @@ async def update_mcp_tool_mock(
     meta: ApiMetaDep,
 ) -> ApiResponse[McpToolMockRead]:
     mock = await service.update(mock_id, body, user_id=user_id)
-    return ApiResponse(meta=meta, data=service.to_read(mock))
+    return ApiResponse(meta=meta, data=await service.to_read(mock))
 
 
 @router.delete(
@@ -103,3 +107,18 @@ async def delete_mcp_tool_mock(
 ) -> ApiResponse[None]:
     await service.delete(mock_id)
     return ApiResponse(meta=meta, data=None)
+
+
+@router.put(
+    "/{mock_id}/tags",
+    response_model=ApiResponse[McpToolMockRead],
+    dependencies=_requires_developer,
+)
+async def set_mcp_tool_mock_tags(
+    mock_id: str,
+    body: TagIdsUpdate,
+    service: MCPToolMockServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[McpToolMockRead]:
+    mock = await service.set_tags(mock_id, body.tag_ids)
+    return ApiResponse(meta=meta, data=await service.to_read(mock))

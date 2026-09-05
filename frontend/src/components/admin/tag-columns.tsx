@@ -1,10 +1,10 @@
 /**
  * @module tag-columns — the shared Tags column for every taggable admin list.
  *
- * One definition rather than four copies, following
- * {@link USER_GROUP_SHARED_COLUMNS}: the four taggable lists render tags
- * identically and filter them through the same axis, so the column that does it
- * belongs in one place.
+ * One definition rather than six copies, following
+ * {@link userGroupSharedColumns}: every taggable list renders tags identically
+ * and filters them through the same axis, so the column that does it belongs in
+ * one place.
  */
 "use client";
 

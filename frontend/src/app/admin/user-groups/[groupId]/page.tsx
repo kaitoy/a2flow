@@ -16,6 +16,7 @@ import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { RolesField } from "@/components/admin/roles-field";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { UserPicker } from "@/components/admin/user-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
@@ -30,8 +31,10 @@ import {
   getUserGroup,
   isForbiddenError,
   SUPPRESS_FORBIDDEN_TOAST,
+  setUserGroupTags,
   updateUserGroup,
 } from "@/lib/api";
+import { sameIds } from "@/lib/ids";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
@@ -71,6 +74,10 @@ export default function UserGroupDetailPage() {
   const [name, setName] = useState("");
   const [roles, setRoles] = useState<Role[]>([]);
   const [memberIds, setMemberIds] = useState<string[]>([]);
+  // `savedTagIds` is what the last successful save wrote, so a submit only
+  // re-PUTs the tag set when it actually changed.
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [savedTagIds, setSavedTagIds] = useState<string[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -91,6 +98,8 @@ export default function UserGroupDetailPage() {
         setName(group.name);
         setRoles(group.roles ?? []);
         setMemberIds(group.memberIds ?? []);
+        setTagIds(group.tagIds ?? []);
+        setSavedTagIds(group.tagIds ?? []);
         reset({ name: group.name, description: group.description ?? "" });
         setAudit({
           createdBy: group.createdBy,
@@ -119,6 +128,11 @@ export default function UserGroupDetailPage() {
           roles,
           memberIds,
         });
+        // Tags are a separate sub-resource, written only when the selection
+        // actually changed.
+        if (!sameIds(tagIds, savedTagIds)) {
+          await setUserGroupTags(groupId, tagIds);
+        }
         dispatch(showToast({ message: "User group updated" }));
         router.push("/admin/user-groups");
       });
@@ -202,6 +216,8 @@ export default function UserGroupDetailPage() {
           />
 
           <UserPicker value={memberIds} onChange={setMemberIds} readOnly={!canEdit} />
+
+          <TagPicker value={tagIds} onChange={setTagIds} readOnly={!canEdit} />
 
           <div className="flex gap-2">
             {canEdit && (

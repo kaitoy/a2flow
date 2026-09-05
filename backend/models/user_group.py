@@ -21,6 +21,12 @@ no SQLAlchemy type and would fail at class creation. This mirrors
 :class:`models.workflow_task_template.WorkflowTaskTemplate`, which keeps its
 scalar columns separate from ``depends_on_ids`` for the same reason.
 
+Tags follow the same shape: they are attached through
+:class:`models.tag.UserGroupTag`, written with ``PUT /user-groups/{id}/tags``
+(body :class:`models.tag.TagIdsUpdate`), and read back as ``tag_ids`` on
+:class:`UserGroupRead` — never as a field of the write payloads or the table
+class.
+
 **The keystone invariant:** a group can never grant ``super_admin``. Three
 layers enforce it — the ``roles`` field validator on :class:`UserGroupUpdate`,
 the ``ck_user_groups_no_super_admin`` check constraint, and the fact that a
@@ -202,7 +208,7 @@ class UserGroupMember(SQLModel, table=True):
 
 
 class UserGroupRead(BaseEntity):
-    """Read view of a UserGroup returned by the API, including its members."""
+    """Read view of a UserGroup returned by the API, including its members and tags."""
 
     model_config = _alias_config
     name: str
@@ -211,22 +217,29 @@ class UserGroupRead(BaseEntity):
     roles: list[Role] = []
     #: Ids of the users belonging to this group.
     member_ids: list[str] = []
+    #: Ids of the tags attached to this group.
+    tag_ids: list[str] = []
     #: Tenant this group belongs to.
     tenant_id: str
 
     @classmethod
-    def from_group(cls, group: UserGroup, *, member_ids: list[str]) -> "UserGroupRead":
-        """Build the read view of a stored group with its membership attached.
+    def from_group(
+        cls, group: UserGroup, *, member_ids: list[str], tag_ids: list[str]
+    ) -> "UserGroupRead":
+        """Build the read view of a stored group with its membership and tags attached.
 
         Args:
             group: The persisted group to project.
             member_ids: Ids of the users belonging to ``group``, which live in
                 :class:`UserGroupMember` rather than on the group row.
+            tag_ids: Ids of the tags attached to ``group``, which live in
+                :class:`models.tag.UserGroupTag` rather than on the group row.
 
         Returns:
-            A read view carrying the group's scalar fields plus its members.
+            A read view carrying the group's scalar fields plus its members and
+            tags.
         """
-        return cls(**group.model_dump(), member_ids=member_ids)
+        return cls(**group.model_dump(), member_ids=member_ids, tag_ids=tag_ids)
 
 
 class UserGroupMembershipUpdate(SQLModel):

@@ -1,9 +1,9 @@
 /**
  * @module TagPicker — shared tag multi-select for the taggable admin forms.
  *
- * Used by the secret, MCP server, agent skill, and workflow forms so the four
- * stay in step, the same way {@link McpToolPicker} is shared across the task
- * template forms.
+ * Used by the secret, MCP server, agent skill, workflow, tool-mock, and
+ * user-group forms so they stay in step, the same way {@link McpToolPicker} is
+ * shared across the task template forms.
  *
  * Shaped like {@link RecordPickerField}: the attached tags read as a row of
  * removable chips and changing them opens a modal, so the field's height is the

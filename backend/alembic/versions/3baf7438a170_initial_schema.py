@@ -1169,6 +1169,8 @@ def upgrade() -> None:
         ("workflow_tags", "workflows"),
         ("mcp_server_tags", "mcp_servers"),
         ("agent_skill_tags", "agent_skills"),
+        ("mcp_tool_mock_tags", "mcp_tool_mocks"),
+        ("user_group_tags", "user_groups"),
     ):
         op.create_table(
             link_table,
@@ -1398,6 +1400,8 @@ def downgrade() -> None:
     )
     op.drop_table("mcp_tool_certificates")
     for link_table in (
+        "user_group_tags",
+        "mcp_tool_mock_tags",
         "agent_skill_tags",
         "mcp_server_tags",
         "workflow_tags",

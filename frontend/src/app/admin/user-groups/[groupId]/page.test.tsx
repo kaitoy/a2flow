@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN, DEVELOPER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
+import { USER_GROUP_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import UserGroupDetailPage from "./page";
@@ -61,6 +62,25 @@ describe("UserGroupDetailPage", () => {
     await waitFor(() => screen.getByRole("button", { name: "Save" }));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/admin/user-groups"));
+  });
+
+  it("writes a changed tag set to the group's tags sub-resource on save", async () => {
+    let tagBody: unknown;
+    server.use(
+      http.patch(`${BASE}/api/v1/user-groups/:groupId`, () => envelope(USER_GROUP_1)),
+      http.put(`${BASE}/api/v1/user-groups/:groupId/tags`, async ({ request }) => {
+        tagBody = await request.json();
+        return envelope(USER_GROUP_1);
+      })
+    );
+    render(<UserGroupDetailPage />, { preloadedState: ADMIN });
+    await userEvent.click(await screen.findByRole("button", { name: "Select tags…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Select tags" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "aws" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Select" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(tagBody).toEqual({ tagIds: ["tag-2"] }));
   });
 
   it("deletes the group after confirmation", async () => {

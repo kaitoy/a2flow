@@ -60,6 +60,7 @@ class MCPToolMockService:
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        tag_ids: Sequence[str] = (),
     ) -> list[MCPToolMock]:
         """Return a page of MCPToolMock records.
 
@@ -68,27 +69,30 @@ class MCPToolMockService:
             offset: Number of records to skip.
             sort: Ordering instructions applied to the query.
             filters: Field filters applied to the query.
+            tag_ids: Narrows the page to mocks carrying every listed tag.
 
         Returns:
             The requested page of mocks.
         """
         return await self._repo.list(
-            limit=limit, offset=offset, sort=sort, filters=filters
+            limit=limit, offset=offset, sort=sort, filters=filters, tag_ids=tag_ids
         )
 
-    def to_read(self, mock: MCPToolMock) -> McpToolMockRead:
-        """Project one MCPToolMock into its API read view.
+    async def to_read(self, mock: MCPToolMock) -> McpToolMockRead:
+        """Project one MCPToolMock into its API read view, attaching its tags.
 
         Args:
             mock: The persisted mock to project.
 
         Returns:
-            The read view, with typed responses.
+            The read view, with typed responses and tag ids attached.
         """
-        return McpToolMockRead.from_mock(mock)
+        return McpToolMockRead.from_mock(
+            mock, tag_ids=await self._repo.tag_ids_for(mock.id)
+        )
 
-    def to_read_many(self, mocks: Sequence[MCPToolMock]) -> _ReadList:
-        """Project a page of MCPToolMocks into read views.
+    async def to_read_many(self, mocks: Sequence[MCPToolMock]) -> _ReadList:
+        """Project a page of MCPToolMocks into read views, reading their tags in one query.
 
         Args:
             mocks: The persisted records to project.
@@ -96,7 +100,28 @@ class MCPToolMockService:
         Returns:
             The read views, in the order they were given.
         """
-        return [McpToolMockRead.from_mock(mock) for mock in mocks]
+        by_id = await self._repo.tag_ids_for_many([mock.id for mock in mocks])
+        return [
+            McpToolMockRead.from_mock(mock, tag_ids=by_id.get(mock.id, []))
+            for mock in mocks
+        ]
+
+    async def set_tags(self, mock_id: str, tag_ids: Sequence[str]) -> MCPToolMock:
+        """Replace an MCPToolMock's tag attachments wholesale.
+
+        Args:
+            mock_id: Identifier of the mock to retag.
+            tag_ids: Ids of the tags it should carry.
+
+        Returns:
+            The mock, unchanged apart from its attachments.
+
+        Raises:
+            NotFoundError: If no mock exists with the given ID.
+            ForeignKeyViolationError: If any id does not name a tag of this
+                tenant.
+        """
+        return await self._repo.set_tags(mock_id, tag_ids)
 
     async def create(self, data: McpToolMockCreate, *, user_id: str) -> MCPToolMock:
         """Create a new MCPToolMock.

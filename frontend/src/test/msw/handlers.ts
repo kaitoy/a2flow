@@ -45,6 +45,7 @@ export const USER_GROUP_1 = {
   description: "People who build workflows",
   roles: ["developer"],
   memberIds: ["user-1"],
+  tagIds: [],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -226,6 +227,7 @@ export const MCP_TOOL_MOCK_1 = {
   mcpServerId: "mcp-1",
   toolName: "search",
   responses: [{ kind: "structured", value: { hits: [] } }],
+  tagIds: [],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -244,6 +246,7 @@ export const MCP_TOOL_MOCK_BUILTIN = {
     { kind: "structured", value: { status: "approved" } },
     { kind: "structured", value: { status: "rejected" } },
   ],
+  tagIds: [],
   createdAt: "2026-01-02T00:00:00Z",
   updatedAt: "2026-01-02T00:00:00Z",
   createdBy: "",
@@ -599,6 +602,10 @@ export const handlers = [
   http.put(`${BASE}/api/v1/mcp-servers/:serverId/tags`, () => envelope(MCP_SERVER_1)),
 
   http.put(`${BASE}/api/v1/agent-skills/:skillId/tags`, () => envelope(SKILL_1)),
+
+  http.put(`${BASE}/api/v1/mcp-tool-mocks/:mockId/tags`, () => envelope(MCP_TOOL_MOCK_1)),
+
+  http.put(`${BASE}/api/v1/user-groups/:groupId/tags`, () => envelope(USER_GROUP_1)),
 
   // The one list route that honours its query string. `SecretRefField` resolves
   // a stored `name/key` reference by asking for that one name, and an empty

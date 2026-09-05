@@ -6,7 +6,7 @@ import { DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope } from "@/test/msw/envelope";
 import { MCP_TOOL_MOCK_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
-import { render, screen, waitFor } from "@/test/test-utils";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import NewMcpToolMockPage from "./page";
 
 /** Render the form as a developer — the role registering a tool mock requires. */
@@ -211,5 +211,36 @@ describe("NewMcpToolMockPage", () => {
   it("refuses the form to a viewer without the developer role", () => {
     render(<NewMcpToolMockPage />, { preloadedState: REQUESTER });
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
+  });
+
+  it("writes the chosen tags as a sub-resource once the mock exists", async () => {
+    const user = userEvent.setup();
+    captureCreate();
+    let tagBody: unknown;
+    server.use(
+      http.put(
+        "http://localhost:8000/api/v1/mcp-tool-mocks/:mockId/tags",
+        async ({ request, params }) => {
+          tagBody = { id: params.mockId, ...((await request.json()) as { tagIds: string[] }) };
+          return envelope({ ...MCP_TOOL_MOCK_1, id: "new-id" });
+        }
+      )
+    );
+
+    renderPage();
+    await user.type(screen.getByLabelText(/^name/i), "with tags");
+    await pickServerAndTool(user);
+    const value = screen.getByLabelText("Response 1 value");
+    await user.clear(value);
+    await user.type(value, '{{"hits": 0}');
+
+    await user.click(await screen.findByRole("button", { name: "Select tags…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Select tags" });
+    await user.click(within(dialog).getByRole("button", { name: "aws" }));
+    await user.click(within(dialog).getByRole("button", { name: "Select" }));
+
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(tagBody).toEqual({ id: "new-id", tagIds: ["tag-2"] }));
   });
 });

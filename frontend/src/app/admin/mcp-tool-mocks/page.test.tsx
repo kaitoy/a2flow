@@ -36,6 +36,12 @@ describe("McpToolMocksPage", () => {
     await waitFor(() => expect(screen.getByText("my-mcp-server")).toBeInTheDocument());
   });
 
+  it("carries the shared Tags column", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("search returns nothing")).toBeInTheDocument());
+    expect(screen.getByRole("columnheader", { name: "Tags" })).toBeInTheDocument();
+  });
+
   it("marks a mock with no server as built-in", async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("Built-in")).toBeInTheDocument());

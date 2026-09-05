@@ -265,8 +265,9 @@ class McpToolMockRead(BaseEntity):
     """Read view of an MCPToolMock returned by the API.
 
     Mirrors every column of :class:`MCPToolMock`, restoring ``responses`` to its
-    typed shape so the generated frontend bindings describe it. The mirroring is
-    not cosmetic: this class is what
+    typed shape so the generated frontend bindings describe it, and adds
+    ``tag_ids``, which lives in :class:`models.tag.McpToolMockTag` rather than on
+    the mock row. The mirroring is not cosmetic: this class is what
     :meth:`repositories.mcp_tool_mock.SqlMcpToolMockRepository.list` passes as
     ``readable=``, and a column missing here becomes unfilterable and unsortable
     through the list API.
@@ -283,15 +284,20 @@ class McpToolMockRead(BaseEntity):
     #: leaving it optional here would only make the generated client treat a
     #: guaranteed field as possibly absent.
     responses: list[MockResponse]
+    #: Ids of the tags attached to this mock.
+    tag_ids: list[str] = []
 
     @classmethod
-    def from_mock(cls, mock: MCPToolMock) -> "McpToolMockRead":
-        """Build the read view of a stored mock.
+    def from_mock(cls, mock: MCPToolMock, *, tag_ids: list[str]) -> "McpToolMockRead":
+        """Build the read view of a stored mock with its tags attached.
 
         Args:
             mock: The persisted mock to project.
+            tag_ids: Ids of the tags attached to ``mock``, which live in
+                :class:`models.tag.McpToolMockTag` rather than on the mock row.
 
         Returns:
-            A read view carrying the mock's columns with typed responses.
+            A read view carrying the mock's columns with typed responses and its
+            attached tag ids.
         """
-        return cls.model_validate(mock.model_dump())
+        return cls.model_validate({**mock.model_dump(), "tag_ids": tag_ids})

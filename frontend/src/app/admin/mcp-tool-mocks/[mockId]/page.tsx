@@ -20,6 +20,7 @@ import {
   responseToFormValue,
   toMcpToolMockBody,
 } from "@/components/admin/mcp-tool-mock-fields";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -30,8 +31,10 @@ import {
   getMcpToolMock,
   isForbiddenError,
   SUPPRESS_FORBIDDEN_TOAST,
+  setMcpToolMockTags,
   updateMcpToolMock,
 } from "@/lib/api";
+import { sameIds } from "@/lib/ids";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -57,6 +60,11 @@ export default function McpToolMockDetailPage() {
   // The persisted name, which titles the page. Kept out of the form so the
   // heading names the saved record rather than following every keystroke.
   const [name, setName] = useState("");
+  // Tags live outside the form state: the picker is a controlled multi-select,
+  // and `savedTagIds` is what the last successful save wrote, so a submit only
+  // re-PUTs the tag set when it actually changed.
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [savedTagIds, setSavedTagIds] = useState<string[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -87,6 +95,8 @@ export default function McpToolMockDetailPage() {
           toolName: mock.toolName,
           responses: mock.responses.map(responseToFormValue),
         });
+        setTagIds(mock.tagIds ?? []);
+        setSavedTagIds(mock.tagIds ?? []);
         setAudit({
           createdBy: mock.createdBy,
           updatedBy: mock.updatedBy,
@@ -109,6 +119,11 @@ export default function McpToolMockDetailPage() {
     try {
       await save.run(async () => {
         await updateMcpToolMock(mockId, toMcpToolMockBody(values));
+        // Tags are a separate sub-resource, so they are only written when the
+        // selection actually changed.
+        if (!sameIds(tagIds, savedTagIds)) {
+          await setMcpToolMockTags(mockId, tagIds);
+        }
         dispatch(showToast({ message: "Tool mock updated" }));
         router.push("/admin/mcp-tool-mocks");
       });
@@ -176,6 +191,8 @@ export default function McpToolMockDetailPage() {
           ) : (
             <McpToolMockFields readOnly values={getValues()} />
           )}
+
+          <TagPicker value={tagIds} onChange={setTagIds} readOnly={!canEdit} />
 
           <div className="flex gap-2">
             {canEdit && (

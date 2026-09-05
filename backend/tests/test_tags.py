@@ -20,9 +20,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure.bootstrap import seed_system_user
 from models.agent_skill import AgentSkill, AgentSkillRead
 from models.mcp_server import MCPServer, McpServerRead
+from models.mcp_tool_mock import MCPToolMock, McpToolMockRead
 from models.secret import Secret, SecretRead
 from models.tag import MAX_RECORD_TAGS
 from models.user import SYSTEM_USER_ID
+from models.user_group import UserGroup, UserGroupRead
 from models.workflow import Workflow, WorkflowRead
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
@@ -107,6 +109,54 @@ async def _set_secret_tags(
     """Attach ``tag_ids`` to a secret and return the updated read model."""
     response = await client.put(
         f"/api/v1/secrets/{secret_id}/tags", json={"tagIds": tag_ids}, headers=ADMIN
+    )
+    return dict(assert_ok(response))
+
+
+async def _create_tool_mock(
+    client: AsyncClient, name: str = "approve-mock"
+) -> dict[str, Any]:
+    """Create a built-in-tool mock through the API and return it."""
+    response = await client.post(
+        "/api/v1/mcp-tool-mocks",
+        json={
+            "name": name,
+            "toolName": "request_approval",
+            "responses": [{"kind": "text", "value": "ok"}],
+        },
+        headers=DEVELOPER,
+    )
+    return dict(assert_ok(response, 201))
+
+
+async def _set_tool_mock_tags(
+    client: AsyncClient, mock_id: str, tag_ids: list[str]
+) -> dict[str, Any]:
+    """Attach ``tag_ids`` to a tool mock and return the updated read model."""
+    response = await client.put(
+        f"/api/v1/mcp-tool-mocks/{mock_id}/tags",
+        json={"tagIds": tag_ids},
+        headers=DEVELOPER,
+    )
+    return dict(assert_ok(response))
+
+
+async def _create_user_group(
+    client: AsyncClient, name: str = "developers"
+) -> dict[str, Any]:
+    """Create an empty user group through the API and return it."""
+    response = await client.post(
+        "/api/v1/user-groups", json={"name": name}, headers=ADMIN
+    )
+    return dict(assert_ok(response, 201))
+
+
+async def _set_user_group_tags(
+    client: AsyncClient, group_id: str, tag_ids: list[str]
+) -> dict[str, Any]:
+    """Attach ``tag_ids`` to a user group and return the updated read model."""
+    response = await client.put(
+        f"/api/v1/user-groups/{group_id}/tags", json={"tagIds": tag_ids}, headers=ADMIN
     )
     return dict(assert_ok(response))
 
@@ -518,6 +568,200 @@ async def test_tags_are_not_a_sortable_field(
     assert_err(response, "INVALID_QUERY", 400)
 
 
+# ---------- tool mocks ----------
+
+
+async def test_tool_mock_tags_round_trip_sorted(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    first = await _create_tag(client, "a")
+    second = await _create_tag(client, "b")
+    mock = await _create_tool_mock(client)
+    updated = await _set_tool_mock_tags(client, mock["id"], [second["id"], first["id"]])
+    assert updated["tagIds"] == sorted([first["id"], second["id"]])
+
+    fetched = assert_ok(
+        await client.get(f"/api/v1/mcp-tool-mocks/{mock['id']}", headers=DEVELOPER)
+    )
+    assert fetched["tagIds"] == sorted([first["id"], second["id"]])
+
+
+async def test_tool_mock_tag_filter_is_conjunctive(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    aws = await _create_tag(client, "aws")
+    prod = await _create_tag(client, "prod")
+    both = await _create_tool_mock(client, "both")
+    only_aws = await _create_tool_mock(client, "only-aws")
+    await _set_tool_mock_tags(client, both["id"], [aws["id"], prod["id"]])
+    await _set_tool_mock_tags(client, only_aws["id"], [aws["id"]])
+
+    one = assert_ok(
+        await client.get(f"/api/v1/mcp-tool-mocks?tag={aws['id']}", headers=DEVELOPER)
+    )
+    assert {m["name"] for m in one} == {"both", "only-aws"}
+
+    two = assert_ok(
+        await client.get(
+            f"/api/v1/mcp-tool-mocks?tag={aws['id']}&tag={prod['id']}",
+            headers=DEVELOPER,
+        )
+    )
+    assert {m["name"] for m in two} == {"both"}
+
+
+async def test_tool_mock_tagging_requires_developer(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    mock = await _create_tool_mock(client)
+    response = await client.put(
+        f"/api/v1/mcp-tool-mocks/{mock['id']}/tags",
+        json={"tagIds": []},
+        headers=NOBODY,
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_deleting_a_tool_mock_removes_its_attachments(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, mem_engine = tag_env
+    tag = await _create_tag(client)
+    mock = await _create_tool_mock(client)
+    await _set_tool_mock_tags(client, mock["id"], [tag["id"]])
+
+    assert_ok(
+        await client.delete(f"/api/v1/mcp-tool-mocks/{mock['id']}", headers=DEVELOPER)
+    )
+
+    from sqlmodel import select
+
+    from models.tag import McpToolMockTag
+
+    async with AsyncSession(mem_engine) as session:
+        rows = (await session.exec(select(McpToolMockTag))).all()
+    assert rows == []
+
+
+# ---------- user groups ----------
+
+
+async def test_user_group_tags_round_trip_sorted(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    first = await _create_tag(client, "a")
+    second = await _create_tag(client, "b")
+    group = await _create_user_group(client)
+    updated = await _set_user_group_tags(
+        client, group["id"], [second["id"], first["id"]]
+    )
+    assert updated["tagIds"] == sorted([first["id"], second["id"]])
+
+    fetched = assert_ok(
+        await client.get(f"/api/v1/user-groups/{group['id']}", headers=ADMIN)
+    )
+    assert fetched["tagIds"] == sorted([first["id"], second["id"]])
+
+
+async def test_user_group_tag_filter_is_conjunctive(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    aws = await _create_tag(client, "aws")
+    prod = await _create_tag(client, "prod")
+    both = await _create_user_group(client, "both")
+    only_aws = await _create_user_group(client, "only-aws")
+    await _set_user_group_tags(client, both["id"], [aws["id"], prod["id"]])
+    await _set_user_group_tags(client, only_aws["id"], [aws["id"]])
+
+    one = assert_ok(
+        await client.get(f"/api/v1/user-groups?tag={aws['id']}", headers=ADMIN)
+    )
+    assert {g["name"] for g in one} == {"both", "only-aws"}
+
+    two = assert_ok(
+        await client.get(
+            f"/api/v1/user-groups?tag={aws['id']}&tag={prod['id']}", headers=ADMIN
+        )
+    )
+    assert {g["name"] for g in two} == {"both"}
+
+
+async def test_user_group_tagging_requires_admin(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    group = await _create_user_group(client)
+    response = await client.put(
+        f"/api/v1/user-groups/{group['id']}/tags",
+        json={"tagIds": []},
+        headers=DEVELOPER,
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_renaming_a_tag_keeps_a_user_group_attachment(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    tag = await _create_tag(client)
+    group = await _create_user_group(client)
+    await _set_user_group_tags(client, group["id"], [tag["id"]])
+
+    assert_ok(
+        await client.patch(
+            f"/api/v1/tags/{tag['id']}", json={"name": "devs"}, headers=ADMIN
+        )
+    )
+
+    fetched = assert_ok(
+        await client.get(f"/api/v1/user-groups/{group['id']}", headers=ADMIN)
+    )
+    assert fetched["tagIds"] == [tag["id"]]
+
+
+async def test_deleting_a_tag_detaches_it_from_a_user_group(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    doomed = await _create_tag(client, "doomed")
+    kept = await _create_tag(client, "kept")
+    group = await _create_user_group(client)
+    await _set_user_group_tags(client, group["id"], [doomed["id"], kept["id"]])
+
+    assert_ok(await client.delete(f"/api/v1/tags/{doomed['id']}", headers=ADMIN))
+
+    fetched = assert_ok(
+        await client.get(f"/api/v1/user-groups/{group['id']}", headers=ADMIN)
+    )
+    assert fetched["tagIds"] == [kept["id"]]
+
+
+async def test_attaching_another_tenants_tag_to_a_user_group_is_rejected(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    foreign = dict(
+        assert_ok(
+            await client.post(
+                "/api/v1/tags", json={"name": "foreign"}, headers=OUTSIDER
+            ),
+            201,
+        )
+    )
+    group = await _create_user_group(client)
+    response = await client.put(
+        f"/api/v1/user-groups/{group['id']}/tags",
+        json={"tagIds": [foreign["id"]]},
+        headers=ADMIN,
+    )
+    assert_err(response, "FOREIGN_KEY_VIOLATION", 422)
+
+
 # ---------- read-model parity ----------
 
 
@@ -530,6 +774,8 @@ async def test_tags_are_not_a_sortable_field(
         (Workflow, WorkflowRead, set[str]()),
         (AgentSkill, AgentSkillRead, set[str]()),
         (MCPServer, McpServerRead, set[str]()),
+        (MCPToolMock, McpToolMockRead, set[str]()),
+        (UserGroup, UserGroupRead, set[str]()),
     ],
 )
 def test_read_model_mirrors_every_filterable_column(

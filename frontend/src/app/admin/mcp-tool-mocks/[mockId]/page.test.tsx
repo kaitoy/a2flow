@@ -86,6 +86,30 @@ describe("McpToolMockDetailPage", () => {
     );
   });
 
+  it("writes a changed tag set to the mock's tags sub-resource on save", async () => {
+    setup();
+    const user = userEvent.setup();
+    let tagBody: unknown;
+    server.use(
+      http.patch("http://localhost:8000/api/v1/mcp-tool-mocks/:mockId", () =>
+        envelope(MCP_TOOL_MOCK_1)
+      ),
+      http.put("http://localhost:8000/api/v1/mcp-tool-mocks/:mockId/tags", async ({ request }) => {
+        tagBody = await request.json();
+        return envelope(MCP_TOOL_MOCK_1);
+      })
+    );
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Select tags…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Select tags" });
+    await user.click(within(dialog).getByRole("button", { name: "aws" }));
+    await user.click(within(dialog).getByRole("button", { name: "Select" }));
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(tagBody).toEqual({ tagIds: ["tag-2"] }));
+  });
+
   it("deletes the mock after confirming", async () => {
     setup();
     const user = userEvent.setup();

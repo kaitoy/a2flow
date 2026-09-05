@@ -20,16 +20,17 @@ import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { tenantColumn } from "@/components/admin/tenant-columns";
-import { USER_GROUP_SHARED_COLUMNS } from "@/components/admin/user-group-columns";
+import { userGroupSharedColumns } from "@/components/admin/user-group-columns";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTags } from "@/hooks/useTags";
 import { useTenantNames } from "@/hooks/useTenantNames";
 import { useUserNames } from "@/hooks/useUserNames";
-import { deleteUserGroup, listUserGroups, type UserGroup } from "@/lib/api";
+import { deleteUserGroup, listUserGroups, type Tag, type UserGroup } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
@@ -38,12 +39,13 @@ const LIMIT = 20;
  * Columns of the list table. Name and Created At are local to this page —
  * Name links off to the group's detail page, which the picker dialog never
  * does — the rest is shared with {@link GroupPicker}'s dialog table via
- * {@link USER_GROUP_SHARED_COLUMNS}.
+ * {@link userGroupSharedColumns}.
  */
 function buildColumns(
   names: Map<string, string>,
   tenantNames: Map<string, string>,
-  isAllTenantsView: boolean
+  isAllTenantsView: boolean,
+  tagsById: Map<string, Tag>
 ): ColumnDef<UserGroup>[] {
   return [
     idColumn<UserGroup>(),
@@ -61,7 +63,7 @@ function buildColumns(
         </Link>
       ),
     },
-    ...USER_GROUP_SHARED_COLUMNS,
+    ...userGroupSharedColumns(tagsById),
     {
       header: "Created At",
       sortField: "createdAt",
@@ -85,8 +87,11 @@ export default function UserGroupsPage() {
     setOffset,
     setSort,
     setFilters,
+    tagIds,
+    setTagIds,
     reload,
   } = useTableQuery<UserGroup>(listUserGroups, { limit: LIMIT });
+  const { byId: tagsById } = useTags();
   const names = useUserNames(rows.flatMap((g) => [g.createdBy, g.updatedBy]));
   const isAllTenantsView = useIsAllTenantsView();
   // Only resolved when the Tenant column is actually rendered: the lookup goes
@@ -108,7 +113,7 @@ export default function UserGroupsPage() {
   }
 
   const columns: ColumnDef<UserGroup>[] = [
-    ...buildColumns(names, tenantNames, isAllTenantsView),
+    ...buildColumns(names, tenantNames, isAllTenantsView, tagsById),
     ...(canEdit
       ? [
           {
@@ -163,6 +168,8 @@ export default function UserGroupsPage() {
         onSortChange={setSort}
         filters={filters}
         onFilterChange={setFilters}
+        tagIds={tagIds}
+        onTagIdsChange={setTagIds}
       />
       <PaginationControls
         offset={offset}

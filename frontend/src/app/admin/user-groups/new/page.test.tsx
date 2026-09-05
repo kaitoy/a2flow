@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { ADMIN, DEVELOPER, SUPER_ADMIN } from "@/test/auth-state";
 import { envelope } from "@/test/msw/envelope";
+import { USER_GROUP_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
-import { render, screen, waitFor } from "@/test/test-utils";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import NewUserGroupPage from "./page";
 
 const BASE = "http://localhost:8000";
@@ -72,5 +73,30 @@ describe("NewUserGroupPage", () => {
     await fillName();
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/admin/user-groups"));
+  });
+
+  it("writes the chosen tags as a sub-resource once the group exists", async () => {
+    let tagBody: unknown;
+    server.use(
+      http.post(`${BASE}/api/v1/user-groups`, () =>
+        envelope({ ...USER_GROUP_1, id: "new-group-id" }, 201)
+      ),
+      http.put(`${BASE}/api/v1/user-groups/:groupId/tags`, async ({ request, params }) => {
+        tagBody = {
+          id: params.groupId,
+          ...((await request.json()) as { tagIds: string[] }),
+        };
+        return envelope({ ...USER_GROUP_1, id: "new-group-id" });
+      })
+    );
+    render(<NewUserGroupPage />, { preloadedState: ADMIN });
+    await fillName();
+    await userEvent.click(screen.getByRole("button", { name: "Select tags…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Select tags" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "aws" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Select" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(tagBody).toEqual({ id: "new-group-id", tagIds: ["tag-2"] }));
   });
 });

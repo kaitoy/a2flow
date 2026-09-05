@@ -19,6 +19,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormColumn } from "@/components/admin/form-column";
 import { FormField } from "@/components/admin/form-field";
 import { RolesField } from "@/components/admin/roles-field";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { UserPicker } from "@/components/admin/user-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zUserGroupCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { createUserGroup } from "@/lib/api";
+import { createUserGroup, setUserGroupTags } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -38,10 +39,12 @@ type FormValues = z.input<typeof schema>;
 export default function NewUserGroupPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  // Roles and members live outside the form state: both are controlled
-  // multi-selects rather than registered inputs.
+  // Roles, members, and tags live outside the form state: all are controlled
+  // multi-selects rather than registered inputs, and tags are a sub-resource
+  // written after the group exists.
   const [roles, setRoles] = useState<Role[]>([]);
   const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const isSuperAdminViewer = useHasRole(Role.SUPER_ADMIN);
   const canEdit = useHasRole(Role.ADMIN);
   const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
@@ -63,12 +66,15 @@ export default function NewUserGroupPage() {
   async function onSubmit(values: FormValues) {
     try {
       await save.run(async () => {
-        await createUserGroup({
+        const created = await createUserGroup({
           name: values.name,
           description: values.description || null,
           roles,
           memberIds,
         });
+        if (tagIds.length > 0) {
+          await setUserGroupTags(created.id, tagIds);
+        }
         dispatch(showToast({ message: "User group created" }));
         router.push("/admin/user-groups");
       });
@@ -126,6 +132,8 @@ export default function NewUserGroupPage() {
           />
 
           <UserPicker value={memberIds} onChange={setMemberIds} />
+
+          <TagPicker value={tagIds} onChange={setTagIds} />
 
           {tenantMissing && (
             <p className="text-xs text-error">

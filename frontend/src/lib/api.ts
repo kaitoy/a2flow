@@ -167,8 +167,10 @@ import {
   zSendSmtpTestEmailApiV1SystemSettingsSmtpTestPostResponse,
   zSetAgentSkillTagsApiV1AgentSkillsSkillIdTagsPutResponse,
   zSetMcpServerTagsApiV1McpServersServerIdTagsPutResponse,
+  zSetMcpToolMockTagsApiV1McpToolMocksMockIdTagsPutResponse,
   zSetSecretTagsApiV1SecretsSecretIdTagsPutResponse,
   zSetUserGroupsApiV1UsersUserIdGroupsPutResponse,
+  zSetUserGroupTagsApiV1UserGroupsGroupIdTagsPutResponse,
   zSetWorkflowTagsApiV1WorkflowsWorkflowIdTagsPutResponse,
   zStartImpersonationApiV1AuthImpersonatePostResponse,
   zStopImpersonationApiV1AuthImpersonateDeleteResponse,
@@ -851,6 +853,19 @@ export async function deleteMcpToolMock(id: string): Promise<void> {
 }
 
 /**
+ * Replace a tool mock's tag set wholesale, returning the updated mock.
+ *
+ * Tags are a sub-resource of the record, so the create and detail forms write
+ * them with this call rather than through the mock's own create/update body.
+ */
+export async function setMcpToolMockTags(id: string, tagIds: string[]): Promise<McpToolMock> {
+  return fetchEnvelope(
+    apiClient.put(`/api/v1/mcp-tool-mocks/${encodeURIComponent(id)}/tags`, { tagIds }),
+    zSetMcpToolMockTagsApiV1McpToolMocksMockIdTagsPutResponse
+  ) as Promise<McpToolMock>;
+}
+
+/**
  * List the MCP tool-call decisions recorded for one workflow execution.
  *
  * Only calls that reached the MCP gateway appear here — allowed ones that went
@@ -1311,6 +1326,19 @@ export async function deleteUserGroup(id: string): Promise<void> {
     apiClient.delete(`/api/v1/user-groups/${encodeURIComponent(id)}`),
     zDeleteUserGroupApiV1UserGroupsGroupIdDeleteResponse
   );
+}
+
+/**
+ * Replace a user group's tag set wholesale, returning the updated group.
+ *
+ * Tags are a sub-resource of the group, so the create and detail forms write
+ * them with this call rather than through the group's own create/update body.
+ */
+export async function setUserGroupTags(id: string, tagIds: string[]): Promise<UserGroup> {
+  return fetchEnvelope(
+    apiClient.put(`/api/v1/user-groups/${encodeURIComponent(id)}/tags`, { tagIds }),
+    zSetUserGroupTagsApiV1UserGroupsGroupIdTagsPutResponse
+  ) as Promise<UserGroup>;
 }
 
 /**

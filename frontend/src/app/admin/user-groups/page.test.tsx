@@ -44,6 +44,12 @@ describe("UserGroupsPage", () => {
     expect(screen.getByText("1")).toBeInTheDocument();
   });
 
+  it("carries the shared Tags column", async () => {
+    renderPage();
+    await waitFor(() => screen.getByText("Developers"));
+    expect(screen.getByRole("columnheader", { name: "Tags" })).toBeInTheDocument();
+  });
+
   it("name links to the detail page", async () => {
     renderPage();
     await waitFor(() => screen.getByText("Developers"));
