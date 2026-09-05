@@ -325,7 +325,7 @@ _DEMO_GROUPS = (
 _DEMO_CALL_AWS_TOOL = "aws___call_aws"
 
 #: The tool of the demo AWS MCP server that runs a script (AWS CLI + boto3).
-_DEMO_RUN_SCRIPT_TOOL = "aws__run_script"
+_DEMO_RUN_SCRIPT_TOOL = "aws___run_script"
 
 #: Instance id shared by the ``call_aws`` and ``run_script`` mock results, so a
 #: run that happens to call both still tells one consistent story.

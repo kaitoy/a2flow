@@ -30,7 +30,7 @@ DEMO_AWS_REGION=us-east-1
 - **[エージェントスキル](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — インスタンスの構成を聞き取り、それについて管理職の明示的な承認を得てから、MCP ツールでインスタンスを起動します。リポジトリは起動後にバックグラウンドで clone するので、使えるようになるまでの間スキルは `pending` と表示されます。
 - **[MCP サーバー](../guides/mcp-servers.md) `AWS MCP Server`** — AWS のマネージド AWS MCP Server に接続する `stdio` サーバーです。EC2 のツールはここから来ます。
 - **[シークレット](../guides/secrets.md) `demo-aws-credentials`** — 上の MCP サーバーが読む、AWS のアクセスキー ID とシークレットアクセスキーです。
-- **[ツールモック](../guides/tool-mocks.md)** — デモ実行で副作用のあるツールのスタブです。AWS MCP Server の `aws___call_aws` と `aws__run_script`(どちらも起動成功を返す)、および組み込みの `request_approval`(approved を返す)。ドラフト実行の **Run** ダイアログで選ぶと、AWS に触れることも管理職の承認を待つこともなく、ワークフローが最後まで動きます。
+- **[ツールモック](../guides/tool-mocks.md)** — デモ実行で副作用のあるツールのスタブです。AWS MCP Server の `aws___call_aws` と `aws___run_script`(どちらも起動成功を返す)、および組み込みの `request_approval`(approved を返す)。ドラフト実行の **Run** ダイアログで選ぶと、AWS に触れることも管理職の承認を待つこともなく、ワークフローが最後まで動きます。
 - **デモユーザーとグループ:**
 
 | ユーザー | ロール | 役割 |
@@ -51,7 +51,7 @@ DEMO_AWS_REGION=us-east-1
 4. **`demo-requester-1`** でワークフローの **Run** を押します([ワークフローを実行する](../guides/workflows.md#running-a-workflow))。実行のチャットが開き、エージェントがタスクを順に進めます。
 5. スキルが承認を求めてきたら、**`demo-approver-1`** でサインインして承認します([承認](../guides/approvals.md))。エージェントはそのあと MCP ツールでインスタンスを起動します。
 
-**AWS アカウントがない場合。** 手順 3 を飛ばし、`draft` のまま実行してください。`developer` である `demo-developer` はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる Run ダイアログが出るのはドラフト実行のときだけです。**Mock tools** に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws__run_script` と、`request_approval`)にチェックを入れれば、AWS に届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。
+**AWS アカウントがない場合。** 手順 3 を飛ばし、`draft` のまま実行してください。`developer` である `demo-developer` はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる Run ダイアログが出るのはドラフト実行のときだけです。**Mock tools** に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws___run_script` と、`request_approval`)にチェックを入れれば、AWS に届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。
 
 ## 削除する
 
