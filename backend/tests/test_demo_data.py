@@ -51,7 +51,14 @@ from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.mcp_server import McpCommand, MCPServer, McpTransport
 from models.mcp_tool_mock import MCPToolMock
 from models.secret import Secret, SecretType
-from models.tag import AgentSkillTag, McpServerTag, SecretTag, Tag
+from models.tag import (
+    AgentSkillTag,
+    McpServerTag,
+    McpToolMockTag,
+    SecretTag,
+    Tag,
+    UserGroupTag,
+)
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from models.user_group import UserGroup, UserGroupMember
@@ -232,9 +239,11 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _rows(engine, SecretTag)) == 1
     assert len(await _rows(engine, McpServerTag)) == 1
     assert len(await _rows(engine, AgentSkillTag)) == 2
+    assert len(await _rows(engine, McpToolMockTag)) == 2
+    assert len(await _rows(engine, UserGroupTag)) == 1
 
 
-async def test_demo_tags_classify_the_secret_mcp_server_and_agent_skill(
+async def test_demo_tags_classify_records_across_five_taggable_kinds(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
@@ -258,6 +267,17 @@ async def test_demo_tags_classify_the_secret_mcp_server_and_agent_skill(
         (DEMO_AGENT_SKILL_ID, DEMO_AWS_TAG_ID),
         (DEMO_AGENT_SKILL_ID, DEMO_APPROVAL_TAG_ID),
     }
+    tool_mock_tags = {
+        (row.resource_id, row.tag_id) for row in await _rows(engine, McpToolMockTag)
+    }
+    assert tool_mock_tags == {
+        (DEMO_CALL_AWS_MOCK_ID, DEMO_AWS_TAG_ID),
+        (DEMO_RUN_SCRIPT_MOCK_ID, DEMO_AWS_TAG_ID),
+    }
+    group_tags = {
+        (row.resource_id, row.tag_id) for row in await _rows(engine, UserGroupTag)
+    }
+    assert group_tags == {(DEMO_APPROVERS_GROUP_ID, DEMO_APPROVAL_TAG_ID)}
 
 
 async def test_demo_users_hold_no_direct_roles(
@@ -375,6 +395,7 @@ async def test_removing_demo_data_deletes_the_groups(
     await _sync(engine)
     assert await _rows(engine, UserGroup) == []
     assert await _rows(engine, UserGroupMember) == []
+    assert await _rows(engine, UserGroupTag) == []
 
 
 async def test_demo_users_honour_the_configured_password(
@@ -595,6 +616,8 @@ async def test_disabling_removes_the_full_dataset(
     assert await _rows(engine, SecretTag) == []
     assert await _rows(engine, McpServerTag) == []
     assert await _rows(engine, AgentSkillTag) == []
+    assert await _rows(engine, McpToolMockTag) == []
+    assert await _rows(engine, UserGroupTag) == []
 
 
 async def test_removal_on_a_database_without_demo_data_is_a_noop(

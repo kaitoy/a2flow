@@ -17,10 +17,11 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
   ``approved``,
 * one AgentSkill pointing at ``sample_skills/aws-ec2-launch`` in this
   repository,
-* two Tags -- ``AWS`` (attached to the secret, MCP server, and agent skill,
-  showing that one tag classifies across resource types) and ``Approval
-  Required`` (attached to the agent skill alone, calling out its approval
-  gate),
+* two Tags -- ``AWS`` (attached to the secret, MCP server, agent skill, and
+  the ``call_aws`` and ``run_script`` tool mocks, showing that one tag
+  classifies across resource types) and ``Approval Required`` (attached to the
+  agent skill and the ``Demo Approvers`` group, tracing the approval gate
+  across the kinds of record it touches),
 * five Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
   either of whom the skill can ask for approval, two requesters,
   ``demo-requester-1`` and ``demo-requester-2``, either of whom may run the
@@ -70,7 +71,16 @@ from models.agent_skill import AgentSkill
 from models.mcp_server import McpCommand, MCPServer, McpTransport
 from models.mcp_tool_mock import REQUEST_APPROVAL_TOOL, MCPToolMock
 from models.secret import Secret, SecretType
-from models.tag import AgentSkillTag, McpServerTag, SecretTag, Tag, TagColor, TagLink
+from models.tag import (
+    AgentSkillTag,
+    McpServerTag,
+    McpToolMockTag,
+    SecretTag,
+    Tag,
+    TagColor,
+    TagLink,
+    UserGroupTag,
+)
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from models.user_group import UserGroup, UserGroupMember
@@ -936,10 +946,15 @@ async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str |
 
 
 async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo tags and attach them to the secret, MCP server, and agent skill.
+    """Create the demo tags and attach them across five of the six taggable kinds.
+
+    ``AWS`` lands on the secret, MCP server, agent skill, and the ``call_aws``
+    and ``run_script`` tool mocks; ``Approval Required`` lands on the agent
+    skill and the ``Demo Approvers`` group.
 
     Must run after :func:`_seed_demo_secrets`, :func:`_seed_demo_mcp_server`,
-    and :func:`_seed_demo_agent_skill`: attaching a tag looks up the record it
+    :func:`_seed_demo_agent_skill`, :func:`_seed_demo_tool_mocks`, and
+    :func:`_seed_demo_groups`: attaching a tag looks up the record it
     attaches to. The demo Workflow does not exist — see the module docstring
     — so neither tag is attached to one; an operator is free to attach either
     once they build a workflow from these records themselves.
@@ -981,6 +996,24 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             tag_id=DEMO_AWS_TAG_ID,
             label=f"tag '{DEMO_AWS_TAG_NAME}' on agent skill '{DEMO_AGENT_SKILL_NAME}'",
         )
+        await _link_tag(
+            session,
+            McpToolMockTag,
+            resource_model=MCPToolMock,
+            resource_id=DEMO_CALL_AWS_MOCK_ID,
+            tag_id=DEMO_AWS_TAG_ID,
+            label=f"tag '{DEMO_AWS_TAG_NAME}' on tool mock '{DEMO_CALL_AWS_MOCK_NAME}'",
+        )
+        await _link_tag(
+            session,
+            McpToolMockTag,
+            resource_model=MCPToolMock,
+            resource_id=DEMO_RUN_SCRIPT_MOCK_ID,
+            tag_id=DEMO_AWS_TAG_ID,
+            label=(
+                f"tag '{DEMO_AWS_TAG_NAME}' on tool mock '{DEMO_RUN_SCRIPT_MOCK_NAME}'"
+            ),
+        )
     if await _ensure_demo_tag(
         session,
         tenant_id,
@@ -999,6 +1032,14 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
                 f"tag '{DEMO_APPROVAL_TAG_NAME}' on agent skill "
                 f"'{DEMO_AGENT_SKILL_NAME}'"
             ),
+        )
+        await _link_tag(
+            session,
+            UserGroupTag,
+            resource_model=UserGroup,
+            resource_id=DEMO_APPROVERS_GROUP_ID,
+            tag_id=DEMO_APPROVAL_TAG_ID,
+            label=f"tag '{DEMO_APPROVAL_TAG_NAME}' on group 'Demo Approvers'",
         )
 
 
