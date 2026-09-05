@@ -219,11 +219,14 @@ describe("McpToolPicker", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers no input-approval choice until a tool is bound", async () => {
+  const NEEDS_APPROVAL = "Input needs approval — click to allow any input";
+  const NEEDS_NO_APPROVAL = "Input needs no approval — click to require approval";
+
+  it("offers no input-approval badge until a tool is bound", async () => {
     render(<Harness />);
 
     expect(await screen.findByRole("button", { name: "Select MCP server…" })).toBeInTheDocument();
-    expect(screen.queryByText("Skip Input Approval")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: NEEDS_APPROVAL })).not.toBeInTheDocument();
   });
 
   it("bounds a newly added tool's input by default", async () => {
@@ -232,23 +235,28 @@ describe("McpToolPicker", () => {
     await pickServer(user, "my-mcp-server");
     await pickTool(user, "search");
 
-    expect(await screen.findByText("Skip Input Approval")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "my-mcp-server: search" })).not.toBeChecked();
+    expect(await screen.findByRole("button", { name: NEEDS_APPROVAL })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
   });
 
-  it("reports the tool checked as needing no input approval", async () => {
+  it("reports the tool badge-toggled as needing no input approval", async () => {
     const onExemptChange = vi.fn();
     render(<Harness initial={["mcp-1::search"]} onExemptChange={onExemptChange} />);
 
-    await userEvent.click(await screen.findByRole("checkbox", { name: "my-mcp-server: search" }));
+    await userEvent.click(await screen.findByRole("button", { name: NEEDS_APPROVAL }));
 
     expect(onExemptChange).toHaveBeenCalledWith(["mcp-1::search"]);
   });
 
-  it("shows a prefilled exemption as checked", async () => {
+  it("shows a prefilled exemption as the exempt badge state", async () => {
     render(<Harness initial={["mcp-1::search"]} initialExempt={["mcp-1::search"]} />);
 
-    expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeChecked();
+    expect(await screen.findByRole("button", { name: NEEDS_NO_APPROVAL })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
   });
 
   it("drops the exemption when its tool is unbound", async () => {
@@ -268,7 +276,7 @@ describe("McpToolPicker", () => {
     // Otherwise re-binding the same tool later would silently bring the
     // exemption back with it.
     expect(onExemptChange).toHaveBeenCalledWith([]);
-    expect(screen.queryByText("Skip Input Approval")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: NEEDS_NO_APPROVAL })).not.toBeInTheDocument();
   });
 
   it("surfaces a registry failure and recovers on retry", async () => {

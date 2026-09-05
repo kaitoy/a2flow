@@ -5,7 +5,7 @@
  */
 "use client";
 
-import { Check, X } from "lucide-react";
+import { Check, type LucideIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { TagColor } from "@/lib/api";
 import { TAG_COLOR_CLASS } from "@/lib/tag-palette";
@@ -44,6 +44,23 @@ interface ChipProps {
    * a chip cannot both be a button and contain one.
    */
   onToggle?: () => void;
+  /**
+   * When supplied, renders a second inline icon button before the remove
+   * button — a toggle for a per-chip flag distinct from removal (e.g.
+   * whether the tool this chip represents needs no input approval).
+   * Compatible with {@link ChipProps.onRemove}; mutually exclusive with
+   * {@link ChipProps.onToggle} for the same reason `onRemove` is — the
+   * button cannot nest inside another button.
+   */
+  badge?: {
+    /** Icon for the current state. */
+    icon: LucideIcon;
+    /** Whether the flag is "on"; tints the button accent when true. */
+    active: boolean;
+    /** Accessible name and tooltip text for the button's current state and action. */
+    label: string;
+    onClick: () => void;
+  };
   /**
    * Pressed state of the toggle. Ignored without {@link ChipProps.onToggle}.
    */
@@ -92,6 +109,28 @@ const REMOVE_BUTTON_CLASS = [
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/50",
   "motion-safe:active:scale-90",
 ].join(" ");
+
+/**
+ * Base class list for the {@link ChipProps.badge} button — the same 20px
+ * round target, `pointer-coarse` sizing, and motion conventions as
+ * {@link REMOVE_BUTTON_CLASS}, but only `ml-1` (no `-mr-1`): the badge always
+ * sits before another trailing element (the remove button), never against the
+ * pill's own edge.
+ */
+const BADGE_BUTTON_BASE = [
+  "ml-1 inline-flex size-5 shrink-0 items-center justify-center rounded-full",
+  "pointer-coarse:size-7",
+  "cursor-pointer border",
+  "transition-[background-color,border-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
+  "motion-safe:active:scale-90",
+].join(" ");
+
+/** {@link ChipProps.badge} button classes at rest (its flag is "off"). */
+const BADGE_BUTTON_CLASS = `${BADGE_BUTTON_BASE} border-transparent text-on-surface-variant hover:border-accent/40 hover:bg-accent/10 hover:text-accent`;
+
+/** {@link ChipProps.badge} button classes while its flag is "on". */
+const BADGE_BUTTON_ACTIVE_CLASS = `${BADGE_BUTTON_BASE} border-accent/30 bg-accent/10 text-accent hover:bg-accent/15`;
 
 /**
  * Shape shared by both roots, so the toggle button and the plain pill are the
@@ -176,6 +215,13 @@ const TOGGLE_CLASS = [
  * carried by color alone. The pressed fill derives from the palette slot, so a
  * toggle chip is expected to carry a {@link ChipProps.color}; without one only
  * the check distinguishes it.
+ *
+ * Pass {@link ChipProps.badge} to add a *second* inline icon button, sitting
+ * before the remove button, that toggles a flag distinct from removal — how
+ * {@link McpToolPicker} lets a bound tool stay removable while also marking
+ * it exempt from input approval. It is a real toggle button of its own
+ * (`aria-pressed`, a tooltip naming the current state and action), so — like
+ * `onRemove` — it cannot coexist with `onToggle`'s whole-chip button.
  */
 export function Chip({
   label,
@@ -185,6 +231,7 @@ export function Chip({
   onMouseLeave,
   onRemove,
   onToggle,
+  badge,
   selected = false,
   size = "sm",
 }: ChipProps) {
@@ -221,6 +268,21 @@ export function Chip({
           {label}
         </span>
       </Tooltip>
+      {badge && (
+        <Tooltip label={badge.label}>
+          <button
+            type="button"
+            aria-label={badge.label}
+            aria-pressed={badge.active}
+            onClick={badge.onClick}
+            className={badge.active ? BADGE_BUTTON_ACTIVE_CLASS : BADGE_BUTTON_CLASS}
+          >
+            {/* `strokeWidth` is raised above the house 1.8 (DESIGN.md →
+                Iconography): at 14px the lighter stroke reads as a hairline. */}
+            <badge.icon size={14} strokeWidth={2} aria-hidden="true" />
+          </button>
+        </Tooltip>
+      )}
       {onRemove && (
         <button
           type="button"

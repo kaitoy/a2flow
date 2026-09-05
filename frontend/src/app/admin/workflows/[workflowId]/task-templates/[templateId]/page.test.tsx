@@ -123,7 +123,7 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     );
   });
 
-  it("shows a stored input-approval exemption as checked", async () => {
+  it("shows a stored input-approval exemption as the exempt badge state", async () => {
     setup({
       ...TEMPLATE,
       toolBindings: [{ mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: false }],
@@ -132,7 +132,11 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
 
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
-    expect(await screen.findByRole("checkbox", { name: "my-mcp-server: search" })).toBeChecked();
+    expect(
+      await screen.findByRole("button", {
+        name: "Input needs no approval — click to require approval",
+      })
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("submits the input-approval choice alongside the binding", async () => {
@@ -141,7 +145,9 @@ describe("WorkflowTaskTemplateDetailPage", () => {
 
     render(<WorkflowTaskTemplateDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByDisplayValue("Template Step 1"));
-    await userEvent.click(await screen.findByRole("checkbox", { name: "my-mcp-server: search" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Input needs approval — click to allow any input" })
+    );
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() =>
@@ -151,8 +157,8 @@ describe("WorkflowTaskTemplateDetailPage", () => {
     );
   });
 
-  it("submits a tool as needing input approval unless it was checked", async () => {
-    // The safe default has to survive a save that never touched the checkbox.
+  it("submits a tool as needing input approval unless its badge was toggled", async () => {
+    // The safe default has to survive a save that never touched the badge.
     setup();
     const captured = capturePatch();
 

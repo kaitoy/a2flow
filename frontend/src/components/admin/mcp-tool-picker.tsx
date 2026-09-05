@@ -23,25 +23,24 @@
  * server is unreachable or which the server no longer advertises — since
  * `value` alone is authoritative and needs no live option to stay visible.
  *
- * Below the chips sits the input-approval choice for each bound tool. It is a
- * {@link CheckboxGroup} — the same control the sibling **Depends on** field uses
- * — rather than a per-chip toggle, because a chip in toggle mode cannot also
- * carry a remove button, and a bound tool has to stay removable. Checked means
- * *exempt*, so a tool just added is bounded by default and nothing has to be
- * kept in two places.
+ * Each chip also carries the input-approval choice for its tool, as a
+ * {@link Chip}'s `badge` button sitting before the remove button — a shield
+ * icon that toggles between "needs approval" (default) and "skips approval"
+ * on click, tinting accent and swapping its icon in the exempt state. Pressed
+ * means *exempt*, so a tool just added is bounded by default and nothing has
+ * to be kept in two places.
  *
  * The single-select sibling — one `(server, tool)` pair rather than a list — is
  * {@link McpToolField}.
  */
 "use client";
 
-import { Server } from "lucide-react";
+import { Server, ShieldCheck, ShieldOff } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormField } from "@/components/admin/form-field";
 import { McpServerPickerDialog } from "@/components/admin/mcp-server-picker-dialog";
 import { Button } from "@/components/ui/button";
-import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select, type SelectOption } from "@/components/ui/select";
@@ -74,7 +73,7 @@ export interface McpToolPickerProps {
    * with.
    */
   exempt: string[];
-  /** Called with the next exempt subset whenever one is checked or unchecked. */
+  /** Called with the next exempt subset whenever a chip's badge is toggled. */
   onExemptChange: (next: string[]) => void;
 }
 
@@ -190,6 +189,13 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
     onExemptChange(exempt.filter((v) => v !== composite));
   }
 
+  /** Flip one bound tool's input-approval exemption. */
+  function toggleExempt(composite: string) {
+    onExemptChange(
+      exempt.includes(composite) ? exempt.filter((v) => v !== composite) : [...exempt, composite]
+    );
+  }
+
   /** Opens the picker dialog, mounting it on the first call. */
   function openPicker() {
     setEverOpened(true);
@@ -286,33 +292,28 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
           <p className="text-sm text-on-surface-variant">No tools are bound to this task yet.</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
-            {chips.map((chip) => (
-              <Chip
-                key={chip.value}
-                label={chip.label}
-                onRemove={() => removeTool(chip.value)}
-                size="lg"
-              />
-            ))}
+            {chips.map((chip) => {
+              const isExempt = exempt.includes(chip.value);
+              return (
+                <Chip
+                  key={chip.value}
+                  label={chip.label}
+                  onRemove={() => removeTool(chip.value)}
+                  badge={{
+                    icon: isExempt ? ShieldOff : ShieldCheck,
+                    active: isExempt,
+                    label: isExempt
+                      ? "Input needs no approval — click to require approval"
+                      : "Input needs approval — click to allow any input",
+                    onClick: () => toggleExempt(chip.value),
+                  }}
+                  size="lg"
+                />
+              );
+            })}
           </div>
         )}
       </div>
-
-      {chips.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-label-caps">Skip Input Approval</span>
-          <p className="text-sm text-on-surface-variant">
-            A checked tool may be called with any input. Check only tools that read — an approval
-            covering the task still has to be granted either way.
-          </p>
-          <CheckboxGroup
-            name="mcpToolInputApproval"
-            options={chips.map((chip) => ({ value: chip.value, label: chip.label }))}
-            value={exempt}
-            onChange={onExemptChange}
-          />
-        </div>
-      )}
 
       {/* Mounted on the first open and then kept mounted, so the server list
           costs nothing until asked for and the leave animation still has a

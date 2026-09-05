@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ShieldCheck, ShieldOff } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import { Chip } from "./chip";
 
@@ -259,5 +260,90 @@ describe("Chip", () => {
     expect(button.className).toContain("rounded-md");
     expect(button.className).toContain("tag-chip");
     expect(screen.getByText("production").className).toContain("truncate");
+  });
+
+  it("renders no badge button without badge", () => {
+    render(<Chip label="search" />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("renders the badge button with its label and reports its state", () => {
+    render(
+      <Chip
+        label="search"
+        badge={{ icon: ShieldCheck, active: false, label: "Needs approval", onClick: () => {} }}
+      />
+    );
+
+    const button = screen.getByRole("button", { name: "Needs approval" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("calls the badge's onClick when pressed", async () => {
+    const onClick = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Chip
+        label="search"
+        badge={{ icon: ShieldCheck, active: false, label: "Needs approval", onClick }}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Needs approval" }));
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks an active badge with aria-pressed", () => {
+    render(
+      <Chip
+        label="search"
+        badge={{ icon: ShieldOff, active: true, label: "Skips approval", onClick: () => {} }}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Skips approval" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+  });
+
+  it("renders the badge before the remove button, both reachable", async () => {
+    const onRemove = vi.fn();
+    const onBadgeClick = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Chip
+        label="search"
+        onRemove={onRemove}
+        badge={{ icon: ShieldCheck, active: false, label: "Needs approval", onClick: onBadgeClick }}
+      />
+    );
+
+    const badgeButton = screen.getByRole("button", { name: "Needs approval" });
+    const removeButton = screen.getByRole("button", { name: "Remove search" });
+    // Both live as siblings of the label span, not nested inside each other.
+    expect(badgeButton.parentElement).toBe(removeButton.parentElement);
+
+    await user.click(badgeButton);
+    expect(onBadgeClick).toHaveBeenCalledTimes(1);
+    await user.click(removeButton);
+    expect(onRemove).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the badge's label in a tooltip on hover", async () => {
+    const user = userEvent.setup();
+    render(
+      <Chip
+        label="search"
+        badge={{ icon: ShieldCheck, active: false, label: "Needs approval", onClick: () => {} }}
+      />
+    );
+
+    await user.hover(screen.getByRole("button", { name: "Needs approval" }));
+    expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
+      "Needs approval"
+    );
   });
 });
