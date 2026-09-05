@@ -55,7 +55,16 @@ Three settings default to values that only suit local HTTP development. Change a
 
 ## Process layout
 
-The backend ships as two entry points against the same database. Which one you run decides where notification email is delivered from:
+Alongside the API, a deployment runs the [MCP sandbox](../architecture/mcp-proxy.md#the-sandbox): the process that actually starts or connects to the MCP servers a tenant has registered. Keeping it separate is the point — it is where third-party code runs, so it holds no database access, no secret encryption key and no LLM API key. `compose.yml` runs it as the `mcp-proxy` container; a deployment that assembles its own containers configures it under [MCP sandbox](./configuration.md#mcp-sandbox).
+
+Two things to get right:
+
+- **The API has to start first.** It issues the material both ends identify each other with, so the sandbox will not accept anything until that has been written. Gate the sandbox on the API's health check, as `compose.yml` does.
+- **They need a shared directory.** `MCP_PROXY_TLS_DIR` has to be the same storage on both sides — writable by the API, read-only for the sandbox. Nothing durable is kept there: it is rewritten whenever it is missing or close to expiring.
+
+Skipping the sandbox is possible — leave `MCP_PROXY_URL` unset and the API reaches MCP servers itself, which is what a local development run does. It means a registered server runs beside the deployment's credentials, so it is not a choice to make for an environment where anyone can register one.
+
+The backend also ships as two entry points against the same database. Which one you run decides where notification email is delivered from:
 
 | Layout | How | Use it when |
 |---|---|---|

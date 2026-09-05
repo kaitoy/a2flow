@@ -123,6 +123,20 @@ Every MCP tool call must present a short-lived X.509 certificate issued for the 
 | `MCP_CA_COMMON_NAME` / `MCP_CA_VALIDITY_DAYS` | `A2Flow MCP Approval CA` / `3650` | Subject and lifetime of the generated root. Read only when the root is first generated; changing them later has no effect on an existing root |
 | `MCP_REGISTRY_URL` | `https://registry.modelcontextprotocol.io` | Base URL of the registry the [Browse registry](../guides/mcp-servers.md#registering-from-the-mcp-registry) dialog searches |
 
+## MCP sandbox {#mcp-sandbox}
+
+A registered MCP server is not A2Flow's code, so it runs [somewhere separate](../architecture/mcp-proxy.md#the-sandbox) from the agent and its secrets. The Docker Compose deployment sets all of this up; a deployment that assembles the containers itself sets it here.
+
+Left unset — which is what a plain local run does — the agent reaches MCP servers itself, in its own process. That is convenient for development and is not what you want in an environment where anyone can register a server.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `MCP_PROXY_URL` | unset | Where the sandbox is. Setting it is what moves MCP servers out of the agent's process |
+| `MCP_PROXY_SERVER_NAME` / `MCP_PROXY_PORT` | `mcp-proxy` / `8443` | The name the sandbox is reached by, and the port it listens on. The name is part of its certificate, so both ends have to agree |
+| `MCP_PROXY_TLS_DIR` | a directory beside the application | Where the agent publishes what the sandbox needs to identify itself. The sandbox reads the same directory, read-only |
+| `MCP_BACKEND_TLS_DIR` | a directory beside the application | Where the agent keeps its *own* key. Deliberately not the directory above — nothing running in the sandbox should be able to read it |
+| `MCP_TRANSPORT_CERT_VALIDITY_DAYS` | `365` | Lifetime of that material. Reissued automatically once fewer than 30 days remain, so it needs no attention |
+
 ## Notification email {#notification-email}
 
 These are the same values the admin UI edits under [System Settings](../guides/system-settings.md), settable from the environment so a deployment can ship its mail configuration rather than leaving it as a manual step.

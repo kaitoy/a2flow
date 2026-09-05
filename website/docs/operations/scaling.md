@@ -14,7 +14,10 @@ The frontend holds no state of its own — it proxies `/api/*` and keeps nothing
 | **PostgreSQL** | SQLite is single-writer and single-process. All replicas share one database, which is also what coordinates them |
 | **A shared `SKILLS_DIR`** | Every replica must mount the same [agent skill store](./configuration.md#agent-skill-store) (ReadWriteMany). A run pins the skill revision it started with, and any replica may serve the next request in that run |
 | **No transaction-pooling proxy** | See [Connection pooling](#connection-pooling) below |
+| **A shared `MCP_PROXY_TLS_DIR`** | Every replica writes and reads the material that identifies it to the [MCP sandbox](../architecture/mcp-proxy.md#the-sandbox) there, and the sandbox reads the same directory. A replica that had its own would issue material the sandbox has never seen |
 | Sticky sessions | Not required. The advisory lock below does the job routing affinity would be reached for |
+
+The MCP sandbox itself scales on its own terms: it keeps nothing between calls, so replicas of it need no coordination at all. Size it against how many tool calls run at once, not against how many backend replicas there are.
 
 ## One driver per conversation
 

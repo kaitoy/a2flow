@@ -14,7 +14,8 @@ flowchart LR
   C -->|"allowed"| K{"Mocked for this run?"}
   K -->|"yes"| MO["The mock's next response<br/>no server is contacted"]
   K -->|"no"| I["Credential injection"]
-  I --> S["MCP server"]
+  I --> X["Sandbox"]
+  X --> S["MCP server"]
   R --> AU["Audit record"]
   S --> AU
 ```
@@ -25,6 +26,41 @@ flowchart LR
 | **Authorization** | Consults an ordered chain of policies, any of which may veto |
 | **Stubbing** | Answers from a [tool mock](./mcp-proxy.md#tool-mocks-and-dry-runs) when the run has one for this tool |
 | **Credentials** | Expands the registered server's [secret](./secrets.md) references into a connection, at connect time only |
+| **Isolation** | Hands the allowed call to the [sandbox](#the-sandbox) that actually runs the server |
+
+## Where a registered server runs {#the-sandbox}
+
+An MCP server you register is not A2Flow's code. A local one is a program A2Flow starts on your behalf; a remote one is a service A2Flow connects out to. Either way, what it does is outside A2Flow's control once it is running.
+
+So it does not run where A2Flow's own secrets are. In a Docker Compose deployment it runs in a **separate container**, which holds none of the following:
+
+| Not in the sandbox | Where it stays |
+|---|---|
+| The database, and everything recorded in it | With the agent |
+| The key that [secrets](./secrets.md) are encrypted under | With the agent |
+| The credentials for an external secret store | With the agent |
+| The LLM provider's API key | With the agent |
+| The [agent skill](../guides/agent-skills.md) repositories | With the agent |
+
+What the sandbox gets is one call at a time: the address or command for the one server being reached, the values that server needs — already expanded from your secret references — and the tool and arguments. Nothing else is there to find.
+
+```mermaid
+flowchart LR
+  subgraph agent ["Runs the agent"]
+    G["Decides: allowed, mocked, which credentials"]
+  end
+  subgraph sandbox ["Sandbox"]
+    P["Starts or connects to the MCP server"]
+  end
+  G -->|"one authorized call,<br/>proven to come from A2Flow"| P
+  P --> S["Your MCP server"]
+```
+
+**The two ends prove who they are to each other.** The channel between them is encrypted, and neither end accepts an unidentified peer: the sandbox refuses a connection from anything that does not hold a certificate this deployment issued. Each individual call additionally carries the [certificate](#who-authorized-a-call) of the task making it, and the sandbox checks that certificate again before it reaches anything — that it was issued here, has not expired, belongs to the caller, and covers this exact tool.
+
+That second check is not the same question as the first. Being A2Flow does not mean being authorized to call a given tool, and holding a task's certificate does not mean the request is the one A2Flow sent. Both have to hold, so a request cannot keep a valid authorization while quietly pointing the sandbox at a different program.
+
+The sandbox is a second line, not the decision-maker. Whether the task is still running, whether the approval still stands, whether the certificate was withdrawn — none of that is answerable there, and all of it stays with the proxy.
 
 ## The policy chain
 
