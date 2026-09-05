@@ -18,15 +18,19 @@ from infrastructure.mcp_ca import (
     sign_leaf_certificate,
 )
 from infrastructure.mcp_certificate import (
+    BACKEND_SERVICE_NAME,
     CertificateBinding,
     CertificateVerificationError,
     build_binding_urn,
+    build_service_urn,
     build_tool_urn,
     canonical_json,
     extract_claims,
     parse_binding_urn,
+    parse_service_urn,
     parse_tool_urn,
     pop_digest,
+    service_name,
     sign_pop_digest,
     verify_certificate,
     verify_pop_signature,
@@ -83,6 +87,26 @@ def _leaf(
         sans=sans,
         not_before=not_before or NOW - timedelta(minutes=1),
         not_after=not_after or NOW + timedelta(hours=1),
+    )
+
+
+def _service_leaf(
+    ca: RootCertificateAuthority,
+    *,
+    name: str = BACKEND_SERVICE_NAME,
+    extra_sans: tuple[x509.GeneralName, ...] = (),
+) -> x509.Certificate:
+    """Sign a leaf carrying a service identity instead of a task's authority."""
+    return sign_leaf_certificate(
+        ca,
+        public_key=generate_key().public_key(),
+        subject=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)]),
+        sans=[
+            x509.UniformResourceIdentifier(build_service_urn(name)),
+            *extra_sans,
+        ],
+        not_before=NOW - timedelta(minutes=1),
+        not_after=NOW + timedelta(hours=1),
     )
 
 
@@ -224,6 +248,63 @@ def test_extract_claims_rejects_an_unrecognized_san() -> None:
 
     with pytest.raises(CertificateVerificationError, match="unrecognized subject"):
         extract_claims(leaf)
+
+
+# ---------------------------------------------------------------------------
+# Service certificates
+# ---------------------------------------------------------------------------
+
+
+def test_service_urn_round_trip() -> None:
+    assert parse_service_urn(build_service_urn("backend")) == "backend"
+
+
+@pytest.mark.parametrize(
+    "urn",
+    [
+        "urn:a2flow:service:",
+        "urn:a2flow:tool:server-1/read_file",
+        "urn:a2flow:services:backend",
+        "",
+    ],
+)
+def test_malformed_service_urns_are_rejected(urn: str) -> None:
+    with pytest.raises(CertificateVerificationError, match="service URN is malformed"):
+        parse_service_urn(urn)
+
+
+def test_service_name_reads_the_component_out_of_a_service_certificate() -> None:
+    assert service_name(_service_leaf(_root())) == BACKEND_SERVICE_NAME
+
+
+def test_service_name_ignores_a_non_uri_san() -> None:
+    """A dNSName alongside is what a listener's certificate carries; not our business."""
+    leaf = _service_leaf(_root(), extra_sans=(x509.DNSName("mcp-proxy"),))
+
+    assert service_name(leaf) == BACKEND_SERVICE_NAME
+
+
+def test_a_tool_certificate_is_not_a_service_certificate() -> None:
+    """The two kinds authorize different operations and never stand in for each other."""
+    with pytest.raises(CertificateVerificationError, match="not a service certificate"):
+        service_name(_leaf(_root()))
+
+
+def test_a_service_certificate_grants_no_tool() -> None:
+    """The other direction of the same rule, enforced by extract_claims' strictness."""
+    with pytest.raises(CertificateVerificationError, match="unrecognized subject"):
+        extract_claims(_service_leaf(_root()))
+
+
+def test_service_name_rejects_a_second_service_urn() -> None:
+    """One identity per certificate, so "which one applies" is never a question."""
+    leaf = _service_leaf(
+        _root(),
+        extra_sans=(x509.UniformResourceIdentifier(build_service_urn("mcp-proxy")),),
+    )
+
+    with pytest.raises(CertificateVerificationError, match="not a service certificate"):
+        service_name(leaf)
 
 
 # ---------------------------------------------------------------------------

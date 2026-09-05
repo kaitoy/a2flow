@@ -11,6 +11,8 @@ tests/
 *.db-shm
 *.db-wal
 .skills/
+.mcp-tls/
+.mcp-tls-backend/
 openapi.yaml
 Dockerfile
 .dockerignore

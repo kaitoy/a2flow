@@ -40,6 +40,21 @@ Both segments are percent-encoded. ``mcp_server_id`` is a UUID, but
 :data:`models.constraints.ToolName` places no character restriction on a tool
 name at all -- a name containing ``/`` would otherwise make the URN ambiguous.
 
+**A third URN, on a different kind of certificate.**
+
+``urn:a2flow:service:NAME``
+    Names one of this deployment's own components rather than a task's
+    authority. It is what a component presents when it has to prove it belongs
+    to this deployment for an operation no task authorizes -- listing what a
+    registered server advertises, which happens during design when there is no
+    run and no grant to speak of.
+
+    A service certificate and a tool certificate are read by different
+    functions and are never interchangeable. :func:`extract_claims` refuses a
+    service URN outright, because it refuses *any* URI it does not recognize --
+    so a service certificate can never be mistaken for a grant over some tool,
+    and :func:`service_name` is equally strict in the other direction.
+
 **Proof of possession.** A certificate alone proves nothing about who is
 presenting it, so every proxied call carries a signature over
 :func:`pop_digest` -- a hash binding the certificate to *this* call's session,
@@ -67,6 +82,14 @@ BINDING_URN_PREFIX = "urn:a2flow:binding:"
 
 #: Prefix of the tool-grant URNs. One entry per granted tool.
 TOOL_URN_PREFIX = "urn:a2flow:tool:"
+
+#: Prefix of the single URN a service certificate carries. Deliberately outside
+#: the grammar :func:`extract_claims` accepts: the two certificate kinds must
+#: not be readable as one another.
+SERVICE_URN_PREFIX = "urn:a2flow:service:"
+
+#: Service name of the backend itself, the only component issued one today.
+BACKEND_SERVICE_NAME = "backend"
 
 #: Domain-separation tag hashed into every proof-of-possession digest. Bumping
 #: it invalidates every signature made under the old scheme, which is the point:
@@ -275,6 +298,80 @@ def parse_tool_urn(urn: str) -> tuple[str, str]:
     if not separator or not server or not tool:
         raise CertificateVerificationError("Certificate tool grant URN is malformed")
     return unquote(server), unquote(tool)
+
+
+def build_service_urn(name: str) -> str:
+    """Render a component's service identity as its URN.
+
+    Args:
+        name: The component's name, e.g. :data:`BACKEND_SERVICE_NAME`.
+
+    Returns:
+        The ``urn:a2flow:service:...`` string.
+    """
+    return f"{SERVICE_URN_PREFIX}{quote(name, safe='')}"
+
+
+def parse_service_urn(urn: str) -> str:
+    """Parse a service URN produced by :func:`build_service_urn`.
+
+    Args:
+        urn: The URN text.
+
+    Returns:
+        The component's name.
+
+    Raises:
+        CertificateVerificationError: If the URN is not a well-formed service
+            identity.
+    """
+    if not urn.startswith(SERVICE_URN_PREFIX):
+        raise CertificateVerificationError("Certificate service URN is malformed")
+    name = unquote(urn[len(SERVICE_URN_PREFIX) :])
+    if not name:
+        raise CertificateVerificationError("Certificate service URN is malformed")
+    return name
+
+
+def service_name(certificate: x509.Certificate) -> str:
+    """Read the component name out of a service certificate.
+
+    Strict in the same way :func:`extract_claims` is, and for the same reason:
+    the two certificate kinds authorize entirely different operations, so a
+    certificate that is anything other than *exactly* a service identity is
+    refused rather than partially understood. In particular a tool certificate,
+    whose URIs are a binding and its grants, fails here -- just as a service
+    certificate fails :func:`extract_claims`.
+
+    Only URI entries are examined. Another SAN type alongside (a ``dNSName``,
+    say) is not this function's business: what a certificate may be *used* for
+    is decided by :func:`verify_certificate` reading its extended key usage.
+
+    Args:
+        certificate: The parsed leaf certificate.
+
+    Returns:
+        The name of the component the certificate speaks for.
+
+    Raises:
+        CertificateVerificationError: If the certificate has no SAN extension,
+            or its URI entries are anything but a single service URN.
+    """
+    try:
+        san = certificate.extensions.get_extension_for_class(
+            x509.SubjectAlternativeName
+        ).value
+    except x509.ExtensionNotFound as exc:
+        raise CertificateVerificationError(
+            "Certificate carries no subject alternative names"
+        ) from exc
+
+    uris = san.get_values_for_type(x509.UniformResourceIdentifier)
+    if len(uris) != 1 or not uris[0].startswith(SERVICE_URN_PREFIX):
+        raise CertificateVerificationError(
+            "Certificate is not a service certificate of this deployment"
+        )
+    return parse_service_urn(uris[0])
 
 
 def extract_claims(certificate: x509.Certificate) -> CertificateClaims:

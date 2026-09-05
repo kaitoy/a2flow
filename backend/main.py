@@ -26,6 +26,7 @@ from infrastructure.bootstrap import (
 from infrastructure.database import engine
 from infrastructure.demo_data import sync_demo_data
 from infrastructure.logging_context import setup_logging
+from infrastructure.mcp_transport_tls import provision_transport_credentials
 from infrastructure.migrations import run_migrations
 from middleware.envelope import RequestContextMiddleware
 from models.user import SYSTEM_USER_ID
@@ -113,6 +114,12 @@ settings = get_settings()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Apply pending migrations, seed the baseline data, and start the email worker.
 
+    When ``MCP_PROXY_URL`` is set, the TLS material for the channel to the MCP
+    proxy is issued here too — see
+    :func:`infrastructure.mcp_transport_tls.provision_transport_credentials`.
+    It runs early because the proxy waits on this process reporting healthy
+    before reading it.
+
     Seeds the system, root, and Default-tenant admin users and the singleton
     system-settings row, applies any ``APP_BASE_URL``/``SMTP_*`` environment
     overrides onto that row, then registers or removes the optional demo
@@ -133,6 +140,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     background: set[asyncio.Task[None]] = set()
     async with AsyncSession(engine) as session:
         await seed_system_user(session)
+        # Before anything that could take a while: the MCP proxy waits on this
+        # process reporting healthy to find its certificate on the shared
+        # volume, so the material has to be there by the time it does.
+        await provision_transport_credentials(session)
         await seed_system_settings(session)
         await apply_system_settings_env_overrides(session)
         # seed_root_user's skip check ("any real user exists") must run

@@ -27,13 +27,14 @@ dependencies package -- that import would cycle back through
 """
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID, ObjectIdentifier
 
 from config import get_settings
 from infrastructure.secret_cipher import get_secret_cipher
@@ -222,14 +223,22 @@ def sign_leaf_certificate(
     sans: list[x509.GeneralName],
     not_before: datetime,
     not_after: datetime,
+    extended_key_usage: Sequence[ObjectIdentifier] = (ExtendedKeyUsageOID.CLIENT_AUTH,),
 ) -> x509.Certificate:
     """Sign a leaf certificate with the root.
 
-    The leaf carries ``digitalSignature`` (it signs proof-of-possession
-    challenges) and ``clientAuth`` (so the same certificate works unchanged as a
-    TLS client certificate once the gateway becomes an HTTP endpoint). Everything
-    that identifies *what* the certificate authorizes lives in ``sans`` -- see
+    Every leaf carries ``digitalSignature``: a tool certificate signs
+    proof-of-possession challenges with it, and a TLS leaf needs it for the
+    ECDHE handshake either way. Everything that identifies *what* the
+    certificate authorizes lives in ``sans`` -- see
     :mod:`infrastructure.mcp_certificate` for the URN grammar.
+
+    ``extended_key_usage`` is what separates the kinds of leaf this root signs.
+    It defaults to ``clientAuth``, which covers every tool certificate, so the
+    same material a run presents to the gateway also works unchanged as a TLS
+    client certificate. Passing ``serverAuth`` instead is how the MCP proxy's
+    own listener gets a certificate the backend trusts, from the one root both
+    sides already share.
 
     Args:
         ca: The loaded root that signs.
@@ -238,17 +247,24 @@ def sign_leaf_certificate(
         sans: Subject alternative names carrying the binding and tool grants.
         not_before: Start of the validity window.
         not_after: End of the validity window.
+        extended_key_usage: What the leaf may be used for. Defaults to client
+            authentication.
 
     Returns:
         The signed leaf certificate.
 
     Raises:
-        McpCaError: If ``sans`` is empty. A leaf with no SAN carries no binding
-            and no tool grant, so verification could never accept it; failing
-            here turns a silently always-denied certificate into a loud error.
+        McpCaError: If ``sans`` is empty, or ``extended_key_usage`` is. A leaf
+            with no SAN carries no binding and no tool grant, and one with no
+            extended key usage is refused by
+            :func:`infrastructure.mcp_certificate.verify_certificate`; either
+            way verification could never accept it, so failing here turns a
+            silently always-denied certificate into a loud error.
     """
     if not sans:
         raise McpCaError("A leaf certificate must carry at least one SAN entry")
+    if not extended_key_usage:
+        raise McpCaError("A leaf certificate must declare an extended key usage")
     return (
         x509.CertificateBuilder()
         .subject_name(subject)
@@ -272,9 +288,7 @@ def sign_leaf_certificate(
             ),
             critical=True,
         )
-        .add_extension(
-            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False
-        )
+        .add_extension(x509.ExtendedKeyUsage(list(extended_key_usage)), critical=False)
         .add_extension(x509.SubjectAlternativeName(sans), critical=False)
         .add_extension(
             x509.AuthorityKeyIdentifier.from_issuer_public_key(

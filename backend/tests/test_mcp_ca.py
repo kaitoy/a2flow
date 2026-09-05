@@ -31,6 +31,10 @@ from infrastructure.mcp_ca import (
     private_key_to_pem,
     sign_leaf_certificate,
 )
+from infrastructure.mcp_certificate import (
+    CertificateVerificationError,
+    verify_certificate,
+)
 from infrastructure.secret_cipher import get_secret_cipher
 from models.mcp_ca import MCPCertificateAuthority
 from repositories._integrity import is_unique_error
@@ -315,6 +319,76 @@ async def test_signing_without_sans_is_rejected(engine: AsyncEngine) -> None:
             sans=[],
             not_before=now,
             not_after=now + timedelta(hours=1),
+        )
+
+
+async def test_a_leaf_can_be_signed_for_server_authentication(
+    engine: AsyncEngine,
+) -> None:
+    """The MCP proxy's listener gets its certificate from this same root."""
+    async with AsyncSession(engine) as session:
+        ca = await load_or_create_root_ca(SqlMcpCertificateAuthorityRepository(session))
+
+    now = datetime.now(UTC)
+    leaf = sign_leaf_certificate(
+        ca,
+        public_key=generate_key().public_key(),
+        subject=_leaf_subject(),
+        sans=[x509.DNSName("mcp-proxy")],
+        not_before=now,
+        not_after=now + timedelta(hours=1),
+        extended_key_usage=[ExtendedKeyUsageOID.SERVER_AUTH],
+    )
+
+    eku = leaf.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
+    assert list(eku.value) == [ExtendedKeyUsageOID.SERVER_AUTH]
+    # digitalSignature is still set: the ECDHE handshake needs it whichever way
+    # round the certificate is used.
+    usage = leaf.extensions.get_extension_for_class(x509.KeyUsage)
+    assert usage.value.digital_signature is True
+
+
+async def test_a_server_leaf_is_refused_as_a_client_certificate(
+    engine: AsyncEngine,
+) -> None:
+    """Sharing one root is safe because the usage check is what separates the kinds."""
+    async with AsyncSession(engine) as session:
+        ca = await load_or_create_root_ca(SqlMcpCertificateAuthorityRepository(session))
+
+    now = datetime.now(UTC)
+    leaf = sign_leaf_certificate(
+        ca,
+        public_key=generate_key().public_key(),
+        subject=_leaf_subject(),
+        sans=[x509.DNSName("mcp-proxy")],
+        not_before=now - timedelta(minutes=1),
+        not_after=now + timedelta(hours=1),
+        extended_key_usage=[ExtendedKeyUsageOID.SERVER_AUTH],
+    )
+
+    with pytest.raises(
+        CertificateVerificationError, match="not marked for client authentication"
+    ):
+        verify_certificate(leaf, ca_certificate=ca.certificate, now=now)
+
+
+async def test_signing_without_an_extended_key_usage_is_rejected(
+    engine: AsyncEngine,
+) -> None:
+    """Verification requires the extension, so a leaf without one is always denied."""
+    async with AsyncSession(engine) as session:
+        ca = await load_or_create_root_ca(SqlMcpCertificateAuthorityRepository(session))
+
+    now = datetime.now(UTC)
+    with pytest.raises(McpCaError, match="extended key usage"):
+        sign_leaf_certificate(
+            ca,
+            public_key=generate_key().public_key(),
+            subject=_leaf_subject(),
+            sans=[x509.DNSName("mcp-proxy")],
+            not_before=now,
+            not_after=now + timedelta(hours=1),
+            extended_key_usage=[],
         )
 
 

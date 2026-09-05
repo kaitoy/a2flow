@@ -102,6 +102,20 @@ _DEFAULT_MCP_CA_VALIDITY_DAYS = 3650
 #: Subject/issuer common name of the generated root CA.
 _DEFAULT_MCP_CA_COMMON_NAME = "A2Flow MCP Approval CA"
 
+#: Hostname the MCP proxy's listener is reached at on the internal network, and
+#: therefore the ``dNSName`` its server certificate carries and the name the
+#: backend verifies the handshake against.
+_DEFAULT_MCP_PROXY_SERVER_NAME = "mcp-proxy"
+
+#: Port the MCP proxy listens on. Not published to the host by ``compose.yml``:
+#: only the backend has any business reaching it.
+_DEFAULT_MCP_PROXY_PORT = 8443
+
+#: Validity of the TLS material the backend issues for the hop between itself
+#: and the MCP proxy. A year, reissued automatically well before it lapses --
+#: unlike a tool certificate, nothing about this one bounds a grant.
+_DEFAULT_MCP_TRANSPORT_CERT_VALIDITY_DAYS = 365
+
 #: Defaults keyed by field name for :meth:`Settings._fallback_positive_int`.
 #: A validator shared across fields cannot read each field's own default, so
 #: the mapping supplies it.
@@ -109,6 +123,8 @@ _POSITIVE_INT_DEFAULTS = {
     "mcp_tool_cert_ttl_seconds": _DEFAULT_TOOL_CERT_TTL_SECONDS,
     "mcp_tool_cert_signature_window_seconds": _DEFAULT_POP_SIGNATURE_WINDOW_SECONDS,
     "mcp_ca_validity_days": _DEFAULT_MCP_CA_VALIDITY_DAYS,
+    "mcp_proxy_port": _DEFAULT_MCP_PROXY_PORT,
+    "mcp_transport_cert_validity_days": _DEFAULT_MCP_TRANSPORT_CERT_VALIDITY_DAYS,
 }
 
 
@@ -168,6 +184,26 @@ class Settings(BaseSettings):
         vault_approle_mount: AppRole login mount path.
         vault_token: Static Vault token, used when AppRole credentials are absent.
         mcp_registry_url: Base URL of the official MCP registry.
+        mcp_proxy_url: Base URL of the MCP proxy, the container that actually
+            reaches registered MCP servers. Left unset — the default — the
+            backend opens those connections itself, in its own process, which
+            is what keeps a plain ``uvicorn main:app`` and the test suite
+            working with nothing else running. Setting it is what moves stdio
+            server spawns and outbound MCP traffic out of this container.
+        mcp_proxy_tls_dir: Directory the backend *publishes* the proxy's TLS
+            material into: the root CA's public certificate, plus the server
+            certificate and key the proxy's listener presents. Mounted
+            read-only by the proxy. Only written when ``mcp_proxy_url`` is set.
+        mcp_backend_tls_dir: Directory the backend keeps its *own* client
+            identity in. Deliberately not the directory above: the proxy runs
+            user-registered MCP servers, and nothing that runs there should be
+            able to read the key that speaks for the backend.
+        mcp_proxy_server_name: Hostname the proxy is reached at, carried as the
+            ``dNSName`` of its server certificate and verified during the
+            handshake.
+        mcp_proxy_port: Port the proxy's listener binds.
+        mcp_transport_cert_validity_days: Validity of the TLS material above.
+            Reissued automatically once less than 30 days remain.
         session_cookie_secure: Whether auth/CSRF cookies carry the ``Secure``
             attribute.
         session_idle_timeout_seconds: Sliding idle timeout, in seconds, for a
@@ -262,6 +298,17 @@ class Settings(BaseSettings):
     mcp_ca_common_name: str = _DEFAULT_MCP_CA_COMMON_NAME
     mcp_ca_validity_days: int = _DEFAULT_MCP_CA_VALIDITY_DAYS
 
+    mcp_proxy_url: str | None = None
+    mcp_proxy_tls_dir: Path = Field(
+        default_factory=lambda: Path(__file__).resolve().parent / ".mcp-tls"
+    )
+    mcp_backend_tls_dir: Path = Field(
+        default_factory=lambda: Path(__file__).resolve().parent / ".mcp-tls-backend"
+    )
+    mcp_proxy_server_name: str = _DEFAULT_MCP_PROXY_SERVER_NAME
+    mcp_proxy_port: int = _DEFAULT_MCP_PROXY_PORT
+    mcp_transport_cert_validity_days: int = _DEFAULT_MCP_TRANSPORT_CERT_VALIDITY_DAYS
+
     session_cookie_secure: bool = False
     session_idle_timeout_seconds: int = _DEFAULT_IDLE_TIMEOUT_SECONDS
 
@@ -332,6 +379,8 @@ class Settings(BaseSettings):
         "mcp_tool_cert_ttl_seconds",
         "mcp_tool_cert_signature_window_seconds",
         "mcp_ca_validity_days",
+        "mcp_proxy_port",
+        "mcp_transport_cert_validity_days",
         mode="before",
     )
     @classmethod

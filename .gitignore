@@ -36,6 +36,10 @@ Thumbs.db
 # Skill repos cloned at runtime
 backend/.skills/
 
+# TLS material for the MCP proxy channel, issued at startup. Private keys.
+backend/.mcp-tls/
+backend/.mcp-tls-backend/
+
 # Next.js
 frontend/.next/
 frontend/out/
