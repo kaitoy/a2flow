@@ -118,6 +118,7 @@ describe("McpServerDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     renderPage();
@@ -137,6 +138,7 @@ describe("McpServerDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/mcp-servers/:serverId", deleteSpy));

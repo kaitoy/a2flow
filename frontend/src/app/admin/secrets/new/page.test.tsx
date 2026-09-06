@@ -143,6 +143,7 @@ describe("NewSecretPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     renderPage();

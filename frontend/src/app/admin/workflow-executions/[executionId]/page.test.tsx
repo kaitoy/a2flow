@@ -117,6 +117,7 @@ describe("WorkflowExecutionDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     renderPage();
@@ -135,6 +136,7 @@ describe("WorkflowExecutionDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     renderPage();
@@ -153,6 +155,7 @@ describe("WorkflowExecutionDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/workflow-executions/:id", deleteSpy));

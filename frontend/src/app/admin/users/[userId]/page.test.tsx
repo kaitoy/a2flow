@@ -141,6 +141,7 @@ describe("UserDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     renderPage();
@@ -160,6 +161,7 @@ describe("UserDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/users/:userId", deleteSpy));
@@ -508,6 +510,7 @@ describe("UserDetailPage", () => {
         prefetch: vi.fn(),
         refresh: vi.fn(),
         forward: vi.fn(),
+        bfcacheId: "",
       });
       const impersonateSpy = vi.fn(() =>
         envelope({

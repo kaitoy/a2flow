@@ -63,6 +63,7 @@ describe("GenerateWorkflowDialog", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
     let receivedBody: unknown;
     server.use(
@@ -92,6 +93,7 @@ describe("GenerateWorkflowDialog", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
     server.use(
       http.post(GENERATE_URL, async () => {

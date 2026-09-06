@@ -182,6 +182,7 @@ describe("WorkflowDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
@@ -202,6 +203,7 @@ describe("WorkflowDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
@@ -312,6 +314,7 @@ describe("WorkflowDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
@@ -336,6 +339,7 @@ describe("WorkflowDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
@@ -572,6 +576,7 @@ describe("WorkflowDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
@@ -1085,6 +1090,7 @@ describe("WorkflowDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });

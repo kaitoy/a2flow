@@ -42,6 +42,7 @@ function routerMock() {
     replace: vi.fn(),
     back: vi.fn(),
     forward: vi.fn(),
+    bfcacheId: "",
     prefetch: vi.fn(),
     refresh: vi.fn(),
   });
