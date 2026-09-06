@@ -48,6 +48,7 @@ function buildColumns(
   tagsById: Map<string, Tag>
 ): ColumnDef<UserGroup>[] {
   return [
+    ...(isAllTenantsView ? [tenantColumn<UserGroup>(tenantNames)] : []),
     idColumn<UserGroup>(),
     {
       header: "Name",
@@ -70,7 +71,6 @@ function buildColumns(
       visibility: "optional",
       cell: (g) => <DateTime value={g.createdAt} className="text-on-surface-variant" />,
     },
-    ...(isAllTenantsView ? [tenantColumn<UserGroup>(tenantNames)] : []),
     ...auditColumns<UserGroup>(names),
   ];
 }

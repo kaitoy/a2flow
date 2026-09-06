@@ -73,6 +73,7 @@ function buildColumns(
   isAllTenantsView: boolean
 ): ColumnDef<AgentSkill>[] {
   return [
+    ...(isAllTenantsView ? [tenantColumn<AgentSkill>(tenantNames)] : []),
     idColumn<AgentSkill>(),
     {
       header: "Name",
@@ -153,7 +154,6 @@ function buildColumns(
       cell: (s) =>
         s.syncedAt ? <DateTime value={s.syncedAt} className="text-on-surface-variant" /> : "—",
     },
-    ...(isAllTenantsView ? [tenantColumn<AgentSkill>(tenantNames)] : []),
     ...auditColumns<AgentSkill>(names),
   ];
 }

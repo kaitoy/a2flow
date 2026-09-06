@@ -58,6 +58,7 @@ export default function ApprovalsPage() {
 
   const columns = useMemo<ColumnDef<Approval>[]>(
     () => [
+      ...(isAllTenantsView ? [tenantColumn<Approval>(tenantNames)] : []),
       idColumn<Approval>(),
       {
         header: "Title",
@@ -134,7 +135,6 @@ export default function ApprovalsPage() {
         cell: (a) =>
           a.decidedAt ? <DateTime value={a.decidedAt} className="text-on-surface-variant" /> : "—",
       },
-      ...(isAllTenantsView ? [tenantColumn<Approval>(tenantNames)] : []),
       ...auditColumns<Approval>(names),
       {
         header: "Actions",

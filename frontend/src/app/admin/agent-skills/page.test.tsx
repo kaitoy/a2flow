@@ -122,6 +122,12 @@ describe("AgentSkillsPage", () => {
     await waitFor(() => expect(screen.getByText("Acme Corp")).toBeInTheDocument());
   });
 
+  it("puts the tenant column first while browsing all tenants", async () => {
+    render(<AgentSkillsPage />, { preloadedState: ALL_TENANTS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getAllByRole("columnheader")[0]).toHaveTextContent("Tenant");
+  });
+
   it("hides the revision column by default", async () => {
     render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
     await waitFor(() => screen.getByText("my-skill"));

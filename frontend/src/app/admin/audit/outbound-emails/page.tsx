@@ -69,6 +69,7 @@ export default function AuditOutboundEmailsPage() {
 
   const columns = useMemo<ColumnDef<OutboundEmail>[]>(
     () => [
+      ...(isAllTenantsView ? [tenantColumn<OutboundEmail>(tenantNames)] : []),
       idColumn<OutboundEmail>(),
       {
         header: "To",
@@ -140,7 +141,6 @@ export default function AuditOutboundEmailsPage() {
         sortField: "createdAt",
         cell: (e) => <DateTime value={e.createdAt} className="text-on-surface-variant" />,
       },
-      ...(isAllTenantsView ? [tenantColumn<OutboundEmail>(tenantNames)] : []),
       ...auditColumns<OutboundEmail>(names),
     ],
     [names, tenantNames, isAllTenantsView]

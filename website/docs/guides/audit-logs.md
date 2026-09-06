@@ -24,7 +24,7 @@ The section is shown to **Admin** and **Super Admin** only. Everyone else gets a
 
 That is stricter than most sections, whose reads stay open to anyone signed in. These lists span every run, account and message in the tenant, so the participant-level access that lets you see *your own* run's records is not enough here. The narrower views remain where they were: a run's own tool calls are still on its [Tool Invocations](./workflow-executions.md#tool-invocations) page, and an approval's certificate is still on the [approval](./approvals.md) itself — though only this list also shows the certificates granted to tasks nobody was asked to approve.
 
-A Super Admin sees whichever tenant the tenant switcher has selected, and can select **All tenants** to browse across all of them at once. In that mode each list gains a **Tenant** column.
+A Super Admin sees whichever tenant the tenant switcher has selected, and can select **All tenants** to browse across all of them at once. In that mode each list gains a **Tenant** column as its leftmost column.
 
 ## Tool Invocations
 

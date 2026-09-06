@@ -59,6 +59,7 @@ function buildColumns(
   isAllTenantsView: boolean
 ): ColumnDef<User>[] {
   return [
+    ...(isAllTenantsView ? [tenantColumn<User>(tenantNames)] : []),
     idColumn<User>(),
     {
       header: "",
@@ -138,7 +139,6 @@ function buildColumns(
       cell: (u) =>
         u.deletedAt ? <DateTime value={u.deletedAt} className="text-on-surface-variant" /> : "—",
     },
-    ...(isAllTenantsView ? [tenantColumn<User>(tenantNames)] : []),
     ...auditColumns<User>(names),
   ];
 }

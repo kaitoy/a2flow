@@ -50,6 +50,7 @@ function buildColumns(
   isAllTenantsView: boolean
 ): ColumnDef<McpServer>[] {
   return [
+    ...(isAllTenantsView ? [tenantColumn<McpServer>(tenantNames)] : []),
     idColumn<McpServer>(),
     {
       header: "Name",
@@ -100,7 +101,6 @@ function buildColumns(
       visibility: "optional",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
-    ...(isAllTenantsView ? [tenantColumn<McpServer>(tenantNames)] : []),
     ...auditColumns<McpServer>(names),
   ];
 }

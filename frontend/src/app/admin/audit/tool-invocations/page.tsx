@@ -81,6 +81,7 @@ export default function AuditToolInvocationsPage() {
 
   const columns = useMemo<ColumnDef<McpToolInvocation>[]>(
     () => [
+      ...(isAllTenantsView ? [tenantColumn<McpToolInvocation>(tenantNames)] : []),
       idColumn<McpToolInvocation>(),
       {
         header: "Tool",
@@ -179,7 +180,6 @@ export default function AuditToolInvocationsPage() {
         visibility: "optional",
         cell: (r) => <span className="font-mono text-xs">{r.sessionId}</span>,
       },
-      ...(isAllTenantsView ? [tenantColumn<McpToolInvocation>(tenantNames)] : []),
       ...auditColumns<McpToolInvocation>(names),
     ],
     [serverNameById, names, tenantNames, isAllTenantsView]

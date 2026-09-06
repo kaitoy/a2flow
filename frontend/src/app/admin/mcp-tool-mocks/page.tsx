@@ -43,6 +43,7 @@ function buildColumns(
   isAllTenantsView: boolean
 ): ColumnDef<McpToolMock>[] {
   return [
+    ...(isAllTenantsView ? [tenantColumn<McpToolMock>(tenantNames)] : []),
     idColumn<McpToolMock>(),
     {
       header: "Name",
@@ -85,7 +86,6 @@ function buildColumns(
       className: "text-center",
       cell: (mock) => mock.responses.length,
     },
-    ...(isAllTenantsView ? [tenantColumn<McpToolMock>(tenantNames)] : []),
     ...auditColumns<McpToolMock>(names),
   ];
 }

@@ -22,7 +22,9 @@ interface TenantScoped {
  * all (e.g. a Super Admin user).
  *
  * @param tenantNameById - Map from tenant id to display name, from {@link useTenantNames}.
- * @returns The column definition, ready to append to a list's `columns` array.
+ * @returns The column definition. Place it first in a list's `columns` array —
+ *   ahead of {@link idColumn} — so which tenant a row belongs to is the
+ *   leftmost thing the Super Admin reads.
  */
 export function tenantColumn<T extends TenantScoped>(
   tenantNameById: Map<string, string>

@@ -42,6 +42,7 @@ function buildColumns(
   isAllTenantsView: boolean
 ): ColumnDef<Secret>[] {
   return [
+    ...(isAllTenantsView ? [tenantColumn<Secret>(tenantNames)] : []),
     idColumn<Secret>(),
     {
       header: "Name",
@@ -85,7 +86,6 @@ function buildColumns(
       visibility: "optional",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
-    ...(isAllTenantsView ? [tenantColumn<Secret>(tenantNames)] : []),
     ...auditColumns<Secret>(names),
   ];
 }

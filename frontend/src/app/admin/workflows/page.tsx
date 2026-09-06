@@ -90,6 +90,7 @@ function buildColumns(
   isAllTenantsView: boolean
 ): ColumnDef<Workflow>[] {
   return [
+    ...(isAllTenantsView ? [tenantColumn<Workflow>(tenantNames)] : []),
     idColumn<Workflow>(),
     {
       header: "Name",
@@ -153,7 +154,6 @@ function buildColumns(
       className: "font-mono",
       cell: (w) => formatRevision(w.agentSkillCommitSha),
     },
-    ...(isAllTenantsView ? [tenantColumn<Workflow>(tenantNames)] : []),
     ...auditColumns<Workflow>(names),
     tagsColumn<Workflow>((w) => w.tagIds, tagsById),
     {

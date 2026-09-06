@@ -32,7 +32,7 @@ The switcher only ever appears for a caller who has no tenant of their own. A **
 
 ### All tenants {#all-tenants}
 
-The switcher also offers an **All tenants** option, which browses every tenant's data at once on the read-only admin list and detail pages. With it active, those pages add a **Tenant** column (and field) so rows from different tenants stay distinguishable.
+The switcher also offers an **All tenants** option, which browses every tenant's data at once on the read-only admin list and detail pages. With it active, those pages add a **Tenant** column as the leftmost column (and a matching field) so rows from different tenants stay distinguishable.
 
 | Selection | Reads | Writes | Chat history | Agent endpoints |
 |---|---|---|---|---|

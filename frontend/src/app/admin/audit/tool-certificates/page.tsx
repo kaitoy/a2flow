@@ -75,6 +75,7 @@ export default function AuditToolCertificatesPage() {
 
   const columns = useMemo<ColumnDef<McpToolCertificate>[]>(
     () => [
+      ...(isAllTenantsView ? [tenantColumn<McpToolCertificate>(tenantNames)] : []),
       idColumn<McpToolCertificate>(),
       {
         header: "Serial",
@@ -199,7 +200,6 @@ export default function AuditToolCertificatesPage() {
         visibility: "optional",
         cell: (c) => `${c.workflowTaskId.slice(0, 8)}…`,
       },
-      ...(isAllTenantsView ? [tenantColumn<McpToolCertificate>(tenantNames)] : []),
       ...auditColumns<McpToolCertificate>(names),
     ],
     [serverNameById, names, tenantNames, isAllTenantsView]
