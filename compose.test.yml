@@ -9,7 +9,7 @@
 #   docker compose -f compose.test.yml down
 #
 # Without that variable the suite keeps running on in-memory SQLite and this
-# service is not needed at all. See README.md's Testing section.
+# service is not needed at all. See CONTRIBUTING.md's Testing section.
 # Its own Compose project. Without this both files default to the directory
 # name and their identically-named `db` services fight over one container.
 name: a2flow-test

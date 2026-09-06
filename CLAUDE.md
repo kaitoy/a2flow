@@ -1,6 +1,6 @@
 # A2Flow
 
-A chat application that connects a Google ADK agent to a Next.js UI via the AG-UI protocol. See [README.md](README.md) for the full overview, architecture diagram, and quick-start instructions.
+A chat application that connects a Google ADK agent to a Next.js UI via the AG-UI protocol. [README.md](README.md) is the user-facing overview — features, architecture diagram, quick start. [CONTRIBUTING.md](CONTRIBUTING.md) holds the developer detail: toolchain setup, testing, the OpenAPI → Zod contract, and the manual-site build.
 
 ## Repository layout
 
@@ -98,7 +98,7 @@ operate A2Flow.** Developer-facing references stay in the repository instead:
 |---|---|
 | A2UI rendering flow | [docs/a2ui-flow.md](docs/a2ui-flow.md) |
 | Design system | [DESIGN.md](DESIGN.md) |
-| Repository layout, toolchain, testing, git hooks, generated API types | [README.md](README.md) |
+| Toolchain setup, testing, git hooks, generated API types | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | REST API reference and implementation notes | [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md) |
 
 When adding a page, decide by its reader: someone *using* A2Flow gets a page under
@@ -142,7 +142,7 @@ Two things to know when editing:
   without it the anchor breaks in the `ja` locale only.
 
 A change to the developer-facing files above follows the same rule in its own place:
-a new build step, test command, or pinned version belongs in `README.md` in the same
+a new build step, test command, or pinned version belongs in `CONTRIBUTING.md` in the same
 change that introduces it.
 
 ## Keeping generated API types in sync

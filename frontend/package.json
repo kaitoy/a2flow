@@ -2,6 +2,7 @@
   "name": "a2flow-frontend",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "packageManager": "pnpm@11.2.2",
   "scripts": {
     "predev": "node --use-system-ca scripts/download-a2ui-schema.mjs && pnpm generate:api",

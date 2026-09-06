@@ -2,7 +2,7 @@
 
 Pre-commit / pre-push hooks run linters, formatters, type checkers, and tests automatically. Configuration lives in [lefthook.yml](../../lefthook.yml).
 
-[lefthook](https://lefthook.dev/) is pinned in [mise.toml](../../mise.toml), so `mise install` (see [Quick start](../../README.md#0-toolchain-mise)) already provides the binary. If you are not using mise, install it once per machine:
+[lefthook](https://lefthook.dev/) is pinned in [mise.toml](../../mise.toml), so `mise install` (see [Setting up](../../CONTRIBUTING.md#0-toolchain-mise)) already provides the binary. If you are not using mise, install it once per machine:
 
 | OS | Command |
 |---|---|
