@@ -27,29 +27,54 @@ the agent takes part in — it is what the agent does.
 
 ## Architecture
 
-```
-┌──────────────────────────────────┐    AG-UI RunAgentInput (JSON)     ┌──────────────────────┐
-│   Next.js frontend               │  (render_a2ui tool injected by    │  FastAPI backend     │
-│   @ag-ui/client                  │ ────────────────────────────────► │  Google ADK agent    │
-│   @ag-ui/a2ui-middleware         │   A2UIMiddleware)                 │  AGUIToolset         │
-│   Redux Toolkit                  │                                   │  DB SessionService   │
-│   Admin UI (/admin)              │ ◄──────────────────────────────── │  SQLite/PostgreSQL   │
-└──────────────────────────────────┘  AG-UI events (SSE) incl.         └──────────┬───────────┘
-     :3000                            A2UI (TOOL_CALL_*)                    :8000 │
-                                                                                  │ HTTPS, client
-                                                                                  │ authentication
-                                                        ┌─────────────────────────▼───────────┐
-                                                        │  MCP proxy                          │
-                                                        │  launches the MCP servers a tenant  │
-                                                        │  registered                         │
-                                                        └─────────────────────────────────────┘
-                                                             :8443 (internal only)
+```mermaid
+flowchart TD
+  subgraph FE["Frontend"]
+    UI["Chat and admin UI"]
+    A2["A2UI surfaces<br/>forms, buttons, tables<br/>drawn into the chat"]
+  end
+
+  subgraph BE["Backend"]
+    AG["AI agent<br/>generates the workflow<br/>from a Skill, then runs it"]
+    GW["MCP gateway<br/>authorizes every tool call"]
+    AG --> GW
+  end
+
+  subgraph GR["Git Repos"]
+    AS["Agent Skills"]
+  end
+
+  LLM["LLM<br/>Gemini, OpenAI, Claude, etc."]
+  DB[("PostgreSQL<br/>records, audit logs,<br/>local secrets (encrypted)")]
+  V[("HashiCorp Vault<br/>secrets read live")]
+  PX["MCP proxy<br/>runs third-party server code"]
+  MS["MCP servers"]
+
+  AG --> AS
+  UI <-->|"AG-UI over SSE"| AG
+  AG -.->|"renders"| A2
+  AG --> LLM
+  A2 -.->|"what the user chose"| UI
+  BE --> DB
+  GW -->|"a secret resolves<br/>here or in the DB"| V
+  GW -->|"every call, allowed or refused,<br/>is appended to the audit log"| DB
+  GW -->|"HTTPS, client certificate"| PX
+  PX --> MS
 ```
 
-The UI talks to a [Google ADK](https://google.github.io/adk-docs/) agent over the
-[AG-UI protocol](https://docs.ag-ui.com/concepts/events). The MCP proxy is a separate
-process because it runs third-party code: it must not sit next to the database
-credentials or the API keys. See the
+The UI talks to the agent over the
+[AG-UI protocol](https://docs.ag-ui.com/concepts/events), and the agent answers with more
+than text: it draws [A2UI](https://a2ui.org/) surfaces — forms, choices, tables — into
+the chat, and what the reader does with them comes back as the next turn. The agent works
+from an [Agent Skill](https://kaitoy.github.io/a2flow/docs/guides/agent-skills) — a
+`SKILL.md` in an external Git repository that A2Flow clones and keeps current — turning it
+into a task graph it can run. Every record lives in PostgreSQL, the audit log among them,
+append-only. A secret is held by name and
+resolved only when it is used, from whichever store backs it: the database, encrypted, or
+HashiCorp Vault, read live. No tool call reaches a server directly — the gateway decides
+whether it may happen, and the MCP proxy is where it happens, a separate process because
+it runs third-party code and so must not sit next to the database credentials or the API
+keys. See the
 [architecture overview](https://kaitoy.github.io/a2flow/docs/architecture/overview) for
 the full picture.
 
