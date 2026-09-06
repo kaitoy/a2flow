@@ -714,6 +714,42 @@ describe("DataTable column fitting", () => {
     expect(colWidths(container)).toEqual([SIZER.Name + HEADER_CHROME + TRIGGER_CHROME, 100, 100]);
   });
 
+  it("shrinks a noTruncate column that declares itself shrinkable", () => {
+    const { container } = render(
+      <DataTable
+        columns={[
+          { header: "Name", cell },
+          { header: "Prompt", noTruncate: true, shrinkable: true, cell },
+          COLS[2],
+        ]}
+        rows={ROWS}
+        getRowKey={(r) => r.id}
+      />
+    );
+    // A cell that folds its own overflow (a ChipRow's `+N` chip) has an
+    // ellipsis by another name, so it gives ground exactly as the plain text
+    // column did — without it, Prompt's 800px natural width would hold and
+    // push the table into horizontal scroll.
+    expect(colWidths(container)).toEqual([200, 300, 100]);
+  });
+
+  it("keeps a column's measured natural width when the column set changes", () => {
+    const { container, rerender } = render(
+      <DataTable columns={COLS} rows={ROWS} getRowKey={(r) => r.id} />
+    );
+    expect(colWidths(container)).toEqual([200, 300, 100]);
+
+    // Hiding a column and showing it again must not re-measure the survivors.
+    // A cell that clips itself to the width it was given — a chip row folded
+    // into a `+N` — would measure back the width the last fit imposed, fold
+    // further, and measure narrower still, until the column sat on its header.
+    NATURAL.Prompt = 120;
+    rerender(<DataTable columns={COLS.slice(1)} rows={ROWS} getRowKey={(r) => r.id} />);
+    rerender(<DataTable columns={COLS} rows={ROWS} getRowKey={(r) => r.id} />);
+    expect(colWidths(container)).toEqual([200, 300, 100]);
+    NATURAL.Prompt = 800;
+  });
+
   it("gives a tag-filter column the same trigger allowance", () => {
     const { container } = render(
       <DataTable

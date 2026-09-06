@@ -138,6 +138,29 @@ describe("Chip", () => {
     }
   });
 
+  it("becomes a plain button, no pressed state, when given onClick", async () => {
+    const onClick = vi.fn();
+    const user = userEvent.setup();
+    render(<Chip label="+3" ariaLabel="Show all 5 tags" onClick={onClick} />);
+
+    const button = screen.getByRole("button", { name: "Show all 5 tags" });
+    // Not a toggle: it acts, it does not hold a state.
+    expect(button).not.toHaveAttribute("aria-pressed");
+    expect(button.className).toContain("cursor-pointer");
+    expect(button.className).toContain("focus-visible:ring-accent/50");
+
+    await user.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no tooltip on an onClick chip that has no description", async () => {
+    const user = userEvent.setup();
+    render(<Chip label="+3" ariaLabel="Show all 5 tags" onClick={() => {}} />);
+
+    await user.hover(screen.getByRole("button", { name: "Show all 5 tags" }));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
   it("stays hover-inert when the label fits", async () => {
     const user = userEvent.setup();
     const onMouseEnter = vi.fn();

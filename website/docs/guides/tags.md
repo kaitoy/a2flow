@@ -33,7 +33,7 @@ Attaching tags is gated by the record's own write role, independent of whatever 
 
 ## Filtering by tag
 
-Every taggable list has a **Tags** column showing each record's chips, and its column header menu offers a multi-select. The selection is **conjunctive** — stated in the menu as "Filter (all of)" — so a record must carry *every* tag you pick, and adding one narrows the result. It applies across the whole dataset, not just the page on screen.
+Every taggable list has a **Tags** column showing each record's chips, and its column header menu offers a multi-select. The column keeps every row one line tall: it shows as many chips as its current width holds and counts the rest in a trailing `+N` chip. Click that chip to open a dialog listing every tag on the record, each showing its description on hover. Widen the column, by dragging its edge or by hiding another column, and the counted tags come back as chips. The selection is **conjunctive** — stated in the menu as "Filter (all of)" — so a record must carry *every* tag you pick, and adding one narrows the result. It applies across the whole dataset, not just the page on screen.
 
 Tags are a separate axis from the other column filters, but they follow the same rule about visibility: hiding the Tags column through the [column picker](./admin-ui.md) clears the tag filter, exactly as hiding any other column clears its own.
 

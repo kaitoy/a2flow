@@ -26,6 +26,19 @@ export interface ColumnDef<T> {
    * so it lays out freely instead.
    */
   noTruncate?: boolean;
+  /**
+   * Let the auto-fit shrink this column even though it opts out of the default
+   * truncation.
+   *
+   * `noTruncate` alone says two things at once — "do not wrap me in
+   * {@link TruncatedCell}" and "do not take width from me" — because a cell
+   * with no ellipsis to fall back on is unreadable once squeezed. A cell that
+   * adapts its *own* content to whatever width it is given wants only the
+   * first: a {@link ChipRow} folds the chips that no longer fit into a `+N`
+   * chip, which is an ellipsis by another name. An actions column, which has
+   * no such fold, leaves this unset.
+   */
+  shrinkable?: boolean;
   /** camelCase field name enabling server-side sort on this column (requires `onSortChange`). */
   sortField?: string;
   /** camelCase field name enabling server-side filter on this column (requires `onFilterChange`). */
@@ -207,9 +220,11 @@ function headerControls<T>(
  * Cells clip to a single line (`white-space: nowrap`), which makes a column's
  * natural width its full, unbroken text width — so the natural widths routinely
  * add up to more than the panel can show. Only the columns whose content can
- * ellipsize give ground; `noTruncate` columns (action buttons, chip lists) and
- * explicitly sized columns keep their natural width, since they have no ellipsis
- * to fall back on.
+ * ellipsize give ground; `noTruncate` columns (action buttons) and explicitly
+ * sized columns keep their natural width, since they have no ellipsis to fall
+ * back on. A `noTruncate` column that clips itself instead says so with
+ * `shrinkable` — a chip row folding its overflow into a `+N` chip — and rejoins
+ * the flexible set.
  *
  * The shrinking is capped rather than proportional: scaling every column by the
  * same factor would squeeze an already-narrow column (and its header) just to
@@ -254,7 +269,9 @@ export function fitColumnWidths<T>(
   const total = Object.values(fitted).reduce((sum, w) => sum + w, 0);
   if (total <= available) return fitted;
 
-  const flexible = columns.filter((col) => !col.noTruncate && col.width === undefined);
+  const flexible = columns.filter(
+    (col) => (!col.noTruncate || col.shrinkable) && col.width === undefined
+  );
   if (flexible.length === 0) return fitted;
 
   const flexibleWidths = flexible.map((col) => fitted[col.header] ?? 0);
@@ -341,9 +358,21 @@ export function DataTable<T>({
   // Hidden nowrap copies of each header's label, measured for the per-column
   // width floor that keeps header text from ellipsizing.
   const sizerRefs = useRef(new Map<string, HTMLElement>());
-  // Natural (unfitted) widths, kept so a refit rescales from the original
-  // measurement instead of ratcheting down from the already-shrunk widths.
+  // Natural (unfitted) widths of the columns currently on screen, kept so a
+  // refit rescales from the original measurement instead of ratcheting down
+  // from the already-shrunk widths.
   const naturalRef = useRef<Record<string, number> | null>(null);
+  // Every natural width measured so far, keyed by header and never dropped.
+  //
+  // A column's natural width is a property of its content, not of which other
+  // columns happen to share the panel, so re-measuring one on a column-set
+  // change is at best wasted work — and at worst wrong. A cell that clips
+  // itself to the width it was given (a `shrinkable` chip row folding into a
+  // `+N`) measures *as it currently renders*, so a second measurement taken
+  // while it is folded reads back the narrow width the last fit imposed. The
+  // column would then be re-fitted from that, fold further, and measure
+  // narrower still — a ratchet that ends with the column pinned to its header.
+  const naturalCacheRef = useRef<Record<string, number>>({});
   // Per-column width floors derived from the header content, applied by every
   // fit and by drag-resizing.
   const headerMinRef = useRef<Record<string, number> | null>(null);
@@ -355,7 +384,9 @@ export function DataTable<T>({
   columnsRef.current = columns;
   const columnsKey = columns.map((c) => c.header).join(" ");
 
-  // Reset measurements whenever the set of columns changes.
+  // Re-fit whenever the set of columns changes. The measurements themselves
+  // survive in the caches — see `naturalCacheRef` — so only the layout derived
+  // from them is thrown away.
   // biome-ignore lint/correctness/useExhaustiveDependencies: columnsKey captures the relevant change
   useEffect(() => {
     naturalRef.current = null;
@@ -394,11 +425,18 @@ export function DataTable<T>({
   // so nothing is clamped and each sizer reports the label's full text width.
   useEffect(() => {
     if (widths || loading || rows.length === 0) return;
+    const cache = naturalCacheRef.current;
     const measured: Record<string, number> = {};
     const headerMin: Record<string, number> = {};
     for (const col of columns) {
-      const el = thRefs.current.get(col.header);
-      if (el) measured[col.header] = col.width ?? el.offsetWidth;
+      // A column seen before keeps the width it was first measured at; only a
+      // column new to the panel is measured from the DOM.
+      if (cache[col.header] !== undefined) {
+        measured[col.header] = cache[col.header];
+      } else {
+        const el = thRefs.current.get(col.header);
+        if (el) measured[col.header] = col.width ?? el.offsetWidth;
+      }
       const { interactive } = headerControls(col, onSortChange, onFilterChange, onTagIdsChange);
       headerMin[col.header] =
         Math.ceil(sizerRefs.current.get(col.header)?.offsetWidth ?? 0) +
@@ -406,7 +444,9 @@ export function DataTable<T>({
         RESIZE_HANDLE_ALLOWANCE +
         (interactive ? TRIGGER_ALLOWANCE : 0);
     }
-    if (Object.keys(measured).length !== columns.length) return;
+    if (columns.some((col) => measured[col.header] === undefined)) return;
+    naturalCacheRef.current = { ...cache, ...measured };
+    // Only the columns on screen, since the fit sums whatever it is handed.
     naturalRef.current = measured;
     headerMinRef.current = headerMin;
     setWidths(fitColumnWidths(columns, measured, wrapperRef.current?.clientWidth ?? 0, headerMin));

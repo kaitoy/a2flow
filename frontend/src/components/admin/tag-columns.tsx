@@ -9,7 +9,7 @@
 "use client";
 
 import type { CheckboxOption } from "@/components/ui/checkbox-group";
-import { Chip } from "@/components/ui/chip";
+import { ChipRow, type ChipRowItem } from "@/components/ui/chip-row";
 import type { ColumnDef } from "@/components/ui/data-table";
 import type { Tag } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
@@ -27,6 +27,11 @@ import { resolveTagColor } from "@/lib/tag-palette";
  * A tag id with no matching tag renders as the raw id rather than vanishing, so
  * a row never silently loses a chip when the tag list is momentarily stale.
  *
+ * The chips are laid out by {@link ChipRow}, which holds the cell to one line
+ * and folds the tags that do not fit into a `+N` chip that opens a dialog
+ * listing every tag on the row, each with its description — so a heavily tagged
+ * record neither grows its row nor claims the column's whole width.
+ *
  * @param getTagIds - Reads the tag ids off a row.
  * @param byId - The tenant's tags keyed by id, from `useTags`.
  * @returns The column definition, ready to drop into a list's `columns` array.
@@ -37,26 +42,25 @@ export function tagsColumn<T>(
 ): ColumnDef<T> {
   return {
     header: "Tags",
-    // Chips wrap onto as many lines as the row needs, so the default
-    // single-line truncation would clip them; each Chip clips its own label.
+    // A row of chips is not text, so the default single-line truncation would
+    // clip it mid-pill; `ChipRow` does its own clipping instead, folding what
+    // does not fit into a `+N` chip.
     noTruncate: true,
+    // That fold is this cell's ellipsis, so the column can give ground to the
+    // panel fit like a text column rather than holding its full natural width.
+    shrinkable: true,
     filterKind: "tags",
     tagOptions: tagFilterOptions(byId),
     cell: (row) => {
       const ids = getTagIds(row) ?? [];
       if (ids.length === 0) return EMPTY_VALUE;
-      return (
-        <div className="flex flex-wrap gap-1">
-          {ids.map((id) => (
-            <Chip
-              key={id}
-              label={byId.get(id)?.name ?? id}
-              color={resolveTagColor(byId.get(id)?.color)}
-              description={byId.get(id)?.description ?? undefined}
-            />
-          ))}
-        </div>
-      );
+      const items: ChipRowItem[] = ids.map((id) => ({
+        key: id,
+        label: byId.get(id)?.name ?? id,
+        color: resolveTagColor(byId.get(id)?.color),
+        description: byId.get(id)?.description ?? undefined,
+      }));
+      return <ChipRow items={items} title="Tags" />;
     },
   };
 }

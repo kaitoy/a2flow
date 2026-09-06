@@ -28,6 +28,20 @@ interface ChipProps {
    * if the label itself isn't clipped.
    */
   description?: string;
+  /**
+   * When supplied, the whole chip becomes a plain `<button type="button">`
+   * (no `aria-pressed`, no `selected` treatment) that runs this on click —
+   * how {@link ChipRow}'s `+N` chip opens its overflow dialog. Mutually
+   * exclusive with {@link ChipProps.onToggle}, and — like it — cannot coexist
+   * with {@link ChipProps.onRemove}/{@link ChipProps.badge}, since a button
+   * cannot nest inside another.
+   */
+  onClick?: () => void;
+  /**
+   * Accessible name for the {@link ChipProps.onClick} button, for when the
+   * visible label alone (e.g. `+7`) would not name the action.
+   */
+  ariaLabel?: string;
   /** Called when the pointer enters the chip. */
   onMouseEnter?: () => void;
   /** Called when the pointer leaves the chip. */
@@ -135,6 +149,10 @@ const BADGE_BUTTON_ACTIVE_CLASS = `${BADGE_BUTTON_BASE} border-accent/30 bg-acce
 /**
  * Shape shared by both roots, so the toggle button and the plain pill are the
  * same object with a different element under it.
+ *
+ * A flex item's default `min-width: auto` is left alone deliberately: it is
+ * what makes a pill report its natural width, which is what {@link ChipRow}
+ * measures to decide how many of them fit on a line.
  */
 const PILL = "inline-flex max-w-64 items-center rounded-md font-mono";
 
@@ -216,6 +234,13 @@ const TOGGLE_CLASS = [
  * toggle chip is expected to carry a {@link ChipProps.color}; without one only
  * the check distinguishes it.
  *
+ * Pass {@link ChipProps.onClick} for a chip that *acts* without holding a
+ * pressed state — the root becomes a plain `<button type="button">` with the
+ * same pressable affordance minus `aria-pressed` and the check. {@link ChipRow}
+ * uses it for the `+N` overflow chip, which opens a dialog. Give it an
+ * {@link ChipProps.ariaLabel} when the label alone (`+7`) would not name the
+ * action.
+ *
  * Pass {@link ChipProps.badge} to add a *second* inline icon button, sitting
  * before the remove button, that toggles a flag distinct from removal — how
  * {@link McpToolPicker} lets a bound tool stay removable while also marking
@@ -227,6 +252,8 @@ export function Chip({
   label,
   color,
   description,
+  onClick,
+  ariaLabel,
   onMouseEnter,
   onMouseLeave,
   onRemove,
@@ -307,6 +334,21 @@ export function Chip({
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         className={`${PILL} ${SIZE[size]} ${surface} ${selected ? "tag-chip-selected " : ""}${TOGGLE_CLASS}`}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        className={`${PILL} ${SIZE[size]} ${surface} ${TOGGLE_CLASS}`}
       >
         {body}
       </button>
