@@ -18,6 +18,12 @@ function renderPage() {
   return render(<McpToolMocksPage />, { preloadedState: DEVELOPER });
 }
 
+/** Turn on a column hidden by default, through the page's own column picker. */
+async function showColumn(user: ReturnType<typeof userEvent.setup>, label: string) {
+  await user.click(screen.getByRole("button", { name: "Columns" }));
+  await user.click(await screen.findByRole("checkbox", { name: label }));
+}
+
 describe("McpToolMocksPage", () => {
   it("shows loading state initially", () => {
     renderPage();
@@ -47,9 +53,19 @@ describe("McpToolMocksPage", () => {
     await waitFor(() => expect(screen.getByText("Built-in")).toBeInTheDocument());
   });
 
-  it("shows how many successive responses each mock defines", async () => {
+  it("hides the Responses column by default", async () => {
     renderPage();
     await waitFor(() => screen.getByText("search returns nothing"));
+    expect(screen.queryByRole("columnheader", { name: "Responses" })).not.toBeInTheDocument();
+  });
+
+  it("shows how many successive responses each mock defines once the column is shown", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => screen.getByText("search returns nothing"));
+
+    await showColumn(user, "Responses");
+
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 

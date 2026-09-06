@@ -81,8 +81,10 @@ function buildColumns(
     },
     {
       // How many successive calls the mock answers differently before its last
-      // response starts repeating.
+      // response starts repeating. Off by default: the count is a niche detail
+      // most viewers do not need, so it is offered through the column picker.
       header: "Responses",
+      visibility: "optional",
       className: "text-center",
       cell: (mock) => mock.responses.length,
     },

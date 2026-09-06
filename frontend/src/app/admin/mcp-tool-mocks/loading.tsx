@@ -15,7 +15,7 @@ export default function Loading() {
         addHref="/admin/mcp-tool-mocks/new"
         addLabel="+ Add tool mock"
       />
-      <AdminListSkeleton columns={["Name", "Tool", "Server", "Responses", "Actions"]} />
+      <AdminListSkeleton columns={["Name", "Tool", "Server", "Description", "Actions"]} />
     </AdminPageContainer>
   );
 }
