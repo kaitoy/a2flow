@@ -34,6 +34,8 @@ The switcher only ever appears for a caller who has no tenant of their own. A **
 
 The switcher also offers an **All tenants** option, which browses every tenant's data at once on the read-only admin list and detail pages. With it active, those pages add a **Tenant** column as the leftmost column (and a matching field) so rows from different tenants stay distinguishable.
 
+While you are impersonating another user, the All tenants selection is set aside: pages behave as though that user's own tenant were selected and the Tenant column is not shown. It takes effect again when you stop.
+
 | Selection | Reads | Writes | Chat history | Agent endpoints |
 |---|---|---|---|---|
 | Own tenant (implicit, every tenant-scoped user) | Own tenant | Own tenant | Own tenant | ✅ |
