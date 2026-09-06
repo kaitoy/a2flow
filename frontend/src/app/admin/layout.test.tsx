@@ -58,19 +58,18 @@ describe("AdminLayout", () => {
     expect(screen.getByRole("link", { name: /API Docs/ })).toBeInTheDocument();
   });
 
-  it.each([
-    "developer",
-    "requester",
-    "approver",
-  ] as const)("hides the API Docs link from a %s", (role) => {
-    render(
-      <AdminLayout>
-        <div />
-      </AdminLayout>,
-      { preloadedState: authState([role]) }
-    );
-    expect(screen.queryByRole("link", { name: /API Docs/ })).not.toBeInTheDocument();
-  });
+  it.each(["developer", "requester", "approver"] as const)(
+    "hides the API Docs link from a %s",
+    (role) => {
+      render(
+        <AdminLayout>
+          <div />
+        </AdminLayout>,
+        { preloadedState: authState([role]) }
+      );
+      expect(screen.queryByRole("link", { name: /API Docs/ })).not.toBeInTheDocument();
+    }
+  );
 
   it("still renders regular nav items alongside the footer", () => {
     render(

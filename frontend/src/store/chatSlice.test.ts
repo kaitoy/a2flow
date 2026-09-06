@@ -255,7 +255,7 @@ describe("chatSlice", () => {
       ];
       const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
       const activityMsg = state.messages.find((m) => m.id === "tc-mcp");
-      if (!activityMsg || activityMsg.role !== "activity") {
+      if (activityMsg?.role !== "activity") {
         throw new Error("expected activity message");
       }
       const content = activityMsg.content as unknown as ToolCallActivityContent;
@@ -295,7 +295,7 @@ describe("chatSlice", () => {
       ];
       const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
       const activityMsg = state.messages.find((m) => m.id === "tc-mcp");
-      if (!activityMsg || activityMsg.role !== "activity") {
+      if (activityMsg?.role !== "activity") {
         throw new Error("expected activity message");
       }
       expect((activityMsg.content as unknown as ToolCallActivityContent).mocked).toBe(true);
