@@ -142,6 +142,7 @@ describe("WorkflowTaskDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
     render(<WorkflowTaskDetailPage />);
     await screen.findByRole("heading", { name: "Step 1" });
@@ -159,6 +160,7 @@ describe("WorkflowTaskDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
     render(<WorkflowTaskDetailPage />);
     await screen.findByRole("heading", { name: "Step 1" });

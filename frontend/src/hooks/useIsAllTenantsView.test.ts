@@ -32,7 +32,7 @@ function authState(
 function renderWith(preloadedState: Partial<RootState>) {
   const store = makeStore(preloadedState);
   const Wrapper = ({ children }: { children: ReactNode }) =>
-    createElement(Provider, { store }, children);
+    createElement(Provider, { store, children });
   return renderHook(() => useIsAllTenantsView(), { wrapper: Wrapper });
 }
 

@@ -62,6 +62,7 @@ tsconfig.tsbuildinfo
 
 # Generated at build time
 frontend/src/generated/
+frontend/coverage/
 backend/openapi.yaml
 
 # Secret encryption key generated at runtime

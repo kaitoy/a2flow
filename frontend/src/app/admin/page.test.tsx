@@ -101,12 +101,11 @@ describe("AdminPage (welcome)", () => {
     );
   });
 
-  it.each([
-    ["admin"],
-    ["developer"],
-    ["requester"],
-  ] as const)("hides the System Settings card from a %s", (role) => {
-    render(<AdminPage />, { preloadedState: authState([role]) });
-    expect(screen.queryByRole("link", { name: /System Settings/ })).not.toBeInTheDocument();
-  });
+  it.each([["admin"], ["developer"], ["requester"]] as const)(
+    "hides the System Settings card from a %s",
+    (role) => {
+      render(<AdminPage />, { preloadedState: authState([role]) });
+      expect(screen.queryByRole("link", { name: /System Settings/ })).not.toBeInTheDocument();
+    }
+  );
 });

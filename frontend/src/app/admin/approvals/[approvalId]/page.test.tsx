@@ -166,6 +166,7 @@ describe("ApprovalDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     render(<ApprovalDetailPage />);
@@ -192,6 +193,7 @@ describe("ApprovalDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     render(<ApprovalDetailPage />);

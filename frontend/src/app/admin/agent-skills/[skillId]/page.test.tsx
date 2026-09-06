@@ -132,6 +132,7 @@ describe("AgentSkillDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
 
     render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
@@ -151,6 +152,7 @@ describe("AgentSkillDetailPage", () => {
       prefetch: vi.fn(),
       refresh: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: "",
     });
     const deleteSpy = vi.fn(() => envelope(null));
     server.use(http.delete("http://localhost:8000/api/v1/agent-skills/:skillId", deleteSpy));

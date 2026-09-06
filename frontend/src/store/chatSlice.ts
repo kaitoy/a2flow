@@ -514,7 +514,7 @@ const chatSlice = createSlice({
      */
     attachToolCallResult(state, action: PayloadAction<{ toolCallId: string; result: unknown }>) {
       const existing = state.messages.find((m) => m.id === action.payload.toolCallId);
-      if (!existing || existing.role !== "activity") return;
+      if (existing?.role !== "activity") return;
       if (existing.activityType !== TOOL_CALL_ACTIVITY_TYPE) return;
       const content = (existing.content ?? {}) as Record<string, unknown>;
       existing.content = {
