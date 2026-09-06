@@ -35,6 +35,13 @@ from infrastructure.demo_data import (
     DEMO_CALL_AWS_MOCK_ID,
     DEMO_DEVELOPER_USER_ID,
     DEMO_DEVELOPERS_GROUP_ID,
+    DEMO_GCP_API_KEY_ENTRY_KEY,
+    DEMO_GCP_MCP_SERVER_ID,
+    DEMO_GCP_MCP_SERVER_NAME,
+    DEMO_GCP_SECRET_ID,
+    DEMO_GCP_SECRET_NAME,
+    DEMO_GCP_TAG_ID,
+    DEMO_GCP_TAG_NAME,
     DEMO_MCP_SERVER_ID,
     DEMO_MCP_SERVER_NAME,
     DEMO_REQUEST_APPROVAL_MOCK_ID,
@@ -199,11 +206,11 @@ async def test_sync_demo_data_seeds_the_full_dataset(
     _enable(monkeypatch)
     await _sync(engine)
     assert len(await _demo_users(engine)) == 5
-    assert len(await _rows(engine, Secret)) == 1
-    assert len(await _rows(engine, MCPServer)) == 1
+    assert len(await _rows(engine, Secret)) == 2
+    assert len(await _rows(engine, MCPServer)) == 2
     assert len(await _rows(engine, MCPToolMock)) == 3
     assert len(await _rows(engine, AgentSkill)) == 1
-    assert len(await _rows(engine, Tag)) == 2
+    assert len(await _rows(engine, Tag)) == 3
 
 
 async def test_sync_demo_data_returns_the_new_skill_id(
@@ -230,13 +237,13 @@ async def test_sync_demo_data_is_idempotent(
     await _sync(engine)
     await _sync(engine)
     assert len(await _demo_users(engine)) == 5
-    assert len(await _rows(engine, Secret)) == 1
-    assert len(await _rows(engine, MCPServer)) == 1
+    assert len(await _rows(engine, Secret)) == 2
+    assert len(await _rows(engine, MCPServer)) == 2
     assert len(await _rows(engine, MCPToolMock)) == 3
     assert len(await _rows(engine, AgentSkill)) == 1
-    assert len(await _rows(engine, Tag)) == 2
-    assert len(await _rows(engine, SecretTag)) == 1
-    assert len(await _rows(engine, McpServerTag)) == 1
+    assert len(await _rows(engine, Tag)) == 3
+    assert len(await _rows(engine, SecretTag)) == 2
+    assert len(await _rows(engine, McpServerTag)) == 2
     assert len(await _rows(engine, AgentSkillTag)) == 2
     assert len(await _rows(engine, McpToolMockTag)) == 2
 
@@ -247,17 +254,24 @@ async def test_demo_tags_classify_records_across_four_taggable_kinds(
     _enable(monkeypatch)
     await _sync(engine)
     tags = {tag.id: tag for tag in await _rows(engine, Tag)}
-    assert set(tags) == {DEMO_AWS_TAG_ID, DEMO_APPROVAL_TAG_ID}
+    assert set(tags) == {DEMO_AWS_TAG_ID, DEMO_GCP_TAG_ID, DEMO_APPROVAL_TAG_ID}
     assert tags[DEMO_AWS_TAG_ID].name == DEMO_AWS_TAG_NAME
+    assert tags[DEMO_GCP_TAG_ID].name == DEMO_GCP_TAG_NAME
     assert tags[DEMO_APPROVAL_TAG_ID].name == DEMO_APPROVAL_TAG_NAME
     secret_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, SecretTag)
     }
-    assert secret_tags == {(DEMO_AWS_SECRET_ID, DEMO_AWS_TAG_ID)}
+    assert secret_tags == {
+        (DEMO_AWS_SECRET_ID, DEMO_AWS_TAG_ID),
+        (DEMO_GCP_SECRET_ID, DEMO_GCP_TAG_ID),
+    }
     mcp_server_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, McpServerTag)
     }
-    assert mcp_server_tags == {(DEMO_MCP_SERVER_ID, DEMO_AWS_TAG_ID)}
+    assert mcp_server_tags == {
+        (DEMO_MCP_SERVER_ID, DEMO_AWS_TAG_ID),
+        (DEMO_GCP_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
+    }
     agent_skill_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, AgentSkillTag)
     }
@@ -475,6 +489,37 @@ async def test_demo_secrets_fall_back_to_a_placeholder(
     assert decrypted == "REPLACE_ME"
 
 
+async def test_demo_gcp_secret_stores_the_configured_key_encrypted(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    monkeypatch.setenv("DEMO_GCP_API_KEY", "AIzaEXAMPLE")
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        secret = await session.get(Secret, DEMO_GCP_SECRET_ID)
+    assert secret is not None
+    assert secret.name == DEMO_GCP_SECRET_NAME
+    assert secret.description
+    assert secret.type is SecretType.local
+    assert secret.tenant_id == TENANT_ID
+    assert sorted(secret.entries) == [DEMO_GCP_API_KEY_ENTRY_KEY]
+    ciphertext = secret.entries[DEMO_GCP_API_KEY_ENTRY_KEY]
+    assert ciphertext != "AIzaEXAMPLE"  # stored as ciphertext
+    assert get_secret_cipher().decrypt(ciphertext) == "AIzaEXAMPLE"
+
+
+async def test_demo_gcp_secret_falls_back_to_a_placeholder(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        secret = await session.get(Secret, DEMO_GCP_SECRET_ID)
+    assert secret is not None
+    decrypted = get_secret_cipher().decrypt(secret.entries[DEMO_GCP_API_KEY_ENTRY_KEY])
+    assert decrypted == "REPLACE_ME"
+
+
 async def test_demo_mcp_server_proxies_the_managed_aws_server(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -520,6 +565,29 @@ async def test_demo_mcp_server_defaults_the_region(
     assert server is not None
     assert server.args[-2:] == ["--metadata", "AWS_REGION=${env:AWS_REGION}"]
     assert server.env["AWS_REGION"] == "us-east-1"
+
+
+async def test_demo_cloud_logging_mcp_server_uses_an_api_key_header(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        server = await session.get(MCPServer, DEMO_GCP_MCP_SERVER_ID)
+    assert server is not None
+    assert server.name == DEMO_GCP_MCP_SERVER_NAME
+    assert server.description
+    assert server.tenant_id == TENANT_ID
+    assert server.transport is McpTransport.streamable_http
+    assert server.url == "https://logging.googleapis.com/mcp"
+    assert server.command is None
+    assert server.args == []
+    assert server.env == {}
+    assert server.headers == {
+        "x-goog-api-key": (
+            f"${{secret:{DEMO_GCP_SECRET_NAME}/{DEMO_GCP_API_KEY_ENTRY_KEY}}}"
+        )
+    }
 
 
 async def test_demo_agent_skill_points_at_the_sample_skill(
@@ -580,14 +648,24 @@ async def test_a_name_collision_is_skipped_without_failing(
     async with AsyncSession(engine) as session:
         assert await session.get(Secret, DEMO_AWS_SECRET_ID) is None
         assert await session.get(MCPServer, DEMO_MCP_SERVER_ID) is not None
+        # Only the AWS secret name collided; the Google Cloud demo records seed.
+        assert await session.get(Secret, DEMO_GCP_SECRET_ID) is not None
+        assert await session.get(MCPServer, DEMO_GCP_MCP_SERVER_ID) is not None
     assert any("conflicts with an existing" in r.getMessage() for r in caplog.records)
-    # The AWS tag itself is still created and attached to the MCP server and
-    # agent skill; only the link to the missing secret is skipped.
-    assert await _rows(engine, SecretTag) == []
+    # The AWS tag itself is still created and attached to the AWS MCP server and
+    # agent skill; only the link to the missing AWS secret is skipped. The GCP
+    # tag attaches to both of its records unaffected.
+    secret_tags = {
+        (row.resource_id, row.tag_id) for row in await _rows(engine, SecretTag)
+    }
+    assert secret_tags == {(DEMO_GCP_SECRET_ID, DEMO_GCP_TAG_ID)}
     mcp_server_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, McpServerTag)
     }
-    assert mcp_server_tags == {(DEMO_MCP_SERVER_ID, DEMO_AWS_TAG_ID)}
+    assert mcp_server_tags == {
+        (DEMO_MCP_SERVER_ID, DEMO_AWS_TAG_ID),
+        (DEMO_GCP_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
+    }
 
 
 # ---------- removal ----------

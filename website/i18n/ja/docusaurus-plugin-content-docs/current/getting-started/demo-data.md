@@ -17,19 +17,22 @@ DEMO_PASSWORD=change-me-now-123
 DEMO_AWS_ACCESS_KEY_ID=AKIA...
 DEMO_AWS_SECRET_ACCESS_KEY=...
 DEMO_AWS_REGION=us-east-1
+DEMO_GCP_API_KEY=AIza...
 ```
 
 - `DEMO_PASSWORD` は 5 つのデモユーザーで共有され、`ROOT_PASSWORD` や `ADMIN_PASSWORD` と同じく、未設定なら生成してログに一度だけ出力します。参照されるのは、そのアカウントがまだ存在しないときだけです。
-- AWS の認証情報は任意です。未設定なら `REPLACE_ME` というプレースホルダーが保存されるので、形としてはデモが揃った状態になり、実際の値は[シークレット](../guides/secrets.md)のページから入れられます。
-- `DEMO_AWS_REGION` は、デモの MCP サーバーのツールが操作する対象のリージョンです。既定は `us-east-1` です。
+- AWS の認証情報と Google Cloud の API キーは任意です。未設定なら `REPLACE_ME` というプレースホルダーが保存されるので、形としてはデモが揃った状態になり、実際の値は[シークレット](../guides/secrets.md)のページから入れられます。
+- `DEMO_AWS_REGION` は、デモの AWS MCP サーバーのツールが操作する対象のリージョンです。既定は `us-east-1` です。
 
-⚠️ デモの MCP サーバーは読み取りだけでなく、**状態を変える** AWS の操作も実行できます。渡した認証情報の権限で実際のリソースを作成したり削除したりできてしまうので、使い捨てのアカウントか、権限を絞った IAM ポリシーを使ってください。AWS にまったく触れずにデモを試す方法は、下の[試してみる](#trying-it-out)を参照してください。
+⚠️ デモの AWS MCP サーバーは読み取りだけでなく、**状態を変える** AWS の操作も実行できます。渡した認証情報の権限で実際のリソースを作成したり削除したりできてしまうので、使い捨てのアカウントか、権限を絞った IAM ポリシーを使ってください。AWS にまったく触れずにデモを試す方法は、下の[試してみる](#trying-it-out)を参照してください。デモの Cloud Logging MCP サーバーはログデータを読むだけです。
 
 ## 登録されるもの
 
 - **[エージェントスキル](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — インスタンスの構成を聞き取り、それについて管理職の明示的な承認を得てから、MCP ツールでインスタンスを起動します。リポジトリは起動後にバックグラウンドで clone するので、使えるようになるまでの間スキルは `pending` と表示されます。
 - **[MCP サーバー](../guides/mcp-servers.md) `AWS MCP Server`** — AWS のマネージド AWS MCP Server に接続する `stdio` サーバーです。EC2 のツールはここから来ます。
-- **[シークレット](../guides/secrets.md) `demo-aws-credentials`** — 上の MCP サーバーが読む、AWS のアクセスキー ID とシークレットアクセスキーです。
+- **[MCP サーバー](../guides/mcp-servers.md) `Cloud Logging MCP Server`** — Google Cloud のマネージド Cloud Logging MCP サーバーに接続する `streamable_http` サーバーです。`demo-gcp-credentials` の API キーを `x-goog-api-key` ヘッダーで送ります。ツールはログエントリ・バケット・ビューを読むだけです。
+- **[シークレット](../guides/secrets.md) `demo-aws-credentials`** — AWS MCP Server が読む、AWS のアクセスキー ID とシークレットアクセスキーです。
+- **[シークレット](../guides/secrets.md) `demo-gcp-credentials`** — Cloud Logging MCP Server が送る、Google Cloud の API キーです。
 - **[ツールモック](../guides/tool-mocks.md)** — デモ実行で副作用のあるツールのスタブです。AWS MCP Server の `aws___call_aws` と `aws___run_script`(どちらも起動成功を返す)、および組み込みの `request_approval`(approved を返す)。ドラフト実行の **Run** ダイアログで選ぶと、AWS に触れることも管理職の承認を待つこともなく、ワークフローが最後まで動きます。
 - **デモユーザーとグループ:**
 

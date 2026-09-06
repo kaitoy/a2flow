@@ -5,22 +5,27 @@ this module keeps a small, self-contained example of everything the
 approval-gated "launch an EC2 instance" workflow needs, all inside the
 seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
 
-* one Secret holding the AWS access key id and secret access key as two
-  entries, described for the admin UI,
-* one stdio MCPServer reaching the managed AWS MCP Server through the
-  ``mcp-proxy-for-aws`` proxy launched with ``uvx``, referencing those
-  entries from its ``env`` via ``${secret:NAME/KEY}``, also described,
+* two Secrets -- one holding the AWS access key id and secret access key as
+  two entries, and one holding a Google Cloud API key as a single entry, both
+  described for the admin UI,
+* two MCPServers -- one stdio server reaching the managed AWS MCP Server
+  through the ``mcp-proxy-for-aws`` proxy launched with ``uvx``, referencing
+  the AWS entries from its ``env`` via ``${secret:NAME/KEY}``, and one
+  ``streamable_http`` server reaching the Google-managed Cloud Logging remote
+  MCP server, sending the Google Cloud API key as its ``x-goog-api-key``
+  header via the same ``${secret:NAME/KEY}`` placeholder, both described,
 * three MCPToolMocks that stub the demo run's side-effecting tools so a
   ``draft`` workflow run plays through without reaching AWS or waiting on a
-  human -- ``call_aws`` and ``run_script`` on that MCP server, each returning
-  a successful EC2 launch, and the built-in ``request_approval``, returning
-  ``approved``,
+  human -- ``call_aws`` and ``run_script`` on the AWS MCP server, each
+  returning a successful EC2 launch, and the built-in ``request_approval``,
+  returning ``approved``,
 * one AgentSkill pointing at ``sample_skills/aws-ec2-launch`` in this
   repository,
-* two Tags -- ``AWS`` (attached to the secret, MCP server, agent skill, and
-  the ``call_aws`` and ``run_script`` tool mocks, showing that one tag
-  classifies across resource types) and ``Approval Required`` (attached to the
-  agent skill alone, calling out its approval gate),
+* three Tags -- ``AWS`` (attached to the AWS secret, AWS MCP server, agent
+  skill, and the ``call_aws`` and ``run_script`` tool mocks, showing that one
+  tag classifies across resource types), ``GCP`` (attached to the Google Cloud
+  secret and the Cloud Logging MCP server), and ``Approval Required``
+  (attached to the agent skill alone, calling out its approval gate),
 * five Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
   either of whom the skill can ask for approval, two requesters,
   ``demo-requester-1`` and ``demo-requester-2``, either of whom may run the
@@ -37,8 +42,8 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
   on the next request.
 
 The Workflow itself is deliberately *not* seeded — these records are the
-ingredients an operator assembles one into. Both tags stay unattached to any
-workflow for the same reason; an operator is free to attach either once they
+ingredients an operator assembles one into. Every tag stays unattached to any
+workflow for the same reason; an operator is free to attach one once they
 build one.
 
 The flag is declarative in both directions: ``DEMO_DATA=true`` guarantees the
@@ -117,8 +122,14 @@ DEMO_DEVELOPERS_GROUP_ID = "00000000-0000-0000-0000-00000000d403"
 #: Fixed identifier of the demo Secret holding the AWS credentials.
 DEMO_AWS_SECRET_ID = "00000000-0000-0000-0000-00000000d101"
 
+#: Fixed identifier of the demo Secret holding the Google Cloud API key.
+DEMO_GCP_SECRET_ID = "00000000-0000-0000-0000-00000000d102"
+
 #: Fixed identifier of the demo AWS MCP server.
 DEMO_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d201"
+
+#: Fixed identifier of the demo Cloud Logging MCP server.
+DEMO_GCP_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d202"
 
 #: Fixed identifier of the demo ``aws-ec2-launch`` agent skill.
 DEMO_AGENT_SKILL_ID = "00000000-0000-0000-0000-00000000d301"
@@ -128,6 +139,9 @@ DEMO_AWS_TAG_ID = "00000000-0000-0000-0000-00000000d501"
 
 #: Fixed identifier of the demo ``Approval Required`` tag.
 DEMO_APPROVAL_TAG_ID = "00000000-0000-0000-0000-00000000d502"
+
+#: Fixed identifier of the demo ``GCP`` tag.
+DEMO_GCP_TAG_ID = "00000000-0000-0000-0000-00000000d503"
 
 #: Fixed identifier of the demo ``call_aws`` tool mock (AWS MCP server).
 DEMO_CALL_AWS_MOCK_ID = "00000000-0000-0000-0000-00000000d601"
@@ -140,6 +154,9 @@ DEMO_REQUEST_APPROVAL_MOCK_ID = "00000000-0000-0000-0000-00000000d603"
 
 #: Name of the demo tag shared by the secret, MCP server, and agent skill.
 DEMO_AWS_TAG_NAME = "AWS"
+
+#: Name of the demo tag shared by the Google Cloud secret and MCP server.
+DEMO_GCP_TAG_NAME = "GCP"
 
 #: Name of the demo tag attached only to the agent skill.
 DEMO_APPROVAL_TAG_NAME = "Approval Required"
@@ -155,8 +172,19 @@ DEMO_ACCESS_KEY_ENTRY_KEY = "AWS_ACCESS_KEY_ID"
 #: Entry key of the AWS secret access key within :data:`DEMO_AWS_SECRET_NAME`.
 DEMO_SECRET_KEY_ENTRY_KEY = "AWS_SECRET_ACCESS_KEY"
 
+#: Name of the demo Secret holding the Google Cloud API key. Its single entry
+#: is embedded in the demo Cloud Logging MCP server's ``headers`` as a
+#: ``${secret:NAME/KEY}`` placeholder.
+DEMO_GCP_SECRET_NAME = "demo-gcp-credentials"
+
+#: Entry key of the Google Cloud API key within :data:`DEMO_GCP_SECRET_NAME`.
+DEMO_GCP_API_KEY_ENTRY_KEY = "GOOGLE_API_KEY"
+
 #: Name of the demo MCP server as shown in the admin UI.
 DEMO_MCP_SERVER_NAME = "AWS MCP Server"
+
+#: Name of the demo Cloud Logging MCP server as shown in the admin UI.
+DEMO_GCP_MCP_SERVER_NAME = "Cloud Logging MCP Server"
 
 #: Name of the demo agent skill as shown in the admin UI.
 DEMO_AGENT_SKILL_NAME = "Demo AWS EC2 Launch"
@@ -186,19 +214,35 @@ _DEMO_MCP_ENDPOINT = "https://aws-mcp.us-east-1.api.aws/mcp"
 #: leaving it implicit would break signing as soon as the two differ.
 _DEMO_MCP_ENDPOINT_REGION = "us-east-1"
 
+#: Google-managed Cloud Logging remote MCP endpoint the demo ``streamable_http``
+#: server connects to. It exposes read-only tools for listing and querying log
+#: entries, buckets, and views.
+_DEMO_GCP_MCP_ENDPOINT = "https://logging.googleapis.com/mcp"
+
+#: Request header the demo Cloud Logging MCP server sends its Google Cloud API
+#: key in. Its value is a ``${secret:NAME/KEY}`` placeholder resolved at
+#: connection time, so the key never lands in the ``mcp_servers`` row.
+_DEMO_GCP_API_KEY_HEADER = "x-goog-api-key"
+
 #: Repository the demo agent skill is cloned from, and the path within it.
 _DEMO_SKILL_REPO_URL = "https://github.com/kaitoy/a2flow"
 _DEMO_SKILL_REPO_PATH = "sample_skills/aws-ec2-launch"
 
-#: Stored in place of an AWS credential when ``DEMO_AWS_ACCESS_KEY_ID`` /
-#: ``DEMO_AWS_SECRET_ACCESS_KEY`` are unset. The demo is then complete in shape
-#: but cannot reach AWS until an operator edits the secret in the admin UI.
+#: Stored in place of an AWS credential or Google Cloud API key when the
+#: matching ``DEMO_*`` variable is unset. The demo is then complete in shape but
+#: cannot reach the provider until an operator edits the secret in the admin UI.
 _PLACEHOLDER_SECRET_VALUE = "REPLACE_ME"
 
-#: Description shown on the demo secret in the admin UI.
+#: Description shown on the demo AWS secret in the admin UI.
 _DEMO_AWS_SECRET_DESCRIPTION = (
     "AWS access key and secret key used by the demo MCP server to sign "
     "requests to the managed AWS MCP endpoint."
+)
+
+#: Description shown on the demo Google Cloud secret in the admin UI.
+_DEMO_GCP_SECRET_DESCRIPTION = (
+    "Google Cloud API key the demo Cloud Logging MCP server sends as its "
+    "x-goog-api-key header."
 )
 
 #: Description shown on the demo MCP server in the admin UI.
@@ -208,10 +252,22 @@ _DEMO_MCP_SERVER_DESCRIPTION = (
     "instances."
 )
 
+#: Description shown on the demo Cloud Logging MCP server in the admin UI.
+_DEMO_GCP_MCP_SERVER_DESCRIPTION = (
+    "Google-managed Cloud Logging remote MCP server, providing read-only tools "
+    "to list and query Cloud Logging log entries, buckets, and views."
+)
+
 #: Description shown on the demo ``AWS`` tag in the admin UI.
 _DEMO_AWS_TAG_DESCRIPTION = (
     "Resources that talk to AWS: credentials, MCP servers, and agent skills "
     "scoped to the AWS provider."
+)
+
+#: Description shown on the demo ``GCP`` tag in the admin UI.
+_DEMO_GCP_TAG_DESCRIPTION = (
+    "Resources that talk to Google Cloud: credentials and MCP servers scoped "
+    "to the GCP provider."
 )
 
 #: Description shown on the demo ``Approval Required`` tag in the admin UI.
@@ -424,7 +480,7 @@ class _DemoToolMockSpec:
 
 
 #: The demo tool mocks, all in the seeded ``Default`` tenant. The first two stub
-#: tools of the demo MCP server (see :func:`_seed_demo_mcp_server`); the third
+#: tools of the demo AWS MCP server (see :func:`_seed_demo_mcp_server`); the third
 #: stubs the built-in :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`.
 #: Checked in a draft run's Run dialog, together they let the sample "launch an
 #: EC2 instance" workflow run end to end without reaching AWS or an approver.
@@ -501,6 +557,7 @@ async def _seed_demo_data(session: AsyncSession) -> str | None:
     await _seed_demo_groups(session, tenant_id)
     await _seed_demo_secrets(session, tenant_id)
     await _seed_demo_mcp_server(session, tenant_id)
+    await _seed_demo_gcp_mcp_server(session, tenant_id)
     await _seed_demo_tool_mocks(session, tenant_id)
     new_skill_id = await _seed_demo_agent_skill(session, tenant_id)
     await _seed_demo_tags(session, tenant_id)
@@ -511,14 +568,14 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     """Delete every demo record that is still present.
 
     Deletion follows the direction of the foreign keys — tool mocks, then agent
-    skill, then MCP server, then secrets, then tags, then user groups, then
+    skill, then MCP servers, then secrets, then tags, then user groups, then
     users — so a record is never orphaned by the removal of something it points
     at. The tool mocks go first because two of them (``call_aws`` and
-    ``run_script``) reference the demo MCP server with ``ondelete="RESTRICT"``,
+    ``run_script``) reference the AWS MCP server with ``ondelete="RESTRICT"``,
     which would otherwise block its removal. A record that other data has come
     to depend on (a Workflow built on the demo skill, a task tool binding on
-    the demo MCP server) cannot be deleted; that is logged and skipped rather
-    than allowed to fail startup.
+    one of the demo MCP servers) cannot be deleted; that is logged and skipped
+    rather than allowed to fail startup.
 
     Deleting a tag has no such protection — the join tables cascade rather
     than restrict, by design (see the module docstring of ``models.tag``) —
@@ -540,12 +597,23 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     await _delete_demo_row(
         session, AgentSkill, DEMO_AGENT_SKILL_ID, label="agent skill"
     )
-    await _delete_demo_row(session, MCPServer, DEMO_MCP_SERVER_ID, label="MCP server")
+    await _delete_demo_row(
+        session, MCPServer, DEMO_MCP_SERVER_ID, label="AWS MCP server"
+    )
+    await _delete_demo_row(
+        session, MCPServer, DEMO_GCP_MCP_SERVER_ID, label="Cloud Logging MCP server"
+    )
     await _delete_demo_row(
         session, Secret, DEMO_AWS_SECRET_ID, label="AWS credentials secret"
     )
     await _delete_demo_row(
+        session, Secret, DEMO_GCP_SECRET_ID, label="Google Cloud API key secret"
+    )
+    await _delete_demo_row(
         session, Tag, DEMO_AWS_TAG_ID, label=f"tag '{DEMO_AWS_TAG_NAME}'"
+    )
+    await _delete_demo_row(
+        session, Tag, DEMO_GCP_TAG_ID, label=f"tag '{DEMO_GCP_TAG_NAME}'"
     )
     await _delete_demo_row(
         session, Tag, DEMO_APPROVAL_TAG_ID, label=f"tag '{DEMO_APPROVAL_TAG_NAME}'"
@@ -766,45 +834,66 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
 
 
 async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo AWS credentials secret.
+    """Create the demo AWS credentials and Google Cloud API key secrets.
 
-    Both credentials live in a single secret as two entries, the way a Vault KV
-    path holds several keys. Values come from ``DEMO_AWS_ACCESS_KEY_ID`` /
-    ``DEMO_AWS_SECRET_ACCESS_KEY`` when set, so a fully working demo is one
-    restart away, and fall back to a placeholder otherwise. They are stored as
-    Fernet ciphertext, the same as any secret created through the API — the
-    encryption lives in the service layer, which this out-of-request caller
-    cannot use, so the cipher is applied directly here.
+    The AWS access key and secret key live in a single secret as two entries,
+    the way a Vault KV path holds several keys; the Google Cloud API key is a
+    second secret with a single entry. Values come from ``DEMO_AWS_ACCESS_KEY_ID``
+    / ``DEMO_AWS_SECRET_ACCESS_KEY`` / ``DEMO_GCP_API_KEY`` when set, so a fully
+    working demo is one restart away, and fall back to a placeholder otherwise.
+    They are stored as Fernet ciphertext, the same as any secret created through
+    the API — the encryption lives in the service layer, which this
+    out-of-request caller cannot use, so the cipher is applied directly here.
+    Each secret is guarded by its own id check, so an operator's own record
+    under one demo name never blocks seeding the other.
 
     Args:
         session: Database session used to read and insert secrets.
-        tenant_id: Id of the ``Default`` tenant the secret belongs to.
+        tenant_id: Id of the ``Default`` tenant the secrets belong to.
     """
-    if await session.get(Secret, DEMO_AWS_SECRET_ID) is not None:
-        return
     settings = get_settings()
     cipher = get_secret_cipher()
-    await _insert(
-        session,
-        Secret(
-            id=DEMO_AWS_SECRET_ID,
-            tenant_id=tenant_id,
-            name=DEMO_AWS_SECRET_NAME,
-            description=_DEMO_AWS_SECRET_DESCRIPTION,
-            type=SecretType.local,
-            entries={
-                DEMO_ACCESS_KEY_ENTRY_KEY: cipher.encrypt(
-                    settings.demo_aws_access_key_id or _PLACEHOLDER_SECRET_VALUE
-                ),
-                DEMO_SECRET_KEY_ENTRY_KEY: cipher.encrypt(
-                    settings.demo_aws_secret_access_key or _PLACEHOLDER_SECRET_VALUE
-                ),
-            },
-            created_by=SYSTEM_USER_ID,
-            updated_by=SYSTEM_USER_ID,
-        ),
-        label=f"secret '{DEMO_AWS_SECRET_NAME}'",
-    )
+    if await session.get(Secret, DEMO_AWS_SECRET_ID) is None:
+        await _insert(
+            session,
+            Secret(
+                id=DEMO_AWS_SECRET_ID,
+                tenant_id=tenant_id,
+                name=DEMO_AWS_SECRET_NAME,
+                description=_DEMO_AWS_SECRET_DESCRIPTION,
+                type=SecretType.local,
+                entries={
+                    DEMO_ACCESS_KEY_ENTRY_KEY: cipher.encrypt(
+                        settings.demo_aws_access_key_id or _PLACEHOLDER_SECRET_VALUE
+                    ),
+                    DEMO_SECRET_KEY_ENTRY_KEY: cipher.encrypt(
+                        settings.demo_aws_secret_access_key or _PLACEHOLDER_SECRET_VALUE
+                    ),
+                },
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            ),
+            label=f"secret '{DEMO_AWS_SECRET_NAME}'",
+        )
+    if await session.get(Secret, DEMO_GCP_SECRET_ID) is None:
+        await _insert(
+            session,
+            Secret(
+                id=DEMO_GCP_SECRET_ID,
+                tenant_id=tenant_id,
+                name=DEMO_GCP_SECRET_NAME,
+                description=_DEMO_GCP_SECRET_DESCRIPTION,
+                type=SecretType.local,
+                entries={
+                    DEMO_GCP_API_KEY_ENTRY_KEY: cipher.encrypt(
+                        settings.demo_gcp_api_key or _PLACEHOLDER_SECRET_VALUE
+                    ),
+                },
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            ),
+            label=f"secret '{DEMO_GCP_SECRET_NAME}'",
+        )
 
 
 async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
@@ -863,6 +952,45 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
             updated_by=SYSTEM_USER_ID,
         ),
         label=f"MCP server '{DEMO_MCP_SERVER_NAME}'",
+    )
+
+
+async def _seed_demo_gcp_mcp_server(session: AsyncSession, tenant_id: str) -> None:
+    """Create the demo Cloud Logging MCP server.
+
+    Google runs the Cloud Logging MCP server as a managed remote endpoint, so
+    the row is registered as a ``streamable_http`` server pointed straight at
+    :data:`_DEMO_GCP_MCP_ENDPOINT`. It authenticates with a Google Cloud API
+    key sent as the :data:`_DEMO_GCP_API_KEY_HEADER` request header; the value
+    is a ``${secret:NAME/KEY}`` placeholder resolved at connection time by
+    :class:`infrastructure.secret_resolver.SecretResolver`, so the key never
+    lands in the ``mcp_servers`` row. The server's tools only read log data, so
+    unlike the AWS demo server it cannot mutate anything.
+
+    Args:
+        session: Database session used to read and insert the server.
+        tenant_id: Id of the ``Default`` tenant the server belongs to.
+    """
+    if await session.get(MCPServer, DEMO_GCP_MCP_SERVER_ID) is not None:
+        return
+    await _insert(
+        session,
+        MCPServer(
+            id=DEMO_GCP_MCP_SERVER_ID,
+            tenant_id=tenant_id,
+            name=DEMO_GCP_MCP_SERVER_NAME,
+            description=_DEMO_GCP_MCP_SERVER_DESCRIPTION,
+            transport=McpTransport.streamable_http,
+            url=_DEMO_GCP_MCP_ENDPOINT,
+            headers={
+                _DEMO_GCP_API_KEY_HEADER: (
+                    f"${{secret:{DEMO_GCP_SECRET_NAME}/{DEMO_GCP_API_KEY_ENTRY_KEY}}}"
+                ),
+            },
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"MCP server '{DEMO_GCP_MCP_SERVER_NAME}'",
     )
 
 
@@ -946,16 +1074,17 @@ async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str |
 async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     """Create the demo tags and attach them across four of the six taggable kinds.
 
-    ``AWS`` lands on the secret, MCP server, agent skill, and the ``call_aws``
-    and ``run_script`` tool mocks; ``Approval Required`` lands on the agent
-    skill alone.
+    ``AWS`` lands on the AWS secret, AWS MCP server, agent skill, and the
+    ``call_aws`` and ``run_script`` tool mocks; ``GCP`` lands on the Google
+    Cloud secret and the Cloud Logging MCP server; ``Approval Required`` lands
+    on the agent skill alone.
 
     Must run after :func:`_seed_demo_secrets`, :func:`_seed_demo_mcp_server`,
-    :func:`_seed_demo_agent_skill`, and :func:`_seed_demo_tool_mocks`:
-    attaching a tag looks up the record it attaches to. The demo Workflow does
-    not exist — see the module docstring — so neither tag is attached to one;
-    an operator is free to attach either once they build a workflow from these
-    records themselves.
+    :func:`_seed_demo_gcp_mcp_server`, :func:`_seed_demo_agent_skill`, and
+    :func:`_seed_demo_tool_mocks`: attaching a tag looks up the record it
+    attaches to. The demo Workflow does not exist — see the module docstring —
+    so no tag is attached to one; an operator is free to attach one once they
+    build a workflow from these records themselves.
 
     Args:
         session: Database session used to read and insert tags and their
@@ -1010,6 +1139,32 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             tag_id=DEMO_AWS_TAG_ID,
             label=(
                 f"tag '{DEMO_AWS_TAG_NAME}' on tool mock '{DEMO_RUN_SCRIPT_MOCK_NAME}'"
+            ),
+        )
+    if await _ensure_demo_tag(
+        session,
+        tenant_id,
+        DEMO_GCP_TAG_ID,
+        DEMO_GCP_TAG_NAME,
+        TagColor.indigo,
+        _DEMO_GCP_TAG_DESCRIPTION,
+    ):
+        await _link_tag(
+            session,
+            SecretTag,
+            resource_model=Secret,
+            resource_id=DEMO_GCP_SECRET_ID,
+            tag_id=DEMO_GCP_TAG_ID,
+            label=f"tag '{DEMO_GCP_TAG_NAME}' on secret '{DEMO_GCP_SECRET_NAME}'",
+        )
+        await _link_tag(
+            session,
+            McpServerTag,
+            resource_model=MCPServer,
+            resource_id=DEMO_GCP_MCP_SERVER_ID,
+            tag_id=DEMO_GCP_TAG_ID,
+            label=(
+                f"tag '{DEMO_GCP_TAG_NAME}' on MCP server '{DEMO_GCP_MCP_SERVER_NAME}'"
             ),
         )
     if await _ensure_demo_tag(

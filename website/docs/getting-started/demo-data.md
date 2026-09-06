@@ -17,19 +17,22 @@ DEMO_PASSWORD=change-me-now-123
 DEMO_AWS_ACCESS_KEY_ID=AKIA...
 DEMO_AWS_SECRET_ACCESS_KEY=...
 DEMO_AWS_REGION=us-east-1
+DEMO_GCP_API_KEY=AIza...
 ```
 
 - `DEMO_PASSWORD` is shared by all five demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
-- The AWS credentials are optional. Left unset, a `REPLACE_ME` placeholder is stored instead, so the demo is complete in shape and you fill the real values in from the [Secrets](../guides/secrets.md) page.
-- `DEMO_AWS_REGION` is the region the demo MCP server's tools act on. It defaults to `us-east-1`.
+- The AWS credentials and the Google Cloud API key are optional. Left unset, a `REPLACE_ME` placeholder is stored instead, so the demo is complete in shape and you fill the real values in from the [Secrets](../guides/secrets.md) page.
+- `DEMO_AWS_REGION` is the region the demo AWS MCP server's tools act on. It defaults to `us-east-1`.
 
-⚠️ The demo MCP server can run **mutating** AWS operations, not just reads. Whatever credentials you give it can create and delete real resources — use a throwaway account or a tightly scoped IAM policy. To try the demo without touching AWS at all, see [Trying it out](#trying-it-out) below.
+⚠️ The demo AWS MCP server can run **mutating** AWS operations, not just reads. Whatever credentials you give it can create and delete real resources — use a throwaway account or a tightly scoped IAM policy. To try the demo without touching AWS at all, see [Trying it out](#trying-it-out) below. The demo Cloud Logging MCP server only reads log data.
 
 ## What gets registered
 
 - **[Agent skill](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — gathers the instance configuration, gets a manager's explicit approval of it, then launches the instance through an MCP tool. Its repository is cloned in the background after startup, so the skill shows as `pending` for a moment before it can be used.
 - **[MCP server](../guides/mcp-servers.md) `AWS MCP Server`** — a `stdio` server reaching AWS's managed AWS MCP Server, which is where the EC2 tools come from.
-- **[Secret](../guides/secrets.md) `demo-aws-credentials`** — the AWS access key id and secret access key that MCP server reads.
+- **[MCP server](../guides/mcp-servers.md) `Cloud Logging MCP Server`** — a `streamable_http` server reaching Google Cloud's managed Cloud Logging MCP server. It sends the `demo-gcp-credentials` API key as its `x-goog-api-key` header, and its tools only read log entries, buckets, and views.
+- **[Secret](../guides/secrets.md) `demo-aws-credentials`** — the AWS access key id and secret access key the AWS MCP Server reads.
+- **[Secret](../guides/secrets.md) `demo-gcp-credentials`** — the Google Cloud API key the Cloud Logging MCP Server sends.
 - **[Tool mocks](../guides/tool-mocks.md)** — stubs for the demo run's side-effecting tools: `aws___call_aws` and `aws___run_script` on the AWS MCP Server, each returning a successful launch, and the built-in `request_approval`, returning approved. Selecting them in a draft run's **Run** dialog lets the workflow finish without touching AWS or waiting on a manager.
 - **Demo users and groups:**
 
