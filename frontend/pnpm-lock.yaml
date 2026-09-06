@@ -10,22 +10,22 @@ importers:
     dependencies:
       '@a2ui/markdown-it':
         specifier: 0.0.4
-        version: 0.0.4(@a2ui/web_core@0.10.3)
+        version: 0.0.4(@a2ui/web_core@0.10.7)
       '@a2ui/react':
-        specifier: 0.10.1
-        version: 0.10.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@3.25.76)
+        specifier: 0.11.0
+        version: 0.11.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@3.25.76)
       '@a2ui/web_core':
-        specifier: 0.10.3
-        version: 0.10.3
+        specifier: 0.10.7
+        version: 0.10.7
       '@ag-ui/a2ui-middleware':
         specifier: ^0.0.10
-        version: 0.0.10(@ag-ui/client@0.0.53)(rxjs@7.8.1)
+        version: 0.0.10(@ag-ui/client@0.0.59)(rxjs@7.8.1)
       '@ag-ui/client':
-        specifier: ^0.0.53
-        version: 0.0.53
+        specifier: ^0.0.59
+        version: 0.0.59
       '@ag-ui/core':
-        specifier: ^0.0.53
-        version: 0.0.53
+        specifier: ^0.0.59
+        version: 0.0.59
       '@hookform/resolvers':
         specifier: ^5.9.1
         version: 5.9.1(@standard-schema/spec@1.1.0)(react-hook-form@7.87.0(react@19.2.8))(zod@3.25.76)
@@ -134,16 +134,16 @@ packages:
     peerDependencies:
       '@a2ui/web_core': ^0.9.2
 
-  '@a2ui/react@0.10.1':
-    resolution: {integrity: sha512-m7rBhOKA2PNwrD9Q7kaJn+l2u0WLAmd/n0RmaUNkTRdzCTcSfEbcet5sbCHGpT7xu4TSp+ABWfowG+mcL7HAnQ==}
+  '@a2ui/react@0.11.0':
+    resolution: {integrity: sha512-Bz5jOi3Fa/ku9KdxT+UY3UouhSJQ+7tskkVN2JH9fEnzv6PU+dHhBr/GBMlzSBjoBBqELDWKhjyesqnfUj9cbA==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^19.2.7
       react-dom: ^19.2.7
       zod: ^3.25.76
 
-  '@a2ui/web_core@0.10.3':
-    resolution: {integrity: sha512-B0+zhC1gac4vweqrWxcW1tlmdspMuZl8YzNXSrza3ppayoFYcJblMuvu8g8+6l++aycNQK5D4WaBX85KVvVx+g==}
+  '@a2ui/web_core@0.10.7':
+    resolution: {integrity: sha512-9czuUjSgsomHYy79lKExwtmMza9iCqaXJx7aw5xOGMLKNPziwux5fj4UnsV41bQkLDeZwNu2LoOwn5c2ceyDsQ==}
 
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
@@ -157,17 +157,17 @@ packages:
   '@ag-ui/a2ui-toolkit@0.0.4':
     resolution: {integrity: sha512-9VPmgpCAsFVICk7z23kh+Kp/BwYMxw0D0KGjOiKXhm1MAH+Wid2iC3yKsXso+q7UZZiyhWgeDUSgaAkltyLmGg==}
 
-  '@ag-ui/client@0.0.53':
-    resolution: {integrity: sha512-Mkup36KUp0KXy9v89QtAOWDUoh8H1s1Vgl4zvQv9HqXuAK1TkbtpXJHpbgZJXIxTqd54KT6yCurmC2UkOP7FDQ==}
+  '@ag-ui/client@0.0.59':
+    resolution: {integrity: sha512-d7++r8sBAq6z9G/D/WKrMznQ1Mdvew14pCqOVATReFIvl06mCi1BPqTwmos3zCDGAIiSgcvxc/8m472rYQgFFQ==}
 
-  '@ag-ui/core@0.0.53':
-    resolution: {integrity: sha512-11UocR7fFdMWw503bWCX2IOK15vbWfxT11Mn9xOiPBVO/UVcn57ywGrlLL4UaBlPgmUTvuzr2yYR2ElSqiN2wQ==}
+  '@ag-ui/core@0.0.59':
+    resolution: {integrity: sha512-hDgy4ipTqXieT8YG8Mr917Y+FD/f11VK1GefZ5CwTDCuNqS/oTwjJ5l/DZkicThgS8hQW/Y7wPylPBMBJ8BkUg==}
 
-  '@ag-ui/encoder@0.0.53':
-    resolution: {integrity: sha512-bAOcfVdm6U4H6G6tW+DZfwPEQm1w/snVBTwaFn9nJcEMW69M7/HZuwvEc/7Zo0rK1jRL32N/j60PwTAeky19fw==}
+  '@ag-ui/encoder@0.0.59':
+    resolution: {integrity: sha512-wQCzBsStyZMm8nzhTdTx1G0B1C8yv5rbzZLnz1ka/l5LcJEsK3KTounU8CR9l+7QtcpOUUDJKd0xAbyI6gNcSw==}
 
-  '@ag-ui/proto@0.0.53':
-    resolution: {integrity: sha512-swjz22xWT8YUZt5OhmUwkARDQdwt8XM1hmGZbQrhRnNPXKwrKJX9ELlbnQ4iFUQIKkMWpphzE3vA3yNKs2bbKw==}
+  '@ag-ui/proto@0.0.59':
+    resolution: {integrity: sha512-X+uvDaegLEHw5kJu8tv2eSqHH8ouat+JCfFokGV1uuMquY8qCEQSlGsM7xzexwX9fujuxgHOWumg5kJDqa0+RA==}
 
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
@@ -2289,23 +2289,23 @@ packages:
 
 snapshots:
 
-  '@a2ui/markdown-it@0.0.4(@a2ui/web_core@0.10.3)':
+  '@a2ui/markdown-it@0.0.4(@a2ui/web_core@0.10.7)':
     dependencies:
-      '@a2ui/web_core': 0.10.3
+      '@a2ui/web_core': 0.10.7
       dompurify: 3.4.0
       markdown-it: 14.2.0
 
-  '@a2ui/react@0.10.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@3.25.76)':
+  '@a2ui/react@0.11.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@3.25.76)':
     dependencies:
-      '@a2ui/markdown-it': 0.0.4(@a2ui/web_core@0.10.3)
-      '@a2ui/web_core': 0.10.3
+      '@a2ui/markdown-it': 0.0.4(@a2ui/web_core@0.10.7)
+      '@a2ui/web_core': 0.10.7
       clsx: 2.1.1
       markdown-it: 14.2.0
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       zod: 3.25.76
 
-  '@a2ui/web_core@0.10.3':
+  '@a2ui/web_core@0.10.7':
     dependencies:
       '@preact/signals-core': 1.14.3
       date-fns: 4.4.0
@@ -2314,20 +2314,20 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ag-ui/a2ui-middleware@0.0.10(@ag-ui/client@0.0.53)(rxjs@7.8.1)':
+  '@ag-ui/a2ui-middleware@0.0.10(@ag-ui/client@0.0.59)(rxjs@7.8.1)':
     dependencies:
       '@ag-ui/a2ui-toolkit': 0.0.4
-      '@ag-ui/client': 0.0.53
+      '@ag-ui/client': 0.0.59
       clarinet: 0.12.6
       rxjs: 7.8.1
 
   '@ag-ui/a2ui-toolkit@0.0.4': {}
 
-  '@ag-ui/client@0.0.53':
+  '@ag-ui/client@0.0.59':
     dependencies:
-      '@ag-ui/core': 0.0.53
-      '@ag-ui/encoder': 0.0.53
-      '@ag-ui/proto': 0.0.53
+      '@ag-ui/core': 0.0.59
+      '@ag-ui/encoder': 0.0.59
+      '@ag-ui/proto': 0.0.59
       '@types/uuid': 10.0.0
       compare-versions: 6.1.1
       fast-json-patch: 3.1.1
@@ -2336,18 +2336,18 @@ snapshots:
       uuid: 11.1.0
       zod: 3.25.76
 
-  '@ag-ui/core@0.0.53':
+  '@ag-ui/core@0.0.59':
     dependencies:
       zod: 3.25.76
 
-  '@ag-ui/encoder@0.0.53':
+  '@ag-ui/encoder@0.0.59':
     dependencies:
-      '@ag-ui/core': 0.0.53
-      '@ag-ui/proto': 0.0.53
+      '@ag-ui/core': 0.0.59
+      '@ag-ui/proto': 0.0.59
 
-  '@ag-ui/proto@0.0.53':
+  '@ag-ui/proto@0.0.59':
     dependencies:
-      '@ag-ui/core': 0.0.53
+      '@ag-ui/core': 0.0.59
       '@bufbuild/protobuf': 2.11.0
       '@protobuf-ts/protoc': 2.11.1
 

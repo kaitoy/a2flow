@@ -2,9 +2,11 @@ allowBuilds:
   msw: true
   sharp: true
 
-# @a2ui/markdown-it@0.0.4 still declares peer @a2ui/web_core ^0.9.2, but
-# @a2ui/react@0.10.1 itself depends on web_core ^0.10.1 — upstream forgot to
-# widen the peer range. Allow it until a fixed @a2ui/markdown-it is released.
+# @a2ui/markdown-it is held at 0.0.4: 0.1.1 regresses the renderer (drops the
+# wrapper tag of the first block — no <h1>/<ul>/<p> — and pulls dompurify 3.4.11).
+# 0.0.4 declares its peer as @a2ui/web_core ^0.9.2, which the 0.10.x web_core the
+# rest of the tree resolves (via @a2ui/react 0.11.0) does not satisfy on paper —
+# upstream never widened it. Allow the stale peer until a fixed markdown-it ships.
 peerDependencyRules:
   allowedVersions:
     "@a2ui/markdown-it>@a2ui/web_core": "^0.10.0"
