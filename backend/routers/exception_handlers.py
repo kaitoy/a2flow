@@ -33,6 +33,7 @@ from repositories.exceptions import (
     RegistryUnavailableError,
     SecretResolutionError,
     SecretValidationError,
+    SessionFileValidationError,
     SessionRunInProgressError,
     SkillCloneError,
     SkillNotReadyError,
@@ -154,6 +155,20 @@ async def avatar_validation_exception_handler(
     return _envelope_error(
         request,
         code="INVALID_AVATAR",
+        message=str(exc),
+        status_code=422,
+        details={"reason": exc.reason},
+    )
+
+
+async def session_file_validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Return HTTP 422 with INVALID_SESSION_FILE code for a file a session cannot hold."""
+    assert isinstance(exc, SessionFileValidationError)
+    return _envelope_error(
+        request,
+        code="INVALID_SESSION_FILE",
         message=str(exc),
         status_code=422,
         details={"reason": exc.reason},

@@ -543,6 +543,32 @@ export const handlers = [
     envelope([WORKFLOW_TASK_1])
   ),
 
+  // Echoes the uploaded file's own name and size, so a test can assert that the
+  // composer sent the file it staged rather than a fixture.
+  http.post(
+    `${BASE}/api/v1/workflow-executions/:executionId/files`,
+    async ({ request, params }) => {
+      const form = await request.formData();
+      const file = form.get("file") as File;
+      return envelope(
+        {
+          id: "session-file-1",
+          tenantId: "tenant-1",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "user",
+          updatedBy: "user",
+          workflowExecutionId: params.executionId as string,
+          name: file.name,
+          contentType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+          origin: "user",
+        },
+        201
+      );
+    }
+  ),
+
   http.post(`${BASE}/api/v1/workflow-tasks`, () =>
     envelope({ ...WORKFLOW_TASK_1, id: "new-task-id" }, 201)
   ),

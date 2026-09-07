@@ -45,7 +45,7 @@ flowchart TD
   end
 
   LLM["LLM<br/>Gemini, OpenAI, Claude, etc."]
-  DB[("PostgreSQL<br/>records, audit logs,<br/>local secrets (encrypted)")]
+  DB[("PostgreSQL<br/>records, audit logs, session files,<br/>local secrets (encrypted)")]
   V[("HashiCorp Vault<br/>secrets read live")]
   PX["MCP proxy<br/>runs third-party server code"]
   MS["MCP servers"]

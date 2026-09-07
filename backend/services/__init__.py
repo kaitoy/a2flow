@@ -23,6 +23,12 @@ from .notification_dispatch import (
 )
 from .outbound_email import OutboundEmailService
 from .secret import SecretService
+from .session_file import (
+    SessionFileService,
+    SessionFileStore,
+    build_session_file_store,
+    describe_session_files,
+)
 from .system_settings import SystemSettingsService
 from .tag import TagService
 from .tenant import TenantService
@@ -57,6 +63,8 @@ __all__ = [
     "NotificationService",
     "OutboundEmailService",
     "SecretService",
+    "SessionFileService",
+    "SessionFileStore",
     "SystemSettingsService",
     "TagService",
     "TenantService",
@@ -70,6 +78,8 @@ __all__ = [
     "WorkflowTaskService",
     "WorkflowTaskTemplateService",
     "build_notification_dispatcher",
+    "build_session_file_store",
+    "describe_session_files",
     "generate_workflow_design",
     "run_email_queue_worker",
     "sync_agent_skill",

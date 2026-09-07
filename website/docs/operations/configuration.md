@@ -91,6 +91,15 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 This is **durable state, not a cache**: a workflow execution pins the revision it started with, so wiping the directory leaves existing executions unable to load their skill (HTTP 409 `SKILL_NOT_READY`) until an admin pulls the skill again — and a pull fetches the repository's current head, not the pinned revision. Back it up ([Backup and restore](./backup.md)), and give every backend replica the same directory ([Horizontal scaling](./scaling.md)).
 
+## Session files {#session-files}
+
+| Variable | Default | What it does |
+|---|---|---|
+| `SESSION_FILE_MAX_BYTES` | `20971520` (20 MiB) | Largest single file that may be attached to a [workflow session](../guides/workflow-executions.md#files-in-the-session). An upload is refused as soon as it passes this, so a larger body is never held whole |
+| `SESSION_FILES_MAX_TOTAL_BYTES` | `209715200` (200 MiB) | Combined size of everything one session holds. Files are removed only when their run is deleted, so this is what bounds a long-running session |
+
+Session files are stored in the database rather than on disk, so they need no directory of their own, no shared volume across replicas, and no backup step beyond the database's own ([Backup and restore](./backup.md)). Raising these limits raises how much of the database one run can occupy, and how much memory a single upload or download takes — the bytes are read whole.
+
 ## Secret management {#secret-management}
 
 | Variable | Default | What it does |

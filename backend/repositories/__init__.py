@@ -35,6 +35,7 @@ from .notification import NotificationRepository, SqlNotificationRepository
 from .outbound_email import OutboundEmailRepository, SqlOutboundEmailRepository
 from .outbound_email_queue import ClaimedEmail, SqlOutboundEmailQueue
 from .secret import SecretRepository, SqlSecretRepository
+from .session_file import SessionFileRepository, SqlSessionFileRepository
 from .system_settings import (
     SqlSystemSettingsRepository,
     SystemSettingsRepository,
@@ -84,6 +85,7 @@ __all__ = [
     "ReferencedError",
     "RepositoryError",
     "SecretRepository",
+    "SessionFileRepository",
     "SqlAgentSkillRepository",
     "SqlMcpToolCertificateRepository",
     "SqlApprovalRepository",
@@ -100,6 +102,7 @@ __all__ = [
     "SqlOutboundEmailQueue",
     "SqlOutboundEmailRepository",
     "SqlSecretRepository",
+    "SqlSessionFileRepository",
     "SqlSystemSettingsRepository",
     "SqlTagRepository",
     "SqlTenantRepository",

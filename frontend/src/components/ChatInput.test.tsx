@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ChatInput } from "./ChatInput";
@@ -57,7 +57,7 @@ describe("ChatInput", () => {
     render(<ChatInput onSend={onSend} disabled={false} />);
     await userEvent.type(screen.getByRole("textbox"), "  hello  ");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    expect(onSend).toHaveBeenCalledWith("hello");
+    expect(onSend).toHaveBeenCalledWith("hello", []);
     expect(screen.getByRole("textbox")).toHaveValue("");
   });
 
@@ -73,14 +73,14 @@ describe("ChatInput", () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} disabled={false} />);
     await userEvent.type(screen.getByRole("textbox"), "hello{Control>}{Enter}{/Control}");
-    expect(onSend).toHaveBeenCalledWith("hello");
+    expect(onSend).toHaveBeenCalledWith("hello", []);
   });
 
   it("pressing Cmd+Enter (Meta) calls onSend", async () => {
     const onSend = vi.fn();
     render(<ChatInput onSend={onSend} disabled={false} />);
     await userEvent.type(screen.getByRole("textbox"), "hello{Meta>}{Enter}{/Meta}");
-    expect(onSend).toHaveBeenCalledWith("hello");
+    expect(onSend).toHaveBeenCalledWith("hello", []);
   });
 
   it("pressing Shift+Enter does NOT call onSend", async () => {
@@ -142,5 +142,96 @@ describe("ChatInput", () => {
   it("omits the leading slot when not provided", () => {
     render(<ChatInput onSend={vi.fn()} disabled={false} />);
     expect(screen.queryByRole("button", { name: "extra" })).not.toBeInTheDocument();
+  });
+
+  describe("attachments", () => {
+    /** The hidden file input the paperclip button opens. */
+    function fileInput(container: HTMLElement): HTMLInputElement {
+      const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+      if (!input) throw new Error("no file input rendered");
+      return input;
+    }
+
+    it("shows no attach button unless allowAttachments is set", () => {
+      render(<ChatInput onSend={vi.fn()} disabled={false} />);
+      expect(screen.queryByRole("button", { name: "Attach files" })).not.toBeInTheDocument();
+    });
+
+    it("shows a chip for each attached file", async () => {
+      const { container } = render(
+        <ChatInput onSend={vi.fn()} disabled={false} allowAttachments />
+      );
+      await userEvent.upload(fileInput(container), [
+        new File(["a"], "notes.txt", { type: "text/plain" }),
+        new File(["b"], "data.csv", { type: "text/csv" }),
+      ]);
+      expect(screen.getByText("notes.txt")).toBeInTheDocument();
+      expect(screen.getByText("data.csv")).toBeInTheDocument();
+    });
+
+    it("removing a chip drops that file from the next send", async () => {
+      const onSend = vi.fn();
+      const { container } = render(<ChatInput onSend={onSend} disabled={false} allowAttachments />);
+      await userEvent.upload(fileInput(container), [
+        new File(["a"], "keep.txt", { type: "text/plain" }),
+        new File(["b"], "drop.txt", { type: "text/plain" }),
+      ]);
+      await userEvent.click(screen.getByRole("button", { name: "Remove drop.txt" }));
+      await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+      const [, files] = onSend.mock.calls[0];
+      expect(files.map((f: File) => f.name)).toEqual(["keep.txt"]);
+    });
+
+    it("sends the attached files and clears the chips", async () => {
+      const onSend = vi.fn();
+      const { container } = render(<ChatInput onSend={onSend} disabled={false} allowAttachments />);
+      await userEvent.upload(
+        fileInput(container),
+        new File(["a"], "notes.txt", { type: "text/plain" })
+      );
+      await userEvent.type(screen.getByRole("textbox"), "look at this");
+      await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+      const [message, files] = onSend.mock.calls[0];
+      expect(message).toBe("look at this");
+      expect(files.map((f: File) => f.name)).toEqual(["notes.txt"]);
+      expect(screen.queryByText("notes.txt")).not.toBeInTheDocument();
+    });
+
+    it("allows sending a file with no message text", async () => {
+      const onSend = vi.fn();
+      const { container } = render(<ChatInput onSend={onSend} disabled={false} allowAttachments />);
+      expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+      await userEvent.upload(
+        fileInput(container),
+        new File(["a"], "notes.txt", { type: "text/plain" })
+      );
+      expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+      await userEvent.click(screen.getByRole("button", { name: "Send" }));
+      expect(onSend).toHaveBeenCalledWith("", [expect.objectContaining({ name: "notes.txt" })]);
+    });
+
+    it("refuses a file over the size limit without staging it", async () => {
+      const { container } = render(
+        <ChatInput onSend={vi.fn()} disabled={false} allowAttachments />
+      );
+      const huge = new File(["x"], "huge.bin", { type: "application/octet-stream" });
+      Object.defineProperty(huge, "size", { value: 21 * 1024 * 1024 });
+      await userEvent.upload(fileInput(container), huge);
+
+      expect(screen.getByRole("alert")).toHaveTextContent("huge.bin");
+      expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+    });
+
+    it("attaches files dropped onto the composer", () => {
+      render(<ChatInput onSend={vi.fn()} disabled={false} allowAttachments />);
+      const composer = screen.getByRole("textbox").closest("div.glass-panel-strong");
+      if (!composer) throw new Error("no composer rendered");
+      fireEvent.drop(composer, {
+        dataTransfer: { files: [new File(["a"], "dropped.txt", { type: "text/plain" })] },
+      });
+      expect(screen.getByText("dropped.txt")).toBeInTheDocument();
+    });
   });
 });

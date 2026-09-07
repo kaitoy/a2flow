@@ -29,6 +29,7 @@ from .notification import (
 )
 from .outbound_email import OutboundEmail, OutboundEmailCreate, OutboundEmailStatus
 from .session import Session
+from .session_file import SessionFile, SessionFileOrigin, SessionFileRead
 from .tag import (
     MAX_RECORD_TAGS,
     AgentSkillTag,
@@ -133,6 +134,9 @@ __all__ = [
     "OutboundEmailStatus",
     "SecretTag",
     "Session",
+    "SessionFile",
+    "SessionFileOrigin",
+    "SessionFileRead",
     "Tag",
     "TagColor",
     "TagCreate",

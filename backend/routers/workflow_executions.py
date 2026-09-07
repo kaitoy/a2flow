@@ -8,6 +8,11 @@ identified by its execution and served from this router's ``/messages`` and
 ``/agent`` sub-resources — the same pair ``routers/workflows.py`` uses to serve
 a workflow's design session, the design-time counterpart.
 
+A workflow session also holds files (:mod:`models.session_file`), served from
+the ``/files`` sub-resources: participants attach them, the agent reads them and
+writes new ones, and everyone who can read the chat can download them. A design
+session has no equivalent.
+
 Three further sub-resources aggregate these records for operational dashboards
 rather than returning them one by one: ``/by-workflow`` (run volume and lead
 time per workflow), ``/lead-time-trend`` (the same lead time as a daily series),
@@ -18,12 +23,13 @@ so their literal path segment is matched first.
 
 from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack
-from typing import Any
+from typing import Annotated, Any
+from urllib.parse import quote
 
 import anyio
 from ag_ui.core import Context, RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
 from dependencies import (
@@ -35,6 +41,8 @@ from dependencies import (
     MetricsServiceDep,
     MetricsWindowDep,
     PaginationDep,
+    SessionFileReadServiceDep,
+    SessionFileServiceDep,
     SortDep,
     WorkflowExecutionReadServiceDep,
     WorkflowExecutionServiceDep,
@@ -49,11 +57,12 @@ from models.metrics import (
     WorkflowVolumeEntry,
 )
 from models.response import ApiResponse
+from models.session_file import SessionFileRead
 from models.user import Role
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
 from repositories.exceptions import SessionRunInProgressError
-from services import MetricsWindow
+from services import MetricsWindow, describe_session_files
 
 router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 
@@ -254,12 +263,98 @@ async def delete_workflow_execution(
     return ApiResponse(meta=meta, data=None)
 
 
+def _content_disposition(name: str) -> str:
+    """Build a ``Content-Disposition`` header value that downloads ``name`` as a file.
+
+    Always ``attachment``: a session file's bytes are whatever a participant or
+    the agent put there, and serving arbitrary uploaded content inline is how an
+    upload endpoint turns into a stored-XSS vector. The name is emitted twice --
+    a quoted ASCII form every client understands, and the RFC 5987 ``filename*``
+    form that carries the real, possibly non-ASCII name.
+
+    Args:
+        name: The stored file name.
+
+    Returns:
+        The header value.
+    """
+    fallback = name.encode("ascii", "replace").decode("ascii")
+    fallback = fallback.replace('"', "'").replace("\\", "_")
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(name)}"
+
+
+@router.post(
+    "/{execution_id}/files",
+    response_model=ApiResponse[SessionFileRead],
+    status_code=201,
+)
+async def upload_session_file(
+    execution_id: str,
+    file: Annotated[UploadFile, File(description="File to attach to the session")],
+    service: SessionFileServiceDep,
+    caller: CurrentUserDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[SessionFileRead]:
+    """Attach an uploaded file to this execution's workflow session.
+
+    Restricted to the same people who may drive the run -- its initiator, its
+    designated approvers, and super admins. A plain admin can read a run and
+    download what it produced, but putting a new file in front of its agent is
+    acting on the run, so it goes through the stricter check.
+
+    The response carries the file's metadata, including the name it was actually
+    stored under: a name already taken in the session is suffixed rather than
+    overwritten.
+    """
+    stored = await service.upload(
+        execution_id,
+        filename=file.filename,
+        content_type=file.content_type,
+        read=file.read,
+        caller=caller,
+    )
+    return ApiResponse(meta=meta, data=stored)
+
+
+@router.get("/{execution_id}/files/{file_id}/content")
+async def download_session_file(
+    execution_id: str,
+    file_id: str,
+    service: SessionFileReadServiceDep,
+    caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
+) -> Response:
+    """Serve one of this execution's session files as a download.
+
+    Open to everyone who may read the run's chat, which is the point: a file is
+    part of the conversation, so the same people see it.
+
+    Deliberately outside the ``ApiResponse`` envelope -- it returns the file's
+    bytes, like ``GET /users/{id}/avatar``. Every file is served as a generic
+    attachment rather than under its recorded type, so nothing a participant or
+    the agent stored can be rendered by the browser.
+    """
+    stored = await service.download(
+        execution_id, file_id, caller=caller, caller_roles=caller_roles
+    )
+    return Response(
+        content=stored.data,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": _content_disposition(stored.name),
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
 @router.post("/{execution_id}/agent", include_in_schema=False)
 async def workflow_session_agent(
     execution_id: str,
     input_data: RunAgentInput,
     request: Request,
     service: WorkflowExecutionServiceDep,
+    files: SessionFileServiceDep,
     caller: CurrentUserDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent driving an execution's workflow session.
@@ -300,9 +395,21 @@ async def workflow_session_agent(
     # The context feeds the system instruction (via CONTEXT_STATE_KEY), so the
     # client-sent one is stripped to the A2UI entries the frontend middleware
     # injects — the LLM has no other source for the component catalog or the
-    # render_a2ui argument format — and the workflow description is prepended
-    # from the server-trusted record rather than taken from the client.
+    # render_a2ui argument format — and the workflow description and the
+    # session's file listing are prepended from server-trusted records rather
+    # than taken from the client. The file listing is how the agent learns what
+    # was attached: the frontend uploads a file and then sends an ordinary
+    # message, and nothing it sends is trusted to say which files exist.
     context = keep_a2ui_context(input_data.context or [])
+    session_files = await files.list_for_run(execution_id)
+    if session_files:
+        context.insert(
+            0,
+            Context(
+                description="Files attached to this session",
+                value=describe_session_files(session_files),
+            ),
+        )
     if execution.description:
         context.insert(
             0,

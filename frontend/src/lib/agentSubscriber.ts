@@ -10,7 +10,13 @@ import {
   REASONING_ACTIVITY_TYPE,
   TOOL_CALL_ACTIVITY_TYPE,
 } from "@/lib/agentActivity";
+import { RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
 import { logAgUiEvent } from "@/lib/devEventLogger";
+import {
+  parseSessionFileResult,
+  SESSION_FILE_ACTIVITY_TYPE,
+  WRITE_SESSION_FILE_TOOL_NAME,
+} from "@/lib/sessionFileTool";
 import type { AppDispatch } from "@/store";
 import {
   addActivityMessage,
@@ -62,6 +68,10 @@ export function createAgentSubscriber(
   dispatch: AppDispatch,
   options: AgentSubscriberOptions
 ): AgentSubscriber {
+  // Tool call ids of this run's `write_session_file` calls. The result event
+  // that carries the stored file's id does not carry the tool's name, so the
+  // name is recorded here when the call ends and read back when it returns.
+  const sessionFileCallIds = new Set<string>();
   return {
     onEvent: async ({ event }) => {
       logAgUiEvent(event);
@@ -114,8 +124,15 @@ export function createAgentSubscriber(
         options.onRenderA2uiEnd(event.toolCallId, toolCallArgs);
         return;
       }
-      if (options.onRenderApprovalEnd && isHiddenToolName(toolCallName)) {
-        options.onRenderApprovalEnd(event.toolCallId, toolCallArgs);
+      if (toolCallName === RENDER_APPROVAL_TOOL_NAME) {
+        options.onRenderApprovalEnd?.(event.toolCallId, toolCallArgs);
+        return;
+      }
+      if (toolCallName === WRITE_SESSION_FILE_TOOL_NAME) {
+        // A backend tool: the file exists only once the call returns, so the
+        // card is built in onToolCallResultEvent. Remember the id here, since
+        // that event carries no tool name of its own.
+        sessionFileCallIds.add(event.toolCallId);
         return;
       }
       if (isHiddenToolName(toolCallName)) return;
@@ -133,12 +150,23 @@ export function createAgentSubscriber(
       );
     },
     onToolCallResultEvent: async ({ event }) => {
-      dispatch(
-        attachToolCallResult({
-          toolCallId: event.toolCallId,
-          result: parseToolResult(event.content),
-        })
-      );
+      const result = parseToolResult(event.content);
+      if (sessionFileCallIds.has(event.toolCallId)) {
+        const file = parseSessionFileResult(result);
+        // A rejected write comes back as `{error}`; showing no card is right —
+        // there is nothing to download, and the agent explains it in the chat.
+        if (file) {
+          dispatch(
+            addActivityMessage({
+              id: event.toolCallId,
+              activityType: SESSION_FILE_ACTIVITY_TYPE,
+              content: { ...file },
+            })
+          );
+        }
+        return;
+      }
+      dispatch(attachToolCallResult({ toolCallId: event.toolCallId, result }));
     },
     onReasoningMessageStartEvent: async ({ event }) => {
       dispatch(

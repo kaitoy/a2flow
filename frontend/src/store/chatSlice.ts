@@ -19,6 +19,11 @@ import {
   TOOL_CALL_ACTIVITY_TYPE,
 } from "@/lib/agentActivity";
 import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
+import {
+  parseSessionFileResult,
+  SESSION_FILE_ACTIVITY_TYPE,
+  WRITE_SESSION_FILE_TOOL_NAME,
+} from "@/lib/sessionFileTool";
 
 export type { Message };
 
@@ -245,9 +250,12 @@ interface RenderedActivityIndex {
  * When resuming a session, the backend returns raw AG-UI messages. Tool calls are stored on
  * assistant messages, not as standalone activity messages. This generator re-synthesizes the
  * activity messages — A2UI surfaces (``render_a2ui``), approval controls (``render_approval``),
- * and user-added MCP tool calls (``call_mcp_tool``) — so resumed sessions display them
- * identically to live sessions. Internal A2Flow tool calls are intentionally not reproduced
- * this way: their live-only chip normally has no persisted representation to rebuild from.
+ * session-file download cards (``write_session_file``), and user-added MCP tool calls
+ * (``call_mcp_tool``) — so resumed sessions display them identically to live sessions. Other
+ * internal A2Flow tool calls are intentionally not reproduced this way: their live-only chip
+ * normally has no persisted representation to rebuild from. A file card is the exception
+ * because it must survive a reload: the file outlives the run that produced it, and the chat
+ * is the only place its download link appears.
  *
  * When {@link rendered} is supplied, an already-rendered message is re-yielded in place of the
  * rebuild wherever the index has one — an internal tool chip (which has nothing to rebuild
@@ -274,6 +282,22 @@ function* synthesizeActivityMessages(
     }
     if (msg.role !== "assistant" || !msg.toolCalls) continue;
     for (const tc of msg.toolCalls) {
+      if (tc.function.name === WRITE_SESSION_FILE_TOOL_NAME) {
+        // The only rebuilt line driven by a call's *result* rather than its
+        // arguments: the file id the card links to exists only after the
+        // backend tool has stored it.
+        const raw = resultsByCallId.get(tc.id);
+        const file = raw === undefined ? null : parseSessionFileResult(parseToolResult(raw));
+        if (file) {
+          yield {
+            id: tc.id,
+            role: "activity",
+            activityType: SESSION_FILE_ACTIVITY_TYPE,
+            content: file,
+          } as RenderedMessage;
+        }
+        continue;
+      }
       if (
         tc.function.name !== RENDER_A2UI_TOOL_NAME &&
         tc.function.name !== RENDER_APPROVAL_TOOL_NAME &&

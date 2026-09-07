@@ -48,6 +48,7 @@ from repositories.exceptions import (
     RegistryUnavailableError,
     SecretResolutionError,
     SecretValidationError,
+    SessionFileValidationError,
     SessionRunInProgressError,
     SkillCloneError,
     SkillNotReadyError,
@@ -81,6 +82,7 @@ from routers.exception_handlers import (
     registry_unavailable_exception_handler,
     secret_resolution_exception_handler,
     secret_validation_exception_handler,
+    session_file_validation_exception_handler,
     session_run_in_progress_exception_handler,
     skill_clone_exception_handler,
     skill_not_ready_exception_handler,
@@ -251,6 +253,9 @@ app.add_exception_handler(
 )
 app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
 app.add_exception_handler(AvatarValidationError, avatar_validation_exception_handler)
+app.add_exception_handler(
+    SessionFileValidationError, session_file_validation_exception_handler
+)
 app.add_exception_handler(SecretValidationError, secret_validation_exception_handler)
 app.add_exception_handler(
     McpServerValidationError, mcp_server_validation_exception_handler

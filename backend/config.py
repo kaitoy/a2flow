@@ -51,6 +51,18 @@ _DEFAULT_PRUNE_GRACE_SECONDS = 3600
 #: ``services/agent_skill_sync.py``).
 _DEFAULT_CLONE_TIMEOUT_SECONDS = 120
 
+#: Largest single file (20 MiB) that may be attached to a workflow session.
+#: Session files are stored as database blobs and are read whole, so this is
+#: also the largest amount of memory one upload or download occupies. It is
+#: sized for the working documents a run actually passes around -- exports,
+#: logs, spreadsheets -- not for archives.
+_DEFAULT_SESSION_FILE_MAX_BYTES = 20 * 1024 * 1024
+
+#: Combined size (200 MiB) of every file one workflow session may hold. Files
+#: live as long as their run does and cannot be deleted individually, so
+#: without a ceiling a long-running session could grow without bound.
+_DEFAULT_SESSION_FILES_MAX_TOTAL_BYTES = 200 * 1024 * 1024
+
 #: Timezone the operations metrics use to decide where a calendar day starts,
 #: used when reporting "today" counts and when bucketing the lead-time trend.
 #: UTC is the safe default; an operations team reading these numbers against
@@ -150,6 +162,12 @@ class Settings(BaseSettings):
             directory is kept before a pull may prune it.
         skills_clone_timeout_seconds: Per-request timeout, in seconds, for a
             skill clone's HTTP requests against its repository.
+        session_file_max_bytes: Largest single file that may be attached to a
+            workflow session, in bytes. Enforced while the upload is read, so a
+            larger body is refused rather than buffered.
+        session_files_max_total_bytes: Combined size, in bytes, of every file
+            one workflow session may hold. Files are removed only when their
+            run is deleted, so this is what bounds a session's footprint.
         llm_model: LLM selection, either a bare Gemini model name or a
             ``litellm:<provider>/<model>`` string.
         role_description: Base role text fed into the system prompt builder.
@@ -273,6 +291,9 @@ class Settings(BaseSettings):
     )
     skills_prune_grace_seconds: int = _DEFAULT_PRUNE_GRACE_SECONDS
     skills_clone_timeout_seconds: int = _DEFAULT_CLONE_TIMEOUT_SECONDS
+
+    session_file_max_bytes: int = _DEFAULT_SESSION_FILE_MAX_BYTES
+    session_files_max_total_bytes: int = _DEFAULT_SESSION_FILES_MAX_TOTAL_BYTES
 
     llm_model: str = "gemini-3.5-flash"
     role_description: str = "You are a helpful assistant."

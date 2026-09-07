@@ -74,6 +74,31 @@ The page refreshes itself every few seconds so each participant sees the others'
 
 The [design session](./workflows.md#adjusting-the-task-templates) is a shared chat too, with the same avatars and the same live updates. It is shared by the tenant's Developers rather than by a run's participants.
 
+### Files in the session {#files-in-the-session}
+
+A workflow session carries files as well as messages. Attach one with the **paperclip** button beside the chat input, or drop it anywhere on the input box: each file appears as a chip above the box, and the × on a chip removes it. Nothing is sent until you send the message, so removing a chip simply drops that file — it never reaches the run.
+
+The message you send names what went with it, so the transcript still shows the attachment after a reload. The agent is told about the files separately, by the server, and can:
+
+| It can | It cannot |
+|---|---|
+| List the session's files | Change a file anyone attached |
+| Read one, as long as it is text | Delete a file |
+| Add a new file of its own | Reach another run's files |
+
+A file the agent writes appears in the chat as a card with a **Download** button. Because the agent only ever adds, a file it writes under a name already in the session is stored under a numbered variant (`report (2).csv`) instead of replacing what is there — the card names the file as it was actually stored.
+
+Reading is limited to text. A spreadsheet, an image or an archive is stored and downloaded intact, but the agent cannot read it; give it a text export if it needs the contents.
+
+| | |
+|---|---|
+| **Who can attach** | The run's initiator and its designated approvers — the same people who can drive the run. An Admin who is only watching cannot attach |
+| **Who can download** | Everyone who can read the chat, Admins included |
+| **How long they last** | As long as the run. Deleting the run deletes its files |
+| **Size limits** | Set per deployment — see [Configuration](../operations/configuration.md#session-files) |
+
+Files cannot be removed one at a time once sent, so a session's files go when the run does.
+
 ## Workflow Tasks
 
 The run's tasks are read-only here: the templates are edited on the [workflow](./workflows.md#adjusting-the-task-templates), and a run's statuses are advanced by the execution agent and the approval flow.

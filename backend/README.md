@@ -249,6 +249,27 @@ The list (ordered most-recent-first) and get endpoints are in the [API reference
 
 ---
 
+### Session files
+
+A workflow session also holds files (`models/session_file.py`, table `session_files`), addressed by the execution the same way its chat is:
+
+| Route | Who | Notes |
+|---|---|---|
+| `POST /workflow-executions/{id}/files` | `assert_access` — initiator, designated approver, super admin | Multipart (`file`), returns `ApiResponse[SessionFileRead]` (201). A plain `admin` is refused: putting a file in front of the agent is acting on the run |
+| `GET /workflow-executions/{id}/files/{file_id}/content` | `assert_read_access` — the above plus a plain `admin` | Raw bytes, deliberately outside the envelope like `GET /users/{id}/avatar` |
+
+Bytes live in a `LargeBinary` column, not on disk: the row's `workflow_execution_id` is `ON DELETE CASCADE`, so a file lives exactly as long as its run, and no shared volume or cleanup job is needed. `SessionFileRead` mirrors every column **except** `data`, which is what keeps a response from ever carrying file bytes; `SqlSessionFileRepository.list_for_execution` defers the column for the same reason.
+
+Downloads are always served as `application/octet-stream` with `Content-Disposition: attachment` (RFC 5987 `filename*` plus an ASCII fallback) and `X-Content-Type-Options: nosniff`, never under the recorded content type — which is why no type allowlist is needed for arbitrary uploaded content. Sizes are capped per file and per session (`SESSION_FILE_MAX_BYTES`, `SESSION_FILES_MAX_TOTAL_BYTES`), the per-file cap enforced while the upload is read so an oversized body is never buffered whole. A rejected file raises `SessionFileValidationError` → 422 `INVALID_SESSION_FILE`.
+
+There is deliberately **no list and no delete endpoint**. Nothing needs them: the agent lists through the repository in-process, the chat rebuilds its download cards from persisted tool calls, and files go when the run does.
+
+`services/session_file.py` splits the two concerns on purpose. `SessionFileStore` validates and persists — sanitizing names down to a bare filename, enforcing both caps, and *renaming* a colliding write rather than overwriting it, which is what makes "the agent can only add" true by construction. `SessionFileService` wraps it with `WorkflowExecutionAccessPolicy`. The agent tools (`infrastructure/session_file_tools.py`: `list_session_files`, `read_session_file`, `write_session_file`, execution-kind only) take the *store*, since they run inside a turn the policy already authorized — so there is no access check there to forget rather than one skipped on purpose.
+
+The agent learns which files exist from the server, never from the client: `POST /workflow-executions/{id}/agent` reads the session's file list and injects it as a `Context` entry beside the workflow description.
+
+---
+
 ### Workflow tasks
 
 A workflow task is a single actionable item belonging to a `WorkflowExecution`, copied from the workflow's task templates at execute time and driven by the execution agent via [agent tools](#agent-task-tools); they are also exposed through the REST endpoints below. Each task carries a `status` (`pending` | `in_progress` | `completed` | `failed` | `skipped`); tasks are listed in `createdAt` order. Deleting the parent `WorkflowExecution` cascades to its tasks.

@@ -174,7 +174,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
           onApprovalResolved={sendApprovalResult}
           pendingRenderCalls={pendingRenderCalls}
         />
-        <ChatInput onSend={sendMessage} disabled={isRunning} />
+        <ChatInput onSend={sendMessage} disabled={isRunning} allowAttachments />
       </div>
     </div>
   );

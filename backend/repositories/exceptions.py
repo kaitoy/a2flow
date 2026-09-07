@@ -297,6 +297,22 @@ class AvatarValidationError(RepositoryError):
         super().__init__(reason)
 
 
+class SessionFileValidationError(RepositoryError):
+    """Raised when a file cannot be attached to a workflow session.
+
+    Covers an unusable name (empty, or nothing left once path separators and
+    control characters are stripped), an empty file, a file over
+    ``Settings.session_file_max_bytes``, and a session already at
+    ``Settings.session_files_max_total_bytes``. Carries a human-readable
+    ``reason`` surfaced in the error envelope's ``details`` block when
+    returning HTTP 422, mirroring :class:`AvatarValidationError`.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class McpServerValidationError(RepositoryError):
     """Raised when an MCPServer create/update would leave an invalid transport shape.
 

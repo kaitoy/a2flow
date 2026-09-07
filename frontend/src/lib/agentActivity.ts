@@ -1,5 +1,6 @@
 import { RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
 import { RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
+import { WRITE_SESSION_FILE_TOOL_NAME } from "@/lib/sessionFileTool";
 
 /**
  * Activity-message type used to render a tool-call status line (running/done)
@@ -149,11 +150,16 @@ export function getToolDisplayName(
 
 /**
  * Whether a tool call should be hidden from the generic tool-activity stream
- * because it already has its own dedicated UI (A2UI surfaces, approval controls).
+ * because it already has its own dedicated UI (A2UI surfaces, approval controls,
+ * session-file download cards).
  *
  * @param toolCallName - The function name from the AG-UI tool-call event.
  * @returns True when the tool is rendered by a dedicated component instead.
  */
 export function isHiddenToolName(toolCallName: string): boolean {
-  return toolCallName === RENDER_A2UI_TOOL_NAME || toolCallName === RENDER_APPROVAL_TOOL_NAME;
+  return (
+    toolCallName === RENDER_A2UI_TOOL_NAME ||
+    toolCallName === RENDER_APPROVAL_TOOL_NAME ||
+    toolCallName === WRITE_SESSION_FILE_TOOL_NAME
+  );
 }

@@ -24,6 +24,11 @@ from infrastructure.approval_tools import (
     request_approval,
 )
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
+from infrastructure.session_file_tools import (
+    list_session_files,
+    read_session_file,
+    write_session_file,
+)
 from infrastructure.task_template_tools import (
     create_task_template,
     delete_task_template,
@@ -383,6 +388,18 @@ EXECUTION_AGENT_INSTRUCTION = (
     "re-check it with `get_approval`). Only proceed when the decision is "
     "`approved`; if it is `rejected`, mark the task `failed` (or `skipped` when "
     "appropriate) and do not perform the action.\n\n"
+    "Session files: this run's chat can carry files. Any the participants "
+    "attached are listed in your context at the start of the turn, and "
+    "`list_session_files` gives the same list again after you add one. Read one "
+    "with `read_session_file(file_id)` -- text only; a file that is not UTF-8 "
+    "text comes back as an error, so ask for a text export rather than "
+    "retrying. When you produce something long or structured -- a report, a CSV "
+    "extract, a generated config -- call "
+    "`write_session_file(name, content, content_type)` and mention the file "
+    "instead of pasting it into the chat; it appears in the conversation with a "
+    "download link. You can only add files: you cannot edit or delete one, and "
+    "a name already taken is stored under a numbered variant, so check the "
+    "returned `name` before referring to it.\n\n"
     'Mocked tools: a tool result containing `"mocked": true` came from a stub '
     "configured for this test run -- the real tool was not called and had no "
     "effect. Trust the result exactly as returned, follow any instruction in its "
@@ -480,7 +497,9 @@ def resolve_model() -> LiteLlm | str:
 #: workflow's task templates through the task-template tools; the execution kind
 #: only advances the run's WorkflowTasks through their statuses -- the tasks are
 #: pre-copied from the published templates and cannot be added, removed, or
-#: restructured mid-run -- plus the approval and MCP invocation tools.
+#: restructured mid-run -- plus the approval, MCP invocation, and session-file
+#: tools. The session-file tools are execution-only: files belong to a workflow
+#: session, and a design session has none.
 _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
     AgentKind.initial_design: [
         register_task_templates,
@@ -506,6 +525,9 @@ _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
         list_user_groups,
         list_mcp_tools,
         call_mcp_tool,
+        list_session_files,
+        read_session_file,
+        write_session_file,
     ],
 }
 

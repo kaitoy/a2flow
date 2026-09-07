@@ -16,9 +16,11 @@ import {
   type ToolCallActivityContent,
 } from "@/lib/agentActivity";
 import { APPROVAL_ACTIVITY_TYPE } from "@/lib/approvalTool";
+import { parseSessionFileResult, SESSION_FILE_ACTIVITY_TYPE } from "@/lib/sessionFileTool";
 import { A2uiRenderer } from "./A2uiRenderer";
 import { ApprovalControls } from "./ApprovalControls";
 import { ReasoningBubble } from "./ReasoningBubble";
+import { SessionFileCard } from "./SessionFileCard";
 import { ToolActivityBubble } from "./ToolActivityBubble";
 
 /** A resolved (non-pending) approval decision. */
@@ -37,8 +39,9 @@ function surfaceRowClass(avatar: ReactNode, isOwn: boolean): string {
 /**
  * Render an activity message by delegating to the renderer for its type: A2UI
  * surfaces to {@link A2uiRenderer}, approval requests to {@link ApprovalControls},
- * tool-call status lines to {@link ToolActivityBubble}, and streamed reasoning to
- * {@link ReasoningBubble}. Ignores unknown activity types.
+ * files the agent wrote to {@link SessionFileCard}, tool-call status lines to
+ * {@link ToolActivityBubble}, and streamed reasoning to {@link ReasoningBubble}.
+ * Ignores unknown activity types.
  *
  * `avatar` is used by the A2UI branch (the user who resolved the surface's
  * pending action) and the approval branch (the user who decided the approval);
@@ -98,6 +101,17 @@ export function ActivityMessageBubble({
 
   if (message.activityType === TOOL_CALL_ACTIVITY_TYPE) {
     return <ToolActivityBubble content={message.content as unknown as ToolCallActivityContent} />;
+  }
+  if (message.activityType === SESSION_FILE_ACTIVITY_TYPE) {
+    const file = parseSessionFileResult(message.content);
+    if (!file) return null;
+    return (
+      <div className="mb-3 flex justify-start">
+        <div className="w-full max-w-[85%]">
+          <SessionFileCard content={file} />
+        </div>
+      </div>
+    );
   }
   if (message.activityType === REASONING_ACTIVITY_TYPE) {
     return (

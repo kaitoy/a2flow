@@ -12,6 +12,7 @@ from fastapi import Depends
 
 from config import get_settings
 from infrastructure.secret_resolver import SecretResolver
+from repositories import SessionFileRepository
 from services import (
     AgentSkillService,
     ApprovalService,
@@ -27,6 +28,8 @@ from services import (
     NotificationService,
     OutboundEmailService,
     SecretService,
+    SessionFileService,
+    SessionFileStore,
     SystemSettingsService,
     TagService,
     TenantService,
@@ -70,6 +73,8 @@ from .repository import (
     OutboundEmailRepositoryDep,
     SecretReadRepositoryDep,
     SecretRepositoryDep,
+    SessionFileReadRepositoryDep,
+    SessionFileRepositoryDep,
     SystemSettingsRepositoryDep,
     TagReadRepositoryDep,
     TagRepositoryDep,
@@ -671,6 +676,51 @@ def get_workflow_execution_access_policy_read(
 
 WorkflowExecutionAccessPolicyReadDep = Annotated[
     WorkflowExecutionAccessPolicy, Depends(get_workflow_execution_access_policy_read)
+]
+
+
+def _session_file_store(files: SessionFileRepository) -> SessionFileStore:
+    """Build the validating session-file store both service factories wrap.
+
+    The size limits come from settings rather than from a route, so the two
+    scopes cannot drift into enforcing different caps.
+    """
+    settings = get_settings()
+    return SessionFileStore(
+        files,
+        max_file_bytes=settings.session_file_max_bytes,
+        max_total_bytes=settings.session_files_max_total_bytes,
+    )
+
+
+def get_session_file_service(
+    files: SessionFileRepositoryDep,
+    executions: WorkflowExecutionRepositoryDep,
+    access: WorkflowExecutionAccessPolicyDep,
+) -> SessionFileService:
+    """Create a SessionFileService for a route that acts on a run's files."""
+    return SessionFileService(_session_file_store(files), executions, access)
+
+
+SessionFileServiceDep = Annotated[SessionFileService, Depends(get_session_file_service)]
+
+
+def get_session_file_read_service(
+    files: SessionFileReadRepositoryDep,
+    executions: WorkflowExecutionReadRepositoryDep,
+    access: WorkflowExecutionAccessPolicyReadDep,
+) -> SessionFileService:
+    """Create a SessionFileService for a read route, possibly across all tenants.
+
+    Mirrors ``get_workflow_execution_access_policy_read``: every collaborator
+    has to be the read-scoped one, or resolving this dependency would raise for
+    the platform-scoped super admin it exists to serve.
+    """
+    return SessionFileService(_session_file_store(files), executions, access)
+
+
+SessionFileReadServiceDep = Annotated[
+    SessionFileService, Depends(get_session_file_read_service)
 ]
 
 

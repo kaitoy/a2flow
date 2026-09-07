@@ -18,6 +18,7 @@ vi.mock("@/lib/api", () => ({
   isForbiddenError: vi.fn(),
   listWorkflowTasks: vi.fn(),
   getUsersByIds: vi.fn(),
+  uploadSessionFile: vi.fn(),
   SUPPRESS_FORBIDDEN_TOAST: { suppressForbiddenToast: true },
   formatUserName: (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`,
 }));
@@ -239,6 +240,95 @@ describe("useWorkflowSessionChat", () => {
     await result.current.sendMessage("hello");
     expect(api.createWorkflowSessionAgent).toHaveBeenCalledWith("execution-1", "sess-abc");
     expect(mockAgent.runAgent).toHaveBeenCalled();
+  });
+
+  describe("attachments", () => {
+    /** Build the metadata the upload endpoint answers with. */
+    function uploaded(name: string): api.SessionFile {
+      return {
+        id: `file-${name}`,
+        tenantId: "tenant-1",
+        workflowExecutionId: "execution-1",
+        name,
+        contentType: "text/plain",
+        sizeBytes: 3,
+        origin: "user",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        createdBy: "owner-1",
+        updatedBy: "owner-1",
+      };
+    }
+
+    /** Mount the hook and let its kickoff run settle. */
+    async function mountSettled(store: ReturnType<typeof makeStore>) {
+      const { result } = renderHook(
+        () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
+        { wrapper: makeWrapper(store) }
+      );
+      await waitFor(() => expect(mockAgent.runAgent).toHaveBeenCalled());
+      mockAgent.runAgent.mockClear();
+      mockAgent.addMessage.mockClear();
+      return result;
+    }
+
+    it("uploads the files then names them in the sent message", async () => {
+      vi.mocked(api.uploadSessionFile).mockResolvedValue(uploaded("notes.txt"));
+      const store = makeStore();
+      const result = await mountSettled(store);
+
+      await result.current.sendMessage("look at this", [
+        new File(["abc"], "notes.txt", { type: "text/plain" }),
+      ]);
+
+      expect(api.uploadSessionFile).toHaveBeenCalledWith("execution-1", expect.any(File));
+      expect(mockAgent.addMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: "user",
+          content: "look at this\n\nAttached files: notes.txt",
+        })
+      );
+    });
+
+    it("names the file the server stored, not the one that was picked", async () => {
+      // A colliding name is stored as a numbered variant, so the transcript has
+      // to name what actually landed.
+      vi.mocked(api.uploadSessionFile).mockResolvedValue(uploaded("notes (2).txt"));
+      const store = makeStore();
+      const result = await mountSettled(store);
+
+      await result.current.sendMessage("", [new File(["abc"], "notes.txt")]);
+
+      expect(mockAgent.addMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ content: "Attached files: notes (2).txt" })
+      );
+    });
+
+    it("sends nothing when an upload fails", async () => {
+      vi.mocked(api.uploadSessionFile).mockRejectedValue(new Error("too large"));
+      const store = makeStore();
+      const result = await mountSettled(store);
+
+      await result.current.sendMessage("look at this", [new File(["abc"], "huge.bin")]);
+
+      expect(mockAgent.runAgent).not.toHaveBeenCalled();
+      expect(store.getState().chat.error).toBeTruthy();
+      expect(store.getState().chat.isRunning).toBe(false);
+    });
+
+    it("uploads nothing for a design session, which has no file store", async () => {
+      vi.mocked(api.uploadSessionFile).mockClear();
+      const store = makeStore();
+      const { result } = renderHook(
+        () => useWorkflowSessionChat("wf-1", "sess-design", null, "owner-1", "design"),
+        { wrapper: makeWrapper(store) }
+      );
+      await waitFor(() => expect(api.getDesignSessionHistory).toHaveBeenCalled());
+
+      await result.current.sendMessage("hi", [new File(["abc"], "notes.txt")]);
+
+      expect(api.uploadSessionFile).not.toHaveBeenCalled();
+    });
   });
 
   it("sendA2uiAction posts the action as a tool result and resumes the run", async () => {

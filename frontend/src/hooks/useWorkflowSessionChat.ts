@@ -21,6 +21,7 @@ import {
   type SessionHistory,
   SUPPRESS_FORBIDDEN_TOAST,
   type User,
+  uploadSessionFile,
   type WorkflowTask,
 } from "@/lib/api";
 import {
@@ -128,7 +129,14 @@ export type SessionChatVariant = "workflow" | "design";
  * On mount, loads prior message history and — when `kickoffPrompt` is non-null
  * and the session is new — auto-sends it to start the run; design sessions
  * pass `null` because their first exchange happened in the background
- * generation run (or the user types it). Subsequent user messages and A2UI
+ * generation run (or the user types it).
+ *
+ * A workflow session's messages can carry files. They are uploaded as part of
+ * sending, not when they were picked, so an abandoned draft leaves no orphaned
+ * files behind; the message text then names them so the transcript still shows
+ * what was attached after a reload. What the *agent* sees is not this line but
+ * the file listing the backend injects into the run's context, so nothing the
+ * client sends decides which files exist. Subsequent user messages and A2UI
  * user actions (e.g. a button click inside a rendered surface) are routed to
  * the session's dedicated agent endpoint, selected by `variant`. A FORBIDDEN
  * (403) failure on that initial load surfaces as the returned `forbidden`
@@ -287,11 +295,35 @@ export function useWorkflowSessionChat(
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, files: File[] = []) => {
       if (!sessionId || isRunning) return;
 
+      // Attachments are uploaded here rather than when they were picked, so a
+      // draft the user abandons leaves nothing behind on the server. Only a
+      // workflow session has a file store; a design session never gets files.
+      let content = prompt;
+      if (files.length > 0 && !isDesign) {
+        dispatch(startRun());
+        try {
+          const uploaded = await Promise.all(
+            files.map((file) => uploadSessionFile(parentId, file))
+          );
+          // The names come from the response, not from the picked files: a name
+          // already taken in the session is stored as a numbered variant, and
+          // the transcript has to name what was actually stored. The agent
+          // learns the real list from the server-injected run context; this
+          // line is what makes the attachment visible in the conversation.
+          const names = uploaded.map((file) => file.name).join(", ");
+          content = `${prompt}\n\nAttached files: ${names}`.trim();
+        } catch (err) {
+          logger.error(err, "failed to upload session files");
+          dispatch(setError("The files could not be attached. Nothing was sent."));
+          return;
+        }
+      }
+
       const msgId = crypto.randomUUID();
-      dispatch(addUserMessage({ id: msgId, content: prompt }));
+      dispatch(addUserMessage({ id: msgId, content }));
       locallySentIds.current.add(msgId);
 
       const agent = buildAgent(parentId, sessionId);
@@ -302,7 +334,7 @@ export function useWorkflowSessionChat(
       }
       if (pending.length > 0) dispatch(clearPendingRenderCalls());
 
-      agent.addMessage({ id: msgId, role: "user", content: prompt });
+      agent.addMessage({ id: msgId, role: "user", content });
 
       try {
         await agent.runAgent(
@@ -323,7 +355,7 @@ export function useWorkflowSessionChat(
       // their keys, so reconciling their ids with the persisted ones is invisible.
       resyncAfterRun();
     },
-    [parentId, sessionId, isRunning, dispatch, resyncAfterRun, buildAgent]
+    [parentId, sessionId, isRunning, isDesign, dispatch, resyncAfterRun, buildAgent]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs

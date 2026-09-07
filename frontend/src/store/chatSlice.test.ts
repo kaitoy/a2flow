@@ -12,6 +12,7 @@ import {
   TOOL_CALL_ACTIVITY_TYPE,
   type ToolCallActivityContent,
 } from "@/lib/agentActivity";
+import { SESSION_FILE_ACTIVITY_TYPE, WRITE_SESSION_FILE_TOOL_NAME } from "@/lib/sessionFileTool";
 import type { Message, RenderedMessage } from "./chatSlice";
 import chatReducer, {
   addActivityMessage,
@@ -223,6 +224,76 @@ describe("chatSlice", () => {
       expect(activityMsg.id).toBe("tc-mcp");
       const content = activityMsg.content as unknown as ToolCallActivityContent;
       expect(content).toMatchObject({ name: "search_web", status: "done", isMcp: true });
+    });
+
+    it("synthesizes a session-file card from a write_session_file result", () => {
+      // The card has to survive a reload: the file outlives the run, and the
+      // chat is the only place its download link appears.
+      const messages: Message[] = [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-file",
+              type: "function",
+              function: {
+                name: WRITE_SESSION_FILE_TOOL_NAME,
+                arguments: JSON.stringify({ name: "summary.md", content: "#" }),
+              },
+            },
+          ],
+        },
+        {
+          id: "m2",
+          role: "tool",
+          toolCallId: "tc-file",
+          content: JSON.stringify({
+            fileId: "file-1",
+            workflowExecutionId: "exec-1",
+            name: "summary.md",
+            sizeBytes: 12,
+          }),
+        },
+      ];
+      const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
+      const activityMsg = state.messages.find((m) => m.id === "tc-file");
+      if (activityMsg?.role !== "activity") throw new Error("expected activity message");
+      expect(activityMsg.activityType).toBe(SESSION_FILE_ACTIVITY_TYPE);
+      expect(activityMsg.content).toMatchObject({
+        fileId: "file-1",
+        workflowExecutionId: "exec-1",
+        name: "summary.md",
+      });
+    });
+
+    it("synthesizes no card when a write_session_file call was rejected", () => {
+      const messages: Message[] = [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-file",
+              type: "function",
+              function: {
+                name: WRITE_SESSION_FILE_TOOL_NAME,
+                arguments: JSON.stringify({ name: "..", content: "x" }),
+              },
+            },
+          ],
+        },
+        {
+          id: "m2",
+          role: "tool",
+          toolCallId: "tc-file",
+          content: JSON.stringify({ error: "File name is empty or unusable" }),
+        },
+      ];
+      const state = chatReducer(emptyState, resumeSession({ sessionId: "sess-1", messages }));
+      expect(state.messages.find((m) => m.role === "activity")).toBeUndefined();
     });
 
     it("restores the MCP call's arguments and result from the persisted history", () => {

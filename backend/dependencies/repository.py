@@ -27,6 +27,7 @@ from repositories import (
     NotificationRepository,
     OutboundEmailRepository,
     SecretRepository,
+    SessionFileRepository,
     SqlAgentSkillRepository,
     SqlApprovalRepository,
     SqlAuthSessionRepository,
@@ -42,6 +43,7 @@ from repositories import (
     SqlNotificationRepository,
     SqlOutboundEmailRepository,
     SqlSecretRepository,
+    SqlSessionFileRepository,
     SqlSystemSettingsRepository,
     SqlTagRepository,
     SqlTenantRepository,
@@ -541,6 +543,30 @@ def get_workflow_execution_read_repository(
 
 WorkflowExecutionReadRepositoryDep = Annotated[
     WorkflowExecutionRepository, Depends(get_workflow_execution_read_repository)
+]
+
+
+def get_session_file_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+) -> SessionFileRepository:
+    """Create a SessionFileRepository backed by the current database session."""
+    return SqlSessionFileRepository(db, tenant_id=tenant_id)
+
+
+SessionFileRepositoryDep = Annotated[
+    SessionFileRepository, Depends(get_session_file_repository)
+]
+
+
+def get_session_file_read_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+) -> SessionFileRepository:
+    """Create a SessionFileRepository for a read route, possibly across all tenants."""
+    return SqlSessionFileRepository(db, tenant_id=tenant_id)
+
+
+SessionFileReadRepositoryDep = Annotated[
+    SessionFileRepository, Depends(get_session_file_read_repository)
 ]
 
 

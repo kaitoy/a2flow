@@ -45,6 +45,8 @@ import type {
   SecretRead as SecretModel,
   SecretType,
   SecretUpdate,
+  SessionFileRead as SessionFileModel,
+  SessionFileOrigin,
   Session as SessionModel,
   SkillSyncStatus,
   SmtpSecurity,
@@ -187,6 +189,7 @@ import {
   zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
   zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
   zUpdateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdPatchResponse,
+  zUploadSessionFileApiV1WorkflowExecutionsExecutionIdFilesPostResponse,
   zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse,
 } from "@/generated/api/zod.gen";
 import { store } from "@/store";
@@ -508,6 +511,8 @@ export type WorkflowExecution = WithAudit<WorkflowExecutionModel>;
 export type WorkflowTask = WithAudit<WorkflowTaskModel>;
 export type WorkflowTaskTemplate = WithAudit<WorkflowTaskTemplateModel>;
 export type Session = SessionModel;
+/** One file attached to a workflow session, by a participant or by the agent. */
+export type SessionFile = WithAudit<SessionFileModel>;
 export type {
   AgentSkillCreate,
   AgentSkillUpdate,
@@ -537,6 +542,7 @@ export type {
   SecretCreate,
   SecretType,
   SecretUpdate,
+  SessionFileOrigin,
   SkillSyncStatus,
   SmtpSecurity,
   SystemSettingsUpdate,
@@ -1770,6 +1776,46 @@ export async function getWorkflowSessionHistory(
     ),
     zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
   );
+}
+
+/**
+ * Attach a file to a workflow session and return the stored file's metadata.
+ *
+ * Sent as multipart form data with the `Content-Type` cleared so the browser
+ * sets it with the correct multipart boundary — the same shape as
+ * {@link uploadUserAvatar}, since the response is still the JSON envelope.
+ *
+ * The returned `name` is the name the file was actually stored under: a name
+ * already taken in the session is stored as a numbered variant rather than
+ * replacing what is there, so callers should display this rather than the name
+ * they uploaded.
+ */
+export async function uploadSessionFile(
+  workflowExecutionId: string,
+  file: File
+): Promise<SessionFile> {
+  const form = new FormData();
+  form.append("file", file);
+  return fetchEnvelope(
+    apiClient.post(
+      `/api/v1/workflow-executions/${encodeURIComponent(workflowExecutionId)}/files`,
+      form,
+      { headers: { "Content-Type": null } }
+    ),
+    zUploadSessionFileApiV1WorkflowExecutionsExecutionIdFilesPostResponse
+  ) as Promise<SessionFile>;
+}
+
+/**
+ * Build the URL that downloads one of a workflow session's files.
+ *
+ * A plain URL rather than a fetch: the endpoint is cookie-authenticated and
+ * serves the file as an attachment, so an `<a href>` downloads it with no
+ * JavaScript involved — the same approach {@link avatarUrl} takes for images.
+ */
+export function sessionFileDownloadUrl(workflowExecutionId: string, fileId: string): string {
+  const execution = encodeURIComponent(workflowExecutionId);
+  return `${API_BASE}/api/v1/workflow-executions/${execution}/files/${encodeURIComponent(fileId)}/content`;
 }
 
 /** List WorkflowExecution records (newest first) with optional pagination, sort, and filters. */
