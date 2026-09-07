@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # Demo data
 
-Setting `DEMO_DATA=true` on the backend registers everything the approval-gated "launch an EC2 instance" example needs, in the seeded **Default** tenant, so there is something to run without registering every piece by hand. The [workflow](../guides/workflows.md) itself is deliberately not seeded — these records are the ingredients you generate one from, which is exactly the tour below.
+Setting `DEMO_DATA=true` on the backend registers everything two approval-gated examples need — the mutating "launch an EC2 instance" one and the read-only "analyze a Google Cloud project's error logs" one — in the seeded **Default** tenant, so there is something to run without registering every piece by hand. The [workflow](../guides/workflows.md) itself is deliberately not seeded — these records are the ingredients you generate one from, which is exactly the tour below.
 
 ## Enabling it
 
@@ -29,6 +29,7 @@ DEMO_GCP_API_KEY=AIza...
 ## What gets registered
 
 - **[Agent skill](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — gathers the instance configuration, gets a manager's explicit approval of it, then launches the instance through an MCP tool. Its repository is cloned in the background after startup, so the skill shows as `pending` for a moment before it can be used.
+- **[Agent skill](../guides/agent-skills.md) `Demo GCP Log Error Analysis`** — agrees the log query scope (project, resource, time range, severity) with the user, gets a manager's explicit approval of that scope, then reads the matching entries through the Cloud Logging MCP Server's read-only tools, singles out the errors, and reports the likely root cause. Its repository is cloned the same way, so it also shows as `pending` at first.
 - **[MCP server](../guides/mcp-servers.md) `AWS MCP Server`** — a `stdio` server reaching AWS's managed AWS MCP Server, which is where the EC2 tools come from.
 - **[MCP server](../guides/mcp-servers.md) `Cloud Logging MCP Server`** — a `streamable_http` server reaching Google Cloud's managed Cloud Logging MCP server. It sends the `demo-gcp-credentials` API key as its `x-goog-api-key` header, and its tools only read log entries, buckets, and views.
 - **[Secret](../guides/secrets.md) `demo-aws-credentials`** — the AWS access key id and secret access key the AWS MCP Server reads.
@@ -40,7 +41,7 @@ DEMO_GCP_API_KEY=AIza...
 |---|---|---|
 | `demo-developer` | `developer` | Generates and publishes the workflow |
 | `demo-requester-1`, `demo-requester-2` | `requester` | Run the workflow |
-| `demo-approver-1`, `demo-approver-2` | `approver` | Approve the launch |
+| `demo-approver-1`, `demo-approver-2` | `approver` | Approve the launch, or the log query scope |
 
 None of them holds its role directly: each one inherits it from a [user group](../guides/users-and-groups.md#user-groups) — `Demo Developers`, `Demo Requesters`, and `Demo Approvers`.
 
@@ -53,6 +54,8 @@ Sign in with `DEMO_PASSWORD` as each account in turn:
 3. Review the generated task templates on the workflow's detail page, then **Publish**.
 4. As **`demo-requester-1`**, press **Run** on the workflow ([Running a workflow](../guides/workflows.md#running-a-workflow)). The run's chat opens and the agent starts working through the tasks.
 5. When the skill asks for approval, sign in as **`demo-approver-1`** and approve it ([Approvals](../guides/approvals.md)). The agent then launches the instance through the MCP tool.
+
+The same five steps work from **`Demo GCP Log Error Analysis`** for a read-only log triage: the approval covers the query scope rather than a launch, and the last step reads logs instead of creating anything. A real run there needs `DEMO_GCP_API_KEY` set to a key for a project that has logs.
 
 **No AWS account?** Skip step 3 and run the workflow while it is still `draft` — as a `developer`, `demo-developer` may do that, and only a draft run's dialog offers the tenant's [tool mocks](../guides/tool-mocks.md). Under **Mock tools**, check the seeded stubs it lists (`aws___call_aws` or `aws___run_script` for the launch, and `request_approval`); the whole workflow then plays through without reaching AWS or waiting on a human.
 

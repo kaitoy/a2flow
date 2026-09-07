@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # デモデータ
 
-バックエンドで `DEMO_DATA=true` を設定すると、承認つきの「EC2 インスタンスを起動する」例に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、その手順が下の「試してみる」です。
+バックエンドで `DEMO_DATA=true` を設定すると、承認つきの 2 つの例 — 状態を変える「EC2 インスタンスを起動する」例と、読み取りだけの「Google Cloud プロジェクトのエラーログを分析する」例 — に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、その手順が下の「試してみる」です。
 
 ## 有効にする
 
@@ -29,6 +29,7 @@ DEMO_GCP_API_KEY=AIza...
 ## 登録されるもの
 
 - **[エージェントスキル](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — インスタンスの構成を聞き取り、それについて管理職の明示的な承認を得てから、MCP ツールでインスタンスを起動します。リポジトリは起動後にバックグラウンドで clone するので、使えるようになるまでの間スキルは `pending` と表示されます。
+- **[エージェントスキル](../guides/agent-skills.md) `Demo GCP Log Error Analysis`** — ログの照会範囲(プロジェクト・リソース・期間・重大度)をユーザーと合意し、その範囲について管理職の明示的な承認を得てから、Cloud Logging MCP Server の読み取り専用ツールで該当するエントリを読み、エラーを切り分けて、想定される根本原因を報告します。リポジトリの clone も同じ仕組みなので、最初は同様に `pending` と表示されます。
 - **[MCP サーバー](../guides/mcp-servers.md) `AWS MCP Server`** — AWS のマネージド AWS MCP Server に接続する `stdio` サーバーです。EC2 のツールはここから来ます。
 - **[MCP サーバー](../guides/mcp-servers.md) `Cloud Logging MCP Server`** — Google Cloud のマネージド Cloud Logging MCP サーバーに接続する `streamable_http` サーバーです。`demo-gcp-credentials` の API キーを `x-goog-api-key` ヘッダーで送ります。ツールはログエントリ・バケット・ビューを読むだけです。
 - **[シークレット](../guides/secrets.md) `demo-aws-credentials`** — AWS MCP Server が読む、AWS のアクセスキー ID とシークレットアクセスキーです。
@@ -40,7 +41,7 @@ DEMO_GCP_API_KEY=AIza...
 |---|---|---|
 | `demo-developer` | `developer` | ワークフローを生成して公開する |
 | `demo-requester-1`、`demo-requester-2` | `requester` | ワークフローを実行する |
-| `demo-approver-1`、`demo-approver-2` | `approver` | 起動を承認する |
+| `demo-approver-1`、`demo-approver-2` | `approver` | 起動、またはログの照会範囲を承認する |
 
 いずれもロールを直接は持ちません。それぞれ[ユーザーグループ](../guides/users-and-groups.md#user-groups) `Demo Developers`、`Demo Requesters`、`Demo Approvers` から継承します。
 
@@ -53,6 +54,8 @@ DEMO_GCP_API_KEY=AIza...
 3. ワークフローの詳細ページで、生成されたタスクテンプレートを確認して **Publish** します。
 4. **`demo-requester-1`** でワークフローの **Run** を押します([ワークフローを実行する](../guides/workflows.md#running-a-workflow))。実行のチャットが開き、エージェントがタスクを順に進めます。
 5. スキルが承認を求めてきたら、**`demo-approver-1`** でサインインして承認します([承認](../guides/approvals.md))。エージェントはそのあと MCP ツールでインスタンスを起動します。
+
+同じ 5 ステップは **`Demo GCP Log Error Analysis`** からも実行できます。読み取りだけのログ切り分けで、承認は起動ではなく照会範囲を対象にし、最後のステップは何も作らずログを読みます。ここで実際に動かすには、ログのあるプロジェクトのキーを `DEMO_GCP_API_KEY` に設定しておく必要があります。
 
 **AWS アカウントがない場合。** 手順 3 を飛ばし、`draft` のまま実行してください。`developer` である `demo-developer` はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる Run ダイアログが出るのはドラフト実行のときだけです。**Mock tools** に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws___run_script` と、`request_approval`)にチェックを入れれば、AWS に届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。
 

@@ -36,6 +36,8 @@ from infrastructure.demo_data import (
     DEMO_DEVELOPER_USER_ID,
     DEMO_DEVELOPERS_GROUP_ID,
     DEMO_GCP_API_KEY_ENTRY_KEY,
+    DEMO_GCP_LOG_SKILL_ID,
+    DEMO_GCP_LOG_SKILL_NAME,
     DEMO_GCP_MCP_SERVER_ID,
     DEMO_GCP_MCP_SERVER_NAME,
     DEMO_GCP_SECRET_ID,
@@ -140,7 +142,7 @@ def _disable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("DEMO_DATA", raising=False)
 
 
-async def _sync(engine: AsyncEngine) -> str | None:
+async def _sync(engine: AsyncEngine) -> list[str]:
     """Run :func:`sync_demo_data` on a session of its own, as one app start would.
 
     Clears the memoized ``Settings`` singleton first so a test that flips
@@ -209,25 +211,25 @@ async def test_sync_demo_data_seeds_the_full_dataset(
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
     assert len(await _rows(engine, MCPToolMock)) == 3
-    assert len(await _rows(engine, AgentSkill)) == 1
+    assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
 
 
-async def test_sync_demo_data_returns_the_new_skill_id(
+async def test_sync_demo_data_returns_the_new_skill_ids(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The caller schedules the clone, so the id comes back on first seed."""
+    """The caller schedules the clones, so both ids come back on first seed."""
     _enable(monkeypatch)
-    assert await _sync(engine) == DEMO_AGENT_SKILL_ID
+    assert set(await _sync(engine)) == {DEMO_AGENT_SKILL_ID, DEMO_GCP_LOG_SKILL_ID}
 
 
-async def test_sync_demo_data_returns_none_on_a_second_run(
+async def test_sync_demo_data_returns_no_skill_ids_on_a_second_run(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A restart must not re-clone a skill that is already registered."""
+    """A restart must not re-clone skills that are already registered."""
     _enable(monkeypatch)
     await _sync(engine)
-    assert await _sync(engine) is None
+    assert await _sync(engine) == []
 
 
 async def test_sync_demo_data_is_idempotent(
@@ -240,11 +242,11 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
     assert len(await _rows(engine, MCPToolMock)) == 3
-    assert len(await _rows(engine, AgentSkill)) == 1
+    assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
     assert len(await _rows(engine, SecretTag)) == 2
     assert len(await _rows(engine, McpServerTag)) == 2
-    assert len(await _rows(engine, AgentSkillTag)) == 2
+    assert len(await _rows(engine, AgentSkillTag)) == 4
     assert len(await _rows(engine, McpToolMockTag)) == 2
 
 
@@ -278,6 +280,8 @@ async def test_demo_tags_classify_records_across_four_taggable_kinds(
     assert agent_skill_tags == {
         (DEMO_AGENT_SKILL_ID, DEMO_AWS_TAG_ID),
         (DEMO_AGENT_SKILL_ID, DEMO_APPROVAL_TAG_ID),
+        (DEMO_GCP_LOG_SKILL_ID, DEMO_GCP_TAG_ID),
+        (DEMO_GCP_LOG_SKILL_ID, DEMO_APPROVAL_TAG_ID),
     }
     tool_mock_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, McpToolMockTag)
@@ -608,6 +612,24 @@ async def test_demo_agent_skill_points_at_the_sample_skill(
     assert skill.commit_sha is None
 
 
+async def test_demo_gcp_log_agent_skill_points_at_the_sample_skill(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        skill = await session.get(AgentSkill, DEMO_GCP_LOG_SKILL_ID)
+    assert skill is not None
+    assert skill.name == DEMO_GCP_LOG_SKILL_NAME
+    assert skill.tenant_id == TENANT_ID
+    assert skill.repo_url == "https://github.com/kaitoy/a2flow"
+    assert skill.repo_path == "sample_skills/gcp-log-error-analysis"
+    assert skill.repo_auth_password is None
+    # Cloning is the caller's job, so the row starts out unpublished.
+    assert skill.sync_status is SkillSyncStatus.pending
+    assert skill.commit_sha is None
+
+
 async def test_seeding_without_the_default_tenant_is_skipped(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -615,7 +637,7 @@ async def test_seeding_without_the_default_tenant_is_skipped(
     mem_engine = await _fresh_engine(with_default_tenant=False)
     try:
         with caplog.at_level(logging.WARNING, logger=_DEMO_LOGGER):
-            assert await _sync(mem_engine) is None
+            assert await _sync(mem_engine) == []
         assert len(await _demo_users(mem_engine)) == 0
         assert len(await _rows(mem_engine, Secret)) == 0
     finally:
@@ -644,7 +666,8 @@ async def test_a_name_collision_is_skipped_without_failing(
         )
         await session.commit()
     with caplog.at_level(logging.WARNING, logger=_DEMO_LOGGER):
-        assert await _sync(engine) == DEMO_AGENT_SKILL_ID
+        # Only the AWS secret name collided; both demo skills still register.
+        assert set(await _sync(engine)) == {DEMO_AGENT_SKILL_ID, DEMO_GCP_LOG_SKILL_ID}
     async with AsyncSession(engine) as session:
         assert await session.get(Secret, DEMO_AWS_SECRET_ID) is None
         assert await session.get(MCPServer, DEMO_MCP_SERVER_ID) is not None
@@ -677,7 +700,7 @@ async def test_disabling_removes_the_full_dataset(
     _enable(monkeypatch)
     await _sync(engine)
     _disable(monkeypatch)
-    assert await _sync(engine) is None
+    assert await _sync(engine) == []
     assert await _demo_users(engine) == []
     assert await _rows(engine, Secret) == []
     assert await _rows(engine, MCPServer) == []
@@ -693,7 +716,7 @@ async def test_disabling_removes_the_full_dataset(
 async def test_removal_on_a_database_without_demo_data_is_a_noop(
     engine: AsyncEngine,
 ) -> None:
-    assert await _sync(engine) is None
+    assert await _sync(engine) == []
     assert await _demo_users(engine) == []
 
 
@@ -874,6 +897,6 @@ async def test_disabling_removes_tool_mocks_before_the_mcp_server(
     _enable(monkeypatch)
     await _sync(engine)
     _disable(monkeypatch)
-    assert await _sync(engine) is None
+    assert await _sync(engine) == []
     assert await _rows(engine, MCPToolMock) == []
     assert await _rows(engine, MCPServer) == []

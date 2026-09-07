@@ -1,9 +1,10 @@
 """Startup registration and removal of the optional demo dataset.
 
 Gated by ``Settings.demo_data`` (the ``DEMO_DATA`` environment variable),
-this module keeps a small, self-contained example of everything the
-approval-gated "launch an EC2 instance" workflow needs, all inside the
-seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
+this module keeps a small, self-contained example of everything two
+approval-gated workflows need -- the mutating "launch an EC2 instance" one and
+the read-only "analyse a Google Cloud project's error logs" one -- all inside
+the seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
 
 * two Secrets -- one holding the AWS access key id and secret access key as
   two entries, and one holding a Google Cloud API key as a single entry, both
@@ -19,13 +20,14 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
   human -- ``call_aws`` and ``run_script`` on the AWS MCP server, each
   returning a successful EC2 launch, and the built-in ``request_approval``,
   returning ``approved``,
-* one AgentSkill pointing at ``sample_skills/aws-ec2-launch`` in this
-  repository,
-* three Tags -- ``AWS`` (attached to the AWS secret, AWS MCP server, agent
-  skill, and the ``call_aws`` and ``run_script`` tool mocks, showing that one
-  tag classifies across resource types), ``GCP`` (attached to the Google Cloud
-  secret and the Cloud Logging MCP server), and ``Approval Required``
-  (attached to the agent skill alone, calling out its approval gate),
+* two AgentSkills pointing at ``sample_skills/aws-ec2-launch`` and
+  ``sample_skills/gcp-log-error-analysis`` in this repository,
+* three Tags -- ``AWS`` (attached to the AWS secret, AWS MCP server, the
+  EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks,
+  showing that one tag classifies across resource types), ``GCP`` (attached to
+  the Google Cloud secret, the Cloud Logging MCP server, and the log-analysis
+  agent skill), and ``Approval Required`` (attached to both agent skills,
+  calling out their approval gate),
 * five Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
   either of whom the skill can ask for approval, two requesters,
   ``demo-requester-1`` and ``demo-requester-2``, either of whom may run the
@@ -134,6 +136,9 @@ DEMO_GCP_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d202"
 #: Fixed identifier of the demo ``aws-ec2-launch`` agent skill.
 DEMO_AGENT_SKILL_ID = "00000000-0000-0000-0000-00000000d301"
 
+#: Fixed identifier of the demo ``gcp-log-error-analysis`` agent skill.
+DEMO_GCP_LOG_SKILL_ID = "00000000-0000-0000-0000-00000000d302"
+
 #: Fixed identifier of the demo ``AWS`` tag.
 DEMO_AWS_TAG_ID = "00000000-0000-0000-0000-00000000d501"
 
@@ -189,6 +194,9 @@ DEMO_GCP_MCP_SERVER_NAME = "Cloud Logging MCP Server"
 #: Name of the demo agent skill as shown in the admin UI.
 DEMO_AGENT_SKILL_NAME = "Demo AWS EC2 Launch"
 
+#: Name of the demo Cloud Logging error-analysis agent skill in the admin UI.
+DEMO_GCP_LOG_SKILL_NAME = "Demo GCP Log Error Analysis"
+
 #: Name of the demo ``call_aws`` tool mock as shown in the admin UI.
 DEMO_CALL_AWS_MOCK_NAME = "Demo AWS call_aws (EC2 launch success)"
 
@@ -224,9 +232,11 @@ _DEMO_GCP_MCP_ENDPOINT = "https://logging.googleapis.com/mcp"
 #: connection time, so the key never lands in the ``mcp_servers`` row.
 _DEMO_GCP_API_KEY_HEADER = "x-goog-api-key"
 
-#: Repository the demo agent skill is cloned from, and the path within it.
+#: Repository the demo agent skills are cloned from, and the path within it to
+#: each one's ``SKILL.md``.
 _DEMO_SKILL_REPO_URL = "https://github.com/kaitoy/a2flow"
-_DEMO_SKILL_REPO_PATH = "sample_skills/aws-ec2-launch"
+_DEMO_AWS_SKILL_REPO_PATH = "sample_skills/aws-ec2-launch"
+_DEMO_GCP_LOG_SKILL_REPO_PATH = "sample_skills/gcp-log-error-analysis"
 
 #: Stored in place of an AWS credential or Google Cloud API key when the
 #: matching ``DEMO_*`` variable is unset. The demo is then complete in shape but
@@ -266,8 +276,8 @@ _DEMO_AWS_TAG_DESCRIPTION = (
 
 #: Description shown on the demo ``GCP`` tag in the admin UI.
 _DEMO_GCP_TAG_DESCRIPTION = (
-    "Resources that talk to Google Cloud: credentials and MCP servers scoped "
-    "to the GCP provider."
+    "Resources that talk to Google Cloud: credentials, MCP servers, and agent "
+    "skills scoped to the GCP provider."
 )
 
 #: Description shown on the demo ``Approval Required`` tag in the admin UI.
@@ -512,7 +522,7 @@ _DEMO_TOOL_MOCKS = (
 )
 
 
-async def sync_demo_data(session: AsyncSession) -> str | None:
+async def sync_demo_data(session: AsyncSession) -> list[str]:
     """Register or remove the demo dataset according to ``DEMO_DATA``.
 
     Must run **after** :func:`infrastructure.bootstrap.seed_root_user` and
@@ -525,25 +535,25 @@ async def sync_demo_data(session: AsyncSession) -> str | None:
         session: Database session used to read, insert, and delete records.
 
     Returns:
-        The id of a freshly registered demo AgentSkill, whose repository has
-        not been cloned yet and whose sync the caller should schedule; or
-        ``None`` when the skill already existed, could not be registered, or
-        the demo data was removed instead.
+        The ids of the demo AgentSkills this call freshly registered, whose
+        repositories have not been cloned yet and whose sync the caller should
+        schedule. Empty when every demo skill already existed, none could be
+        registered, or the demo data was removed instead.
     """
     if get_settings().demo_data:
         return await _seed_demo_data(session)
     await _remove_demo_data(session)
-    return None
+    return []
 
 
-async def _seed_demo_data(session: AsyncSession) -> str | None:
+async def _seed_demo_data(session: AsyncSession) -> list[str]:
     """Create every missing demo record in the seeded ``Default`` tenant.
 
     Args:
         session: Database session used to read and insert records.
 
     Returns:
-        The id of the AgentSkill if this call created it, else ``None``.
+        The ids of the demo AgentSkills this call created, in seeding order.
     """
     tenant_id = await _default_tenant_id(session)
     if tenant_id is None:
@@ -552,28 +562,35 @@ async def _seed_demo_data(session: AsyncSession) -> str | None:
             "skipping demo data.",
             DEFAULT_TENANT_NAME,
         )
-        return None
+        return []
     await _seed_demo_users(session, tenant_id)
     await _seed_demo_groups(session, tenant_id)
     await _seed_demo_secrets(session, tenant_id)
     await _seed_demo_mcp_server(session, tenant_id)
     await _seed_demo_gcp_mcp_server(session, tenant_id)
     await _seed_demo_tool_mocks(session, tenant_id)
-    new_skill_id = await _seed_demo_agent_skill(session, tenant_id)
+    new_skill_ids = [
+        skill_id
+        for skill_id in (
+            await _seed_demo_agent_skill(session, tenant_id),
+            await _seed_demo_gcp_log_agent_skill(session, tenant_id),
+        )
+        if skill_id is not None
+    ]
     await _seed_demo_tags(session, tenant_id)
-    return new_skill_id
+    return new_skill_ids
 
 
 async def _remove_demo_data(session: AsyncSession) -> None:
     """Delete every demo record that is still present.
 
     Deletion follows the direction of the foreign keys — tool mocks, then agent
-    skill, then MCP servers, then secrets, then tags, then user groups, then
+    skills, then MCP servers, then secrets, then tags, then user groups, then
     users — so a record is never orphaned by the removal of something it points
     at. The tool mocks go first because two of them (``call_aws`` and
     ``run_script``) reference the AWS MCP server with ``ondelete="RESTRICT"``,
     which would otherwise block its removal. A record that other data has come
-    to depend on (a Workflow built on the demo skill, a task tool binding on
+    to depend on (a Workflow built on a demo skill, a task tool binding on
     one of the demo MCP servers) cannot be deleted; that is logged and skipped
     rather than allowed to fail startup.
 
@@ -595,7 +612,13 @@ async def _remove_demo_data(session: AsyncSession) -> None:
             session, MCPToolMock, mock_spec.id, label=f"tool mock {mock_spec.name!r}"
         )
     await _delete_demo_row(
-        session, AgentSkill, DEMO_AGENT_SKILL_ID, label="agent skill"
+        session, AgentSkill, DEMO_AGENT_SKILL_ID, label="EC2-launch agent skill"
+    )
+    await _delete_demo_row(
+        session,
+        AgentSkill,
+        DEMO_GCP_LOG_SKILL_ID,
+        label="Cloud Logging analysis agent skill",
     )
     await _delete_demo_row(
         session, MCPServer, DEMO_MCP_SERVER_ID, label="AWS MCP server"
@@ -1036,7 +1059,7 @@ async def _seed_demo_tool_mocks(session: AsyncSession, tenant_id: str) -> None:
 
 
 async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str | None:
-    """Create the demo agent skill pointing at this repository's sample skill.
+    """Create the demo agent skill pointing at the ``aws-ec2-launch`` sample.
 
     The repository is public, so no ``repo_auth_password`` is needed. The row is
     left ``pending``: cloning is the caller's job, since it is a network
@@ -1058,7 +1081,7 @@ async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str |
             tenant_id=tenant_id,
             name=DEMO_AGENT_SKILL_NAME,
             repo_url=_DEMO_SKILL_REPO_URL,
-            repo_path=_DEMO_SKILL_REPO_PATH,
+            repo_path=_DEMO_AWS_SKILL_REPO_PATH,
             description=(
                 "Launch an AWS EC2 instance through a registered MCP tool, "
                 "gated by a manager's explicit approval."
@@ -1071,20 +1094,62 @@ async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str |
     return DEMO_AGENT_SKILL_ID if created else None
 
 
+async def _seed_demo_gcp_log_agent_skill(
+    session: AsyncSession, tenant_id: str
+) -> str | None:
+    """Create the demo agent skill pointing at the ``gcp-log-error-analysis`` sample.
+
+    A second sample skill, this one read-only: it queries the Cloud Logging MCP
+    server for a project's log entries and reports a root cause, and its
+    approval gates the *scope* of that query rather than a mutation. Registered
+    exactly like :func:`_seed_demo_agent_skill` -- built as a table model
+    directly, left ``pending`` for the caller to clone.
+
+    Args:
+        session: Database session used to read and insert the skill.
+        tenant_id: Id of the ``Default`` tenant the skill belongs to.
+
+    Returns:
+        The skill's id when this call created it, else ``None``.
+    """
+    if await session.get(AgentSkill, DEMO_GCP_LOG_SKILL_ID) is not None:
+        return None
+    created = await _insert(
+        session,
+        AgentSkill(
+            id=DEMO_GCP_LOG_SKILL_ID,
+            tenant_id=tenant_id,
+            name=DEMO_GCP_LOG_SKILL_NAME,
+            repo_url=_DEMO_SKILL_REPO_URL,
+            repo_path=_DEMO_GCP_LOG_SKILL_REPO_PATH,
+            description=(
+                "Fetch a Google Cloud project's logs through the Cloud Logging "
+                "MCP server, single out the errors, and report the root cause, "
+                "gated by a manager's explicit approval of the query scope."
+            ),
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"agent skill '{DEMO_GCP_LOG_SKILL_NAME}'",
+    )
+    return DEMO_GCP_LOG_SKILL_ID if created else None
+
+
 async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     """Create the demo tags and attach them across four of the six taggable kinds.
 
-    ``AWS`` lands on the AWS secret, AWS MCP server, agent skill, and the
-    ``call_aws`` and ``run_script`` tool mocks; ``GCP`` lands on the Google
-    Cloud secret and the Cloud Logging MCP server; ``Approval Required`` lands
-    on the agent skill alone.
+    ``AWS`` lands on the AWS secret, AWS MCP server, the EC2-launch agent skill,
+    and the ``call_aws`` and ``run_script`` tool mocks; ``GCP`` lands on the
+    Google Cloud secret, the Cloud Logging MCP server, and the log-analysis
+    agent skill; ``Approval Required`` lands on both agent skills.
 
     Must run after :func:`_seed_demo_secrets`, :func:`_seed_demo_mcp_server`,
-    :func:`_seed_demo_gcp_mcp_server`, :func:`_seed_demo_agent_skill`, and
-    :func:`_seed_demo_tool_mocks`: attaching a tag looks up the record it
-    attaches to. The demo Workflow does not exist — see the module docstring —
-    so no tag is attached to one; an operator is free to attach one once they
-    build a workflow from these records themselves.
+    :func:`_seed_demo_gcp_mcp_server`, :func:`_seed_demo_agent_skill`,
+    :func:`_seed_demo_gcp_log_agent_skill`, and :func:`_seed_demo_tool_mocks`:
+    attaching a tag looks up the record it attaches to. The demo Workflow does
+    not exist — see the module docstring — so no tag is attached to one; an
+    operator is free to attach one once they build a workflow from these
+    records themselves.
 
     Args:
         session: Database session used to read and insert tags and their
@@ -1167,6 +1232,16 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
                 f"tag '{DEMO_GCP_TAG_NAME}' on MCP server '{DEMO_GCP_MCP_SERVER_NAME}'"
             ),
         )
+        await _link_tag(
+            session,
+            AgentSkillTag,
+            resource_model=AgentSkill,
+            resource_id=DEMO_GCP_LOG_SKILL_ID,
+            tag_id=DEMO_GCP_TAG_ID,
+            label=(
+                f"tag '{DEMO_GCP_TAG_NAME}' on agent skill '{DEMO_GCP_LOG_SKILL_NAME}'"
+            ),
+        )
     if await _ensure_demo_tag(
         session,
         tenant_id,
@@ -1184,6 +1259,17 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             label=(
                 f"tag '{DEMO_APPROVAL_TAG_NAME}' on agent skill "
                 f"'{DEMO_AGENT_SKILL_NAME}'"
+            ),
+        )
+        await _link_tag(
+            session,
+            AgentSkillTag,
+            resource_model=AgentSkill,
+            resource_id=DEMO_GCP_LOG_SKILL_ID,
+            tag_id=DEMO_APPROVAL_TAG_ID,
+            label=(
+                f"tag '{DEMO_APPROVAL_TAG_NAME}' on agent skill "
+                f"'{DEMO_GCP_LOG_SKILL_NAME}'"
             ),
         )
 

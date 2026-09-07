@@ -152,8 +152,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # users are real users too, so sync_demo_data comes after both.
         await seed_root_user(session)
         await seed_default_tenant_and_admin_user(session)
-        demo_skill_id = await sync_demo_data(session)
-    if demo_skill_id is not None:
+        demo_skill_ids = await sync_demo_data(session)
+    for demo_skill_id in demo_skill_ids:
         clone = asyncio.create_task(
             sync_agent_skill(demo_skill_id, user_id=SYSTEM_USER_ID)
         )
