@@ -1412,3 +1412,71 @@ async def test_unknown_error_kind_is_rejected(workflow_client: AsyncClient) -> N
     )
 
     assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def _task_status(client: AsyncClient, task_id: str) -> Any:
+    """Fetch a single task's ``status`` field."""
+    return assert_ok(await client.get(f"/api/v1/workflow-tasks/{task_id}"))["status"]
+
+
+async def test_failing_a_task_skips_blocked_dependents_and_fails_the_run(
+    workflow_client: AsyncClient,
+) -> None:
+    """A failed task's transitive dependents can never run, so they are skipped
+    and the run settles ``failed`` instead of hanging on them forever."""
+    execution = await _create_workflow_execution(workflow_client)
+    a = await _create_task(workflow_client, execution["id"], title="A")
+    b = await _create_task(
+        workflow_client, execution["id"], title="B", dependsOnIds=[a["id"]]
+    )
+    c = await _create_task(
+        workflow_client, execution["id"], title="C", dependsOnIds=[b["id"]]
+    )
+
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{a['id']}",
+            json={
+                "status": "failed",
+                "errorKind": "api_error",
+                "errorMessage": "billing API returned 503",
+            },
+        )
+    )
+
+    assert await _task_status(workflow_client, b["id"]) == "skipped"
+    assert await _task_status(workflow_client, c["id"]) == "skipped"
+    status, finished_at = await _execution_state(workflow_client, execution["id"])
+    assert status == "failed"
+    assert finished_at is not None
+
+
+async def test_an_independent_pending_task_keeps_a_failed_run_running(
+    workflow_client: AsyncClient,
+) -> None:
+    """Only the failed task's own dependents are skipped: an unrelated pending
+    task still holds the run ``running`` until it too reaches a terminal state."""
+    execution = await _create_workflow_execution(workflow_client)
+    a = await _create_task(workflow_client, execution["id"], title="A")
+    d = await _create_task(workflow_client, execution["id"], title="D")
+
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{a['id']}",
+            json={
+                "status": "failed",
+                "errorKind": "api_error",
+                "errorMessage": "billing API returned 503",
+            },
+        )
+    )
+    assert await _execution_state(workflow_client, execution["id"]) == ("running", None)
+
+    assert_ok(
+        await workflow_client.patch(
+            f"/api/v1/workflow-tasks/{d['id']}", json={"status": "completed"}
+        )
+    )
+    status, finished_at = await _execution_state(workflow_client, execution["id"])
+    assert status == "failed"
+    assert finished_at is not None

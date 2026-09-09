@@ -291,6 +291,30 @@ async def test_agent_failing_a_task_fails_the_run(engine: AsyncEngine) -> None:
     assert finished.finished_at is not None
 
 
+async def test_agent_failing_a_task_skips_blocked_dependents(
+    engine: AsyncEngine,
+) -> None:
+    """A task waiting on a failed one can never run, so it is skipped and the
+    run settles ``failed`` rather than hanging on a permanently ``pending`` task."""
+    execution_id = await _seed_session(engine, user_id="owner")
+    a = await seed_workflow_task(engine, execution_id, title="A")
+    b = await seed_workflow_task(engine, execution_id, title="B", depends_on_ids=[a])
+
+    await update_workflow_task(
+        a,
+        _ctx(),
+        status="failed",
+        error_kind="timeout",
+        error_message="no response after 30s",
+    )
+
+    blocked = await get_workflow_task(b, _ctx())
+    assert blocked["status"] == "skipped"
+    finished = await _execution(engine, execution_id)
+    assert finished.status is WorkflowExecutionStatus.failed
+    assert finished.finished_at is not None
+
+
 async def test_agent_records_the_failure_cause(engine: AsyncEngine) -> None:
     execution_id = await _seed_session(engine, user_id="owner")
     task_id = await seed_workflow_task(engine, execution_id, title="A")

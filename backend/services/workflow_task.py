@@ -99,7 +99,9 @@ class WorkflowTaskService:
         self._notifications = notifications
         self._certificates = certificates
 
-    async def _evaluate_completion(self, execution_id: str) -> None:
+    async def _evaluate_completion(
+        self, execution_id: str, acting_user_id: str
+    ) -> None:
         """Re-evaluate whether the parent run has finished after a task write.
 
         Delegates to the rule shared with the agent's task tools so a run
@@ -108,12 +110,16 @@ class WorkflowTaskService:
 
         Args:
             execution_id: Primary key of the task's parent workflow execution.
+            acting_user_id: The caller performing the write, recorded on any
+                task the shared rule skips as a blocked dependent of a failed
+                one.
         """
         await evaluate_completion(
             executions=self._execution_repo,
             tasks=self._repo,
             notifications=self._notifications,
             execution_id=execution_id,
+            acting_user_id=acting_user_id,
         )
 
     async def _get_or_404(self, task_id: str) -> WorkflowTaskRead:
@@ -384,7 +390,7 @@ class WorkflowTaskService:
             await self._assert_tool_bindings_change_allowed(task, data.tool_bindings)
         updated = await self._repo.update(task_id, data, user_id=caller.id)
         await self._settle_certificate(updated, caller)
-        await self._evaluate_completion(updated.workflow_execution_id)
+        await self._evaluate_completion(updated.workflow_execution_id, caller.id)
         return updated
 
     async def _settle_certificate(self, task: WorkflowTaskRead, caller: User) -> None:
@@ -426,4 +432,4 @@ class WorkflowTaskService:
         task = await self._get_or_404(task_id)
         await self._assert_execution_write_access(task.workflow_execution_id, caller)
         await self._repo.delete(task_id)
-        await self._evaluate_completion(task.workflow_execution_id)
+        await self._evaluate_completion(task.workflow_execution_id, caller.id)

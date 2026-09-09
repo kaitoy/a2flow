@@ -247,7 +247,7 @@ async def _notify(
         )
 
 
-async def _evaluate_completion(scope: _Scope) -> None:
+async def _evaluate_completion(scope: _Scope, acting_user_id: str) -> None:
     """Re-run the shared run-completion bookkeeping after a task write.
 
     The import is deferred to call time on purpose. ``evaluate_completion``
@@ -259,6 +259,9 @@ async def _evaluate_completion(scope: _Scope) -> None:
 
     Args:
         scope: The current tool call's resolved run and repositories.
+        acting_user_id: The caller driving this turn, recorded on the
+            ``updated_by`` of any task the shared rule skips as a blocked
+            dependent of a failed one.
     """
     from services.workflow_execution_completion import evaluate_completion
 
@@ -267,6 +270,7 @@ async def _evaluate_completion(scope: _Scope) -> None:
         tasks=scope.task_repo,
         notifications=scope.notifications,
         execution_id=scope.execution_id,
+        acting_user_id=acting_user_id,
     )
 
 
@@ -574,7 +578,7 @@ async def update_workflow_task(
             # A task that just started needs a tool certificate; one that
             # just finished no longer needs the certificate it had.
             await _settle_certificate(s, task, acting_user_id)
-            await _evaluate_completion(s)
+            await _evaluate_completion(s, acting_user_id)
             return _task_to_dict(task)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}

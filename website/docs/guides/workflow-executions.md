@@ -31,6 +31,8 @@ stateDiagram-v2
 
 A run starts `running` and settles once it has at least one task and every task has reached a terminal state — `completed`, `failed` or `skipped`. A run whose tasks include a failure ends `failed`. The finish time is stamped at that moment and is never moved by a later edit, and a run with no tasks at all stays `running`. These are the numbers the [operations metrics](../operations/metrics.md) count.
 
+When a task fails, any task still waiting on it — directly or down the chain — is set to `skipped`, since it can no longer run; that is what lets the run settle rather than hang on a task that will never start. Tasks on branches that do not depend on the failed one are unaffected, so a run can still be `running` for a while after a failure until they too finish.
+
 ## The workflow session screen {#the-workflow-session-screen}
 
 The workflow session is the chat one run happens in. It opens with the run's kickoff message and the agent already working.

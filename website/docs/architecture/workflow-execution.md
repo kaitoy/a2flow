@@ -40,6 +40,8 @@ flowchart TD
 
 A run ends `completed` when every task reached a terminal status with no failure among them, and `failed` when at least one failed. The statuses can be watched live in the run's read-only task view, as a table or as the dependency graph.
 
+When a task fails, every task still waiting on it — directly or further down the chain — is set to `skipped`, because it can no longer run. That is what lets the run settle as `failed` instead of waiting forever on a task that will never start. Tasks on other branches that do not depend on the failed one keep running as normal.
+
 ## Why in_progress matters
 
 Marking a task `in_progress` is not bookkeeping. It is what unlocks that task's tools: the [proxy](./mcp-proxy.md) allows a call only when the tool is bound to a task the run currently has in progress. A task that has ended can no longer act, and one not yet started never could.
