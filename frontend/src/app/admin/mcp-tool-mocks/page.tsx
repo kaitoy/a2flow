@@ -67,10 +67,14 @@ function buildColumns(
     },
     {
       header: "Server",
-      noTruncate: true,
       cell: (mock) =>
         mock.mcpServerId ? (
-          (serverNameById.get(mock.mcpServerId) ?? `${mock.mcpServerId.slice(0, 8)}…`)
+          <Link
+            href={`/admin/mcp-servers/${mock.mcpServerId}`}
+            className="font-medium text-accent transition-colors hover:underline"
+          >
+            {serverNameById.get(mock.mcpServerId) ?? `${mock.mcpServerId.slice(0, 8)}…`}
+          </Link>
         ) : (
           <Badge>Built-in</Badge>
         ),

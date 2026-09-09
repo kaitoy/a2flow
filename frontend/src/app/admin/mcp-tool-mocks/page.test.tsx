@@ -37,9 +37,10 @@ describe("McpToolMocksPage", () => {
     expect(screen.getByText("request_approval")).toBeInTheDocument();
   });
 
-  it("names the MCP server a mock targets", async () => {
+  it("links the MCP server a mock targets to its detail page", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByText("my-mcp-server")).toBeInTheDocument());
+    const link = await screen.findByRole("link", { name: "my-mcp-server" });
+    expect(link).toHaveAttribute("href", "/admin/mcp-servers/mcp-1");
   });
 
   it("carries the shared Tags column", async () => {
