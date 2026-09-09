@@ -39,7 +39,9 @@ Then wait for the decision. If it comes back approved, continue to step 3. If it
 
 Launch exactly the configuration that was approved. Nothing may change between the approval and the launch; if something has to change, go back to step 2 and have the new configuration approved.
 
-Whatever you launch through may name its fields differently from the terms used here, so map the approved configuration onto the names and units it actually accepts (e.g. "AMI" onto an `image_id` field) and pass only the fields it accepts.
+Run every AWS operation through the **AWS MCP Server**'s `aws___run_script` tool. Give it a short script that launches the approved instance — an `aws ec2 run-instances` CLI call, or a boto3 `call_boto3` step. The tool may name its fields differently from the terms used here, so map the approved configuration onto the names and units it actually accepts (e.g. "AMI" onto an `ImageId` field) and pass only the fields it accepts.
+
+**`call_boto3` caveat:** the `operation_name` argument and every key in `params` are **PascalCase**, mirroring the AWS API model — `operation_name` is `RunInstances` or `DescribeInstances`, and the `params` keys are `ImageId`, `InstanceType`, `MinCount`, `MaxCount`, `KeyName`, and the like. snake_case (`run_instances`, `image_id`) and camelCase (`runInstances`, `imageId`) are both rejected.
 
 If the launch returns an error (invalid AMI, insufficient permissions, quota exceeded, etc.), report the exact error to the user and stop — do not retry with silently altered parameters or guess a fix.
 
