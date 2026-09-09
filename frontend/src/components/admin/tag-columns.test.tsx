@@ -32,6 +32,17 @@ const TAGS: Tag[] = [
     createdBy: "",
     updatedBy: "",
   },
+  {
+    id: "tag-3",
+    tenantId: "tenant-1",
+    name: "staging",
+    color: "cyan",
+    description: "Pre-production environment.",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    createdBy: "",
+    updatedBy: "",
+  },
 ];
 
 const BY_ID = new Map(TAGS.map((tag) => [tag.id, tag]));
@@ -107,10 +118,12 @@ describe("tagsColumn", () => {
     expect(onTagIdsChange).toHaveBeenCalledWith(["tag-2"]);
   });
 
-  it("folds the tags that do not fit into a counted chip", () => {
+  it("folds the tags that overflow two lines into a counted chip", () => {
     // jsdom lays nothing out, so the column normally takes ChipRow's
     // show-everything path. Stub the two widths it measures to prove a heavily
-    // tagged row collapses to one line instead of widening the column.
+    // tagged row collapses to two lines instead of widening the column: at
+    // 200px only one 100px chip fits per line, so two lines take two tags and
+    // the third folds.
     Object.defineProperty(HTMLSpanElement.prototype, "offsetWidth", {
       configurable: true,
       get: () => 100,
@@ -119,13 +132,14 @@ describe("tagsColumn", () => {
       configurable: true,
       get: () => 200,
     });
-    renderTable([{ id: "r1", tagIds: ["tag-1", "tag-2"] }]);
+    renderTable([{ id: "r1", tagIds: ["tag-1", "tag-2", "tag-3"] }]);
 
     expect(screen.getByText("production")).toBeInTheDocument();
+    expect(screen.getByText("aws")).toBeInTheDocument();
     expect(screen.getByText("+1")).toBeInTheDocument();
     // The folded tag leaves no chip behind — only the name a screen reader
     // still needs, which is what the count alone would have taken away.
-    expect(screen.getByText("aws")).toHaveClass("sr-only");
+    expect(screen.getByText("staging")).toHaveClass("sr-only");
   });
 
   it("opens a dialog listing every tag, each with its description, from the +N chip", async () => {
@@ -138,12 +152,13 @@ describe("tagsColumn", () => {
       configurable: true,
       get: () => 200,
     });
-    renderTable([{ id: "r1", tagIds: ["tag-1", "tag-2"] }]);
+    renderTable([{ id: "r1", tagIds: ["tag-1", "tag-2", "tag-3"] }]);
 
-    await user.click(screen.getByRole("button", { name: "Show all 2 tags" }));
+    await user.click(screen.getByRole("button", { name: "Show all 3 tags" }));
     const dialog = await screen.findByRole("dialog", { name: "Tags" });
     expect(within(dialog).getByText("production")).toBeInTheDocument();
     expect(within(dialog).getByText("aws")).toBeInTheDocument();
+    expect(within(dialog).getByText("staging")).toBeInTheDocument();
 
     await user.hover(within(dialog).getByText("production"));
     expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
@@ -166,6 +181,7 @@ describe("tagFilterOptions", () => {
     expect(tagFilterOptions(BY_ID)).toEqual([
       { value: "tag-1", label: "production", swatch: "rose" },
       { value: "tag-2", label: "aws", swatch: "amber" },
+      { value: "tag-3", label: "staging", swatch: "cyan" },
     ]);
   });
 });

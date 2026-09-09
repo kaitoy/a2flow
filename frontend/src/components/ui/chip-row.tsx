@@ -1,7 +1,7 @@
 /**
- * @module ChipRow — single-line row of {@link Chip}s that folds whatever does not
- * fit into one trailing `+N` chip. Clicking that chip opens a dialog listing
- * every chip in the row, each with its own description tooltip.
+ * @module ChipRow — row of {@link Chip}s wrapped to at most two lines, folding
+ * whatever does not fit into one trailing `+N` chip. Clicking that chip opens a
+ * dialog listing every chip in the row, each with its own description tooltip.
  */
 "use client";
 
@@ -34,19 +34,23 @@ interface ChipRowProps {
   title?: string;
 }
 
-/** Gap between chips in pixels. Mirrors the row's `gap-1`. */
+/** Gap between chips in pixels. Mirrors the row's `gap-1`, both between chips on
+ * a line and between the two wrapped lines. */
 const GAP = 4;
 
-/** Horizontal padding a chip spends on itself (`px-2`), in pixels. */
-const CHIP_PADDING_X = 16;
+/** Most lines a cell's chips may occupy before the rest fold into `+N`. */
+const MAX_ROWS = 2;
+
+/** Horizontal padding a chip spends on itself (`xs` size's `px-1.5`), in pixels. */
+const CHIP_PADDING_X = 12;
 
 /**
- * Width of one character in the chip's `text-xs` mono face, in pixels.
+ * Width of one character in the chip's `xs` 11px mono face, in pixels.
  *
- * JetBrains Mono at 12px advances ~7.2px; rounded up so every derived width is
+ * JetBrains Mono at 11px advances ~6.6px; rounded up so every derived width is
  * an upper bound rather than a hair short.
  */
-const MONO_CHAR_WIDTH = 8;
+const MONO_CHAR_WIDTH = 7;
 
 /**
  * Width to reserve for the `+N` chip, in pixels.
@@ -66,36 +70,59 @@ function overflowChipWidth(count: number): number {
 }
 
 /**
- * How many of `widths` fit in `available`, counting the gaps between them.
+ * Lay `widths` out left to right, wrapping at `available`, and report how tall
+ * the run gets and how many chips land within {@link MAX_ROWS} lines.
+ *
+ * Every chip costs {@link GAP} plus its width, except the first on a line. A
+ * chip wider than the whole line still takes a line to itself. The walk stops
+ * the moment a chip would open a line past the cap: `rows` is then
+ * `MAX_ROWS + 1` and `fitted` is the count that fit within it. When every chip
+ * fits, `fitted === widths.length` and `rows <= MAX_ROWS`.
  *
  * @param widths - Chip widths in pixels, in display order.
- * @param available - Pixels the row may occupy.
- * @returns The number of leading chips that fit, possibly `0`.
+ * @param available - Pixels one line may occupy.
+ * @returns `rows` the run occupies (capped at `MAX_ROWS + 1`) and the leading
+ *   `fitted` chip count.
  */
-function countThatFit(widths: number[], available: number): number {
-  let used = 0;
+function packRows(widths: number[], available: number): { rows: number; fitted: number } {
+  let row = 1;
+  let x = 0;
   for (let i = 0; i < widths.length; i++) {
-    const next = used + (i > 0 ? GAP : 0) + widths[i];
-    if (next > available) return i;
-    used = next;
+    const width = widths[i];
+    if (width > available) {
+      // Never fits whole on any line — a pill clipped mid-label names its tag
+      // no better than the count does, so it folds rather than showing broken.
+      return { rows: MAX_ROWS + 1, fitted: i };
+    }
+    if (x === 0) {
+      x = width;
+    } else if (x + GAP + width <= available) {
+      x += GAP + width;
+    } else {
+      row++;
+      if (row > MAX_ROWS) return { rows: row, fitted: i };
+      x = width;
+    }
   }
-  return widths.length;
+  return { rows: row, fitted: widths.length };
 }
 
 /**
- * Row of chips capped to a single line, with the overflow collapsed into a
+ * Row of chips wrapped to at most two lines, with the overflow collapsed into a
  * neutral `+N` chip. That chip is a button: clicking it opens a modal dialog
  * that lists *every* chip in the row (not just the folded ones), each rendered
  * with its own description-on-hover tooltip.
  *
- * A table cell is the reason this exists. Left to wrap, a row of chips makes
- * row height a function of the data — a record with eight tags stands three
- * lines tall beside a record with one — and the column claims its full
+ * A table cell is the reason this exists. Left to wrap freely, a row of chips
+ * makes row height a function of the data — a record with eight tags stands
+ * three lines tall beside a record with one — and the column claims its full
  * max-content width, squeezing every other column (see DESIGN.md → Data
- * Tables). Clipping to one line and counting the remainder holds the row height
- * constant and lets the column give ground like a text column: the `+N` fold
- * *is* this cell's ellipsis, which is why a column rendering one is declared
- * `shrinkable` rather than merely `noTruncate`.
+ * Tables). Capping the wrap at two lines of the compact `xs` chip and counting
+ * the remainder holds the row height constant — two `xs` lines occupy the space
+ * one `sm` line plus the cell padding held before — and lets the column give
+ * ground like a text column: the `+N` fold *is* this cell's ellipsis, which is
+ * why a column rendering one is declared `shrinkable` rather than merely
+ * `noTruncate`.
  *
  * The fit is measured, not guessed, so the count follows the width the column
  * actually has: widening it brings chips back, narrowing it raises `N`. Chip
@@ -107,9 +134,9 @@ function countThatFit(widths: number[], available: number): number {
  *
  * A container that measures `0` — not laid out yet — shows everything rather
  * than nothing, matching `fitColumnWidths`' own `if (!available)` guard. A
- * column too narrow for even one whole chip shows the count alone: a pill
- * clipped mid-label names its tag no better than `+8` does, and letting it
- * overflow would push the count itself out of the cell.
+ * column too narrow for even one whole chip on the first line shows the count
+ * alone: a pill clipped mid-label names its tag no better than `+8` does, and
+ * letting it overflow would push the count itself out of the cell.
  *
  * Folded chips are unmounted, so their labels are handed back to assistive
  * technology in an `sr-only` span listing *only* the folded ones — a
@@ -153,16 +180,22 @@ export function ChipRow({ items, title = "Details" }: ChipRowProps) {
       setVisibleCount(widths.length);
       return;
     }
-    const all = countThatFit(widths, available);
-    if (all === widths.length) {
-      setVisibleCount(all);
+    if (packRows(widths, available).rows <= MAX_ROWS) {
+      setVisibleCount(widths.length);
       return;
     }
-    // Something is folding, so the `+N` chip has to fit alongside the rest.
-    // Only chips that fit *whole* are shown: a partly-clipped pill would be the
-    // one thing to spill past `overflow-hidden`, and what it would push out is
-    // the count itself — the one mark that says there is more to see.
-    setVisibleCount(countThatFit(widths, available - overflowChipWidth(widths.length) - GAP));
+    // Something is folding, so the `+N` chip has to share the two lines with the
+    // chips that stay. Drop chips from the end until it — laid out after them —
+    // still lands within the cap. Only chips that fit *whole* are shown: a
+    // partly-clipped pill would be the one thing to spill past `overflow-hidden`,
+    // and what it would push out is the count itself — the one mark that says
+    // there is more to see.
+    const plusN = overflowChipWidth(widths.length);
+    let count = packRows(widths, available).fitted;
+    while (count > 0 && packRows([...widths.slice(0, count), plusN], available).rows > MAX_ROWS) {
+      count--;
+    }
+    setVisibleCount(count);
   }, []);
 
   // Measure from the commit that rendered every chip, then fit. A layout effect
@@ -193,14 +226,23 @@ export function ChipRow({ items, title = "Details" }: ChipRowProps) {
           cell's max-content, which would collapse the column's *natural* width
           to its header label and leave the fit no reason ever to grant the
           chips room. A plain block div already fills the cell, and measures as
-          the full row of chips while the table is still laying out naturally. */}
-      <div ref={rowRef} className="flex items-center gap-1 overflow-hidden">
+          the full row of chips while the table is still laying out naturally.
+
+          `max-h` is two `xs` chip lines (~17px each) plus one `gap-1` (4px),
+          a hair generous so a sub-pixel-tall line is not clipped; with
+          `overflow-hidden` it hides the pre-fold pass's extra lines until the
+          layout effect below trims the count to what `MAX_ROWS` holds. */}
+      <div
+        ref={rowRef}
+        className="flex max-h-[40px] flex-wrap content-start items-center gap-1 overflow-hidden"
+      >
         {shown.map((item) => (
           <Chip
             key={item.key}
             label={item.label}
             color={item.color}
             description={item.description}
+            size="xs"
           />
         ))}
         {hidden.length > 0 && (
@@ -212,6 +254,7 @@ export function ChipRow({ items, title = "Details" }: ChipRowProps) {
             <Chip
               label={`+${hidden.length}`}
               ariaLabel={`Show all ${items.length} ${title.toLowerCase()}`}
+              size="xs"
               onClick={() => {
                 setEverOpened(true);
                 setOpen(true);
@@ -243,6 +286,7 @@ export function ChipRow({ items, title = "Details" }: ChipRowProps) {
                   label={item.label}
                   color={item.color}
                   description={item.description}
+                  size="xs"
                 />
               ))}
             </div>

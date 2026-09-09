@@ -62,17 +62,28 @@ describe("ChipRow", () => {
     });
   };
 
-  it("shows every chip when they all fit", () => {
+  it("shows every chip when they all fit on one line", () => {
     render(<ChipRow items={ITEMS} />);
     // 4 × 100 plus three 4px gaps = 412, inside the 600px row.
     for (const item of ITEMS) expect(screen.getByText(item.label)).toBeInTheDocument();
     expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
   });
 
-  it("folds the chips that do not fit into a single counted chip", () => {
+  it("wraps onto a second line instead of folding", () => {
     rowWidth = 300;
+    const { container } = render(<ChipRow items={ITEMS} />);
+    // 300px holds two 100px chips per line (204px), so all four fit across two
+    // lines — nothing folds.
+    expect(container.firstElementChild).toHaveClass("flex-wrap");
+    for (const item of ITEMS) expect(screen.getByText(item.label)).toBeInTheDocument();
+    expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
+  });
+
+  it("folds what overflows two lines into a single counted chip", () => {
+    rowWidth = 150;
     render(<ChipRow items={ITEMS} />);
-    // Two chips (204px) fit alongside the reserved `+N` width; the rest fold.
+    // 150px holds one 100px chip per line, so two lines take two chips and the
+    // `+N` chip (26px) rides the second line alongside the last of them.
     expect(screen.getByText("alpha")).toBeInTheDocument();
     expect(screen.getByText("bravo")).toBeInTheDocument();
     expect(screen.getByText("+2")).toBeInTheDocument();
@@ -81,7 +92,7 @@ describe("ChipRow", () => {
 
   it("opens a dialog listing every chip when the +N chip is clicked", async () => {
     const user = userEvent.setup();
-    rowWidth = 300;
+    rowWidth = 150;
     render(<ChipRow items={ITEMS} title="Tags" />);
 
     await user.click(screen.getByRole("button", { name: "Show all 4 tags" }));
@@ -95,7 +106,7 @@ describe("ChipRow", () => {
 
   it("shows a chip's description on hover inside the dialog", async () => {
     const user = userEvent.setup();
-    rowWidth = 300;
+    rowWidth = 150;
     render(<ChipRow items={ITEMS} title="Tags" />);
 
     await user.click(screen.getByRole("button", { name: "Show all 4 tags" }));
@@ -109,20 +120,31 @@ describe("ChipRow", () => {
   });
 
   it("hands the folded labels to assistive technology", () => {
-    rowWidth = 300;
+    rowWidth = 150;
     const { container } = render(<ChipRow items={ITEMS} />);
     // Folded chips are unmounted, so a screen reader would otherwise be told
     // only that there are two more of something.
     expect(container.querySelector(".sr-only")).toHaveTextContent("charlie, delta");
   });
 
-  it("folds every chip once not even the first one fits whole", () => {
+  it("keeps the whole chips of both lines and folds the rest", () => {
     rowWidth = 120;
     render(<ChipRow items={ITEMS} />);
-    // 120 leaves 84px beside the reserved count, under a chip's own 100px. A
-    // pill clipped mid-label names its tag no better than "+4" does, and would
-    // be the one thing to spill past the row's overflow — pushing the count,
-    // the only mark saying there is more to see, out of the cell.
+    // 120px holds one 100px chip per line; the second line still has room for
+    // the 26px `+N` chip after its one whole chip, so a chip survives on each
+    // line and only the overflow folds.
+    expect(screen.getByText("alpha")).toBeInTheDocument();
+    expect(screen.getByText("+3")).toBeInTheDocument();
+    expect(screen.queryByText("bravo")).not.toBeInTheDocument();
+  });
+
+  it("shows the count alone when not even the first chip fits whole", () => {
+    rowWidth = 80;
+    render(<ChipRow items={ITEMS} />);
+    // 80px is under a chip's own 100px. A pill clipped mid-label names its tag
+    // no better than "+4" does, and would be the one thing to spill past the
+    // row's overflow — pushing the count, the only mark saying there is more to
+    // see, out of the cell.
     expect(screen.getByText("+4")).toBeInTheDocument();
     expect(screen.queryByText("alpha")).not.toBeInTheDocument();
   });
@@ -140,7 +162,7 @@ describe("ChipRow", () => {
     render(<ChipRow items={ITEMS} />);
     expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
 
-    resizeRow(300);
+    resizeRow(150);
     expect(screen.getByText("+2")).toBeInTheDocument();
 
     // Widening refits from the cached natural widths rather than ratcheting.
@@ -150,12 +172,13 @@ describe("ChipRow", () => {
   });
 
   it("re-measures when the chips themselves change", () => {
-    rowWidth = 300;
+    rowWidth = 150;
     const { rerender } = render(<ChipRow items={ITEMS} />);
     expect(screen.getByText("+2")).toBeInTheDocument();
 
     rerender(<ChipRow items={ITEMS.slice(0, 2)} />);
-    // The previous fit's survivors must not be mistaken for the whole set.
+    // The previous fit's survivors must not be mistaken for the whole set: two
+    // chips, one per line, fit within the two-line cap.
     expect(screen.getByText("alpha")).toBeInTheDocument();
     expect(screen.getByText("bravo")).toBeInTheDocument();
     expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();

@@ -27,10 +27,14 @@ import { resolveTagColor } from "@/lib/tag-palette";
  * A tag id with no matching tag renders as the raw id rather than vanishing, so
  * a row never silently loses a chip when the tag list is momentarily stale.
  *
- * The chips are laid out by {@link ChipRow}, which holds the cell to one line
- * and folds the tags that do not fit into a `+N` chip that opens a dialog
- * listing every tag on the row, each with its description — so a heavily tagged
- * record neither grows its row nor claims the column's whole width.
+ * The chips are laid out by {@link ChipRow}, which wraps the cell to at most two
+ * lines of the compact `xs` chip and folds the rest into a `+N` chip that opens
+ * a dialog listing every tag on the row, each with its description — so a
+ * heavily tagged record neither grows its row nor claims the column's whole
+ * width. The column trims its vertical padding (`py-1!`) so two `xs` lines sit
+ * in the height one `sm` line held before, and keeps its cells vertically
+ * centred so a lightly tagged row's single line sits mid-row like the taller
+ * text cells rather than clinging to the top.
  *
  * @param getTagIds - Reads the tag ids off a row.
  * @param byId - The tenant's tags keyed by id, from `useTags`.
@@ -43,12 +47,17 @@ export function tagsColumn<T>(
   return {
     header: "Tags",
     // A row of chips is not text, so the default single-line truncation would
-    // clip it mid-pill; `ChipRow` does its own clipping instead, folding what
-    // does not fit into a `+N` chip.
+    // clip it mid-pill; `ChipRow` does its own clipping instead, wrapping to at
+    // most two lines and folding the rest into a `+N` chip.
     noTruncate: true,
     // That fold is this cell's ellipsis, so the column can give ground to the
     // panel fit like a text column rather than holding its full natural width.
     shrinkable: true,
+    // Trim the body cell's vertical padding (`!` to beat the `<td>`'s own
+    // `py-3`) so two `xs` chip lines occupy the height one `sm` line did, and
+    // keep it vertically centred (the table's default, restated here so it
+    // survives the padding override) so a one-line row sits mid-cell.
+    className: "py-1! align-middle",
     filterKind: "tags",
     tagOptions: tagFilterOptions(byId),
     cell: (row) => {

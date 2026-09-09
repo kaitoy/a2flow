@@ -84,8 +84,11 @@ interface ChipProps {
    * other caller wants. Pass `"lg"` where the chip sits beside a full-size
    * form control (e.g. {@link SecretRefField}'s secret chip next to its
    * entry `Select`) and the default reads as visually undersized next to it.
+   * Pass `"xs"` — the densest size, 11px mono with no vertical padding — for a
+   * {@link ChipRow} inside a table cell, where two lines of chips must share the
+   * height a single `sm` line plus the cell padding occupies today.
    */
-  size?: "sm" | "lg";
+  size?: "xs" | "sm" | "lg";
 }
 
 /**
@@ -160,9 +163,12 @@ const PILL = "inline-flex max-w-64 items-center rounded-md font-mono";
  * Padding and type scale per {@link ChipProps.size}. `lg`'s `px-4 py-2.5
  * text-sm` mirrors {@link Select}'s `TRIGGER_BASE` padding and type scale so a
  * chip standing in for a chosen value lands at the same height as the control
- * beside it.
+ * beside it. `xs` drops the type to 11px mono and removes the vertical padding
+ * so two stacked lines of a {@link ChipRow} fit the height one `sm` line plus
+ * the table cell's padding occupies today (see DESIGN.md → Shapes).
  */
-const SIZE: Record<"sm" | "lg", string> = {
+const SIZE: Record<"xs" | "sm" | "lg", string> = {
+  xs: "px-1.5 py-0 text-[11px] leading-[15px]",
   sm: "px-2 py-0.5 text-xs",
   lg: "px-4 py-2.5 text-sm",
 };

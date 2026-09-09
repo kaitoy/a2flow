@@ -74,6 +74,14 @@ describe("Chip", () => {
     expect(pill).toHaveClass("px-2", "py-0.5", "text-xs");
   });
 
+  it("shrinks to the xs size's padding and type scale when asked", () => {
+    render(<Chip label="Gather sources" size="xs" />);
+    const pill = screen.getByText("Gather sources").closest("span")?.parentElement;
+    // The densest size: 11px mono with no vertical padding, so a two-line
+    // `ChipRow` fits the height a single `sm` line plus cell padding holds today.
+    expect(pill).toHaveClass("px-1.5", "py-0", "text-[11px]", "leading-[15px]");
+  });
+
   it("grows to the lg size's padding and type scale when asked", () => {
     render(<Chip label="Gather sources" size="lg" />);
     const pill = screen.getByText("Gather sources").closest("span")?.parentElement;
