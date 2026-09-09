@@ -632,8 +632,14 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
     assert "A2UI Rules" in rendered
     assert "render_a2ui" in rendered
     # Known allowed values (e.g. listed in the workflow description) must be
-    # offered as ChoicePicker options rather than typed into a TextField.
+    # offered as ChoicePicker options rather than typed into a TextField. The
+    # rule is a decision gate ("decide this before you emit any input") with a
+    # guardrail against inventing a picker for a semi-open value.
+    assert "decide this before you emit any input component" in rendered
+    assert "you MUST use a `ChoicePicker`" in rendered
     assert "list every allowed value as an option" in rendered
+    assert "do not invent a `ChoicePicker` for it" in rendered
+    assert "a yes/no confirmation" in rendered
     assert "register_task_templates" not in rendered
     # The Skill is generic, so the instruction owns the A2Flow half: how a
     # go-ahead in the Skill maps onto an approval, and an external step onto
@@ -665,6 +671,10 @@ def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None
     # that is what an approval at run time takes effect from.
     assert "register that ask as a task of its own" in rendered
     assert "A2UI Rules" in rendered
+    # The strengthened ChoicePicker-vs-TextField gate lives in the shared
+    # block, so it reaches the design agent too.
+    assert "you MUST use a `ChoicePicker`" in rendered
+    assert "do not invent a `ChoicePicker` for it" in rendered
     # Titles are listed as chips, so the shared rules ask for short ones.
     assert "at most 30 characters" in rendered
 

@@ -416,6 +416,12 @@ class A2UIInstructionProvider:
     input components; informational messages stay as streamed plain text; the
     user's input is read from the render call's ``values`` result, not from the
     action ``context``) + any context entries stored in session state.
+
+    The rules make ``ChoicePicker`` mandatory over ``TextField`` whenever the
+    acceptable answers are already enumerable (listed in the workflow
+    description, the Skill, or a tool result, or a small closed set such as
+    yes/no), so the client can render radio buttons or a dropdown instead of a
+    free-text field.
     """
 
     def __init__(self, base_instruction: str) -> None:
@@ -433,14 +439,27 @@ class A2UIInstructionProvider:
             "- `ChoicePicker` for selecting among known options (`mutuallyExclusive` for a single choice),\n"
             "- a `Button` that submits the action,\n"
             "- short `Text` components inside the surface for labels and context only.\n\n"
-            "Whenever the allowed values of an input are already known — enumerated in the "
-            "workflow description, spelled out by the Skill, or returned by a tool you just "
-            "called — use a `ChoicePicker` instead of a `TextField`, and list every allowed "
-            "value as an option. Set each option's `value` to the exact string the work "
-            "needs and its `label` to a human-readable name. Never trim the list to keep the "
-            "surface short: the client collapses a long single-choice picker into a dropdown "
-            "on its own. Add `filterable: true` past roughly 20 options. Reserve `TextField` "
-            "for values you cannot enumerate.\n\n"
+            "Choosing between `TextField` and `ChoicePicker` — decide this before you emit "
+            "any input component. Ask yourself: is the set of acceptable answers already "
+            "fixed and knowable? The answer is YES when the values are enumerated in the "
+            "workflow description, spelled out by the Skill, returned by a tool you just "
+            "called, or implied by the question as a small closed set (yes/no, on/off, one "
+            "of a handful of named modes). Whenever the answer is YES you MUST use a "
+            "`ChoicePicker` (`mutuallyExclusive` for a single choice), never a `TextField` — "
+            "list every allowed value as an option, with each option's `value` set to the "
+            "exact string the work needs and its `label` a human-readable name. Never trim "
+            "the list to keep the surface short: the client renders a short single-choice "
+            "picker as radio buttons and collapses a long one into a dropdown on its own. "
+            "Add `filterable: true` past roughly 20 options.\n\n"
+            "Use a `TextField` only when the value is genuinely open-ended — a name, a "
+            "message, a URL, a free-form number or description you cannot enumerate. If you "
+            "can only guess two or three plausible options, that is still a `TextField`: do "
+            "not invent a `ChoicePicker` for it.\n\n"
+            "Examples. Use a `ChoicePicker` for: picking an environment (dev / staging / "
+            "prod), an AWS region, which team to route an approval to, a record chosen from "
+            "a list a tool just returned, a yes/no confirmation. Use a `TextField` for: a "
+            "commit message, a display name, an arbitrary hostname or URL, a free-text "
+            "reason, a quantity with no fixed set.\n\n"
             "The result of a `render_a2ui` call tells you what the user did with the surface. "
             'When they submit it, the result is a JSON object with `status: "action"` whose '
             "`values` field is the surface's entire data model — every value the user typed or "
