@@ -1,15 +1,16 @@
 """Access-control tests for workflow-execution-scoped operations.
 
 Every operation on a workflow execution (get, list, messages, task listing,
-agent stream, task CRUD) is restricted to the execution initiator, the
+agent stream, task status update) is restricted to the execution initiator, the
 designated approvers of the session's approvals, and super admins; deletion is
 stricter (owner or super admin only). A plain admin gets the same access as a
 super admin for the read-only operations (get, list, messages, task listing,
-reading a single task) but not for the ones that act (agent stream, task
-create/update/delete, deletion) -- see ``services/workflow_execution_access.py``.
-The auth test stub reads roles from the ``X-User-Roles`` header (defaulting to
-``super_admin``), so these tests pass explicit role headers to model each
-participant.
+reading a single task) but not for the ones that act (agent stream, task status
+update, deletion) -- see ``services/workflow_execution_access.py``. A run's task
+list is fixed at execute time, so there is no create or delete endpoint for
+tasks; the auth test stub reads roles from the ``X-User-Roles`` header
+(defaulting to ``super_admin``), so these tests pass explicit role headers to
+model each participant.
 """
 
 from collections.abc import AsyncGenerator
@@ -27,6 +28,7 @@ from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.approval import Approval, ApprovalStatus
 from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
+from models.workflow_task import WorkflowTask
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
@@ -153,15 +155,25 @@ async def _insert_approval(
         return approval.id
 
 
-async def _create_task(
-    client: AsyncClient, execution_id: str, headers: dict[str, str]
-) -> Any:
-    """POST a WorkflowTask into the session and return the raw response."""
-    return await client.post(
-        "/api/v1/workflow-tasks",
-        json={"workflowExecutionId": execution_id, "title": "Step 1"},
-        headers=headers,
-    )
+async def _seed_task(eng: AsyncEngine, execution_id: str) -> str:
+    """Insert a WorkflowTask directly and return its id.
+
+    There is no create endpoint -- a run's tasks are copied from templates at
+    execute time -- so the access tests seed one straight into the database,
+    the same way :func:`_insert_approval` seeds an Approval.
+    """
+    async with AsyncSession(eng) as db:
+        task = WorkflowTask(
+            workflow_execution_id=execution_id,
+            title="Step 1",
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by="owner",
+            updated_by="owner",
+        )
+        task_id = task.id
+        db.add(task)
+        await db.commit()
+    return task_id
 
 
 def _run_agent_input() -> dict[str, Any]:
@@ -499,79 +511,49 @@ async def test_approver_can_stream_agent(
     assert res.status_code == 200
 
 
-# ---------- task CRUD ----------
-
-
-async def test_unrelated_user_cannot_create_task(
-    access_env: tuple[AsyncClient, AsyncEngine],
-) -> None:
-    client, eng = access_env
-    execution_id = await _seed_session(eng)
-    assert_err(await _create_task(client, execution_id, UNRELATED), "FORBIDDEN", 403)
-
-
-async def test_admin_cannot_create_task(
-    access_env: tuple[AsyncClient, AsyncEngine],
-) -> None:
-    """A plain admin can read an execution's tasks but must not be able to create one."""
-    client, eng = access_env
-    execution_id = await _seed_session(eng)
-    assert_err(await _create_task(client, execution_id, ADMIN), "FORBIDDEN", 403)
-
-
-async def test_approver_can_create_task(
-    access_env: tuple[AsyncClient, AsyncEngine],
-) -> None:
-    client, eng = access_env
-    execution_id = await _seed_session(eng)
-    await _insert_approval(eng, workflow_execution_id=execution_id)
-    assert_ok(await _create_task(client, execution_id, APPROVER), status=201)
+# ---------- task status update ----------
 
 
 async def test_approver_cannot_advance_non_approval_task_status(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """A designated approver may create a task, but advancing one no approval
-    covers is the initiator's to do -- see ``WorkflowTaskService``'s status guard."""
+    """A designated approver may not advance a task no approval covers -- that is
+    the initiator's to do -- see ``WorkflowTaskService``'s status guard."""
     client, eng = access_env
     execution_id = await _seed_session(eng)
     await _insert_approval(eng, workflow_execution_id=execution_id)
-    task = assert_ok(await _create_task(client, execution_id, APPROVER), status=201)
+    task_id = await _seed_task(eng, execution_id)
     res = await client.patch(
-        f"/api/v1/workflow-tasks/{task['id']}",
+        f"/api/v1/workflow-tasks/{task_id}",
         json={"status": "in_progress"},
         headers=APPROVER,
     )
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_unrelated_user_cannot_read_or_delete_task(
+async def test_unrelated_user_cannot_read_task(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = access_env
     execution_id = await _seed_session(eng)
-    task = assert_ok(await _create_task(client, execution_id, OWNER), status=201)
-    res = await client.get(f"/api/v1/workflow-tasks/{task['id']}", headers=UNRELATED)
-    assert_err(res, "FORBIDDEN", 403)
-    res = await client.delete(f"/api/v1/workflow-tasks/{task['id']}", headers=UNRELATED)
+    task_id = await _seed_task(eng, execution_id)
+    res = await client.get(f"/api/v1/workflow-tasks/{task_id}", headers=UNRELATED)
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_admin_can_read_but_not_update_or_delete_task(
+async def test_admin_can_read_but_not_update_task(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """A plain admin can read a single task but must not update or delete it."""
+    """A plain admin can read a single task but must not change its status."""
     client, eng = access_env
     execution_id = await _seed_session(eng)
-    task = assert_ok(await _create_task(client, execution_id, OWNER), status=201)
-    assert_ok(await client.get(f"/api/v1/workflow-tasks/{task['id']}", headers=ADMIN))
+    task_id = await _seed_task(eng, execution_id)
+    assert_ok(await client.get(f"/api/v1/workflow-tasks/{task_id}", headers=ADMIN))
     res = await client.patch(
-        f"/api/v1/workflow-tasks/{task['id']}",
+        f"/api/v1/workflow-tasks/{task_id}",
         json={"status": "in_progress"},
         headers=ADMIN,
     )
-    assert_err(res, "FORBIDDEN", 403)
-    res = await client.delete(f"/api/v1/workflow-tasks/{task['id']}", headers=ADMIN)
     assert_err(res, "FORBIDDEN", 403)
 
 

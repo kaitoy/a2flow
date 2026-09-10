@@ -2,11 +2,15 @@
 
 Wraps the :class:`WorkflowTaskRepository` with the business rules the router
 needs: raising :class:`NotFoundError` when a task is missing and authorizing
-every operation against the task's parent workflow execution. Reading a task
-(``get``) is open to the execution's initiator, a designated approver of it, a
-super admin, or a plain admin (read-only, tenant-scoped); creating, updating,
-or deleting one is restricted to the initiator, a designated approver, or a
-super admin -- a plain admin cannot mutate tasks, mirroring
+every operation against the task's parent workflow execution. A run's task list
+is fixed at execute time (copied from the workflow's published templates), so
+this service exposes only ``get`` and ``update`` -- there is no create or delete
+path, and ``update`` touches only ``status`` / ``error_kind`` / ``error_message``
+(titles, descriptions, dependency edges and tool bindings are immutable once a
+task exists). Reading a task (``get``) is open to the execution's initiator, a
+designated approver of it, a super admin, or a plain admin (read-only,
+tenant-scoped); updating one is restricted to the initiator, a designated
+approver, or a super admin -- a plain admin cannot mutate tasks, mirroring
 ``WorkflowExecutionService.resolve_agent``'s exclusion of admins from driving
 an execution's agent. Changing a task's ``status`` is further restricted: a
 caller who is only a designated approver of the run may advance a task only
@@ -16,13 +20,11 @@ approval names, and every task downstream of it up to the next approval --
 status; a ``super_admin`` may only for a task no approval governs, mirroring
 ``ApprovalService.resolve``'s no-bypass rule once an approval is in play. The
 execution agent's ``update_workflow_task`` tool applies the same rule to the
-chat-driven path. Changing a task's ``tool_bindings`` is refused outright once
-an approval covers the task, so the set an approver was shown is the set their
-decision goes on to authorize.
+chat-driven path.
 
-Every write that can change the set of unfinished tasks also re-runs the shared
+A status change that can finish the parent run also re-runs the shared
 completion bookkeeping in :mod:`services.workflow_execution_completion`, so a
-run driven through these endpoints ends up in the same terminal state as one
+run driven through this endpoint ends up in the same terminal state as one
 driven by the agent's own task tools. A write that starts or finishes a task
 likewise settles its MCP tool certificate (:meth:`WorkflowTaskService._settle_certificate`),
 for the same reason: a task started from here has to end up able to call its
@@ -38,8 +40,6 @@ from infrastructure.approval_scope import (
 )
 from models.user import Role, User, has_any_role
 from models.workflow_task import (
-    ToolBinding,
-    WorkflowTaskCreate,
     WorkflowTaskRead,
     WorkflowTaskUpdate,
 )
@@ -50,7 +50,6 @@ from repositories import (
 )
 from repositories.exceptions import (
     ForbiddenError,
-    ForeignKeyViolationError,
     NotFoundError,
 )
 from services.approver_groups import ApproverGroupResolver
@@ -251,55 +250,6 @@ class WorkflowTaskService:
             "this task is addressed to, can change this task's status"
         )
 
-    async def _assert_tool_bindings_change_allowed(
-        self, task: WorkflowTaskRead, bindings: list[ToolBinding]
-    ) -> None:
-        """Refuse to change the bound MCP tools of a task an approval covers.
-
-        A task's certificate freezes its ``tool_bindings`` when the task starts,
-        not when the approval was decided -- that is what lets one approval
-        cover a chain of tasks without them racing a single validity window.
-        The gap it opens is this one: between the decision and the covered
-        task's start, an edit here would widen what the approver's decision goes
-        on to authorize. So it is refused.
-
-        Refused whether or not the approval has been decided. While it is still
-        pending, changing the bindings would move the ground under the person
-        being asked to weigh them.
-
-        ``requires_input_approval`` counts as part of a binding here, not merely
-        the ``(server, tool)`` pair: flipping it alone would drop the tool out of
-        what the approver's declaration bounds, which is the same widening by a
-        quieter route.
-
-        Args:
-            task: The task whose bindings are being changed.
-            bindings: The bindings the caller is asking for.
-
-        Raises:
-            ForbiddenError: If an approval governs the task and the requested
-                bindings differ from the ones it already carries.
-        """
-        current = {
-            (b.mcp_server_id, b.tool_name, b.requires_input_approval)
-            for b in task.tool_bindings
-        }
-        if {
-            (b.mcp_server_id, b.tool_name, b.requires_input_approval) for b in bindings
-        } == current:
-            return
-        tasks = await self._repo.list(
-            limit=_MAX_TASKS, offset=0, workflow_execution_id=task.workflow_execution_id
-        )
-        approvals = await self._approvals.list_for_execution(task.workflow_execution_id)
-        governing = governing_approvals(tasks, active_approval_by_task(approvals))
-        if governing.get(task.id):
-            raise ForbiddenError(
-                "An approval covers this task, so the MCP tools bound to it "
-                "cannot be changed: the approver's decision would end up "
-                "authorizing tools they were never shown"
-            )
-
     async def get(
         self, task_id: str, *, caller: User, caller_roles: Collection[str]
     ) -> WorkflowTaskRead:
@@ -327,59 +277,21 @@ class WorkflowTaskService:
         )
         return task
 
-    async def create(
-        self, data: WorkflowTaskCreate, *, caller: User
-    ) -> WorkflowTaskRead:
-        """Create a new WorkflowTask.
-
-        A missing parent execution surfaces as a foreign-key violation (HTTP
-        422), matching the pre-authorization behavior of the repository's own
-        FK check, rather than the 404 used when the execution appears in the
-        URL path.
-
-        Args:
-            data: Fields for the new task, including its parent execution.
-            caller: The authenticated user creating the task.
-
-        Returns:
-            The created WorkflowTask.
-
-        Raises:
-            ForeignKeyViolationError: If the parent execution does not exist.
-            ForbiddenError: If the caller may not act on the parent execution
-                (a plain admin who is not the initiator or a designated
-                approver is rejected, same as :meth:`update`/:meth:`delete`).
-        """
-        execution = await self._execution_repo.get(data.workflow_execution_id)
-        if execution is None:
-            raise ForeignKeyViolationError(
-                "WorkflowExecution", data.workflow_execution_id
-            )
-        await self._access.assert_access(
-            data.workflow_execution_id, execution.initiator_id, caller
-        )
-        created = await self._repo.create(data, user_id=caller.id)
-        # A task can be created already ``in_progress``, which is the same edge
-        # :meth:`update` handles -- it just happens at insert time instead.
-        await self._certificates.issue_for_started_task(
-            created, execution, user_id=caller.id
-        )
-        return created
-
     async def update(
         self, task_id: str, data: WorkflowTaskUpdate, *, caller: User
     ) -> WorkflowTaskRead:
         """Apply a partial update to a WorkflowTask.
 
-        Changing ``status`` is further restricted to the execution initiator or
-        an eligible approver of an approval covering the task, on top of the
-        general execution-access check — see
-        :meth:`_assert_status_change_allowed`. Changing ``tool_bindings`` on a
-        task an approval covers is refused outright — see
-        :meth:`_assert_tool_bindings_change_allowed`.
+        Only ``status`` / ``error_kind`` / ``error_message`` are updatable — a
+        run's task list is fixed at execute time, so titles, descriptions,
+        dependency edges and tool bindings cannot be changed here (nor can a
+        task be created or deleted through the REST API). Changing ``status`` is
+        further restricted to the execution initiator or an eligible approver of
+        an approval covering the task, on top of the general execution-access
+        check — see :meth:`_assert_status_change_allowed`.
 
         Once the write lands, the parent run's completion is re-evaluated, so a
-        run finished through these endpoints reaches the same terminal state as
+        run finished through this endpoint reaches the same terminal state as
         one finished by the agent.
 
         Args:
@@ -394,16 +306,13 @@ class WorkflowTaskService:
             NotFoundError: If no task exists with the given ID.
             ForbiddenError: If the caller may not act on the task's execution
                 (a plain admin is rejected, see :meth:`_assert_execution_write_access`),
-                is changing ``status`` on a task outside the scope of any
-                approval addressed to them, or is changing ``tool_bindings`` on
-                a task an approval covers.
+                or is changing ``status`` on a task outside the scope of any
+                approval addressed to them.
         """
         task = await self._get_or_404(task_id)
         await self._assert_execution_write_access(task.workflow_execution_id, caller)
         if data.status is not None and data.status != task.status:
             await self._assert_status_change_allowed(task, caller)
-        if data.tool_bindings is not None:
-            await self._assert_tool_bindings_change_allowed(task, data.tool_bindings)
         updated = await self._repo.update(task_id, data, user_id=caller.id)
         await self._settle_certificate(updated, caller)
         await self._evaluate_completion(updated.workflow_execution_id, caller.id)
@@ -429,23 +338,3 @@ class WorkflowTaskService:
                 task, execution, user_id=caller.id
             )
         await self._certificates.revoke_if_task_finished(task, user_id=caller.id)
-
-    async def delete(self, task_id: str, *, caller: User) -> None:
-        """Delete a WorkflowTask.
-
-        Deleting the last non-terminal task of a run can finish it, so the
-        parent run's completion is re-evaluated afterwards.
-
-        Args:
-            task_id: Identifier of the task to delete.
-            caller: The authenticated user performing the deletion.
-
-        Raises:
-            NotFoundError: If no task exists with the given ID.
-            ForbiddenError: If the caller may not act on the task's execution
-                (a plain admin is rejected, see :meth:`_assert_execution_write_access`).
-        """
-        task = await self._get_or_404(task_id)
-        await self._assert_execution_write_access(task.workflow_execution_id, caller)
-        await self._repo.delete(task_id)
-        await self._evaluate_completion(task.workflow_execution_id, caller.id)

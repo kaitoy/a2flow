@@ -116,11 +116,15 @@ class ToolBinding(SQLModel):
 class WorkflowTaskUpdate(SQLModel):
     """Partial update payload for a WorkflowTask — every field is optional.
 
-    Does not include ``workflow_execution_id``: tasks cannot be re-parented to a
-    different session after creation. When ``depends_on_ids`` is ``None`` the
-    task's dependency edges are left unchanged; when it is an explicit list the
-    full set of edges is replaced with that list. ``tool_bindings`` follows the
-    same semantics for the task's bound MCP tools.
+    Only the fields a run may change after it starts are here: a task's
+    ``status`` and, describing a failure, ``error_kind`` / ``error_message``.
+    A run's task list is otherwise fixed at execute time (copied from the
+    workflow's published templates), so ``title``, ``description``,
+    ``depends_on_ids`` and ``tool_bindings`` are **not** updatable and are
+    absent from this model — ``PATCH /workflow-tasks/{id}`` silently ignores
+    them if sent, the same way the execution agent's ``update_workflow_task``
+    tool only ever touches ``status``. ``workflow_execution_id`` is likewise
+    absent: tasks cannot be re-parented to a different session.
 
     ``error_kind`` and ``error_message`` describe why a task failed and are
     meaningful only alongside ``status="failed"``. They are not enforced to
@@ -130,26 +134,31 @@ class WorkflowTaskUpdate(SQLModel):
     """
 
     model_config = _alias_config
-    title: ShortText | None = None
-    description: DescText | None = None
     status: WorkflowTaskStatus | None = None
     error_kind: TaskErrorKind | None = None
     error_message: ShortText | None = None
-    depends_on_ids: list[str] | None = None
-    tool_bindings: list[ToolBinding] | None = None
 
 
 class WorkflowTaskCreate(WorkflowTaskUpdate):
     """Creation payload for a WorkflowTask.
 
-    Inherits the optional fields from :class:`WorkflowTaskUpdate` and tightens
-    ``title`` to required, supplies a default for ``status``, adds the required
-    parent ``workflow_execution_id`` foreign key, and defaults
-    ``depends_on_ids`` and ``tool_bindings`` to empty lists.
+    Not exposed as a REST endpoint: a run's tasks are created only at execute
+    time, when :meth:`services.workflow.WorkflowService.execute` copies the
+    workflow's published task templates into the new session through
+    :class:`repositories.workflow_task.WorkflowTaskRepository`. This model is
+    that copy's payload.
+
+    Inherits ``status`` / ``error_kind`` / ``error_message`` from
+    :class:`WorkflowTaskUpdate`, tightens ``title`` to required, supplies a
+    default for ``status``, adds the required parent ``workflow_execution_id``
+    foreign key, and defaults ``depends_on_ids`` and ``tool_bindings`` to empty
+    lists. ``depends_on_ids`` is the set of task IDs this task depends on;
+    ``tool_bindings`` the MCP tools bound to it.
     """
 
     workflow_execution_id: str
     title: ShortText
+    description: DescText | None = None
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
     depends_on_ids: list[str] = []
     tool_bindings: list[ToolBinding] = []

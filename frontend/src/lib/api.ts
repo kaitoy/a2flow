@@ -71,7 +71,6 @@ import type {
   WorkflowExecutionStatus,
   WorkflowRead as WorkflowModel,
   WorkflowStatus,
-  WorkflowTaskCreate,
   WorkflowTaskRead as WorkflowTaskModel,
   WorkflowTaskStatus,
   WorkflowTaskTemplateCreate,
@@ -89,7 +88,6 @@ import {
   zCreateTenantApiV1TenantsPostResponse,
   zCreateUserApiV1UsersPostResponse,
   zCreateUserGroupApiV1UserGroupsPostResponse,
-  zCreateWorkflowTaskApiV1WorkflowTasksPostResponse,
   zCreateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPostResponse,
   zDeactivateWorkflowApiV1WorkflowsWorkflowIdDeactivatePostResponse,
   zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse,
@@ -105,7 +103,6 @@ import {
   zDeleteUserGroupApiV1UserGroupsGroupIdDeleteResponse,
   zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
   zDeleteWorkflowExecutionApiV1WorkflowExecutionsExecutionIdDeleteResponse,
-  zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse,
   zDeleteWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdDeleteResponse,
   zDiscardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPostResponse,
   zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse,
@@ -559,7 +556,6 @@ export type {
   WorkflowDesignSource,
   WorkflowExecutionStatus,
   WorkflowStatus,
-  WorkflowTaskCreate,
   WorkflowTaskStatus,
   WorkflowTaskTemplateCreate,
   WorkflowTaskTemplateUpdate,
@@ -1862,15 +1858,14 @@ export async function getWorkflowTask(
   ) as Promise<WorkflowTask>;
 }
 
-/** Create a new WorkflowTask under the workflow execution given in ``body.workflowExecutionId``. */
-export async function createWorkflowTask(body: WorkflowTaskCreate): Promise<WorkflowTask> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/workflow-tasks", body),
-    zCreateWorkflowTaskApiV1WorkflowTasksPostResponse
-  ) as Promise<WorkflowTask>;
-}
-
-/** Apply a partial update to a WorkflowTask. ``workflowExecutionId`` is not updatable. */
+/**
+ * Apply a partial update to a WorkflowTask.
+ *
+ * Only `status` / `errorKind` / `errorMessage` are updatable — a run's task
+ * list is fixed at execute time, so a task's title, description, dependencies
+ * and tool bindings cannot be changed, and tasks cannot be created or deleted
+ * through the API.
+ */
 export async function updateWorkflowTask(
   taskId: string,
   body: WorkflowTaskUpdate
@@ -1879,14 +1874,6 @@ export async function updateWorkflowTask(
     apiClient.patch(`/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`, body),
     zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse
   ) as Promise<WorkflowTask>;
-}
-
-/** Delete a WorkflowTask by ID. */
-export async function deleteWorkflowTask(taskId: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`),
-    zDeleteWorkflowTaskApiV1WorkflowTasksTaskIdDeleteResponse
-  );
 }
 
 /**

@@ -569,15 +569,9 @@ export const handlers = [
     }
   ),
 
-  http.post(`${BASE}/api/v1/workflow-tasks`, () =>
-    envelope({ ...WORKFLOW_TASK_1, id: "new-task-id" }, 201)
-  ),
-
   http.get(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(WORKFLOW_TASK_1)),
 
   http.patch(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(WORKFLOW_TASK_1)),
-
-  http.delete(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(null)),
 
   http.get(`${BASE}/api/v1/mcp-servers`, () => envelope([MCP_SERVER_1, MCP_STDIO_SERVER])),
 

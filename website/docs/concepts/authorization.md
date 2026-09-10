@@ -32,7 +32,7 @@ A group is also addressable in its own right: an [approval](../guides/approvals.
 | Role | Grants |
 |---|---|
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the two designated-approver checks in the [matrix below](./authorization.md#workflow-execution-access)) |
-| `admin` | User CRUD, secrets CRUD, deleting workflow executions, and read-only visibility into every workflow execution, its tasks, and its chat history, and every approval, in their tenant (see [Workflow execution and its workflow session](./authorization.md#workflow-execution-access) — apart from deleting one, an Admin cannot drive an execution's agent, create/edit/delete its tasks, or resolve an approval) |
+| `admin` | User CRUD, secrets CRUD, deleting workflow executions, and read-only visibility into every workflow execution, its tasks, and its chat history, and every approval, in their tenant (see [Workflow execution and its workflow session](./authorization.md#workflow-execution-access) — apart from deleting one, an Admin cannot drive an execution's agent, change one of its tasks' status, or resolve an approval) |
 | `developer` | Secrets CRUD, MCP server CRUD, [tool-mock](../guides/tool-mocks.md) CRUD, agent-skill CRUD, workflow generation/editing/publishing/deactivating — including regenerating a workflow's AI-generated `generatedDescription`, though only a Super Admin may edit that field directly — task-template CRUD, design-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows and the unpublished edits of a `modified` one, for pre-publish testing. It is also the only role that can **see** those unpublished edits: a workflow's name, description and task templates read as they were at the last publish for every other role |
 | `requester` | Running **published** (and `modified`) workflows (`POST /workflows/{id}/execute`), always against the last published design |
 | `approver` | Eligibility to be a workflow approval's designated approver — individually, or as a member of a group an approval is addressed to — and resolving their own approvals |
@@ -100,7 +100,7 @@ Admitting the creator explicitly means nobody is locked out of a chat they start
 
 ### Workflow execution and its workflow session {#workflow-execution-access}
 
-Beyond roles, each operation on a workflow execution requires the caller to be the execution's **initiator** (the user who ran the workflow) or a **designated approver of one of its approvals** — the named user, or a member holding `approver` of a group one is addressed to (see [Human approval](../guides/approvals.md#human-approval)). This preserves the approver-sharing design — the approver joins the initiator's chat — while keeping third parties out. Reading is broader, and two operations are narrower:
+Beyond roles, each operation on a workflow execution requires the caller to be the execution's **initiator** (the user who ran the workflow) or a **designated approver of one of its approvals** — the named user, or a member holding `approver` of a group one is addressed to (see [Human approval](../guides/approvals.md#human-approval)). This preserves the approver-sharing design — the approver joins the initiator's chat — while keeping third parties out. Reading is broader, and the acting operations are narrower:
 
 | Operation | Endpoint | Initiator | Designated approver | Admin (same tenant) | Super Admin |
 |---|---|---|---|---|---|
@@ -108,12 +108,13 @@ Beyond roles, each operation on a workflow execution requires the caller to be t
 | List or open its tasks | `GET .../workflow-tasks` | ✅ | ✅ | ✅ | ✅ |
 | Read the workflow session's history | `GET .../messages` | ✅ | ✅ | ✅ | ✅ |
 | Drive its agent | `POST .../agent` | ✅ | ✅ | ❌ | ✅ |
-| Create, update or delete a task (fields other than status) | `/workflow-tasks` | ✅ | ✅ | ❌ | ✅ |
 | Change a task's **status** (by hand or through the agent) | `PATCH /workflow-tasks/{id}` | ✅ | Only for a task an approval addressed to them covers | ❌ | Only for a task no approval covers |
 | Resolve an approval | `PATCH /approvals/{id}` | ❌ | Only that approval's approver | ❌ | ❌ |
 | Delete the execution | `DELETE /workflow-executions/{id}` | Only if Admin | Only if Admin | ✅ | ✅ |
 
 Anyone outside those columns gets HTTP 403. The same `GET /approvals` list shows an Admin every approval in the tenant, matching the read row above.
+
+A run's **task list is fixed when the workflow is executed** — the tasks are copied from the workflow's published templates and only their `status` (plus a failure's cause) ever changes afterwards. Nobody adds, removes, retitles, re-describes or re-links a run's tasks through the API; to change the steps, edit the [task templates](../guides/workflows.md#adjusting-the-task-templates) and run again.
 
 **The last three rows are the ones worth reading twice.**
 

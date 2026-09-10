@@ -121,13 +121,19 @@ async def engine() -> AsyncGenerator[AsyncEngine, None]:
 
 @pytest.fixture(autouse=True)
 def _demo_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Start every test from a clean, fully unset demo configuration."""
+    """Start every test from a clean, fully unset demo configuration.
+
+    Every ``DEMO_*`` variable a test in this module sets is listed here, so an
+    ambient value (a developer's shell, CI) or one left by an earlier test that
+    skipped its teardown cannot bleed into the next test's :func:`_sync`.
+    """
     for name in (
         "DEMO_DATA",
         "DEMO_PASSWORD",
         "DEMO_AWS_ACCESS_KEY_ID",
         "DEMO_AWS_SECRET_ACCESS_KEY",
         "DEMO_AWS_REGION",
+        "DEMO_GCP_API_KEY",
     ):
         monkeypatch.delenv(name, raising=False)
 

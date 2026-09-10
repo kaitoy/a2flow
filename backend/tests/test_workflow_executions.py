@@ -23,7 +23,12 @@ from models.user import SYSTEM_USER_ID
 from models.workflow_execution import WorkflowExecution
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID
-from tests._workflow import GENERATE_BODY, create_published_workflow, create_skill
+from tests._workflow import (
+    GENERATE_BODY,
+    create_published_workflow,
+    create_skill,
+    insert_workflow_task,
+)
 from tests.conftest import FAKE_COMMIT_SHA
 
 
@@ -741,13 +746,10 @@ async def test_workflow_execution_messages_record_task_after_run(
 
     skill = await _create_skill(workflow_client)
     execution = await _execute_workflow(workflow_client, skill["id"])
-    task = assert_ok(
-        await workflow_client.post(
-            "/api/v1/workflow-tasks",
-            json={"workflowExecutionId": execution["id"], "title": "Step one"},
-        ),
-        status=201,
+    task_id = await insert_workflow_task(
+        workflow_execution_id=execution["id"], title="Step one"
     )
+    task = assert_ok(await workflow_client.get(f"/api/v1/workflow-tasks/{task_id}"))
 
     async def _appending_run(
         input_data: Any, *args: Any, **kwargs: Any
@@ -853,15 +855,11 @@ async def test_delete_workflow_execution_cascades_tasks(
 ) -> None:
     skill = await _create_skill(workflow_client)
     execution = await _execute_workflow(workflow_client, skill["id"])
-    task = assert_ok(
-        await workflow_client.post(
-            "/api/v1/workflow-tasks",
-            json={"workflowExecutionId": execution["id"], "title": "Step one"},
-        ),
-        status=201,
+    task_id = await insert_workflow_task(
+        workflow_execution_id=execution["id"], title="Step one"
     )
     await workflow_client.delete(f"/api/v1/workflow-executions/{execution['id']}")
-    response = await workflow_client.get(f"/api/v1/workflow-tasks/{task['id']}")
+    response = await workflow_client.get(f"/api/v1/workflow-tasks/{task_id}")
     assert_err(response, code="NOT_FOUND", status=404)
 
 

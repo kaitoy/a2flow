@@ -6,19 +6,128 @@ revision) → "Generate workflow" from it (the mocked generation job flips it to
 helpers keep that chain out of individual test bodies.
 """
 
+from collections.abc import AsyncIterator, Mapping, Sequence
+from contextlib import asynccontextmanager
 from typing import Any
 
 from google.adk.events.event import Event
 from google.adk.sessions import BaseSessionService
 from google.genai import types
 from httpx import AsyncClient
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from dependencies import APP_NAME
 from infrastructure.agent import tenant_app_name
 from tests._envelope import assert_err, assert_ok
+from tests._seed import DEFAULT_TEST_TENANT_ID
 
 SKILL_BODY = {"name": "skill-a", "repo_url": "https://github.com/x/y"}
 GENERATE_BODY = {"name": "my-workflow", "prompt": "Do the thing"}
+
+
+@asynccontextmanager
+async def app_db_session() -> AsyncIterator[AsyncSession]:
+    """Yield a DB session bound to whatever engine the test app is using.
+
+    Reads the ``get_session`` dependency override the workflow-client fixtures
+    install, so a helper can seed rows directly — as :func:`_insert_approval`
+    does with an explicit engine — without the test having to depend on the
+    ``workflow_client_with_engine`` variant just to reach the database.
+    """
+    from infrastructure.database import get_session
+    from main import app
+
+    override = app.dependency_overrides.get(get_session)
+    if override is None:  # pragma: no cover - guards against fixture drift
+        raise RuntimeError("no get_session override is installed on the app")
+    agen = override()
+    session = await agen.__anext__()
+    try:
+        yield session
+    finally:
+        await agen.aclose()
+
+
+async def insert_workflow_task(
+    *,
+    workflow_execution_id: str,
+    title: str = "Step",
+    description: str | None = None,
+    status: str = "pending",
+    depends_on_ids: Sequence[str] = (),
+    tool_bindings: Sequence[Mapping[str, object]] = (),
+    user_id: str = "owner",
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
+) -> str:
+    """Insert a WorkflowTask row directly and return its id.
+
+    A run's tasks are created only at execute time, when the workflow's task
+    templates are copied into the new session — there is no REST create
+    endpoint. Tests that need an ad-hoc task on an execution seed it through
+    the database the same way :func:`_insert_approval` seeds an Approval.
+
+    Args:
+        workflow_execution_id: Parent execution the task belongs to.
+        title: The task's title.
+        description: Optional task description.
+        status: Initial lifecycle status (``WorkflowTaskStatus`` value).
+        depends_on_ids: Ids of sibling tasks this task depends on.
+        tool_bindings: Mappings of ``mcp_server_id`` / ``tool_name`` /
+            ``requires_input_approval`` to bind MCP tools to the task.
+        user_id: The acting user recorded as ``created_by`` / ``updated_by``.
+        tenant_id: Tenant the task belongs to.
+
+    Returns:
+        The new task's id.
+    """
+    from models.workflow_task import (
+        WorkflowTask,
+        WorkflowTaskDependency,
+        WorkflowTaskStatus,
+        WorkflowTaskToolBinding,
+    )
+
+    async with app_db_session() as db:
+        task = WorkflowTask(
+            workflow_execution_id=workflow_execution_id,
+            title=title,
+            description=description,
+            status=WorkflowTaskStatus(status),
+            tenant_id=tenant_id,
+            created_by=user_id,
+            updated_by=user_id,
+        )
+        task_id = task.id
+        db.add(task)
+        for dep_id in depends_on_ids:
+            db.add(WorkflowTaskDependency(task_id=task_id, depends_on_id=dep_id))
+        for binding in tool_bindings:
+            db.add(WorkflowTaskToolBinding(task_id=task_id, **binding))
+        await db.commit()
+    return task_id
+
+
+async def clear_execution_tasks(execution_id: str) -> None:
+    """Delete every WorkflowTask of ``execution_id`` (dependency/binding rows cascade).
+
+    Used by helpers that execute a workflow only to obtain an empty session:
+    a published workflow always carries at least one task template, so the run
+    comes up with a task copied from it.
+    """
+    from models.workflow_task import WorkflowTask
+
+    async with app_db_session() as db:
+        rows = (
+            await db.exec(
+                select(WorkflowTask).where(
+                    WorkflowTask.workflow_execution_id == execution_id
+                )
+            )
+        ).all()
+        for row in rows:
+            await db.delete(row)
+        await db.commit()
 
 
 async def create_skill(client: AsyncClient, **overrides: object) -> Any:
