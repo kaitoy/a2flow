@@ -28,9 +28,10 @@ from infrastructure.workflow_task_tools import (
     list_workflow_tasks,
     update_workflow_task,
 )
+from models.approval import Approval, ApprovalStatus
 from models.notification import Notification, NotificationType
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
-from models.workflow_task import WorkflowTask
+from models.workflow_task import WorkflowTask, WorkflowTaskStatus
 from repositories import SqlNotificationRepository, SqlWorkflowExecutionRepository
 from repositories.tenant_bootstrap import NoTenantSessionError
 from tests._engine import make_test_engine
@@ -83,13 +84,49 @@ async def _seed_session(
         return execution.id
 
 
+async def _insert_approval(
+    eng: AsyncEngine,
+    *,
+    workflow_execution_id: str,
+    workflow_task_id: str | None = None,
+    approver: str,
+    status: ApprovalStatus = ApprovalStatus.pending,
+) -> str:
+    """Insert a pending Approval addressed to ``approver`` and return its id.
+
+    Stands in for the ``request_approval`` agent tool: a real run creates the
+    row that way, but these tests only need the linkage the status guard reads.
+    """
+    async with AsyncSession(eng) as db:
+        approval = Approval(
+            workflow_execution_id=workflow_execution_id,
+            workflow_task_id=workflow_task_id,
+            title="Approve me",
+            status=status,
+            approver=approver,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by="owner",
+            updated_by="owner",
+        )
+        db.add(approval)
+        await db.commit()
+        await db.refresh(approval)
+        return approval.id
+
+
 def _ctx(
     session_id: str = "sess-abc",
-    user_id: str = "tester",
+    user_id: str = "owner",
     *,
     state: dict[str, Any] | None = None,
 ) -> Any:
-    """Build a fake ToolContext exposing ``session.id``, ``user_id``, and ``state``."""
+    """Build a fake ToolContext exposing ``session.id``, ``user_id``, and ``state``.
+
+    ``user_id`` defaults to ``"owner"`` -- the id :func:`_seed_session` records as
+    the run's initiator -- so a plain ``_ctx()`` drives the tools as the
+    participant who may advance any task. Tests exercising the approver
+    status-change restriction pass ``state={ACTING_USER_STATE_KEY: <approver>}``.
+    """
     return SimpleNamespace(
         session=SimpleNamespace(id=session_id), user_id=user_id, state=state
     )
@@ -98,7 +135,9 @@ def _ctx(
 async def test_update_workflow_task_attributes_to_acting_user(
     engine: AsyncEngine,
 ) -> None:
-    execution_id = await _seed_session(engine, user_id="owner")
+    # "bob" initiates the run, so the per-turn acting user (state) -- not the
+    # ADK session owner in ``user_id`` -- is what lands in ``updated_by``.
+    execution_id = await _seed_session(engine, user_id="bob")
     task_id = await seed_workflow_task(engine, execution_id, title="Solo")
     await update_workflow_task(
         task_id,
@@ -156,6 +195,100 @@ async def test_update_preserves_unset_fields(engine: AsyncEngine) -> None:
     updated = await update_workflow_task(task_id, _ctx(), status="completed")
     assert updated["title"] == "Original"
     assert updated["description"] == "desc"
+    assert updated["status"] == "completed"
+
+
+# ---------- approver status-change restriction ----------
+
+
+async def test_approver_can_advance_their_own_approval_task(
+    engine: AsyncEngine,
+) -> None:
+    """The person an approval is addressed to may advance the task it names."""
+    execution_id = await _seed_session(engine, user_id="owner")
+    task_id = await seed_workflow_task(engine, execution_id, title="Gated")
+    await _insert_approval(
+        engine,
+        workflow_execution_id=execution_id,
+        workflow_task_id=task_id,
+        approver="carol",
+    )
+
+    updated = await update_workflow_task(
+        task_id,
+        _ctx(state={ACTING_USER_STATE_KEY: "carol"}),
+        status="completed",
+    )
+    assert updated["status"] == "completed"
+
+
+async def test_approver_can_advance_downstream_covered_task(
+    engine: AsyncEngine,
+) -> None:
+    """An approval covers the steps downstream of the task it names, so its
+    approver may advance those too -- this is what resumes the run."""
+    execution_id = await _seed_session(engine, user_id="owner")
+    gate = await seed_workflow_task(engine, execution_id, title="Gate")
+    downstream = await seed_workflow_task(
+        engine, execution_id, title="Downstream", depends_on_ids=[gate]
+    )
+    await _insert_approval(
+        engine,
+        workflow_execution_id=execution_id,
+        workflow_task_id=gate,
+        approver="carol",
+    )
+
+    updated = await update_workflow_task(
+        downstream,
+        _ctx(state={ACTING_USER_STATE_KEY: "carol"}),
+        status="completed",
+    )
+    assert updated["status"] == "completed"
+
+
+async def test_approver_cannot_advance_task_outside_their_approval(
+    engine: AsyncEngine,
+) -> None:
+    """A task no approval addressed to the approver covers stays untouched."""
+    execution_id = await _seed_session(engine, user_id="owner")
+    gated = await seed_workflow_task(engine, execution_id, title="Gated")
+    unrelated = await seed_workflow_task(engine, execution_id, title="Unrelated")
+    await _insert_approval(
+        engine,
+        workflow_execution_id=execution_id,
+        workflow_task_id=gated,
+        approver="carol",
+    )
+
+    result = await update_workflow_task(
+        unrelated,
+        _ctx(state={ACTING_USER_STATE_KEY: "carol"}),
+        status="completed",
+    )
+    assert "approval addressed to you" in result["error"]
+
+    async with AsyncSession(engine) as db:
+        task = await db.get(WorkflowTask, unrelated)
+    assert task is not None
+    assert task.status is WorkflowTaskStatus.pending
+
+
+async def test_initiator_can_advance_any_task_despite_an_approval(
+    engine: AsyncEngine,
+) -> None:
+    """The restriction is on approvers only; the initiator still drives freely."""
+    execution_id = await _seed_session(engine, user_id="owner")
+    gated = await seed_workflow_task(engine, execution_id, title="Gated")
+    unrelated = await seed_workflow_task(engine, execution_id, title="Unrelated")
+    await _insert_approval(
+        engine,
+        workflow_execution_id=execution_id,
+        workflow_task_id=gated,
+        approver="carol",
+    )
+
+    updated = await update_workflow_task(unrelated, _ctx(), status="completed")
     assert updated["status"] == "completed"
 
 

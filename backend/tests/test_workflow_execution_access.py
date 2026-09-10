@@ -519,9 +519,20 @@ async def test_admin_cannot_create_task(
     assert_err(await _create_task(client, execution_id, ADMIN), "FORBIDDEN", 403)
 
 
-async def test_approver_can_create_and_update_task(
+async def test_approver_can_create_task(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    await _insert_approval(eng, workflow_execution_id=execution_id)
+    assert_ok(await _create_task(client, execution_id, APPROVER), status=201)
+
+
+async def test_approver_cannot_advance_non_approval_task_status(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A designated approver may create a task, but advancing one no approval
+    covers is the initiator's to do -- see ``WorkflowTaskService``'s status guard."""
     client, eng = access_env
     execution_id = await _seed_session(eng)
     await _insert_approval(eng, workflow_execution_id=execution_id)
@@ -531,7 +542,7 @@ async def test_approver_can_create_and_update_task(
         json={"status": "in_progress"},
         headers=APPROVER,
     )
-    assert_ok(res)
+    assert_err(res, "FORBIDDEN", 403)
 
 
 async def test_unrelated_user_cannot_read_or_delete_task(

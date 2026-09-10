@@ -51,7 +51,7 @@ The agent explains the request in plain text, and the controls appear in the cha
 
 Each decision takes an optional **comment**. The decision itself is **final** — two members of an approver group can genuinely race each other, so a second decision that would change the recorded one is refused rather than overwriting it. Editing the comment afterwards is still allowed, and it moves neither the recorded decider nor the decision time, so the turnaround from request to decision stays the approver's real one.
 
-Only the designated approver may decide, with **no exception — not even a Super Admin** who is not the addressee. The same rule extends to the linked task's status: marking such a task `completed` by hand is limited to the person who started the run and to an eligible approver, since flipping the status would otherwise let any approver of the run stand in for the addressee.
+Only the designated approver may decide, with **no exception — not even a Super Admin** who is not the addressee. The same rule extends to task status: changing a task's status — by hand or by asking the execution agent to — is limited to the person who started the run and to an approver of an approval **covering that task**. An approver may move the steps their decision covers (the task an approval names and everything after it up to the next approval), which is what lets an approval resume the run; they cannot advance a task outside what they were asked to approve, since that would let any approver of the run stand in for the addressee.
 
 ### What a request authorizes {#what-a-request-authorizes}
 

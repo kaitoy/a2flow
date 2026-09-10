@@ -1133,21 +1133,53 @@ async def test_update_status_allowed_for_session_owner_despite_linked_approval(
     assert assert_ok(response)["status"] == "completed"
 
 
-async def test_update_status_allowed_when_no_linked_approval(
+async def test_update_status_forbidden_for_session_approver_when_no_linked_approval(
     workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """A task with no linked approval keeps the broader any-session-participant rule."""
+    """A task no approval governs is the initiator's to advance, not an approver's."""
     client, eng = workflow_client_with_engine
     execution = await _create_workflow_execution(client)
     task = await _create_task(client, execution["id"])
-    # alice is an approver of an unrelated approval in the session; the task
-    # itself has no linked approval, so there is nothing to protect.
+    # alice is an approver of an unrelated approval in the session, so she is a
+    # participant -- but nothing addresses this task to her, so she may not
+    # advance it.
     await _insert_approval(eng, workflow_execution_id=execution["id"], approver="alice")
 
     response = await client.patch(
         f"/api/v1/workflow-tasks/{task['id']}",
         json={"status": "completed"},
         headers={"X-User-Id": "alice", "X-User-Roles": "approver"},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+    unchanged = await client.get(f"/api/v1/workflow-tasks/{task['id']}")
+    assert assert_ok(unchanged)["status"] == "pending"
+
+
+async def test_update_status_allowed_for_approver_on_downstream_covered_task(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """An approval covers the steps downstream of the task it names, so its approver
+    may advance those too -- this is what lets a decision resume the run."""
+    client, eng = workflow_client_with_engine
+    execution = await _create_workflow_execution(client)
+    gate = await _create_task(client, execution["id"], title="gate")
+    downstream = await _create_task(
+        client, execution["id"], title="downstream", dependsOnIds=[gate["id"]]
+    )
+    # The approval takes effect from ``gate``; nothing links it to ``downstream``
+    # directly, but the scope rule carries it down the dependency edge.
+    await _insert_approval(
+        eng,
+        workflow_execution_id=execution["id"],
+        workflow_task_id=gate["id"],
+        approver="bob",
+    )
+
+    response = await client.patch(
+        f"/api/v1/workflow-tasks/{downstream['id']}",
+        json={"status": "completed"},
+        headers={"X-User-Id": "bob", "X-User-Roles": "approver"},
     )
     assert assert_ok(response)["status"] == "completed"
 

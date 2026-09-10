@@ -108,8 +108,8 @@ Beyond roles, each operation on a workflow execution requires the caller to be t
 | List or open its tasks | `GET .../workflow-tasks` | ✅ | ✅ | ✅ | ✅ |
 | Read the workflow session's history | `GET .../messages` | ✅ | ✅ | ✅ | ✅ |
 | Drive its agent | `POST .../agent` | ✅ | ✅ | ❌ | ✅ |
-| Create, update or delete a task | `/workflow-tasks` | ✅ | ✅ | ❌ | ✅ |
-| Change a task's status **when that task has a linked approval** | `PATCH /workflow-tasks/{id}` | ✅ | Only that approval's approver | ❌ | ❌ |
+| Create, update or delete a task (fields other than status) | `/workflow-tasks` | ✅ | ✅ | ❌ | ✅ |
+| Change a task's **status** (by hand or through the agent) | `PATCH /workflow-tasks/{id}` | ✅ | Only for a task an approval addressed to them covers | ❌ | Only for a task no approval covers |
 | Resolve an approval | `PATCH /approvals/{id}` | ❌ | Only that approval's approver | ❌ | ❌ |
 | Delete the execution | `DELETE /workflow-executions/{id}` | Only if Admin | Only if Admin | ✅ | ✅ |
 
@@ -117,7 +117,7 @@ Anyone outside those columns gets HTTP 403. The same `GET /approvals` list shows
 
 **The last three rows are the ones worth reading twice.**
 
-The two approval rows are the **ownership-layer exceptions to the Super Admin bypass** promised at the top of this page: only the designated approver may resolve an approval, and only the initiator or that specific approval's approver may flip the linked task's status — not merely any approver of the execution, and not a Super Admin or Admin who is neither. Otherwise, flipping a task straight to `completed` would let anyone stand in for the addressee (see [Human approval](../guides/approvals.md#human-approval)).
+The status row and the resolve row are the **ownership-layer exceptions to the Super Admin bypass** promised at the top of this page: only the designated approver may resolve an approval, and a task's status may be changed only by the initiator or by an approver an approval **covering that task** is addressed to — not merely any approver of the execution, and (once an approval covers the task) not a Super Admin or Admin either. An approver may advance a task only within the scope of what they were asked to approve — the task an approval names and the steps after it up to the next approval — which is what lets a decision resume the run without letting an approver push unrelated steps forward. Otherwise, flipping a task straight to `completed` would let anyone stand in for the addressee (see [Human approval](../guides/approvals.md#human-approval)). The rule is the same whether the change is made by hand or asked of the execution agent in the workflow session's chat: the agent refuses a status change its driver could not make directly.
 
 **Deleting** an execution is the opposite shape: it is a plain role gate with no ownership component at all, so an Admin may delete any execution in the tenant while a non-Admin initiator may not delete their own. Deleting removes the run's tasks and its ADK session with it.
 

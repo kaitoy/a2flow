@@ -994,7 +994,9 @@ async def test_the_agent_tool_grants_a_task_it_starts(
     """
     _, eng = cert_env
     monkeypatch.setattr("infrastructure.database.engine", eng)
-    execution_id = await _seed_execution(eng)
+    # "alice" drives this turn (see ``_tool_context``); make her the initiator so
+    # the status guard lets a task with no governing approval through.
+    execution_id = await _seed_execution(eng, user_id="alice")
     server_id = await _seed_mcp_server(eng)
     task_id = await _seed_task(
         eng,

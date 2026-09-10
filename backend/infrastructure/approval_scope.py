@@ -38,7 +38,7 @@ applies, and keeping the two in step is what stops a task from being wedged
 forever by a rejection it has already superseded.
 """
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 
 from models.approval import Approval, ApprovalStatus
 from models.workflow_task import WorkflowTaskRead
@@ -184,3 +184,64 @@ def covered_task_ids(
         for task_id, approval_ids in governing.items()
         if approval_id in approval_ids
     )
+
+
+def may_change_governed_task_status(
+    *,
+    caller_id: str,
+    initiator_id: str,
+    caller_is_super_admin: bool,
+    governing_approval_ids: Collection[str],
+    approvals_by_id: Mapping[str, Approval],
+    caller_approver_group_ids: Collection[str],
+) -> bool:
+    """Return whether ``caller_id`` may change the status of a governed task.
+
+    The rule the workflow session applies to every task-status write, whether it
+    arrives through ``PATCH /workflow-tasks/{id}`` or the execution agent's
+    ``update_workflow_task`` tool: a participant who is only a designated
+    approver of the run may advance a task only while it sits within the scope of
+    an approval addressed to them. The run's initiator keeps full control, and a
+    super admin keeps their bypass only for tasks no approval governs -- once an
+    approval is in play the "only the addressee decides" invariant holds for them
+    too, matching ``ApprovalService.resolve``.
+
+    Pure so the rule stays testable without a database; the caller resolves the
+    governing approvals (:func:`governing_approvals`), loads their rows, and
+    resolves which approver groups the caller counts for
+    (:class:`services.approver_groups.ApproverGroupResolver`) before calling in.
+
+    Args:
+        caller_id: The user performing the status change.
+        initiator_id: ``WorkflowExecution.initiator_id`` of the task's run.
+        caller_is_super_admin: Whether ``caller_id`` holds ``super_admin``.
+        governing_approval_ids: The approvals governing the task in question, from
+            :func:`governing_approvals`.
+        approvals_by_id: Every approval of the run keyed by id, so a governing
+            id can be resolved to its destination.
+        caller_approver_group_ids: The approver groups ``caller_id`` is an
+            eligible approver for, already role-filtered.
+
+    Returns:
+        ``True`` if the caller may change the task's status.
+    """
+    if caller_id == initiator_id:
+        return True
+    for approval_id in governing_approval_ids:
+        approval = approvals_by_id.get(approval_id)
+        if approval is None:
+            continue
+        if approval.approver is None and approval.approver_group_id is None:
+            # A destination-less approval gates nobody in particular; keep the
+            # pre-existing lenient reading rather than wedging the task.
+            return True
+        if approval.approver is not None and approval.approver == caller_id:
+            return True
+        if (
+            approval.approver_group_id is not None
+            and approval.approver_group_id in caller_approver_group_ids
+        ):
+            return True
+    if not governing_approval_ids:
+        return caller_is_super_admin
+    return False

@@ -9,6 +9,12 @@ Bulk template registration lives in
 :mod:`infrastructure.task_template_tools`, which the design agents use to write
 the workflow's templates.
 
+:func:`update_workflow_task` also carries the session's status-change rule for
+the chat-driven path: when the turn is driven by someone who is only a
+designated approver of the run, a status change is accepted only for a task an
+approval addressed to them governs, mirroring
+:meth:`services.workflow_task.WorkflowTaskService._assert_status_change_allowed`.
+
 Two facts shape the implementation:
 
 * The tools run *during* the AG-UI SSE stream, outside FastAPI's per-request
@@ -39,7 +45,13 @@ from google.adk.tools.tool_context import ToolContext
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database
+from infrastructure.approval_scope import (
+    active_approval_by_task,
+    governing_approvals,
+    may_change_governed_task_status,
+)
 from models.notification import NotificationCreate, NotificationType
+from models.user import Role, has_any_role
 from models.workflow_task import (
     TaskErrorKind,
     ToolBinding,
@@ -48,9 +60,17 @@ from models.workflow_task import (
     WorkflowTaskUpdate,
 )
 from repositories import (
+    ApprovalRepository,
+    EffectiveRoleRepository,
+    SqlApprovalRepository,
+    SqlEffectiveRoleRepository,
     SqlMCPServerRepository,
+    SqlUserGroupRepository,
+    SqlUserRepository,
     SqlWorkflowExecutionRepository,
     SqlWorkflowTaskRepository,
+    UserGroupRepository,
+    UserRepository,
     WorkflowExecutionRepository,
     WorkflowTaskRepository,
 )
@@ -75,6 +95,12 @@ logger = logging.getLogger(__name__)
 
 _NO_SESSION = "no workflow execution is bound to the current run; cannot manage tasks"
 
+#: Upper bound on how many of a run's tasks the status guard reads when working
+#: out which approval governs the one being advanced. Mirrors
+#: ``infrastructure.approval_tools._MAX_TASKS`` and
+#: ``infrastructure.mcp_policies._MAX_TASKS``.
+_MAX_TASKS = 1000
+
 #: ``RunAgentInput.state`` key carrying the effective (impersonation-aware)
 #: caller actually driving the current turn, stamped in by
 #: ``infrastructure.agent.with_user_id`` -- as opposed to the ADK session's
@@ -97,10 +123,19 @@ class _Scope:
     tenant_id: str
     execution_repo: WorkflowExecutionRepository
     task_repo: WorkflowTaskRepository
+    #: The run's approvals, so :func:`update_workflow_task` can tell which
+    #: approval governs a task before letting a designated approver advance it.
+    approval_repo: ApprovalRepository
     certificates: "McpToolCertificateService"
     # Quoted so the dataclass does not evaluate the name at class-creation
     # time -- it only exists under TYPE_CHECKING (see the import above).
     notifications: "NotificationDispatcher"
+    #: Not tenant scoped -- neither ``User`` nor a membership row is a
+    #: ``TenantScoped`` entity; the status guard checks the acting user's roles
+    #: and approver-group membership itself.
+    user_repo: UserRepository
+    effective_role_repo: EffectiveRoleRepository
+    group_repo: UserGroupRepository
 
 
 async def _resolve_scope(
@@ -164,6 +199,8 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
     async with AsyncSession(database.engine) as db:
         execution_id, tenant_id = await _resolve_scope(tool_context, db)
         execution_repo = SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
+        user_repo = SqlUserRepository(db)
+        group_repo = SqlUserGroupRepository(db, user_repo, tenant_id=tenant_id)
         yield _Scope(
             execution_id=execution_id,
             tenant_id=tenant_id,
@@ -174,8 +211,14 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
                 SqlMCPServerRepository(db, tenant_id=tenant_id),
                 tenant_id=tenant_id,
             ),
+            approval_repo=SqlApprovalRepository(
+                db, execution_repo, group_repo, tenant_id=tenant_id
+            ),
             certificates=build_mcp_tool_certificate_service(db, tenant_id=tenant_id),
             notifications=build_notification_dispatcher(db, tenant_id=tenant_id),
+            user_repo=user_repo,
+            effective_role_repo=SqlEffectiveRoleRepository(db),
+            group_repo=group_repo,
         )
 
 
@@ -503,6 +546,67 @@ async def get_workflow_task(task_id: str, tool_context: ToolContext) -> dict[str
         return {"error": _NO_SESSION}
 
 
+async def _status_change_denied_reason(
+    s: _Scope, task: WorkflowTaskRead, acting_user_id: str
+) -> str | None:
+    """Return why ``acting_user_id`` may not change ``task``'s status, or ``None``.
+
+    The chat-driven counterpart of
+    :meth:`services.workflow_task.WorkflowTaskService._assert_status_change_allowed`.
+    The human driving this turn already passed
+    ``WorkflowExecutionAccessPolicy.assert_access`` at the ``/agent`` route, so
+    they are the run's initiator, a super admin, or a designated approver of one
+    of its approvals. This narrows the last case: a caller who is only an
+    approver may advance a task only while an approval addressed to them governs
+    it (the task an approval names, and every task downstream of it up to the
+    next approval -- :func:`infrastructure.approval_scope.governing_approvals`).
+    That is what still lets an approval resume the run through the covered steps
+    that follow it, while keeping an approver from advancing unrelated ones.
+
+    The :class:`~services.approver_groups.ApproverGroupResolver` import is
+    deferred to call time for the same reason the ones in :func:`_repos` are --
+    reaching into ``services`` at module import time closes a cycle back through
+    ``infrastructure.agent``.
+
+    Args:
+        s: The current tool call's resolved run and repositories.
+        task: The task whose status the agent is about to change.
+        acting_user_id: The user driving this turn (see :func:`_user_id`).
+
+    Returns:
+        An error message for the model, or ``None`` when the change is allowed.
+    """
+    from services.approver_groups import ApproverGroupResolver
+
+    execution = await s.execution_repo.get(s.execution_id)
+    initiator_id = execution.initiator_id if execution is not None else ""
+    if acting_user_id == initiator_id:
+        return None
+    user = await s.user_repo.get(acting_user_id)
+    tasks = await s.task_repo.list(
+        limit=_MAX_TASKS, offset=0, workflow_execution_id=s.execution_id
+    )
+    approvals = await s.approval_repo.list_for_execution(s.execution_id)
+    governing = governing_approvals(tasks, active_approval_by_task(approvals))
+    resolver = ApproverGroupResolver(s.group_repo, s.effective_role_repo)
+    group_ids = await resolver.group_ids_for(user) if user is not None else ()
+    if may_change_governed_task_status(
+        caller_id=acting_user_id,
+        initiator_id=initiator_id,
+        caller_is_super_admin=(
+            user is not None and has_any_role(user.roles, Role.super_admin)
+        ),
+        governing_approval_ids=governing.get(task.id, frozenset()),
+        approvals_by_id={approval.id: approval for approval in approvals},
+        caller_approver_group_ids=group_ids,
+    ):
+        return None
+    return (
+        "you may only advance tasks covered by an approval addressed to you; "
+        f"task {task.id!r} is not one of them"
+    )
+
+
 async def update_workflow_task(
     task_id: str,
     tool_context: ToolContext,
@@ -523,6 +627,12 @@ async def update_workflow_task(
     ``in_progress`` is what grants it permission to call the MCP tools bound to
     it. Whenever you set ``status`` to "failed", also pass ``error_kind`` and
     ``error_message`` so the failure can be triaged later.
+
+    When the person driving this turn is only a designated approver of the run
+    (not its initiator), a status change is accepted only for a task an approval
+    addressed to them governs -- the task an approval names and the steps
+    downstream of it up to the next approval. Advancing any other task is
+    refused; the initiator has to drive those steps.
 
     Args:
         task_id: Id of the task to update.
@@ -546,7 +656,8 @@ async def update_workflow_task(
 
     Returns:
         The updated task dict, or ``{"error": <message>}`` on an invalid status
-        or error kind, unknown task, cross-session task, or unresolved session.
+        or error kind, unknown task, cross-session task, unresolved session, or
+        a status change the acting approver is not allowed to make.
     """
     status_enum = _parse_status(status)
     if status is not None and status_enum is None:
@@ -567,6 +678,10 @@ async def update_workflow_task(
             if error_message is not None:
                 fields["error_message"] = error_message
             acting_user_id = _user_id(tool_context)
+            if status_enum is not None and status_enum != existing.status:
+                denied = await _status_change_denied_reason(s, existing, acting_user_id)
+                if denied is not None:
+                    return {"error": denied}
             try:
                 task = await s.task_repo.update(
                     task_id,

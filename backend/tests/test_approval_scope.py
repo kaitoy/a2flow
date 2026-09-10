@@ -13,6 +13,7 @@ from infrastructure.approval_scope import (
     active_approval_by_task,
     covered_task_ids,
     governing_approvals,
+    may_change_governed_task_status,
 )
 from models.approval import Approval, ApprovalStatus
 from models.workflow_task import WorkflowTaskRead
@@ -199,3 +200,136 @@ def test_covered_task_ids_is_empty_for_a_superseded_approval() -> None:
 
     assert covered_task_ids(tasks, active, "a1") == frozenset()
     assert covered_task_ids(tasks, active, "a2") == frozenset({"ask", "launch"})
+
+
+# ---------------------------------------------------------------------------
+# Who may change a governed task's status
+# ---------------------------------------------------------------------------
+
+
+def _addressed(
+    approval_id: str, *, approver: str | None = None, group: str | None = None
+) -> Approval:
+    """Build an approval row carrying a destination."""
+    return Approval(
+        id=approval_id,
+        workflow_execution_id="run-1",
+        title=approval_id,
+        status=ApprovalStatus.pending,
+        approver=approver,
+        approver_group_id=group,
+        tenant_id="tenant-1",
+        created_at=_EPOCH,
+        created_by="owner",
+        updated_by="owner",
+    )
+
+
+def test_initiator_may_change_any_task_status() -> None:
+    approvals = {"a1": _addressed("a1", approver="carol")}
+    assert may_change_governed_task_status(
+        caller_id="owner",
+        initiator_id="owner",
+        caller_is_super_admin=False,
+        governing_approval_ids=frozenset({"a1"}),
+        approvals_by_id=approvals,
+        caller_approver_group_ids=(),
+    )
+
+
+def test_super_admin_may_change_an_ungoverned_task_but_not_a_governed_one() -> None:
+    approvals = {"a1": _addressed("a1", approver="carol")}
+    assert may_change_governed_task_status(
+        caller_id="root",
+        initiator_id="owner",
+        caller_is_super_admin=True,
+        governing_approval_ids=frozenset(),
+        approvals_by_id={},
+        caller_approver_group_ids=(),
+    )
+    assert not may_change_governed_task_status(
+        caller_id="root",
+        initiator_id="owner",
+        caller_is_super_admin=True,
+        governing_approval_ids=frozenset({"a1"}),
+        approvals_by_id=approvals,
+        caller_approver_group_ids=(),
+    )
+
+
+def test_plain_participant_may_not_change_an_ungoverned_task_status() -> None:
+    assert not may_change_governed_task_status(
+        caller_id="carol",
+        initiator_id="owner",
+        caller_is_super_admin=False,
+        governing_approval_ids=frozenset(),
+        approvals_by_id={},
+        caller_approver_group_ids=(),
+    )
+
+
+def test_named_approver_of_a_governing_approval_may_change_the_status() -> None:
+    approvals = {"a1": _addressed("a1", approver="carol")}
+    assert may_change_governed_task_status(
+        caller_id="carol",
+        initiator_id="owner",
+        caller_is_super_admin=False,
+        governing_approval_ids=frozenset({"a1"}),
+        approvals_by_id=approvals,
+        caller_approver_group_ids=(),
+    )
+
+
+def test_group_member_of_a_governing_approval_may_change_the_status() -> None:
+    approvals = {"a1": _addressed("a1", group="g1")}
+    assert may_change_governed_task_status(
+        caller_id="carol",
+        initiator_id="owner",
+        caller_is_super_admin=False,
+        governing_approval_ids=frozenset({"a1"}),
+        approvals_by_id=approvals,
+        caller_approver_group_ids=("g1",),
+    )
+
+
+def test_approver_of_a_different_approval_may_not_change_the_status() -> None:
+    approvals = {
+        "a1": _addressed("a1", approver="carol"),
+        "a2": _addressed("a2", approver="dave"),
+    }
+    assert not may_change_governed_task_status(
+        caller_id="dave",
+        initiator_id="owner",
+        caller_is_super_admin=False,
+        governing_approval_ids=frozenset({"a1"}),
+        approvals_by_id=approvals,
+        caller_approver_group_ids=(),
+    )
+
+
+def test_one_owned_approval_among_several_governing_is_enough() -> None:
+    approvals = {
+        "a1": _addressed("a1", approver="carol"),
+        "a2": _addressed("a2", approver="dave"),
+    }
+    assert may_change_governed_task_status(
+        caller_id="dave",
+        initiator_id="owner",
+        caller_is_super_admin=False,
+        governing_approval_ids=frozenset({"a1", "a2"}),
+        approvals_by_id=approvals,
+        caller_approver_group_ids=(),
+    )
+
+
+def test_destination_less_governing_approval_is_left_permissive() -> None:
+    """A legacy approval with no addressee gates nobody in particular."""
+    approvals = {"a1": _addressed("a1")}
+    assert may_change_governed_task_status(
+        caller_id="carol",
+        initiator_id="owner",
+        caller_is_super_admin=False,
+        governing_approval_ids=frozenset({"a1"}),
+        approvals_by_id=approvals,
+        caller_approver_group_ids=(),
+    )

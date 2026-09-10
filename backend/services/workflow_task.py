@@ -8,14 +8,17 @@ super admin, or a plain admin (read-only, tenant-scoped); creating, updating,
 or deleting one is restricted to the initiator, a designated approver, or a
 super admin -- a plain admin cannot mutate tasks, mirroring
 ``WorkflowExecutionService.resolve_agent``'s exclusion of admins from driving
-an execution's agent. Changing a task's ``status`` is further restricted
-when the task has a linked ``Approval`` (``Approval.workflow_task_id``): only
-the execution initiator or an eligible approver of that Approval may do so --
-the named ``approver``, or a member of its ``approver_group_id`` holding the
-``approver`` role -- not merely any approver of the execution, mirroring
-``ApprovalService.resolve``'s no-bypass rule. Changing a task's
-``tool_bindings`` is refused outright once an approval covers the task, so the
-set an approver was shown is the set their decision goes on to authorize.
+an execution's agent. Changing a task's ``status`` is further restricted: a
+caller who is only a designated approver of the run may advance a task only
+while it sits within the scope of an approval addressed to them (the task an
+approval names, and every task downstream of it up to the next approval --
+:mod:`infrastructure.approval_scope`). The initiator may change any task's
+status; a ``super_admin`` may only for a task no approval governs, mirroring
+``ApprovalService.resolve``'s no-bypass rule once an approval is in play. The
+execution agent's ``update_workflow_task`` tool applies the same rule to the
+chat-driven path. Changing a task's ``tool_bindings`` is refused outright once
+an approval covers the task, so the set an approver was shown is the set their
+decision goes on to authorize.
 
 Every write that can change the set of unfinished tasks also re-runs the shared
 completion bookkeeping in :mod:`services.workflow_execution_completion`, so a
@@ -28,8 +31,12 @@ tools, exactly as one the agent started does.
 
 from collections.abc import Collection
 
-from infrastructure.approval_scope import active_approval_by_task, governing_approvals
-from models.user import User
+from infrastructure.approval_scope import (
+    active_approval_by_task,
+    governing_approvals,
+    may_change_governed_task_status,
+)
+from models.user import Role, User, has_any_role
 from models.workflow_task import (
     ToolBinding,
     WorkflowTaskCreate,
@@ -79,13 +86,13 @@ class WorkflowTaskService:
             access: Policy restricting task operations to the execution initiator,
                 the execution's designated approvers, admins (read-only), and
                 super admins.
-            approvals: Repository used to look up whether a task being updated
-                has a linked Approval and, if so, its designated approver, to
-                restrict ``status`` changes on such tasks.
+            approvals: Repository used to read the run's approvals so the
+                status-change guard can tell which approval governs the task
+                being advanced and who its designated approver is.
             notifications: Dispatcher the shared completion bookkeeping uses to
                 emit the one-shot ``execution_completed`` notification.
-            approver_groups: Resolver backing the status-change guard when the
-                linked Approval is addressed to a group rather than one user.
+            approver_groups: Resolver backing the status-change guard when a
+                governing approval is addressed to a group rather than one user.
             certificates: Service issuing a task's MCP tool certificate when it
                 starts and revoking it when it finishes, so a run driven through
                 these endpoints carries the same signed authority as one the
@@ -196,17 +203,22 @@ class WorkflowTaskService:
     async def _assert_status_change_allowed(
         self, task: WorkflowTaskRead, caller: User
     ) -> None:
-        """Restrict a ``status`` transition on a task with a linked Approval.
+        """Restrict a ``status`` transition to the initiator or an eligible approver.
 
-        Only applies when the task has a linked Approval carrying a
-        destination -- a named ``approver``, or an ``approver_group_id`` whose
-        eligible members stand in for one. Tasks without such an approval keep
-        the broader rule already enforced
-        by :meth:`_assert_execution_write_access`. No ``super_admin`` bypass, for
-        consistency with ``ApprovalService.resolve``'s no-bypass rule — this
-        check protects the same "only the addressee decides" invariant,
-        reachable here via the task's ``status`` field instead of the
-        Approval's own ``status`` field.
+        A participant who is only a designated approver of the run may advance a
+        task only while it sits within the scope of an approval addressed to
+        them -- the named ``approver``, or a member of its ``approver_group_id``
+        holding the ``approver`` role. The run's initiator may change any task's
+        status; a ``super_admin`` may only for a task no approval governs, since
+        once an approval is in play the "only the addressee decides" invariant
+        holds for them too, matching ``ApprovalService.resolve``.
+
+        "Governs" follows :mod:`infrastructure.approval_scope`: an approval
+        covers the task it names and every task downstream of it up to the next
+        approval, so approving one step lets the covered steps that follow it be
+        advanced without each carrying an approval of its own. The execution
+        agent's ``update_workflow_task`` tool applies the same rule to the
+        chat-driven path.
 
         Args:
             task: The task whose ``status`` is being changed.
@@ -214,25 +226,29 @@ class WorkflowTaskService:
 
         Raises:
             ForbiddenError: If the caller is neither the execution initiator nor
-                an eligible approver of the linked Approval.
+                an eligible approver of an approval covering the task (nor, for a
+                task no approval governs, a super admin).
         """
-        approval = await self._approvals.get_for_task(task.id)
-        if approval is None:
-            return
-        if approval.approver is None and approval.approver_group_id is None:
-            return
-        if approval.approver is not None and caller.id == approval.approver:
-            return
-        if approval.approver_group_id is not None:
-            eligible = await self._approver_groups.group_ids_for(caller)
-            if approval.approver_group_id in eligible:
-                return
+        tasks = await self._repo.list(
+            limit=_MAX_TASKS,
+            offset=0,
+            workflow_execution_id=task.workflow_execution_id,
+        )
+        approvals = await self._approvals.list_for_execution(task.workflow_execution_id)
+        governing = governing_approvals(tasks, active_approval_by_task(approvals))
         execution = await self._execution_repo.get(task.workflow_execution_id)
-        if execution is not None and caller.id == execution.initiator_id:
+        if may_change_governed_task_status(
+            caller_id=caller.id,
+            initiator_id=execution.initiator_id if execution is not None else "",
+            caller_is_super_admin=has_any_role(caller.roles, Role.super_admin),
+            governing_approval_ids=governing.get(task.id, frozenset()),
+            approvals_by_id={approval.id: approval for approval in approvals},
+            caller_approver_group_ids=await self._approver_groups.group_ids_for(caller),
+        ):
             return
         raise ForbiddenError(
-            "Only the execution initiator or an eligible approver of the linked "
-            "approval can change this task's status"
+            "Only the execution initiator, or an approver an approval covering "
+            "this task is addressed to, can change this task's status"
         )
 
     async def _assert_tool_bindings_change_allowed(
@@ -355,9 +371,9 @@ class WorkflowTaskService:
     ) -> WorkflowTaskRead:
         """Apply a partial update to a WorkflowTask.
 
-        Changing ``status`` on a task with a linked Approval is further
-        restricted to the execution initiator or that Approval's designated
-        approver, on top of the general execution-access check — see
+        Changing ``status`` is further restricted to the execution initiator or
+        an eligible approver of an approval covering the task, on top of the
+        general execution-access check — see
         :meth:`_assert_status_change_allowed`. Changing ``tool_bindings`` on a
         task an approval covers is refused outright — see
         :meth:`_assert_tool_bindings_change_allowed`.
@@ -378,9 +394,9 @@ class WorkflowTaskService:
             NotFoundError: If no task exists with the given ID.
             ForbiddenError: If the caller may not act on the task's execution
                 (a plain admin is rejected, see :meth:`_assert_execution_write_access`),
-                is changing ``status`` on a task whose linked Approval
-                designates someone else as approver, or is changing
-                ``tool_bindings`` on a task an approval covers.
+                is changing ``status`` on a task outside the scope of any
+                approval addressed to them, or is changing ``tool_bindings`` on
+                a task an approval covers.
         """
         task = await self._get_or_404(task_id)
         await self._assert_execution_write_access(task.workflow_execution_id, caller)
