@@ -14,10 +14,17 @@ pre-commit:
       glob: "backend/*.py"
       run: uv run ruff format --check .
 
+    # NOTE: invoked as `python -m mypy`, not the bare `mypy` console-script. The
+    # `.venv/Scripts/*.exe` shims pip/uv generate are unsigned, low-reputation,
+    # and carry a venv-specific hash, so Windows Smart App Control (enforced mode)
+    # blocks spawning them ("Failed to spawn: `mypy` ... os error 4551"). Going
+    # through the signed `python.exe` sidesteps that and is behaviour-identical on
+    # every OS and in CI. Same reason for backend-pytest below; `ruff` is a signed
+    # native binary and needs no such treatment.
     - name: backend-mypy
       root: backend/
       glob: "backend/*.py"
-      run: uv run mypy .
+      run: uv run python -m mypy .
 
     # Runs in parallel across CPU cores via pytest-xdist (`-n auto` in
     # backend/pyproject.toml's [tool.pytest.ini_options] addopts, worker
@@ -30,7 +37,7 @@ pre-commit:
     - name: backend-pytest
       root: backend/
       glob: "backend/*.py"
-      run: uv run pytest
+      run: uv run python -m pytest
 
     # NOTE: lefthook matches `glob` against repo-root-relative paths (it does NOT
     # strip `root`), and its `*` crosses `/`. So the glob must include the
