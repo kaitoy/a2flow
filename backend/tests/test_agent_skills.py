@@ -222,6 +222,41 @@ async def test_get_skill_unknown_id_returns_404(skill_client: AsyncClient) -> No
     assert_err(response, code="NOT_FOUND", status=404)
 
 
+# ---------- content ----------
+
+
+async def test_get_content_unknown_skill_returns_404(skill_client: AsyncClient) -> None:
+    response = await skill_client.get("/api/v1/agent-skills/nonexistent/content")
+    assert_err(response, code="NOT_FOUND", status=404)
+
+
+async def test_get_content_unpublished_skill_returns_409(
+    skill_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await skill_client.post("/api/v1/agent-skills", json=_CREATE_BODY), status=201
+    )
+    response = await skill_client.get(f"/api/v1/agent-skills/{created['id']}/content")
+    assert_err(response, code="SKILL_NOT_READY", status=409)
+
+
+async def test_get_content_returns_skill_md_text(
+    workflow_client: AsyncClient, mock_skill_manager: MagicMock
+) -> None:
+    created = assert_ok(
+        await workflow_client.post("/api/v1/agent-skills", json=_CREATE_BODY),
+        status=201,
+    )
+    skill_dir = mock_skill_manager.skill_dir(created["id"], "unused")
+    content = "---\nname: my-skill\n---\nDo the thing — carefully."
+    (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
+
+    response = await workflow_client.get(
+        f"/api/v1/agent-skills/{created['id']}/content"
+    )
+    assert assert_ok(response)["content"] == content
+
+
 # ---------- patch ----------
 
 

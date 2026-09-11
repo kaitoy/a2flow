@@ -64,3 +64,7 @@ flowchart LR
 ## スキルからワークフローを生成する {#generating-a-workflow-from-a-skill}
 
 各行の Actions 列に **Generate workflow** があり、スキルの詳細ページのヘッダーにも同じ操作のアイコンボタンがあります。どちらも同じダイアログを開き、どちらもスキルがリビジョンを公開するまでは押せません。[ワークフローを生成する](./workflows.md#generating-a-workflow)を参照してください。
+
+## SKILL.md を見る {#viewing-skillmd}
+
+スキルの詳細ページのヘッダーには **View SKILL.md** アイコンボタンもあります。押すと、リポジトリに書かれたそのスキルの指示ファイルをダイアログで表示します。Generate workflow と同じく、スキルがリビジョンを公開するまでは押せません。クローンが成功して初めてファイルが存在するためです。上記の書き込み系の操作と違い、これは developer ロールを持たない閲覧者にも表示されます。

@@ -4,6 +4,7 @@ import type { Message } from "@ag-ui/core";
 import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
 import type { z } from "zod";
 import type {
+  AgentSkillContent,
   AgentSkillCreate,
   AgentSkillRead as AgentSkillModel,
   AgentSkillUpdate,
@@ -109,6 +110,7 @@ import {
   zGenerateWorkflowApiV1AgentSkillsSkillIdWorkflowsPostResponse,
   zGenerateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPostResponse,
   zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
+  zGetAgentSkillContentApiV1AgentSkillsSkillIdContentGetResponse,
   zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
   zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse,
   zGetImpersonationEventApiV1ImpersonationEventsEventIdGetResponse,
@@ -511,6 +513,7 @@ export type Session = SessionModel;
 /** One file attached to a workflow session, by a participant or by the agent. */
 export type SessionFile = WithAudit<SessionFileModel>;
 export type {
+  AgentSkillContent,
   AgentSkillCreate,
   AgentSkillUpdate,
   ApprovalStatus,
@@ -727,6 +730,14 @@ export async function getAgentSkill(id: string, config?: AxiosRequestConfig): Pr
     apiClient.get(`/api/v1/agent-skills/${encodeURIComponent(id)}`, config),
     zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse
   ) as Promise<AgentSkill>;
+}
+
+/** Fetch the raw SKILL.md content of an agent skill's published revision. */
+export async function getAgentSkillContent(id: string): Promise<AgentSkillContent> {
+  return fetchEnvelope(
+    apiClient.get(`/api/v1/agent-skills/${encodeURIComponent(id)}/content`),
+    zGetAgentSkillContentApiV1AgentSkillsSkillIdContentGetResponse
+  ) as Promise<AgentSkillContent>;
 }
 
 /** Create a new agent skill. */

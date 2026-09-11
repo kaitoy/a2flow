@@ -64,3 +64,7 @@ The reference is stored as a name and a key, and resolved at clone time — so d
 ## Generating a workflow from a skill
 
 Each row's Actions column carries **Generate workflow**, and a skill's detail page carries the same action as an icon button in its header. Both open the same dialog, and both are disabled until the skill has published a revision. See [Generating a workflow](./workflows.md#generating-a-workflow).
+
+## Viewing SKILL.md
+
+A skill's detail page header carries a **View SKILL.md** icon button. It opens a dialog rendering the skill's instructions file as written in its repository. Like Generate workflow, it is disabled until the skill has published a revision — the file only exists once cloning succeeds. Unlike the write actions above, it stays available to a viewer without the developer role.

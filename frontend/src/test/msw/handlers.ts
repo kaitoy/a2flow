@@ -422,6 +422,10 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/agent-skills/:skillId`, () => envelope(SKILL_1)),
 
+  http.get(`${BASE}/api/v1/agent-skills/:skillId/content`, () =>
+    envelope({ content: "# Sample skill\n\nDo the thing." })
+  ),
+
   http.post(`${BASE}/api/v1/agent-skills`, () => envelope({ ...SKILL_1, id: "new-skill-id" }, 201)),
 
   http.post(`${BASE}/api/v1/agent-skills/:skillId/pull`, () =>

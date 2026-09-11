@@ -16,7 +16,12 @@ from dependencies import (
     WorkflowGenerationJobDep,
     require_roles,
 )
-from models.agent_skill import AgentSkillCreate, AgentSkillRead, AgentSkillUpdate
+from models.agent_skill import (
+    AgentSkillContent,
+    AgentSkillCreate,
+    AgentSkillRead,
+    AgentSkillUpdate,
+)
 from models.response import ApiResponse
 from models.tag import TagIdsUpdate
 from models.user import Role
@@ -144,6 +149,17 @@ async def get_agent_skill(
 ) -> ApiResponse[AgentSkillRead]:
     skill = await service.get(skill_id)
     return ApiResponse(meta=meta, data=await service.to_read(skill))
+
+
+@router.get("/{skill_id}/content", response_model=ApiResponse[AgentSkillContent])
+async def get_agent_skill_content(
+    skill_id: str,
+    service: AgentSkillReadServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[AgentSkillContent]:
+    """Return the raw SKILL.md content of the skill's published revision."""
+    content = await service.get_content(skill_id)
+    return ApiResponse(meta=meta, data=AgentSkillContent(content=content))
 
 
 @router.patch(

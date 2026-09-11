@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { FileText, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -22,6 +22,7 @@ import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { GenerateWorkflowDialog } from "@/components/admin/generate-workflow-dialog";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { SkillContentDialog } from "@/components/admin/skill-content-dialog";
 import { StatusCard } from "@/components/admin/status-card";
 import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
@@ -85,6 +86,7 @@ export default function AgentSkillDetailPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saveBeforeGenerateOpen, setSaveBeforeGenerateOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [skillMdOpen, setSkillMdOpen] = useState(false);
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [sync, setSync] = useState<SyncState | null>(null);
   // The persisted name, which titles the page. Kept out of the form so the
@@ -282,17 +284,27 @@ export default function AgentSkillDetailPage() {
             title={name}
             icon={Wand2}
             secondaryAction={
-              canEdit ? (
+              <>
                 <HeaderIconButton
-                  label="Generate Workflow"
-                  onClick={handleGenerateClick}
-                  // A skill can only back a design run once its clone has
-                  // published a revision.
+                  label="View SKILL.md"
+                  onClick={() => setSkillMdOpen(true)}
+                  // The file only exists once a revision has been published.
                   disabled={sync?.status !== "ready"}
                 >
-                  <Sparkles size={18} strokeWidth={1.8} aria-hidden="true" />
+                  <FileText size={18} strokeWidth={1.8} aria-hidden="true" />
                 </HeaderIconButton>
-              ) : undefined
+                {canEdit && (
+                  <HeaderIconButton
+                    label="Generate Workflow"
+                    onClick={handleGenerateClick}
+                    // A skill can only back a design run once its clone has
+                    // published a revision.
+                    disabled={sync?.status !== "ready"}
+                  >
+                    <Sparkles size={18} strokeWidth={1.8} aria-hidden="true" />
+                  </HeaderIconButton>
+                )}
+              </>
             }
           />
         }
@@ -385,6 +397,11 @@ export default function AgentSkillDetailPage() {
         skillId={skillId}
         defaultName={getValues("name")}
         onClose={() => setGenerateOpen(false)}
+      />
+      <SkillContentDialog
+        open={skillMdOpen}
+        skillId={skillId}
+        onClose={() => setSkillMdOpen(false)}
       />
     </AdminPageContainer>
   );

@@ -161,3 +161,10 @@ class AgentSkillRead(BaseEntity):
             A read view carrying the skill's columns plus its tags.
         """
         return cls(**skill.model_dump(), tag_ids=tag_ids)
+
+
+class AgentSkillContent(SQLModel):
+    """Raw SKILL.md content for a skill's currently published revision."""
+
+    model_config = _alias_config
+    content: str

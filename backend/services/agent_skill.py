@@ -8,6 +8,7 @@ router layer never touches the repository directly.
 from collections.abc import Sequence
 
 from infrastructure.secret_resolver import split_secret_ref
+from infrastructure.skill_manager import SkillManager
 from models.agent_skill import (
     AgentSkill,
     AgentSkillCreate,
@@ -16,27 +17,41 @@ from models.agent_skill import (
     SkillSyncStatus,
 )
 from repositories import AgentSkillRepository, SecretRepository
-from repositories.exceptions import ForeignKeyViolationError, NotFoundError
+from repositories.exceptions import (
+    ForeignKeyViolationError,
+    NotFoundError,
+    SkillNotReadyError,
+)
 from repositories.query import FilterSpec, SortSpec
 
 #: Alias for ``list[AgentSkillRead]``: the ``list`` method below shadows the
 #: builtin inside the service class body.
 _ReadList = list[AgentSkillRead]
 
+_SKILL_MD_FILENAME = "SKILL.md"
+
 
 class AgentSkillService:
     """Application service orchestrating AgentSkill operations."""
 
-    def __init__(self, repo: AgentSkillRepository, secrets: SecretRepository) -> None:
+    def __init__(
+        self,
+        repo: AgentSkillRepository,
+        secrets: SecretRepository,
+        skill_manager: SkillManager,
+    ) -> None:
         """Initialize the service.
 
         Args:
             repo: Repository providing AgentSkill persistence.
             secrets: Repository used to check that a ``repo_auth_password``
                 names an existing Secret at create/update time.
+            skill_manager: The git-backed skill store, used to locate a
+                published revision's SKILL.md.
         """
         self._repo = repo
         self._secrets = secrets
+        self._skill_manager = skill_manager
 
     async def _check_auth_password(self, ref: str | None) -> None:
         """Raise if ``ref`` is set but names no existing Secret.
@@ -219,3 +234,22 @@ class AgentSkillService:
             NotFoundError: If no skill exists with the given ID.
         """
         await self._repo.delete(skill_id)
+
+    async def get_content(self, skill_id: str) -> str:
+        """Return the raw SKILL.md text for a skill's published revision.
+
+        Args:
+            skill_id: Identifier of the skill to read.
+
+        Returns:
+            The SKILL.md file's contents, verbatim.
+
+        Raises:
+            NotFoundError: If no skill exists with the given ID.
+            SkillNotReadyError: If the skill has no published revision yet.
+        """
+        skill = await self.get(skill_id)
+        if skill.commit_sha is None:
+            raise SkillNotReadyError(skill.id)
+        skill_dir = self._skill_manager.skill_dir(skill, skill.commit_sha)
+        return (skill_dir / _SKILL_MD_FILENAME).read_text(encoding="utf-8")

@@ -9,6 +9,8 @@ import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import AgentSkillDetailPage from "./page";
 
+vi.mock("@a2ui/markdown-it", () => ({ renderMarkdown: (s: string) => s }));
+
 const FULL_SKILL = {
   id: "skill-1",
   tenantId: "tenant-1",
@@ -27,6 +29,7 @@ const FULL_SKILL = {
 };
 
 const SKILL_URL = "http://localhost:8000/api/v1/agent-skills/:skillId";
+const CONTENT_URL = `${SKILL_URL}/content`;
 
 function setup() {
   vi.mocked(useParams).mockReturnValue({ skillId: "skill-1" });
@@ -249,6 +252,32 @@ describe("AgentSkillDetailPage", () => {
     expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
     // The sync state is still readable — only the actions are gated.
     expect(screen.getByRole("region", { name: /repository sync/i })).toBeInTheDocument();
+    // Viewing SKILL.md is a read action, so it stays available.
+    expect(screen.getByRole("button", { name: /view skill\.md/i })).toBeInTheDocument();
+  });
+
+  it("opens the SKILL.md dialog with the fetched content", async () => {
+    setup();
+    const user = userEvent.setup();
+    server.use(http.get(CONTENT_URL, () => envelope({ content: "Do the thing." })));
+
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
+    await user.click(screen.getByRole("button", { name: /view skill\.md/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Do the thing.")).toBeInTheDocument();
+  });
+
+  it("disables viewing SKILL.md while the skill has no published revision", async () => {
+    setup();
+    server.use(
+      http.get(SKILL_URL, () => envelope({ ...FULL_SKILL, syncStatus: "pending", commitSha: null }))
+    );
+
+    render(<AgentSkillDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() => screen.getByDisplayValue("my-skill"));
+    expect(screen.getByRole("button", { name: /view skill\.md/i })).toBeDisabled();
   });
 
   it("renders the fields as values for a user without the developer role", async () => {

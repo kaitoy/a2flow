@@ -104,17 +104,21 @@ from .singletons import (
 
 
 def get_agent_skill_service(
-    repo: AgentSkillRepositoryDep, secrets: SecretRepositoryDep
+    repo: AgentSkillRepositoryDep,
+    secrets: SecretRepositoryDep,
+    skill_manager: SkillManagerDep,
 ) -> AgentSkillService:
     """Create an AgentSkillService backed by the request's repositories."""
-    return AgentSkillService(repo, secrets)
+    return AgentSkillService(repo, secrets, skill_manager)
 
 
 AgentSkillServiceDep = Annotated[AgentSkillService, Depends(get_agent_skill_service)]
 
 
 def get_agent_skill_read_service(
-    repo: AgentSkillReadRepositoryDep, secrets: SecretReadRepositoryDep
+    repo: AgentSkillReadRepositoryDep,
+    secrets: SecretReadRepositoryDep,
+    skill_manager: SkillManagerDep,
 ) -> AgentSkillService:
     """Create an AgentSkillService for a read route, possibly across all tenants.
 
@@ -123,7 +127,7 @@ def get_agent_skill_read_service(
     the strict ``SecretRepositoryDep`` would itself raise in all-tenants mode,
     since it depends on ``CurrentTenantIdDep``.
     """
-    return AgentSkillService(repo, secrets)
+    return AgentSkillService(repo, secrets, skill_manager)
 
 
 AgentSkillReadServiceDep = Annotated[
