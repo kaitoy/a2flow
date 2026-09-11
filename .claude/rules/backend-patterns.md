@@ -304,7 +304,7 @@ async def get_agent_skill(
     return ApiResponse(meta=meta, data=skill)
 ```
 
-Repository (and service) exceptions propagate to global exception handlers (`backend/routers/exception_handlers.py`) which build the full `{meta, data, error}` envelope (via `_envelope_error`) with a structured `{code, message, details}` error body. Routers should not catch and re-raise as `HTTPException`.
+Repository (and service) exceptions all subclass `HttpMappedError` (`backend/repositories/exceptions.py`), which carries the `code`, `http_status`, and `details()` of its envelope; one global handler (`backend/routers/exception_handlers.py::api_error_handler`) builds the full `{meta, data, error}` envelope from them. Routers should not catch and re-raise as `HTTPException`.
 
 | Exception | HTTP status | Error code | Notes |
 |---|---|---|---|
@@ -414,10 +414,8 @@ Two endpoints intentionally skip the `ApiResponse` envelope by simply not using 
 
 Error codes are uppercase `SCREAMING_SNAKE_CASE` strings. The current set is documented in the Error Mapping table above. When introducing a new repository exception:
 
-1. Add it to `backend/repositories/exceptions.py`.
-2. Add a handler in `backend/routers/exception_handlers.py` that builds the envelope with `_envelope_error(...)`, passing the `{code, message, details}` error body.
-3. Register the handler in `backend/main.py` via `app.add_exception_handler(...)`.
-4. Append a row to the Error Mapping table above with the new HTTP status and `code`.
+1. Add it to `backend/repositories/exceptions.py` as an `HttpMappedError` (or `RepositoryError`) subclass with `code` and `http_status` class attributes; override `details()` for the envelope's `details` block, and `public_message()` + `log()` when the raw message must stay server-side.
+2. Append a row to the Error Mapping table above with the new HTTP status and `code`.
 
 ---
 
@@ -500,5 +498,5 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 7. **Router file** (`routers/<entity>.py`):
    - Inject the `EntityServiceDep` (not the repository) and follow RESTful conventions and the error mapping table above.
    - Register in `main.py` with the correct prefix and tag.
-   - Do not catch repository/service exceptions; let global handlers map them. If a new repository exception is introduced, add a corresponding handler in `backend/routers/exception_handlers.py` and document the error code in the Error Codes table.
+   - Do not catch repository/service exceptions; let global handlers map them. If a new repository exception is introduced, give it `code`/`http_status` per the Error Codes section and document it in the table there.
 8. **Tests**: cover create, list, get, update, delete, not-found, and any FK constraints. Use the `assert_ok` / `assert_err` helpers in `tests/_envelope.py` to unwrap the response envelope.

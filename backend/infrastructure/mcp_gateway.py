@@ -39,7 +39,7 @@ returns is a plain value object or an MCP wire type -- no ``ToolContext``, no
 ``AsyncSession``, no ORM row. That is what let the executor seam be added
 without reshaping anything, and it is what a future move of the gateway itself
 behind an endpoint would rest on. That move is also when
-:class:`McpGatewayError` would earn rows in ``routers/exception_handlers.py``
+:class:`McpGatewayError` would become an ``HttpMappedError``
 (``McpPolicyDeniedError`` -> 403, ``McpServerUnknownError`` -> 404, the rest ->
 502).
 

@@ -1,32 +1,75 @@
-"""Domain exceptions raised by repository implementations."""
+"""Domain exceptions raised by repository implementations.
+
+Every class here maps to one HTTP error response: ``code`` is the envelope's
+error code, ``http_status`` the HTTP status, and :meth:`HttpMappedError.details`
+the envelope's ``details`` block. ``routers/exception_handlers.py`` renders
+them all through one handler, so adding an error means adding a class here
+and nothing else.
+"""
+
+import logging
+from typing import Any, ClassVar
+
+logger = logging.getLogger(__name__)
 
 
-class RepositoryError(Exception):
+class HttpMappedError(Exception):
+    """Base class for every error the API renders as an error envelope."""
+
+    #: The envelope's ``error.code``.
+    code: ClassVar[str] = "INTERNAL_ERROR"
+    #: The HTTP status the envelope is returned with.
+    http_status: ClassVar[int] = 500
+
+    def details(self) -> dict[str, Any] | None:
+        """Return the envelope's ``details`` block, or ``None`` for none."""
+        return None
+
+    def public_message(self) -> str:
+        """Return the message sent to the client.
+
+        Defaults to ``str(self)``. Errors whose message quotes raw internals
+        (a caught exception's text, a relay banner) override this with a fixed
+        sentence and log the internals through :meth:`log` instead.
+        """
+        return str(self)
+
+    def log(self) -> None:
+        """Log what the client is not told. A no-op unless overridden."""
+
+
+class RepositoryError(HttpMappedError):
     """Base class for all repository errors."""
 
 
-class UnauthorizedError(Exception):
+class UnauthorizedError(HttpMappedError):
     """Raised when a request lacks a valid authenticated session.
 
     Mapped to HTTP 401 with the ``UNAUTHENTICATED`` error code. The message is
     intentionally generic to avoid leaking whether a username exists.
     """
 
+    code = "UNAUTHENTICATED"
+    http_status = 401
+
     def __init__(self, message: str = "Authentication required") -> None:
         super().__init__(message)
 
 
-class CsrfError(Exception):
+class CsrfError(HttpMappedError):
     """Raised when a state-changing request fails CSRF validation.
 
     Mapped to HTTP 403 with the ``CSRF_FAILED`` error code.
     """
 
+    code = "CSRF_FAILED"
+    http_status = 403
+
     def __init__(self, message: str = "CSRF validation failed") -> None:
         super().__init__(message)
 
 
-class ForbiddenError(Exception):
+class ForbiddenError(HttpMappedError):
     """Raised when an authenticated user is not allowed to perform an action.
 
     Mapped to HTTP 403 with the ``FORBIDDEN`` error code. Unlike
@@ -35,6 +78,9 @@ class ForbiddenError(Exception):
     they are not the designated approver of.
     """
 
+    code = "FORBIDDEN"
+    http_status = 403
+
     def __init__(self, message: str = "Operation not permitted") -> None:
         super().__init__(message)
 
@@ -42,23 +88,40 @@ class ForbiddenError(Exception):
 class NotFoundError(RepositoryError):
     """Raised when a requested entity does not exist in the database."""
 
+    code = "NOT_FOUND"
+    http_status = 404
+
     def __init__(self, entity: str, id_: str) -> None:
         self.entity = entity
         self.id = id_
         super().__init__(f"{entity} {id_!r} not found")
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"entity": self.entity, "id": self.id}
 
 
 class ForeignKeyViolationError(RepositoryError):
     """Raised when a required related entity (foreign key) does not exist."""
 
+    code = "FOREIGN_KEY_VIOLATION"
+    http_status = 422
+
     def __init__(self, entity: str, id_: str) -> None:
         self.entity = entity
         self.id = id_
         super().__init__(f"{entity} {id_!r} not found")
 
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"entity": self.entity, "id": self.id}
+
 
 class ReferencedError(RepositoryError):
     """Raised when deleting an entity that is still referenced by other records."""
+
+    code = "CONFLICT_REFERENCED"
+    http_status = 409
 
 
 class UniqueViolationError(RepositoryError):
@@ -69,14 +132,21 @@ class UniqueViolationError(RepositoryError):
     ``details`` block when returning HTTP 409.
     """
 
+    code = "CONFLICT_UNIQUE"
+    http_status = 409
+
     def __init__(self, entity: str, field: str, value: str) -> None:
         self.entity = entity
         self.field = field
         self.value = value
         super().__init__(f"{entity} with {field} {value!r} already exists")
 
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"field": self.field, "value": self.value}
 
-class McpConnectionError(Exception):
+
+class McpConnectionError(HttpMappedError):
     """Raised when a registered MCP server cannot be reached, launched, or errors out.
 
     Carries the ``server`` (name, URL, or command line — already known to the
@@ -85,13 +155,28 @@ class McpConnectionError(Exception):
     exception text.
     """
 
+    code = "MCP_UNREACHABLE"
+    http_status = 502
+
     def __init__(self, server: str, reason: str) -> None:
         self.server = server
         self.reason = reason
         super().__init__(f"MCP server {server!r} unreachable: {reason}")
 
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"server": self.server}
 
-class SkillCloneError(Exception):
+    def public_message(self) -> str:
+        """Return the fixed client-facing message; the reason is only logged."""
+        return f"MCP server {self.server!r} unreachable"
+
+    def log(self) -> None:
+        """Log the raw reason server-side."""
+        logger.warning("MCP server %s unreachable: %s", self.server, self.reason)
+
+
+class SkillCloneError(HttpMappedError):
     """Raised when an AgentSkill repository cannot be cloned or its directory resolved.
 
     Carries the ``skill_id`` and a ``reason`` string. The HTTP layer logs
@@ -100,10 +185,25 @@ class SkillCloneError(Exception):
     text.
     """
 
+    code = "SKILL_CLONE_FAILED"
+    http_status = 502
+
     def __init__(self, skill_id: str, reason: str) -> None:
         self.skill_id = skill_id
         self.reason = reason
         super().__init__(f"failed to prepare skill {skill_id!r}: {reason}")
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"skillId": self.skill_id}
+
+    def public_message(self) -> str:
+        """Return the fixed client-facing message; the reason is only logged."""
+        return f"Failed to prepare skill {self.skill_id!r}"
+
+    def log(self) -> None:
+        """Log the raw reason server-side."""
+        logger.warning("Skill %s clone failed: %s", self.skill_id, self.reason)
 
 
 class SkillNotReadyError(RepositoryError):
@@ -120,11 +220,18 @@ class SkillNotReadyError(RepositoryError):
     envelope's ``details`` block when returning HTTP 409.
     """
 
+    code = "SKILL_NOT_READY"
+    http_status = 409
+
     def __init__(self, skill_id: str) -> None:
         self.skill_id = skill_id
         super().__init__(
             f"AgentSkill {skill_id!r} has no published revision; pull it first"
         )
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"skillId": self.skill_id}
 
 
 class WorkflowNotRunnableError(RepositoryError):
@@ -143,10 +250,17 @@ class WorkflowNotRunnableError(RepositoryError):
     returning HTTP 409.
     """
 
+    code = "WORKFLOW_NOT_RUNNABLE"
+    http_status = 409
+
     def __init__(self, workflow_id: str, reason: str) -> None:
         self.workflow_id = workflow_id
         self.reason = reason
         super().__init__(f"Workflow {workflow_id!r} is not runnable: {reason}")
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"workflowId": self.workflow_id, "reason": self.reason}
 
 
 class ApprovalAlreadyResolvedError(RepositoryError):
@@ -169,10 +283,17 @@ class ApprovalAlreadyResolvedError(RepositoryError):
     returning HTTP 409.
     """
 
+    code = "APPROVAL_ALREADY_RESOLVED"
+    http_status = 409
+
     def __init__(self, approval_id: str, status: str) -> None:
         self.approval_id = approval_id
         self.status = status
         super().__init__(f"Approval {approval_id!r} was already resolved as {status!r}")
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"approvalId": self.approval_id, "status": self.status}
 
 
 class WorkflowNotModifiedError(RepositoryError):
@@ -187,9 +308,16 @@ class WorkflowNotModifiedError(RepositoryError):
     envelope's ``details`` block when returning HTTP 409.
     """
 
+    code = "WORKFLOW_NOT_MODIFIED"
+    http_status = 409
+
     def __init__(self, workflow_id: str) -> None:
         self.workflow_id = workflow_id
         super().__init__(f"Workflow {workflow_id!r} has no unpublished changes")
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"workflowId": self.workflow_id}
 
 
 class WorkflowNotDeactivatableError(RepositoryError):
@@ -205,9 +333,16 @@ class WorkflowNotDeactivatableError(RepositoryError):
     envelope's ``details`` block when returning HTTP 409.
     """
 
+    code = "WORKFLOW_NOT_DEACTIVATABLE"
+    http_status = 409
+
     def __init__(self, workflow_id: str) -> None:
         self.workflow_id = workflow_id
         super().__init__(f"Workflow {workflow_id!r} is not published")
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"workflowId": self.workflow_id}
 
 
 class WorkflowDescriptionNotGeneratableError(RepositoryError):
@@ -224,12 +359,19 @@ class WorkflowDescriptionNotGeneratableError(RepositoryError):
     returning HTTP 409.
     """
 
+    code = "WORKFLOW_DESCRIPTION_NOT_GENERATABLE"
+    http_status = 409
+
     def __init__(self, workflow_id: str, reason: str) -> None:
         self.workflow_id = workflow_id
         self.reason = reason
         super().__init__(
             f"Workflow {workflow_id!r} has no description to generate: {reason}"
         )
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"workflowId": self.workflow_id, "reason": self.reason}
 
 
 class SummarizationFailedError(RepositoryError):
@@ -245,6 +387,9 @@ class SummarizationFailedError(RepositoryError):
     caught exception text.
     """
 
+    code = "SUMMARIZATION_FAILED"
+    http_status = 502
+
     def __init__(self, workflow_id: str, reason: str) -> None:
         self.workflow_id = workflow_id
         self.reason = reason
@@ -253,8 +398,24 @@ class SummarizationFailedError(RepositoryError):
             f"{workflow_id!r}: {reason}"
         )
 
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"workflowId": self.workflow_id}
 
-class RegistryUnavailableError(Exception):
+    def public_message(self) -> str:
+        """Return the fixed client-facing message; the reason is only logged."""
+        return f"Failed to summarize the design conversation of workflow {self.workflow_id!r}"
+
+    def log(self) -> None:
+        """Log the raw reason server-side."""
+        logger.warning(
+            "Failed to summarize the design conversation of workflow %s: %s",
+            self.workflow_id,
+            self.reason,
+        )
+
+
+class RegistryUnavailableError(HttpMappedError):
     """Raised when the official MCP registry cannot be reached or errors out.
 
     Carries a ``reason`` string. The HTTP layer logs ``reason`` server-side
@@ -262,9 +423,20 @@ class RegistryUnavailableError(Exception):
     exception text.
     """
 
+    code = "REGISTRY_UNREACHABLE"
+    http_status = 502
+
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(f"MCP registry unavailable: {reason}")
+
+    def public_message(self) -> str:
+        """Return the fixed client-facing message; the reason is only logged."""
+        return "MCP registry unavailable"
+
+    def log(self) -> None:
+        """Log the raw reason server-side."""
+        logger.warning("MCP registry unavailable: %s", self.reason)
 
 
 class DependencyCycleError(RepositoryError):
@@ -276,6 +448,9 @@ class DependencyCycleError(RepositoryError):
     returning HTTP 409.
     """
 
+    code = "DEPENDENCY_CYCLE"
+    http_status = 409
+
     def __init__(self, task_id: str, depends_on_id: str) -> None:
         self.task_id = task_id
         self.depends_on_id = depends_on_id
@@ -283,6 +458,10 @@ class DependencyCycleError(RepositoryError):
             f"Dependency from task {task_id!r} on {depends_on_id!r} "
             "would create a cycle"
         )
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"taskId": self.task_id, "dependsOnId": self.depends_on_id}
 
 
 class AvatarValidationError(RepositoryError):
@@ -292,9 +471,16 @@ class AvatarValidationError(RepositoryError):
     error envelope's ``details`` block when returning HTTP 422.
     """
 
+    code = "INVALID_AVATAR"
+    http_status = 422
+
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"reason": self.reason}
 
 
 class SessionFileValidationError(RepositoryError):
@@ -308,9 +494,16 @@ class SessionFileValidationError(RepositoryError):
     returning HTTP 422, mirroring :class:`AvatarValidationError`.
     """
 
+    code = "INVALID_SESSION_FILE"
+    http_status = 422
+
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"reason": self.reason}
 
 
 class McpServerValidationError(RepositoryError):
@@ -323,9 +516,16 @@ class McpServerValidationError(RepositoryError):
     block when returning HTTP 422.
     """
 
+    code = "INVALID_MCP_SERVER"
+    http_status = 422
+
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"reason": self.reason}
 
 
 class McpToolMockValidationError(RepositoryError):
@@ -338,9 +538,16 @@ class McpToolMockValidationError(RepositoryError):
     ``details`` block when returning HTTP 422.
     """
 
+    code = "INVALID_MCP_TOOL_MOCK"
+    http_status = 422
+
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"reason": self.reason}
 
 
 class SecretValidationError(RepositoryError):
@@ -353,9 +560,16 @@ class SecretValidationError(RepositoryError):
     block when returning HTTP 422.
     """
 
+    code = "INVALID_SECRET"
+    http_status = 422
+
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"reason": self.reason}
 
 
 class SystemSettingsValidationError(RepositoryError):
@@ -369,12 +583,19 @@ class SystemSettingsValidationError(RepositoryError):
     block when returning HTTP 422.
     """
 
+    code = "INVALID_SYSTEM_SETTINGS"
+    http_status = 422
+
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
 
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"reason": self.reason}
 
-class EmailSendError(Exception):
+
+class EmailSendError(HttpMappedError):
     """Raised when a message could not be handed to the configured SMTP relay.
 
     Carries a ``reason`` string. The HTTP layer logs ``reason`` server-side but
@@ -390,10 +611,21 @@ class EmailSendError(Exception):
     either way.
     """
 
+    code = "EMAIL_SEND_FAILED"
+    http_status = 502
+
     def __init__(self, reason: str, *, permanent: bool = False) -> None:
         self.reason = reason
         self.permanent = permanent
         super().__init__(f"failed to send email: {reason}")
+
+    def public_message(self) -> str:
+        """Return the fixed client-facing message; the reason is only logged."""
+        return "Failed to send the message through the configured SMTP server"
+
+    def log(self) -> None:
+        """Log the raw reason server-side."""
+        logger.warning("SMTP delivery failed: %s", self.reason)
 
 
 class UserValidationError(RepositoryError):
@@ -406,12 +638,19 @@ class UserValidationError(RepositoryError):
     surfaced in the error envelope's ``details`` block when returning HTTP 422.
     """
 
+    code = "INVALID_USER"
+    http_status = 422
+
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
 
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"reason": self.reason}
 
-class SecretResolutionError(Exception):
+
+class SecretResolutionError(HttpMappedError):
     """Raised when a ``${secret:NAME/KEY}`` reference cannot be resolved to a value.
 
     Covers a missing secret name, a ciphertext that cannot be decrypted, a
@@ -421,10 +660,25 @@ class SecretResolutionError(Exception):
     returns it to the client, mirroring :class:`McpConnectionError`.
     """
 
+    code = "SECRET_RESOLUTION_FAILED"
+    http_status = 502
+
     def __init__(self, secret_name: str, reason: str) -> None:
         self.secret_name = secret_name
         self.reason = reason
         super().__init__(f"failed to resolve secret {secret_name!r}: {reason}")
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"secret": self.secret_name}
+
+    def public_message(self) -> str:
+        """Return the fixed client-facing message; the reason is only logged."""
+        return f"Failed to resolve secret {self.secret_name!r}"
+
+    def log(self) -> None:
+        """Log the raw reason server-side."""
+        logger.warning("Secret %s resolution failed: %s", self.secret_name, self.reason)
 
 
 class SessionRunInProgressError(RepositoryError):
@@ -437,11 +691,18 @@ class SessionRunInProgressError(RepositoryError):
     envelope's ``details`` block when returning HTTP 409.
     """
 
+    code = "SESSION_RUN_IN_PROGRESS"
+    http_status = 409
+
     def __init__(self, thread_id: str) -> None:
         self.thread_id = thread_id
         super().__init__(
             f"An agent run is already in progress for session {thread_id!r}"
         )
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"threadId": self.thread_id}
 
 
 class OutboundEmailNotDeletableError(RepositoryError):
@@ -456,6 +717,9 @@ class OutboundEmailNotDeletableError(RepositoryError):
     HTTP 409.
     """
 
+    code = "OUTBOUND_EMAIL_NOT_DELETABLE"
+    http_status = 409
+
     def __init__(self, email_id: str, status: str) -> None:
         self.email_id = email_id
         self.status = status
@@ -463,6 +727,10 @@ class OutboundEmailNotDeletableError(RepositoryError):
             f"OutboundEmail {email_id!r} cannot be deleted while its status "
             f"is {status!r}; only 'sent' or 'failed' rows may be deleted"
         )
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"outboundEmailId": self.email_id, "status": self.status}
 
 
 class QueryValidationError(RepositoryError):
@@ -472,6 +740,13 @@ class QueryValidationError(RepositoryError):
     error envelope's ``details`` block when returning HTTP 400.
     """
 
+    code = "INVALID_QUERY"
+    http_status = 400
+
     def __init__(self, reason: str) -> None:
         self.reason = reason
         super().__init__(reason)
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"reason": self.reason}

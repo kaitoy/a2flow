@@ -30,73 +30,13 @@ from infrastructure.mcp_transport_tls import provision_transport_credentials
 from infrastructure.migrations import run_migrations
 from middleware.envelope import RequestContextMiddleware
 from models.user import SYSTEM_USER_ID
-from repositories.exceptions import (
-    ApprovalAlreadyResolvedError,
-    AvatarValidationError,
-    CsrfError,
-    DependencyCycleError,
-    EmailSendError,
-    ForbiddenError,
-    ForeignKeyViolationError,
-    McpConnectionError,
-    McpServerValidationError,
-    McpToolMockValidationError,
-    NotFoundError,
-    OutboundEmailNotDeletableError,
-    QueryValidationError,
-    ReferencedError,
-    RegistryUnavailableError,
-    SecretResolutionError,
-    SecretValidationError,
-    SessionFileValidationError,
-    SessionRunInProgressError,
-    SkillCloneError,
-    SkillNotReadyError,
-    SummarizationFailedError,
-    SystemSettingsValidationError,
-    UnauthorizedError,
-    UniqueViolationError,
-    UserValidationError,
-    WorkflowDescriptionNotGeneratableError,
-    WorkflowNotDeactivatableError,
-    WorkflowNotModifiedError,
-    WorkflowNotRunnableError,
-)
+from repositories.exceptions import HttpMappedError
 from routers import api_router
 from routers.exception_handlers import (
-    approval_already_resolved_exception_handler,
-    avatar_validation_exception_handler,
-    csrf_exception_handler,
-    dependency_cycle_exception_handler,
-    email_send_exception_handler,
-    forbidden_exception_handler,
-    foreign_key_violation_exception_handler,
+    api_error_handler,
     http_exception_handler,
-    mcp_connection_exception_handler,
-    mcp_server_validation_exception_handler,
-    mcp_tool_mock_validation_exception_handler,
-    not_found_exception_handler,
-    outbound_email_not_deletable_exception_handler,
-    query_validation_exception_handler,
-    referenced_exception_handler,
-    registry_unavailable_exception_handler,
-    secret_resolution_exception_handler,
-    secret_validation_exception_handler,
-    session_file_validation_exception_handler,
-    session_run_in_progress_exception_handler,
-    skill_clone_exception_handler,
-    skill_not_ready_exception_handler,
-    summarization_failed_exception_handler,
-    system_settings_validation_exception_handler,
-    unauthorized_exception_handler,
     unhandled_exception_handler,
-    unique_violation_exception_handler,
-    user_validation_exception_handler,
     validation_exception_handler,
-    workflow_description_not_generatable_exception_handler,
-    workflow_not_deactivatable_exception_handler,
-    workflow_not_modified_exception_handler,
-    workflow_not_runnable_exception_handler,
 )
 from services.agent_skill_sync import sync_agent_skill
 from services.email_queue_worker import run_email_queue_worker
@@ -213,65 +153,7 @@ app.add_middleware(
 app.add_middleware(RequestContextMiddleware)
 
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(NotFoundError, not_found_exception_handler)
-app.add_exception_handler(
-    ForeignKeyViolationError, foreign_key_violation_exception_handler
-)
-app.add_exception_handler(ReferencedError, referenced_exception_handler)
-app.add_exception_handler(
-    SessionRunInProgressError, session_run_in_progress_exception_handler
-)
-app.add_exception_handler(UniqueViolationError, unique_violation_exception_handler)
-app.add_exception_handler(DependencyCycleError, dependency_cycle_exception_handler)
-app.add_exception_handler(McpConnectionError, mcp_connection_exception_handler)
-app.add_exception_handler(SkillCloneError, skill_clone_exception_handler)
-app.add_exception_handler(SkillNotReadyError, skill_not_ready_exception_handler)
-app.add_exception_handler(
-    WorkflowNotRunnableError, workflow_not_runnable_exception_handler
-)
-app.add_exception_handler(
-    ApprovalAlreadyResolvedError, approval_already_resolved_exception_handler
-)
-app.add_exception_handler(
-    WorkflowNotModifiedError, workflow_not_modified_exception_handler
-)
-app.add_exception_handler(
-    WorkflowNotDeactivatableError, workflow_not_deactivatable_exception_handler
-)
-app.add_exception_handler(
-    OutboundEmailNotDeletableError, outbound_email_not_deletable_exception_handler
-)
-app.add_exception_handler(
-    WorkflowDescriptionNotGeneratableError,
-    workflow_description_not_generatable_exception_handler,
-)
-app.add_exception_handler(
-    SummarizationFailedError, summarization_failed_exception_handler
-)
-app.add_exception_handler(
-    RegistryUnavailableError, registry_unavailable_exception_handler
-)
-app.add_exception_handler(QueryValidationError, query_validation_exception_handler)
-app.add_exception_handler(AvatarValidationError, avatar_validation_exception_handler)
-app.add_exception_handler(
-    SessionFileValidationError, session_file_validation_exception_handler
-)
-app.add_exception_handler(SecretValidationError, secret_validation_exception_handler)
-app.add_exception_handler(
-    McpServerValidationError, mcp_server_validation_exception_handler
-)
-app.add_exception_handler(
-    McpToolMockValidationError, mcp_tool_mock_validation_exception_handler
-)
-app.add_exception_handler(UserValidationError, user_validation_exception_handler)
-app.add_exception_handler(
-    SystemSettingsValidationError, system_settings_validation_exception_handler
-)
-app.add_exception_handler(EmailSendError, email_send_exception_handler)
-app.add_exception_handler(SecretResolutionError, secret_resolution_exception_handler)
-app.add_exception_handler(UnauthorizedError, unauthorized_exception_handler)
-app.add_exception_handler(CsrfError, csrf_exception_handler)
-app.add_exception_handler(ForbiddenError, forbidden_exception_handler)
+app.add_exception_handler(HttpMappedError, api_error_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
