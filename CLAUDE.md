@@ -161,12 +161,12 @@ After the YAML is regenerated, refresh the frontend bindings:
 cd frontend && pnpm openapi-ts
 ```
 
-Whenever `backend/openapi.yaml` changes (e.g. route path prefixes, operation IDs) or types are regenerated, the Zod schema export names in `zod.gen.ts` can change — they embed the full URL path segments. For example, adding an `/api/v1/` prefix changes `zListAgentSkillsAgentSkillsGetResponse` to `zListAgentSkillsApiV1AgentSkillsGetResponse`.
+Whenever `backend/openapi.yaml` changes (e.g. route path prefixes, operation IDs) or types are regenerated, the SDK function names in `sdk.gen.ts` can change — they embed the full URL path segments. For example, adding an `/api/v1/` prefix changes `listAgentSkillsAgentSkillsGet` to `listAgentSkillsApiV1AgentSkillsGet`.
 
-After any regeneration, verify that all imports in `frontend/src/lib/api.ts` still match the current export names in `zod.gen.ts`. A quick check:
+After any regeneration, verify that every `sdk.` call in `frontend/src/lib/api.ts` still matches the current export names in `sdk.gen.ts`. A quick check:
 
 ```bash
 cd frontend && pnpm build
 ```
 
-Module-not-found errors on `zod.gen` imports indicate a name mismatch that must be fixed before the change is done.
+Type errors on `sdk.` calls indicate a name mismatch that must be fixed before the change is done.

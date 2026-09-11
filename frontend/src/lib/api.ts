@@ -1,8 +1,8 @@
 import { type A2UIInlineCatalogSchema, A2UIMiddleware } from "@ag-ui/a2ui-middleware";
 import { HttpAgent } from "@ag-ui/client";
 import type { Message } from "@ag-ui/core";
-import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
-import type { z } from "zod";
+import { client } from "@/generated/api/client.gen";
+import * as sdk from "@/generated/api/sdk.gen";
 import type {
   AgentSkillContent,
   AgentSkillCreate,
@@ -80,117 +80,6 @@ import type {
   WorkflowTaskUpdate,
   WorkflowUpdate,
 } from "@/generated/api/types.gen";
-import {
-  zCreateAgentSkillApiV1AgentSkillsPostResponse,
-  zCreateMcpServerApiV1McpServersPostResponse,
-  zCreateMcpToolMockApiV1McpToolMocksPostResponse,
-  zCreateSecretApiV1SecretsPostResponse,
-  zCreateTagApiV1TagsPostResponse,
-  zCreateTenantApiV1TenantsPostResponse,
-  zCreateUserApiV1UsersPostResponse,
-  zCreateUserGroupApiV1UserGroupsPostResponse,
-  zCreateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPostResponse,
-  zDeactivateWorkflowApiV1WorkflowsWorkflowIdDeactivatePostResponse,
-  zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse,
-  zDeleteMcpServerApiV1McpServersServerIdDeleteResponse,
-  zDeleteMcpToolMockApiV1McpToolMocksMockIdDeleteResponse,
-  zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse,
-  zDeleteSecretApiV1SecretsSecretIdDeleteResponse,
-  zDeleteSessionApiV1SessionsSessionIdDeleteResponse,
-  zDeleteTagApiV1TagsTagIdDeleteResponse,
-  zDeleteTenantApiV1TenantsTenantIdDeleteResponse,
-  zDeleteUserApiV1UsersUserIdDeleteResponse,
-  zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse,
-  zDeleteUserGroupApiV1UserGroupsGroupIdDeleteResponse,
-  zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse,
-  zDeleteWorkflowExecutionApiV1WorkflowExecutionsExecutionIdDeleteResponse,
-  zDeleteWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdDeleteResponse,
-  zDiscardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPostResponse,
-  zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse,
-  zGenerateWorkflowApiV1AgentSkillsSkillIdWorkflowsPostResponse,
-  zGenerateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPostResponse,
-  zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse,
-  zGetAgentSkillContentApiV1AgentSkillsSkillIdContentGetResponse,
-  zGetApprovalApiV1ApprovalsApprovalIdGetResponse,
-  zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse,
-  zGetImpersonationEventApiV1ImpersonationEventsEventIdGetResponse,
-  zGetMcpServerApiV1McpServersServerIdGetResponse,
-  zGetMcpToolCertificateByIdApiV1McpToolCertificatesCertificateIdGetResponse,
-  zGetMcpToolInvocationApiV1McpToolInvocationsInvocationIdGetResponse,
-  zGetMcpToolMockApiV1McpToolMocksMockIdGetResponse,
-  zGetOutboundEmailApiV1OutboundEmailsEmailIdGetResponse,
-  zGetSecretApiV1SecretsSecretIdGetResponse,
-  zGetSessionApiV1SessionsSessionIdGetResponse,
-  zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse,
-  zGetSystemSettingsApiV1SystemSettingsGetResponse,
-  zGetTagApiV1TagsTagIdGetResponse,
-  zGetTenantApiV1TenantsTenantIdGetResponse,
-  zGetUserApiV1UsersUserIdGetResponse,
-  zGetUserGroupApiV1UserGroupsGroupIdGetResponse,
-  zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse,
-  zGetWorkflowExecutionApiV1WorkflowExecutionsExecutionIdGetResponse,
-  zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse,
-  zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse,
-  zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse,
-  zListAgentSkillsApiV1AgentSkillsGetResponse,
-  zListApprovalCertificatesApiV1ApprovalsApprovalIdCertificatesGetResponse,
-  zListApprovalsApiV1ApprovalsGetResponse,
-  zListGroupsForUserApiV1UsersUserIdGroupsGetResponse,
-  zListImpersonationEventsApiV1ImpersonationEventsGetResponse,
-  zListMcpServersApiV1McpServersGetResponse,
-  zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse,
-  zListMcpToolCertificatesApiV1McpToolCertificatesGetResponse,
-  zListMcpToolInvocationsApiV1McpToolInvocationsGetResponse,
-  zListMcpToolMocksApiV1McpToolMocksGetResponse,
-  zListNotificationsApiV1NotificationsGetResponse,
-  zListOutboundEmailsApiV1OutboundEmailsGetResponse,
-  zListSecretKeysApiV1SecretsSecretIdKeysGetResponse,
-  zListSecretsApiV1SecretsGetResponse,
-  zListSessionsApiV1SessionsGetResponse,
-  zListTagsApiV1TagsGetResponse,
-  zListTenantsApiV1TenantsGetResponse,
-  zListUserGroupsApiV1UserGroupsGetResponse,
-  zListUsersApiV1UsersGetResponse,
-  zListWorkflowExecutionsApiV1WorkflowExecutionsGetResponse,
-  zListWorkflowExecutionTasksApiV1WorkflowExecutionsExecutionIdWorkflowTasksGetResponse,
-  zListWorkflowExecutionToolInvocationsApiV1WorkflowExecutionsExecutionIdToolInvocationsGetResponse,
-  zListWorkflowsApiV1WorkflowsGetResponse,
-  zListWorkflowTaskTemplatesApiV1WorkflowsWorkflowIdTaskTemplatesGetResponse,
-  zLoginApiV1AuthLoginPostResponse,
-  zLogoutApiV1AuthLogoutPostResponse,
-  zMarkAllNotificationsReadApiV1NotificationsReadAllPostResponse,
-  zMeApiV1AuthMeGetResponse,
-  zPublishWorkflowApiV1WorkflowsWorkflowIdPublishPostResponse,
-  zPullAgentSkillApiV1AgentSkillsSkillIdPullPostResponse,
-  zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse,
-  zResolveUserNamesApiV1UsersResolveNamesPostResponse,
-  zSearchMcpRegistryApiV1McpRegistryGetResponse,
-  zSendSmtpTestEmailApiV1SystemSettingsSmtpTestPostResponse,
-  zSetAgentSkillTagsApiV1AgentSkillsSkillIdTagsPutResponse,
-  zSetMcpServerTagsApiV1McpServersServerIdTagsPutResponse,
-  zSetMcpToolMockTagsApiV1McpToolMocksMockIdTagsPutResponse,
-  zSetSecretTagsApiV1SecretsSecretIdTagsPutResponse,
-  zSetUserGroupsApiV1UsersUserIdGroupsPutResponse,
-  zSetUserGroupTagsApiV1UserGroupsGroupIdTagsPutResponse,
-  zSetWorkflowTagsApiV1WorkflowsWorkflowIdTagsPutResponse,
-  zStartImpersonationApiV1AuthImpersonatePostResponse,
-  zStopImpersonationApiV1AuthImpersonateDeleteResponse,
-  zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse,
-  zUpdateMcpServerApiV1McpServersServerIdPatchResponse,
-  zUpdateMcpToolMockApiV1McpToolMocksMockIdPatchResponse,
-  zUpdateNotificationApiV1NotificationsNotificationIdPatchResponse,
-  zUpdateSecretApiV1SecretsSecretIdPatchResponse,
-  zUpdateSystemSettingsApiV1SystemSettingsPatchResponse,
-  zUpdateTagApiV1TagsTagIdPatchResponse,
-  zUpdateTenantApiV1TenantsTenantIdPatchResponse,
-  zUpdateUserApiV1UsersUserIdPatchResponse,
-  zUpdateUserGroupApiV1UserGroupsGroupIdPatchResponse,
-  zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse,
-  zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse,
-  zUpdateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdPatchResponse,
-  zUploadSessionFileApiV1WorkflowExecutionsExecutionIdFilesPostResponse,
-  zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse,
-} from "@/generated/api/zod.gen";
 import { store } from "@/store";
 import { showToast } from "@/store/toastSlice";
 import basicCatalogJson from "../generated/basic_catalog.json";
@@ -232,91 +121,49 @@ function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
 }
 
-declare module "axios" {
-  interface AxiosRequestConfig {
-    /**
-     * When true, skip the global error toast for a FORBIDDEN (403) failure on
-     * this specific request -- the caller renders its own access-denied state
-     * instead. Any other failure, including a different 403, still toasts
-     * normally. See {@link isForbiddenError}.
-     */
-    suppressForbiddenToast?: boolean;
+/**
+ * Wraps the platform `fetch` so two identical GETs in flight at once share one
+ * network request instead of the backend seeing it twice. The main case this
+ * guards against is a list page's mount effect firing twice with identical
+ * params -- e.g. under React StrictMode's dev-only mount/cleanup/remount cycle
+ * -- but it also covers two independent components (the tenant switcher and
+ * the tenants admin page) requesting the same resource at once. Entries are
+ * removed as soon as the request settles, so this shares only concurrent
+ * requests -- it is not a cache and never serves stale data to a later call.
+ * Each awaiter gets its own clone, since a `Response` body reads once.
+ */
+const inFlightGets = new Map<string, Promise<Response>>();
+async function dedupingFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const request = input instanceof Request ? input : new Request(input, init);
+  if (request.method !== "GET") return fetch(request);
+  const key = request.url;
+  let pending = inFlightGets.get(key);
+  if (!pending) {
+    pending = fetch(request).finally(() => inFlightGets.delete(key));
+    inFlightGets.set(key, pending);
   }
+  return (await pending).clone();
 }
 
-const apiClient = axios.create({
-  baseURL: API_BASE,
-  withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
+client.setConfig({
+  baseUrl: API_BASE,
+  credentials: "include",
+  fetch: dedupingFetch,
+  // Repeated keys without brackets (`q=a&q=b`), matching FastAPI's list-query shape.
+  querySerializer: { array: { explode: true, style: "form" } },
 });
 
-apiClient.interceptors.request.use((config) => {
-  if (UNSAFE_METHODS.has((config.method ?? "get").toLowerCase())) {
+client.interceptors.request.use((request) => {
+  if (UNSAFE_METHODS.has(request.method.toLowerCase())) {
     const token = readCookie(CSRF_COOKIE_NAME);
-    if (token) config.headers.set(CSRF_HEADER_NAME, token);
+    if (token) request.headers.set(CSRF_HEADER_NAME, token);
   }
   const tenantId = store.getState().auth.selectedTenantId;
-  if (tenantId) config.headers.set(TENANT_HEADER_NAME, tenantId);
+  if (tenantId) request.headers.set(TENANT_HEADER_NAME, tenantId);
   const impersonatedUserId = store.getState().auth.impersonatedUserId;
-  if (impersonatedUserId) config.headers.set(IMPERSONATE_HEADER_NAME, impersonatedUserId);
-  return config;
-});
-
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Redirect to the login page when a request is rejected for lack of a valid
-    // session — except the login request itself, which surfaces 401 inline.
-    const url: string = error?.config?.url ?? "";
-    const isSessionExpiry =
-      typeof window !== "undefined" &&
-      error?.response?.status === 401 &&
-      !url.endsWith("/auth/login") &&
-      window.location.pathname !== "/login";
-    if (isSessionExpiry) {
-      // A toast would just flash and vanish mid-navigation, so skip it here.
-      window.location.assign("/login");
-    } else if (error?.config?.suppressForbiddenToast && isForbiddenError(error)) {
-      // Caller renders its own access-denied state; skip the generic toast.
-    } else {
-      reportApiError(error);
-    }
-    return Promise.reject(error);
-  }
-);
-
-/**
- * In-flight GET requests keyed by URL + query params, so two callers racing
- * for the exact same data collapse into one network request instead of the
- * backend seeing it twice. The main case this guards against is a list
- * page's mount effect firing twice with identical params -- e.g. under React
- * StrictMode's dev-only mount/cleanup/remount cycle -- but it also covers two
- * independent components (e.g. the tenant switcher and the tenants admin
- * page) requesting the same resource at once. Entries are removed as soon as
- * the request settles, so this shares only concurrent requests -- it is not
- * a cache and never serves stale data to a later call.
- */
-const inFlightGets = new Map<string, Promise<AxiosResponse>>();
-
-function dedupeKey(url: string, config?: AxiosRequestConfig): string {
-  return `${url}?${JSON.stringify(config?.params ?? {})}`;
-}
-
-const rawGet = apiClient.get.bind(apiClient) as (
-  url: string,
-  config?: AxiosRequestConfig
-) => Promise<AxiosResponse>;
-
-apiClient.get = ((url: string, config?: AxiosRequestConfig) => {
-  const key = dedupeKey(url, config);
-  const existing = inFlightGets.get(key);
-  if (existing) return existing;
-  const request = rawGet(url, config).finally(() => inFlightGets.delete(key));
-  inFlightGets.set(key, request);
+  if (impersonatedUserId) request.headers.set(IMPERSONATE_HEADER_NAME, impersonatedUserId);
   return request;
-}) as typeof apiClient.get;
+});
 
 /** Re-export the generated envelope types so call sites do not import from ``@/generated``. */
 export type { ApiError, ApiMeta };
@@ -328,52 +175,28 @@ export interface ApiResponse<T> {
   error: ApiError | null;
 }
 
-/** Error thrown when the API returns an error envelope instead of data. */
+/** Error thrown when an API call fails: an error envelope, a non-2xx status, or no response at all. */
 export class ApiClientError extends Error {
   constructor(
     public code: string,
     message: string,
     public details?: unknown,
-    public requestId?: string
+    public requestId?: string,
+    /** HTTP status of the response, when one arrived. */
+    public status?: number
   ) {
     super(message);
     this.name = "ApiClientError";
   }
 }
 
-/**
- * Extract a user-facing message from a failed API call. Handles both shapes a
- * call can fail with: an {@link ApiClientError} (a 2xx response whose envelope
- * carries an error, thrown by {@link fetchEnvelope}) and a raw Axios error (an
- * HTTP-level failure, e.g. a non-2xx status), which the response interceptor
- * below reports but re-throws unconverted.
- */
+/** Extract a user-facing message from a failed API call. */
 export function getApiErrorMessage(error: unknown): string {
-  if (error instanceof ApiClientError) {
-    return error.message;
-  }
-  if (axios.isAxiosError(error)) {
-    const envelopeError = (error.response?.data as { error?: ApiError } | null | undefined)?.error;
-    if (envelopeError?.message) {
-      return envelopeError.message;
-    }
-    if (!error.response) {
-      return "Unable to reach the server. Please check your connection and try again.";
-    }
-    if (error.message) {
-      return error.message;
-    }
-  } else if (error instanceof Error) {
-    return error.message;
-  }
+  if (error instanceof Error) return error.message;
   return "Something went wrong. Please try again.";
 }
 
-/**
- * Show a failed API call's message as a red toast. Called from the response
- * interceptor (HTTP-level failures) and from {@link fetchEnvelope} (2xx
- * responses whose envelope still carries an error).
- */
+/** Show a failed API call's message as a red toast. */
 function reportApiError(error: unknown): void {
   store.dispatch(showToast({ message: getApiErrorMessage(error), variant: "error" }));
 }
@@ -387,21 +210,10 @@ const APPROVAL_ALREADY_RESOLVED_CODE = "APPROVAL_ALREADY_RESOLVED";
  * `error.code === "FORBIDDEN"`) -- an authenticated caller who lacks the
  * specific role/ownership grant for an otherwise-existing record. Distinct
  * from a 404 (the record doesn't exist, or isn't visible to this tenant),
- * which this deliberately does not match. Handles both shapes a call can
- * fail with, same as {@link getApiErrorMessage}: a raw Axios error
- * (HTTP-level 403) and an {@link ApiClientError} (a 2xx envelope that still
- * carries the error, thrown by {@link fetchEnvelope}).
+ * which this deliberately does not match.
  */
 export function isForbiddenError(error: unknown): boolean {
-  if (error instanceof ApiClientError) {
-    return error.code === FORBIDDEN_CODE;
-  }
-  if (axios.isAxiosError(error) && error.response?.status === 403) {
-    const envelopeCode = (error.response.data as { error?: ApiError } | null | undefined)?.error
-      ?.code;
-    return envelopeCode === undefined || envelopeCode === FORBIDDEN_CODE;
-  }
-  return false;
+  return error instanceof ApiClientError && error.code === FORBIDDEN_CODE;
 }
 
 /**
@@ -412,62 +224,76 @@ export function isForbiddenError(error: unknown): boolean {
  * the UI reports "already decided" rather than a generic failure.
  */
 export function isApprovalAlreadyResolvedError(error: unknown): boolean {
-  if (error instanceof ApiClientError) {
-    return error.code === APPROVAL_ALREADY_RESOLVED_CODE;
-  }
-  if (axios.isAxiosError(error) && error.response?.status === 409) {
-    const envelopeCode = (error.response.data as { error?: ApiError } | null | undefined)?.error
-      ?.code;
-    return envelopeCode === APPROVAL_ALREADY_RESOLVED_CODE;
-  }
-  return false;
+  return error instanceof ApiClientError && error.code === APPROVAL_ALREADY_RESOLVED_CODE;
+}
+
+/** Per-call options accepted by the API functions below. */
+export interface CallOptions {
+  /**
+   * When true, skip the global error toast for a FORBIDDEN (403) failure on
+   * this specific request -- the caller renders its own access-denied state
+   * instead. Any other failure, including a different 403, still toasts
+   * normally. See {@link isForbiddenError}.
+   */
+  suppressForbiddenToast?: boolean;
 }
 
 /**
- * Axios request config for a page's initial-load GET that renders its own
+ * Options for a page's initial-load GET that renders its own
  * {@link isForbiddenError}-driven access-denied state, so the generic error
  * toast should stay silent for a FORBIDDEN failure on that specific request.
  */
-export const SUPPRESS_FORBIDDEN_TOAST: AxiosRequestConfig = { suppressForbiddenToast: true };
+export const SUPPRESS_FORBIDDEN_TOAST: CallOptions = { suppressForbiddenToast: true };
+
+/** What a generated SDK call resolves to: the parsed envelope on success, else the error and its response. */
+interface SdkResult<T> {
+  data?: { meta: ApiMeta; data?: T | null; error?: ApiError | null };
+  error?: unknown;
+  response?: Response;
+}
 
 /**
- * Zod schema shape produced for every wrapped response by ``@hey-api/openapi-ts``.
- * Constrains the helper below so only generated envelope schemas can be passed in.
+ * Turn a generated SDK call into the envelope's `data`, or throw an
+ * {@link ApiClientError}.
+ *
+ * Every failure funnels through here: a network error, a non-2xx status (whose
+ * body is the same envelope with `error` set), and a 2xx whose envelope still
+ * carries an error. A 401 anywhere but the login request means the session
+ * expired, so the browser is sent to the login page instead of shown a toast
+ * that would only flash mid-navigation.
  */
-type EnvelopeSchema = z.ZodObject<{
-  meta: z.ZodTypeAny;
-  data: z.ZodTypeAny;
-  error: z.ZodTypeAny;
-}>;
-
-/**
- * Validate an API response against its generated envelope Zod schema and
- * return the inner ``data`` field, throwing ``ApiClientError`` if the
- * envelope carries an error body.
- */
-async function fetchEnvelope<S extends EnvelopeSchema>(
-  promise: Promise<AxiosResponse<unknown>>,
-  schema: S
-): Promise<z.infer<S>["data"]> {
-  const res = await promise;
-  const env = schema.parse(res.data) as {
-    meta: ApiMeta;
-    data: z.infer<S>["data"];
-    error: ApiError | null;
-  };
-  if (env.error) {
-    const err = new ApiClientError(
-      env.error.code,
-      env.error.message,
-      env.error.details,
-      env.meta.requestId
+async function unwrap<T>(call: Promise<SdkResult<T>>, options?: CallOptions): Promise<T> {
+  const { data: env, error, response } = await call;
+  if (env && !env.error) return env.data as T;
+  if (env === undefined && response?.ok) throw error;
+  let failure: ApiClientError;
+  if (!response) {
+    failure = new ApiClientError(
+      "NETWORK_ERROR",
+      "Unable to reach the server. Please check your connection and try again."
     );
-    if (!(res.config?.suppressForbiddenToast && isForbiddenError(err))) {
-      reportApiError(err);
-    }
-    throw err;
+  } else {
+    const body = (env ?? error) as SdkResult<unknown>["data"] | null;
+    const err = body?.error ?? null;
+    failure = new ApiClientError(
+      err?.code ?? `HTTP_${response.status}`,
+      err?.message ?? `Request failed with status ${response.status}`,
+      err?.details,
+      body?.meta?.requestId,
+      response.status
+    );
   }
-  return env.data;
+  const isSessionExpiry =
+    typeof window !== "undefined" &&
+    failure.status === 401 &&
+    !response?.url.endsWith("/auth/login") &&
+    window.location.pathname !== "/login";
+  if (isSessionExpiry) {
+    window.location.assign("/login");
+  } else if (!(options?.suppressForbiddenToast && isForbiddenError(failure))) {
+    reportApiError(failure);
+  }
+  throw failure;
 }
 
 type AuditedKeys = "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy";
@@ -604,24 +430,23 @@ export interface ListQuery {
 }
 
 /**
- * Build the axios request config (query params + serializer) for a list call.
- *
- * Encodes `sort` into the `s` param (`-` prefix for descending) and `filters`
- * into repeated `q` params (`field:op:value`). `indexes: null` makes axios emit
- * repeated keys without brackets (`q=a&q=b`), matching FastAPI's list-query shape.
+ * Build the query params for a list call: `sort` becomes the `s` param (`-`
+ * prefix for descending) and `filters` repeated `q` params (`field:op:value`).
  */
-function listConfig({
+function listQuery({
   limit = 20,
   offset = 0,
   sort = null,
   filters = [],
   tagIds = [],
-}: ListQuery = {}): Pick<AxiosRequestConfig, "params" | "paramsSerializer"> {
-  const params: Record<string, unknown> = { limit, offset };
-  if (sort) params.s = `${sort.descending ? "-" : ""}${sort.field}`;
-  if (filters.length > 0) params.q = filters.map((f) => `${f.field}:${f.op}:${f.value}`);
-  if (tagIds.length > 0) params.tag = tagIds;
-  return { params, paramsSerializer: { indexes: null } };
+}: ListQuery = {}) {
+  return {
+    limit,
+    offset,
+    s: sort ? `${sort.descending ? "-" : ""}${sort.field}` : undefined,
+    q: filters.length > 0 ? filters.map((f) => `${f.field}:${f.op}:${f.value}`) : undefined,
+    tag: tagIds.length > 0 ? tagIds : undefined,
+  };
 }
 
 /**
@@ -635,19 +460,20 @@ export async function login(
   password: string,
   tenantName?: string
 ): Promise<User> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/auth/login", {
-      username,
-      password,
-      tenantName: tenantName || undefined,
-    }),
-    zLoginApiV1AuthLoginPostResponse
+  return unwrap(
+    sdk.loginApiV1AuthLoginPost({
+      body: {
+        username,
+        password,
+        tenantName: tenantName || undefined,
+      },
+    })
   ) as Promise<User>;
 }
 
 /** Revoke the current session and clear the auth cookies. */
 export async function logout(): Promise<void> {
-  await fetchEnvelope(apiClient.post("/api/v1/auth/logout"), zLogoutApiV1AuthLogoutPostResponse);
+  await unwrap(sdk.logoutApiV1AuthLogoutPost());
 }
 
 /**
@@ -661,7 +487,7 @@ export interface Me {
 
 /** Fetch the currently authenticated (effective) user, or throw if the session is invalid. */
 export async function getMe(): Promise<Me> {
-  return fetchEnvelope(apiClient.get("/api/v1/auth/me"), zMeApiV1AuthMeGetResponse) as Promise<Me>;
+  return unwrap(sdk.meApiV1AuthMeGet()) as Promise<Me>;
 }
 
 /**
@@ -670,89 +496,71 @@ export async function getMe(): Promise<Me> {
  * `ApiClientError` with the usual `FORBIDDEN`/`NOT_FOUND` codes.
  */
 export async function startImpersonation(targetUserId: string): Promise<Me> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/auth/impersonate", { targetUserId }),
-    zStartImpersonationApiV1AuthImpersonatePostResponse
+  return unwrap(
+    sdk.startImpersonationApiV1AuthImpersonatePost({ body: { targetUserId } })
   ) as Promise<Me>;
 }
 
 /** Stop impersonating, if currently active; a no-op (never throws for this reason) otherwise. */
 export async function stopImpersonation(): Promise<Me> {
-  return fetchEnvelope(
-    apiClient.delete("/api/v1/auth/impersonate"),
-    zStopImpersonationApiV1AuthImpersonateDeleteResponse
-  ) as Promise<Me>;
+  return unwrap(sdk.stopImpersonationApiV1AuthImpersonateDelete()) as Promise<Me>;
 }
 
 /** Fetch all sessions for the current user (resolved from the session cookie). */
 export async function listSessions(): Promise<Session[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/sessions"),
-    zListSessionsApiV1SessionsGetResponse
-  ) as Promise<Session[]>;
+  return unwrap(sdk.listSessionsApiV1SessionsGet()) as Promise<Session[]>;
 }
 
 /** Fetch a single session by ID. */
 export async function getSession(sessionId: string): Promise<Session> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/sessions/${encodeURIComponent(sessionId)}`),
-    zGetSessionApiV1SessionsSessionIdGetResponse
+  return unwrap(
+    sdk.getSessionApiV1SessionsSessionIdGet({ path: { session_id: sessionId } })
   ) as Promise<Session>;
 }
 
 /** Fetch the full message history for a session (used to restore conversation state). */
 export async function getSessionMessages(sessionId: string): Promise<Message[]> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/sessions/${encodeURIComponent(sessionId)}/messages`),
-    zGetSessionMessagesApiV1SessionsSessionIdMessagesGetResponse
+  return unwrap(
+    sdk.getSessionMessagesApiV1SessionsSessionIdMessagesGet({ path: { session_id: sessionId } })
   ) as Promise<Message[]>;
 }
 
 /** Delete a session and its associated message history. */
 export async function deleteSession(sessionId: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/sessions/${encodeURIComponent(sessionId)}`),
-    zDeleteSessionApiV1SessionsSessionIdDeleteResponse
-  );
+  await unwrap(sdk.deleteSessionApiV1SessionsSessionIdDelete({ path: { session_id: sessionId } }));
 }
 
 /** List agent skills with optional pagination, sort, and filters. */
 export async function listAgentSkills(query: ListQuery = {}): Promise<AgentSkill[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/agent-skills", listConfig(query)),
-    zListAgentSkillsApiV1AgentSkillsGetResponse
-  ) as Promise<AgentSkill[]>;
+  return unwrap(sdk.listAgentSkillsApiV1AgentSkillsGet({ query: listQuery(query) })) as Promise<
+    AgentSkill[]
+  >;
 }
 
 /** Fetch a single agent skill by ID. */
-export async function getAgentSkill(id: string, config?: AxiosRequestConfig): Promise<AgentSkill> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/agent-skills/${encodeURIComponent(id)}`, config),
-    zGetAgentSkillApiV1AgentSkillsSkillIdGetResponse
+export async function getAgentSkill(id: string, options?: CallOptions): Promise<AgentSkill> {
+  return unwrap(
+    sdk.getAgentSkillApiV1AgentSkillsSkillIdGet({ path: { skill_id: id } }),
+    options
   ) as Promise<AgentSkill>;
 }
 
 /** Fetch the raw SKILL.md content of an agent skill's published revision. */
 export async function getAgentSkillContent(id: string): Promise<AgentSkillContent> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/agent-skills/${encodeURIComponent(id)}/content`),
-    zGetAgentSkillContentApiV1AgentSkillsSkillIdContentGetResponse
+  return unwrap(
+    sdk.getAgentSkillContentApiV1AgentSkillsSkillIdContentGet({ path: { skill_id: id } })
   ) as Promise<AgentSkillContent>;
 }
 
 /** Create a new agent skill. */
 export async function createAgentSkill(body: AgentSkillCreate): Promise<AgentSkill> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/agent-skills", body),
-    zCreateAgentSkillApiV1AgentSkillsPostResponse
-  ) as Promise<AgentSkill>;
+  return unwrap(sdk.createAgentSkillApiV1AgentSkillsPost({ body: body })) as Promise<AgentSkill>;
 }
 
 /** Apply a partial update to an agent skill. */
 export async function updateAgentSkill(id: string, body: AgentSkillUpdate): Promise<AgentSkill> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/agent-skills/${encodeURIComponent(id)}`, body),
-    zUpdateAgentSkillApiV1AgentSkillsSkillIdPatchResponse
+  return unwrap(
+    sdk.updateAgentSkillApiV1AgentSkillsSkillIdPatch({ path: { skill_id: id }, body: body })
   ) as Promise<AgentSkill>;
 }
 
@@ -765,92 +573,72 @@ export async function updateAgentSkill(id: string, body: AgentSkillUpdate): Prom
  * `failed`.
  */
 export async function pullAgentSkill(id: string): Promise<AgentSkill> {
-  return fetchEnvelope(
-    apiClient.post(`/api/v1/agent-skills/${encodeURIComponent(id)}/pull`),
-    zPullAgentSkillApiV1AgentSkillsSkillIdPullPostResponse
+  return unwrap(
+    sdk.pullAgentSkillApiV1AgentSkillsSkillIdPullPost({ path: { skill_id: id } })
   ) as Promise<AgentSkill>;
 }
 
 /** Delete an agent skill by ID. */
 export async function deleteAgentSkill(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/agent-skills/${encodeURIComponent(id)}`),
-    zDeleteAgentSkillApiV1AgentSkillsSkillIdDeleteResponse
-  );
+  await unwrap(sdk.deleteAgentSkillApiV1AgentSkillsSkillIdDelete({ path: { skill_id: id } }));
 }
 
 /** List registered MCP servers with optional pagination, sort, and filters. */
 export async function listMcpServers(query: ListQuery = {}): Promise<McpServer[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/mcp-servers", listConfig(query)),
-    zListMcpServersApiV1McpServersGetResponse
-  ) as Promise<McpServer[]>;
+  return unwrap(sdk.listMcpServersApiV1McpServersGet({ query: listQuery(query) })) as Promise<
+    McpServer[]
+  >;
 }
 
 /** Fetch a single registered MCP server by ID. */
-export async function getMcpServer(id: string, config?: AxiosRequestConfig): Promise<McpServer> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/mcp-servers/${encodeURIComponent(id)}`, config),
-    zGetMcpServerApiV1McpServersServerIdGetResponse
+export async function getMcpServer(id: string, options?: CallOptions): Promise<McpServer> {
+  return unwrap(
+    sdk.getMcpServerApiV1McpServersServerIdGet({ path: { server_id: id } }),
+    options
   ) as Promise<McpServer>;
 }
 
 /** Register a new remote MCP server. */
 export async function createMcpServer(body: McpServerCreate): Promise<McpServer> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/mcp-servers", body),
-    zCreateMcpServerApiV1McpServersPostResponse
-  ) as Promise<McpServer>;
+  return unwrap(sdk.createMcpServerApiV1McpServersPost({ body: body })) as Promise<McpServer>;
 }
 
 /** Apply a partial update to a registered MCP server. ``headers`` replaces the full set. */
 export async function updateMcpServer(id: string, body: McpServerUpdate): Promise<McpServer> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/mcp-servers/${encodeURIComponent(id)}`, body),
-    zUpdateMcpServerApiV1McpServersServerIdPatchResponse
+  return unwrap(
+    sdk.updateMcpServerApiV1McpServersServerIdPatch({ path: { server_id: id }, body: body })
   ) as Promise<McpServer>;
 }
 
 /** Delete a registered MCP server. Fails while WorkflowTask tool bindings still reference it. */
 export async function deleteMcpServer(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/mcp-servers/${encodeURIComponent(id)}`),
-    zDeleteMcpServerApiV1McpServersServerIdDeleteResponse
-  );
+  await unwrap(sdk.deleteMcpServerApiV1McpServersServerIdDelete({ path: { server_id: id } }));
 }
 
 /** List the tool mocks registered in the tenant (createdAt DESC by default). */
 export async function listMcpToolMocks(query: ListQuery = {}): Promise<McpToolMock[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/mcp-tool-mocks", listConfig(query)),
-    zListMcpToolMocksApiV1McpToolMocksGetResponse
-  ) as Promise<McpToolMock[]>;
+  return unwrap(sdk.listMcpToolMocksApiV1McpToolMocksGet({ query: listQuery(query) })) as Promise<
+    McpToolMock[]
+  >;
 }
 
 /** Fetch a single tool mock by ID. */
-export async function getMcpToolMock(
-  id: string,
-  config?: AxiosRequestConfig
-): Promise<McpToolMock> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/mcp-tool-mocks/${encodeURIComponent(id)}`, config),
-    zGetMcpToolMockApiV1McpToolMocksMockIdGetResponse
+export async function getMcpToolMock(id: string, options?: CallOptions): Promise<McpToolMock> {
+  return unwrap(
+    sdk.getMcpToolMockApiV1McpToolMocksMockIdGet({ path: { mock_id: id } }),
+    options
   ) as Promise<McpToolMock>;
 }
 
 /** Register a new tool mock. */
 export async function createMcpToolMock(body: McpToolMockCreate): Promise<McpToolMock> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/mcp-tool-mocks", body),
-    zCreateMcpToolMockApiV1McpToolMocksPostResponse
-  ) as Promise<McpToolMock>;
+  return unwrap(sdk.createMcpToolMockApiV1McpToolMocksPost({ body: body })) as Promise<McpToolMock>;
 }
 
 /** Apply a partial update to a tool mock. `responses` replaces the full list. */
 export async function updateMcpToolMock(id: string, body: McpToolMockUpdate): Promise<McpToolMock> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/mcp-tool-mocks/${encodeURIComponent(id)}`, body),
-    zUpdateMcpToolMockApiV1McpToolMocksMockIdPatchResponse
+  return unwrap(
+    sdk.updateMcpToolMockApiV1McpToolMocksMockIdPatch({ path: { mock_id: id }, body: body })
   ) as Promise<McpToolMock>;
 }
 
@@ -859,10 +647,7 @@ export async function updateMcpToolMock(id: string, body: McpToolMockUpdate): Pr
  * deleting one never changes how an existing run behaves.
  */
 export async function deleteMcpToolMock(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/mcp-tool-mocks/${encodeURIComponent(id)}`),
-    zDeleteMcpToolMockApiV1McpToolMocksMockIdDeleteResponse
-  );
+  await unwrap(sdk.deleteMcpToolMockApiV1McpToolMocksMockIdDelete({ path: { mock_id: id } }));
 }
 
 /**
@@ -872,9 +657,11 @@ export async function deleteMcpToolMock(id: string): Promise<void> {
  * them with this call rather than through the mock's own create/update body.
  */
 export async function setMcpToolMockTags(id: string, tagIds: string[]): Promise<McpToolMock> {
-  return fetchEnvelope(
-    apiClient.put(`/api/v1/mcp-tool-mocks/${encodeURIComponent(id)}/tags`, { tagIds }),
-    zSetMcpToolMockTagsApiV1McpToolMocksMockIdTagsPutResponse
+  return unwrap(
+    sdk.setMcpToolMockTagsApiV1McpToolMocksMockIdTagsPut({
+      path: { mock_id: id },
+      body: { tagIds },
+    })
   ) as Promise<McpToolMock>;
 }
 
@@ -889,12 +676,11 @@ export async function listWorkflowExecutionToolInvocations(
   executionId: string,
   query: ListQuery = {}
 ): Promise<McpToolInvocation[]> {
-  return fetchEnvelope(
-    apiClient.get(
-      `/api/v1/workflow-executions/${encodeURIComponent(executionId)}/tool-invocations`,
-      listConfig(query)
-    ),
-    zListWorkflowExecutionToolInvocationsApiV1WorkflowExecutionsExecutionIdToolInvocationsGetResponse
+  return unwrap(
+    sdk.listWorkflowExecutionToolInvocationsApiV1WorkflowExecutionsExecutionIdToolInvocationsGet({
+      path: { execution_id: executionId },
+      query: listQuery(query),
+    })
   ) as Promise<McpToolInvocation[]>;
 }
 
@@ -905,20 +691,19 @@ export async function listWorkflowExecutionToolInvocations(
  * which narrows to one run. Admin-only, since it spans every run in the tenant.
  */
 export async function listMcpToolInvocations(query: ListQuery = {}): Promise<McpToolInvocation[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/mcp-tool-invocations", listConfig(query)),
-    zListMcpToolInvocationsApiV1McpToolInvocationsGetResponse
+  return unwrap(
+    sdk.listMcpToolInvocationsApiV1McpToolInvocationsGet({ query: listQuery(query) })
   ) as Promise<McpToolInvocation[]>;
 }
 
 /** Fetch a single recorded MCP tool-call decision by ID. */
 export async function getMcpToolInvocation(
   id: string,
-  config?: AxiosRequestConfig
+  options?: CallOptions
 ): Promise<McpToolInvocation> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/mcp-tool-invocations/${encodeURIComponent(id)}`, config),
-    zGetMcpToolInvocationApiV1McpToolInvocationsInvocationIdGetResponse
+  return unwrap(
+    sdk.getMcpToolInvocationApiV1McpToolInvocationsInvocationIdGet({ path: { invocation_id: id } }),
+    options
   ) as Promise<McpToolInvocation>;
 }
 
@@ -932,20 +717,19 @@ export async function getMcpToolInvocation(
 export async function listImpersonationEvents(
   query: ListQuery = {}
 ): Promise<ImpersonationEvent[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/impersonation-events", listConfig(query)),
-    zListImpersonationEventsApiV1ImpersonationEventsGetResponse
+  return unwrap(
+    sdk.listImpersonationEventsApiV1ImpersonationEventsGet({ query: listQuery(query) })
   ) as Promise<ImpersonationEvent[]>;
 }
 
 /** Fetch a single recorded impersonation session by ID. */
 export async function getImpersonationEvent(
   id: string,
-  config?: AxiosRequestConfig
+  options?: CallOptions
 ): Promise<ImpersonationEvent> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/impersonation-events/${encodeURIComponent(id)}`, config),
-    zGetImpersonationEventApiV1ImpersonationEventsEventIdGetResponse
+  return unwrap(
+    sdk.getImpersonationEventApiV1ImpersonationEventsEventIdGet({ path: { event_id: id } }),
+    options
   ) as Promise<ImpersonationEvent>;
 }
 
@@ -961,9 +745,8 @@ export async function getImpersonationEvent(
 export async function listMcpToolCertificates(
   query: ListQuery = {}
 ): Promise<McpToolCertificate[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/mcp-tool-certificates", listConfig(query)),
-    zListMcpToolCertificatesApiV1McpToolCertificatesGetResponse
+  return unwrap(
+    sdk.listMcpToolCertificatesApiV1McpToolCertificatesGet({ query: listQuery(query) })
   ) as Promise<McpToolCertificate[]>;
 }
 
@@ -976,38 +759,35 @@ export async function listMcpToolCertificates(
  */
 export async function getMcpToolCertificateById(
   id: string,
-  config?: AxiosRequestConfig
+  options?: CallOptions
 ): Promise<McpToolCertificate> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/mcp-tool-certificates/${encodeURIComponent(id)}`, config),
-    zGetMcpToolCertificateByIdApiV1McpToolCertificatesCertificateIdGetResponse
+  return unwrap(
+    sdk.getMcpToolCertificateByIdApiV1McpToolCertificatesCertificateIdGet({
+      path: { certificate_id: id },
+    }),
+    options
   ) as Promise<McpToolCertificate>;
 }
 
 /** List the outgoing notification-email queue (createdAt DESC by default). */
 export async function listOutboundEmails(query: ListQuery = {}): Promise<OutboundEmail[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/outbound-emails", listConfig(query)),
-    zListOutboundEmailsApiV1OutboundEmailsGetResponse
+  return unwrap(
+    sdk.listOutboundEmailsApiV1OutboundEmailsGet({ query: listQuery(query) })
   ) as Promise<OutboundEmail[]>;
 }
 
 /** Fetch a single queued or delivered notification email by ID. */
-export async function getOutboundEmail(
-  id: string,
-  config?: AxiosRequestConfig
-): Promise<OutboundEmail> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/outbound-emails/${encodeURIComponent(id)}`, config),
-    zGetOutboundEmailApiV1OutboundEmailsEmailIdGetResponse
+export async function getOutboundEmail(id: string, options?: CallOptions): Promise<OutboundEmail> {
+  return unwrap(
+    sdk.getOutboundEmailApiV1OutboundEmailsEmailIdGet({ path: { email_id: id } }),
+    options
   ) as Promise<OutboundEmail>;
 }
 
 /** Fetch the tools advertised by a registered MCP server (live query to the server). */
 export async function listMcpServerTools(id: string): Promise<McpToolInfo[]> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/mcp-servers/${encodeURIComponent(id)}/tools`),
-    zListMcpServerToolsApiV1McpServersServerIdToolsGetResponse
+  return unwrap(
+    sdk.listMcpServerToolsApiV1McpServersServerIdToolsGet({ path: { server_id: id } })
   ) as Promise<McpToolInfo[]>;
 }
 
@@ -1021,25 +801,21 @@ export async function listMcpServerTools(id: string): Promise<McpToolInfo[]> {
 export async function searchMcpRegistry(
   params: { search?: string; cursor?: string } = {}
 ): Promise<McpRegistrySearchResult> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/mcp-registry", { params }),
-    zSearchMcpRegistryApiV1McpRegistryGetResponse
+  return unwrap(
+    sdk.searchMcpRegistryApiV1McpRegistryGet({ query: params })
   ) as Promise<McpRegistrySearchResult>;
 }
 
 /** List secrets with optional pagination, sort, and filters. Values are never returned. */
 export async function listSecrets(query: ListQuery = {}): Promise<Secret[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/secrets", listConfig(query)),
-    zListSecretsApiV1SecretsGetResponse
-  ) as Promise<Secret[]>;
+  return unwrap(sdk.listSecretsApiV1SecretsGet({ query: listQuery(query) })) as Promise<Secret[]>;
 }
 
 /** Fetch a single secret by ID. The stored value is never returned. */
-export async function getSecret(id: string, config?: AxiosRequestConfig): Promise<Secret> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/secrets/${encodeURIComponent(id)}`, config),
-    zGetSecretApiV1SecretsSecretIdGetResponse
+export async function getSecret(id: string, options?: CallOptions): Promise<Secret> {
+  return unwrap(
+    sdk.getSecretApiV1SecretsSecretIdGet({ path: { secret_id: id } }),
+    options
   ) as Promise<Secret>;
 }
 
@@ -1051,58 +827,41 @@ export async function getSecret(id: string, config?: AxiosRequestConfig): Promis
  * live from its KV v2 path.
  */
 export async function listSecretKeys(id: string): Promise<string[]> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/secrets/${encodeURIComponent(id)}/keys`),
-    zListSecretKeysApiV1SecretsSecretIdKeysGetResponse
+  return unwrap(
+    sdk.listSecretKeysApiV1SecretsSecretIdKeysGet({ path: { secret_id: id } })
   ) as Promise<string[]>;
 }
 
 /** Register a new secret: a `local` encrypted value or a `vault` KV v2 reference. */
 export async function createSecret(body: SecretCreate): Promise<Secret> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/secrets", body),
-    zCreateSecretApiV1SecretsPostResponse
-  ) as Promise<Secret>;
+  return unwrap(sdk.createSecretApiV1SecretsPost({ body: body })) as Promise<Secret>;
 }
 
 /** Apply a partial update to a secret. Omitting `entries` keeps the stored map unchanged. */
 export async function updateSecret(id: string, body: SecretUpdate): Promise<Secret> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/secrets/${encodeURIComponent(id)}`, body),
-    zUpdateSecretApiV1SecretsSecretIdPatchResponse
+  return unwrap(
+    sdk.updateSecretApiV1SecretsSecretIdPatch({ path: { secret_id: id }, body: body })
   ) as Promise<Secret>;
 }
 
 /** Delete a secret by ID. References to it fail lazily at their next resolution. */
 export async function deleteSecret(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/secrets/${encodeURIComponent(id)}`),
-    zDeleteSecretApiV1SecretsSecretIdDeleteResponse
-  );
+  await unwrap(sdk.deleteSecretApiV1SecretsSecretIdDelete({ path: { secret_id: id } }));
 }
 
 /** List tags with optional pagination, sort, and filters. */
 export async function listTags(query: ListQuery = {}): Promise<Tag[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/tags", listConfig(query)),
-    zListTagsApiV1TagsGetResponse
-  ) as Promise<Tag[]>;
+  return unwrap(sdk.listTagsApiV1TagsGet({ query: listQuery(query) })) as Promise<Tag[]>;
 }
 
 /** Fetch a single tag by ID. */
-export async function getTag(id: string, config?: AxiosRequestConfig): Promise<Tag> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/tags/${encodeURIComponent(id)}`, config),
-    zGetTagApiV1TagsTagIdGetResponse
-  ) as Promise<Tag>;
+export async function getTag(id: string, options?: CallOptions): Promise<Tag> {
+  return unwrap(sdk.getTagApiV1TagsTagIdGet({ path: { tag_id: id } }), options) as Promise<Tag>;
 }
 
 /** Register a new tag. Requires the `admin` or `developer` role. */
 export async function createTag(body: TagCreate): Promise<Tag> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/tags", body),
-    zCreateTagApiV1TagsPostResponse
-  ) as Promise<Tag>;
+  return unwrap(sdk.createTagApiV1TagsPost({ body: body })) as Promise<Tag>;
 }
 
 /**
@@ -1112,18 +871,14 @@ export async function createTag(body: TagCreate): Promise<Tag> {
  * carrying it picks up the new name.
  */
 export async function updateTag(id: string, body: TagUpdate): Promise<Tag> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/tags/${encodeURIComponent(id)}`, body),
-    zUpdateTagApiV1TagsTagIdPatchResponse
+  return unwrap(
+    sdk.updateTagApiV1TagsTagIdPatch({ path: { tag_id: id }, body: body })
   ) as Promise<Tag>;
 }
 
 /** Delete a tag, detaching it from every record that carried it. */
 export async function deleteTag(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/tags/${encodeURIComponent(id)}`),
-    zDeleteTagApiV1TagsTagIdDeleteResponse
-  );
+  await unwrap(sdk.deleteTagApiV1TagsTagIdDelete({ path: { tag_id: id } }));
 }
 
 /**
@@ -1133,74 +888,69 @@ export async function deleteTag(id: string): Promise<void> {
  * creating a tagged record is a create followed by this call.
  */
 export async function setSecretTags(id: string, tagIds: string[]): Promise<Secret> {
-  return fetchEnvelope(
-    apiClient.put(`/api/v1/secrets/${encodeURIComponent(id)}/tags`, { tagIds }),
-    zSetSecretTagsApiV1SecretsSecretIdTagsPutResponse
+  return unwrap(
+    sdk.setSecretTagsApiV1SecretsSecretIdTagsPut({ path: { secret_id: id }, body: { tagIds } })
   ) as Promise<Secret>;
 }
 
 /** Replace a workflow's tags wholesale. An empty array detaches every tag. */
 export async function setWorkflowTags(id: string, tagIds: string[]): Promise<Workflow> {
-  return fetchEnvelope(
-    apiClient.put(`/api/v1/workflows/${encodeURIComponent(id)}/tags`, { tagIds }),
-    zSetWorkflowTagsApiV1WorkflowsWorkflowIdTagsPutResponse
+  return unwrap(
+    sdk.setWorkflowTagsApiV1WorkflowsWorkflowIdTagsPut({
+      path: { workflow_id: id },
+      body: { tagIds },
+    })
   ) as Promise<Workflow>;
 }
 
 /** Replace an MCP server's tags wholesale. An empty array detaches every tag. */
 export async function setMcpServerTags(id: string, tagIds: string[]): Promise<McpServer> {
-  return fetchEnvelope(
-    apiClient.put(`/api/v1/mcp-servers/${encodeURIComponent(id)}/tags`, { tagIds }),
-    zSetMcpServerTagsApiV1McpServersServerIdTagsPutResponse
+  return unwrap(
+    sdk.setMcpServerTagsApiV1McpServersServerIdTagsPut({
+      path: { server_id: id },
+      body: { tagIds },
+    })
   ) as Promise<McpServer>;
 }
 
 /** Replace an agent skill's tags wholesale. An empty array detaches every tag. */
 export async function setAgentSkillTags(id: string, tagIds: string[]): Promise<AgentSkill> {
-  return fetchEnvelope(
-    apiClient.put(`/api/v1/agent-skills/${encodeURIComponent(id)}/tags`, { tagIds }),
-    zSetAgentSkillTagsApiV1AgentSkillsSkillIdTagsPutResponse
+  return unwrap(
+    sdk.setAgentSkillTagsApiV1AgentSkillsSkillIdTagsPut({
+      path: { skill_id: id },
+      body: { tagIds },
+    })
   ) as Promise<AgentSkill>;
 }
 
 /** List tenants with optional pagination, sort, and filters. */
 export async function listTenants(query: ListQuery = {}): Promise<Tenant[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/tenants", listConfig(query)),
-    zListTenantsApiV1TenantsGetResponse
-  ) as Promise<Tenant[]>;
+  return unwrap(sdk.listTenantsApiV1TenantsGet({ query: listQuery(query) })) as Promise<Tenant[]>;
 }
 
 /** Fetch a single tenant by ID. */
-export async function getTenant(id: string, config?: AxiosRequestConfig): Promise<Tenant> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/tenants/${encodeURIComponent(id)}`, config),
-    zGetTenantApiV1TenantsTenantIdGetResponse
+export async function getTenant(id: string, options?: CallOptions): Promise<Tenant> {
+  return unwrap(
+    sdk.getTenantApiV1TenantsTenantIdGet({ path: { tenant_id: id } }),
+    options
   ) as Promise<Tenant>;
 }
 
 /** Create a new tenant. */
 export async function createTenant(body: TenantCreate): Promise<Tenant> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/tenants", body),
-    zCreateTenantApiV1TenantsPostResponse
-  ) as Promise<Tenant>;
+  return unwrap(sdk.createTenantApiV1TenantsPost({ body: body })) as Promise<Tenant>;
 }
 
 /** Apply a partial update to a tenant. */
 export async function updateTenant(id: string, body: TenantUpdate): Promise<Tenant> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/tenants/${encodeURIComponent(id)}`, body),
-    zUpdateTenantApiV1TenantsTenantIdPatchResponse
+  return unwrap(
+    sdk.updateTenantApiV1TenantsTenantIdPatch({ path: { tenant_id: id }, body: body })
   ) as Promise<Tenant>;
 }
 
 /** Delete a tenant by ID. Fails while any user remains assigned to it. */
 export async function deleteTenant(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/tenants/${encodeURIComponent(id)}`),
-    zDeleteTenantApiV1TenantsTenantIdDeleteResponse
-  );
+  await unwrap(sdk.deleteTenantApiV1TenantsTenantIdDelete({ path: { tenant_id: id } }));
 }
 
 /**
@@ -1209,11 +959,8 @@ export async function deleteTenant(id: string): Promise<void> {
  * The SMTP password is never part of the response; `smtpPasswordSet` reports
  * only whether one is stored.
  */
-export async function getSystemSettings(config?: AxiosRequestConfig): Promise<SystemSettings> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/system-settings", config),
-    zGetSystemSettingsApiV1SystemSettingsGetResponse
-  ) as Promise<SystemSettings>;
+export async function getSystemSettings(options?: CallOptions): Promise<SystemSettings> {
+  return unwrap(sdk.getSystemSettingsApiV1SystemSettingsGet(), options) as Promise<SystemSettings>;
 }
 
 /**
@@ -1223,9 +970,8 @@ export async function getSystemSettings(config?: AxiosRequestConfig): Promise<Sy
  * password, so a blank field in the form is non-destructive.
  */
 export async function updateSystemSettings(body: SystemSettingsUpdate): Promise<SystemSettings> {
-  return fetchEnvelope(
-    apiClient.patch("/api/v1/system-settings", body),
-    zUpdateSystemSettingsApiV1SystemSettingsPatchResponse
+  return unwrap(
+    sdk.updateSystemSettingsApiV1SystemSettingsPatch({ body: body })
   ) as Promise<SystemSettings>;
 }
 
@@ -1236,58 +982,44 @@ export async function updateSystemSettings(body: SystemSettingsUpdate): Promise<
  * anywhere else.
  */
 export async function sendSmtpTestEmail(): Promise<void> {
-  await fetchEnvelope(
-    apiClient.post("/api/v1/system-settings/smtp/test"),
-    zSendSmtpTestEmailApiV1SystemSettingsSmtpTestPostResponse
-  );
+  await unwrap(sdk.sendSmtpTestEmailApiV1SystemSettingsSmtpTestPost());
 }
 
 /** List users with optional pagination, sort, and filters. */
 export async function listUsers(query: ListQuery = {}): Promise<User[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/users", listConfig(query)),
-    zListUsersApiV1UsersGetResponse
-  ) as Promise<User[]>;
+  return unwrap(sdk.listUsersApiV1UsersGet({ query: listQuery(query) })) as Promise<User[]>;
 }
 
 /** Fetch a single user by ID. */
-export async function getUser(id: string, config?: AxiosRequestConfig): Promise<User> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/users/${encodeURIComponent(id)}`, config),
-    zGetUserApiV1UsersUserIdGetResponse
+export async function getUser(id: string, options?: CallOptions): Promise<User> {
+  return unwrap(
+    sdk.getUserApiV1UsersUserIdGet({ path: { user_id: id } }),
+    options
   ) as Promise<User>;
 }
 
 /** Create a new user. */
 export async function createUser(body: UserCreate): Promise<User> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/users", body),
-    zCreateUserApiV1UsersPostResponse
-  ) as Promise<User>;
+  return unwrap(sdk.createUserApiV1UsersPost({ body: body })) as Promise<User>;
 }
 
 /** Apply a partial update to a user. A blank password leaves it unchanged. */
 export async function updateUser(id: string, body: UserUpdate): Promise<User> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/users/${encodeURIComponent(id)}`, body),
-    zUpdateUserApiV1UsersUserIdPatchResponse
+  return unwrap(
+    sdk.updateUserApiV1UsersUserIdPatch({ path: { user_id: id }, body: body })
   ) as Promise<User>;
 }
 
 /** Delete a user by ID. */
 export async function deleteUser(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/users/${encodeURIComponent(id)}`),
-    zDeleteUserApiV1UsersUserIdDeleteResponse
-  );
+  await unwrap(sdk.deleteUserApiV1UsersUserIdDelete({ path: { user_id: id } }));
 }
 
 /** List user groups in the acting tenant, with optional pagination, sort, and filters. */
 export async function listUserGroups(query: ListQuery = {}): Promise<UserGroup[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/user-groups", listConfig(query)),
-    zListUserGroupsApiV1UserGroupsGetResponse
-  ) as Promise<UserGroup[]>;
+  return unwrap(sdk.listUserGroupsApiV1UserGroupsGet({ query: listQuery(query) })) as Promise<
+    UserGroup[]
+  >;
 }
 
 /**
@@ -1298,26 +1030,22 @@ export async function listUserGroups(query: ListQuery = {}): Promise<UserGroup[]
  * show without paging through every group in the tenant.
  */
 export async function getUserGroupsForUser(userId: string): Promise<UserGroup[]> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/users/${encodeURIComponent(userId)}/groups`),
-    zListGroupsForUserApiV1UsersUserIdGroupsGetResponse
+  return unwrap(
+    sdk.listGroupsForUserApiV1UsersUserIdGroupsGet({ path: { user_id: userId } })
   ) as Promise<UserGroup[]>;
 }
 
 /** Fetch a single user group by ID, including its member IDs. */
-export async function getUserGroup(id: string, config?: AxiosRequestConfig): Promise<UserGroup> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/user-groups/${encodeURIComponent(id)}`, config),
-    zGetUserGroupApiV1UserGroupsGroupIdGetResponse
+export async function getUserGroup(id: string, options?: CallOptions): Promise<UserGroup> {
+  return unwrap(
+    sdk.getUserGroupApiV1UserGroupsGroupIdGet({ path: { group_id: id } }),
+    options
   ) as Promise<UserGroup>;
 }
 
 /** Create a new user group in the acting tenant. */
 export async function createUserGroup(body: UserGroupCreate): Promise<UserGroup> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/user-groups", body),
-    zCreateUserGroupApiV1UserGroupsPostResponse
-  ) as Promise<UserGroup>;
+  return unwrap(sdk.createUserGroupApiV1UserGroupsPost({ body: body })) as Promise<UserGroup>;
 }
 
 /**
@@ -1327,18 +1055,14 @@ export async function createUserGroup(body: UserGroupCreate): Promise<UserGroup>
  * it wholesale.
  */
 export async function updateUserGroup(id: string, body: UserGroupUpdate): Promise<UserGroup> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/user-groups/${encodeURIComponent(id)}`, body),
-    zUpdateUserGroupApiV1UserGroupsGroupIdPatchResponse
+  return unwrap(
+    sdk.updateUserGroupApiV1UserGroupsGroupIdPatch({ path: { group_id: id }, body: body })
   ) as Promise<UserGroup>;
 }
 
 /** Delete a user group. Its members keep their accounts but lose its roles. */
 export async function deleteUserGroup(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/user-groups/${encodeURIComponent(id)}`),
-    zDeleteUserGroupApiV1UserGroupsGroupIdDeleteResponse
-  );
+  await unwrap(sdk.deleteUserGroupApiV1UserGroupsGroupIdDelete({ path: { group_id: id } }));
 }
 
 /**
@@ -1348,9 +1072,8 @@ export async function deleteUserGroup(id: string): Promise<void> {
  * them with this call rather than through the group's own create/update body.
  */
 export async function setUserGroupTags(id: string, tagIds: string[]): Promise<UserGroup> {
-  return fetchEnvelope(
-    apiClient.put(`/api/v1/user-groups/${encodeURIComponent(id)}/tags`, { tagIds }),
-    zSetUserGroupTagsApiV1UserGroupsGroupIdTagsPutResponse
+  return unwrap(
+    sdk.setUserGroupTagsApiV1UserGroupsGroupIdTagsPut({ path: { group_id: id }, body: { tagIds } })
   ) as Promise<UserGroup>;
 }
 
@@ -1362,9 +1085,8 @@ export async function setUserGroupTags(id: string, tagIds: string[]): Promise<Us
  * `groupRoles` already reflects the new membership.
  */
 export async function setUserGroups(userId: string, groupIds: string[]): Promise<User> {
-  return fetchEnvelope(
-    apiClient.put(`/api/v1/users/${encodeURIComponent(userId)}/groups`, { groupIds }),
-    zSetUserGroupsApiV1UsersUserIdGroupsPutResponse
+  return unwrap(
+    sdk.setUserGroupsApiV1UsersUserIdGroupsPut({ path: { user_id: userId }, body: { groupIds } })
   ) as Promise<User>;
 }
 
@@ -1399,25 +1121,21 @@ export function avatarUrl(user: Pick<User, "id" | "avatarUpdatedAt">): string | 
 /**
  * Upload (or replace) a user's custom avatar image and return the updated user.
  *
- * The file is sent as multipart form data; the `Content-Type` is cleared so the
- * browser sets it with the correct multipart boundary.
+ * The file is sent as multipart form data.
  */
 export async function uploadUserAvatar(id: string, file: File): Promise<User> {
-  const form = new FormData();
-  form.append("file", file);
-  return fetchEnvelope(
-    apiClient.put(`/api/v1/users/${encodeURIComponent(id)}/avatar`, form, {
-      headers: { "Content-Type": null },
-    }),
-    zUploadUserAvatarApiV1UsersUserIdAvatarPutResponse
+  return unwrap(
+    sdk.uploadUserAvatarApiV1UsersUserIdAvatarPut({
+      path: { user_id: id },
+      body: { file },
+    })
   ) as Promise<User>;
 }
 
 /** Remove a user's custom avatar, reverting them to the generated default. */
 export async function deleteUserAvatar(id: string): Promise<User> {
-  return fetchEnvelope(
-    apiClient.delete(`/api/v1/users/${encodeURIComponent(id)}/avatar`),
-    zDeleteUserAvatarApiV1UsersUserIdAvatarDeleteResponse
+  return unwrap(
+    sdk.deleteUserAvatarApiV1UsersUserIdAvatarDelete({ path: { user_id: id } })
   ) as Promise<User>;
 }
 
@@ -1438,9 +1156,8 @@ export async function deleteUserAvatar(id: string): Promise<User> {
 export async function getUserNames(ids: Iterable<string>): Promise<Map<string, string>> {
   const unique = [...new Set([...ids].filter(Boolean))];
   if (unique.length === 0) return new Map();
-  const resolved = await fetchEnvelope(
-    apiClient.post("/api/v1/users/resolve-names", { ids: unique }),
-    zResolveUserNamesApiV1UsersResolveNamesPostResponse
+  const resolved = await unwrap(
+    sdk.resolveUserNamesApiV1UsersResolveNamesPost({ body: { ids: unique } })
   );
   return new Map((resolved ?? []).map((entry) => [entry.id, entry.displayName]));
 }
@@ -1469,17 +1186,16 @@ export async function getUsersByIds(ids: Iterable<string>): Promise<Map<string, 
 
 /** List workflows with optional pagination, sort, and filters. */
 export async function listWorkflows(query: ListQuery = {}): Promise<Workflow[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/workflows", listConfig(query)),
-    zListWorkflowsApiV1WorkflowsGetResponse
-  ) as Promise<Workflow[]>;
+  return unwrap(sdk.listWorkflowsApiV1WorkflowsGet({ query: listQuery(query) })) as Promise<
+    Workflow[]
+  >;
 }
 
 /** Fetch a single workflow by ID. */
-export async function getWorkflow(id: string, config?: AxiosRequestConfig): Promise<Workflow> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/workflows/${encodeURIComponent(id)}`, config),
-    zGetWorkflowApiV1WorkflowsWorkflowIdGetResponse
+export async function getWorkflow(id: string, options?: CallOptions): Promise<Workflow> {
+  return unwrap(
+    sdk.getWorkflowApiV1WorkflowsWorkflowIdGet({ path: { workflow_id: id } }),
+    options
   ) as Promise<Workflow>;
 }
 
@@ -1494,9 +1210,11 @@ export async function generateWorkflow(
   skillId: string,
   body: GenerateWorkflowRequest
 ): Promise<Workflow> {
-  const workflow = (await fetchEnvelope(
-    apiClient.post(`/api/v1/agent-skills/${encodeURIComponent(skillId)}/workflows`, body),
-    zGenerateWorkflowApiV1AgentSkillsSkillIdWorkflowsPostResponse
+  const workflow = (await unwrap(
+    sdk.generateWorkflowApiV1AgentSkillsSkillIdWorkflowsPost({
+      path: { skill_id: skillId },
+      body: body,
+    })
   )) as Workflow;
   logger.info({ workflowId: workflow.id, skillId }, "workflow generation started");
   return workflow;
@@ -1507,9 +1225,8 @@ export async function generateWorkflow(
  * workflow's published snapshot on the backend.
  */
 export async function publishWorkflow(id: string): Promise<Workflow> {
-  return fetchEnvelope(
-    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/publish`),
-    zPublishWorkflowApiV1WorkflowsWorkflowIdPublishPostResponse
+  return unwrap(
+    sdk.publishWorkflowApiV1WorkflowsWorkflowIdPublishPost({ path: { workflow_id: id } })
   ) as Promise<Workflow>;
 }
 
@@ -1519,9 +1236,10 @@ export async function publishWorkflow(id: string): Promise<Workflow> {
  * `modified`.
  */
 export async function generateWorkflowDescription(id: string): Promise<Workflow> {
-  return fetchEnvelope(
-    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/generate-description`),
-    zGenerateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPostResponse
+  return unwrap(
+    sdk.generateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPost({
+      path: { workflow_id: id },
+    })
   ) as Promise<Workflow>;
 }
 
@@ -1530,9 +1248,10 @@ export async function generateWorkflowDescription(id: string): Promise<Workflow>
  * name, and description captured the last time it was published.
  */
 export async function discardWorkflowChanges(id: string): Promise<Workflow> {
-  return fetchEnvelope(
-    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/discard-changes`),
-    zDiscardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPostResponse
+  return unwrap(
+    sdk.discardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPost({
+      path: { workflow_id: id },
+    })
   ) as Promise<Workflow>;
 }
 
@@ -1541,26 +1260,21 @@ export async function discardWorkflowChanges(id: string): Promise<Workflow> {
  * and the published snapshot are left untouched.
  */
 export async function deactivateWorkflow(id: string): Promise<Workflow> {
-  return fetchEnvelope(
-    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/deactivate`),
-    zDeactivateWorkflowApiV1WorkflowsWorkflowIdDeactivatePostResponse
+  return unwrap(
+    sdk.deactivateWorkflowApiV1WorkflowsWorkflowIdDeactivatePost({ path: { workflow_id: id } })
   ) as Promise<Workflow>;
 }
 
 /** Apply a partial update to a workflow. */
 export async function updateWorkflow(id: string, body: WorkflowUpdate): Promise<Workflow> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/workflows/${encodeURIComponent(id)}`, body),
-    zUpdateWorkflowApiV1WorkflowsWorkflowIdPatchResponse
+  return unwrap(
+    sdk.updateWorkflowApiV1WorkflowsWorkflowIdPatch({ path: { workflow_id: id }, body: body })
   ) as Promise<Workflow>;
 }
 
 /** Delete a workflow by ID. */
 export async function deleteWorkflow(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/workflows/${encodeURIComponent(id)}`),
-    zDeleteWorkflowApiV1WorkflowsWorkflowIdDeleteResponse
-  );
+  await unwrap(sdk.deleteWorkflowApiV1WorkflowsWorkflowIdDelete({ path: { workflow_id: id } }));
 }
 
 /**
@@ -1585,9 +1299,11 @@ export async function executeWorkflow(
     toolMockIds: options.toolMockIds ?? [],
     designSource: options.designSource ?? "published",
   };
-  const session = (await fetchEnvelope(
-    apiClient.post(`/api/v1/workflows/${encodeURIComponent(id)}/execute`, body),
-    zExecuteWorkflowApiV1WorkflowsWorkflowIdExecutePostResponse
+  const session = (await unwrap(
+    sdk.executeWorkflowApiV1WorkflowsWorkflowIdExecutePost({
+      path: { workflow_id: id },
+      body: body,
+    })
   )) as WorkflowExecution;
   logger.info({ workflowExecutionId: session.id, workflowId: id }, "workflow executed");
   return session;
@@ -1601,23 +1317,24 @@ export async function listWorkflowTaskTemplates(
   workflowId: string,
   query: ListQuery = {}
 ): Promise<WorkflowTaskTemplate[]> {
-  return fetchEnvelope(
-    apiClient.get(
-      `/api/v1/workflows/${encodeURIComponent(workflowId)}/task-templates`,
-      listConfig(query)
-    ),
-    zListWorkflowTaskTemplatesApiV1WorkflowsWorkflowIdTaskTemplatesGetResponse
+  return unwrap(
+    sdk.listWorkflowTaskTemplatesApiV1WorkflowsWorkflowIdTaskTemplatesGet({
+      path: { workflow_id: workflowId },
+      query: listQuery(query),
+    })
   ) as Promise<WorkflowTaskTemplate[]>;
 }
 
 /** Fetch a single WorkflowTaskTemplate by ID. */
 export async function getWorkflowTaskTemplate(
   templateId: string,
-  config?: AxiosRequestConfig
+  options?: CallOptions
 ): Promise<WorkflowTaskTemplate> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-task-templates/${encodeURIComponent(templateId)}`, config),
-    zGetWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGetResponse
+  return unwrap(
+    sdk.getWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdGet({
+      path: { template_id: templateId },
+    }),
+    options
   ) as Promise<WorkflowTaskTemplate>;
 }
 
@@ -1625,9 +1342,8 @@ export async function getWorkflowTaskTemplate(
 export async function createWorkflowTaskTemplate(
   body: WorkflowTaskTemplateCreate
 ): Promise<WorkflowTaskTemplate> {
-  return fetchEnvelope(
-    apiClient.post("/api/v1/workflow-task-templates", body),
-    zCreateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPostResponse
+  return unwrap(
+    sdk.createWorkflowTaskTemplateApiV1WorkflowTaskTemplatesPost({ body: body })
   ) as Promise<WorkflowTaskTemplate>;
 }
 
@@ -1636,17 +1352,20 @@ export async function updateWorkflowTaskTemplate(
   templateId: string,
   body: WorkflowTaskTemplateUpdate
 ): Promise<WorkflowTaskTemplate> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/workflow-task-templates/${encodeURIComponent(templateId)}`, body),
-    zUpdateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdPatchResponse
+  return unwrap(
+    sdk.updateWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdPatch({
+      path: { template_id: templateId },
+      body: body,
+    })
   ) as Promise<WorkflowTaskTemplate>;
 }
 
 /** Delete a task template by ID. */
 export async function deleteWorkflowTaskTemplate(templateId: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/workflow-task-templates/${encodeURIComponent(templateId)}`),
-    zDeleteWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdDeleteResponse
+  await unwrap(
+    sdk.deleteWorkflowTaskTemplateApiV1WorkflowTaskTemplatesTemplateIdDelete({
+      path: { template_id: templateId },
+    })
   );
 }
 
@@ -1716,10 +1435,10 @@ function tasksFrom(records: SessionMessageRecord[]): Map<string, string> {
  * single consistent snapshot behind all three.
  */
 async function fetchSessionHistory(
-  promise: Promise<AxiosResponse<unknown>>,
-  schema: EnvelopeSchema
+  call: Promise<SdkResult<unknown>>,
+  options?: CallOptions
 ): Promise<SessionHistory> {
-  const records = (await fetchEnvelope(promise, schema)) as SessionMessageRecord[];
+  const records = (await unwrap(call, options)) as SessionMessageRecord[];
   return {
     messages: records as unknown as Message[],
     senders: sendersFrom(records),
@@ -1740,22 +1459,24 @@ async function fetchSessionHistory(
  */
 export async function getDesignSessionHistory(
   workflowId: string,
-  config?: AxiosRequestConfig
+  options?: CallOptions
 ): Promise<SessionHistory> {
   return fetchSessionHistory(
-    apiClient.get(`/api/v1/workflows/${encodeURIComponent(workflowId)}/messages`, config),
-    zGetDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGetResponse
+    sdk.getDesignSessionMessagesApiV1WorkflowsWorkflowIdMessagesGet({
+      path: { workflow_id: workflowId },
+    }),
+    options
   );
 }
 
 /** Fetch a WorkflowExecution record by ID. */
 export async function getWorkflowExecution(
   id: string,
-  config?: AxiosRequestConfig
+  options?: CallOptions
 ): Promise<WorkflowExecution> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-executions/${encodeURIComponent(id)}`, config),
-    zGetWorkflowExecutionApiV1WorkflowExecutionsExecutionIdGetResponse
+  return unwrap(
+    sdk.getWorkflowExecutionApiV1WorkflowExecutionsExecutionIdGet({ path: { execution_id: id } }),
+    options
   ) as Promise<WorkflowExecution>;
 }
 
@@ -1774,14 +1495,13 @@ export async function getWorkflowExecution(
  */
 export async function getWorkflowSessionHistory(
   executionId: string,
-  config?: AxiosRequestConfig
+  options?: CallOptions
 ): Promise<SessionHistory> {
   return fetchSessionHistory(
-    apiClient.get(
-      `/api/v1/workflow-executions/${encodeURIComponent(executionId)}/messages`,
-      config
-    ),
-    zGetWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGetResponse
+    sdk.getWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGet({
+      path: { execution_id: executionId },
+    }),
+    options
   );
 }
 
@@ -1801,15 +1521,11 @@ export async function uploadSessionFile(
   workflowExecutionId: string,
   file: File
 ): Promise<SessionFile> {
-  const form = new FormData();
-  form.append("file", file);
-  return fetchEnvelope(
-    apiClient.post(
-      `/api/v1/workflow-executions/${encodeURIComponent(workflowExecutionId)}/files`,
-      form,
-      { headers: { "Content-Type": null } }
-    ),
-    zUploadSessionFileApiV1WorkflowExecutionsExecutionIdFilesPostResponse
+  return unwrap(
+    sdk.uploadSessionFileApiV1WorkflowExecutionsExecutionIdFilesPost({
+      path: { execution_id: workflowExecutionId },
+      body: { file },
+    })
   ) as Promise<SessionFile>;
 }
 
@@ -1827,17 +1543,17 @@ export function sessionFileDownloadUrl(workflowExecutionId: string, fileId: stri
 
 /** List WorkflowExecution records (newest first) with optional pagination, sort, and filters. */
 export async function listWorkflowExecutions(query: ListQuery = {}): Promise<WorkflowExecution[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/workflow-executions", listConfig(query)),
-    zListWorkflowExecutionsApiV1WorkflowExecutionsGetResponse
+  return unwrap(
+    sdk.listWorkflowExecutionsApiV1WorkflowExecutionsGet({ query: listQuery(query) })
   ) as Promise<WorkflowExecution[]>;
 }
 
 /** Delete a WorkflowExecution by ID, along with its tasks and workflow session. */
 export async function deleteWorkflowExecution(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/workflow-executions/${encodeURIComponent(id)}`),
-    zDeleteWorkflowExecutionApiV1WorkflowExecutionsExecutionIdDeleteResponse
+  await unwrap(
+    sdk.deleteWorkflowExecutionApiV1WorkflowExecutionsExecutionIdDelete({
+      path: { execution_id: id },
+    })
   );
 }
 
@@ -1849,23 +1565,22 @@ export async function listWorkflowTasks(
   workflowExecutionId: string,
   query: ListQuery = {}
 ): Promise<WorkflowTask[]> {
-  return fetchEnvelope(
-    apiClient.get(
-      `/api/v1/workflow-executions/${encodeURIComponent(workflowExecutionId)}/workflow-tasks`,
-      listConfig(query)
-    ),
-    zListWorkflowExecutionTasksApiV1WorkflowExecutionsExecutionIdWorkflowTasksGetResponse
+  return unwrap(
+    sdk.listWorkflowExecutionTasksApiV1WorkflowExecutionsExecutionIdWorkflowTasksGet({
+      path: { execution_id: workflowExecutionId },
+      query: listQuery(query),
+    })
   ) as Promise<WorkflowTask[]>;
 }
 
 /** Fetch a single WorkflowTask by ID. */
 export async function getWorkflowTask(
   taskId: string,
-  config?: AxiosRequestConfig
+  options?: CallOptions
 ): Promise<WorkflowTask> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`, config),
-    zGetWorkflowTaskApiV1WorkflowTasksTaskIdGetResponse
+  return unwrap(
+    sdk.getWorkflowTaskApiV1WorkflowTasksTaskIdGet({ path: { task_id: taskId } }),
+    options
   ) as Promise<WorkflowTask>;
 }
 
@@ -1881,9 +1596,8 @@ export async function updateWorkflowTask(
   taskId: string,
   body: WorkflowTaskUpdate
 ): Promise<WorkflowTask> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/workflow-tasks/${encodeURIComponent(taskId)}`, body),
-    zUpdateWorkflowTaskApiV1WorkflowTasksTaskIdPatchResponse
+  return unwrap(
+    sdk.updateWorkflowTaskApiV1WorkflowTasksTaskIdPatch({ path: { task_id: taskId }, body: body })
   ) as Promise<WorkflowTask>;
 }
 
@@ -1896,10 +1610,9 @@ export const UNREAD_ONLY_FILTER: FilterSpec = { field: "read", op: "eq", value: 
 
 /** List the current user's notifications (newest first) with optional pagination, sort, and filters. */
 export async function listNotifications(query: ListQuery = {}): Promise<Notification[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/notifications", listConfig(query)),
-    zListNotificationsApiV1NotificationsGetResponse
-  ) as Promise<Notification[]>;
+  return unwrap(sdk.listNotificationsApiV1NotificationsGet({ query: listQuery(query) })) as Promise<
+    Notification[]
+  >;
 }
 
 /**
@@ -1912,44 +1625,38 @@ export async function updateNotification(
   id: string,
   data: NotificationUpdate
 ): Promise<Notification> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/notifications/${encodeURIComponent(id)}`, data),
-    zUpdateNotificationApiV1NotificationsNotificationIdPatchResponse
+  return unwrap(
+    sdk.updateNotificationApiV1NotificationsNotificationIdPatch({
+      path: { notification_id: id },
+      body: data,
+    })
   ) as Promise<Notification>;
 }
 
 /** Mark all of the current user's unread notifications as read. */
 export async function markAllNotificationsRead(): Promise<void> {
-  await fetchEnvelope(
-    apiClient.post("/api/v1/notifications/read-all"),
-    zMarkAllNotificationsReadApiV1NotificationsReadAllPostResponse
-  );
+  await unwrap(sdk.markAllNotificationsReadApiV1NotificationsReadAllPost());
 }
 
 /** Permanently delete a single notification. */
 export async function deleteNotification(id: string): Promise<void> {
-  await fetchEnvelope(
-    apiClient.delete(`/api/v1/notifications/${encodeURIComponent(id)}`),
-    zDeleteNotificationApiV1NotificationsNotificationIdDeleteResponse
+  await unwrap(
+    sdk.deleteNotificationApiV1NotificationsNotificationIdDelete({ path: { notification_id: id } })
   );
 }
 
 /** List approval requests (newest first) with optional pagination, sort, and filters. */
 export async function listApprovals(query: ListQuery = {}): Promise<Approval[]> {
-  return fetchEnvelope(
-    apiClient.get("/api/v1/approvals", listConfig(query)),
-    zListApprovalsApiV1ApprovalsGetResponse
-  ) as Promise<Approval[]>;
+  return unwrap(sdk.listApprovalsApiV1ApprovalsGet({ query: listQuery(query) })) as Promise<
+    Approval[]
+  >;
 }
 
 /** Fetch a single approval request by ID. */
-export async function getApproval(
-  id: string,
-  config?: AxiosRequestConfig
-): Promise<ApprovalDetail> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}`, config),
-    zGetApprovalApiV1ApprovalsApprovalIdGetResponse
+export async function getApproval(id: string, options?: CallOptions): Promise<ApprovalDetail> {
+  return unwrap(
+    sdk.getApprovalApiV1ApprovalsApprovalIdGet({ path: { approval_id: id } }),
+    options
   ) as Promise<ApprovalDetail>;
 }
 
@@ -1964,11 +1671,13 @@ export async function getApproval(
  */
 export async function listApprovalCertificates(
   id: string,
-  config?: AxiosRequestConfig
+  options?: CallOptions
 ): Promise<McpToolCertificateRead[]> {
-  return fetchEnvelope(
-    apiClient.get(`/api/v1/approvals/${encodeURIComponent(id)}/certificates`, config),
-    zListApprovalCertificatesApiV1ApprovalsApprovalIdCertificatesGetResponse
+  return unwrap(
+    sdk.listApprovalCertificatesApiV1ApprovalsApprovalIdCertificatesGet({
+      path: { approval_id: id },
+    }),
+    options
   ) as Promise<McpToolCertificateRead[]>;
 }
 
@@ -1981,9 +1690,11 @@ export async function resolveApproval(
   status: ApprovalStatus,
   response?: string
 ): Promise<Approval> {
-  return fetchEnvelope(
-    apiClient.patch(`/api/v1/approvals/${encodeURIComponent(id)}`, { status, response }),
-    zResolveApprovalApiV1ApprovalsApprovalIdPatchResponse
+  return unwrap(
+    sdk.resolveApprovalApiV1ApprovalsApprovalIdPatch({
+      path: { approval_id: id },
+      body: { status, response },
+    })
   ) as Promise<Approval>;
 }
 
@@ -1994,8 +1705,8 @@ export async function resolveApproval(
  * (`credentials: "include"`) and the double-submit `X-CSRF-Token` header; a
  * super_admin also needs `X-Tenant-Id` to reach these tenant-scoped endpoints
  * at all, and an impersonating admin needs `X-Impersonate-User-Id` for the
- * agent to act as the impersonated user -- unlike the axios-based calls
- * above, these bypass `apiClient`'s interceptor entirely, so the headers
+ * agent to act as the impersonated user -- unlike the generated SDK calls
+ * above, these bypass `client`'s request interceptor entirely, so the headers
  * must be attached here too.
  */
 class CredentialedHttpAgent extends HttpAgent {

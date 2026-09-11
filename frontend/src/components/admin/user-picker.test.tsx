@@ -49,10 +49,7 @@ describe("UserPicker", () => {
 
     await user.click(screen.getByRole("button", { name: "Select members…" }));
 
-    // Axios's default paramsSerializer (the `listConfig` helper every list page
-    // relies on) deliberately un-escapes `%3A` back to `:` for readability, so
-    // the wire format is `q=tenantId:eq:<id>`, not percent-encoded.
-    await waitFor(() => expect(query).toContain("tenantId:eq:"));
+    await waitFor(() => expect(decodeURIComponent(query)).toContain("tenantId:eq:"));
   });
 
   it("shows an empty message when the tenant has no users", async () => {

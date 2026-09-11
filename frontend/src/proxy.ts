@@ -9,8 +9,8 @@
  * `compose.yml`'s `frontend.environment` without rebuilding the image. Every
  * other path is gated on the HttpOnly session cookie's presence (not
  * validity); the `AuthProvider` then confirms the session with `/auth/me`
- * and the axios 401 interceptor handles sessions that turn out to be
- * invalid.
+ * and the API client's 401 handling sends sessions that turn out to be
+ * invalid back to the login page.
  */
 import { type NextRequest, NextResponse } from "next/server";
 

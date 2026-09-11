@@ -183,29 +183,29 @@ backend/openapi.yaml ◄─── gitignored (regenerated locally / in CI)
    │
    │  pnpm generate:api  (frontend)
    ▼
-frontend/src/generated/api/{types.gen.ts, zod.gen.ts}  ◄─── gitignored
+frontend/src/generated/api/{types,zod,sdk,client}.gen.ts  ◄─── gitignored
 ```
 
 The AG-UI streaming endpoint (`POST /agent`) is marked `include_in_schema=False` and is
 intentionally excluded from the spec — its events are typed by `@ag-ui/core`. The
 `{meta, data, error}` response envelope is built by the routes themselves (each declares
 `response_model=ApiResponse[T]` and returns `ApiResponse(meta=…, data=…)`) and by the
-exception handlers for errors, so its shape **is** part of the spec. The generated Zod
-schemas therefore describe the whole envelope; the frontend's internal `fetchEnvelope()`
-helper parses it and returns the inner `data` (throwing `ApiClientError` if the envelope
-carries an error body).
+exception handlers for errors, so its shape **is** part of the spec. The generated SDK
+(`sdk.gen.ts`, one function per operation over the bundled fetch client in
+`client.gen.ts`) validates each response against its generated Zod schema, and the
+frontend's internal `unwrap()` helper in `lib/api.ts` returns the inner `data` (throwing
+`ApiClientError` if the envelope carries an error body or the status is not 2xx).
 
-`pnpm generate:api` (frontend) runs the backend export step via `uv` first, then the Zod
+`pnpm generate:api` (frontend) runs the backend export step via `uv` first, then the
 codegen — so a single command keeps both layers in sync. The frontend's `predev` and
 `prebuild` hooks invoke it automatically, so `pnpm dev` and `pnpm build` regenerate the
 spec and schemas on every run. `uv` must be available on `PATH`.
 
-Regenerating can rename the Zod schema exports in `zod.gen.ts`, since they embed the
-full URL path segments — adding an `/api/v1/` prefix turns
-`zListAgentSkillsAgentSkillsGetResponse` into
-`zListAgentSkillsApiV1AgentSkillsGetResponse`. After any regeneration,
-`cd frontend && pnpm build` is the quick check: a module-not-found error on a `zod.gen`
-import is a name mismatch to fix.
+Regenerating can rename the SDK exports in `sdk.gen.ts`, since they embed the full URL
+path segments — adding an `/api/v1/` prefix turns `listAgentSkillsAgentSkillsGet` into
+`listAgentSkillsApiV1AgentSkillsGet`. After any regeneration,
+`cd frontend && pnpm build` is the quick check: a type error on an `sdk.` call in
+`lib/api.ts` is a name mismatch to fix.
 
 Every collection endpoint accepts a shared set of `limit` / `offset` / sort (`s`) /
 filter (`q`) query parameters, with camelCase field names. See
