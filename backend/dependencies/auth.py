@@ -72,10 +72,9 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 #: synthetic test user's own ``tenant_id``, not a super_admin's selected tenant.
 TENANT_HEADER_NAME = "X-Tenant-Id"
 #: Reserved :data:`TENANT_HEADER_NAME` value meaning "no single tenant --
-#: browse across every tenant", selectable only via :func:`get_current_tenant_scope`
-#: and only by a platform-scoped caller. Rejected by the strict
-#: :func:`get_current_tenant_id` (used by every write route), so it can never
-#: reach a create/update/delete path.
+#: browse across every tenant", honoured by :func:`get_current_tenant_scope`
+#: only for a platform-scoped caller on a :data:`SAFE_METHODS` request, so it
+#: can never reach a create/update/delete path.
 ALL_TENANTS_SENTINEL = "__all__"
 #: Header naming the user id to impersonate. Re-validated by
 #: :func:`get_current_user` on every request that carries it, not just when
@@ -294,40 +293,39 @@ CurrentTenantIdDep = Annotated[str, Depends(get_current_tenant_id)]
 
 
 def get_current_tenant_scope(user: CurrentUserDep, request: Request) -> str | None:
-    """Return the tenant id a *read* request is scoped to, or ``None`` for all tenants.
+    """Return the tenant id the request is scoped to, or ``None`` for all tenants.
 
-    Identical to :func:`get_current_tenant_id` except that a platform-scoped
-    caller may additionally send :data:`ALL_TENANTS_SENTINEL` to browse across
-    every tenant at once, signaled here by returning ``None``. Only read routes
-    (list/get) may depend on this; every write route depends on the strict
-    :func:`get_current_tenant_id` instead, which rejects the sentinel, so a
-    mutation can never run with no concrete tenant selected.
+    Identical to :func:`get_current_tenant_id` except that on a *safe* request
+    (``GET``/``HEAD``/``OPTIONS``) a platform-scoped caller may send
+    :data:`ALL_TENANTS_SENTINEL` to browse across every tenant at once,
+    signaled here by returning ``None``. A mutating request still goes through
+    the strict rule, so a write can never run with no concrete tenant
+    selected -- the method decides, not the route, which is what lets every
+    repository factory depend on this one function.
 
     Args:
         user: The user resolved by :func:`get_current_user`.
         request: The incoming request, used to read :data:`TENANT_HEADER_NAME`
-            for a platform-scoped caller.
+            for a platform-scoped caller and to tell a read from a write.
 
     Returns:
         The tenant id this request is scoped to, or ``None`` to mean "every
-        tenant" (only reachable for a platform-scoped caller).
+        tenant" (only reachable for a platform-scoped caller on a safe method).
 
     Raises:
         ForbiddenError: If the caller is platform-scoped and the header is
             missing or empty. There is no implicit "see everything" fallback
             and no server-side default tenant -- "all tenants" must be
-            selected explicitly via :data:`ALL_TENANTS_SENTINEL`.
+            selected explicitly via :data:`ALL_TENANTS_SENTINEL`. Also raised
+            when a mutating request names the sentinel.
     """
-    if user.tenant_id is not None:
-        return user.tenant_id
-    tenant_id = request.headers.get(TENANT_HEADER_NAME, "").strip()
-    if not tenant_id:
-        raise ForbiddenError(
-            f"Select a tenant to act as via the {TENANT_HEADER_NAME} header"
-        )
-    if tenant_id == ALL_TENANTS_SENTINEL:
+    if (
+        user.tenant_id is None
+        and request.method in SAFE_METHODS
+        and request.headers.get(TENANT_HEADER_NAME, "").strip() == ALL_TENANTS_SENTINEL
+    ):
         return None
-    return tenant_id
+    return get_current_tenant_id(user, request)
 
 
 CurrentTenantScopeDep = Annotated[str | None, Depends(get_current_tenant_scope)]

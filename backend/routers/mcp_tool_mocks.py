@@ -17,7 +17,7 @@ from dependencies.context import (
     SortDep,
     TagFilterDep,
 )
-from dependencies.service import MCPToolMockReadServiceDep, MCPToolMockServiceDep
+from dependencies.service import MCPToolMockServiceDep
 from models.mcp_tool_mock import (
     McpToolMockCreate,
     McpToolMockRead,
@@ -51,7 +51,7 @@ async def create_mcp_tool_mock(
 
 @router.get("", response_model=ApiResponse[list[McpToolMockRead]])
 async def list_mcp_tool_mocks(
-    service: MCPToolMockReadServiceDep,
+    service: MCPToolMockServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -71,7 +71,7 @@ async def list_mcp_tool_mocks(
 @router.get("/{mock_id}", response_model=ApiResponse[McpToolMockRead])
 async def get_mcp_tool_mock(
     mock_id: str,
-    service: MCPToolMockReadServiceDep,
+    service: MCPToolMockServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[McpToolMockRead]:
     mock = await service.get(mock_id)

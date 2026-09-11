@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends
 from dependencies.auth import CurrentUserIdDep
 from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
-from dependencies.service import TagReadServiceDep, TagServiceDep
+from dependencies.service import TagServiceDep
 from models.response import ApiResponse
 from models.tag import Tag, TagCreate, TagUpdate
 from models.user import Role
@@ -48,7 +48,7 @@ async def create_tag(
 
 @router.get("", response_model=ApiResponse[list[Tag]])
 async def list_tags(
-    service: TagReadServiceDep,
+    service: TagServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -66,7 +66,7 @@ async def list_tags(
 @router.get("/{tag_id}", response_model=ApiResponse[Tag])
 async def get_tag(
     tag_id: str,
-    service: TagReadServiceDep,
+    service: TagServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Tag]:
     tag = await service.get(tag_id)

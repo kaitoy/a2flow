@@ -63,9 +63,9 @@ def _user(tenant_id: str | None) -> User:
     )
 
 
-def _request(headers: dict[str, str] | None = None) -> Request:
+def _request(headers: dict[str, str] | None = None, method: str = "GET") -> Request:
     raw_headers = [(k.lower().encode(), v.encode()) for k, v in (headers or {}).items()]
-    return Request(scope={"type": "http", "headers": raw_headers})
+    return Request(scope={"type": "http", "method": method, "headers": raw_headers})
 
 
 def test_get_current_tenant_id_returns_the_users_tenant() -> None:
@@ -134,6 +134,16 @@ def test_get_current_tenant_scope_returns_none_for_all_tenants_sentinel() -> Non
     """The sentinel means "every tenant", signaled as ``None``."""
     request = _request({TENANT_HEADER_NAME: ALL_TENANTS_SENTINEL})
     assert get_current_tenant_scope(_user(None), request) is None
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+def test_get_current_tenant_scope_rejects_all_tenants_sentinel_on_a_write(
+    method: str,
+) -> None:
+    """A mutation can never run across every tenant, whatever route it hits."""
+    request = _request({TENANT_HEADER_NAME: ALL_TENANTS_SENTINEL}, method=method)
+    with pytest.raises(ForbiddenError):
+        get_current_tenant_scope(_user(None), request)
 
 
 def test_get_current_tenant_scope_ignores_sentinel_for_tenant_scoped_caller() -> None:

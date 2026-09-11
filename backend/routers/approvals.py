@@ -34,9 +34,8 @@ from dependencies.context import (
     SortDep,
 )
 from dependencies.service import (
-    ApprovalReadServiceDep,
     ApprovalServiceDep,
-    McpToolCertificateReadServiceDep,
+    McpToolCertificateServiceDep,
     MetricsServiceDep,
 )
 from models.approval import Approval, ApprovalRead, ApprovalUpdate
@@ -49,7 +48,7 @@ router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 @router.get("", response_model=ApiResponse[list[Approval]])
 async def list_approvals(
-    service: ApprovalReadServiceDep,
+    service: ApprovalServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,
@@ -118,7 +117,7 @@ async def approval_backlog_by_workflow(
 @router.get("/{approval_id}", response_model=ApiResponse[ApprovalRead])
 async def get_approval(
     approval_id: str,
-    service: ApprovalReadServiceDep,
+    service: ApprovalServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[ApprovalRead]:
     """Return the Approval record for the given ID.
@@ -139,7 +138,7 @@ async def get_approval(
 )
 async def list_approval_certificates(
     approval_id: str,
-    service: McpToolCertificateReadServiceDep,
+    service: McpToolCertificateServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[McpToolCertificateRead]]:
     """Return the certificates issued under this approval, one per covered task.

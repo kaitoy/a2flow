@@ -75,7 +75,7 @@ DBSessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 def get_agent_skill_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> AgentSkillRepository:
     """Create an AgentSkillRepository backed by the current database session."""
     return SqlAgentSkillRepository(db, tenant_id=tenant_id)
@@ -83,23 +83,6 @@ def get_agent_skill_repository(
 
 AgentSkillRepositoryDep = Annotated[
     AgentSkillRepository, Depends(get_agent_skill_repository)
-]
-
-
-def get_agent_skill_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> AgentSkillRepository:
-    """Create an AgentSkillRepository for a read route, possibly across all tenants.
-
-    Backs only ``GET`` routes (list/get); every write route stays on
-    :func:`get_agent_skill_repository`, so a mutation can never run with
-    ``tenant_id=None``.
-    """
-    return SqlAgentSkillRepository(db, tenant_id=tenant_id)
-
-
-AgentSkillReadRepositoryDep = Annotated[
-    AgentSkillRepository, Depends(get_agent_skill_read_repository)
 ]
 
 
@@ -114,7 +97,7 @@ AuthSessionRepositoryDep = Annotated[
 
 
 def get_mcp_server_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> MCPServerRepository:
     """Create an MCPServerRepository backed by the current database session."""
     return SqlMCPServerRepository(db, tenant_id=tenant_id)
@@ -125,26 +108,10 @@ MCPServerRepositoryDep = Annotated[
 ]
 
 
-def get_mcp_server_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> MCPServerRepository:
-    """Create an MCPServerRepository for a read route, possibly across all tenants.
-
-    Backs only ``GET`` routes; every write route stays on
-    :func:`get_mcp_server_repository`.
-    """
-    return SqlMCPServerRepository(db, tenant_id=tenant_id)
-
-
-MCPServerReadRepositoryDep = Annotated[
-    MCPServerRepository, Depends(get_mcp_server_read_repository)
-]
-
-
 def get_mcp_tool_mock_repository(
     db: DBSessionDep,
     servers: MCPServerRepositoryDep,
-    tenant_id: CurrentTenantIdDep,
+    tenant_id: CurrentTenantScopeDep,
 ) -> MCPToolMockRepository:
     """Create an MCPToolMockRepository backed by the current database session."""
     return SqlMcpToolMockRepository(db, servers, tenant_id=tenant_id)
@@ -155,25 +122,7 @@ MCPToolMockRepositoryDep = Annotated[
 ]
 
 
-def get_mcp_tool_mock_read_repository(
-    db: DBSessionDep,
-    servers: MCPServerReadRepositoryDep,
-    tenant_id: CurrentTenantScopeDep,
-) -> MCPToolMockRepository:
-    """Create an MCPToolMockRepository for a read route, possibly across all tenants.
-
-    Backs only ``GET`` routes; every write route stays on
-    :func:`get_mcp_tool_mock_repository`.
-    """
-    return SqlMcpToolMockRepository(db, servers, tenant_id=tenant_id)
-
-
-MCPToolMockReadRepositoryDep = Annotated[
-    MCPToolMockRepository, Depends(get_mcp_tool_mock_read_repository)
-]
-
-
-def get_impersonation_event_read_repository(
+def get_impersonation_event_repository(
     db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> ImpersonationEventRepository:
     """Create an ImpersonationEventRepository for the audit read routes.
@@ -186,13 +135,13 @@ def get_impersonation_event_read_repository(
     return SqlImpersonationEventRepository(db, tenant_id=tenant_id)
 
 
-ImpersonationEventReadRepositoryDep = Annotated[
-    ImpersonationEventRepository, Depends(get_impersonation_event_read_repository)
+ImpersonationEventRepositoryDep = Annotated[
+    ImpersonationEventRepository, Depends(get_impersonation_event_repository)
 ]
 
 
 def get_mcp_tool_invocation_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> McpToolInvocationRepository:
     """Create an McpToolInvocationRepository backed by the current database session."""
     return SqlMcpToolInvocationRepository(db, tenant_id=tenant_id)
@@ -203,22 +152,14 @@ McpToolInvocationRepositoryDep = Annotated[
 ]
 
 
-def get_mcp_tool_invocation_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> McpToolInvocationRepository:
-    """Create an McpToolInvocationRepository for a read route, possibly across all tenants."""
-    return SqlMcpToolInvocationRepository(db, tenant_id=tenant_id)
-
-
-McpToolInvocationReadRepositoryDep = Annotated[
-    McpToolInvocationRepository, Depends(get_mcp_tool_invocation_read_repository)
-]
-
-
 def get_metrics_repository(
     db: DBSessionDep, tenant_id: CurrentTenantIdDep
 ) -> MetricsRepository:
-    """Create a MetricsRepository backed by the current database session."""
+    """Create a MetricsRepository backed by the current database session.
+
+    Metrics are computed for one tenant at a time, so this is the one
+    repository factory that stays on the strict dependency even for ``GET``.
+    """
     return SqlMetricsRepository(db, tenant_id=tenant_id)
 
 
@@ -226,7 +167,7 @@ MetricsRepositoryDep = Annotated[MetricsRepository, Depends(get_metrics_reposito
 
 
 def get_notification_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> NotificationRepository:
     """Create a NotificationRepository backed by the current database session."""
     return SqlNotificationRepository(db, tenant_id=tenant_id)
@@ -237,20 +178,8 @@ NotificationRepositoryDep = Annotated[
 ]
 
 
-def get_notification_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> NotificationRepository:
-    """Create a NotificationRepository for a read route, possibly across all tenants."""
-    return SqlNotificationRepository(db, tenant_id=tenant_id)
-
-
-NotificationReadRepositoryDep = Annotated[
-    NotificationRepository, Depends(get_notification_read_repository)
-]
-
-
 def get_outbound_email_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> OutboundEmailRepository:
     """Create an OutboundEmailRepository backed by the current database session."""
     return SqlOutboundEmailRepository(db, tenant_id=tenant_id)
@@ -261,27 +190,8 @@ OutboundEmailRepositoryDep = Annotated[
 ]
 
 
-def get_outbound_email_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> OutboundEmailRepository:
-    """Create an OutboundEmailRepository for a read route, possibly across all tenants.
-
-    Backs the ``/outbound-emails`` list/get routes (``delete`` stays on
-    :func:`get_outbound_email_repository`), and also lets a read
-    ``NotificationDispatcher`` (a collaborator of write-oriented services with
-    a read variant, e.g. ``WorkflowTaskService``) be constructed without
-    resolving the strict, all-tenants-incompatible dependency.
-    """
-    return SqlOutboundEmailRepository(db, tenant_id=tenant_id)
-
-
-OutboundEmailReadRepositoryDep = Annotated[
-    OutboundEmailRepository, Depends(get_outbound_email_read_repository)
-]
-
-
 def get_mcp_tool_certificate_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> McpToolCertificateRepository:
     """Create an McpToolCertificateRepository backed by the current session."""
     return SqlMcpToolCertificateRepository(db, tenant_id=tenant_id)
@@ -289,18 +199,6 @@ def get_mcp_tool_certificate_repository(
 
 McpToolCertificateRepositoryDep = Annotated[
     McpToolCertificateRepository, Depends(get_mcp_tool_certificate_repository)
-]
-
-
-def get_mcp_tool_certificate_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> McpToolCertificateRepository:
-    """Create an McpToolCertificateRepository for a read route, possibly across all tenants."""
-    return SqlMcpToolCertificateRepository(db, tenant_id=tenant_id)
-
-
-McpToolCertificateReadRepositoryDep = Annotated[
-    McpToolCertificateRepository, Depends(get_mcp_tool_certificate_read_repository)
 ]
 
 
@@ -322,32 +220,13 @@ McpCertificateAuthorityRepositoryDep = Annotated[
 
 
 def get_secret_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> SecretRepository:
     """Create a SecretRepository backed by the current database session."""
     return SqlSecretRepository(db, tenant_id=tenant_id)
 
 
 SecretRepositoryDep = Annotated[SecretRepository, Depends(get_secret_repository)]
-
-
-def get_secret_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> SecretRepository:
-    """Create a SecretRepository for a read route, possibly across all tenants.
-
-    Backs only ``GET`` routes; every write route stays on
-    :func:`get_secret_repository`. Also the collaborator any other read
-    repository must use in place of :data:`SecretRepositoryDep` when it needs
-    Secret only for FK/lookup checks -- see the module docstring pattern in
-    ``dependencies.repository``.
-    """
-    return SqlSecretRepository(db, tenant_id=tenant_id)
-
-
-SecretReadRepositoryDep = Annotated[
-    SecretRepository, Depends(get_secret_read_repository)
-]
 
 
 def get_system_settings_repository(db: DBSessionDep) -> SystemSettingsRepository:
@@ -368,23 +247,13 @@ SystemSettingsRepositoryDep = Annotated[
 
 
 def get_tag_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> TagRepository:
     """Create a TagRepository backed by the current database session."""
     return SqlTagRepository(db, tenant_id=tenant_id)
 
 
 TagRepositoryDep = Annotated[TagRepository, Depends(get_tag_repository)]
-
-
-def get_tag_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> TagRepository:
-    """Create a TagRepository for a read route, possibly across all tenants."""
-    return SqlTagRepository(db, tenant_id=tenant_id)
-
-
-TagReadRepositoryDep = Annotated[TagRepository, Depends(get_tag_read_repository)]
 
 
 def get_tenant_repository(db: DBSessionDep) -> TenantRepository:
@@ -418,7 +287,7 @@ UserAvatarRepositoryDep = Annotated[
 
 
 def get_user_group_repository(
-    db: DBSessionDep, users: UserRepositoryDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, users: UserRepositoryDep, tenant_id: CurrentTenantScopeDep
 ) -> UserGroupRepository:
     """Create a UserGroupRepository backed by the current database session."""
     return SqlUserGroupRepository(db, users, tenant_id=tenant_id)
@@ -426,23 +295,6 @@ def get_user_group_repository(
 
 UserGroupRepositoryDep = Annotated[
     UserGroupRepository, Depends(get_user_group_repository)
-]
-
-
-def get_user_group_read_repository(
-    db: DBSessionDep, users: UserRepositoryDep, tenant_id: CurrentTenantScopeDep
-) -> UserGroupRepository:
-    """Create a UserGroupRepository for a read route, possibly across all tenants.
-
-    ``users`` is reused as-is (not a "read" variant): ``SqlUserRepository``
-    takes no ``tenant_id`` at all, so resolving it never depends on
-    ``CurrentTenantIdDep`` and can never raise in all-tenants mode.
-    """
-    return SqlUserGroupRepository(db, users, tenant_id=tenant_id)
-
-
-UserGroupReadRepositoryDep = Annotated[
-    UserGroupRepository, Depends(get_user_group_read_repository)
 ]
 
 
@@ -465,7 +317,7 @@ EffectiveRoleRepositoryDep = Annotated[
 def get_workflow_repository(
     db: DBSessionDep,
     skills: AgentSkillRepositoryDep,
-    tenant_id: CurrentTenantIdDep,
+    tenant_id: CurrentTenantScopeDep,
 ) -> WorkflowRepository:
     """Create a WorkflowRepository backed by the current database session."""
     return SqlWorkflowRepository(db, skills, tenant_id=tenant_id)
@@ -474,26 +326,8 @@ def get_workflow_repository(
 WorkflowRepositoryDep = Annotated[WorkflowRepository, Depends(get_workflow_repository)]
 
 
-def get_workflow_read_repository(
-    db: DBSessionDep,
-    skills: AgentSkillReadRepositoryDep,
-    tenant_id: CurrentTenantScopeDep,
-) -> WorkflowRepository:
-    """Create a WorkflowRepository for a read route, possibly across all tenants.
-
-    ``skills`` must be the read repository: merely resolving the strict
-    ``AgentSkillRepositoryDep`` would itself raise in all-tenants mode.
-    """
-    return SqlWorkflowRepository(db, skills, tenant_id=tenant_id)
-
-
-WorkflowReadRepositoryDep = Annotated[
-    WorkflowRepository, Depends(get_workflow_read_repository)
-]
-
-
 def get_workflow_published_version_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> WorkflowPublishedVersionRepository:
     """Create a WorkflowPublishedVersionRepository backed by the current database session."""
     return SqlWorkflowPublishedVersionRepository(db, tenant_id=tenant_id)
@@ -505,26 +339,8 @@ WorkflowPublishedVersionRepositoryDep = Annotated[
 ]
 
 
-def get_workflow_published_version_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> WorkflowPublishedVersionRepository:
-    """Create a WorkflowPublishedVersionRepository for a read route.
-
-    Not exposed through any route of its own -- exists only so
-    ``WorkflowService``'s read variant can supply this collaborator without
-    resolving the strict, all-tenants-incompatible dependency.
-    """
-    return SqlWorkflowPublishedVersionRepository(db, tenant_id=tenant_id)
-
-
-WorkflowPublishedVersionReadRepositoryDep = Annotated[
-    WorkflowPublishedVersionRepository,
-    Depends(get_workflow_published_version_read_repository),
-]
-
-
 def get_workflow_execution_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> WorkflowExecutionRepository:
     """Create a WorkflowExecutionRepository backed by the current database session."""
     return SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
@@ -535,20 +351,8 @@ WorkflowExecutionRepositoryDep = Annotated[
 ]
 
 
-def get_workflow_execution_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> WorkflowExecutionRepository:
-    """Create a WorkflowExecutionRepository for a read route, possibly across all tenants."""
-    return SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
-
-
-WorkflowExecutionReadRepositoryDep = Annotated[
-    WorkflowExecutionRepository, Depends(get_workflow_execution_read_repository)
-]
-
-
 def get_session_file_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> SessionFileRepository:
     """Create a SessionFileRepository backed by the current database session."""
     return SqlSessionFileRepository(db, tenant_id=tenant_id)
@@ -559,20 +363,8 @@ SessionFileRepositoryDep = Annotated[
 ]
 
 
-def get_session_file_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> SessionFileRepository:
-    """Create a SessionFileRepository for a read route, possibly across all tenants."""
-    return SqlSessionFileRepository(db, tenant_id=tenant_id)
-
-
-SessionFileReadRepositoryDep = Annotated[
-    SessionFileRepository, Depends(get_session_file_read_repository)
-]
-
-
 def get_message_meta_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
 ) -> MessageMetaRepository:
     """Create a MessageMetaRepository backed by the current database session."""
     return SqlMessageMetaRepository(db, tenant_id=tenant_id)
@@ -583,28 +375,11 @@ MessageMetaRepositoryDep = Annotated[
 ]
 
 
-def get_message_meta_read_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
-) -> MessageMetaRepository:
-    """Create a MessageMetaRepository for a read route.
-
-    Not exposed through any route of its own yet -- exists only so
-    ``WorkflowService``'s read variant can supply this collaborator without
-    resolving the strict, all-tenants-incompatible dependency.
-    """
-    return SqlMessageMetaRepository(db, tenant_id=tenant_id)
-
-
-MessageMetaReadRepositoryDep = Annotated[
-    MessageMetaRepository, Depends(get_message_meta_read_repository)
-]
-
-
 def get_workflow_task_repository(
     db: DBSessionDep,
     execution_repo: WorkflowExecutionRepositoryDep,
     mcp_repo: MCPServerRepositoryDep,
-    tenant_id: CurrentTenantIdDep,
+    tenant_id: CurrentTenantScopeDep,
 ) -> WorkflowTaskRepository:
     """Create a WorkflowTaskRepository backed by the current database session.
 
@@ -620,30 +395,11 @@ WorkflowTaskRepositoryDep = Annotated[
 ]
 
 
-def get_workflow_task_read_repository(
-    db: DBSessionDep,
-    execution_repo: WorkflowExecutionReadRepositoryDep,
-    mcp_repo: MCPServerReadRepositoryDep,
-    tenant_id: CurrentTenantScopeDep,
-) -> WorkflowTaskRepository:
-    """Create a WorkflowTaskRepository for a read route, possibly across all tenants.
-
-    Both collaborators must be the read repositories: merely resolving either
-    strict dependency would itself raise in all-tenants mode.
-    """
-    return SqlWorkflowTaskRepository(db, execution_repo, mcp_repo, tenant_id=tenant_id)
-
-
-WorkflowTaskReadRepositoryDep = Annotated[
-    WorkflowTaskRepository, Depends(get_workflow_task_read_repository)
-]
-
-
 def get_workflow_task_template_repository(
     db: DBSessionDep,
     workflows: WorkflowRepositoryDep,
     mcp_repo: MCPServerRepositoryDep,
-    tenant_id: CurrentTenantIdDep,
+    tenant_id: CurrentTenantScopeDep,
 ) -> WorkflowTaskTemplateRepository:
     """Create a WorkflowTaskTemplateRepository backed by the current database session.
 
@@ -661,32 +417,11 @@ WorkflowTaskTemplateRepositoryDep = Annotated[
 ]
 
 
-def get_workflow_task_template_read_repository(
-    db: DBSessionDep,
-    workflows: WorkflowReadRepositoryDep,
-    mcp_repo: MCPServerReadRepositoryDep,
-    tenant_id: CurrentTenantScopeDep,
-) -> WorkflowTaskTemplateRepository:
-    """Create a WorkflowTaskTemplateRepository for a read route, possibly across all tenants.
-
-    Both collaborators must be the read repositories: merely resolving either
-    strict dependency would itself raise in all-tenants mode.
-    """
-    return SqlWorkflowTaskTemplateRepository(
-        db, workflows, mcp_repo, tenant_id=tenant_id
-    )
-
-
-WorkflowTaskTemplateReadRepositoryDep = Annotated[
-    WorkflowTaskTemplateRepository, Depends(get_workflow_task_template_read_repository)
-]
-
-
 def get_approval_repository(
     db: DBSessionDep,
     execution_repo: WorkflowExecutionRepositoryDep,
     group_repo: UserGroupRepositoryDep,
-    tenant_id: CurrentTenantIdDep,
+    tenant_id: CurrentTenantScopeDep,
 ) -> ApprovalRepository:
     """Create an ApprovalRepository backed by the current database session.
 
@@ -699,22 +434,3 @@ def get_approval_repository(
 
 
 ApprovalRepositoryDep = Annotated[ApprovalRepository, Depends(get_approval_repository)]
-
-
-def get_approval_read_repository(
-    db: DBSessionDep,
-    execution_repo: WorkflowExecutionReadRepositoryDep,
-    group_repo: UserGroupReadRepositoryDep,
-    tenant_id: CurrentTenantScopeDep,
-) -> ApprovalRepository:
-    """Create an ApprovalRepository for a read route, possibly across all tenants.
-
-    Both collaborators must be the read repositories: merely resolving either
-    strict dependency would itself raise in all-tenants mode.
-    """
-    return SqlApprovalRepository(db, execution_repo, group_repo, tenant_id=tenant_id)
-
-
-ApprovalReadRepositoryDep = Annotated[
-    ApprovalRepository, Depends(get_approval_read_repository)
-]

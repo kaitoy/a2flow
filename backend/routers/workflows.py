@@ -38,9 +38,8 @@ from dependencies.context import (
 )
 from dependencies.service import (
     WorkflowDesignServiceDep,
-    WorkflowReadServiceDep,
     WorkflowServiceDep,
-    WorkflowTaskTemplateReadServiceDep,
+    WorkflowTaskTemplateServiceDep,
 )
 from infrastructure.agent import tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
@@ -71,7 +70,7 @@ _requires_execute = [Depends(require_roles(Role.requester, Role.developer))]
 
 @router.get("", response_model=ApiResponse[list[WorkflowRead]])
 async def list_workflows(
-    service: WorkflowReadServiceDep,
+    service: WorkflowServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -101,7 +100,7 @@ async def list_workflows(
 @router.get("/{workflow_id}", response_model=ApiResponse[WorkflowRead])
 async def get_workflow(
     workflow_id: str,
-    service: WorkflowReadServiceDep,
+    service: WorkflowServiceDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowRead]:
@@ -124,7 +123,7 @@ async def get_workflow(
 )
 async def list_workflow_task_templates(
     workflow_id: str,
-    service: WorkflowTaskTemplateReadServiceDep,
+    service: WorkflowTaskTemplateServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -155,7 +154,7 @@ async def list_workflow_task_templates(
 @router.get("/{workflow_id}/messages", response_model=ApiResponse[list[dict[str, Any]]])
 async def get_design_session_messages(
     workflow_id: str,
-    service: WorkflowReadServiceDep,
+    service: WorkflowServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
@@ -173,7 +172,7 @@ async def get_design_session_messages(
     Unlike ``POST /workflows/{id}/agent`` below, this is a read: a
     platform-scoped super_admin who has selected "All tenants"
     (``X-Tenant-Id: __all__``) can read this chat for a workflow in any
-    tenant, not just the one they've picked -- see ``WorkflowReadServiceDep``
+    tenant, not just the one they've picked -- see ``WorkflowServiceDep``
     and ``dependencies.auth.get_current_tenant_scope``. The agent route stays
     on the strict, single-tenant dependency, since driving the chat is a write.
     """

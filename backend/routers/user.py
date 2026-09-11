@@ -13,7 +13,6 @@ from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
 from dependencies.service import (
     UserAvatarServiceDep,
-    UserGroupReadServiceDep,
     UserGroupServiceDep,
     UserServiceDep,
 )
@@ -210,7 +209,7 @@ async def delete_user(
 async def list_groups_for_user(
     user_id: str,
     service: UserServiceDep,
-    group_service: UserGroupReadServiceDep,
+    group_service: UserGroupServiceDep,
     acting_user: CurrentUserDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[UserGroupRead]]:

@@ -23,7 +23,7 @@ from dependencies.context import (
     SortDep,
     TagFilterDep,
 )
-from dependencies.service import UserGroupReadServiceDep, UserGroupServiceDep
+from dependencies.service import UserGroupServiceDep
 from models.response import ApiResponse
 from models.tag import TagIdsUpdate
 from models.user import Role
@@ -60,7 +60,7 @@ async def create_user_group(
 
 @router.get("", response_model=ApiResponse[list[UserGroupRead]])
 async def list_user_groups(
-    service: UserGroupReadServiceDep,
+    service: UserGroupServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -87,7 +87,7 @@ async def list_user_groups(
 @router.get("/{group_id}", response_model=ApiResponse[UserGroupRead])
 async def get_user_group(
     group_id: str,
-    service: UserGroupReadServiceDep,
+    service: UserGroupServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[UserGroupRead]:
     """Return a single user group with its members.

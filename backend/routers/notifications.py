@@ -9,7 +9,7 @@ from fastapi import APIRouter
 
 from dependencies.auth import CurrentUserIdDep
 from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
-from dependencies.service import NotificationReadServiceDep, NotificationServiceDep
+from dependencies.service import NotificationServiceDep
 from models.notification import Notification, NotificationUpdate
 from models.response import ApiResponse
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 @router.get("", response_model=ApiResponse[list[Notification]])
 async def list_notifications(
-    service: NotificationReadServiceDep,
+    service: NotificationServiceDep,
     user_id: CurrentUserIdDep,
     pagination: PaginationDep,
     sort: SortDep,

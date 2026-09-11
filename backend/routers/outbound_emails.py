@@ -26,7 +26,7 @@ from fastapi import APIRouter, Depends
 
 from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
-from dependencies.service import OutboundEmailReadServiceDep, OutboundEmailServiceDep
+from dependencies.service import OutboundEmailServiceDep
 from models.outbound_email import OutboundEmailRead
 from models.response import ApiResponse
 from models.user import Role
@@ -47,7 +47,7 @@ _requires_super_admin = [Depends(require_roles(Role.super_admin))]
     dependencies=_requires_admin,
 )
 async def list_outbound_emails(
-    service: OutboundEmailReadServiceDep,
+    service: OutboundEmailServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -74,7 +74,7 @@ async def list_outbound_emails(
 )
 async def get_outbound_email(
     email_id: str,
-    service: OutboundEmailReadServiceDep,
+    service: OutboundEmailServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[OutboundEmailRead]:
     """Return a single outbound-email queue row.

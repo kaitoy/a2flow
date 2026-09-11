@@ -12,7 +12,6 @@ from dependencies.context import (
     TagFilterDep,
 )
 from dependencies.service import (
-    AgentSkillReadServiceDep,
     AgentSkillServiceDep,
     SkillSyncJobDep,
     WorkflowDesignServiceDep,
@@ -126,7 +125,7 @@ async def generate_workflow(
 
 @router.get("", response_model=ApiResponse[list[AgentSkillRead]])
 async def list_agent_skills(
-    service: AgentSkillReadServiceDep,
+    service: AgentSkillServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -146,7 +145,7 @@ async def list_agent_skills(
 @router.get("/{skill_id}", response_model=ApiResponse[AgentSkillRead])
 async def get_agent_skill(
     skill_id: str,
-    service: AgentSkillReadServiceDep,
+    service: AgentSkillServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[AgentSkillRead]:
     skill = await service.get(skill_id)
@@ -156,7 +155,7 @@ async def get_agent_skill(
 @router.get("/{skill_id}/content", response_model=ApiResponse[AgentSkillContent])
 async def get_agent_skill_content(
     skill_id: str,
-    service: AgentSkillReadServiceDep,
+    service: AgentSkillServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[AgentSkillContent]:
     """Return the raw SKILL.md content of the skill's published revision."""

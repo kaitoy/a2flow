@@ -14,7 +14,6 @@ from dependencies.auth import CurrentUserIdDep, EffectiveRolesDep
 from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep
 from dependencies.service import (
-    WorkflowTaskTemplateReadServiceDep,
     WorkflowTaskTemplateServiceDep,
 )
 from models.response import ApiResponse
@@ -51,7 +50,7 @@ async def create_workflow_task_template(
 @router.get("/{template_id}", response_model=ApiResponse[WorkflowTaskTemplateRead])
 async def get_workflow_task_template(
     template_id: str,
-    service: WorkflowTaskTemplateReadServiceDep,
+    service: WorkflowTaskTemplateServiceDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowTaskTemplateRead]:

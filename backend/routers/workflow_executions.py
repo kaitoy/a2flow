@@ -44,9 +44,7 @@ from dependencies.context import (
 )
 from dependencies.service import (
     MetricsServiceDep,
-    SessionFileReadServiceDep,
     SessionFileServiceDep,
-    WorkflowExecutionReadServiceDep,
     WorkflowExecutionServiceDep,
 )
 from infrastructure.agent import keep_a2ui_context, tenant_app_name, with_user_id
@@ -74,7 +72,7 @@ _requires_admin = [Depends(require_roles(Role.admin))]
 
 @router.get("", response_model=ApiResponse[list[WorkflowExecution]])
 async def list_workflow_executions(
-    service: WorkflowExecutionReadServiceDep,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,
@@ -159,7 +157,7 @@ async def list_failed_workflow_executions(
 @router.get("/{execution_id}", response_model=ApiResponse[WorkflowExecution])
 async def get_workflow_execution(
     execution_id: str,
-    service: WorkflowExecutionReadServiceDep,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
@@ -181,7 +179,7 @@ async def get_workflow_execution(
 )
 async def list_workflow_execution_tasks(
     execution_id: str,
-    service: WorkflowExecutionReadServiceDep,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,
@@ -214,7 +212,7 @@ async def list_workflow_execution_tasks(
 )
 async def list_workflow_execution_tool_invocations(
     execution_id: str,
-    service: WorkflowExecutionReadServiceDep,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     pagination: PaginationDep,
@@ -322,7 +320,7 @@ async def upload_session_file(
 async def download_session_file(
     execution_id: str,
     file_id: str,
-    service: SessionFileReadServiceDep,
+    service: SessionFileServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
 ) -> Response:
@@ -489,7 +487,7 @@ async def workflow_session_agent(
 )
 async def get_workflow_session_messages(
     execution_id: str,
-    service: WorkflowExecutionReadServiceDep,
+    service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
@@ -506,7 +504,7 @@ async def get_workflow_session_messages(
     Unlike ``POST /workflow-executions/{id}/agent`` above, this is a read: a
     platform-scoped super_admin who has selected "All tenants"
     (``X-Tenant-Id: __all__``) can read this chat for an execution in any
-    tenant -- see ``WorkflowExecutionReadServiceDep`` and
+    tenant -- see ``WorkflowExecutionServiceDep`` and
     ``dependencies.auth.get_current_tenant_scope``. The agent route stays on
     the strict, single-tenant dependency, since driving the chat is a write.
     """

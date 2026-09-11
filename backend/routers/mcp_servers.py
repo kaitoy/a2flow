@@ -11,7 +11,7 @@ from dependencies.context import (
     SortDep,
     TagFilterDep,
 )
-from dependencies.service import MCPServerReadServiceDep, MCPServerServiceDep
+from dependencies.service import MCPServerServiceDep
 from models.mcp_server import (
     MCPServerCreate,
     McpServerRead,
@@ -46,7 +46,7 @@ async def create_mcp_server(
 
 @router.get("", response_model=ApiResponse[list[McpServerRead]])
 async def list_mcp_servers(
-    service: MCPServerReadServiceDep,
+    service: MCPServerServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -66,7 +66,7 @@ async def list_mcp_servers(
 @router.get("/{server_id}", response_model=ApiResponse[McpServerRead])
 async def get_mcp_server(
     server_id: str,
-    service: MCPServerReadServiceDep,
+    service: MCPServerServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[McpServerRead]:
     server = await service.get(server_id)
@@ -76,7 +76,7 @@ async def get_mcp_server(
 @router.get("/{server_id}/tools", response_model=ApiResponse[list[McpToolInfo]])
 async def list_mcp_server_tools(
     server_id: str,
-    service: MCPServerReadServiceDep,
+    service: MCPServerServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[McpToolInfo]]:
     tools = await service.list_tools(server_id)

@@ -214,7 +214,7 @@ class SqlWorkflowRepository:
         ...
 ```
 
-This produces a friendlier error message than relying solely on the database constraint. When both repositories are `TenantScoped`, the collaborator must be constructed with the **same** `tenant_id` as the repository holding it — for request-scoped code this is automatic (both come from `CurrentTenantIdDep`, cached per request by FastAPI's `Depends()`), but callers outside request scope (agent tools, background jobs) must thread the same resolved `tenant_id` through every repository they construct for one call.
+This produces a friendlier error message than relying solely on the database constraint. When both repositories are `TenantScoped`, the collaborator must be constructed with the **same** `tenant_id` as the repository holding it — for request-scoped code this is automatic (both come from `CurrentTenantScopeDep`, cached per request by FastAPI's `Depends()`), but callers outside request scope (agent tools, background jobs) must thread the same resolved `tenant_id` through every repository they construct for one call.
 
 ### Error Hierarchy (`repositories/exceptions.py`)
 
@@ -432,6 +432,10 @@ CurrentTenantIdDep  # str, the tenant this request is scoped to: the caller's ow
                     # or -- for a platform-scoped (super_admin) caller -- the tenant selected
                     # via the X-Tenant-Id request header ("act as tenant X"); raises
                     # ForbiddenError if platform-scoped with no header set (auth.py)
+CurrentTenantScopeDep  # str | None: the same, except a platform-scoped caller may send
+                    # X-Tenant-Id: __all__ on a GET to read across every tenant (None);
+                    # on a mutating method the sentinel is rejected like CurrentTenantIdDep.
+                    # Every tenant-scoped repository factory depends on this one.
 AuthServiceDep      # AuthService, per-request (login/authenticate/logout)
 DBSessionDep        # AsyncSession, per-request
 AgentSkillRepositoryDep   # SqlAgentSkillRepository, per-request (tenant-scoped)
@@ -446,9 +450,12 @@ SkillSyncJobDep     # sync_agent_skill, the background clone/pull job
 
 Routers inject the `*ServiceDep` aliases; the repository aliases exist so the
 service factories can compose them. A route never needs to declare
-`tenant_id: CurrentTenantIdDep` itself — it reaches every tenant-scoped route
+`tenant_id: CurrentTenantScopeDep` itself — it reaches every tenant-scoped route
 transitively once the repository factory pulls it in, since FastAPI caches
-`Depends()` results per request.
+`Depends()` results per request. There is one factory per repository and per
+service: the request method, not the route, decides whether the all-tenants
+scope is allowed, so a `GET` may run across tenants while a write on the very
+same service gets a 403 before any work is done.
 
 Singletons are created once using `@lru_cache` on the factory function. Per-request dependencies use `Depends()` with `async def` generators that yield and then commit/rollback.
 
@@ -489,7 +496,7 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
    - If `list()` calls `apply_filters`/`apply_sort`, pass `readable=<EntityRead>` (or `readable=Entity` when the table class doubles as the response model) — see "List Query Field Exposure" above.
 4. **Exceptions**: reuse existing exception types; add new ones to `repositories/exceptions.py` only if needed.
 5. **Service file** (`services/<entity>.py`): define `EntityService` as a concrete class wrapping the repository. Raise `NotFoundError` on missing single-entity fetches and host any multi-collaborator orchestration here.
-6. **Dependencies** (`dependencies/`): add the `EntityRepositoryDep` alias to `repository.py` **and** the `EntityServiceDep` alias to `service.py` (the service factory composes the repository deps). If tenant-isolated, the `get_entity_repository` factory also takes `tenant_id: CurrentTenantIdDep` and passes it to the `SqlEntityRepository` constructor.
+6. **Dependencies** (`dependencies/`): add the `EntityRepositoryDep` alias to `repository.py` **and** the `EntityServiceDep` alias to `service.py` (the service factory composes the repository deps). If tenant-isolated, the `get_entity_repository` factory also takes `tenant_id: CurrentTenantScopeDep` and passes it to the `SqlEntityRepository` constructor.
 7. **Router file** (`routers/<entity>.py`):
    - Inject the `EntityServiceDep` (not the repository) and follow RESTful conventions and the error mapping table above.
    - Register in `main.py` with the correct prefix and tag.

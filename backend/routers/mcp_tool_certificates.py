@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends
 
 from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
-from dependencies.service import McpToolCertificateReadServiceDep
+from dependencies.service import McpToolCertificateServiceDep
 from models.mcp_tool_certificate import McpToolCertificateRead
 from models.response import ApiResponse
 from models.user import Role
@@ -46,7 +46,7 @@ _requires_admin = [Depends(require_roles(Role.admin))]
     dependencies=_requires_admin,
 )
 async def list_mcp_tool_certificates(
-    service: McpToolCertificateReadServiceDep,
+    service: McpToolCertificateServiceDep,
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
@@ -76,7 +76,7 @@ async def list_mcp_tool_certificates(
 )
 async def get_mcp_tool_certificate_by_id(
     certificate_id: str,
-    service: McpToolCertificateReadServiceDep,
+    service: McpToolCertificateServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[McpToolCertificateRead]:
     """Return a single tool certificate by its own ID.

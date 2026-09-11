@@ -23,7 +23,7 @@ from fastapi import APIRouter
 
 from dependencies.auth import CurrentUserDep, EffectiveRolesDep
 from dependencies.context import ApiMetaDep
-from dependencies.service import WorkflowTaskReadServiceDep, WorkflowTaskServiceDep
+from dependencies.service import WorkflowTaskServiceDep
 from models.response import ApiResponse
 from models.workflow_task import (
     WorkflowTaskRead,
@@ -36,7 +36,7 @@ router = APIRouter(prefix="/workflow-tasks", tags=["workflow-tasks"])
 @router.get("/{task_id}", response_model=ApiResponse[WorkflowTaskRead])
 async def get_workflow_task(
     task_id: str,
-    service: WorkflowTaskReadServiceDep,
+    service: WorkflowTaskServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
