@@ -5,8 +5,8 @@ Every call the agent makes to a user-registered MCP server passes through
 :mod:`infrastructure.mcp_tools` used to each own a copy of:
 
 1. **Authentication** -- turning the caller's claimed :class:`McpPrincipal`
-   into a verified :class:`McpIdentity` (which tenant, which run). Pluggable
-   through the :class:`McpAuthenticator` protocol.
+   into a verified :class:`McpIdentity` (which tenant, which run), by
+   :class:`AgentRunAuthenticator`.
 2. **Authorization** -- a chain of :class:`McpPolicy` objects consulted before
    every operation, each of which may veto by raising
    :class:`McpPolicyDeniedError`.
@@ -124,7 +124,7 @@ class McpPrincipal:
     """The caller's *claimed* identity, as the caller knows itself.
 
     Deliberately unverified: this is what an HTTP request body or header would
-    carry. :meth:`McpAuthenticator.authenticate` turns it into an
+    carry. :meth:`AgentRunAuthenticator.authenticate` turns it into an
     :class:`McpIdentity`.
 
     Attributes:
@@ -292,29 +292,6 @@ class McpUpstreamError(McpGatewayError):
     """Raised when the target server cannot be reached, launched, or times out."""
 
 
-class McpAuthenticator(Protocol):
-    """Turns a caller's claimed :class:`McpPrincipal` into a verified identity."""
-
-    async def authenticate(
-        self, principal: McpPrincipal, db: AsyncSession
-    ) -> McpIdentity:
-        """Verify the principal and resolve the run it belongs to.
-
-        Args:
-            principal: The caller's claimed identity.
-            db: The gateway's open database session. Valid only for the duration
-                of this call; do not retain it.
-
-        Returns:
-            The verified identity.
-
-        Raises:
-            McpAuthenticationError: If the principal cannot be verified or maps
-                to no known tenant.
-        """
-        ...
-
-
 class AgentRunAuthenticator:
     """Pass-through authenticator for agent runs driven by this process.
 
@@ -449,32 +426,6 @@ class McpAuditSink(Protocol):
         ...
 
 
-class NullAuditSink:
-    """Discards every decision.
-
-    The default, so a directly constructed :class:`McpGateway` (as in tests) does
-    not need a database table. The process-wide gateway from
-    :func:`get_mcp_gateway` is built with the SQL sink instead.
-    """
-
-    async def record(
-        self,
-        ctx: McpCallContext,
-        db: AsyncSession,
-        *,
-        decision: McpAuditDecision,
-        reason: str | None,
-    ) -> None:
-        """Do nothing.
-
-        Args:
-            ctx: The operation that was decided on.
-            db: The gateway's open database session.
-            decision: Whether the call was allowed.
-            reason: The refusal message when denied, else ``None``.
-        """
-
-
 class McpPolicy(Protocol):
     """A decision point consulted before every operation the gateway performs.
 
@@ -562,41 +513,6 @@ class McpToolStub(Protocol):
         ...
 
 
-class NullToolStub:
-    """Stubs nothing.
-
-    The default, so a directly constructed :class:`McpGateway` (as in tests) does
-    not need a run carrying mock snapshots. The process-wide gateway from
-    :func:`get_mcp_gateway` is built with the WorkflowExecution-backed stub.
-    """
-
-    async def stubs(self, ctx: McpCallContext, db: AsyncSession) -> bool:
-        """Report that nothing is stubbed.
-
-        Args:
-            ctx: The operation being attempted.
-            db: The gateway's open database session.
-
-        Returns:
-            Always ``False``.
-        """
-        return False
-
-    async def answer(
-        self, ctx: McpCallContext, db: AsyncSession
-    ) -> types.CallToolResult:
-        """Fail loudly: :meth:`stubs` never returns ``True``, so this is unreachable.
-
-        Args:
-            ctx: The operation being attempted.
-            db: The gateway's open database session.
-
-        Raises:
-            RuntimeError: Always.
-        """
-        raise RuntimeError("NullToolStub answers nothing")
-
-
 @asynccontextmanager
 async def _default_session() -> AsyncIterator[AsyncSession]:
     """Open a database session on the module-level engine.
@@ -638,7 +554,6 @@ class McpGateway:
     def __init__(
         self,
         *,
-        authenticator: McpAuthenticator | None = None,
         policies: Sequence[McpPolicy] | None = None,
         audit: McpAuditSink | None = None,
         stub: McpToolStub | None = None,
@@ -649,19 +564,17 @@ class McpGateway:
         """Initialize the gateway.
 
         Args:
-            authenticator: Verifies callers. Defaults to
-                :class:`AgentRunAuthenticator`.
             policies: The authorization chain, consulted in order. Defaults to
                 an empty chain, which allows everything -- the process-wide
                 gateway built by :func:`get_mcp_gateway` passes
                 :func:`infrastructure.mcp_policies.default_policies` instead.
             audit: Receives every ``call_tool`` decision that reaches a server.
-                Defaults to :class:`NullAuditSink`; the process-wide gateway built
-                by :func:`get_mcp_gateway` passes the SQL-backed sink instead.
-            stub: Answers a call from a run's recorded tool mocks. Defaults to
-                :class:`NullToolStub`, which stubs nothing; the process-wide
-                gateway built by :func:`get_mcp_gateway` passes the
-                WorkflowExecution-backed stub instead.
+                ``None`` (as in a directly constructed gateway in tests) records
+                nothing; the process-wide gateway built by
+                :func:`get_mcp_gateway` passes the SQL-backed sink.
+            stub: Answers a call from a run's recorded tool mocks. ``None``
+                stubs nothing; the process-wide gateway built by
+                :func:`get_mcp_gateway` passes the WorkflowExecution-backed stub.
             executor: Carries out the operations this gateway allows -- in this
                 process, or in the MCP proxy container. Defaults to whichever
                 :func:`infrastructure.mcp_executor.get_mcp_executor` selects
@@ -669,10 +582,10 @@ class McpGateway:
             session_factory: Opens the database session each operation runs
                 against. Defaults to a session on the module-level engine.
         """
-        self._audit: McpAuditSink = audit or NullAuditSink()
-        self._authenticator: McpAuthenticator = authenticator or AgentRunAuthenticator()
+        self._audit = audit
+        self._authenticator = AgentRunAuthenticator()
         self._policies: tuple[McpPolicy, ...] = tuple(policies or ())
-        self._stub: McpToolStub = stub or NullToolStub()
+        self._stub = stub
         self._executor: McpExecutor = executor or get_mcp_executor()
         self._session_factory = session_factory or _default_session
 
@@ -769,14 +682,14 @@ class McpGateway:
             # refused call that would have been stubbed is left unaudited too,
             # since the audit describes calls that reached a server. Asking is
             # side-effect free; ``answer`` below is what consumes a response.
-            stubbed = await self._stub.stubs(ctx, db)
+            stubbed = self._stub is not None and await self._stub.stubs(ctx, db)
             try:
                 await self._authorize(ctx, db)
             except McpGatewayError as exc:
                 if not stubbed:
                     await self._record(ctx, db, McpAuditDecision.denied, exc.message)
                 raise
-            if stubbed:
+            if stubbed and self._stub is not None:
                 # Authorized, but answered from the run's mocks: no server row
                 # is loaded, no upstream call goes out, and no row is written.
                 # Unlike ``_record``, a failure here is *not* swallowed --
@@ -900,6 +813,8 @@ class McpGateway:
             decision: Whether the call was allowed.
             reason: The refusal message when denied, else ``None``.
         """
+        if self._audit is None:
+            return
         try:
             await self._audit.record(ctx, db, decision=decision, reason=reason)
         except Exception:  # noqa: BLE001 -- auditing must never break the call

@@ -757,7 +757,7 @@ class _CountingAuditSink:
 async def test_call_tool_reaches_the_server_when_nothing_is_stubbed(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The default NullToolStub must not divert anything."""
+    """A gateway built without a stub must not divert anything."""
     server_id = await _seed_server(engine)
     await _seed_session(engine)
     called: list[str] = []

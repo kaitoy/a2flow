@@ -204,7 +204,7 @@ class McpClientCredential:
 
     Deliberately unverified: this is the material a caller hands over, before
     anything has checked it.
-    :meth:`infrastructure.mcp_gateway.McpAuthenticator.authenticate` turns it
+    :meth:`infrastructure.mcp_gateway.AgentRunAuthenticator.authenticate` turns it
     into a :class:`VerifiedCredential`.
 
     Lives here rather than beside its consumers because three of them share it
