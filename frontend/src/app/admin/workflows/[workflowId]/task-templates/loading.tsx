@@ -2,10 +2,7 @@
 
 import { ListTree } from "lucide-react";
 import { useParams } from "next/navigation";
-import { AdminListSkeleton } from "@/components/admin/admin-list-skeleton";
-import { AdminPageContainer } from "@/components/admin/admin-page-container";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { AdminLoading } from "@/components/admin/admin-loading";
 
 /**
  * Route loading fallback for the task templates list page. `loading.tsx`
@@ -15,24 +12,17 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 export default function Loading() {
   const { workflowId } = useParams<{ workflowId: string }>();
   return (
-    <AdminPageContainer>
-      <Breadcrumbs
-        items={[
-          { label: "Admin", href: "/admin" },
-          { label: "Workflows", href: "/admin/workflows" },
-          { label: "…", href: `/admin/workflows/${workflowId}` },
-          { label: "Task Templates" },
-        ]}
-      />
-      <AdminPageHeader
-        title="Task Templates"
-        icon={ListTree}
-        addHref={`/admin/workflows/${workflowId}/task-templates/new`}
-        addLabel="+ Add task"
-      />
-      <AdminListSkeleton
-        columns={["#", "Title", "Description", "Depends on", "Tools", "Actions"]}
-      />
-    </AdminPageContainer>
+    <AdminLoading
+      crumbs={[
+        { label: "Workflows", href: "/admin/workflows" },
+        { label: "…", href: `/admin/workflows/${workflowId}` },
+        { label: "Task Templates" },
+      ]}
+      icon={ListTree}
+      title="Task Templates"
+      addHref={`/admin/workflows/${workflowId}/task-templates/new`}
+      addLabel="+ Add task"
+      columns={["#", "Title", "Description", "Depends on", "Tools", "Actions"]}
+    />
   );
 }

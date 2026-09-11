@@ -1,16 +1,16 @@
 import { Tags } from "lucide-react";
-import { AdminListSkeleton } from "@/components/admin/admin-list-skeleton";
-import { AdminPageContainer } from "@/components/admin/admin-page-container";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { AdminLoading } from "@/components/admin/admin-loading";
 
 /** Route loading fallback for the tags list page. */
 export default function Loading() {
   return (
-    <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Tags" }]} />
-      <AdminPageHeader title="Tags" icon={Tags} addHref="/admin/tags/new" addLabel="+ Add tag" />
-      <AdminListSkeleton columns={["Name", "Preview", "Created At", "Actions"]} />
-    </AdminPageContainer>
+    <AdminLoading
+      crumbs={[{ label: "Tags" }]}
+      icon={Tags}
+      title="Tags"
+      addHref="/admin/tags/new"
+      addLabel="+ Add tag"
+      columns={["Name", "Preview", "Created At", "Actions"]}
+    />
   );
 }

@@ -1,23 +1,16 @@
 import { User as UsersIcon } from "lucide-react";
-import { AdminListSkeleton } from "@/components/admin/admin-list-skeleton";
-import { AdminPageContainer } from "@/components/admin/admin-page-container";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { AdminLoading } from "@/components/admin/admin-loading";
 
 /** Route loading fallback for the users list page. */
 export default function Loading() {
   return (
-    <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Users" }]} />
-      <AdminPageHeader
-        title="Users"
-        icon={UsersIcon}
-        addHref="/admin/users/new"
-        addLabel="+ Add user"
-      />
-      <AdminListSkeleton
-        columns={["", "Username", "Name", "Roles", "Enabled", "Created At", "Actions"]}
-      />
-    </AdminPageContainer>
+    <AdminLoading
+      crumbs={[{ label: "Users" }]}
+      icon={UsersIcon}
+      title="Users"
+      addHref="/admin/users/new"
+      addLabel="+ Add user"
+      columns={["", "Username", "Name", "Roles", "Enabled", "Created At", "Actions"]}
+    />
   );
 }

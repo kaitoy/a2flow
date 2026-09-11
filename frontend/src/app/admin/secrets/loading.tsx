@@ -1,21 +1,16 @@
 import { KeyRound } from "lucide-react";
-import { AdminListSkeleton } from "@/components/admin/admin-list-skeleton";
-import { AdminPageContainer } from "@/components/admin/admin-page-container";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { AdminLoading } from "@/components/admin/admin-loading";
 
 /** Route loading fallback for the secrets list page. */
 export default function Loading() {
   return (
-    <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/admin" }, { label: "Secrets" }]} />
-      <AdminPageHeader
-        title="Secrets"
-        icon={KeyRound}
-        addHref="/admin/secrets/new"
-        addLabel="+ Add secret"
-      />
-      <AdminListSkeleton columns={["Name", "Type", "Created At", "Actions"]} />
-    </AdminPageContainer>
+    <AdminLoading
+      crumbs={[{ label: "Secrets" }]}
+      icon={KeyRound}
+      title="Secrets"
+      addHref="/admin/secrets/new"
+      addLabel="+ Add secret"
+      columns={["Name", "Type", "Created At", "Actions"]}
+    />
   );
 }
