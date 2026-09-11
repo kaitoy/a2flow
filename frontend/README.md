@@ -17,7 +17,6 @@ What each screen does, from the user's side, is in the manual at
 | Icons | lucide-react (wrapped by `AnimatedIcon` for subtle, motion-safe animation) |
 | Graph viz | @xyflow/react (React Flow) |
 | HTTP | Fetch API (REST) / @ag-ui/client (SSE streaming) |
-| Logging | pino (browser mode) |
 | AG-UI | @ag-ui/client + @ag-ui/core + @ag-ui/a2ui-middleware |
 | A2UI | @a2ui/react + @a2ui/web_core |
 | Package manager | pnpm |

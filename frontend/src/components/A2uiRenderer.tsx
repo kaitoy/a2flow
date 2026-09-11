@@ -6,7 +6,6 @@ import type { SurfaceModel } from "@a2ui/web_core/v0_9";
 import { MessageProcessor } from "@a2ui/web_core/v0_9";
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { useEffect, useRef, useState } from "react";
-import logger from "@/lib/logger";
 import { SurfaceResolvedContext } from "./a2ui/surfaceResolvedContext";
 import { tailwindCatalog } from "./a2uiCatalog";
 
@@ -95,7 +94,7 @@ export function A2uiRenderer({
       );
       setSurfaces(created);
     } catch (err) {
-      logger.error({ err }, "failed to process A2UI payload");
+      console.error("failed to process A2UI payload", { err });
     }
     sub.unsubscribe();
 

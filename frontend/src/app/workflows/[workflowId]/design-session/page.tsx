@@ -38,7 +38,6 @@ import {
   type Workflow,
   type WorkflowTaskTemplate,
 } from "@/lib/api";
-import logger from "@/lib/logger";
 import { Role, useHasRole } from "@/lib/roles";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -116,7 +115,7 @@ function DesignSessionView({
     try {
       setTemplates(await listWorkflowTaskTemplates(workflowId));
     } catch (err) {
-      logger.error(err, "failed to load task templates");
+      console.error("failed to load task templates", err);
     }
   }, [workflowId]);
 
@@ -124,7 +123,7 @@ function DesignSessionView({
     try {
       onWorkflowUpdate(await getWorkflow(workflowId));
     } catch (err) {
-      logger.error(err, "failed to load workflow");
+      console.error("failed to load workflow", err);
     }
   }, [workflowId, onWorkflowUpdate]);
 
@@ -324,7 +323,7 @@ export default function DesignSessionPage() {
           setForbidden(true);
           return;
         }
-        logger.error(err, "failed to load design session");
+        console.error("failed to load design session", err);
         setLoadFailed(true);
       });
   }, [workflowId, retryCount]);

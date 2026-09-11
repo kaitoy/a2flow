@@ -6,7 +6,6 @@ import Script from "next/script";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import logger from "@/lib/logger";
 import { NO_FLASH_THEME_SCRIPT } from "@/lib/no-flash-theme-script";
 import "./globals.css";
 
@@ -60,7 +59,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    logger.error(error, "uncaught root layout error");
+    console.error("uncaught root layout error", error);
   }, [error]);
 
   return (

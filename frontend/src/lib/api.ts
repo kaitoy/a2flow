@@ -84,7 +84,6 @@ import { store } from "@/store";
 import { showToast } from "@/store/toastSlice";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import { A2UI_CATALOG_ID } from "./a2uiCatalogId";
-import logger from "./logger";
 
 /**
  * API base URL. Empty by default so the browser talks to the frontend origin
@@ -1216,7 +1215,7 @@ export async function generateWorkflow(
       body: body,
     })
   )) as Workflow;
-  logger.info({ workflowId: workflow.id, skillId }, "workflow generation started");
+  console.info("workflow generation started", { workflowId: workflow.id, skillId });
   return workflow;
 }
 
@@ -1305,7 +1304,7 @@ export async function executeWorkflow(
       body: body,
     })
   )) as WorkflowExecution;
-  logger.info({ workflowExecutionId: session.id, workflowId: id }, "workflow executed");
+  console.info("workflow executed", { workflowExecutionId: session.id, workflowId: id });
   return session;
 }
 

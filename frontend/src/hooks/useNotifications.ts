@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect } from "react";
 import { listNotifications, UNREAD_ONLY_FILTER } from "@/lib/api";
-import logger from "@/lib/logger";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   notificationsError,
@@ -48,7 +47,7 @@ export function useNotifications(): { refresh: () => Promise<void> } {
       const items = await listNotifications({ filters: [UNREAD_ONLY_FILTER] });
       dispatch(setNotifications(items));
     } catch (err) {
-      logger.error({ err }, "failed to fetch notifications");
+      console.error("failed to fetch notifications", { err });
       dispatch(notificationsError());
     }
   }, [dispatch]);

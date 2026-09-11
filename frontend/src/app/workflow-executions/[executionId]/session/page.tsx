@@ -31,7 +31,6 @@ import {
   SUPPRESS_FORBIDDEN_TOAST,
   type WorkflowExecution,
 } from "@/lib/api";
-import logger from "@/lib/logger";
 import { EXECUTION_KICKOFF_PROMPT } from "@/lib/workflowKickoff";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -222,7 +221,7 @@ export default function WorkflowSessionPage() {
           setForbidden(true);
           return;
         }
-        logger.error(err, "failed to load workflow execution");
+        console.error("failed to load workflow execution", err);
         setLoadFailed(true);
       });
   }, [executionId, retryCount]);

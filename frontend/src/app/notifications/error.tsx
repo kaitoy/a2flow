@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { RouteErrorFallback } from "@/components/ui/route-error-fallback";
-import logger from "@/lib/logger";
 
 /**
  * Error boundary for `/notifications`. Renders inside `NotificationsLayout`
@@ -17,7 +16,7 @@ export default function RouteError({
   reset: () => void;
 }) {
   useEffect(() => {
-    logger.error(error, "uncaught render error");
+    console.error("uncaught render error", error);
   }, [error]);
 
   return (

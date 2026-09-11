@@ -7,7 +7,6 @@ import { useStore } from "react-redux";
 import { buildRenderAckMessages } from "@/lib/a2uiAction";
 import { type AgentSubscriberOptions, createAgentSubscriber } from "@/lib/agentSubscriber";
 import { createChatAgent, getSessionMessages } from "@/lib/api";
-import logger from "@/lib/logger";
 import type { AppDispatch, RootState } from "@/store";
 import {
   addPendingRenderCall,
@@ -64,7 +63,7 @@ export function useChat(initialSessionId: string | null) {
     getSessionMessages(initialSessionId)
       .then((messages) => dispatch(resumeSession({ sessionId: initialSessionId, messages })))
       .catch((err) => {
-        logger.error(err, "failed to load session history");
+        console.error("failed to load session history", err);
         dispatch(setError("Failed to load this session's message history."));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,7 +102,7 @@ export function useChat(initialSessionId: string | null) {
           })
         );
       } catch (err) {
-        logger.error(err, "stream error");
+        console.error("stream error", err);
         dispatch(setError("An error occurred while communicating with the agent."));
         return;
       }
@@ -139,7 +138,7 @@ export function useChat(initialSessionId: string | null) {
           })
         );
       } catch (err) {
-        logger.error(err, "stream error");
+        console.error("stream error", err);
         dispatch(setError("An error occurred while communicating with the agent."));
         return;
       }

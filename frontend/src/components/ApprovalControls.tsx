@@ -12,7 +12,6 @@ import {
   resolveApproval,
 } from "@/lib/api";
 import { getApprovalCached } from "@/lib/approvalCache";
-import logger from "@/lib/logger";
 import { effectiveRoles, Role } from "@/lib/roles";
 import { useAppSelector } from "@/store/hooks";
 import { ApprovedCallList } from "./ApprovedCallList";
@@ -228,7 +227,7 @@ export function ApprovalControls({
         }
         return;
       }
-      logger.error(err, "failed to resolve approval");
+      console.error("failed to resolve approval", err);
       setError("Failed to record your decision. Please try again.");
     }
   };

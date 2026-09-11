@@ -8,7 +8,6 @@ import { createPortal } from "react-dom";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
 import { markAllNotificationsRead, updateNotification } from "@/lib/api";
-import logger from "@/lib/logger";
 import { useMotionConfig } from "@/lib/motion";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { markAllReadLocal, markReadLocal } from "@/store/notificationsSlice";
@@ -100,7 +99,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
     (id: string, link: string | null | undefined) => {
       dispatch(markReadLocal(id));
       updateNotification(id, { read: true }).catch((err) => {
-        logger.error({ err, id }, "failed to mark notification read");
+        console.error("failed to mark notification read", { err, id });
       });
       onClose();
       if (link) router.push(link);
@@ -112,7 +111,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
     (id: string) => {
       dispatch(markReadLocal(id));
       updateNotification(id, { read: true }).catch((err) => {
-        logger.error({ err, id }, "failed to mark notification read");
+        console.error("failed to mark notification read", { err, id });
       });
     },
     [dispatch]
@@ -121,7 +120,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
   const onMarkAllRead = useCallback(() => {
     dispatch(markAllReadLocal());
     markAllNotificationsRead().catch((err) => {
-      logger.error({ err }, "failed to mark all notifications read");
+      console.error("failed to mark all notifications read", { err });
     });
   }, [dispatch]);
 

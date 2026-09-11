@@ -47,12 +47,3 @@ Element.prototype.scrollIntoView = vi.fn();
 // three, so the stubs are gone. What happy-dom still lacks is a layout engine —
 // every measurement (`offsetWidth`, `getBoundingClientRect`, …) reads back
 // zero — so tests that depend on real sizes stub those per file.
-
-vi.mock("@/lib/logger", () => ({
-  default: {
-    info: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-    warn: vi.fn(),
-  },
-}));

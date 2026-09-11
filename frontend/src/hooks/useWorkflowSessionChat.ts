@@ -29,7 +29,6 @@ import {
   RENDER_APPROVAL_TOOL,
   RENDER_APPROVAL_TOOL_NAME,
 } from "@/lib/approvalTool";
-import logger from "@/lib/logger";
 import type { AppDispatch, RootState } from "@/store";
 import {
   addActivityMessage,
@@ -263,7 +262,7 @@ export function useWorkflowSessionChat(
       dispatch(syncPolledMessages({ sessionId, messages: history.messages }));
       await applyAttribution(history);
     } catch (err) {
-      logger.error(err, "failed to refresh session history");
+      console.error("failed to refresh session history", err);
     }
   }, [parentId, sessionId, dispatch, applyAttribution, fetchHistory]);
 
@@ -315,7 +314,7 @@ export function useWorkflowSessionChat(
           const names = uploaded.map((file) => file.name).join(", ");
           content = `${prompt}\n\nAttached files: ${names}`.trim();
         } catch (err) {
-          logger.error(err, "failed to upload session files");
+          console.error("failed to upload session files", err);
           dispatch(setError("The files could not be attached. Nothing was sent."));
           return;
         }
@@ -343,7 +342,7 @@ export function useWorkflowSessionChat(
           })
         );
       } catch (err) {
-        logger.error(err, "stream error");
+        console.error("stream error", err);
         dispatch(setError("An error occurred while communicating with the agent."));
         return;
       }
@@ -384,7 +383,7 @@ export function useWorkflowSessionChat(
           })
         );
       } catch (err) {
-        logger.error(err, "stream error");
+        console.error("stream error", err);
         dispatch(setError("An error occurred while communicating with the agent."));
         return;
       }
@@ -437,7 +436,7 @@ export function useWorkflowSessionChat(
           })
         );
       } catch (err) {
-        logger.error(err, "stream error");
+        console.error("stream error", err);
         dispatch(setError("An error occurred while communicating with the agent."));
         return;
       }
@@ -472,7 +471,7 @@ export function useWorkflowSessionChat(
         // Catches its own failure: a rejection here must not reach the catch
         // below, which would read it as a missing session and auto-send.
         void applyAttribution(history).catch((err: unknown) => {
-          logger.error(err, "failed to load session attribution");
+          console.error("failed to load session attribution", err);
         });
         if (kickoffPrompt !== null && loadedMessages.length === 0 && !autoSentRef.current) {
           autoSentRef.current = true;
