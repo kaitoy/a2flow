@@ -7,7 +7,7 @@
   "scripts": {
     "predev": "node --use-system-ca scripts/download-a2ui-schema.mjs && pnpm generate:api",
     "prebuild": "node --use-system-ca scripts/download-a2ui-schema.mjs && pnpm generate:api",
-    "generate:openapi": "node scripts/export-backend-openapi.mjs",
+    "generate:openapi": "cd ../backend && uv run python -m scripts.export_openapi",
     "generate:api": "pnpm generate:openapi && openapi-ts",
     "dev": "next dev",
     "build": "next build",
