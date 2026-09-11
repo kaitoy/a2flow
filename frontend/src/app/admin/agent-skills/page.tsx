@@ -22,10 +22,9 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
-import { useTenantNames } from "@/hooks/useTenantNames";
-import { useUserNames } from "@/hooks/useUserNames";
 import {
   formatRevision,
   formatSyncStatusLabel,

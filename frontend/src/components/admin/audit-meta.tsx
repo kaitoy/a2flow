@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { DateTime } from "@/components/ui/date-time";
 import { DetailItem } from "@/components/ui/detail-list";
-import { useTenantNames } from "@/hooks/useTenantNames";
+import { useTenantNames } from "@/hooks/useNames";
 import { getUserNames } from "@/lib/api";
 
 /** Props for {@link AuditMeta}: the audit fields shared by every persistent entity. */

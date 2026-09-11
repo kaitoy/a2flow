@@ -15,7 +15,7 @@ import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { DateTime } from "@/components/ui/date-time";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { StatusDot } from "@/components/ui/status-dot";
-import { useUserNames } from "@/hooks/useUserNames";
+import { useUserNames } from "@/hooks/useNames";
 import {
   getImpersonationEvent,
   type ImpersonationEvent,

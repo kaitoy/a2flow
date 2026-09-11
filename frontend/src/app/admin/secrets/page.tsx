@@ -27,10 +27,9 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
-import { useTenantNames } from "@/hooks/useTenantNames";
-import { useUserNames } from "@/hooks/useUserNames";
 import { deleteSecret, listSecrets, type Secret } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 

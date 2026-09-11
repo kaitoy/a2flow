@@ -25,10 +25,8 @@ import {
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useTenantNames, useUserNames, useWorkflowNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { useTenantNames } from "@/hooks/useTenantNames";
-import { useUserNames } from "@/hooks/useUserNames";
-import { useWorkflowNames } from "@/hooks/useWorkflowNames";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import { deleteWorkflowExecution, listWorkflowExecutions, type WorkflowExecution } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";

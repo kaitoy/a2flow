@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { useUserNames } from "@/hooks/useUserNames";
 import {
   getWorkflowExecution,
   listMcpServers,

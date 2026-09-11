@@ -35,9 +35,8 @@ import {
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { useTenantNames } from "@/hooks/useTenantNames";
-import { useUserNames } from "@/hooks/useUserNames";
 import { deleteUser, listUsers, startImpersonation, type User } from "@/lib/api";
 import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
 import { ROLE_LABELS, Role, useHasRole } from "@/lib/roles";

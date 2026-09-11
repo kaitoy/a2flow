@@ -18,7 +18,7 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
-import { useUserNames } from "@/hooks/useUserNames";
+import { useUserNames } from "@/hooks/useNames";
 import {
   deleteWorkflowTaskTemplate,
   type FilterSpec,

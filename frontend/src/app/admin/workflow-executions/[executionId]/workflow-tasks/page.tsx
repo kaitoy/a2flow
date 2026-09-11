@@ -15,7 +15,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { StatusDot } from "@/components/ui/status-dot";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
-import { useUserNames } from "@/hooks/useUserNames";
+import { useUserNames } from "@/hooks/useNames";
 import {
   type FilterSpec,
   getWorkflowExecution,

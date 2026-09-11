@@ -70,8 +70,9 @@ describe("ApprovalsPage", () => {
     render(<ApprovalsPage />);
     await waitFor(() => screen.getByText("Approve 0"));
 
-    // "owner" is every row's createdBy/updatedBy, deduplicated with the approvers.
-    await waitFor(() => expect(requests).toEqual([["ann", "owner", "bob", "cal"]]));
+    // "owner" is every row's createdBy/updatedBy, deduplicated with the approvers
+    // and sent as one sorted set.
+    await waitFor(() => expect(requests).toEqual([["ann", "bob", "cal", "owner"]]));
   });
 
   it("shows the Description column by default", async () => {

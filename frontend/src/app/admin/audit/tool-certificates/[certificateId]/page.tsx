@@ -17,7 +17,7 @@ import { Chip } from "@/components/ui/chip";
 import { DateTime } from "@/components/ui/date-time";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { StatusDot } from "@/components/ui/status-dot";
-import { useUserNames } from "@/hooks/useUserNames";
+import { useUserNames } from "@/hooks/useNames";
 import {
   getMcpToolCertificateById,
   isForbiddenError,

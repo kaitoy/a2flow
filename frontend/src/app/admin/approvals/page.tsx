@@ -16,12 +16,14 @@ import { tenantColumn } from "@/components/admin/tenant-columns";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
-import { useGroupNames } from "@/hooks/useGroupNames";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import {
+  useGroupNames,
+  useTenantNames,
+  useUserNames,
+  useWorkflowExecutionNames,
+} from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { useTenantNames } from "@/hooks/useTenantNames";
-import { useUserNames } from "@/hooks/useUserNames";
-import { useWorkflowExecutionNames } from "@/hooks/useWorkflowExecutionNames";
 import { type Approval, listApprovals } from "@/lib/api";
 
 const LIMIT = 20;

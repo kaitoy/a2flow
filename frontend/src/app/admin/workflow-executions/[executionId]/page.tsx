@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
-import { useWorkflowNames } from "@/hooks/useWorkflowNames";
+import { useWorkflowNames } from "@/hooks/useNames";
 import {
   deleteWorkflowExecution,
   getUserNames,

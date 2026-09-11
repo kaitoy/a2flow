@@ -16,9 +16,8 @@ import { DateTime } from "@/components/ui/date-time";
 import { StatusDot } from "@/components/ui/status-dot";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { useTenantNames } from "@/hooks/useTenantNames";
-import { useUserNames } from "@/hooks/useUserNames";
 import { type ImpersonationEvent, listImpersonationEvents } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
