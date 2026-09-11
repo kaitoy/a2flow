@@ -57,7 +57,7 @@ Recipients who cannot be reached are skipped before any relay is contacted: the 
 
 Nothing is sent while a workflow operation is still in flight. The notification and its fully rendered message are written together, so a crash can never leave a notification whose email was never queued. A worker then drains that queue:
 
-- **Paced.** A rate limit holds the relay to a sustained rate with a small burst, and a whole batch goes out over one reused connection.
+- **Paced.** A rate limit holds the relay to a fixed number of messages per second, and a whole batch goes out over one reused connection.
 - **Retried.** A transient failure — the relay is down, or rejects the credentials — schedules another attempt with a growing backoff: 15s, 30s, 1m, 2m, doubling to an hour. The default budget rides out roughly an hour of downtime.
 - **Written off when hopeless.** A failure the relay reports as permanent, an unknown recipient say, is not retried at all. A message that is out of attempts, or failed permanently, stays on the queue as `failed` with its last error — a dead letter to look at, not a silent loss. Delivered messages are purged after 30 days; dead letters are kept.
 

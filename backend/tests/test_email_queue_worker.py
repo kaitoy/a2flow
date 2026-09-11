@@ -7,7 +7,7 @@ limiter is asked to allow.
 """
 
 import random
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -20,7 +20,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
 from infrastructure.email_sender import SmtpConfig
-from infrastructure.rate_limit import TokenBucket
 from models.outbound_email import (
     OutboundEmail,
     OutboundEmailCreate,
@@ -202,17 +201,20 @@ async def _rows(sessions: async_sessionmaker[AsyncSession]) -> list[OutboundEmai
         return list(result.all())
 
 
+async def _no_sleep(_seconds: float) -> None:
+    """Stand in for the pacing sleep so a test pass never waits."""
+
+
 def _worker(
     sessions: async_sessionmaker[AsyncSession],
     sender: _FakeSender,
     *,
-    bucket: TokenBucket | None = None,
+    sleep: Callable[[float], Awaitable[None]] | None = None,
     **config_overrides: Any,
 ) -> EmailQueueWorker:
     """Build a worker on the test database with a pinned clock and seeded jitter."""
     fields: dict[str, Any] = {
         "rate_per_second": 1000.0,
-        "burst": 1000,
         "batch_size": 20,
         "poll_interval_seconds": 0.0,
         "max_attempts": 9,
@@ -223,7 +225,7 @@ def _worker(
         EmailQueueConfig(**fields),
         sessions=sessions,
         sender=sender,  # type: ignore[arg-type]
-        bucket=bucket,
+        sleep=sleep if sleep is not None else _no_sleep,
         now=lambda: _NOW,
         rng=random.Random(0),
     )
@@ -296,16 +298,16 @@ async def test_every_message_passes_through_the_rate_limiter(
     for index in range(3):
         await _enqueue(sessions, to_email=f"user{index}@example.com")
     sender = _FakeSender()
-    clock = _VirtualClock()
-    # A bucket holding two permits and refilling slowly: the third message in
-    # the batch cannot go out without waiting, which is what proves the worker
-    # asks the limiter for every message rather than only between passes.
-    bucket = TokenBucket(1.0, 2, clock=clock.time, sleep=clock.sleep)
+    slept: list[float] = []
 
-    await _worker(sessions, sender, bucket=bucket).run_once()
+    async def sleep(seconds: float) -> None:
+        slept.append(seconds)
+
+    await _worker(sessions, sender, sleep=sleep, rate_per_second=2.0).run_once()
 
     assert len(sender.sent) == 3
-    assert clock.slept == [pytest.approx(1.0)]
+    # One pause of 1 / rate before every message, the first included.
+    assert slept == [pytest.approx(0.5)] * 3
 
 
 async def test_a_transient_failure_is_scheduled_for_another_attempt(
@@ -438,20 +440,3 @@ async def test_delivered_messages_past_their_retention_are_purged(
     remaining = {row.id for row in await _rows(sessions)}
     assert old_id not in remaining
     assert kept_id in remaining
-
-
-class _VirtualClock:
-    """A monotonic clock that advances only when something sleeps on it."""
-
-    def __init__(self) -> None:
-        self.now = 0.0
-        self.slept: list[float] = []
-
-    def time(self) -> float:
-        """Return the current virtual time, in seconds."""
-        return self.now
-
-    async def sleep(self, seconds: float) -> None:
-        """Advance the virtual clock instead of waiting."""
-        self.slept.append(seconds)
-        self.now += seconds

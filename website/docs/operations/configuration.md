@@ -174,7 +174,7 @@ These are the knobs for the queue that drains into the relay — see [The delive
 | Variable | Default | What it does |
 |---|---|---|
 | `EMAIL_WORKER_IN_PROCESS` | `true` | Whether the API process also runs the drain worker, so `uvicorn main:app` on its own delivers mail. Set it false when running a dedicated worker process — see [Process layout](./deployment.md#process-layout). Leaving both on is safe, just pointless: an advisory lock elects exactly one sender across the deployment |
-| `EMAIL_SEND_RATE_PER_SECOND` / `EMAIL_SEND_BURST` | `5.0` / `10` | Sustained messages per second handed to the relay, and how many may go out back-to-back after an idle period before that rate applies. Lower them to sit under a stricter relay limit |
+| `EMAIL_SEND_RATE_PER_SECOND` | `5.0` | Messages per second handed to the relay; the worker pauses `1 / rate` before each send. Lower it to sit under a stricter relay limit |
 | `EMAIL_QUEUE_BATCH_SIZE` / `EMAIL_QUEUE_POLL_INTERVAL_SECONDS` | `20` / `5.0` | How many messages one drain pass claims, and how long the worker sleeps when the queue is empty. The poll interval is the floor on delivery latency for a notification produced while the worker is asleep |
 | `EMAIL_MAX_ATTEMPTS` | `9` | Delivery attempts before a message becomes a dead letter. The backoff runs 15s, 30s, 1m, 2m and so on, capped at an hour, so the default rides out roughly an hour of relay downtime. A failure the relay reports as permanent is written off on the first attempt regardless |
 | `EMAIL_SENT_RETENTION_DAYS` | `30` | How long delivered messages are kept before the worker purges them. They are a record of what went out, not queue state. Dead letters are never purged |

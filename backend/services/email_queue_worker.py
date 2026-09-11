@@ -4,10 +4,9 @@ One process does this at a time. :func:`EmailQueueWorker.run_forever` holds the
 ``email-queue`` advisory lock (:func:`infrastructure.locks.email_queue_key`) for
 as long as it runs and simply waits when another replica already has it, so a
 horizontally scaled deployment still presents a single sender to the relay. That
-is what makes two otherwise awkward things easy: the rate limiter is a plain
-in-memory :class:`~infrastructure.rate_limit.TokenBucket` rather than something
-shared through the database, and one SMTP connection can stay open for a whole
-batch.
+is what makes two otherwise awkward things easy: the rate limit is a plain
+in-process sleep between sends rather than something shared through the
+database, and one SMTP connection can stay open for a whole batch.
 
 Each pass is :meth:`EmailQueueWorker.run_once`, which is also what the tests
 drive; :meth:`run_forever` is that in a loop with a sleep. A pass reclaims
@@ -23,7 +22,7 @@ decisions are *when* to send and what to do about a failure.
 import asyncio
 import logging
 import random
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -34,7 +33,6 @@ from config import get_settings
 from infrastructure.database import engine
 from infrastructure.email_sender import SmtpEmailSender, SmtpSession, get_email_sender
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, email_queue_key
-from infrastructure.rate_limit import TokenBucket
 from infrastructure.secret_cipher import get_secret_cipher
 from repositories.exceptions import EmailSendError
 from repositories.outbound_email_queue import ClaimedEmail, SqlOutboundEmailQueue
@@ -86,8 +84,8 @@ class EmailQueueConfig:
     """Tunables for one worker, resolved from the environment at startup.
 
     Attributes:
-        rate_per_second: Sustained messages per second handed to the relay.
-        burst: Messages allowed back-to-back after an idle period.
+        rate_per_second: Messages per second handed to the relay: the worker
+            waits ``1 / rate_per_second`` before each send.
         batch_size: Messages claimed per pass.
         poll_interval_seconds: Sleep between passes.
         max_attempts: Attempts a message gets before it becomes a dead letter.
@@ -95,7 +93,6 @@ class EmailQueueConfig:
     """
 
     rate_per_second: float
-    burst: int
     batch_size: int
     poll_interval_seconds: float
     max_attempts: int
@@ -107,7 +104,6 @@ class EmailQueueConfig:
         settings = get_settings()
         return cls(
             rate_per_second=settings.email_send_rate_per_second,
-            burst=settings.email_send_burst,
             batch_size=settings.email_queue_batch_size,
             poll_interval_seconds=settings.email_queue_poll_interval_seconds,
             max_attempts=settings.email_max_attempts,
@@ -124,15 +120,11 @@ class EmailQueueWorker:
         *,
         sessions: Callable[[], AsyncSession] | None = None,
         sender: SmtpEmailSender | None = None,
-        bucket: TokenBucket | None = None,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
         now: Callable[[], datetime] | None = None,
         rng: random.Random | None = None,
     ) -> None:
         """Wire a worker to its collaborators.
-
-        The rate limiter belongs to the worker rather than to a pass: the limit
-        applies to the relay over time, not to one batch, so it has to outlive
-        one drain.
 
         Args:
             config: The tunables this worker runs with.
@@ -140,7 +132,8 @@ class EmailQueueWorker:
                 fresh session on the application engine, since the worker runs
                 outside any request scope.
             sender: The SMTP adapter. Defaults to the process-wide singleton.
-            bucket: The rate limiter. Defaults to one built from ``config``.
+            sleep: Awaitable delay used to pace sends. Defaults to
+                :func:`asyncio.sleep`; injected so tests need not wait.
             now: Current time source. Injected so tests can pin it.
             rng: Randomness source for the retry jitter.
         """
@@ -149,11 +142,7 @@ class EmailQueueWorker:
         self._sender = sender if sender is not None else get_email_sender()
         self._now = now if now is not None else _utc_now
         self._rng = rng if rng is not None else random.Random()
-        self._bucket = (
-            bucket
-            if bucket is not None
-            else TokenBucket(config.rate_per_second, config.burst)
-        )
+        self._sleep = sleep if sleep is not None else asyncio.sleep
 
     async def run_forever(self) -> None:
         """Drain the queue until cancelled, as the deployment's single sender.
@@ -209,7 +198,9 @@ class EmailQueueWorker:
             sent = 0
             async with self._sender.session(smtp_config) as smtp:
                 for email in claimed:
-                    await self._bucket.take()
+                    # ponytail: a fixed pause before every send, no burst credit;
+                    # bring back a token bucket if idle-then-burst ever matters.
+                    await self._sleep(1 / self._config.rate_per_second)
                     if await self._deliver(queue, smtp, email):
                         sent += 1
             await self._purge(queue)

@@ -69,14 +69,10 @@ _DEFAULT_SESSION_FILES_MAX_TOTAL_BYTES = 200 * 1024 * 1024
 #: their own working day will want their local zone instead.
 _DEFAULT_METRICS_TIMEZONE = "UTC"
 
-#: Sustained rate, in messages per second, at which the email queue worker hands
-#: messages to the SMTP relay. Five a second is comfortably below what a typical
-#: relay throttles at while still clearing thousands of messages an hour.
+#: Rate, in messages per second, at which the email queue worker hands messages
+#: to the SMTP relay. Five a second is comfortably below what a typical relay
+#: throttles at while still clearing thousands of messages an hour.
 _DEFAULT_EMAIL_RATE_PER_SECOND = 5.0
-
-#: How many messages the rate limiter lets go out back-to-back after an idle
-#: period, before the sustained rate takes over.
-_DEFAULT_EMAIL_BURST = 10
 
 #: How many messages one drain pass claims at a time. Also bounds how many
 #: messages a sender that dies mid-pass leaves waiting on their lease.
@@ -257,10 +253,8 @@ class Settings(BaseSettings):
             dedicated ``worker`` process (see ``compose.yml``) sets it false.
             Leaving both on is safe — the ``email-queue`` advisory lock still
             elects exactly one sender — just pointless.
-        email_send_rate_per_second: Sustained messages per second handed to the
-            SMTP relay.
-        email_send_burst: How many messages may go out back-to-back after an
-            idle period before that sustained rate applies.
+        email_send_rate_per_second: Messages per second handed to the SMTP
+            relay; the worker pauses ``1 / rate`` before each send.
         email_queue_batch_size: How many messages one drain pass claims.
         email_queue_poll_interval_seconds: How long the worker sleeps when the
             queue is empty.
@@ -353,7 +347,6 @@ class Settings(BaseSettings):
 
     email_worker_in_process: bool = True
     email_send_rate_per_second: float = _DEFAULT_EMAIL_RATE_PER_SECOND
-    email_send_burst: int = _DEFAULT_EMAIL_BURST
     email_queue_batch_size: int = _DEFAULT_EMAIL_BATCH_SIZE
     email_queue_poll_interval_seconds: float = _DEFAULT_EMAIL_POLL_INTERVAL_SECONDS
     email_max_attempts: int = _DEFAULT_EMAIL_MAX_ATTEMPTS
