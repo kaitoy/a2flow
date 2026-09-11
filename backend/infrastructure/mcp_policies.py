@@ -94,22 +94,6 @@ async def _in_progress_tasks(
     return [t for t in tasks if t.status == WorkflowTaskStatus.in_progress]
 
 
-class PassThroughPolicy:
-    """Allows everything.
-
-    The base for a policy that guards only some operations, and the thing to
-    register when a chain must exist but decide nothing.
-    """
-
-    async def authorize(self, ctx: McpCallContext, db: AsyncSession) -> None:
-        """Allow the operation unconditionally.
-
-        Args:
-            ctx: The operation being attempted.
-            db: The gateway's open database session.
-        """
-
-
 class InProgressToolBindingPolicy:
     """Restricts a run to the MCP tools bound to a task it is currently working on.
 

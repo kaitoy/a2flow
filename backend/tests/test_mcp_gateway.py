@@ -43,7 +43,6 @@ from infrastructure.mcp_gateway import (
 )
 from infrastructure.mcp_policies import (
     InProgressToolBindingPolicy,
-    PassThroughPolicy,
     default_policies,
 )
 from infrastructure.secret_cipher import get_secret_cipher
@@ -440,19 +439,6 @@ async def test_listing_consults_the_chain_with_its_own_operation(
     assert [c.operation for c in spy.contexts] == [McpOperation.list_tools]
     assert spy.contexts[0].server_id == server_id
     assert spy.contexts[0].server_name == "visible"
-
-
-async def test_pass_through_policy_allows_everything(engine: AsyncEngine) -> None:
-    identity = McpIdentity(tenant_id="t", execution_id=None)
-    ctx = McpCallContext(
-        operation=McpOperation.call_tool,
-        principal=_principal(),
-        identity=identity,
-        server_id="srv",
-        tool_name="anything",
-    )
-    async with AsyncSession(engine) as db:
-        await PassThroughPolicy().authorize(ctx, db)
 
 
 def test_default_policies_start_with_the_binding_rule() -> None:
