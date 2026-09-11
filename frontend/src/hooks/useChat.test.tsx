@@ -113,6 +113,7 @@ describe("useChat", () => {
         isStreaming: false,
         error: null,
         pendingRenderCalls: [],
+        suggestions: [],
       },
     });
     renderHook(() => useChat(null), { wrapper: makeWrapper(store) });
@@ -130,6 +131,7 @@ describe("useChat", () => {
         isStreaming: false,
         error: null,
         pendingRenderCalls: [],
+        suggestions: [],
       },
     });
     renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });
@@ -146,6 +148,7 @@ describe("useChat", () => {
         isStreaming: false,
         error: null,
         pendingRenderCalls: [{ toolCallId: "tc-1", surfaceId: "s1" }],
+        suggestions: [],
       },
     });
     const { result } = renderHook(() => useChat("sess-abc"), { wrapper: makeWrapper(store) });

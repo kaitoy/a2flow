@@ -19,6 +19,7 @@ import {
   TOOL_CALL_ACTIVITY_TYPE,
 } from "@/lib/agentActivity";
 import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
+import { parseReplySuggestions, SUGGEST_REPLIES_TOOL_NAME } from "@/lib/replySuggestions";
 import {
   parseSessionFileResult,
   SESSION_FILE_ACTIVITY_TYPE,
@@ -210,6 +211,51 @@ function derivePendingRenderCalls(messages: Message[]): PendingRenderCall[] {
 }
 
 /**
+ * Derive the reply suggestions still worth offering from a persisted message
+ * history: the ones the agent named in its **last turn**, if that turn ended
+ * waiting for the user.
+ *
+ * The history is walked backwards. A `user` message ends the search empty —
+ * whatever was suggested has been answered. So does a `tool` message answering
+ * a client tool (`render_a2ui`, `render_approval`): that is a user acting on a
+ * surface or deciding an approval, after which the agent may well have carried
+ * on and finished without asking anything, and the chips from before the action
+ * must not outlive it. Results of backend tools are passed over, since the agent
+ * calls several of them between naming the suggestions and writing its question.
+ * The first `suggest_replies` call met on the way back is the current one.
+ *
+ * Like {@link derivePendingRenderCalls} this reads the history rather than the
+ * live stream, so it also restores chips this browser never streamed — after a
+ * reload, or when another participant's run produced them.
+ */
+function deriveSuggestions(messages: Message[]): string[] {
+  const clientCallIds = new Set<string>();
+  for (const msg of messages) {
+    if (msg.role !== "assistant" || !msg.toolCalls) continue;
+    for (const tc of msg.toolCalls) {
+      if (
+        tc.function.name === RENDER_A2UI_TOOL_NAME ||
+        tc.function.name === RENDER_APPROVAL_TOOL_NAME
+      ) {
+        clientCallIds.add(tc.id);
+      }
+    }
+  }
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === "user") return [];
+    if (msg.role === "tool" && clientCallIds.has(msg.toolCallId)) return [];
+    if (msg.role !== "assistant" || !msg.toolCalls) continue;
+    for (const tc of msg.toolCalls) {
+      if (tc.function.name !== SUGGEST_REPLIES_TOOL_NAME) continue;
+      const args = parseToolArgs(tc.function.arguments);
+      return args === null ? [] : parseReplySuggestions(args);
+    }
+  }
+  return [];
+}
+
+/**
  * The activity messages already on screen that a poll should re-use instead of
  * replacing with an equivalent rebuild.
  *
@@ -366,6 +412,12 @@ interface ChatState {
   error: string | null;
   /** render_a2ui calls awaiting an acknowledging tool result on the next agent run. */
   pendingRenderCalls: PendingRenderCall[];
+  /**
+   * Replies the agent suggested when it last stopped to wait for the user,
+   * shown as one-click drafts under the chat input. Empty once the user has
+   * sent or acted on something — see `deriveSuggestions`.
+   */
+  suggestions: string[];
 }
 
 const initialState: ChatState = {
@@ -375,6 +427,7 @@ const initialState: ChatState = {
   isStreaming: false,
   error: null,
   pendingRenderCalls: [],
+  suggestions: [],
 };
 
 const chatSlice = createSlice({
@@ -388,6 +441,7 @@ const chatSlice = createSlice({
       state.isStreaming = false;
       state.error = null;
       state.pendingRenderCalls = [];
+      state.suggestions = [];
     },
     resumeSession(state, action: PayloadAction<{ sessionId: string; messages: Message[] }>) {
       state.sessionId = action.payload.sessionId;
@@ -401,6 +455,7 @@ const chatSlice = createSlice({
       // rendered by another participant's run) so a later user action can
       // still be delivered as the acted-on call's tool result.
       state.pendingRenderCalls = derivePendingRenderCalls(action.payload.messages);
+      state.suggestions = deriveSuggestions(action.payload.messages);
     },
     /**
      * Merge a freshly polled history into the rendered messages without
@@ -487,6 +542,7 @@ const chatSlice = createSlice({
       // a dismiss button, and `addUserMessage` / `startRun` clear it when the
       // user tries again.
       state.pendingRenderCalls = derivePendingRenderCalls(polled);
+      state.suggestions = deriveSuggestions(polled);
     },
     addUserMessage(state, action: PayloadAction<{ id: string; content: string }>) {
       state.messages.push({
@@ -496,6 +552,7 @@ const chatSlice = createSlice({
       });
       state.isRunning = true;
       state.error = null;
+      state.suggestions = [];
     },
     startAssistantMessage(state, action: PayloadAction<string>) {
       state.messages.push({
@@ -550,6 +607,7 @@ const chatSlice = createSlice({
     startRun(state) {
       state.isRunning = true;
       state.error = null;
+      state.suggestions = [];
     },
     finishRun(state) {
       state.isRunning = false;
@@ -568,6 +626,14 @@ const chatSlice = createSlice({
     },
     clearPendingRenderCalls(state) {
       state.pendingRenderCalls = [];
+    },
+    /**
+     * Record the replies a `suggest_replies` call named during the live run.
+     * The composer only shows them once the run ends, and the post-run resync
+     * re-derives the same list from the persisted history.
+     */
+    setSuggestions(state, action: PayloadAction<string[]>) {
+      state.suggestions = action.payload;
     },
   },
 });
@@ -588,6 +654,7 @@ export const {
   clearError,
   addPendingRenderCall,
   clearPendingRenderCalls,
+  setSuggestions,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

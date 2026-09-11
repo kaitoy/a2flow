@@ -57,11 +57,11 @@ Clicking a button sends the surface's **whole data model** back — every value 
 So you can see what the agent is doing between replies, its intermediate work is surfaced inline in the chat stream:
 
 - **Working indicator** — while a run is in flight but nothing is on screen yet, a subtle pulse appears at the bottom of the message list.
-- **Tool-call lines** — every backend tool call (e.g. `list_workflow_tasks`, `update_workflow_task`) becomes a compact status line that transitions from a spinner (`running…`) to a check (`done`). Calls routed through the [tool proxy](./mcp-proxy.md) are shown under the **real MCP tool name** with an `MCP` tag. The `render_a2ui` and `render_approval` client tools, and the tool that writes a session file, keep their dedicated UI and are not shown as tool lines.
+- **Tool-call lines** — every backend tool call (e.g. `list_workflow_tasks`, `update_workflow_task`) becomes a compact status line that transitions from a spinner (`running…`) to a check (`done`). Calls routed through the [tool proxy](./mcp-proxy.md) are shown under the **real MCP tool name** with an `MCP` tag. The `render_a2ui` and `render_approval` client tools, the tool that writes a session file, and the one that proposes [suggested replies](../guides/workflow-executions.md#suggested-replies) keep their dedicated UI and are not shown as tool lines.
 - **Call details** — a tool line with arguments or a result **expands on click** to show both as formatted JSON, so what the agent actually sent and got back is inspectable without leaving the chat. A line answered by a [tool mock](./mcp-proxy.md#tool-mocks-and-dry-runs) carries a `Mocked` badge — and the chat is the *only* place to inspect one, since a stubbed call never reaches the proxy and so leaves no audit record.
 - **Reasoning** — when a thinking-capable model streams its reasoning, the thoughts render as a muted "Thinking" panel. A model that reasons internally without emitting thought summaries produces no panel.
 
-On session resume, **MCP tool calls** and **file cards** are reconstructed from history; other internal A2Flow tool calls and reasoning are live-only. A file card is rebuilt because the file outlives the run that produced it and the chat is the only place its download link appears.
+On session resume, **MCP tool calls**, **file cards** and the **suggested replies** of the last turn are reconstructed from history; other internal A2Flow tool calls and reasoning are live-only. A file card is rebuilt because the file outlives the run that produced it and the chat is the only place its download link appears; the suggestions are rebuilt because the question they answer is still open.
 
 ## Files in a session {#files-in-a-session}
 

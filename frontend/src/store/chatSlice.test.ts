@@ -12,6 +12,8 @@ import {
   TOOL_CALL_ACTIVITY_TYPE,
   type ToolCallActivityContent,
 } from "@/lib/agentActivity";
+import { RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
+import { SUGGEST_REPLIES_TOOL_NAME } from "@/lib/replySuggestions";
 import { SESSION_FILE_ACTIVITY_TYPE, WRITE_SESSION_FILE_TOOL_NAME } from "@/lib/sessionFileTool";
 import type { Message, RenderedMessage } from "./chatSlice";
 import chatReducer, {
@@ -27,11 +29,44 @@ import chatReducer, {
   resumeSession,
   setError,
   setSession,
+  setSuggestions,
   startAssistantMessage,
+  startRun,
   syncPolledMessages,
 } from "./chatSlice";
 
 const emptyState = chatReducer(undefined, { type: "@@INIT" });
+
+/** An assistant message carrying one tool call, as the persisted history returns it. */
+function assistantCall(id: string, toolCallId: string, name: string, args: unknown): Message {
+  return {
+    id,
+    role: "assistant",
+    content: "",
+    toolCalls: [
+      { id: toolCallId, type: "function", function: { name, arguments: JSON.stringify(args) } },
+    ],
+  };
+}
+
+/** A tool-result message answering `toolCallId`. */
+function toolResult(id: string, toolCallId: string, content: string): Message {
+  return { id, role: "tool", toolCallId, content };
+}
+
+/**
+ * The history of one agent turn that named suggestions: the call, its ack, a
+ * backend tool it used afterwards, and the question it then asked.
+ */
+function suggestingTurn(prefix: string, suggestions: string[]): Message[] {
+  return [
+    assistantCall(`${prefix}-sug`, `${prefix}-tc-sug`, SUGGEST_REPLIES_TOOL_NAME, { suggestions }),
+    toolResult(`${prefix}-sug-r`, `${prefix}-tc-sug`, '{"status":"ok"}'),
+    assistantCall(`${prefix}-list`, `${prefix}-tc-list`, "list_workflow_tasks", {}),
+    toolResult(`${prefix}-list-r`, `${prefix}-tc-list`, "[]"),
+    { id: `${prefix}-q`, role: "assistant", content: "Which region?" },
+  ];
+}
 
 describe("chatSlice", () => {
   describe("setSession", () => {
@@ -46,6 +81,106 @@ describe("chatSlice", () => {
       expect(state.isStreaming).toBe(false);
       expect(state.error).toBeNull();
       expect(state.pendingRenderCalls).toEqual([]);
+    });
+
+    it("drops the previous session's suggestions", () => {
+      const state = chatReducer({ ...emptyState, suggestions: ["Yes"] }, setSession("new-session"));
+      expect(state.suggestions).toEqual([]);
+    });
+  });
+
+  describe("suggestions", () => {
+    const resume = (messages: Message[]) =>
+      chatReducer(
+        { ...emptyState, suggestions: ["stale"] },
+        resumeSession({ sessionId: "sess-1", messages })
+      ).suggestions;
+
+    it("restores the replies named in the last turn from the history", () => {
+      expect(resume([...suggestingTurn("t1", ["Yes, go ahead", "Skip"])])).toEqual([
+        "Yes, go ahead",
+        "Skip",
+      ]);
+    });
+
+    it("prefers the latest turn's replies", () => {
+      expect(
+        resume([
+          ...suggestingTurn("t1", ["Old"]),
+          { id: "u1", role: "user", content: "eu-west-1" },
+          ...suggestingTurn("t2", ["New"]),
+        ])
+      ).toEqual(["New"]);
+    });
+
+    it("is empty once the user has replied", () => {
+      expect(
+        resume([...suggestingTurn("t1", ["Yes"]), { id: "u1", role: "user", content: "no" }])
+      ).toEqual([]);
+    });
+
+    it("is empty once the user has acted on a surface or an approval", () => {
+      const acted = [
+        ...suggestingTurn("t1", ["Yes"]),
+        assistantCall("a1", "tc-a2ui", RENDER_A2UI_TOOL_NAME, { surfaceId: "s" }),
+        toolResult("a1-r", "tc-a2ui", '{"status":"action","values":{}}'),
+        { id: "a2", role: "assistant", content: "Done." },
+      ] satisfies Message[];
+      expect(resume(acted)).toEqual([]);
+
+      const decided = [
+        ...suggestingTurn("t1", ["Approve"]),
+        assistantCall("p1", "tc-appr", RENDER_APPROVAL_TOOL_NAME, { approvalId: "ap" }),
+        toolResult("p1-r", "tc-appr", '{"decision":"approved"}'),
+      ] satisfies Message[];
+      expect(resume(decided)).toEqual([]);
+    });
+
+    it("is empty when the last turn named none", () => {
+      expect(
+        resume([
+          ...suggestingTurn("t1", ["Yes"]),
+          { id: "u1", role: "user", content: "ok" },
+          { id: "a2", role: "assistant", content: "Working on it." },
+        ])
+      ).toEqual([]);
+      expect(resume([])).toEqual([]);
+    });
+
+    it("tolerates unparsable arguments", () => {
+      expect(
+        resume([
+          {
+            id: "m1",
+            role: "assistant",
+            content: "",
+            toolCalls: [
+              {
+                id: "tc",
+                type: "function",
+                function: { name: SUGGEST_REPLIES_TOOL_NAME, arguments: "{not json" },
+              },
+            ],
+          },
+        ])
+      ).toEqual([]);
+    });
+
+    it("is derived by a poll too", () => {
+      const state = chatReducer(
+        emptyState,
+        syncPolledMessages({ sessionId: "sess-1", messages: suggestingTurn("t1", ["Yes"]) })
+      );
+      expect(state.suggestions).toEqual(["Yes"]);
+    });
+
+    it("is set live by setSuggestions and cleared when the user sends or acts", () => {
+      const live = chatReducer(emptyState, setSuggestions(["Yes", "No"]));
+      expect(live.suggestions).toEqual(["Yes", "No"]);
+      expect(chatReducer(live, addUserMessage({ id: "u1", content: "Yes" })).suggestions).toEqual(
+        []
+      );
+      expect(chatReducer(live, startRun()).suggestions).toEqual([]);
     });
   });
 

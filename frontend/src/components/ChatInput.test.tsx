@@ -234,4 +234,44 @@ describe("ChatInput", () => {
       expect(screen.getByText("dropped.txt")).toBeInTheDocument();
     });
   });
+
+  describe("suggested replies", () => {
+    const suggestions = ["Yes, go ahead", "Skip this step"];
+
+    it("offers each suggestion as a chip", () => {
+      render(<ChatInput onSend={vi.fn()} disabled={false} suggestions={suggestions} />);
+      const group = screen.getByRole("group", { name: "Suggested replies" });
+      expect(group).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Yes, go ahead" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Skip this step" })).toBeInTheDocument();
+    });
+
+    it("clicking a chip drafts the reply without sending it", async () => {
+      const onSend = vi.fn();
+      render(<ChatInput onSend={onSend} disabled={false} suggestions={suggestions} />);
+      await userEvent.click(screen.getByRole("button", { name: "Skip this step" }));
+      const textbox = screen.getByRole<HTMLTextAreaElement>("textbox");
+      expect(textbox).toHaveValue("Skip this step");
+      expect(onSend).not.toHaveBeenCalled();
+      // Focus lands on the draft with the caret at its end, so typing on
+      // continues the reply rather than prepending to it.
+      expect(textbox).toHaveFocus();
+      expect(textbox.selectionStart).toBe("Skip this step".length);
+      await userEvent.keyboard(" today");
+      expect(textbox).toHaveValue("Skip this step today");
+      // The row stays, so another chip can still replace the draft.
+      await userEvent.click(screen.getByRole("button", { name: "Yes, go ahead" }));
+      expect(textbox).toHaveValue("Yes, go ahead");
+    });
+
+    it("hides the chips while a run is in flight", () => {
+      render(<ChatInput onSend={vi.fn()} disabled={true} suggestions={suggestions} />);
+      expect(screen.queryByRole("group", { name: "Suggested replies" })).not.toBeInTheDocument();
+    });
+
+    it("renders no row without suggestions", () => {
+      render(<ChatInput onSend={vi.fn()} disabled={false} suggestions={[]} />);
+      expect(screen.queryByRole("group", { name: "Suggested replies" })).not.toBeInTheDocument();
+    });
+  });
 });

@@ -72,6 +72,7 @@ beforeEach(() => {
     isStreaming: false,
     error: null,
     pendingRenderCalls: [],
+    suggestions: [],
     sendMessage: vi.fn(),
     sendA2uiAction: vi.fn(),
     sendApprovalResult: vi.fn(),

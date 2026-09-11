@@ -170,9 +170,8 @@ export function useWorkflowSessionChat(
   const buildAgent = isDesign ? createDesignSessionAgent : createWorkflowSessionAgent;
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
-  const { messages, isRunning, isStreaming, error, pendingRenderCalls } = useAppSelector(
-    (s) => s.chat
-  );
+  const { messages, isRunning, isStreaming, error, pendingRenderCalls, suggestions } =
+    useAppSelector((s) => s.chat);
   const autoSentRef = useRef(false);
   // The session the mount effect has already initialized. React StrictMode (and
   // Fast Refresh) mount, unmount, then remount in development, re-invoking the
@@ -516,6 +515,7 @@ export function useWorkflowSessionChat(
     isStreaming,
     error,
     pendingRenderCalls,
+    suggestions,
     sendMessage,
     sendA2uiAction,
     sendApprovalResult,

@@ -76,6 +76,19 @@ The page refreshes itself every few seconds so each participant sees the others'
 
 The [design session](./workflows.md#adjusting-the-task-templates) is a shared chat too, with the same avatars and the same live updates. It is shared by the tenant's Developers rather than by a run's participants.
 
+### Suggested replies {#suggested-replies}
+
+When the agent stops to wait for you — it asked a question, wants a value, or needs a go-ahead — a row of **suggested replies** appears above the chat input: a few short answers it expects, such as `Yes, go ahead` or `Skip this step`.
+
+| | |
+|---|---|
+| **Clicking one** | Puts that text into the chat input. Nothing is sent — edit it, or send it as it is |
+| **While the agent is working** | The row is hidden; it comes back with the agent's next question |
+| **After you reply** | The row goes away, and the next question brings its own suggestions |
+| **After a reload** | The same row is there, for every participant who can send |
+
+The suggestions are the agent's guess at what you would type, not a menu of the only allowed answers — a question with a fixed set of answers is asked as a choice inside the message instead. The row is a workflow session feature; the design session has none.
+
 ### Files in the session {#files-in-the-session}
 
 A workflow session carries files as well as messages. Attach one with the **paperclip** button beside the chat input, or drop it anywhere on the input box: each file appears as a chip above the box, and the × on a chip removes it. Nothing is sent until you send the message, so removing a chip simply drops that file — it never reaches the run.

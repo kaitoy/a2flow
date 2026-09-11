@@ -651,6 +651,10 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
     assert "task list is fixed" in rendered
     assert "create_workflow_task" not in rendered
     assert "delete_workflow_task" not in rendered
+    # Before stopping to wait for the user, the agent names a few likely
+    # replies; the chat shows them as one-click drafts under the input.
+    assert "call `suggest_replies` FIRST" in rendered
+    assert "at most 30 characters" in rendered
 
 
 def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None:
@@ -677,6 +681,8 @@ def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None
     assert "do not invent a `ChoicePicker` for it" in rendered
     # Titles are listed as chips, so the shared rules ask for short ones.
     assert "at most 30 characters" in rendered
+    # Reply suggestions are a workflow-session feature; the design chat has none.
+    assert "suggest_replies" not in rendered
 
 
 def test_create_agent_initial_design_kind_has_no_a2ui(tmp_path: Any) -> None:
@@ -699,6 +705,7 @@ def test_create_agent_initial_design_kind_has_no_a2ui(tmp_path: Any) -> None:
 def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
     from infrastructure.agent import create_agent
     from infrastructure.approval_tools import get_approval, list_users, request_approval
+    from infrastructure.reply_suggestion_tools import suggest_replies
     from infrastructure.workflow_task_tools import (
         get_workflow_task,
         list_workflow_tasks,
@@ -713,6 +720,7 @@ def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
         request_approval,
         get_approval,
         list_users,
+        suggest_replies,
     ):
         assert tool in agent.tools
     # The execution agent can only advance a task's status, never add or remove
@@ -726,6 +734,7 @@ def test_create_agent_design_kind_attaches_design_tools(tmp_path: Any) -> None:
     from infrastructure.agent import AgentKind, create_agent
     from infrastructure.approval_tools import request_approval
     from infrastructure.mcp_tools import call_mcp_tool
+    from infrastructure.reply_suggestion_tools import suggest_replies
     from infrastructure.task_template_tools import (
         create_task_template,
         delete_task_template,
@@ -748,6 +757,8 @@ def test_create_agent_design_kind_attaches_design_tools(tmp_path: Any) -> None:
     # Design never executes: no MCP invocation and no approval flow.
     assert call_mcp_tool not in agent.tools
     assert request_approval not in agent.tools
+    # Reply suggestions are shown only in the workflow session chat.
+    assert suggest_replies not in agent.tools
 
 
 def test_register_tool_excludes_tool_context_from_declaration() -> None:

@@ -3,6 +3,7 @@
 import { animated, useSpring } from "@react-spring/web";
 import { Paperclip } from "lucide-react";
 import { type DragEvent, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMotionConfig } from "@/lib/motion";
 import { formatFileSize, MAX_ATTACHMENT_BYTES } from "@/lib/sessionFileTool";
@@ -41,6 +42,13 @@ interface Props {
    * because only a workflow session has a file store to attach to.
    */
   allowAttachments?: boolean;
+  /**
+   * Replies the agent suggested when it last stopped to wait for the user,
+   * offered as a row of clickable chips above the textarea. Clicking one only
+   * fills the textarea — the user edits or sends it themselves. Hidden while
+   * {@link Props.disabled}, since a run in flight has nothing to answer yet.
+   */
+  suggestions?: string[];
 }
 
 /**
@@ -53,8 +61,18 @@ interface Props {
  * `File` objects and handed to {@link Props.onSend} only when the message is
  * sent. Nothing is uploaded before that, which is what makes removing a chip a
  * purely local act: an abandoned draft leaves nothing behind on the server.
+ *
+ * {@link Props.suggestions} render as chips above the textarea; a click drops
+ * the reply into the textarea as a draft and leaves the row in place, so the
+ * user can still swap it for another before sending.
  */
-export function ChatInput({ onSend, disabled, leading, allowAttachments = false }: Props) {
+export function ChatInput({
+  onSend,
+  disabled,
+  leading,
+  allowAttachments = false,
+  suggestions = [],
+}: Props) {
   const coarsePointer = useMediaQuery("(pointer: coarse)");
   const [value, setValue] = useState("");
   const [files, setFiles] = useState<StagedFile[]>([]);
@@ -127,6 +145,21 @@ export function ChatInput({ onSend, disabled, leading, allowAttachments = false 
     el.style.height = `${el.scrollHeight}px`;
   };
 
+  /** Put a suggested reply into the textarea as an editable draft. */
+  const applySuggestion = (text: string) => {
+    // Committed synchronously so the textarea already holds the draft when it
+    // is sized and focused below — deferring that to the next frame is not an
+    // option, since a background tab never gets one. The caret goes to the end
+    // explicitly: a programmatic focus otherwise leaves it at the start, and
+    // anything typed next would land in front of the draft.
+    flushSync(() => setValue(text));
+    handleInput();
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  };
+
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     if (!allowAttachments) return;
     e.preventDefault();
@@ -162,6 +195,14 @@ export function ChatInput({ onSend, disabled, leading, allowAttachments = false 
           .filter(Boolean)
           .join(" ")}
       >
+        {suggestions.length > 0 && !disabled && (
+          <fieldset className="flex min-w-0 flex-wrap gap-1.5 px-1 pt-1">
+            <legend className="sr-only">Suggested replies</legend>
+            {suggestions.map((text) => (
+              <Chip key={text} label={text} onClick={() => applySuggestion(text)} />
+            ))}
+          </fieldset>
+        )}
         {files.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-1 pt-1">
             {files.map(({ id, file }) => (

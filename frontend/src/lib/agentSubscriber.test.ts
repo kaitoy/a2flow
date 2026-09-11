@@ -7,6 +7,7 @@ import {
 } from "@/lib/agentActivity";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import { RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
+import { SUGGEST_REPLIES_TOOL_NAME } from "@/lib/replySuggestions";
 import { makeStore } from "@/test/test-utils";
 
 function lastActivity(store: ReturnType<typeof makeStore>) {
@@ -135,6 +136,31 @@ describe("createAgentSubscriber", () => {
       toolCallArgs: { approvalId: "appr-1" },
     } as never);
     expect(onRenderApprovalEnd).toHaveBeenCalledWith("tc-appr", { approvalId: "appr-1" });
+    expect(store.getState().chat.messages).toHaveLength(0);
+  });
+
+  it("stores a suggest_replies call's replies without a tool line", async () => {
+    const store = makeStore();
+    const sub = createAgentSubscriber(store.dispatch, { onRenderA2uiEnd: vi.fn() });
+
+    await sub.onToolCallStartEvent?.({
+      event: { toolCallId: "tc-sug", toolCallName: SUGGEST_REPLIES_TOOL_NAME },
+    } as never);
+    expect(store.getState().chat.messages).toHaveLength(0);
+
+    await sub.onToolCallEndEvent?.({
+      event: { toolCallId: "tc-sug" },
+      toolCallName: SUGGEST_REPLIES_TOOL_NAME,
+      toolCallArgs: { suggestions: ["Yes, go ahead", " Skip this step ", 7] },
+    } as never);
+    expect(store.getState().chat.suggestions).toEqual(["Yes, go ahead", "Skip this step"]);
+    expect(store.getState().chat.messages).toHaveLength(0);
+
+    // The bare ack that comes back has no line to attach to, and must not
+    // conjure one.
+    await sub.onToolCallResultEvent?.({
+      event: { toolCallId: "tc-sug", content: '{"status":"ok"}' },
+    } as never);
     expect(store.getState().chat.messages).toHaveLength(0);
   });
 

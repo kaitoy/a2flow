@@ -46,6 +46,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
     isStreaming,
     error,
     pendingRenderCalls,
+    suggestions,
     sendMessage,
     sendA2uiAction,
     sendApprovalResult,
@@ -174,7 +175,12 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
           onApprovalResolved={sendApprovalResult}
           pendingRenderCalls={pendingRenderCalls}
         />
-        <ChatInput onSend={sendMessage} disabled={isRunning} allowAttachments />
+        <ChatInput
+          onSend={sendMessage}
+          disabled={isRunning}
+          allowAttachments
+          suggestions={suggestions}
+        />
       </div>
     </div>
   );

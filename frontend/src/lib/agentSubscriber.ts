@@ -12,6 +12,7 @@ import {
 } from "@/lib/agentActivity";
 import { RENDER_APPROVAL_TOOL_NAME } from "@/lib/approvalTool";
 import { logAgUiEvent } from "@/lib/devEventLogger";
+import { parseReplySuggestions, SUGGEST_REPLIES_TOOL_NAME } from "@/lib/replySuggestions";
 import {
   parseSessionFileResult,
   SESSION_FILE_ACTIVITY_TYPE,
@@ -24,6 +25,7 @@ import {
   attachToolCallResult,
   endAssistantMessage,
   setError,
+  setSuggestions,
   startAssistantMessage,
 } from "@/store/chatSlice";
 
@@ -58,7 +60,9 @@ export interface AgentSubscriberOptions {
  * agent's intermediate work in the chat stream: each non-rendering tool call
  * becomes a {@link TOOL_CALL_ACTIVITY_TYPE} activity line that transitions from
  * `running` to `done`, and streamed `REASONING_*` events accumulate into a
- * {@link REASONING_ACTIVITY_TYPE} "thinking" panel.
+ * {@link REASONING_ACTIVITY_TYPE} "thinking" panel. A `suggest_replies` call
+ * becomes no line at all: its arguments go straight to the store's reply
+ * suggestions, which the composer shows once the run ends.
  *
  * @param dispatch - The Redux dispatch used to apply the mapped actions.
  * @param options - Per-surface callbacks (see {@link AgentSubscriberOptions}).
@@ -133,6 +137,11 @@ export function createAgentSubscriber(
         // card is built in onToolCallResultEvent. Remember the id here, since
         // that event carries no tool name of its own.
         sessionFileCallIds.add(event.toolCallId);
+        return;
+      }
+      if (toolCallName === SUGGEST_REPLIES_TOOL_NAME) {
+        // The whole payload is in the arguments; the result is a bare ack.
+        dispatch(setSuggestions(parseReplySuggestions(toolCallArgs)));
         return;
       }
       if (isHiddenToolName(toolCallName)) return;

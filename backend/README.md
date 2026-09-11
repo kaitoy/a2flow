@@ -284,7 +284,7 @@ Skill-bound agents are built in one of three roles (`AgentKind` in `infrastructu
 
 - **`initial_design`** — the unattended background run of "Generate workflow". No A2UI toolset (no client is connected); tools: `register_task_templates`, `list_task_templates`, `list_mcp_tools`.
 - **`design`** — the interactive [design session](#design-sessions) chat. Tools: the full task-template set plus `list_mcp_tools`; never executes, and has no approval or MCP-invocation tools.
-- **`execution`** — a workflow execution's session. The tasks come pre-copied from the templates, so there is no bulk registration and no design-approval wait: the instruction says to **begin executing immediately**. Tools: task inspection (`list`/`get`) and status advancement (`update_workflow_task`) — it cannot add, remove, or restructure the run's tasks — plus the approval tools and the MCP proxies.
+- **`execution`** — a workflow execution's session. The tasks come pre-copied from the templates, so there is no bulk registration and no design-approval wait: the instruction says to **begin executing immediately**. Tools: task inspection (`list`/`get`) and status advancement (`update_workflow_task`) — it cannot add, remove, or restructure the run's tasks — plus the approval tools, the MCP proxies, the session-file tools, and `suggest_replies`.
 
 | Tool | Kind | Purpose |
 |---|---|---|
@@ -299,6 +299,7 @@ Skill-bound agents are built in one of three roles (`AgentKind` in `infrastructu
 | `list_user_groups` | execution | List the tenant's user groups that have at least one member able to approve (id, name, description, `eligible_approver_count`) so the agent can choose an `approver_group_id` for `request_approval` |
 | `list_mcp_tools` | design + execution | Discover the tools advertised by every [registered MCP server](#mcp-servers) (queried live and concurrently; per-server failures are isolated) |
 | `call_mcp_tool` | execution | Invoke an MCP tool bound to the task currently `in_progress`; calls to unbound tools are rejected with an error listing the allowed tools |
+| `suggest_replies` | execution | Name two to four short replies the user is likely to give, called right before the agent stops to wait for them (a question, an input request, a `render_a2ui` surface). Stores nothing and returns a bare ack: the frontend reads the list from the persisted call's arguments and shows it as one-click drafts under the chat input, live and on reload alike (`frontend/src/lib/replySuggestions.ts`, `deriveSuggestions` in `chatSlice.ts`) |
 
 `request_approval` and `call_mcp_tool` are the two tools a draft run may **mock** — see [Tool mocks](#tool-mocks). A mocked call returns the configured result with `"mocked": true` and performs none of the tool's side effects. It is still authorized first: a mocked `call_mcp_tool` targeting an unbound tool is rejected exactly like a real one.
 

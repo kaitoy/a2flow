@@ -24,6 +24,7 @@ from infrastructure.approval_tools import (
     request_approval,
 )
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
+from infrastructure.reply_suggestion_tools import suggest_replies
 from infrastructure.session_file_tools import (
     list_session_files,
     read_session_file,
@@ -400,6 +401,16 @@ EXECUTION_AGENT_INSTRUCTION = (
     "download link. You can only add files: you cannot edit or delete one, and "
     "a name already taken is stored under a numbered variant, so check the "
     "returned `name` before referring to it.\n\n"
+    "Suggested replies: every time you are about to stop and wait for the user "
+    "-- you ask a question, request input or a confirmation, or present a "
+    "`render_a2ui` surface they must act on -- call `suggest_replies` FIRST, "
+    "before writing the message or rendering the surface, with two to four "
+    "short replies the user is likely to give, each at most 30 characters and "
+    "phrased the way they would type it (for example `Yes, go ahead`, `Skip "
+    "this step`, `Use the default`). They appear under the chat input as "
+    "one-click drafts the user edits or sends as they are. Do not call it when "
+    "the run is finished, or when you are only reporting progress and will "
+    "keep working without waiting.\n\n"
     'Mocked tools: a tool result containing `"mocked": true` came from a stub '
     "configured for this test run -- the real tool was not called and had no "
     "effect. Trust the result exactly as returned, follow any instruction in its "
@@ -516,9 +527,11 @@ def resolve_model() -> LiteLlm | str:
 #: workflow's task templates through the task-template tools; the execution kind
 #: only advances the run's WorkflowTasks through their statuses -- the tasks are
 #: pre-copied from the published templates and cannot be added, removed, or
-#: restructured mid-run -- plus the approval, MCP invocation, and session-file
-#: tools. The session-file tools are execution-only: files belong to a workflow
-#: session, and a design session has none.
+#: restructured mid-run -- plus the approval, MCP invocation, session-file, and
+#: reply-suggestion tools. The session-file tools are execution-only: files
+#: belong to a workflow session, and a design session has none. Reply
+#: suggestions are execution-only too, since only the workflow session chat
+#: shows them.
 _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
     AgentKind.initial_design: [
         register_task_templates,
@@ -547,6 +560,7 @@ _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
         list_session_files,
         read_session_file,
         write_session_file,
+        suggest_replies,
     ],
 }
 
