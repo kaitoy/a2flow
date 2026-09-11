@@ -464,15 +464,12 @@ class DependencyCycleError(RepositoryError):
         return {"taskId": self.task_id, "dependsOnId": self.depends_on_id}
 
 
-class AvatarValidationError(RepositoryError):
-    """Raised when an uploaded avatar image has an unsupported type or exceeds the size limit.
+class ReasonError(RepositoryError):
+    """Base for a validation failure whose whole story is a human-readable ``reason``.
 
-    Carries a human-readable ``reason`` so the HTTP layer can surface it in the
-    error envelope's ``details`` block when returning HTTP 422.
+    The reason is both the message and the envelope's ``details`` block;
+    subclasses only name the code (and status) the API reports it under.
     """
-
-    code = "INVALID_AVATAR"
-    http_status = 422
 
     def __init__(self, reason: str) -> None:
         self.reason = reason
@@ -483,7 +480,18 @@ class AvatarValidationError(RepositoryError):
         return {"reason": self.reason}
 
 
-class SessionFileValidationError(RepositoryError):
+class AvatarValidationError(ReasonError):
+    """Raised when an uploaded avatar image has an unsupported type or exceeds the size limit.
+
+    Carries a human-readable ``reason`` so the HTTP layer can surface it in the
+    error envelope's ``details`` block when returning HTTP 422.
+    """
+
+    code = "INVALID_AVATAR"
+    http_status = 422
+
+
+class SessionFileValidationError(ReasonError):
     """Raised when a file cannot be attached to a workflow session.
 
     Covers an unusable name (empty, or nothing left once path separators and
@@ -497,16 +505,8 @@ class SessionFileValidationError(RepositoryError):
     code = "INVALID_SESSION_FILE"
     http_status = 422
 
-    def __init__(self, reason: str) -> None:
-        self.reason = reason
-        super().__init__(reason)
 
-    def details(self) -> dict[str, Any]:
-        """Return the envelope's ``details`` block."""
-        return {"reason": self.reason}
-
-
-class McpServerValidationError(RepositoryError):
+class McpServerValidationError(ReasonError):
     """Raised when an MCPServer create/update would leave an invalid transport shape.
 
     ``MCPServerCreate`` enforces the shape at the request boundary, but a PATCH
@@ -519,16 +519,8 @@ class McpServerValidationError(RepositoryError):
     code = "INVALID_MCP_SERVER"
     http_status = 422
 
-    def __init__(self, reason: str) -> None:
-        self.reason = reason
-        super().__init__(reason)
 
-    def details(self) -> dict[str, Any]:
-        """Return the envelope's ``details`` block."""
-        return {"reason": self.reason}
-
-
-class McpToolMockValidationError(RepositoryError):
+class McpToolMockValidationError(ReasonError):
     """Raised when an MCPToolMock create/update would leave an invalid target.
 
     ``McpToolMockCreate`` enforces the rule at the request boundary, but a PATCH
@@ -541,16 +533,8 @@ class McpToolMockValidationError(RepositoryError):
     code = "INVALID_MCP_TOOL_MOCK"
     http_status = 422
 
-    def __init__(self, reason: str) -> None:
-        self.reason = reason
-        super().__init__(reason)
 
-    def details(self) -> dict[str, Any]:
-        """Return the envelope's ``details`` block."""
-        return {"reason": self.reason}
-
-
-class SecretValidationError(RepositoryError):
+class SecretValidationError(ReasonError):
     """Raised when a Secret create/update would leave an invalid per-type shape.
 
     ``SecretCreate`` enforces the shape at the request boundary, but a PATCH
@@ -563,16 +547,8 @@ class SecretValidationError(RepositoryError):
     code = "INVALID_SECRET"
     http_status = 422
 
-    def __init__(self, reason: str) -> None:
-        self.reason = reason
-        super().__init__(reason)
 
-    def details(self) -> dict[str, Any]:
-        """Return the envelope's ``details`` block."""
-        return {"reason": self.reason}
-
-
-class SystemSettingsValidationError(RepositoryError):
+class SystemSettingsValidationError(ReasonError):
     """Raised when a system-settings update would leave an unusable SMTP configuration.
 
     Enabling email delivery needs a relay host and a sender address, and a relay
@@ -585,14 +561,6 @@ class SystemSettingsValidationError(RepositoryError):
 
     code = "INVALID_SYSTEM_SETTINGS"
     http_status = 422
-
-    def __init__(self, reason: str) -> None:
-        self.reason = reason
-        super().__init__(reason)
-
-    def details(self) -> dict[str, Any]:
-        """Return the envelope's ``details`` block."""
-        return {"reason": self.reason}
 
 
 class EmailSendError(HttpMappedError):
@@ -628,7 +596,7 @@ class EmailSendError(HttpMappedError):
         logger.warning("SMTP delivery failed: %s", self.reason)
 
 
-class UserValidationError(RepositoryError):
+class UserValidationError(ReasonError):
     """Raised when a User create/update would combine super_admin with a tenant.
 
     A super admin is platform-scoped by definition and must never carry a
@@ -640,14 +608,6 @@ class UserValidationError(RepositoryError):
 
     code = "INVALID_USER"
     http_status = 422
-
-    def __init__(self, reason: str) -> None:
-        self.reason = reason
-        super().__init__(reason)
-
-    def details(self) -> dict[str, Any]:
-        """Return the envelope's ``details`` block."""
-        return {"reason": self.reason}
 
 
 class SecretResolutionError(HttpMappedError):
@@ -733,7 +693,7 @@ class OutboundEmailNotDeletableError(RepositoryError):
         return {"outboundEmailId": self.email_id, "status": self.status}
 
 
-class QueryValidationError(RepositoryError):
+class QueryValidationError(ReasonError):
     """Raised when a sort or filter query parameter is malformed or references an unknown field.
 
     Carries a human-readable ``reason`` so the HTTP layer can surface it in the
@@ -742,11 +702,3 @@ class QueryValidationError(RepositoryError):
 
     code = "INVALID_QUERY"
     http_status = 400
-
-    def __init__(self, reason: str) -> None:
-        self.reason = reason
-        super().__init__(reason)
-
-    def details(self) -> dict[str, Any]:
-        """Return the envelope's ``details`` block."""
-        return {"reason": self.reason}
