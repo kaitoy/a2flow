@@ -15,7 +15,6 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { isKeyboardModality, trackInputModality } from "@/lib/input-modality";
 import { useMotionConfig } from "@/lib/motion";
 
 /** Side of the trigger the tooltip should appear on. */
@@ -47,7 +46,7 @@ const EDGE_PADDING = 8;
 
 /**
  * Floating glass tooltip shown on hover of its child element, or on focus while
- * the user is navigating by keyboard (see {@link isKeyboardModality}).
+ * the user is navigating by keyboard (`:focus-visible`).
  *
  * Renders via a portal to `document.body` so it is never clipped by the
  * trigger's scroll container, and uses React Spring's `useTransition` to
@@ -67,8 +66,6 @@ export function Tooltip({
   const [coords, setCoords] = useState<Coords | null>(null);
   const tooltipId = `tooltip-${useId()}`;
   const config = useMotionConfig("gentle");
-
-  useEffect(trackInputModality, []);
 
   const computeCoords = useCallback((): Coords | null => {
     const trigger = triggerRef.current;
@@ -194,12 +191,13 @@ export function Tooltip({
     ref: attachRef,
     onMouseEnter: compose<MouseEvent<HTMLElement>>(childProps.onMouseEnter, show),
     onMouseLeave: compose<MouseEvent<HTMLElement>>(childProps.onMouseLeave, hide),
-    onFocus: compose<FocusEvent<HTMLElement>>(childProps.onFocus, () => {
+    onFocus: compose<FocusEvent<HTMLElement>>(childProps.onFocus, (e) => {
       // Only keyboard focus reveals the label. A trigger that opens a modal
       // gets focus back when the modal closes, and with no pointer over it
       // nothing would ever fire `mouseleave` to take the tooltip away again —
-      // it would just hang there.
-      if (isKeyboardModality()) show();
+      // it would just hang there. The browser's `:focus-visible` heuristic is
+      // exactly "was this focus reached by keyboard".
+      if (e.currentTarget.matches(":focus-visible")) show();
     }),
     onBlur: compose<FocusEvent<HTMLElement>>(childProps.onBlur, hide),
     "aria-describedby": describedBy,

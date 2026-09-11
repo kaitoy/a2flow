@@ -1,12 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
-import { resetInputModality } from "@/lib/input-modality";
+import { describe, expect, it, vi } from "vitest";
 import { Tooltip } from "./tooltip";
-
-// Input modality is module-global by design, so each case starts from the
-// pointer-ish default rather than inheriting the previous test's last event.
-beforeEach(resetInputModality);
 
 describe("Tooltip", () => {
   it("shows the label on hover", async () => {
@@ -46,13 +41,16 @@ describe("Tooltip", () => {
     // The shape of the bug: click a trigger that opens a modal, the modal's
     // backdrop takes the pointer off the button, and closing the modal hands
     // focus back — with no pointer left to fire `mouseleave`, a tooltip shown
-    // on that focus would hang around forever.
+    // on that focus would hang around forever. A real browser reports that
+    // pointer-then-programmatic focus as not `:focus-visible`; happy-dom does
+    // not implement the heuristic, so stand in for it.
     await user.click(trigger);
     await user.unhover(trigger);
     await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(), {
       timeout: 3000,
     });
 
+    vi.spyOn(trigger, "matches").mockImplementation((sel) => sel !== ":focus-visible");
     trigger.blur();
     trigger.focus();
 
