@@ -25,7 +25,7 @@ from ag_ui.core import Message
 from google.adk.sessions import Session
 
 from models.message_meta import MessageMeta, MessageScope
-from repositories import MessageMetaRepository
+from repositories.message_meta import MessageMetaRepository
 
 #: Tool-response payload of the frontend's no-op ``render_a2ui``
 #: acknowledgement (``RENDER_ACK_CONTENT`` in ``frontend/src/lib/a2uiAction.ts``,

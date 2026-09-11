@@ -16,13 +16,14 @@ from models.agent_skill import (
     AgentSkillUpdate,
     SkillSyncStatus,
 )
-from repositories import AgentSkillRepository, SecretRepository
+from repositories.agent_skill import AgentSkillRepository
 from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
     SkillNotReadyError,
 )
 from repositories.query import FilterSpec, SortSpec
+from repositories.secret import SecretRepository
 
 #: Alias for ``list[AgentSkillRead]``: the ``list`` method below shadows the
 #: builtin inside the service class body.

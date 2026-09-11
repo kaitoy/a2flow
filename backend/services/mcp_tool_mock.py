@@ -16,8 +16,8 @@ from models.mcp_tool_mock import (
     McpToolMockRead,
     McpToolMockUpdate,
 )
-from repositories import MCPToolMockRepository
 from repositories.exceptions import McpToolMockValidationError, NotFoundError
+from repositories.mcp_tool_mock import MCPToolMockRepository
 from repositories.query import FilterSpec, SortSpec
 
 #: Alias for ``list[McpToolMockRead]``: the ``list`` method below shadows the

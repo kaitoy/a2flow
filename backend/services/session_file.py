@@ -34,12 +34,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.session_file import SessionFile, SessionFileOrigin, SessionFileRead
 from models.user import User
-from repositories import (
-    SessionFileRepository,
-    SqlSessionFileRepository,
-    WorkflowExecutionRepository,
-)
 from repositories.exceptions import NotFoundError, SessionFileValidationError
+from repositories.session_file import SessionFileRepository, SqlSessionFileRepository
+from repositories.workflow_execution import WorkflowExecutionRepository
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 
 #: Size of each chunk read from an upload stream while the per-file cap is checked.

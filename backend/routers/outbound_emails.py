@@ -24,15 +24,9 @@ in that header to browse the queue across every tenant at once, the same
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
-    ApiMetaDep,
-    FilterDep,
-    OutboundEmailReadServiceDep,
-    OutboundEmailServiceDep,
-    PaginationDep,
-    SortDep,
-    require_roles,
-)
+from dependencies.authz import require_roles
+from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
+from dependencies.service import OutboundEmailReadServiceDep, OutboundEmailServiceDep
 from models.outbound_email import OutboundEmailRead
 from models.response import ApiResponse
 from models.user import Role

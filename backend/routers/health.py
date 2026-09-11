@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from dependencies import DBSessionDep
+from dependencies.repository import DBSessionDep
 
 logger = logging.getLogger(__name__)
 

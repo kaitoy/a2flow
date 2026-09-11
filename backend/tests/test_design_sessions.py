@@ -16,7 +16,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from httpx import AsyncClient
 
-from dependencies import APP_NAME
+from dependencies.context import APP_NAME
 from infrastructure.agent import AgentKind, tenant_app_name
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID

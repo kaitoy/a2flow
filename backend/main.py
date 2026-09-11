@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
-from dependencies import APP_NAME
+from dependencies.context import APP_NAME
 from infrastructure.bootstrap import (
     apply_system_settings_env_overrides,
     seed_default_tenant_and_admin_user,

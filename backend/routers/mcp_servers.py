@@ -2,17 +2,16 @@
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
+from dependencies.auth import CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import (
     ApiMetaDep,
-    CurrentUserIdDep,
     FilterDep,
-    MCPServerReadServiceDep,
-    MCPServerServiceDep,
     PaginationDep,
     SortDep,
     TagFilterDep,
-    require_roles,
 )
+from dependencies.service import MCPServerReadServiceDep, MCPServerServiceDep
 from models.mcp_server import (
     MCPServerCreate,
     McpServerRead,

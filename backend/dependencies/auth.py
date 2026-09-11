@@ -49,15 +49,14 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.database import get_session
 from models.user import User
-from repositories import (
-    SqlAuthSessionRepository,
-    SqlEffectiveRoleRepository,
-    SqlImpersonationEventRepository,
-    SqlTenantRepository,
-    SqlUserRepository,
-)
+from repositories.auth_session import SqlAuthSessionRepository
+from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.exceptions import CsrfError, ForbiddenError
-from services import AuthService, ImpersonationService
+from repositories.impersonation_event import SqlImpersonationEventRepository
+from repositories.tenant import SqlTenantRepository
+from repositories.user import SqlUserRepository
+from services.auth import AuthService
+from services.impersonation import ImpersonationService
 
 #: Name of the HttpOnly cookie carrying the opaque session token.
 SESSION_COOKIE_NAME = "a2flow_session"

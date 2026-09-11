@@ -16,8 +16,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.user import Role, User
 from models.user_group import UserGroup, UserGroupMember
-from repositories import SqlEffectiveRoleRepository, SqlUserGroupRepository
+from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.user import SqlUserRepository
+from repositories.user_group import SqlUserGroupRepository
 from services.approver_groups import ApproverGroupResolver
 from tests._engine import make_test_engine
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users

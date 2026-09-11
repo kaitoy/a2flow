@@ -27,22 +27,22 @@ from models.workflow_execution import WorkflowExecutionCreate
 from models.workflow_published_version import dump_templates, snapshot_template
 from models.workflow_task import WorkflowTaskCreate
 from models.workflow_task_template import WorkflowTaskTemplateCreate
-from repositories import (
-    SqlAgentSkillRepository,
-    SqlApprovalRepository,
-    SqlMCPServerRepository,
-    SqlMessageMetaRepository,
-    SqlNotificationRepository,
-    SqlSecretRepository,
-    SqlUserGroupRepository,
-    SqlUserRepository,
-    SqlWorkflowExecutionRepository,
-    SqlWorkflowPublishedVersionRepository,
-    SqlWorkflowRepository,
-    SqlWorkflowTaskRepository,
-    SqlWorkflowTaskTemplateRepository,
-)
+from repositories.agent_skill import SqlAgentSkillRepository
+from repositories.approval import SqlApprovalRepository
 from repositories.exceptions import NotFoundError
+from repositories.mcp_server import SqlMCPServerRepository
+from repositories.message_meta import SqlMessageMetaRepository
+from repositories.notification import SqlNotificationRepository
+from repositories.secret import SqlSecretRepository
+from repositories.user import SqlUserRepository
+from repositories.user_group import SqlUserGroupRepository
+from repositories.workflow import SqlWorkflowRepository
+from repositories.workflow_execution import SqlWorkflowExecutionRepository
+from repositories.workflow_published_version import (
+    SqlWorkflowPublishedVersionRepository,
+)
+from repositories.workflow_task import SqlWorkflowTaskRepository
+from repositories.workflow_task_template import SqlWorkflowTaskTemplateRepository
 from tests._engine import make_test_engine
 from tests._seed import seed_tenant, seed_users
 

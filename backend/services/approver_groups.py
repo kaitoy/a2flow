@@ -26,7 +26,8 @@ an approval may be *addressed* to, so the address-time and act-time rules agree.
 from collections.abc import Collection
 
 from models.user import Role, User, has_any_role
-from repositories import EffectiveRoleRepository, UserGroupRepository
+from repositories.effective_roles import EffectiveRoleRepository
+from repositories.user_group import UserGroupRepository
 
 
 class ApproverGroupResolver:

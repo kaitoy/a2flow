@@ -7,8 +7,8 @@ so the API never leaks the existence of other users' notifications.
 """
 
 from models.notification import Notification, NotificationUpdate
-from repositories import NotificationRepository
 from repositories.exceptions import NotFoundError
+from repositories.notification import NotificationRepository
 from repositories.query import FilterSpec, SortSpec
 
 

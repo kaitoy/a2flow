@@ -20,7 +20,8 @@ async def skill_client(
     mock_agent_registry: MagicMock,
     mock_sync_job: AsyncMock,
 ) -> AsyncGenerator[AsyncClient, None]:
-    from dependencies import get_agent_registry, get_skill_sync_job
+    from dependencies.service import get_skill_sync_job
+    from dependencies.singletons import get_agent_registry
     from infrastructure.database import get_session
     from main import app
     from models.agent_skill import (

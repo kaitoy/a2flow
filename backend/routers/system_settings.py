@@ -16,14 +16,11 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
-    ApiMetaDep,
-    CurrentUserDep,
-    CurrentUserIdDep,
-    EmailSenderDep,
-    SystemSettingsServiceDep,
-    require_roles,
-)
+from dependencies.auth import CurrentUserDep, CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import ApiMetaDep
+from dependencies.service import SystemSettingsServiceDep
+from dependencies.singletons import EmailSenderDep
 from models.response import ApiResponse
 from models.system_settings import SystemSettingsRead, SystemSettingsUpdate
 from models.user import Role

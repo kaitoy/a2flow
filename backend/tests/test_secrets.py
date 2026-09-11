@@ -521,7 +521,7 @@ def _use_vault(vault: object | None) -> None:
     The ``secrets_client`` fixture clears every override afterwards, so this
     needs no teardown of its own.
     """
-    from dependencies import get_vault_client
+    from dependencies.singletons import get_vault_client
     from main import app
 
     app.dependency_overrides[get_vault_client] = lambda: vault

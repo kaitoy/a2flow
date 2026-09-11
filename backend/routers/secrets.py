@@ -19,17 +19,16 @@ an admin happened to create first.
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
+from dependencies.auth import CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import (
     ApiMetaDep,
-    CurrentUserIdDep,
     FilterDep,
     PaginationDep,
-    SecretReadServiceDep,
-    SecretServiceDep,
     SortDep,
     TagFilterDep,
-    require_roles,
 )
+from dependencies.service import SecretReadServiceDep, SecretServiceDep
 from models.response import ApiResponse
 from models.secret import SecretCreate, SecretRead, SecretUpdate
 from models.tag import TagIdsUpdate

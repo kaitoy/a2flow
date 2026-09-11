@@ -27,14 +27,9 @@ once; see ``CurrentTenantScopeDep`` in ``dependencies/auth.py``.
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
-    ApiMetaDep,
-    FilterDep,
-    McpToolCertificateReadServiceDep,
-    PaginationDep,
-    SortDep,
-    require_roles,
-)
+from dependencies.authz import require_roles
+from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
+from dependencies.service import McpToolCertificateReadServiceDep
 from models.mcp_tool_certificate import McpToolCertificateRead
 from models.response import ApiResponse
 from models.user import Role

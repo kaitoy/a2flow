@@ -21,15 +21,13 @@ from models.message_meta import MessageScope
 from models.user import Role, User, has_any_role
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
-from repositories import (
-    AgentSkillRepository,
-    McpToolInvocationRepository,
-    MessageMetaRepository,
-    WorkflowExecutionRepository,
-    WorkflowTaskRepository,
-)
+from repositories.agent_skill import AgentSkillRepository
 from repositories.exceptions import NotFoundError, SkillNotReadyError
+from repositories.mcp_tool_invocation import McpToolInvocationRepository
+from repositories.message_meta import MessageMetaRepository
 from repositories.query import FilterSpec, SortSpec
+from repositories.workflow_execution import WorkflowExecutionRepository
+from repositories.workflow_task import WorkflowTaskRepository
 from services import session_attribution
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 

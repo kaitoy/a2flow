@@ -38,12 +38,10 @@ from models.system_settings import (
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, User
 from models.workflow_execution import WorkflowExecution
-from repositories import (
-    SqlNotificationRepository,
-    SqlSystemSettingsRepository,
-    SqlUserRepository,
-)
+from repositories.notification import SqlNotificationRepository
 from repositories.query import FilterSpec, SortSpec
+from repositories.system_settings import SqlSystemSettingsRepository
+from repositories.user import SqlUserRepository
 from services.notification_dispatch import (
     NotificationDispatcher,
     _deep_link,

@@ -10,13 +10,12 @@ per-user session, so no ownership rule applies.
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
-    ApiMetaDep,
-    CurrentUserIdDep,
-    EffectiveRolesDep,
+from dependencies.auth import CurrentUserIdDep, EffectiveRolesDep
+from dependencies.authz import require_roles
+from dependencies.context import ApiMetaDep
+from dependencies.service import (
     WorkflowTaskTemplateReadServiceDep,
     WorkflowTaskTemplateServiceDep,
-    require_roles,
 )
 from models.response import ApiResponse
 from models.user import Role

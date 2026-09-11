@@ -32,8 +32,9 @@ from models.approval import Approval, ApprovalStatus
 from models.notification import Notification, NotificationType
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
 from models.workflow_task import WorkflowTask, WorkflowTaskStatus
-from repositories import SqlNotificationRepository, SqlWorkflowExecutionRepository
+from repositories.notification import SqlNotificationRepository
 from repositories.tenant_bootstrap import NoTenantSessionError
+from repositories.workflow_execution import SqlWorkflowExecutionRepository
 from tests._engine import make_test_engine
 from tests._seed import (
     DEFAULT_TEST_TENANT_ID,

@@ -1,7 +1,7 @@
 from google.adk.sessions import InMemorySessionService
 from httpx import AsyncClient
 
-from dependencies import APP_NAME
+from dependencies.context import APP_NAME
 from infrastructure.agent import SESSION_TITLE_KEY, tenant_app_name
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID

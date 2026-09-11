@@ -668,7 +668,11 @@ async def test_impersonated_agent_run_stamps_acting_user_in_state(
 
     from google.adk.sessions import InMemorySessionService
 
-    from dependencies import get_agent_registry, get_session_service, get_skill_manager
+    from dependencies.singletons import (
+        get_agent_registry,
+        get_session_service,
+        get_skill_manager,
+    )
     from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
     from main import app
     from models.agent_skill import AgentSkill

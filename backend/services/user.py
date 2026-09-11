@@ -38,9 +38,10 @@ from models.user import (
     UserUpdate,
     has_any_role,
 )
-from repositories import EffectiveRoleRepository, UserRepository
+from repositories.effective_roles import EffectiveRoleRepository
 from repositories.exceptions import ForbiddenError, NotFoundError, UserValidationError
 from repositories.query import FilterSpec, SortSpec
+from repositories.user import UserRepository
 
 #: Fields a non-admin user may update on their own record via ``PATCH``.
 #: Matches what the self-service ``/profile`` page sends (avatar customization

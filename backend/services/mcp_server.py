@@ -23,8 +23,8 @@ from models.mcp_server import (
     McpTransport,
     referenced_env_names,
 )
-from repositories import MCPServerRepository
 from repositories.exceptions import McpServerValidationError, NotFoundError
+from repositories.mcp_server import MCPServerRepository
 from repositories.query import FilterSpec, SortSpec
 
 # Module-level alias for ``list[McpToolInfo]``. The service defines a method

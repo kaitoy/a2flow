@@ -8,19 +8,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Response, UploadFile
 
-from dependencies import (
-    ApiMetaDep,
-    CurrentTenantScopeDep,
-    CurrentUserDep,
-    EffectiveRolesDep,
-    FilterDep,
-    PaginationDep,
-    SortDep,
+from dependencies.auth import CurrentTenantScopeDep, CurrentUserDep, EffectiveRolesDep
+from dependencies.authz import require_roles
+from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
+from dependencies.service import (
     UserAvatarServiceDep,
     UserGroupReadServiceDep,
     UserGroupServiceDep,
     UserServiceDep,
-    require_roles,
 )
 from models.response import ApiResponse
 from models.user import (
@@ -33,7 +28,7 @@ from models.user import (
     UserUpdate,
 )
 from models.user_group import UserGroupMembershipUpdate, UserGroupRead
-from services import UserService
+from services.user import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
 

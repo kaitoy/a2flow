@@ -7,7 +7,8 @@ admin form, so no write endpoint lives here.
 
 from fastapi import APIRouter
 
-from dependencies import ApiMetaDep, MCPRegistryServiceDep
+from dependencies.context import ApiMetaDep
+from dependencies.service import MCPRegistryServiceDep
 from models.mcp_registry import McpRegistrySearchResult
 from models.response import ApiResponse
 

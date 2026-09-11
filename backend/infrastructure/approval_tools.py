@@ -69,24 +69,22 @@ from models.mcp_tool_mock import (
 )
 from models.notification import NotificationType
 from models.user import Role, User, has_any_role
-from repositories import (
-    ApprovalRepository,
+from repositories.approval import ApprovalRepository, SqlApprovalRepository
+from repositories.effective_roles import (
     EffectiveRoleRepository,
-    SqlApprovalRepository,
     SqlEffectiveRoleRepository,
-    SqlMCPServerRepository,
-    SqlUserGroupRepository,
-    SqlUserRepository,
-    SqlWorkflowExecutionRepository,
-    SqlWorkflowTaskRepository,
-    UserGroupRepository,
-    UserRepository,
-    WorkflowExecutionRepository,
-    WorkflowTaskRepository,
 )
 from repositories.exceptions import ForeignKeyViolationError
+from repositories.mcp_server import SqlMCPServerRepository
 from repositories.query import FilterSpec
 from repositories.tenant_bootstrap import NoTenantSessionError
+from repositories.user import SqlUserRepository, UserRepository
+from repositories.user_group import SqlUserGroupRepository, UserGroupRepository
+from repositories.workflow_execution import (
+    SqlWorkflowExecutionRepository,
+    WorkflowExecutionRepository,
+)
+from repositories.workflow_task import SqlWorkflowTaskRepository, WorkflowTaskRepository
 
 if TYPE_CHECKING:
     # Type-only for the same reason as in ``infrastructure.workflow_task_tools``:

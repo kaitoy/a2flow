@@ -30,12 +30,10 @@ from models.user import SYSTEM_USER_ID, Role
 from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskStatus
-from repositories import (
-    SqlApprovalRepository,
-    SqlNotificationRepository,
-    SqlUserGroupRepository,
-    SqlUserRepository,
-)
+from repositories.approval import SqlApprovalRepository
+from repositories.notification import SqlNotificationRepository
+from repositories.user import SqlUserRepository
+from repositories.user_group import SqlUserGroupRepository
 from tests._engine import make_test_engine
 from tests._seed import (
     DEFAULT_TEST_TENANT_ID,
@@ -337,7 +335,7 @@ async def test_list_users_id_usable_as_approver(engine: AsyncEngine) -> None:
 
 def _execution_repo(db: AsyncSession) -> Any:
     """Build a WorkflowExecution repository for the approval repository's FK check."""
-    from repositories import SqlWorkflowExecutionRepository
+    from repositories.workflow_execution import SqlWorkflowExecutionRepository
 
     return SqlWorkflowExecutionRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
 

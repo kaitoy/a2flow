@@ -21,13 +21,9 @@ designated approver may do so.
 
 from fastapi import APIRouter
 
-from dependencies import (
-    ApiMetaDep,
-    CurrentUserDep,
-    EffectiveRolesDep,
-    WorkflowTaskReadServiceDep,
-    WorkflowTaskServiceDep,
-)
+from dependencies.auth import CurrentUserDep, EffectiveRolesDep
+from dependencies.context import ApiMetaDep
+from dependencies.service import WorkflowTaskReadServiceDep, WorkflowTaskServiceDep
 from models.response import ApiResponse
 from models.workflow_task import (
     WorkflowTaskRead,

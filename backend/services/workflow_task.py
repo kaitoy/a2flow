@@ -43,15 +43,13 @@ from models.workflow_task import (
     WorkflowTaskRead,
     WorkflowTaskUpdate,
 )
-from repositories import (
-    ApprovalRepository,
-    WorkflowExecutionRepository,
-    WorkflowTaskRepository,
-)
+from repositories.approval import ApprovalRepository
 from repositories.exceptions import (
     ForbiddenError,
     NotFoundError,
 )
+from repositories.workflow_execution import WorkflowExecutionRepository
+from repositories.workflow_task import WorkflowTaskRepository
 from services.approver_groups import ApproverGroupResolver
 from services.mcp_tool_certificate import McpToolCertificateService
 from services.notification_dispatch import NotificationDispatcher

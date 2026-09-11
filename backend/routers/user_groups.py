@@ -14,17 +14,16 @@ manage it from whichever page they are already on.
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
+from dependencies.auth import CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import (
     ApiMetaDep,
-    CurrentUserIdDep,
     FilterDep,
     PaginationDep,
     SortDep,
     TagFilterDep,
-    UserGroupReadServiceDep,
-    UserGroupServiceDep,
-    require_roles,
 )
+from dependencies.service import UserGroupReadServiceDep, UserGroupServiceDep
 from models.response import ApiResponse
 from models.tag import TagIdsUpdate
 from models.user import Role

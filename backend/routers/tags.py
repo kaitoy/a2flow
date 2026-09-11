@@ -16,16 +16,10 @@ hunting down its users first.
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
-    ApiMetaDep,
-    CurrentUserIdDep,
-    FilterDep,
-    PaginationDep,
-    SortDep,
-    TagReadServiceDep,
-    TagServiceDep,
-    require_roles,
-)
+from dependencies.auth import CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
+from dependencies.service import TagReadServiceDep, TagServiceDep
 from models.response import ApiResponse
 from models.tag import Tag, TagCreate, TagUpdate
 from models.user import Role

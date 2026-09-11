@@ -14,9 +14,9 @@ those rules.
 from collections.abc import Sequence
 
 from models.tag import Tag, TagCreate, TagUpdate
-from repositories import TagRepository
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec
+from repositories.tag import TagRepository
 
 
 class TagService:

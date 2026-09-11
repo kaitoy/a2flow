@@ -26,21 +26,21 @@ from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
-from dependencies import (
+from dependencies.auth import CurrentUserDep, CurrentUserIdDep, EffectiveRolesDep
+from dependencies.authz import require_roles
+from dependencies.context import (
     APP_NAME,
     ApiMetaDep,
-    CurrentUserDep,
-    CurrentUserIdDep,
-    EffectiveRolesDep,
     FilterDep,
     PaginationDep,
     SortDep,
     TagFilterDep,
+)
+from dependencies.service import (
     WorkflowDesignServiceDep,
     WorkflowReadServiceDep,
     WorkflowServiceDep,
     WorkflowTaskTemplateReadServiceDep,
-    require_roles,
 )
 from infrastructure.agent import tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key

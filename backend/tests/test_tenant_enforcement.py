@@ -16,13 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
 
-from dependencies import APP_NAME
 from dependencies.auth import (
     ALL_TENANTS_SENTINEL,
     TENANT_HEADER_NAME,
     get_current_tenant_id,
     get_current_tenant_scope,
 )
+from dependencies.context import APP_NAME
 from infrastructure.agent import tenant_app_name
 from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.user import SYSTEM_USER_ID, User

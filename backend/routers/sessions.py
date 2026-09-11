@@ -4,14 +4,10 @@ from typing import Any
 from ag_ui_adk import adk_events_to_messages
 from fastapi import APIRouter, Depends
 
-from dependencies import (
-    APP_NAME,
-    ApiMetaDep,
-    CurrentTenantIdDep,
-    CurrentUserIdDep,
-    SessionServiceDep,
-    require_roles,
-)
+from dependencies.auth import CurrentTenantIdDep, CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import APP_NAME, ApiMetaDep
+from dependencies.singletons import SessionServiceDep
 from infrastructure.agent import SESSION_TITLE_KEY, tenant_app_name
 from models.response import ApiResponse
 from models.session import Session

@@ -9,15 +9,10 @@ most resources.
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
-    ApiMetaDep,
-    CurrentUserIdDep,
-    FilterDep,
-    PaginationDep,
-    SortDep,
-    TenantServiceDep,
-    require_roles,
-)
+from dependencies.auth import CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
+from dependencies.service import TenantServiceDep
 from models.response import ApiResponse
 from models.tenant import Tenant, TenantCreate, TenantUpdate
 from models.user import Role

@@ -25,18 +25,19 @@ initiator granted itself is ``GET /mcp-tool-certificates``.
 
 from fastapi import APIRouter
 
-from dependencies import (
+from dependencies.auth import CurrentUserDep, EffectiveRolesDep
+from dependencies.context import (
     ApiMetaDep,
-    ApprovalReadServiceDep,
-    ApprovalServiceDep,
     BacklogThresholdDep,
-    CurrentUserDep,
-    EffectiveRolesDep,
     FilterDep,
-    McpToolCertificateReadServiceDep,
-    MetricsServiceDep,
     PaginationDep,
     SortDep,
+)
+from dependencies.service import (
+    ApprovalReadServiceDep,
+    ApprovalServiceDep,
+    McpToolCertificateReadServiceDep,
+    MetricsServiceDep,
 )
 from models.approval import Approval, ApprovalRead, ApprovalUpdate
 from models.mcp_tool_certificate import McpToolCertificateRead

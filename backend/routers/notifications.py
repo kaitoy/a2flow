@@ -7,15 +7,9 @@ notifications through this router.
 
 from fastapi import APIRouter
 
-from dependencies import (
-    ApiMetaDep,
-    CurrentUserIdDep,
-    FilterDep,
-    NotificationReadServiceDep,
-    NotificationServiceDep,
-    PaginationDep,
-    SortDep,
-)
+from dependencies.auth import CurrentUserIdDep
+from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
+from dependencies.service import NotificationReadServiceDep, NotificationServiceDep
 from models.notification import Notification, NotificationUpdate
 from models.response import ApiResponse
 

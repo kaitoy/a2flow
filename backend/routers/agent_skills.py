@@ -2,19 +2,21 @@
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 
-from dependencies import (
-    AgentSkillReadServiceDep,
-    AgentSkillServiceDep,
+from dependencies.auth import CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import (
     ApiMetaDep,
-    CurrentUserIdDep,
     FilterDep,
     PaginationDep,
-    SkillSyncJobDep,
     SortDep,
     TagFilterDep,
+)
+from dependencies.service import (
+    AgentSkillReadServiceDep,
+    AgentSkillServiceDep,
+    SkillSyncJobDep,
     WorkflowDesignServiceDep,
     WorkflowGenerationJobDep,
-    require_roles,
 )
 from models.agent_skill import (
     AgentSkillContent,

@@ -1,8 +1,6 @@
 import asyncio
-import importlib
 import math
 import os
-import pkgutil
 from collections.abc import AsyncGenerator, AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,22 +16,20 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.orm import configure_mappers
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-import models
+import models  # noqa: F401 -- registers every table on SQLModel.metadata
 from config import Settings, get_settings
 from models.user import SYSTEM_USER_ID, User
 from tests._engine import drop_schema, make_test_engine, pg_url, provision_schema
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 
-# Import every model submodule (mirroring alembic/env.py) and configure
-# SQLAlchemy's mappers before any test runs. Without this, whichever test
+# Configure SQLAlchemy's mappers before any test runs (``import models`` above
+# already registered every table). Without this, whichever test
 # happens to be first to build a User via ``User.model_construct(...)`` (the
 # header-driven auth override below) and read a mapped attribute off it --
 # ``id``, ``tenant_id``, anything -- crashes with a cryptic
 # ``AttributeError: 'NoneType' object has no attribute 'supports_population'``:
 # ``model_construct`` bypasses the real ``__init__``, so it never triggers
 # SQLAlchemy's normal lazy mapper configuration itself.
-for _finder, _module_name, _is_pkg in pkgutil.iter_modules(models.__path__):
-    importlib.import_module(f"models.{_module_name}")
 configure_mappers()
 
 
@@ -352,10 +348,7 @@ async def client_with_real_sessions(
     real_session_service: InMemorySessionService,
     mock_agent_registry: MagicMock,
 ) -> AsyncGenerator[AsyncClient, None]:
-    from dependencies import (
-        get_agent_registry,
-        get_session_service,
-    )
+    from dependencies.singletons import get_agent_registry, get_session_service
     from main import app
 
     app.dependency_overrides[get_session_service] = lambda: real_session_service
@@ -384,12 +377,11 @@ async def _workflow_client_env(
     ``workflow_client_with_engine`` (client plus engine, for tests that need to
     seed rows — e.g. an Approval — directly via the database).
     """
-    from dependencies import (
+    from dependencies.service import get_skill_sync_job, get_workflow_generation_job
+    from dependencies.singletons import (
         get_agent_registry,
         get_session_service,
         get_skill_manager,
-        get_skill_sync_job,
-        get_workflow_generation_job,
     )
     from infrastructure.database import get_session
     from main import app

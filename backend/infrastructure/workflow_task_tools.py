@@ -59,28 +59,26 @@ from models.workflow_task import (
     WorkflowTaskStatus,
     WorkflowTaskUpdate,
 )
-from repositories import (
-    ApprovalRepository,
+from repositories.approval import ApprovalRepository, SqlApprovalRepository
+from repositories.effective_roles import (
     EffectiveRoleRepository,
-    SqlApprovalRepository,
     SqlEffectiveRoleRepository,
-    SqlMCPServerRepository,
-    SqlUserGroupRepository,
-    SqlUserRepository,
-    SqlWorkflowExecutionRepository,
-    SqlWorkflowTaskRepository,
-    UserGroupRepository,
-    UserRepository,
-    WorkflowExecutionRepository,
-    WorkflowTaskRepository,
 )
 from repositories.exceptions import (
     NotFoundError,
 )
+from repositories.mcp_server import SqlMCPServerRepository
 from repositories.tenant_bootstrap import (
     NoTenantSessionError,
     resolve_workflow_execution_tenant,
 )
+from repositories.user import SqlUserRepository, UserRepository
+from repositories.user_group import SqlUserGroupRepository, UserGroupRepository
+from repositories.workflow_execution import (
+    SqlWorkflowExecutionRepository,
+    WorkflowExecutionRepository,
+)
+from repositories.workflow_task import SqlWorkflowTaskRepository, WorkflowTaskRepository
 
 if TYPE_CHECKING:
     # Type-only: importing any ``services`` submodule at runtime executes

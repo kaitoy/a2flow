@@ -20,14 +20,9 @@ tenant via the ``X-Tenant-Id`` request header, and may send
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
-    ApiMetaDep,
-    FilterDep,
-    ImpersonationEventServiceDep,
-    PaginationDep,
-    SortDep,
-    require_roles,
-)
+from dependencies.authz import require_roles
+from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
+from dependencies.service import ImpersonationEventServiceDep
 from models.impersonation_event import ImpersonationEventRead
 from models.response import ApiResponse
 from models.user import Role

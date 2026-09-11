@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from dependencies import get_current_user, verify_csrf
+from dependencies.auth import get_current_user, verify_csrf
 from routers import (
     agent,
     agent_skills,

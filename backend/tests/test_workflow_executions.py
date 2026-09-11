@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from dependencies import APP_NAME
+from dependencies.context import APP_NAME
 from infrastructure.agent import (
     A2UI_GUIDE_CONTEXT_DESCRIPTION,
     A2UI_SCHEMA_CONTEXT_DESCRIPTION,

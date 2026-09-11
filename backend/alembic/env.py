@@ -1,6 +1,4 @@
 import asyncio
-import importlib
-import pkgutil
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -8,7 +6,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel
 
-import models
+import models  # noqa: F401 -- registers every table on SQLModel.metadata
 from alembic import context
 from config import get_settings
 from infrastructure.database import to_async_url
@@ -33,12 +31,7 @@ if config.config_file_name is not None and config.attributes.get(
 ):
     fileConfig(config.config_file_name)
 
-# Import every model submodule so all table classes register onto
-# SQLModel.metadata, regardless of what models/__init__.py re-exports (it
-# does not re-export every table, e.g. User and Secret).
-for _finder, _module_name, _is_pkg in pkgutil.iter_modules(models.__path__):
-    importlib.import_module(f"models.{_module_name}")
-
+# ``import models`` above registers every table class onto SQLModel.metadata.
 target_metadata = SQLModel.metadata
 
 # Follow the same DB_URL the running app uses (config.Settings.db_url),

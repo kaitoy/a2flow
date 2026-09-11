@@ -9,9 +9,9 @@ ownership rules to enforce here.
 from collections.abc import Sequence
 
 from models.tenant import Tenant, TenantCreate, TenantUpdate
-from repositories import TenantRepository
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec
+from repositories.tenant import TenantRepository
 
 
 class TenantService:

@@ -33,8 +33,8 @@ import re
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.vault_client import VaultClient, VaultError
 from models.secret import Secret, SecretType
-from repositories import SecretRepository
 from repositories.exceptions import SecretResolutionError
+from repositories.secret import SecretRepository
 
 #: Matches ``${secret:NAME/KEY}`` where NAME uses the slug charset enforced by
 #: :data:`models.constraints.SecretName`. The key group is optional so that a

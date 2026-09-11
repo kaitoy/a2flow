@@ -15,8 +15,10 @@ from config import get_settings
 from infrastructure.auth_tokens import generate_token, hash_token
 from infrastructure.password import verify_password
 from models.user import User
-from repositories import AuthSessionRepository, TenantRepository, UserRepository
+from repositories.auth_session import AuthSessionRepository
 from repositories.exceptions import UnauthorizedError
+from repositories.tenant import TenantRepository
+from repositories.user import UserRepository
 
 
 @dataclass

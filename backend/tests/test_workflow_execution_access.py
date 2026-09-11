@@ -80,7 +80,11 @@ async def access_env(
     real_session_service: InMemorySessionService,
 ) -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None]:
     """Yield an API client and its engine, with users seeded and agents mocked."""
-    from dependencies import get_agent_registry, get_session_service, get_skill_manager
+    from dependencies.singletons import (
+        get_agent_registry,
+        get_session_service,
+        get_skill_manager,
+    )
     from infrastructure.database import get_session
     from main import app
 

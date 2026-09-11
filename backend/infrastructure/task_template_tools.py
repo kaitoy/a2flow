@@ -51,22 +51,21 @@ from models.workflow_task_template import (
     WorkflowTaskTemplateRead,
     WorkflowTaskTemplateUpdate,
 )
-from repositories import (
-    SqlAgentSkillRepository,
-    SqlMCPServerRepository,
-    SqlWorkflowRepository,
-    SqlWorkflowTaskTemplateRepository,
-    WorkflowRepository,
-    WorkflowTaskTemplateRepository,
-)
+from repositories.agent_skill import SqlAgentSkillRepository
 from repositories.exceptions import (
     DependencyCycleError,
     ForeignKeyViolationError,
     NotFoundError,
 )
+from repositories.mcp_server import SqlMCPServerRepository
 from repositories.tenant_bootstrap import (
     NoTenantSessionError,
     resolve_workflow_design_tenant,
+)
+from repositories.workflow import SqlWorkflowRepository, WorkflowRepository
+from repositories.workflow_task_template import (
+    SqlWorkflowTaskTemplateRepository,
+    WorkflowTaskTemplateRepository,
 )
 
 logger = logging.getLogger(__name__)

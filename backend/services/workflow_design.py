@@ -44,19 +44,19 @@ from models.workflow import (
     WorkflowUpdate,
 )
 from models.workflow_published_version import dump_templates, snapshot_template
-from repositories import (
-    MAX_TASK_TEMPLATES,
-    AgentSkillRepository,
-    WorkflowPublishedVersionRepository,
-    WorkflowRepository,
-    WorkflowTaskTemplateRepository,
-)
+from repositories.agent_skill import AgentSkillRepository
 from repositories.exceptions import (
     NotFoundError,
     SkillNotReadyError,
     SummarizationFailedError,
     WorkflowDescriptionNotGeneratableError,
     WorkflowNotRunnableError,
+)
+from repositories.workflow import WorkflowRepository
+from repositories.workflow_published_version import WorkflowPublishedVersionRepository
+from repositories.workflow_task_template import (
+    MAX_TASK_TEMPLATES,
+    WorkflowTaskTemplateRepository,
 )
 from services.workflow import build_workflow_read
 
@@ -437,13 +437,11 @@ async def generate_workflow_design(
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     from infrastructure import database
-    from repositories import (
-        SqlAgentSkillRepository,
-        SqlMCPServerRepository,
-        SqlWorkflowRepository,
-        SqlWorkflowTaskTemplateRepository,
-    )
+    from repositories.agent_skill import SqlAgentSkillRepository
+    from repositories.mcp_server import SqlMCPServerRepository
     from repositories.tenant_bootstrap import resolve_workflow_tenant
+    from repositories.workflow import SqlWorkflowRepository
+    from repositories.workflow_task_template import SqlWorkflowTaskTemplateRepository
     from services.notification_dispatch import build_notification_dispatcher
 
     async with AsyncSession(database.engine, expire_on_commit=False) as db:

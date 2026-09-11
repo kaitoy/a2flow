@@ -14,22 +14,22 @@ from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from config import get_settings
-from dependencies import (
+from dependencies.auth import (
     CSRF_COOKIE_NAME,
     SESSION_COOKIE_NAME,
-    ApiMetaDep,
     AuthServiceDep,
     CurrentUserDep,
-    EffectiveRoleRepositoryDep,
     ImpersonationServiceDep,
     RealUserDep,
-    require_actor_roles,
     verify_csrf,
 )
+from dependencies.authz import require_actor_roles
+from dependencies.context import ApiMetaDep
+from dependencies.repository import EffectiveRoleRepositoryDep
 from models.constraints import TenantSlug
 from models.response import ApiResponse
 from models.user import Role, User, UserRead
-from repositories import EffectiveRoleRepository
+from repositories.effective_roles import EffectiveRoleRepository
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

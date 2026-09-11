@@ -36,9 +36,9 @@ from infrastructure.email_sender import SmtpEmailSender, SmtpSession, get_email_
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, email_queue_key
 from infrastructure.rate_limit import TokenBucket
 from infrastructure.secret_cipher import get_secret_cipher
-from repositories import SqlSystemSettingsRepository
 from repositories.exceptions import EmailSendError
 from repositories.outbound_email_queue import ClaimedEmail, SqlOutboundEmailQueue
+from repositories.system_settings import SqlSystemSettingsRepository
 from services.system_settings import SystemSettingsService
 
 logger = logging.getLogger(__name__)

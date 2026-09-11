@@ -33,10 +33,8 @@ from models.workflow_task import (
     WorkflowTaskStatus,
     WorkflowTaskUpdate,
 )
-from repositories import (
-    WorkflowExecutionRepository,
-    WorkflowTaskRepository,
-)
+from repositories.workflow_execution import WorkflowExecutionRepository
+from repositories.workflow_task import WorkflowTaskRepository
 from services.notification_dispatch import NotificationDispatcher
 
 logger = logging.getLogger(__name__)

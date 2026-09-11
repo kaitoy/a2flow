@@ -10,8 +10,8 @@ from infrastructure.secret_resolver import SecretResolver, split_secret_ref
 from infrastructure.vault_client import VaultClient, VaultError
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
-from repositories import SecretRepository
 from repositories.exceptions import SecretResolutionError
+from repositories.secret import SecretRepository
 
 _CIPHER = SecretCipher(Fernet.generate_key())
 

@@ -8,14 +8,10 @@ from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
-from dependencies import (
-    APP_NAME,
-    AgentRegistryDep,
-    CurrentTenantIdDep,
-    CurrentUserIdDep,
-    SessionServiceDep,
-    require_roles,
-)
+from dependencies.auth import CurrentTenantIdDep, CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import APP_NAME
+from dependencies.singletons import AgentRegistryDep, SessionServiceDep
 from infrastructure.agent import (
     SESSION_TITLE_KEY,
     derive_session_title,

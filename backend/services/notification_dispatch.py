@@ -43,16 +43,14 @@ from infrastructure.secret_cipher import get_secret_cipher
 from models.notification import Notification, NotificationCreate, NotificationType
 from models.outbound_email import OutboundEmailCreate
 from models.user import SYSTEM_USER_ID, User
-from repositories import (
-    NotificationRepository,
-    OutboundEmailRepository,
-    SqlNotificationRepository,
-    SqlOutboundEmailRepository,
-    SqlSystemSettingsRepository,
-    SqlUserRepository,
-    UserRepository,
-)
 from repositories._integrity import commit_or_translate_user_fk
+from repositories.notification import NotificationRepository, SqlNotificationRepository
+from repositories.outbound_email import (
+    OutboundEmailRepository,
+    SqlOutboundEmailRepository,
+)
+from repositories.system_settings import SqlSystemSettingsRepository
+from repositories.user import SqlUserRepository, UserRepository
 from services.system_settings import SystemSettingsService
 
 logger = logging.getLogger(__name__)

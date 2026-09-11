@@ -23,19 +23,17 @@ from infrastructure.secret_resolver import SecretResolver
 from infrastructure.skill_manager import SkillManager, get_skill_manager
 from infrastructure.vault_client import get_vault_client
 from models.agent_skill import SkillSyncStatus
-from repositories import (
-    AgentSkillRepository,
-    SqlAgentSkillRepository,
-    SqlSecretRepository,
-    SqlWorkflowExecutionRepository,
-    SqlWorkflowRepository,
-    WorkflowExecutionRepository,
-    WorkflowRepository,
-)
+from repositories.agent_skill import AgentSkillRepository, SqlAgentSkillRepository
 from repositories.exceptions import (
     NotFoundError,
 )
+from repositories.secret import SqlSecretRepository
 from repositories.tenant_bootstrap import resolve_agent_skill_tenant
+from repositories.workflow import SqlWorkflowRepository, WorkflowRepository
+from repositories.workflow_execution import (
+    SqlWorkflowExecutionRepository,
+    WorkflowExecutionRepository,
+)
 
 logger = logging.getLogger(__name__)
 

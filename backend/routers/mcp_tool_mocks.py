@@ -8,17 +8,16 @@ tested, not something a requester should be able to change.
 
 from fastapi import APIRouter, Depends
 
-from dependencies import (
+from dependencies.auth import CurrentUserIdDep
+from dependencies.authz import require_roles
+from dependencies.context import (
     ApiMetaDep,
-    CurrentUserIdDep,
     FilterDep,
-    MCPToolMockReadServiceDep,
-    MCPToolMockServiceDep,
     PaginationDep,
     SortDep,
     TagFilterDep,
-    require_roles,
 )
+from dependencies.service import MCPToolMockReadServiceDep, MCPToolMockServiceDep
 from models.mcp_tool_mock import (
     McpToolMockCreate,
     McpToolMockRead,

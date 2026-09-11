@@ -30,8 +30,8 @@ from models.system_settings import (
     SystemSettingsRead,
     SystemSettingsUpdate,
 )
-from repositories import SystemSettingsRepository
 from repositories.exceptions import NotFoundError, SystemSettingsValidationError
+from repositories.system_settings import SystemSettingsRepository
 
 logger = logging.getLogger(__name__)
 

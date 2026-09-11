@@ -17,9 +17,9 @@ from collections.abc import Sequence
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.secret_resolver import SecretResolver
 from models.secret import Secret, SecretCreate, SecretRead, SecretType, SecretUpdate
-from repositories import SecretRepository
 from repositories.exceptions import NotFoundError, SecretValidationError
 from repositories.query import FilterSpec, SortSpec
+from repositories.secret import SecretRepository
 
 #: Alias for ``list[SecretRead]``: the ``list`` method below shadows the
 #: builtin inside the service class body.

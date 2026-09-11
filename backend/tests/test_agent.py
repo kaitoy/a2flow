@@ -39,7 +39,7 @@ def _async_gen_factory(
 
 @pytest_asyncio.fixture()
 async def agent_client() -> AsyncGenerator[tuple[AsyncClient, MagicMock], None]:
-    from dependencies import get_agent_registry, get_session_service
+    from dependencies.singletons import get_agent_registry, get_session_service
     from main import app
 
     mock_agent = MagicMock()

@@ -9,12 +9,12 @@ user (or a super admin) may upload or remove an avatar.
 
 from models.user import Role, User, has_any_role
 from models.user_avatar import UserAvatar
-from repositories import UserAvatarRepository
 from repositories.exceptions import (
     AvatarValidationError,
     ForbiddenError,
     NotFoundError,
 )
+from repositories.user_avatar import UserAvatarRepository
 
 
 def _assert_self_or_super_admin(user_id: str, acting_user: User) -> None:

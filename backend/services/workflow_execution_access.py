@@ -56,7 +56,7 @@ effective roles) to the collection endpoints (``GET /workflow-executions``,
 from collections.abc import Collection
 
 from models.user import Role, User, has_any_role
-from repositories import ApprovalRepository
+from repositories.approval import ApprovalRepository
 from repositories.exceptions import ForbiddenError
 from services.approver_groups import ApproverGroupResolver
 

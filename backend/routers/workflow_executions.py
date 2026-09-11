@@ -32,21 +32,22 @@ from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
-from dependencies import (
+from dependencies.auth import CurrentUserDep, EffectiveRolesDep
+from dependencies.authz import require_roles
+from dependencies.context import (
     APP_NAME,
     ApiMetaDep,
-    CurrentUserDep,
-    EffectiveRolesDep,
     FilterDep,
-    MetricsServiceDep,
     MetricsWindowDep,
     PaginationDep,
+    SortDep,
+)
+from dependencies.service import (
+    MetricsServiceDep,
     SessionFileReadServiceDep,
     SessionFileServiceDep,
-    SortDep,
     WorkflowExecutionReadServiceDep,
     WorkflowExecutionServiceDep,
-    require_roles,
 )
 from infrastructure.agent import keep_a2ui_context, tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
@@ -62,7 +63,8 @@ from models.user import Role
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead
 from repositories.exceptions import SessionRunInProgressError
-from services import MetricsWindow, describe_session_files
+from services.metrics import MetricsWindow
+from services.session_file import describe_session_files
 
 router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 

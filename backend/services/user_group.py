@@ -16,9 +16,9 @@ invalidate.
 from collections.abc import Sequence
 
 from models.user_group import UserGroupCreate, UserGroupRead, UserGroupUpdate
-from repositories import UserGroupRepository
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec
+from repositories.user_group import UserGroupRepository
 
 _GroupList = list[UserGroupRead]
 _StrList = list[str]

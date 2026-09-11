@@ -27,13 +27,11 @@ from models.workflow_task_template import (
     WorkflowTaskTemplateRead,
     WorkflowTaskTemplateUpdate,
 )
-from repositories import (
-    WorkflowPublishedVersionRepository,
-    WorkflowRepository,
-    WorkflowTaskTemplateRepository,
-)
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec
+from repositories.workflow import WorkflowRepository
+from repositories.workflow_published_version import WorkflowPublishedVersionRepository
+from repositories.workflow_task_template import WorkflowTaskTemplateRepository
 
 
 class WorkflowTaskTemplateService:

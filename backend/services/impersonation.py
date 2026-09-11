@@ -11,12 +11,10 @@ whom) and the persistent audit trail (:class:`~models.impersonation_event.Impers
 from collections.abc import Collection
 
 from models.user import SYSTEM_USER_ID, Role, User
-from repositories import (
-    EffectiveRoleRepository,
-    ImpersonationEventRepository,
-    UserRepository,
-)
+from repositories.effective_roles import EffectiveRoleRepository
 from repositories.exceptions import ForbiddenError, NotFoundError
+from repositories.impersonation_event import ImpersonationEventRepository
+from repositories.user import UserRepository
 
 
 def _target_ineligible_for_actor(

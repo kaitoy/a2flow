@@ -9,7 +9,7 @@ from collections.abc import Collection
 
 from models.approval import Approval, ApprovalStatus, ApprovalUpdate
 from models.user import Role, User, has_any_role
-from repositories import ApprovalRepository
+from repositories.approval import ApprovalRepository
 from repositories.exceptions import (
     ApprovalAlreadyResolvedError,
     ForbiddenError,

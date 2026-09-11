@@ -38,7 +38,9 @@ from fastapi.responses import PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 from prometheus_client.core import GaugeMetricFamily
 
-from dependencies import BacklogThresholdDep, CurrentTenantIdDep, MetricsServiceDep
+from dependencies.auth import CurrentTenantIdDep
+from dependencies.context import BacklogThresholdDep
+from dependencies.service import MetricsServiceDep
 from services.metrics import RECENT_WINDOW_HOURS, MetricsSnapshot
 
 router = APIRouter()

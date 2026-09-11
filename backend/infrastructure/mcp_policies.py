@@ -35,12 +35,10 @@ from infrastructure.mcp_gateway import (
 from models.approval import Approval, ApprovalStatus, ApprovedCall
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead, WorkflowTaskStatus
-from repositories import (
-    SqlMCPServerRepository,
-    SqlWorkflowExecutionRepository,
-    SqlWorkflowTaskRepository,
-)
+from repositories.mcp_server import SqlMCPServerRepository
 from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
+from repositories.workflow_execution import SqlWorkflowExecutionRepository
+from repositories.workflow_task import SqlWorkflowTaskRepository
 
 #: Denial message when the run has no WorkflowExecution to take bindings from.
 _NO_EXECUTION = (

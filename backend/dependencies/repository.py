@@ -11,60 +11,61 @@ from fastapi import Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.database import get_session
-from repositories import (
-    AgentSkillRepository,
-    ApprovalRepository,
-    AuthSessionRepository,
+from repositories.agent_skill import AgentSkillRepository, SqlAgentSkillRepository
+from repositories.approval import ApprovalRepository, SqlApprovalRepository
+from repositories.auth_session import AuthSessionRepository, SqlAuthSessionRepository
+from repositories.effective_roles import (
     EffectiveRoleRepository,
-    ImpersonationEventRepository,
-    McpCertificateAuthorityRepository,
-    MCPServerRepository,
-    McpToolCertificateRepository,
-    McpToolInvocationRepository,
-    MCPToolMockRepository,
-    MessageMetaRepository,
-    MetricsRepository,
-    NotificationRepository,
-    OutboundEmailRepository,
-    SecretRepository,
-    SessionFileRepository,
-    SqlAgentSkillRepository,
-    SqlApprovalRepository,
-    SqlAuthSessionRepository,
     SqlEffectiveRoleRepository,
+)
+from repositories.impersonation_event import (
+    ImpersonationEventRepository,
     SqlImpersonationEventRepository,
+)
+from repositories.mcp_ca import (
+    McpCertificateAuthorityRepository,
     SqlMcpCertificateAuthorityRepository,
-    SqlMCPServerRepository,
+)
+from repositories.mcp_server import MCPServerRepository, SqlMCPServerRepository
+from repositories.mcp_tool_certificate import (
+    McpToolCertificateRepository,
     SqlMcpToolCertificateRepository,
+)
+from repositories.mcp_tool_invocation import (
+    McpToolInvocationRepository,
     SqlMcpToolInvocationRepository,
-    SqlMcpToolMockRepository,
-    SqlMessageMetaRepository,
-    SqlMetricsRepository,
-    SqlNotificationRepository,
+)
+from repositories.mcp_tool_mock import MCPToolMockRepository, SqlMcpToolMockRepository
+from repositories.message_meta import MessageMetaRepository, SqlMessageMetaRepository
+from repositories.metrics import MetricsRepository, SqlMetricsRepository
+from repositories.notification import NotificationRepository, SqlNotificationRepository
+from repositories.outbound_email import (
+    OutboundEmailRepository,
     SqlOutboundEmailRepository,
-    SqlSecretRepository,
-    SqlSessionFileRepository,
+)
+from repositories.secret import SecretRepository, SqlSecretRepository
+from repositories.session_file import SessionFileRepository, SqlSessionFileRepository
+from repositories.system_settings import (
     SqlSystemSettingsRepository,
-    SqlTagRepository,
-    SqlTenantRepository,
-    SqlUserAvatarRepository,
-    SqlUserGroupRepository,
-    SqlUserRepository,
-    SqlWorkflowExecutionRepository,
-    SqlWorkflowPublishedVersionRepository,
-    SqlWorkflowRepository,
-    SqlWorkflowTaskRepository,
-    SqlWorkflowTaskTemplateRepository,
     SystemSettingsRepository,
-    TagRepository,
-    TenantRepository,
-    UserAvatarRepository,
-    UserGroupRepository,
-    UserRepository,
+)
+from repositories.tag import SqlTagRepository, TagRepository
+from repositories.tenant import SqlTenantRepository, TenantRepository
+from repositories.user import SqlUserRepository, UserRepository
+from repositories.user_avatar import SqlUserAvatarRepository, UserAvatarRepository
+from repositories.user_group import SqlUserGroupRepository, UserGroupRepository
+from repositories.workflow import SqlWorkflowRepository, WorkflowRepository
+from repositories.workflow_execution import (
+    SqlWorkflowExecutionRepository,
     WorkflowExecutionRepository,
+)
+from repositories.workflow_published_version import (
+    SqlWorkflowPublishedVersionRepository,
     WorkflowPublishedVersionRepository,
-    WorkflowRepository,
-    WorkflowTaskRepository,
+)
+from repositories.workflow_task import SqlWorkflowTaskRepository, WorkflowTaskRepository
+from repositories.workflow_task_template import (
+    SqlWorkflowTaskTemplateRepository,
     WorkflowTaskTemplateRepository,
 )
 

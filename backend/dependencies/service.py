@@ -12,39 +12,35 @@ from fastapi import Depends
 
 from config import get_settings
 from infrastructure.secret_resolver import SecretResolver
-from repositories import SessionFileRepository
-from services import (
-    AgentSkillService,
-    ApprovalService,
-    ApproverGroupResolver,
-    ImpersonationEventService,
-    MCPRegistryService,
-    MCPServerService,
-    McpToolCertificateService,
-    McpToolInvocationService,
-    MCPToolMockService,
-    MetricsService,
-    NotificationDispatcher,
-    NotificationService,
-    OutboundEmailService,
-    SecretService,
-    SessionFileService,
-    SessionFileStore,
-    SystemSettingsService,
-    TagService,
-    TenantService,
-    UserAvatarService,
-    UserGroupService,
-    UserService,
-    WorkflowDesignService,
-    WorkflowExecutionAccessPolicy,
-    WorkflowExecutionService,
-    WorkflowService,
-    WorkflowTaskService,
-    WorkflowTaskTemplateService,
-    generate_workflow_design,
-    sync_agent_skill,
-)
+from repositories.session_file import SessionFileRepository
+from services.agent_skill import AgentSkillService
+from services.agent_skill_sync import sync_agent_skill
+from services.approval import ApprovalService
+from services.approver_groups import ApproverGroupResolver
+from services.impersonation_event import ImpersonationEventService
+from services.mcp_registry import MCPRegistryService
+from services.mcp_server import MCPServerService
+from services.mcp_tool_certificate import McpToolCertificateService
+from services.mcp_tool_invocation import McpToolInvocationService
+from services.mcp_tool_mock import MCPToolMockService
+from services.metrics import MetricsService
+from services.notification import NotificationService
+from services.notification_dispatch import NotificationDispatcher
+from services.outbound_email import OutboundEmailService
+from services.secret import SecretService
+from services.session_file import SessionFileService, SessionFileStore
+from services.system_settings import SystemSettingsService
+from services.tag import TagService
+from services.tenant import TenantService
+from services.user import UserService
+from services.user_avatar import UserAvatarService
+from services.user_group import UserGroupService
+from services.workflow import WorkflowService
+from services.workflow_design import WorkflowDesignService, generate_workflow_design
+from services.workflow_execution import WorkflowExecutionService
+from services.workflow_execution_access import WorkflowExecutionAccessPolicy
+from services.workflow_task import WorkflowTaskService
+from services.workflow_task_template import WorkflowTaskTemplateService
 
 from .context import APP_NAME
 from .repository import (
