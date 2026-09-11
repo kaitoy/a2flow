@@ -9,7 +9,6 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from sqlmodel import col, select
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.notification import (
     Notification,
@@ -19,6 +18,7 @@ from models.notification import (
     build_notification_link,
 )
 from repositories._integrity import commit_or_translate_user_fk
+from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
@@ -57,33 +57,10 @@ class NotificationRepository(Protocol):
     ) -> bool: ...
 
 
-class SqlNotificationRepository:
+class SqlNotificationRepository(TenantScopedRepository[Notification]):
     """SQLModel-backed implementation of NotificationRepository."""
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
-        """Store the SQLModel async session and the tenant these queries are scoped to."""
-        self._db = session
-        self._tenant_id = tenant_id
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- see
-        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
-
-    async def _get_scoped(self, notification_id: str) -> Notification | None:
-        """Return the Notification with the given ID within the current tenant, or ``None``."""
-        stmt = select(Notification).where(Notification.id == notification_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(Notification.tenant_id == self._tenant_id)
-        result = await self._db.exec(stmt)
-        return result.first()
+    model = Notification
 
     async def get(self, notification_id: str) -> Notification | None:
         """Return the Notification with the given ID, or ``None`` if missing."""
@@ -118,8 +95,7 @@ class SqlNotificationRepository:
             The matching notifications.
         """
         stmt = select(Notification).where(Notification.user_id == user_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(Notification.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         stmt = apply_filters(stmt, Notification, filters, readable=Notification)
         stmt = apply_sort(
             stmt,

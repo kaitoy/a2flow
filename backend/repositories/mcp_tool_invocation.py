@@ -11,7 +11,6 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from sqlmodel import col, select
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
 from models.mcp_tool_invocation import (
@@ -19,6 +18,7 @@ from models.mcp_tool_invocation import (
     McpToolInvocationCreate,
 )
 from repositories._integrity import commit_or_translate_user_fk
+from repositories._scoped import TenantScopedRepository
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
 
@@ -51,32 +51,10 @@ class McpToolInvocationRepository(Protocol):
     ) -> list[MCPToolInvocation]: ...
 
 
-class SqlMcpToolInvocationRepository:
+class SqlMcpToolInvocationRepository(TenantScopedRepository[MCPToolInvocation]):
     """SQLModel-backed implementation of McpToolInvocationRepository."""
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
-        """Store the session and the tenant these records belong to.
-
-        Args:
-            session: The gateway's open database session.
-            tenant_id: Tenant the audited run belongs to, or ``None`` for a
-                super_admin read across every tenant. Recording always needs a
-                concrete tenant -- see :meth:`_require_tenant`.
-        """
-        self._db = session
-        self._tenant_id = tenant_id
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only :meth:`record` calls this -- see
-        ``repositories.mcp_server.SqlMCPServerRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} recording requires a concrete tenant_id"
-            )
-        return self._tenant_id
+    model = MCPToolInvocation
 
     async def record(
         self, data: McpToolInvocationCreate, *, user_id: str
@@ -137,8 +115,7 @@ class SqlMcpToolInvocationRepository:
         Returns:
             The requested page of records.
         """
-        if self._tenant_id is not None:
-            stmt = stmt.where(MCPToolInvocation.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         stmt = apply_filters(
             stmt, MCPToolInvocation, filters, readable=MCPToolInvocation
         )
@@ -202,8 +179,7 @@ class SqlMcpToolInvocationRepository:
             The row, or ``None`` when it does not exist in this tenant.
         """
         stmt = select(MCPToolInvocation).where(MCPToolInvocation.id == invocation_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(MCPToolInvocation.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         return (await self._db.exec(stmt)).first()
 
     async def list(

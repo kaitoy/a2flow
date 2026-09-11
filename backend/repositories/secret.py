@@ -10,6 +10,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.secret import Secret, SecretCreate, SecretRead, SecretUpdate
 from models.tag import SecretTag
 from repositories._integrity import is_foreign_key_error
+from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
@@ -60,7 +61,7 @@ class SecretRepository(Protocol):
     async def set_tags(self, secret_id: str, tag_ids: Sequence[str]) -> Secret: ...
 
 
-class SqlSecretRepository:
+class SqlSecretRepository(TenantScopedRepository[Secret]):
     """SQLModel-backed implementation of SecretRepository.
 
     ``create`` and ``update`` translate a unique-name violation into
@@ -69,31 +70,12 @@ class SqlSecretRepository:
     plaintext.
     """
 
+    model = Secret
+
     def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
         """Store the SQLModel session and the tenant these operations are scoped to."""
-        self._db = session
-        self._tenant_id = tenant_id
+        super().__init__(session, tenant_id=tenant_id)
         self._tags = TagLinks(session, SecretTag, tenant_id=tenant_id)
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- see
-        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
-
-    async def _get_scoped(self, secret_id: str) -> Secret | None:
-        """Return the Secret with the given ID within the current tenant, or ``None``."""
-        stmt = select(Secret).where(Secret.id == secret_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(Secret.tenant_id == self._tenant_id)
-        result = await self._db.exec(stmt)
-        return result.first()
 
     async def get(self, secret_id: str) -> Secret | None:
         """Return the Secret with the given ID, or ``None`` if missing."""
@@ -102,14 +84,9 @@ class SqlSecretRepository:
     async def get_by_name(self, name: str) -> Secret | None:
         """Return the Secret with the given unique name, or ``None`` if missing."""
         stmt = select(Secret).where(Secret.name == name)
-        if self._tenant_id is not None:
-            stmt = stmt.where(Secret.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         result = await self._db.exec(stmt)
         return result.first()
-
-    async def exists(self, secret_id: str) -> bool:
-        """Return ``True`` if a Secret with the given ID exists."""
-        return await self._get_scoped(secret_id) is not None
 
     async def list(
         self,
@@ -127,8 +104,7 @@ class SqlSecretRepository:
         the filter.
         """
         stmt = select(Secret)
-        if self._tenant_id is not None:
-            stmt = stmt.where(Secret.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         for clause in self._tags.filter_clauses(col(Secret.id), tag_ids):
             stmt = stmt.where(clause)
         stmt = apply_filters(stmt, Secret, filters, readable=SecretRead)

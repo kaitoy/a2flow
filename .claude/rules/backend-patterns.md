@@ -147,14 +147,14 @@ class SqlAgentSkillRepository:
 
 Using a Protocol makes the repository easy to mock in tests without depending on the database.
 
-For a `TenantScoped` entity, the constructor also takes a required keyword-only `tenant_id: str`, resolved by the caller (see "Tenant Scoping in the Repository Layer" below) — not a `Protocol` method parameter, since it applies to every operation uniformly:
+For a `TenantScoped` entity, the implementation subclasses `repositories/_scoped.py::TenantScopedRepository[Model]` and names its table in `model`. The base class owns the constructor — `(session, *, tenant_id: str | None)`, resolved by the caller (see "Tenant Scoping in the Repository Layer" below) rather than passed per method, since it applies to every operation uniformly — plus `_require_tenant`, `_scoped`, `_get_scoped`, and `exists`:
 
 ```python
-class SqlAgentSkillRepository:
-    def __init__(self, db: AsyncSession, *, tenant_id: str) -> None:
-        self._db = db
-        self._tenant_id = tenant_id
+class SqlAgentSkillRepository(TenantScopedRepository[AgentSkill]):
+    model = AgentSkill
 ```
+
+A repository with collaborators keeps its own `__init__` and calls `super().__init__(session, tenant_id=tenant_id)` first.
 
 ### Standard Repository Operations
 
@@ -169,17 +169,9 @@ class SqlAgentSkillRepository:
 
 ### Tenant Scoping in the Repository Layer
 
-For a `TenantScoped` entity, every query filters on `self._tenant_id`. `AsyncSession.get(Model, id)` cannot express that extra predicate, so `get`/`update`/`delete`/`exists`/`set_*` on such an entity go through a private `_get_scoped(self, id) -> Model | None` helper built on `select(Model).where(Model.id == id, Model.tenant_id == self._tenant_id)`, not `session.get(...)`:
+For a `TenantScoped` entity, every query filters on `self._tenant_id`. `AsyncSession.get(Model, id)` cannot express that extra predicate, so `get`/`update`/`delete`/`exists`/`set_*` on such an entity go through `TenantScopedRepository._get_scoped(id) -> Model | None`, built on `select(Model).where(Model.id == id)` plus the tenant predicate, not `session.get(...)`. `_scoped(stmt)` adds that same predicate to any other select (it is skipped when `tenant_id` is `None`, the all-tenants read mode), and `_require_tenant()` returns the concrete tenant a write needs, raising if there is none.
 
-```python
-async def _get_scoped(self, skill_id: str) -> AgentSkill | None:
-    stmt = select(AgentSkill).where(
-        AgentSkill.id == skill_id, AgentSkill.tenant_id == self._tenant_id
-    )
-    return (await self._db.exec(stmt)).first()
-```
-
-A cross-tenant fetch this way returns `None`, which the existing `NotFoundError` path on `update`/`delete` already handles — a caller in tenant A gets 404, not 403, when it references an id that exists only in tenant B, matching the "fetch entity first so a missing record still surfaces as 404, not 403" rule below. `list()` adds `.where(Model.tenant_id == self._tenant_id)` to its `select()`; `create()` adds `"tenant_id": self._tenant_id` to the `model_validate({...})` merge dict.
+A cross-tenant fetch this way returns `None`, which the existing `NotFoundError` path on `update`/`delete` already handles — a caller in tenant A gets 404, not 403, when it references an id that exists only in tenant B, matching the "fetch entity first so a missing record still surfaces as 404, not 403" rule below. `list()` starts from `self._scoped(select(Model))`; `create()` adds `"tenant_id": self._require_tenant()` to the `model_validate({...})` merge dict.
 
 Enforcement is deliberately explicit at this layer rather than via `with_loader_criteria`/ORM event listeners: ADK agent tools and background jobs (`infrastructure/*_tools.py`, `services/workflow_design.py`, `services/agent_skill_sync.py`) open their own `AsyncSession` on the module-level engine outside FastAPI's request scope, so a request-scoped listener would silently not apply to them — the most dangerous path. Those callers resolve `tenant_id` themselves via `repositories/tenant_bootstrap.py` (an opaque ADK session id or bare entity id is all they start with) before constructing any repository.
 
@@ -492,7 +484,7 @@ Singletons are created once using `@lru_cache` on the factory function. Per-requ
 2. **Migration**: generate and review an Alembic migration for the new table (`cd backend && uv run alembic revision --autogenerate -m "add <entity> table"`) — see Database Configuration above.
 3. **Repository file** (`repositories/<entity>.py`):
    - Define a `Protocol` with the standard five methods plus `exists()`.
-   - Implement `SqlEntityRepository`. If tenant-isolated, add the `tenant_id` constructor parameter and the `_get_scoped` helper per "Tenant Scoping in the Repository Layer" above.
+   - Implement `SqlEntityRepository`. If tenant-isolated, subclass `TenantScopedRepository[Entity]` with `model = Entity` per "Tenant Scoping in the Repository Layer" above.
    - Raise `NotFoundError` / `ReferencedError` / `ForeignKeyViolationError` as appropriate.
    - If `list()` calls `apply_filters`/`apply_sort`, pass `readable=<EntityRead>` (or `readable=Entity` when the table class doubles as the response model) — see "List Query Field Exposure" above.
 4. **Exceptions**: reuse existing exception types; add new ones to `repositories/exceptions.py` only if needed.

@@ -3,11 +3,11 @@
 from typing import Protocol
 
 from sqlmodel import col, select
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
 from models.message_meta import MessageMeta, MessageScope
 from repositories._integrity import commit_or_translate_user_fk
+from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import ForeignKeyViolationError
 
 
@@ -30,7 +30,7 @@ class MessageMetaRepository(Protocol):
     async def meta_for_session(self, scope: MessageScope) -> dict[str, MessageMeta]: ...
 
 
-class SqlMessageMetaRepository:
+class SqlMessageMetaRepository(TenantScopedRepository[MessageMeta]):
     """SQLModel-backed implementation of MessageMetaRepository.
 
     Each event has at most one row, created lazily by whichever setter records a
@@ -45,24 +45,9 @@ class SqlMessageMetaRepository:
     status-ful WorkflowTasks, so a design session never has a task to associate.
     """
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
-        """Store the SQLModel async session and the tenant these queries are scoped to."""
-        self._db = session
-        self._tenant_id = tenant_id
+    model = MessageMeta
 
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- see
-        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
-
-    def _scoped(self, scope: MessageScope) -> SelectOfScalar[MessageMeta]:
+    def _for_scope(self, scope: MessageScope) -> SelectOfScalar[MessageMeta]:
         """Return a tenant- and parent-filtered ``select`` over MessageMeta.
 
         Args:
@@ -71,9 +56,7 @@ class SqlMessageMetaRepository:
         Returns:
             A statement matching only that chat's rows in the current tenant.
         """
-        stmt = select(MessageMeta)
-        if self._tenant_id is not None:
-            stmt = stmt.where(MessageMeta.tenant_id == self._tenant_id)
+        stmt = self._scoped(select(MessageMeta))
         if scope.workflow_id is not None:
             return stmt.where(col(MessageMeta.workflow_id) == scope.workflow_id)
         return stmt.where(
@@ -83,7 +66,7 @@ class SqlMessageMetaRepository:
     async def _get(self, scope: MessageScope, adk_event_id: str) -> MessageMeta | None:
         """Return the metadata row for one event, or ``None`` if not yet recorded."""
         result = await self._db.exec(
-            self._scoped(scope)
+            self._for_scope(scope)
             .where(col(MessageMeta.adk_event_id) == adk_event_id)
             .limit(1)
         )
@@ -191,5 +174,5 @@ class SqlMessageMetaRepository:
             A mapping from ADK event id to its metadata row. Events without a
             row are simply absent from the map.
         """
-        result = await self._db.exec(self._scoped(scope))
+        result = await self._db.exec(self._for_scope(scope))
         return {row.adk_event_id: row for row in result.all()}

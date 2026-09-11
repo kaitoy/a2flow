@@ -15,7 +15,6 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from sqlmodel import col, select
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.mcp_tool_certificate import (
     McpToolCertificate,
@@ -24,6 +23,7 @@ from models.mcp_tool_certificate import (
     RevocationReason,
 )
 from repositories._integrity import commit_or_translate_user_fk
+from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 
@@ -67,43 +67,10 @@ class McpToolCertificateRepository(Protocol):
     ) -> McpToolCertificate: ...
 
 
-class SqlMcpToolCertificateRepository:
+class SqlMcpToolCertificateRepository(TenantScopedRepository[McpToolCertificate]):
     """SQLModel-backed implementation of McpToolCertificateRepository."""
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
-        """Store the session and the tenant these operations are scoped to.
-
-        Args:
-            session: The request-scoped (or job-scoped) database session.
-            tenant_id: Tenant every query is filtered by.
-        """
-        self._db = session
-        self._tenant_id = tenant_id
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- see
-        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
-
-    async def _get_scoped(self, certificate_id: str) -> McpToolCertificate | None:
-        """Fetch one certificate by id, filtered by tenant.
-
-        Uses a filtered ``select`` rather than ``session.get`` so a
-        cross-tenant id returns ``None`` (surfacing as a 404) instead of a row
-        the caller may not see.
-        """
-        stmt = select(McpToolCertificate).where(McpToolCertificate.id == certificate_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(McpToolCertificate.tenant_id == self._tenant_id)
-        result = await self._db.exec(stmt)
-        return result.first()
+    model = McpToolCertificate
 
     async def get(self, certificate_id: str) -> McpToolCertificate | None:
         """Return a certificate by id within the tenant, or ``None``.
@@ -276,8 +243,7 @@ class SqlMcpToolCertificateRepository:
             The requested page of certificates.
         """
         stmt = select(McpToolCertificate)
-        if self._tenant_id is not None:
-            stmt = stmt.where(McpToolCertificate.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         stmt = apply_filters(
             stmt, McpToolCertificate, filters, readable=McpToolCertificateRead
         )

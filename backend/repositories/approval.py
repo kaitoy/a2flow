@@ -12,6 +12,7 @@ from models.approval import Approval, ApprovalCreate, ApprovalStatus, ApprovalUp
 from models.user import User
 from models.workflow_execution import WorkflowExecution
 from repositories._integrity import commit_or_translate_user_fk
+from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 from repositories.user_group import UserGroupRepository
@@ -64,8 +65,10 @@ class ApprovalRepository(Protocol):
     async def get_for_task(self, workflow_task_id: str) -> Approval | None: ...
 
 
-class SqlApprovalRepository:
+class SqlApprovalRepository(TenantScopedRepository[Approval]):
     """SQLModel-backed implementation of ApprovalRepository."""
+
+    model = Approval
 
     def __init__(
         self,
@@ -85,30 +88,9 @@ class SqlApprovalRepository:
         repository -- a cross-tenant group then reads as a missing foreign key
         rather than a valid destination.
         """
-        self._db = session
+        super().__init__(session, tenant_id=tenant_id)
         self._execution_repo = execution_repo
         self._group_repo = group_repo
-        self._tenant_id = tenant_id
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- see
-        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
-
-    async def _get_scoped(self, approval_id: str) -> Approval | None:
-        """Return the Approval with the given ID within the current tenant, or ``None``."""
-        stmt = select(Approval).where(Approval.id == approval_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(Approval.tenant_id == self._tenant_id)
-        result = await self._db.exec(stmt)
-        return result.first()
 
     async def get(self, approval_id: str) -> Approval | None:
         """Return the Approval with the given ID, or ``None`` if missing."""
@@ -177,8 +159,7 @@ class SqlApprovalRepository:
             The matching approvals.
         """
         stmt = select(Approval)
-        if self._tenant_id is not None:
-            stmt = stmt.where(Approval.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         if visible_to_user_id is not None:
             clauses = [
                 col(Approval.approver) == visible_to_user_id,

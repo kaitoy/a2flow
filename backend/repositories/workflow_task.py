@@ -30,6 +30,7 @@ from models.workflow_task import (
     WorkflowTaskUpdate,
 )
 from repositories._integrity import commit_or_translate_user_fk
+from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import (
     DependencyCycleError,
     ForeignKeyViolationError,
@@ -73,7 +74,7 @@ class WorkflowTaskRepository(Protocol):
     async def delete(self, task_id: str) -> None: ...
 
 
-class SqlWorkflowTaskRepository:
+class SqlWorkflowTaskRepository(TenantScopedRepository[WorkflowTask]):
     """SQLModel-backed implementation of WorkflowTaskRepository.
 
     Validates that the referenced ``workflow_execution_id`` exists before creating
@@ -84,6 +85,8 @@ class SqlWorkflowTaskRepository:
     servers before being written; reads resolve them into ``tool_bindings``.
     """
 
+    model = WorkflowTask
+
     def __init__(
         self,
         session: AsyncSession,
@@ -93,30 +96,9 @@ class SqlWorkflowTaskRepository:
         tenant_id: str | None,
     ) -> None:
         """Store the session and the WorkflowExecution/MCPServer repos for FK checks."""
-        self._db = session
+        super().__init__(session, tenant_id=tenant_id)
         self._execution = execution_repo
         self._mcp = mcp_repo
-        self._tenant_id = tenant_id
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- see
-        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
-
-    async def _get_scoped(self, task_id: str) -> WorkflowTask | None:
-        """Return the WorkflowTask row with the given ID within the current tenant."""
-        stmt = select(WorkflowTask).where(WorkflowTask.id == task_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(WorkflowTask.tenant_id == self._tenant_id)
-        result = await self._db.exec(stmt)
-        return result.first()
 
     async def get(self, task_id: str) -> WorkflowTaskRead | None:
         """Return the WorkflowTask with the given ID resolved into a read model, or ``None``."""
@@ -143,8 +125,7 @@ class SqlWorkflowTaskRepository:
         into ``depends_on_ids`` with a single batched query.
         """
         stmt = select(WorkflowTask)
-        if self._tenant_id is not None:
-            stmt = stmt.where(WorkflowTask.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         if workflow_execution_id is not None:
             stmt = stmt.where(
                 WorkflowTask.workflow_execution_id == workflow_execution_id

@@ -17,6 +17,7 @@ from models.agent_skill import (
 )
 from models.tag import AgentSkillTag
 from repositories._integrity import commit_or_translate_user_fk
+from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import NotFoundError, ReferencedError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 from repositories.tags import TagLinks
@@ -70,46 +71,21 @@ class AgentSkillRepository(Protocol):
     async def set_tags(self, skill_id: str, tag_ids: Sequence[str]) -> AgentSkill: ...
 
 
-class SqlAgentSkillRepository:
+class SqlAgentSkillRepository(TenantScopedRepository[AgentSkill]):
     """SQLModel-backed implementation of AgentSkillRepository.
 
     ``delete`` catches IntegrityError and re-raises it as ReferencedError when
     a skill is still referenced by one or more workflows.
     """
 
+    model = AgentSkill
+
     def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
-        self._db = session
-        self._tenant_id = tenant_id
+        super().__init__(session, tenant_id=tenant_id)
         self._tags = TagLinks(session, AgentSkillTag, tenant_id=tenant_id)
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this. A ``None`` tenant_id means this
-        repository was built for a read route running in "all tenants" mode
-        (see ``CurrentTenantScopeDep``); a write route always resolves a
-        concrete tenant via the strict ``CurrentTenantIdDep``, so reaching
-        ``None`` here means a write route was mis-wired to the permissive
-        dependency -- a bug, not a state a real request should produce.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
-
-    async def _get_scoped(self, skill_id: str) -> AgentSkill | None:
-        stmt = select(AgentSkill).where(AgentSkill.id == skill_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(AgentSkill.tenant_id == self._tenant_id)
-        result = await self._db.exec(stmt)
-        return result.first()
 
     async def get(self, skill_id: str) -> AgentSkill | None:
         return await self._get_scoped(skill_id)
-
-    async def exists(self, skill_id: str) -> bool:
-        return await self._get_scoped(skill_id) is not None
 
     async def list(
         self,
@@ -127,8 +103,7 @@ class SqlAgentSkillRepository:
         the filter.
         """
         stmt = select(AgentSkill)
-        if self._tenant_id is not None:
-            stmt = stmt.where(AgentSkill.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         for clause in self._tags.filter_clauses(col(AgentSkill.id), tag_ids):
             stmt = stmt.where(clause)
         stmt = apply_filters(stmt, AgentSkill, filters, readable=AgentSkillRead)

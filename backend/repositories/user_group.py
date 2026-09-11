@@ -35,6 +35,7 @@ from models.user_group import (
     UserGroupUpdate,
 )
 from repositories._integrity import is_foreign_key_error
+from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import (
     ForeignKeyViolationError,
     NotFoundError,
@@ -91,7 +92,7 @@ class UserGroupRepository(Protocol):
     ) -> None: ...
 
 
-class SqlUserGroupRepository:
+class SqlUserGroupRepository(TenantScopedRepository[UserGroup]):
     """SQLModel-backed implementation of UserGroupRepository.
 
     Takes the user repository as a collaborator so membership can be validated
@@ -99,34 +100,16 @@ class SqlUserGroupRepository:
     key pattern used by :class:`repositories.workflow.SqlWorkflowRepository`.
     """
 
+    model = UserGroup
+
     def __init__(
         self, session: AsyncSession, users: UserRepository, *, tenant_id: str | None
     ) -> None:
-        self._db = session
+        super().__init__(session, tenant_id=tenant_id)
         self._users = users
-        self._tenant_id = tenant_id
         self._tags = TagLinks(session, UserGroupTag, tenant_id=tenant_id)
 
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- see
-        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
-
     # -- group lookups -------------------------------------------------------
-
-    async def _get_scoped(self, group_id: str) -> UserGroup | None:
-        """Return the group when it belongs to this repository's tenant, else ``None``."""
-        stmt = select(UserGroup).where(UserGroup.id == group_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(UserGroup.tenant_id == self._tenant_id)
-        return (await self._db.exec(stmt)).first()
 
     async def get(self, group_id: str) -> UserGroupRead | None:
         group = await self._get_scoped(group_id)
@@ -138,9 +121,6 @@ class SqlUserGroupRepository:
             tag_ids=await self._tags.for_one(group_id),
         )
 
-    async def exists(self, group_id: str) -> bool:
-        return await self._get_scoped(group_id) is not None
-
     async def list(
         self,
         *,
@@ -151,8 +131,7 @@ class SqlUserGroupRepository:
         tag_ids: Sequence[str] = (),
     ) -> _GroupList:
         stmt = select(UserGroup)
-        if self._tenant_id is not None:
-            stmt = stmt.where(UserGroup.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         for clause in self._tags.filter_clauses(col(UserGroup.id), tag_ids):
             stmt = stmt.where(clause)
         stmt = apply_filters(stmt, UserGroup, filters, readable=UserGroupRead)

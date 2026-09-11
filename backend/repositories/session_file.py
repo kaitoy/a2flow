@@ -16,10 +16,10 @@ from typing import Protocol, cast
 from sqlalchemy import func
 from sqlalchemy.orm import QueryableAttribute, defer
 from sqlmodel import col, select
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.session_file import SessionFile, SessionFileOrigin, SessionFileRead
 from repositories._integrity import commit_or_translate_user_fk
+from repositories._scoped import TenantScopedRepository
 
 
 class SessionFileRepository(Protocol):
@@ -45,7 +45,7 @@ class SessionFileRepository(Protocol):
     ) -> SessionFile: ...
 
 
-class SqlSessionFileRepository:
+class SqlSessionFileRepository(TenantScopedRepository[SessionFile]):
     """SQLModel-backed implementation of :class:`SessionFileRepository`.
 
     ``tenant_id`` follows the same convention as
@@ -55,34 +55,7 @@ class SqlSessionFileRepository:
     need a concrete tenant.
     """
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
-        """Store the SQLModel async session and the tenant these queries are scoped to.
-
-        Args:
-            session: The database session backing every query.
-            tenant_id: Tenant to scope queries to, or ``None`` for a
-                platform-scoped read across every tenant.
-        """
-        self._db = session
-        self._tenant_id = tenant_id
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- a mutation has to land in one
-        tenant, and silently picking one would be worse than failing.
-
-        Returns:
-            The concrete tenant id.
-
-        Raises:
-            RuntimeError: If the repository was built without a tenant.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
+    model = SessionFile
 
     async def list_for_execution(self, execution_id: str) -> list[SessionFileRead]:
         """Return the metadata of every file in a run's workflow session.
@@ -110,8 +83,7 @@ class SqlSessionFileRepository:
             .options(defer(cast(QueryableAttribute[bytes], col(SessionFile.data))))
             .order_by(col(SessionFile.created_at), col(SessionFile.id))
         )
-        if self._tenant_id is not None:
-            stmt = stmt.where(col(SessionFile.tenant_id) == self._tenant_id)
+        stmt = self._scoped(stmt)
         rows = (await self._db.exec(stmt)).all()
         return [SessionFileRead.model_validate(row) for row in rows]
 
@@ -133,8 +105,7 @@ class SqlSessionFileRepository:
             col(SessionFile.id) == file_id,
             col(SessionFile.workflow_execution_id) == execution_id,
         )
-        if self._tenant_id is not None:
-            stmt = stmt.where(col(SessionFile.tenant_id) == self._tenant_id)
+        stmt = self._scoped(stmt)
         return (await self._db.exec(stmt)).first()
 
     async def name_exists(self, execution_id: str, name: str) -> bool:
@@ -151,8 +122,7 @@ class SqlSessionFileRepository:
             col(SessionFile.workflow_execution_id) == execution_id,
             col(SessionFile.name) == name,
         )
-        if self._tenant_id is not None:
-            stmt = stmt.where(col(SessionFile.tenant_id) == self._tenant_id)
+        stmt = self._scoped(stmt)
         return (await self._db.exec(stmt)).first() is not None
 
     async def total_bytes(self, execution_id: str) -> int:
@@ -170,8 +140,7 @@ class SqlSessionFileRepository:
         stmt = select(func.coalesce(func.sum(col(SessionFile.size_bytes)), 0)).where(
             col(SessionFile.workflow_execution_id) == execution_id
         )
-        if self._tenant_id is not None:
-            stmt = stmt.where(col(SessionFile.tenant_id) == self._tenant_id)
+        stmt = self._scoped(stmt)
         return int((await self._db.exec(stmt)).one())
 
     async def create(

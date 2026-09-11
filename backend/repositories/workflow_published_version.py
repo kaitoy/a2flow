@@ -20,7 +20,6 @@ from typing import Any, Protocol
 from sqlalchemy import Integer, Text, column, func, literal, true
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import col, select
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.workflow_published_version import (
     WorkflowPublishedVersion,
@@ -31,6 +30,7 @@ from models.workflow_task_template import (
     WorkflowTaskTemplateRead,
 )
 from repositories._integrity import commit_or_translate_user_fk
+from repositories._scoped import TenantScopedRepository
 from repositories.query import (
     ColumnOverride,
     FilterSpec,
@@ -70,7 +70,9 @@ class WorkflowPublishedVersionRepository(Protocol):
     ) -> WorkflowPublishedVersion: ...
 
 
-class SqlWorkflowPublishedVersionRepository:
+class SqlWorkflowPublishedVersionRepository(
+    TenantScopedRepository[WorkflowPublishedVersion]
+):
     """SQLModel-backed implementation of WorkflowPublishedVersionRepository.
 
     The parent workflow's existence is not re-validated here: the only caller
@@ -78,30 +80,14 @@ class SqlWorkflowPublishedVersionRepository:
     its own tenant-scoped repository.
     """
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
-        """Store the session and the tenant every query is scoped to."""
-        self._db = session
-        self._tenant_id = tenant_id
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- see
-        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
+    model = WorkflowPublishedVersion
 
     async def _get_scoped(self, workflow_id: str) -> WorkflowPublishedVersion | None:
         """Return the snapshot row of ``workflow_id`` within the current tenant."""
         stmt = select(WorkflowPublishedVersion).where(
             WorkflowPublishedVersion.workflow_id == workflow_id
         )
-        if self._tenant_id is not None:
-            stmt = stmt.where(WorkflowPublishedVersion.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         result = await self._db.exec(stmt)
         return result.first()
 
@@ -129,8 +115,7 @@ class SqlWorkflowPublishedVersionRepository:
         stmt = select(WorkflowPublishedVersion).where(
             col(WorkflowPublishedVersion.workflow_id).in_(list(workflow_ids))
         )
-        if self._tenant_id is not None:
-            stmt = stmt.where(WorkflowPublishedVersion.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         result = await self._db.exec(stmt)
         return {v.workflow_id: v for v in result.all()}
 
@@ -255,8 +240,7 @@ class SqlWorkflowPublishedVersionRepository:
             .join(elem, true())
             .where(WorkflowPublishedVersion.workflow_id == workflow_id)
         )
-        if self._tenant_id is not None:
-            stmt = stmt.where(WorkflowPublishedVersion.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         stmt = apply_filters(
             stmt,
             WorkflowTaskTemplate,

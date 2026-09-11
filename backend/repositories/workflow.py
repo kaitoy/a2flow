@@ -20,6 +20,7 @@ from models.workflow import (
 )
 from models.workflow_published_version import WorkflowPublishedVersion
 from repositories._integrity import commit_or_translate_user_fk, is_foreign_key_error
+from repositories._scoped import TenantScopedRepository
 from repositories.agent_skill import AgentSkillRepository
 from repositories.exceptions import (
     ForeignKeyViolationError,
@@ -91,12 +92,14 @@ class WorkflowRepository(Protocol):
     async def delete(self, workflow_id: str) -> None: ...
 
 
-class SqlWorkflowRepository:
+class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
     """SQLModel-backed implementation of WorkflowRepository.
 
     Validates that the referenced ``agent_skill_id`` exists before creating or
     updating a workflow, raising ForeignKeyViolationError if it does not.
     """
+
+    model = Workflow
 
     def __init__(
         self,
@@ -105,29 +108,9 @@ class SqlWorkflowRepository:
         *,
         tenant_id: str | None,
     ) -> None:
-        self._db = session
+        super().__init__(session, tenant_id=tenant_id)
         self._skills = skills
-        self._tenant_id = tenant_id
         self._tags = TagLinks(session, WorkflowTag, tenant_id=tenant_id)
-
-    def _require_tenant(self) -> str:
-        """Return ``self._tenant_id``, raising if this instance has no concrete tenant.
-
-        Only a write method should call this -- see
-        ``repositories.agent_skill.SqlAgentSkillRepository._require_tenant``.
-        """
-        if self._tenant_id is None:
-            raise RuntimeError(
-                f"{type(self).__name__} mutation requires a concrete tenant_id"
-            )
-        return self._tenant_id
-
-    async def _get_scoped(self, workflow_id: str) -> Workflow | None:
-        stmt = select(Workflow).where(Workflow.id == workflow_id)
-        if self._tenant_id is not None:
-            stmt = stmt.where(Workflow.tenant_id == self._tenant_id)
-        result = await self._db.exec(stmt)
-        return result.first()
 
     async def get(self, workflow_id: str) -> Workflow | None:
         return await self._get_scoped(workflow_id)
@@ -183,8 +166,7 @@ class SqlWorkflowRepository:
         and the two must agree.
         """
         stmt = select(Workflow)
-        if self._tenant_id is not None:
-            stmt = stmt.where(Workflow.tenant_id == self._tenant_id)
+        stmt = self._scoped(stmt)
         for clause in self._tags.filter_clauses(col(Workflow.id), tag_ids):
             stmt = stmt.where(clause)
         columns = None
