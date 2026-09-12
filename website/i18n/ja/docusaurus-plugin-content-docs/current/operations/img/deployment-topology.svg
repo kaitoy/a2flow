@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="deployment-topology-title deployment-topology-desc">
+      <title id="deployment-topology-title">デプロイのトポロジー</title>
+      <desc id="deployment-topology-desc">ブラウザがリバースプロキシ経由でフロントエンドに届き、フロントエンドがバックエンド API を呼び、メールワーカーも動かすバックエンド API が、永続化が必要な状態(データベース、スキルストア、暗号化キー)、外部サービス(LLM プロバイダー、MCP サーバー)、SMTP リレーに届くことを示すアーキテクチャ図。</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Zones (bg -> zones -> arrows -> nodes) -->
+      <rect x="40" y="480" width="360" height="120" rx="8" fill="#1c1e21" fill-opacity="0.02" stroke="#1c1e21" stroke-opacity="0.10" stroke-width="0.8"/>
+      <rect x="52" y="483" width="116" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="110" y="493" fill="#1c1e21" fill-opacity="0.40" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">永続化が必要な状態</text>
+
+      <rect x="440" y="480" width="280" height="120" rx="8" fill="#1c1e21" fill-opacity="0.02" stroke="#1c1e21" stroke-opacity="0.10" stroke-width="0.8"/>
+      <rect x="452" y="483" width="68" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="486" y="493" fill="#1c1e21" fill-opacity="0.40" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">外部サービス</text>
+
+      <!-- Arrows -->
+      <line x1="500" y1="96" x2="500" y2="136" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="192" x2="500" y2="232" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="296" x2="500" y2="336" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M440,408 L440,436 Q440,444 432,444 L228,444 Q220,444 220,452 L220,480" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M500,408 L500,436 Q500,444 508,444 L572,444 Q580,444 580,452 L580,480" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M560,408 L560,420 Q560,428 568,428 L852,428 Q860,428 860,436 L860,512" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Label -->
+      <rect x="474" y="108" width="52" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="500" y="117" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">HTTPS</text>
+
+      <!-- Browser (external) -->
+      <rect x="380" y="40" width="240" height="56" rx="6" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="500" y="74" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ブラウザ</text>
+
+      <!-- Reverse proxy -->
+      <rect x="380" y="136" width="240" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="160" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">リバースプロキシ</text>
+      <text x="500" y="176" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ロードバランサー</text>
+
+      <!-- Frontend -->
+      <rect x="380" y="232" width="240" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="260" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">フロントエンド</text>
+      <text x="500" y="276" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">Next.js</text>
+
+      <!-- Backend API (focal — folds in the email worker) -->
+      <rect x="380" y="336" width="240" height="72" rx="6" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="500" y="366" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">バックエンド API</text>
+      <text x="500" y="382" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">uvicorn + メールワーカー</text>
+
+      <!-- Durable state: Database, Skill store, Secret key -->
+      <rect x="60" y="512" width="100" height="72" rx="6" fill="#1c1e21" fill-opacity="0.05" stroke="#525860" stroke-width="1"/>
+      <text x="110" y="542" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">データベース</text>
+      <text x="110" y="558" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">レコード</text>
+
+      <rect x="170" y="512" width="100" height="72" rx="6" fill="#1c1e21" fill-opacity="0.05" stroke="#525860" stroke-width="1"/>
+      <text x="220" y="542" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">スキルストア</text>
+      <text x="220" y="558" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">クローン</text>
+
+      <rect x="280" y="512" width="100" height="72" rx="6" fill="#1c1e21" fill-opacity="0.05" stroke="#525860" stroke-width="1"/>
+      <text x="330" y="542" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">暗号化キー</text>
+      <text x="330" y="558" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">暗号化に使う</text>
+
+      <!-- External services: LLM provider, MCP servers -->
+      <rect x="448" y="512" width="130" height="72" rx="6" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="513" y="552" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">LLM プロバイダー</text>
+
+      <rect x="590" y="512" width="110" height="72" rx="6" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="645" y="552" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">MCP サーバー</text>
+
+      <!-- SMTP relay (external) -->
+      <rect x="780" y="512" width="160" height="72" rx="6" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="860" y="552" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">SMTP リレー</text>
+
+      <!-- Legend -->
+      <line x1="40" y1="632" x2="960" y2="632" stroke="#1c1e21" stroke-opacity="0.10" stroke-width="0.8"/>
+      <text x="40" y="648" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">凡例</text>
+
+      <rect x="40" y="660" width="24" height="14" rx="4" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="72" y="671" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">A2Flow の構成要素</text>
+
+      <rect x="220" y="660" width="24" height="14" rx="4" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="252" y="671" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">外部システム</text>
+
+      <rect x="400" y="660" width="24" height="14" rx="4" fill="#1c1e21" fill-opacity="0.05" stroke="#525860" stroke-width="1"/>
+      <text x="432" y="671" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">データストア</text>
+    </svg>

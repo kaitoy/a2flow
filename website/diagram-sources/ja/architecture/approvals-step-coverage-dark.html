@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1 つの承認が対象にする範囲</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #030711; color: #e3e3e3; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #9aa1ab; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #e3e3e3; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Flowchart · Diagram Design</p>
+    <h1>1 つの承認が対象にする範囲</h1>
+
+    <svg viewBox="0 0 1000 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="approvals-step-coverage-dark-title approvals-step-coverage-dark-desc">
+      <title id="approvals-step-coverage-dark-title">1 つの承認が対象にする範囲</title>
+      <desc id="approvals-step-coverage-dark-desc">5 ステップのタスク連鎖のフローチャート。承認 A が最初の 3 ステップを対象にし、4 番目からは承認 B が引き継ぐ。承認は名指ししたステップと、次の承認までのそれ以降すべてを対象にする。</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="120" y1="88" x2="120" y2="140" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="200" y1="168" x2="220" y2="168" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="380" y1="168" x2="400" y2="168" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="560" y1="168" x2="580" y2="168" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="660" y1="88" x2="660" y2="140" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="740" y1="168" x2="760" y2="168" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Gates -->
+      <rect x="40" y="40" width="160" height="48" rx="24" fill="rgba(227,227,227,0.02)" stroke="rgba(227,227,227,0.35)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="120" y="60" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">承認 A</text>
+      <text x="120" y="76" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ゲート</text>
+
+      <rect x="580" y="40" width="160" height="48" rx="24" fill="rgba(227,227,227,0.02)" stroke="rgba(227,227,227,0.35)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="660" y="60" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">承認 B</text>
+      <text x="660" y="76" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ゲート</text>
+
+      <!-- Steps -->
+      <rect x="40" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="120" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">承認を依頼する</text>
+
+      <rect x="220" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="300" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">インスタンス起動</text>
+
+      <rect x="400" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="480" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">インスタンスにタグ付け</text>
+
+      <rect x="580" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="660" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">もう一度依頼する</text>
+
+      <rect x="760" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="840" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">スナップショット削除</text>
+
+      <!-- Coverage brackets -->
+      <path d="M40,208 L40,214 L560,214 L560,208" fill="none" stroke="#3bf5c4" stroke-width="1.2"/>
+      <text x="300" y="230" fill="#3bf5c4" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">承認 A の対象</text>
+
+      <path d="M580,208 L580,214 L920,214 L920,208" fill="none" stroke="#3bf5c4" stroke-width="1.2"/>
+      <text x="750" y="230" fill="#3bf5c4" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">承認 B の対象</text>
+
+      <!-- Legend -->
+      <line x1="40" y1="256" x2="960" y2="256" stroke="rgba(227,227,227,0.10)" stroke-width="0.8"/>
+      <text x="40" y="272" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">凡例</text>
+
+      <rect x="40" y="284" width="24" height="14" rx="7" fill="rgba(227,227,227,0.02)" stroke="rgba(227,227,227,0.35)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="76" y="295" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">承認ゲート</text>
+    </svg>
+  </div>
+</body>
+</html>

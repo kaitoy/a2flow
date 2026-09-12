@@ -11,12 +11,8 @@ sidebar_position: 9
 
 ## どこで使われるか {#where-a-secret-is-used}
 
-```mermaid
-flowchart LR
-  S["シークレット<br/>name"] --> K["エントリ<br/>key"]
-  K -->|"${secret:name/key}"| H["MCP サーバーのヘッダーと<br/>環境変数"]
-  K -->|"Auth Password のピッカー"| G["エージェントスキルの<br/>リポジトリのクローン"]
-```
+![シークレットのエントリが、MCP サーバーのヘッダーと環境変数から参照されるか、エージェントスキルのリポジトリの Auth Password として参照されるかを示すフローチャート。](./img/secrets-usage.svg#gh-light-mode-only)
+![シークレットのエントリが、MCP サーバーのヘッダーと環境変数から参照されるか、エージェントスキルのリポジトリの Auth Password として参照されるかを示すフローチャート。](./img/secrets-usage-dark.svg#gh-dark-mode-only)
 
 - **[MCP サーバー](./mcp-servers.md)** — ヘッダーの値と環境変数の値には `${secret:name/key}` を埋め込めます。展開されるのは接続のときです。
 - **[エージェントスキル](./agent-skills.md)** — スキルの **Auth Password** は 1 エントリへの参照で、入力ではなくドロップダウンから選びます。

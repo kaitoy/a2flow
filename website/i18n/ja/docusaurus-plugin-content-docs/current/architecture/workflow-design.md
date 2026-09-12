@@ -7,16 +7,8 @@ sidebar_position: 2
 
 ワークフローを空の状態から作ることはできません。ワークフローは[エージェントスキル](../guides/agent-skills.md)、つまり A2Flow がクローンして最新に保つ Git リポジトリから生成され、設計を凍結する価値が出るまで磨かれます。
 
-```mermaid
-flowchart LR
-  S["エージェントスキル<br/>公開済みのリビジョン"] -->|"ワークフローを生成"| G["generating<br/>設計実行が書いている最中"]
-  G --> D["draft<br/>タスクテンプレートとツールバインディングがある"]
-  G -->|"何も登録されなかった"| F["failed<br/>理由がレコードに残る"]
-  F -->|"チャットまたは手作業で書く"| D
-  D -->|"公開"| P["公開版<br/>設計が凍結される"]
-  P -->|"何か編集する"| MOD["modified<br/>実行はいまも公開版を使う"]
-  MOD -->|"公開"| P
-```
+![公開済みのエージェントスキルから generating を経て draft か failed になり、draft から published、modified へ進み、modified から公開で戻る、ワークフローの状態遷移図。](./img/workflow-design-status.svg#gh-light-mode-only)
+![公開済みのエージェントスキルから generating を経て draft か failed になり、draft から published、modified へ進み、modified から公開で戻る、ワークフローの状態遷移図。](./img/workflow-design-status-dark.svg#gh-dark-mode-only)
 
 公開済みのリビジョンがないスキルは、ワークフローの生成にも実行にも使えません。2 つのエージェントが従うのはクローンそのものなので、それが出るまでは従う先がないからです。
 

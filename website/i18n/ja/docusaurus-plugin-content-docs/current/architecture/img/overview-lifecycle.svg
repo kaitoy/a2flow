@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 760" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="overview-lifecycle-title overview-lifecycle-desc">
+      <title id="overview-lifecycle-title">ワークフローの流れ</title>
+      <desc id="overview-lifecycle-desc">エージェントスキルからワークフローを生成し、ワークフローセッションの中でワークフロー実行として動かし、そのタスクが人の承認を求めるか、MCP ゲートウェイを通して MCP サーバーのツールを呼ぶことを示すフローチャート。</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Spine arrows -->
+      <line x1="500" y1="104" x2="500" y2="144" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="208" x2="500" y2="248" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="312" x2="500" y2="352" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="416" x2="500" y2="456" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Spine labels (beside the line) -->
+      <rect x="508" y="117" width="124" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="516" y="127" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">ワークフローを生成</text>
+      <rect x="508" y="221" width="88" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="516" y="231" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">公開して実行</text>
+
+      <!-- Branch elbows: Tasks -> Approval gate / MCP gateway -->
+      <path d="M460,512 L460,532 Q460,540 452,540 L298,540 Q290,540 290,548 L290,552" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M540,512 L540,532 Q540,540 548,540 L702,540 Q710,540 710,548 L710,552" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <rect x="329" y="519" width="92" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="375" y="529" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">人の判断が要る</text>
+      <rect x="585" y="519" width="80" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="625" y="529" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ツールが要る</text>
+
+      <!-- Approval gate -> MCP gateway -->
+      <line x1="380" y1="580" x2="620" y2="580" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="478" y="559" width="44" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="500" y="569" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">証明書</text>
+
+      <!-- MCP gateway -> MCP server -->
+      <line x1="710" y1="608" x2="710" y2="648" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Nodes: main spine -->
+      <rect x="400" y="40" width="200" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="68" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">エージェントスキル</text>
+      <text x="500" y="88" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">Git リポジトリ</text>
+
+      <rect x="390" y="144" width="220" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="172" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ワークフロー</text>
+      <text x="500" y="192" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">テンプレートとツールバインディング</text>
+
+      <rect x="380" y="248" width="240" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="276" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ワークフロー実行</text>
+      <text x="500" y="296" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">設計のスナップショット</text>
+
+      <rect x="390" y="352" width="220" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="380" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ワークフローセッション</text>
+      <text x="500" y="400" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行が進むチャット</text>
+
+      <rect x="420" y="456" width="160" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="480" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">タスク</text>
+      <text x="500" y="500" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">1 つずつ</text>
+
+      <!-- Nodes: branch row -->
+      <rect x="200" y="552" width="180" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="290" y="585" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">承認ゲート</text>
+
+      <rect x="620" y="552" width="180" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="710" y="585" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">MCP ゲートウェイ</text>
+
+      <!-- Node: MCP server -->
+      <rect x="620" y="648" width="180" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="710" y="681" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">MCP サーバー</text>
+    </svg>

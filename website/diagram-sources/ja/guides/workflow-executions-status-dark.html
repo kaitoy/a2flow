@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>実行のステータス</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #030711; color: #e3e3e3; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #9aa1ab; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #e3e3e3; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">State machine · Diagram Design</p>
+    <h1>実行のステータス</h1>
+
+    <svg viewBox="0 0 660 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-executions-status-dark-title workflow-executions-status-dark-desc">
+      <title id="workflow-executions-status-dark-title">実行のステータス</title>
+      <desc id="workflow-executions-status-dark-desc">実行が running で始まり、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="360" y1="30" x2="360" y2="52" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M330,116 L330,144 Q330,152 322,152 L238,152 Q230,152 230,160 L230,200" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M390,116 L390,144 Q390,152 398,152 L482,152 Q490,152 490,160 L490,200" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="252" y="129" width="56" height="16" rx="2" fill="#030711"/>
+      <text x="280" y="141" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">失敗なし</text>
+
+      <rect x="400" y="129" width="80" height="16" rx="2" fill="#030711"/>
+      <text x="440" y="141" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">1 つ以上失敗</text>
+
+      <!-- Start -->
+      <circle cx="360" cy="26" r="6" fill="#e3e3e3"/>
+
+      <!-- running (focal) -->
+      <rect x="270" y="52" width="180" height="64" rx="8" fill="rgba(59,245,196,0.10)" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="360" y="91" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">running</text>
+
+      <!-- completed -->
+      <rect x="140" y="200" width="180" height="56" rx="8" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="230" y="235" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">completed</text>
+
+      <!-- failed -->
+      <rect x="400" y="200" width="180" height="56" rx="8" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="490" y="235" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">failed</text>
+    </svg>
+  </div>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>承認ゲートの動き</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #030711; color: #e3e3e3; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #9aa1ab; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #e3e3e3; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Sequence · Diagram Design</p>
+    <h1>承認ゲートの動き</h1>
+
+    <svg viewBox="0 0 1000 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="approvals-sequence-dark-title approvals-sequence-dark-desc">
+      <title id="approvals-sequence-dark-title">承認ゲートの動き</title>
+      <desc id="approvals-sequence-dark-desc">承認のシーケンス図。実行エージェントが承認を依頼し、対象のステップが止まったまま A2Flow が承認者に通知する。承認者が決定すると、A2Flow は対象の各ステップに開始時に証明書を渡し、実行を続けさせる。</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3bf5c4"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Lifelines -->
+      <line x1="130" y1="128" x2="130" y2="380" stroke="rgba(227,227,227,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="430" y1="128" x2="430" y2="380" stroke="rgba(227,227,227,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="700" y1="128" x2="700" y2="380" stroke="rgba(227,227,227,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+
+      <!-- Messages -->
+      <line x1="130" y1="176" x2="430" y2="176" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="430" y1="236" x2="700" y2="236" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="700" y1="296" x2="430" y2="296" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="430" y1="356" x2="130" y2="356" stroke="#3bf5c4" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+
+      <!-- Labels -->
+      <rect x="246" y="159" width="68" height="14" rx="2" fill="#030711"/>
+      <text x="280" y="170" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">承認を依頼</text>
+
+      <rect x="549" y="219" width="32" height="14" rx="2" fill="#030711"/>
+      <text x="565" y="230" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">通知</text>
+
+      <rect x="549" y="279" width="32" height="14" rx="2" fill="#030711"/>
+      <text x="565" y="290" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">決定</text>
+
+      <rect x="246" y="339" width="68" height="14" rx="2" fill="#030711"/>
+      <text x="280" y="350" fill="#3bf5c4" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行が続く</text>
+
+      <!-- Editorial callouts, kept clear of the lifelines and each other -->
+      <path d="M 900 182 Q 852 182 700 228" fill="none" stroke="rgba(227,227,227,0.40)" stroke-width="1" stroke-dasharray="4,3"/>
+      <circle cx="700" cy="236" r="2" fill="#e3e3e3"/>
+      <text x="960" y="152" fill="#e3e3e3" font-size="16" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="end">対象のステップは</text>
+      <text x="960" y="170" fill="#e3e3e3" font-size="16" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="end">止まったまま</text>
+
+      <path d="M 900 262 Q 852 262 700 288" fill="none" stroke="rgba(227,227,227,0.40)" stroke-width="1" stroke-dasharray="4,3"/>
+      <circle cx="700" cy="296" r="2" fill="#e3e3e3"/>
+      <text x="960" y="232" fill="#e3e3e3" font-size="16" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="end">ステップごとに</text>
+      <text x="960" y="250" fill="#e3e3e3" font-size="16" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="end">証明書が渡される</text>
+
+      <!-- Actor boxes -->
+      <rect x="58" y="72" width="144" height="56" rx="6" fill="rgba(227,227,227,0.03)" stroke="rgba(227,227,227,0.30)" stroke-width="1"/>
+      <text x="130" y="98" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行</text>
+      <text x="130" y="113" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">エージェント</text>
+
+      <rect x="358" y="72" width="144" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="430" y="104" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">A2Flow</text>
+
+      <rect x="628" y="72" width="144" height="56" rx="6" fill="rgba(227,227,227,0.03)" stroke="rgba(227,227,227,0.30)" stroke-width="1"/>
+      <text x="700" y="104" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">承認者</text>
+
+      <!-- Legend -->
+      <line x1="58" y1="400" x2="944" y2="400" stroke="rgba(227,227,227,0.10)" stroke-width="0.8"/>
+      <text x="58" y="416" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">凡例</text>
+
+      <line x1="58" y1="440" x2="86" y2="440" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <text x="94" y="443" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">呼び出し</text>
+
+      <line x1="180" y1="440" x2="208" y2="440" stroke="#3bf5c4" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+      <text x="216" y="443" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">実行の続行</text>
+    </svg>
+  </div>
+</body>
+</html>

@@ -7,25 +7,8 @@ sidebar_position: 1
 
 デプロイの構成要素は、フロントエンドとバックエンドと 1 つのリレーショナルデータベースです。3 つをまとめて立ち上げる一番短い道は [Docker Compose で動かす](../getting-started/docker-compose.md)です。ここから先は、その構成がプロキシの背後に入り、残しておく価値のあるデータを抱えるようになったときに変わることです。
 
-```mermaid
-flowchart LR
-  U["ブラウザ"] -->|HTTPS| RP["リバースプロキシ / LB"]
-  RP --> F["フロントエンド<br/>Next.js。/api/* をサーバー側でプロキシ"]
-  F -->|BACKEND_BASE_URL| A["バックエンド API<br/>uvicorn"]
-  A --> LLM["LLM プロバイダー"]
-  A --> MCP["MCP サーバー"]
-  A --> DB
-  A --> SK
-  A --> KEY
-  EW["メールワーカー"] --> DB
-  EW --> SMTP["SMTP リレー"]
-
-  subgraph durable ["永続化が必要な状態"]
-    DB[("データベース<br/>DB_URL")]
-    SK[("エージェントスキルストア<br/>SKILLS_DIR")]
-    KEY["シークレット暗号化キー<br/>SECRET_KEY_FILE"]
-  end
-```
+![ブラウザがリバースプロキシ経由でフロントエンドに届き、フロントエンドがバックエンド API を呼び、メールワーカーも動かすバックエンド API が、永続化が必要な状態(データベース、スキルストア、暗号化キー)、外部サービス(LLM プロバイダー、MCP サーバー)、SMTP リレーに届くことを示すアーキテクチャ図。](./img/deployment-topology.svg#gh-light-mode-only)
+![ブラウザがリバースプロキシ経由でフロントエンドに届き、フロントエンドがバックエンド API を呼び、メールワーカーも動かすバックエンド API が、永続化が必要な状態(データベース、スキルストア、暗号化キー)、外部サービス(LLM プロバイダー、MCP サーバー)、SMTP リレーに届くことを示すアーキテクチャ図。](./img/deployment-topology-dark.svg#gh-dark-mode-only)
 
 ブラウザが話す相手はフロントエンドだけです。サーバー側のプロキシが `/api/*` をバックエンドへ転送し、認証クッキーをファーストパーティに保ちます。したがってバックエンドを公開する経路は要りません。ここに出てくる変数はすべて[設定リファレンス](./configuration.md)で説明しています。
 

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1010 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflows-tool-binding-title workflows-tool-binding-desc">
+      <title id="workflows-tool-binding-title">ツールの割り当て: 設計時と実行時</title>
+      <desc id="workflows-tool-binding-desc">設計時のツールの割り当てが Run 時にタスクへコピーされ、呼び出し時に確認されることを示すフローチャート。進行中のタスクに割り当てられたツールなら呼び出しは届き、そうでなければ使えるツールの一覧とともに拒否される。</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <line x1="240" y1="92" x2="320" y2="92" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="520" y1="92" x2="570" y2="92" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="750" y1="92" x2="790" y2="92" stroke="#00877a" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <line x1="660" y1="148" x2="660" y2="220" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="258" y="69" width="44" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="280" y="81" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">コピー</text>
+
+      <rect x="754" y="69" width="32" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="770" y="81" fill="#00877a" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">はい</text>
+
+      <rect x="664" y="176" width="44" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="686" y="188" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">いいえ</text>
+
+      <!-- Design time -->
+      <rect x="40" y="60" width="200" height="64" rx="6" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="140" y="87" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">設計時</text>
+      <text x="140" y="104" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">サーバーとツールを割り当て</text>
+
+      <!-- Run time -->
+      <rect x="320" y="60" width="200" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="420" y="87" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行時</text>
+      <text x="420" y="104" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">タスクが割り当てを持つ</text>
+
+      <!-- Decision -->
+      <polygon points="660,36 750,92 660,148 570,92" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="660" y="88" fill="#1c1e21" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">進行中のタスクに</text>
+      <text x="660" y="103" fill="#1c1e21" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">割り当てられている?</text>
+
+      <!-- Call goes through (focal) -->
+      <rect x="790" y="64" width="180" height="56" rx="28" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="880" y="98" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">呼び出しが届く</text>
+
+      <!-- Refused -->
+      <rect x="570" y="220" width="180" height="64" rx="28" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="660" y="247" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">拒否</text>
+      <text x="660" y="264" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">使えるツールの一覧が返る</text>
+    </svg>

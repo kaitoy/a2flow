@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1248 296" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="authorization-session-matrix-dark-title authorization-session-matrix-dark-desc"><defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style></defs>
+      <title id="authorization-session-matrix-dark-title">誰がどのセッションに入れるか</title>
+      <desc id="authorization-session-matrix-dark-desc">開発者、ワークフローの作成者、スーパー管理者が設計セッションに入れ、実行の開始者、指名された承認者、スーパー管理者がワークフローセッションに入れること、そして管理者はワークフローセッションを読み取りのみできることを示すアクセスマトリクス。</desc>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Header row -->
+      <rect x="12" y="72" width="208" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="116" y="98" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">セッション</text>
+      <text x="116" y="116" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">vs. アクター</text>
+
+      <rect x="232" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="306" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">開発者</text>
+      <text x="306" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">テナントの全員</text>
+
+      <rect x="396" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="470" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">作成者</text>
+      <text x="470" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">createdBy</text>
+
+      <rect x="560" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="634" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">開始者</text>
+      <text x="634" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行を始めた人</text>
+
+      <rect x="724" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="798" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">承認者</text>
+      <text x="798" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">その実行で指名</text>
+
+      <rect x="888" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="962" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">管理者</text>
+      <text x="962" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">テナントの管理者</text>
+
+      <rect x="1052" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="1126" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">スーパー管理者</text>
+      <text x="1126" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">制限なし</text>
+
+      <!-- Row 0: Design session -->
+      <rect x="12" y="144" width="208" height="40" rx="4" fill="#242526" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="24" y="168" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">設計セッション</text>
+
+      <rect x="232" y="144" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="306" y="168" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">フルアクセス</text>
+
+      <rect x="396" y="144" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="470" y="168" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">フルアクセス</text>
+
+      <rect x="560" y="144" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="634" y="168" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">アクセス不可</text>
+
+      <rect x="724" y="144" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="798" y="168" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">アクセス不可</text>
+
+      <rect x="888" y="144" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="962" y="168" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">アクセス不可</text>
+
+      <rect x="1052" y="144" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="1126" y="168" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">フルアクセス</text>
+
+      <!-- Row 1: Workflow session -->
+      <rect x="12" y="188" width="208" height="40" rx="4" fill="#242526" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="24" y="212" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">ワークフローセッション</text>
+
+      <rect x="232" y="188" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="306" y="212" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">アクセス不可</text>
+
+      <rect x="396" y="188" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="470" y="212" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">アクセス不可</text>
+
+      <rect x="560" y="188" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="634" y="212" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">フルアクセス</text>
+
+      <rect x="724" y="188" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="798" y="212" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">フルアクセス</text>
+
+      <rect x="888" y="188" width="148" height="40" rx="4" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1.4"/>
+      <text x="962" y="204" fill="#3bf5c4" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">読み取りのみ</text>
+      <text x="962" y="218" fill="#3bf5c4" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">唯一の例外</text>
+
+      <rect x="1052" y="188" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="1126" y="212" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">フルアクセス</text>
+
+      <!-- Legend -->
+      <line x1="12" y1="248" x2="1200" y2="248" stroke="#e3e3e3" stroke-opacity="0.10" stroke-width="0.8"/>
+      <text x="12" y="269" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">凡例</text>
+
+      <rect x="120" y="260" width="18" height="15" rx="2" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="146" y="272" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">フルアクセス</text>
+
+      <rect x="260" y="260" width="18" height="15" rx="2" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="286" y="272" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">読み取りのみ</text>
+
+      <rect x="400" y="260" width="18" height="15" rx="2" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="426" y="272" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">アクセス不可</text>
+    </svg>

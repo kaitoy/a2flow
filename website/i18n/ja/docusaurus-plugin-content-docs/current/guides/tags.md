@@ -7,15 +7,8 @@ sidebar_position: 10
 
 タグはレコードを分類するラベルです。1 つの語彙を、タグを付けられる 6 つの登録簿すべてで共有します。`aws` というタグ 1 つで、シークレットも MCP サーバーも同じように絞り込めます。
 
-```mermaid
-flowchart LR
-  T["テナントごとに<br/>1 つのタグ語彙"] --> S["Secrets"]
-  T --> M["MCP Servers"]
-  T --> A["Agent Skills"]
-  T --> W["Workflows"]
-  T --> K["Tool Mocks"]
-  T --> G["User Groups"]
-```
+![テナントごとに 1 つのタグ語彙が、タグを付けられる 6 つのレジストリ(Secrets、MCP Servers、Agent Skills、Workflows、Tool Mocks、User Groups)に共有されることを示すフローチャート。](./img/tags-vocabulary.svg#gh-light-mode-only)
+![テナントごとに 1 つのタグ語彙が、タグを付けられる 6 つのレジストリ(Secrets、MCP Servers、Agent Skills、Workflows、Tool Mocks、User Groups)に共有されることを示すフローチャート。](./img/tags-vocabulary-dark.svg#gh-dark-mode-only)
 
 管理サイドバーの **Tags** を開くと語彙を整えられます。各タグは、テナント内で一意の **Name**、任意の **Description**、そして固定の 8 色パレットから選ぶ**色**を持ちます。パレットにない色は拒否されます。
 

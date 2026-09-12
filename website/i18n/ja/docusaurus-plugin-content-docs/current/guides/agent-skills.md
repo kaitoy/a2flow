@@ -9,15 +9,8 @@ sidebar_position: 6
 
 管理サイドバーの **Agent Skills** を開くと目録を管理できます。
 
-```mermaid
-flowchart LR
-  N["スキルを登録<br/>フォームはすぐ返る"] --> C["Cloning<br/>背景で処理"]
-  C --> R["ready<br/>リビジョンが公開された"]
-  C --> F["failed<br/>理由がレコードに出る"]
-  F -->|"URL や資格情報を直して Pull"| C
-  R -->|"Pull"| C
-  R -->|"Generate workflow"| W["新しいワークフロー"]
-```
+![エージェントスキルの状態遷移図。登録するとバックグラウンドでクローンされ、ready か failed になる。どちらの状態からも Pull でやり直せ、ready のスキルから新しいワークフローを生成できる。](./img/agent-skills-lifecycle.svg#gh-light-mode-only)
+![エージェントスキルの状態遷移図。登録するとバックグラウンドでクローンされ、ready か failed になる。どちらの状態からも Pull でやり直せ、ready のスキルから新しいワークフローを生成できる。](./img/agent-skills-lifecycle-dark.svg#gh-dark-mode-only)
 
 スキルが使えるようになるのは、リビジョンが公開されてからです。それまでは、そのスキルからのワークフロー生成も実行も拒否されます。
 

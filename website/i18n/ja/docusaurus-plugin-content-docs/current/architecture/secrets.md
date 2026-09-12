@@ -7,14 +7,8 @@ sidebar_position: 8
 
 [シークレット](../guides/secrets.md)は名前の付いた key/value のエントリの束で、参照はつねにちょうど 1 つのエントリを指します。MCP サーバーのヘッダーや環境変数なら `${secret:name/key}`、エージェントスキルなら名前とキーの組です。参照は名前のまま保持され、**使うときに初めて解決されます**。だから資格情報を必要とする側が、資格情報そのものを抱えることはありません。
 
-```mermaid
-flowchart LR
-  R["参照<br/>name/key"] --> V{"どちらの型か"}
-  V -->|"local"| L["保管された値を復号する"]
-  V -->|"vault"| H["Vault からその場で読む"]
-  L --> U["MCP サーバーへの接続<br/>またはスキルのリポジトリのクローン"]
-  H --> U
-```
+![name/key のシークレット参照が保管の型で分岐することを示すフローチャート。local のシークレットは保管された値を復号し、Vault のシークレットはその場で読み、どちらも MCP サーバーへの接続かスキルのリポジトリのクローンに使われる。](./img/secrets-resolution.svg#gh-light-mode-only)
+![name/key のシークレット参照が保管の型で分岐することを示すフローチャート。local のシークレットは保管された値を復号し、Vault のシークレットはその場で読み、どちらも MCP サーバーへの接続かスキルのリポジトリのクローンに使われる。](./img/secrets-resolution-dark.svg#gh-dark-mode-only)
 
 | | **ローカル** | **HashiCorp Vault** |
 |---|---|---|

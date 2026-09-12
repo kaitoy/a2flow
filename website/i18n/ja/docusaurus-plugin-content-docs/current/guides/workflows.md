@@ -9,30 +9,15 @@ sidebar_position: 3
 
 管理サイドバーの **Workflows** を開くと管理できます。
 
-```mermaid
-flowchart LR
-  S["エージェントスキル"] -->|"Generate workflow"| G["ワークフロー<br/>AI がタスクテンプレートを設計"]
-  G -->|"設計チャットまたは管理フォーム"| A["調整した下書き"]
-  A -->|"Publish"| P["公開済み<br/>設計が凍結される"]
-  P -->|"Run"| E["ワークフロー実行<br/>1 回の実行。タスクの写しを持つ"]
-```
+![エージェントスキルからワークフローを生成し、下書きを調整して公開し、ワークフロー実行として動かすまでを示すフローチャート。](./img/workflows-lifecycle.svg#gh-light-mode-only)
+![エージェントスキルからワークフローを生成し、下書きを調整して公開し、ワークフロー実行として動かすまでを示すフローチャート。](./img/workflows-lifecycle-dark.svg#gh-dark-mode-only)
 
 ワークフローを何もないところから作る方法はありません。スキルから生成することが、ワークフローの生まれ方です。
 
 ## ステータス
 
-```mermaid
-stateDiagram-v2
-  [*] --> generating: Generate workflow
-  generating --> draft: タスクテンプレートが登録された
-  generating --> failed: 生成に失敗した
-  failed --> draft: 手動またはチャットでテンプレートを書いた
-  draft --> published: Publish
-  published --> modified: 何かを編集した
-  modified --> published: Publish
-  modified --> draft: Deactivate
-  published --> draft: Deactivate
-```
+![ワークフローの詳細ステータスの状態遷移図。generating から draft か failed になり、failed は書き直して draft に戻せる。draft は公開すると published になり、published と modified は編集と公開で行き来し、どちらも Deactivate で draft に戻る。](./img/workflows-status.svg#gh-light-mode-only)
+![ワークフローの詳細ステータスの状態遷移図。generating から draft か failed になり、failed は書き直して draft に戻せる。draft は公開すると published になり、published と modified は編集と公開で行き来し、どちらも Deactivate で draft に戻る。](./img/workflows-status-dark.svg#gh-dark-mode-only)
 
 | ステータス | 意味 | 実行できる人 |
 |---|---|---|
@@ -127,12 +112,8 @@ Developer ロールを持たない人には、この間ずっと公開済みの�
 
 ワークフロー一覧の **Run** を押すと、**ワークフロー実行**が作られます。実行はその時点のワークフローのスナップショットを持つ、独立したレコードです。
 
-```mermaid
-flowchart LR
-  W["ワークフロー<br/>(公開済みの版)"] -->|"Run"| X["ワークフロー実行<br/>スナップショット"]
-  M["選んだツールモック"] -->|"値としてコピー"| X
-  X --> C["ワークフローセッション<br/>実行が進むチャット"]
-```
+![公開済みのワークフローと選んだツールモックが、新しいワークフロー実行のスナップショットに値としてコピーされ、ワークフローセッションが開くことを示すフローチャート。](./img/workflows-snapshot.svg#gh-light-mode-only)
+![公開済みのワークフローと選んだツールモックが、新しいワークフロー実行のスナップショットに値としてコピーされ、ワークフローセッションが開くことを示すフローチャート。](./img/workflows-snapshot-dark.svg#gh-dark-mode-only)
 
 **テスト実行**では、実行ダイアログの **Mock tools** に、このワークフローのいずれかのタスクが使うツールの[ツールモック](./tool-mocks.md)と、ビルトインツールのモックが並びます。チェックするとそのツールがこの実行の間だけ差し替えられるので、ツールの副作用なしに公開前のテストを何度でも繰り返せます。テスト実行とは、`draft` のワークフローか、`modified` のワークフローの未公開の編集内容(下記)を実行する場合です。それ以外ではモックは出ませんし、指定しても拒否されます。本物に見えて何もしなかった実行が返るくらいなら、実行しないほうがましだからです。
 
@@ -168,13 +149,8 @@ flowchart LR
 
 タスクは [MCP サーバー](./mcp-servers.md)に登録されたサーバーのツールを使えます。ツールは設計時に割り当てられ、実行時に検査されます。
 
-```mermaid
-flowchart LR
-  D["設計時<br/>テンプレートが (サーバー, ツール) を持つ"] -->|"Run 時にコピー"| R["実行時<br/>タスクが同じ割り当てを持つ"]
-  R --> P{"そのツールは、進行中のタスクに<br/>割り当てられているか?"}
-  P -->|"はい"| OK["呼び出しがサーバーへ届く"]
-  P -->|"いいえ"| NO["拒否。使えるツールの一覧が返る"]
-```
+![設計時のツールの割り当てが Run 時にタスクへコピーされ、呼び出し時に確認されることを示すフローチャート。進行中のタスクに割り当てられたツールなら呼び出しは届き、そうでなければ使えるツールの一覧とともに拒否される。](./img/workflows-tool-binding.svg#gh-light-mode-only)
+![設計時のツールの割り当てが Run 時にタスクへコピーされ、呼び出し時に確認されることを示すフローチャート。進行中のタスクに割り当てられたツールなら呼び出しは届き、そうでなければ使えるツールの一覧とともに拒否される。](./img/workflows-tool-binding-dark.svg#gh-dark-mode-only)
 
 設計中、エージェントは登録済みの各サーバーが公開しているツールを一覧し、必要なものをステップに与えられます。この割り当てはテンプレートに保存され、実行開始時にその実行のタスクへコピーされます。
 

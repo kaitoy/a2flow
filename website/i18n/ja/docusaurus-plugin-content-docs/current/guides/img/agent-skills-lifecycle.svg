@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="agent-skills-lifecycle-title agent-skills-lifecycle-desc">
+      <title id="agent-skills-lifecycle-title">エージェントスキルのライフサイクル</title>
+      <desc id="agent-skills-lifecycle-desc">エージェントスキルの状態遷移図。登録するとバックグラウンドでクローンされ、ready か failed になる。どちらの状態からも Pull でやり直せ、ready のスキルから新しいワークフローを生成できる。</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <line x1="200" y1="108" x2="240" y2="108" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="400" y1="108" x2="440" y2="108" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="300" y1="144" x2="300" y2="220" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="360" y1="220" x2="360" y2="144" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M520,72 L520,48 Q520,40 512,40 L328,40 Q320,40 320,48 L320,72" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="520" y1="144" x2="520" y2="220" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="376" y="176" width="40" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="396" y="187" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">PULL</text>
+
+      <rect x="394" y="18" width="52" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="420" y="29" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">PULL</text>
+
+      <rect x="534" y="176" width="64" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="566" y="187" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">GENERATE</text>
+
+      <!-- Register -->
+      <rect x="40" y="72" width="160" height="72" rx="24" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="120" y="102" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">登録</text>
+      <text x="120" y="122" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">フォームはすぐ返る</text>
+
+      <!-- Cloning -->
+      <rect x="240" y="72" width="160" height="72" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="320" y="102" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Cloning</text>
+      <text x="320" y="122" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">バックグラウンドで処理</text>
+
+      <!-- ready (focal) -->
+      <rect x="440" y="72" width="160" height="72" rx="8" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="520" y="102" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">ready</text>
+      <text x="520" y="122" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">リビジョンが公開された</text>
+
+      <!-- failed -->
+      <rect x="240" y="220" width="160" height="72" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="320" y="250" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">failed</text>
+      <text x="320" y="270" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">理由がレコードに出る</text>
+
+      <!-- New workflow -->
+      <rect x="440" y="220" width="160" height="56" rx="24" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="520" y="253" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">新しいワークフロー</text>
+    </svg>

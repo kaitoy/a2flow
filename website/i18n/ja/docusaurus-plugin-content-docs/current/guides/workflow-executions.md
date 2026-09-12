@@ -22,12 +22,8 @@ sidebar_position: 4
 
 ## 実行のステータス {#run-status}
 
-```mermaid
-stateDiagram-v2
-  [*] --> running: Run
-  running --> completed: 全タスクが終わり、失敗はなかった
-  running --> failed: 全タスクが終わり、1 つ以上が失敗した
-```
+![実行が running で始まり、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。](./img/workflow-executions-status.svg#gh-light-mode-only)
+![実行が running で始まり、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。](./img/workflow-executions-status-dark.svg#gh-dark-mode-only)
 
 実行は `running` で始まり、タスクが 1 つ以上あり、そのすべてが終端の状態 — `completed`、`failed`、`skipped` — に達した時点で確定します。失敗したタスクを含む実行は `failed` で終わります。終了時刻はそのときに刻まれ、あとから編集しても動きません。タスクが 1 つもない実行は `running` のままです。[運用メトリクス](../operations/metrics.md)が数えるのはこの値です。
 
@@ -37,11 +33,8 @@ stateDiagram-v2
 
 ワークフローセッションは、1 回の実行が進むチャットです。開くと実行の開始メッセージが並び、エージェントはすでに作業を始めています。
 
-```mermaid
-flowchart LR
-  T["タスクタイムライン<br/>左端。折りたためる"] <--> M["メッセージ<br/>タスクごとにまとまる"]
-  M --> I["チャット入力"]
-```
+![ワークフローセッションの画面レイアウトを示すフローチャート。タスクタイムラインと、タスクごとにまとまったメッセージが横に並び、メッセージの先にチャット入力がある。](./img/workflow-executions-layout.svg#gh-light-mode-only)
+![ワークフローセッションの画面レイアウトを示すフローチャート。タスクタイムラインと、タスクごとにまとまったメッセージが横に並び、メッセージの先にチャット入力がある。](./img/workflow-executions-layout-dark.svg#gh-dark-mode-only)
 
 ### 誰と共有されるか {#who-shares-it}
 

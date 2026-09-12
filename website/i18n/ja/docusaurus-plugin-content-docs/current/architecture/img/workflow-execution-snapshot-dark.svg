@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-execution-snapshot-dark-title workflow-execution-snapshot-dark-desc">
+      <title id="workflow-execution-snapshot-dark-title">ワークフローの実行は設計を写す</title>
+      <desc id="workflow-execution-snapshot-dark-desc">公開版のワークフローと選ばれたツールモックが、新しいワークフロー実行のスナップショットに値のまま写され、開始時はすべて pending のタスクを持つワークフローセッションが開くことを示すフローチャート。</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3bf5c4"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <path d="M380,124 L380,144 Q380,152 388,152 L452,152 Q460,152 460,160 L460,180" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M660,124 L660,144 Q660,152 652,152 L548,152 Q540,152 540,160 L540,180" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="244" x2="500" y2="300" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="364" x2="500" y2="420" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Arrow labels -->
+      <rect x="404" y="135" width="32" height="14" rx="2" fill="#030711"/>
+      <text x="420" y="145" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行</text>
+
+      <rect x="552" y="135" width="104" height="14" rx="2" fill="#030711"/>
+      <text x="604" y="145" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">値のまま写される</text>
+
+      <!-- Workflow -->
+      <rect x="280" y="60" width="200" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="380" y="88" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ワークフロー</text>
+      <text x="380" y="104" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">公開版</text>
+
+      <!-- Chosen tool mocks -->
+      <rect x="560" y="60" width="200" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="660" y="88" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">選ばれたツールモック</text>
+      <text x="660" y="104" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">テスト実行だけ</text>
+
+      <!-- Workflow execution (focal) -->
+      <rect x="380" y="180" width="240" height="64" rx="6" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="500" y="208" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ワークフロー実行</text>
+      <text x="500" y="224" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">スナップショット</text>
+
+      <!-- Workflow session -->
+      <rect x="380" y="300" width="240" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="328" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ワークフローセッション</text>
+      <text x="500" y="344" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行が進むチャット</text>
+
+      <!-- Tasks -->
+      <rect x="380" y="420" width="240" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="448" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">タスク</text>
+      <text x="500" y="464" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">開始時はすべて pending</text>
+    </svg>

@@ -11,18 +11,8 @@ sidebar_position: 5
 
 破壊的な操作や取り消せない操作など、エージェントが動く前に明示的な了解が要るステップでは、エージェントは承認を求めて処理を止めます。
 
-```mermaid
-sequenceDiagram
-  participant A as 実行エージェント
-  participant F as A2Flow
-  participant P as 承認者
-  A->>F: 個人かグループを指名して承認を依頼
-  F->>P: 通知。メール送信が有効ならメールも
-  Note over A,P: 実行が止まり、チャットに Approve / Reject / Return が出る
-  P->>F: コメントを添えて判断
-  Note over F: Approve なら、対象の各ステップが開始時に証明書を受け取る
-  F-->>A: 判断が返り、実行が再開する
-```
+![承認依頼のシーケンス図。実行エージェントが承認を依頼し、A2Flow が承認者に通知して実行が止まる。承認者が判断すると、A2Flow は対象の各ステップに証明書を渡して実行を再開する。](./img/approvals-sequence.svg#gh-light-mode-only)
+![承認依頼のシーケンス図。実行エージェントが承認を依頼し、A2Flow が承認者に通知して実行が止まる。承認者が判断すると、A2Flow は対象の各ステップに証明書を渡して実行を再開する。](./img/approvals-sequence-dark.svg#gh-dark-mode-only)
 
 ### 誰に依頼されるか {#who-is-asked}
 

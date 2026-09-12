@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 660 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-executions-status-title workflow-executions-status-desc">
+      <title id="workflow-executions-status-title">実行のステータス</title>
+      <desc id="workflow-executions-status-desc">実行が running で始まり、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <line x1="360" y1="30" x2="360" y2="52" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M330,116 L330,144 Q330,152 322,152 L238,152 Q230,152 230,160 L230,200" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M390,116 L390,144 Q390,152 398,152 L482,152 Q490,152 490,160 L490,200" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="252" y="129" width="56" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="280" y="141" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">失敗なし</text>
+
+      <rect x="400" y="129" width="80" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="440" y="141" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">1 つ以上失敗</text>
+
+      <!-- Start -->
+      <circle cx="360" cy="26" r="6" fill="#1c1e21"/>
+
+      <!-- running (focal) -->
+      <rect x="270" y="52" width="180" height="64" rx="8" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="360" y="91" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">running</text>
+
+      <!-- completed -->
+      <rect x="140" y="200" width="180" height="56" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="230" y="235" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">completed</text>
+
+      <!-- failed -->
+      <rect x="400" y="200" width="180" height="56" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="490" y="235" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">failed</text>
+    </svg>

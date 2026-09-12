@@ -27,24 +27,8 @@ MCP プロキシ自体は別の理屈でスケールします。呼び出しの�
 
 そこで各エージェント実行(`POST /api/v1/workflow-executions/{id}/agent`、`POST /api/v1/workflows/{id}/agent`)は、**PostgreSQL のセッションレベルのアドバイザリロック**を取り、SSE ストリームの全体にわたって保持します。
 
-```mermaid
-sequenceDiagram
-  participant A as クライアント A
-  participant R1 as レプリカ 1
-  participant PG as PostgreSQL
-  participant R2 as レプリカ 2
-  participant B as クライアント B
-  A->>R1: POST .../agent
-  R1->>PG: このセッションのアドバイザリロックを取得
-  PG-->>R1: 取得できた
-  R1-->>A: SSE ストリーム開始
-  B->>R2: POST .../agent(同じセッション)
-  R2->>PG: このセッションのアドバイザリロックを取得
-  PG-->>R2: 他が保持中
-  R2-->>B: 409 SESSION_RUN_IN_PROGRESS
-  R1-->>A: ストリーム終了
-  R1->>PG: 接続とともにロック解放
-```
+![2 つのレプリカが同じセッションを動かそうと競合するシーケンス図。レプリカ 1 が PostgreSQL のアドバイザリロックを取得してクライアント A にストリームを開き、ロックが保持されている間はレプリカ 2 への同じセッションのリクエストが 409 で拒否され、レプリカ 1 のストリームが終わったときにだけロックが解放される。](./img/scaling-lock-race.svg#gh-light-mode-only)
+![2 つのレプリカが同じセッションを動かそうと競合するシーケンス図。レプリカ 1 が PostgreSQL のアドバイザリロックを取得してクライアント A にストリームを開き、ロックが保持されている間はレプリカ 2 への同じセッションのリクエストが 409 で拒否され、レプリカ 1 のストリームが終わったときにだけロックが解放される。](./img/scaling-lock-race-dark.svg#gh-dark-mode-only)
 
 同じセッションの 2 つ目の同時実行は、静かにずれていくのではなく、SSE のヘッダーを送る前に拒否されます。異なるセッションどうしが競合することはありません。ロックはあきらめる前に少しだけ待つので、ストリームを中断してすぐ再試行したクライアントが、放棄された実行の後始末中に拒否されることもありません。
 

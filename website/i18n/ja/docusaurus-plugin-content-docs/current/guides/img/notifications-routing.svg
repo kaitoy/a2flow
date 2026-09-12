@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="notifications-routing-title notifications-routing-desc">
+      <title id="notifications-routing-title">通知の行き先</title>
+      <desc id="notifications-routing-desc">ワークフローの出来事が、関係する 1 人(承認者グループなら資格のある全員)に届き、ベル、通知ページ、そして有効ならメールへ広がることを示すフローチャート。</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <line x1="350" y1="96" x2="350" y2="160" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M300,232 L300,244 Q300,252 292,252 L158,252 Q150,252 150,260 L150,300" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="350" y1="232" x2="350" y2="300" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M400,232 L400,244 Q400,252 408,252 L542,252 Q550,252 550,260 L550,300" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Event -->
+      <rect x="260" y="40" width="180" height="56" rx="28" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="350" y="72" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ワークフローの出来事</text>
+
+      <!-- Concerned user(s) (focal) -->
+      <rect x="250" y="160" width="200" height="72" rx="6" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="350" y="190" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">関係するユーザー</text>
+      <text x="350" y="210" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">または承認者グループの全員</text>
+
+      <!-- Bell -->
+      <rect x="70" y="300" width="160" height="72" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="150" y="330" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ベル</text>
+      <text x="150" y="350" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">未読の通知</text>
+
+      <!-- Notifications page -->
+      <rect x="270" y="300" width="160" height="72" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="350" y="330" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">通知ページ</text>
+      <text x="350" y="350" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">履歴の全体</text>
+
+      <!-- Email -->
+      <rect x="470" y="300" width="160" height="72" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="550" y="330" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">メール</text>
+      <text x="550" y="350" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">有効にしていれば</text>
+    </svg>
