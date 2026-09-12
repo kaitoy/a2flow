@@ -60,4 +60,4 @@ A mock buys past the side effect, not past the rules. A mocked call is still che
 
 ## Seeing what a mocked call did
 
-The run's chat transcript is where a stubbed call is inspected: its tool line expands to show the arguments and the result, badged **Mocked**. It deliberately does not appear on the run's [Tool Invocations](./workflow-executions.md#tool-invocations) page — that page records the decisions the tool proxy actually made, and a stub never reaches it. The run itself is badged **Mocked** in the [executions list](./workflow-executions.md).
+The run's chat transcript is where a stubbed call is inspected: its tool line expands to show the arguments and the result, badged **Mocked**. It deliberately does not appear on the run's [Tool Invocations](./workflow-executions.md#tool-invocations) page — that page records the decisions the MCP gateway actually made, and a stub never reaches it. The run itself is badged **Mocked** in the [executions list](./workflow-executions.md).

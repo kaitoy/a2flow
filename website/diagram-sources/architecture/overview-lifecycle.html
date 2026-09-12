@@ -30,7 +30,7 @@
 
     <svg viewBox="0 0 1000 760" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="overview-lifecycle-title overview-lifecycle-desc">
       <title id="overview-lifecycle-title">How a workflow moves</title>
-      <desc id="overview-lifecycle-desc">Flowchart showing an Agent Skill generated into a Workflow, run as a Workflow execution inside a Workflow session, whose Tasks request human approval or call an MCP tool through the MCP proxy to reach an MCP server.</desc>
+      <desc id="overview-lifecycle-desc">Flowchart showing an Agent Skill generated into a Workflow, run as a Workflow execution inside a Workflow session, whose Tasks request human approval or call an MCP tool through the MCP gateway to reach an MCP server.</desc>
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
       </defs>
@@ -49,7 +49,7 @@
       <rect x="508" y="222" width="100" height="12" rx="2" fill="#f2f8fc"/>
       <text x="516" y="231" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.06em">PUBLISH/RUN</text>
 
-      <!-- Branch elbows: Tasks -> Approval gate / MCP proxy -->
+      <!-- Branch elbows: Tasks -> Approval gate / MCP gateway -->
       <path d="M460,512 L460,532 Q460,540 452,540 L298,540 Q290,540 290,548 L290,552" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
       <path d="M540,512 L540,532 Q540,540 548,540 L702,540 Q710,540 710,548 L710,552" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
 
@@ -58,12 +58,12 @@
       <rect x="565" y="520" width="120" height="12" rx="2" fill="#f2f8fc"/>
       <text x="625" y="529" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NEEDS A TOOL</text>
 
-      <!-- Approval gate -> MCP proxy -->
+      <!-- Approval gate -> MCP gateway -->
       <line x1="380" y1="580" x2="620" y2="580" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
       <rect x="460" y="560" width="80" height="12" rx="2" fill="#f2f8fc"/>
       <text x="500" y="569" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CERTIFICATE</text>
 
-      <!-- MCP proxy -> MCP server -->
+      <!-- MCP gateway -> MCP server -->
       <line x1="710" y1="608" x2="710" y2="648" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
 
       <!-- Nodes: main spine -->
@@ -92,7 +92,7 @@
       <text x="290" y="585" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Approval gate</text>
 
       <rect x="620" y="552" width="180" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="710" y="585" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP proxy</text>
+      <text x="710" y="585" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP gateway</text>
 
       <!-- Node: MCP server -->
       <rect x="620" y="648" width="180" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>

@@ -19,9 +19,9 @@
     <p class="eyebrow">Flowchart · Diagram Design</p>
     <h1>The policy chain</h1>
 
-    <svg viewBox="0 0 1000 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mcp-proxy-policy-chain-title mcp-proxy-policy-chain-desc">
-      <title id="mcp-proxy-policy-chain-title">Policy chain</title>
-      <desc id="mcp-proxy-policy-chain-desc">Flowchart showing how the MCP proxy decides a tool call: a policy chain either refuses it or allows it, an allowed call is either answered from a mock or goes through credential injection and the sandbox to the real MCP server, and both the refusal and the real call produce an audit record.</desc>
+    <svg viewBox="0 0 1000 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mcp-gateway-and-proxy-policy-chain-title mcp-gateway-and-proxy-policy-chain-desc">
+      <title id="mcp-gateway-and-proxy-policy-chain-title">Policy chain</title>
+      <desc id="mcp-gateway-and-proxy-policy-chain-desc">Flowchart showing how the MCP gateway decides a tool call: a policy chain either refuses it or allows it, an allowed call is either answered from a mock or goes through credential injection and the MCP proxy to the real MCP server, and both the refusal and the real call produce an audit record.</desc>
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
@@ -81,9 +81,9 @@
       <rect x="400" y="416" width="200" height="48" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
       <text x="500" y="444" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Credential injection</text>
 
-      <!-- X: sandbox -->
+      <!-- X: MCP proxy -->
       <rect x="420" y="512" width="160" height="48" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="500" y="540" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Sandbox</text>
+      <text x="500" y="540" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP proxy</text>
 
       <!-- S: MCP server -->
       <rect x="420" y="608" width="160" height="48" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>

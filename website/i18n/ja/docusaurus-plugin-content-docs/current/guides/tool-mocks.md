@@ -64,4 +64,4 @@ flowchart LR
 
 ## モックされた呼び出しを確認する {#seeing-what-a-mocked-call-did}
 
-差し替えられた呼び出しを確認する場所は、実行のチャットの記録です。ツールの行を展開すると引数と結果が出て、**Mocked** のバッジが付きます。実行の [Tool Invocations](./workflow-executions.md#tool-invocations) のページには意図的に出しません。あのページはツールプロキシが実際に下した判断を記録するもので、差し替えられた呼び出しはそこまで届かないからです。実行そのものには、[実行一覧](./workflow-executions.md)で **Mocked** のバッジが付きます。
+差し替えられた呼び出しを確認する場所は、実行のチャットの記録です。ツールの行を展開すると引数と結果が出て、**Mocked** のバッジが付きます。実行の [Tool Invocations](./workflow-executions.md#tool-invocations) のページには意図的に出しません。あのページは MCP ゲートウェイが実際に下した判断を記録するもので、差し替えられた呼び出しはそこまで届かないからです。実行そのものには、[実行一覧](./workflow-executions.md)で **Mocked** のバッジが付きます。

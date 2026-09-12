@@ -35,7 +35,7 @@ One Vault connection is configured for the whole deployment, authenticating eith
 
 | Consumer | Resolved when |
 |---|---|
-| An MCP server's header and environment values | The [proxy](./mcp-proxy.md) connects to that server |
+| An MCP server's header and environment values | The [gateway](./mcp-gateway-and-proxy.md) expands them for the connection the MCP proxy opens to that server |
 | An agent skill's repository password | The repository is cloned or pulled |
 
 Because resolution is lazy, renaming or deleting a secret that something still references does not fail at edit time. The next use fails instead, naming the secret it could not find; the underlying reason stays in the server's log rather than being handed to the caller.

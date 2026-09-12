@@ -23,7 +23,7 @@ Set `FRONTEND_PORT` in `.env` to publish the frontend on a different host port (
 | **db** | PostgreSQL 17. Everything A2Flow records lives here |
 | **backend** | The agent and the API |
 | **worker** | Sends the [notification email](../guides/notifications.md#the-delivery-queue) the backend queues |
-| **mcp-proxy** | Runs the [MCP servers](../guides/mcp-servers.md) you register — see [why it is separate](../architecture/mcp-proxy.md#the-sandbox) |
+| **mcp-proxy** | Runs the [MCP servers](../guides/mcp-servers.md) you register — see [why it is separate](../architecture/mcp-gateway-and-proxy.md#the-sandbox) |
 | **frontend** | The screens you use |
 
 Only the frontend is reachable from outside; the rest talk to each other on Docker's internal network.

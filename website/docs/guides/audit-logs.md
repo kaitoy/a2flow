@@ -11,7 +11,7 @@ Open **Audit Logs** in the admin sidebar. Four tabs sit above the table:
 
 | Tab | One row is |
 |---|---|
-| **Tool Invocations** | One decision the tool proxy made about one tool call |
+| **Tool Invocations** | One decision the MCP gateway made about one tool call |
 | **Impersonations** | One session where an administrator acted as another user |
 | **Certificates** | The authority behind each task's tool calls |
 | **Emails** | One notification message queued for delivery |
@@ -28,7 +28,7 @@ A Super Admin sees whichever tenant the tenant switcher has selected, and can se
 
 ## Tool Invocations
 
-The tool calls that reached the proxy, and what it decided about each: `allowed` ones that went upstream, `denied` ones a rule vetoed.
+The tool calls that reached the MCP gateway, and what it decided about each: `allowed` ones that went upstream, `denied` ones a rule vetoed.
 
 | Column | Notes |
 |---|---|

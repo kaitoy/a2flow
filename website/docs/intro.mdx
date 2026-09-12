@@ -67,7 +67,7 @@ request?"
 
 An [approval](./guides/approvals.md) is not advice the agent is asked to follow.
 Every task that calls a tool holds a short-lived X.509 certificate over exactly
-the tools it held when that certificate was issued, and the MCP proxy refuses
+the tools it held when that certificate was issued, and the MCP gateway refuses
 any call that does not present one, signed. Approving a task is what puts an
 approver's name on its certificate; a task nobody was asked to approve carries
 the authority of whoever started the run. A prompt injection cannot talk its way

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mcp-proxy-trust-boundary-title mcp-proxy-trust-boundary-desc">
-      <title id="mcp-proxy-trust-boundary-title">Crossing the trust boundary</title>
-      <desc id="mcp-proxy-trust-boundary-desc">Architecture diagram showing the execution agent, which decides whether a call is allowed, mocked, and which credentials it needs, handing exactly one authorized call across a trust boundary into the sandbox, which starts or connects to the real MCP server.</desc>
+<svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mcp-gateway-and-proxy-trust-boundary-title mcp-gateway-and-proxy-trust-boundary-desc">
+      <title id="mcp-gateway-and-proxy-trust-boundary-title">Crossing the trust boundary</title>
+      <desc id="mcp-gateway-and-proxy-trust-boundary-desc">Architecture diagram showing the MCP gateway, which decides whether a call is allowed, mocked, and which credentials it needs, handing exactly one authorized call across a trust boundary into the MCP proxy, which starts or connects to the real MCP server.</desc>
       <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
       </defs>
@@ -25,14 +25,14 @@
       <rect x="328" y="104" width="84" height="12" rx="2" fill="#f2f8fc"/>
       <text x="370" y="113" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTHORIZED</text>
 
-      <!-- Execution agent -->
+      <!-- MCP gateway -->
       <rect x="80" y="92" width="220" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="190" y="118" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Execution agent</text>
+      <text x="190" y="118" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP gateway</text>
       <text x="190" y="134" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">allowed, mocked, credentials</text>
 
-      <!-- Runner (inside sandbox zone) -->
+      <!-- MCP proxy (inside sandbox zone) -->
       <rect x="440" y="92" width="160" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="520" y="118" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Runner</text>
+      <text x="520" y="118" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP proxy</text>
       <text x="520" y="134" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">starts or connects</text>
 
       <!-- MCP server (outside both zones) -->

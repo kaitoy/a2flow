@@ -17,7 +17,7 @@ The pause is not the agent politely waiting.
 | While an approval is undecided | |
 |---|---|
 | What the covered steps may call | None of their bound MCP tools — the call is refused before it reaches a server |
-| Who enforces that | The [proxy](./mcp-proxy.md), as a rule it checks; not a sentence in the agent's instructions |
+| Who enforces that | The [gateway](./mcp-gateway-and-proxy.md), as a rule it checks; not a sentence in the agent's instructions |
 | What triggers the gate | The *existence* of an approval covering the step. A pending one and a rejected one block alike, so the gate fails closed |
 | What is unaffected | Steps no approval covers — they keep running under the ordinary tool-binding rule |
 
@@ -82,7 +82,7 @@ Approval A covers *Ask for a go-ahead*, *Launch instance* and *Tag instance*. Ap
 | A second approval is requested on a step already covered by an earlier one | The nearer request takes over immediately, and the earlier decision stops authorizing that step |
 | A step is returned for rework and re-submitted | The new request replaces the old decision as that step's gate, so a rejection cannot leave the step stuck for good |
 
-Every later tool call from a covered step must present its certificate, and the proxy checks all of the following before the call goes anywhere:
+Every later tool call from a covered step must present its certificate, and the gateway checks all of the following before the call goes anywhere:
 
 - the certificate speaks for this run and this step,
 - it is one this deployment issued, and it has not been revoked,
@@ -98,4 +98,4 @@ Every decided call — allowed or refused — is recorded together with the cert
 
 A call refused for departing from the decision records why, naming the input at fault and the bound the approver agreed to — but never the value that was actually passed. The reason is stored as written, on the same record that keeps arguments only as a digest, so quoting the refused value there would put back exactly what the digest exists to leave out.
 
-**Scope of the guarantee.** The proxy runs inside the backend process, so a certificate proves possession to a verifier sharing that process — it is not a defence against an attacker who already controls the backend. What it does provide is a single fail-closed enforcement point, a grant that cannot be widened after the fact, and a record that can be checked afterwards.
+**Scope of the guarantee.** The gateway runs inside the backend process, so a certificate proves possession to a verifier sharing that process — it is not a defence against an attacker who already controls the backend. What it does provide is a single fail-closed enforcement point, a grant that cannot be widened after the fact, and a record that can be checked afterwards.

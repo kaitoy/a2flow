@@ -104,7 +104,7 @@ Every decided tool call — allowed or refused — is recorded on the run's [Too
 
 Nothing needs configuring for any of this; the certificate's lifetime is adjustable in the [configuration reference](../operations/configuration.md#mcp-tools-and-approvals).
 
-> **Scope of the guarantee.** The tool proxy currently runs inside the backend process, so a certificate proves possession to a verifier sharing that process — it is not a defence against an attacker who already controls the backend. What it provides is a single fail-closed enforcement point, a grant that cannot be widened after the fact, and a verifiable record.
+> **Scope of the guarantee.** The MCP gateway currently runs inside the backend process, so a certificate proves possession to a verifier sharing that process — it is not a defence against an attacker who already controls the backend. What it provides is a single fail-closed enforcement point, a grant that cannot be widened after the fact, and a verifiable record.
 
 ## Browsing approvals {#browsing-approvals}
 

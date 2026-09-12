@@ -23,7 +23,7 @@ docker compose up --build
 | **db** | PostgreSQL 17。A2Flow が記録するものはすべてここに入ります |
 | **backend** | エージェントと API |
 | **worker** | バックエンドが積んだ[通知メール](../guides/notifications.md#the-delivery-queue)を送ります |
-| **mcp-proxy** | 登録した [MCP サーバ](../guides/mcp-servers.md)を実行します。分けている理由は[サンドボックス](../architecture/mcp-proxy.md#the-sandbox)を参照してください |
+| **mcp-proxy** | 登録した [MCP サーバ](../guides/mcp-servers.md)を実行します。分けている理由は[登録したサーバーが動く場所](../architecture/mcp-gateway-and-proxy.md#the-sandbox)を参照してください |
 | **frontend** | 実際に操作する画面 |
 
 外から到達できるのはフロントエンドだけで、残りは Docker の内部ネットワークでやり取りします。

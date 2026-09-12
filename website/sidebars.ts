@@ -57,7 +57,7 @@ const sidebars: SidebarsConfig = {
         'architecture/workflow-execution',
         'architecture/sessions',
         'architecture/approvals',
-        'architecture/mcp-proxy',
+        'architecture/mcp-gateway-and-proxy',
         'architecture/database',
         'architecture/secrets',
       ],

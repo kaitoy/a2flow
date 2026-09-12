@@ -1,28 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Policy chain</title>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', system-ui, sans-serif; background: #030711; color: #e3e3e3; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
-    .frame { max-width: 1200px; width: 100%; }
-    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #9aa1ab; margin-bottom: 0.5rem; }
-    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #e3e3e3; margin-bottom: 1.5rem; }
-    svg { width: 100%; min-width: 900px; display: block; }
-  </style>
-</head>
-<body>
-  <div class="frame">
-    <p class="eyebrow">Flowchart · Diagram Design</p>
-    <h1>The policy chain</h1>
-
-    <svg viewBox="0 0 1000 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mcp-proxy-policy-chain-dark-title mcp-proxy-policy-chain-dark-desc">
-      <title id="mcp-proxy-policy-chain-dark-title">Policy chain</title>
-      <desc id="mcp-proxy-policy-chain-dark-desc">Flowchart showing how the MCP proxy decides a tool call: a policy chain either refuses it or allows it, an allowed call is either answered from a mock or goes through credential injection and the sandbox to the real MCP server, and both the refusal and the real call produce an audit record.</desc>
-      <defs>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mcp-gateway-and-proxy-policy-chain-dark-title mcp-gateway-and-proxy-policy-chain-dark-desc">
+      <title id="mcp-gateway-and-proxy-policy-chain-dark-title">Policy chain</title>
+      <desc id="mcp-gateway-and-proxy-policy-chain-dark-desc">Flowchart showing how the MCP gateway decides a tool call: a policy chain either refuses it or allows it, an allowed call is either answered from a mock or goes through credential injection and the MCP proxy to the real MCP server, and both the refusal and the real call produce an audit record.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3bf5c4"/></marker>
       </defs>
@@ -54,7 +34,7 @@
       <text x="522" y="399" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">NO</text>
 
       <!-- A: start oval -->
-      <rect x="420" y="40" width="160" height="48" rx="24" fill="rgba(227,227,227,0.03)" stroke="rgba(227,227,227,0.30)" stroke-width="1"/>
+      <rect x="420" y="40" width="160" height="48" rx="24" fill="#e3e3e3" fill-opacity="0.03" stroke="#e3e3e3" stroke-opacity="0.30" stroke-width="1"/>
       <text x="500" y="60" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Execution agent</text>
       <text x="500" y="74" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">calls a tool</text>
 
@@ -63,7 +43,7 @@
       <text x="500" y="164" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Policy chain</text>
 
       <!-- R: refused (end oval) -->
-      <rect x="680" y="132" width="160" height="56" rx="28" fill="rgba(227,227,227,0.03)" stroke="rgba(227,227,227,0.30)" stroke-width="1"/>
+      <rect x="680" y="132" width="160" height="56" rx="28" fill="#e3e3e3" fill-opacity="0.03" stroke="#e3e3e3" stroke-opacity="0.30" stroke-width="1"/>
       <text x="760" y="156" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Refused</text>
       <text x="760" y="170" fill="#9aa1ab" font-size="9.5" font-family="'Geist Mono', monospace" text-anchor="middle">lists what is allowed</text>
 
@@ -73,7 +53,7 @@
       <text x="500" y="330" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">this run?</text>
 
       <!-- MO: mock response (end oval) -->
-      <rect x="820" y="292" width="160" height="56" rx="28" fill="rgba(227,227,227,0.03)" stroke="rgba(227,227,227,0.30)" stroke-width="1"/>
+      <rect x="820" y="292" width="160" height="56" rx="28" fill="#e3e3e3" fill-opacity="0.03" stroke="#e3e3e3" stroke-opacity="0.30" stroke-width="1"/>
       <text x="900" y="316" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Mock's response</text>
       <text x="900" y="330" fill="#9aa1ab" font-size="9.5" font-family="'Geist Mono', monospace" text-anchor="middle">no server contacted</text>
 
@@ -81,18 +61,15 @@
       <rect x="400" y="416" width="200" height="48" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
       <text x="500" y="444" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Credential injection</text>
 
-      <!-- X: sandbox -->
+      <!-- X: MCP proxy -->
       <rect x="420" y="512" width="160" height="48" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
-      <text x="500" y="540" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Sandbox</text>
+      <text x="500" y="540" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP proxy</text>
 
       <!-- S: MCP server -->
       <rect x="420" y="608" width="160" height="48" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
       <text x="500" y="636" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP server</text>
 
       <!-- AU: audit record (focal end oval) -->
-      <rect x="410" y="704" width="180" height="56" rx="28" fill="rgba(59,245,196,0.10)" stroke="#3bf5c4" stroke-width="1"/>
+      <rect x="410" y="704" width="180" height="56" rx="28" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
       <text x="500" y="738" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Audit record</text>
     </svg>
-  </div>
-</body>
-</html>
