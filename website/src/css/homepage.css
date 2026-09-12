@@ -22,19 +22,21 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Animated mesh-gradient canvas (layer 0), same technique as the app. */
+/* Aurora canvas (layer 0), the app's own: a single diagonal ribbon — mint head,
+   violet body, soft-cyan tail — plus a faint counter-glow in the opposite
+   corner, drifting slowly along its own flow direction. */
 .a2flow-home::before {
   content: "";
   position: fixed;
   inset: -12%;
   z-index: -2;
   background:
-    radial-gradient(38% 42% at 16% 18%, var(--a2f-blob-1) 0%, transparent 70%),
-    radial-gradient(44% 46% at 84% 22%, var(--a2f-blob-2) 0%, transparent 70%),
-    radial-gradient(40% 44% at 26% 86%, var(--a2f-blob-3) 0%, transparent 70%),
-    radial-gradient(42% 40% at 78% 78%, var(--a2f-blob-4) 0%, transparent 70%);
-  filter: saturate(120%);
-  animation: float-slow 22s ease-in-out infinite alternate;
+    radial-gradient(56rem 22rem at 24% 18%, var(--a2f-aurora-1) 0%, transparent 65%),
+    radial-gradient(64rem 24rem at 58% 36%, var(--a2f-aurora-2) 0%, transparent 65%),
+    radial-gradient(48rem 20rem at 88% 54%, var(--a2f-aurora-3) 0%, transparent 70%),
+    radial-gradient(40rem 26rem at 8% 90%, var(--a2f-aurora-3) 0%, transparent 65%);
+  filter: saturate(115%);
+  animation: aurora-drift 36s ease-in-out infinite;
 }
 
 /* Film-grain overlay. */
@@ -49,11 +51,11 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
 }
 
-@keyframes float-slow {
-from { transform: translate3d(0, 0, 0) scale(1);
+@keyframes aurora-drift {
+0%, 100% { transform: translate3d(0, 0, 0) scale(1);
 }
 
-to { transform: translate3d(2.5%, -2%, 0) scale(1.06);
+50% { transform: translate3d(2%, -1.5%, 0) scale(1.05);
 }
 
 }
@@ -72,7 +74,7 @@ to { transform: translate3d(2.5%, -2%, 0) scale(1.06);
 .a2flow-home code { font-family: var(--a2f-font-mono); font-size: 0.92em;
 }
 
-.a2flow-home :focus-visible { outline: 2px solid rgba(var(--a2f-accent-rgb), 0.7); outline-offset: 2px; border-radius: 4px;
+.a2flow-home :focus-visible { outline: 2px solid rgba(var(--a2f-accent-rgb), 0.5); outline-offset: 2px; border-radius: 4px;
 }
 
 .a2flow-home .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem;
@@ -93,8 +95,8 @@ to { transform: translate3d(2.5%, -2%, 0) scale(1.06);
 
 .a2flow-home .glass-strong {
   background: var(--a2f-glass-strong);
-  backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
   box-shadow: var(--a2f-shadow-glass-lg);
 }
 
@@ -315,10 +317,10 @@ to { opacity: 1; transform: none;
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.a2flow-home .a2f-avatar.mika { background: linear-gradient(135deg, #f59e0b, #ef4444);
+.a2flow-home .a2f-avatar.mika { background: linear-gradient(135deg, #0e8a7c, #16bfa9);
 }
 
-.a2flow-home .a2f-avatar.sam { background: linear-gradient(135deg, #6366f1, #8b5cf6);
+.a2flow-home .a2f-avatar.sam { background: linear-gradient(135deg, #7f62d5, #16bfa9);
 }
 
 .a2flow-home .a2f-avatar.bot {
@@ -342,11 +344,11 @@ to { opacity: 1; transform: none;
 }
 
 .a2flow-home .bubble.agent {
-  border-bottom-left-radius: 0.375rem;
+  border-top-left-radius: 0.375rem;
   background: var(--a2f-glass);
   border: 1px solid var(--a2f-glass-border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
 }
 
 .a2flow-home .bubble .who {
@@ -372,10 +374,10 @@ to { opacity: 1; transform: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 300ms cubic-bezier(0.2, 0, 0, 1);
+  transition: all 240ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-.a2flow-home .plan .tick svg { width: 0.625rem; height: 0.625rem; opacity: 0; transition: opacity 300ms;
+.a2flow-home .plan .tick svg { width: 0.625rem; height: 0.625rem; opacity: 0; transition: opacity 240ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .a2flow-home .plan li.doing .tick {
@@ -427,15 +429,15 @@ to { opacity: 1; transform: none;
 }
 
 .a2flow-home .approval {
-  border: 1px solid color-mix(in srgb, var(--a2f-secondary) 45%, transparent);
-  border-radius: 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--a2f-accent) 45%, transparent);
+  border-radius: 1rem;
   padding: 0.8125rem 0.9375rem;
   background: var(--a2f-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
   max-width: 78%;
   font-size: 0.8125rem;
-  transition: border-color 400ms;
+  transition: border-color 360ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .a2flow-home .approval .ttl {
@@ -445,7 +447,7 @@ to { opacity: 1; transform: none;
   font-weight: 700;
   font-size: 0.8125rem;
   margin-bottom: 0.375rem;
-  color: var(--a2f-secondary);
+  color: var(--a2f-accent);
 }
 
 .a2flow-home .approval .ttl svg { width: 1rem; height: 1rem; flex: none;
@@ -461,7 +463,7 @@ to { opacity: 1; transform: none;
   font-size: 0.75rem;
   font-weight: 700;
   padding: 0.375rem 0.9375rem;
-  border-radius: 0.5625rem;
+  border-radius: 0.5rem;
 }
 
 .a2flow-home .fbtn.yes { color: var(--a2f-on-primary); background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
@@ -649,7 +651,7 @@ to { opacity: 1; transform: none;
 .a2flow-home .dag-svg .doing-ring { animation: breathe 1.8s ease-in-out infinite;
 }
 
-.a2flow-home .dag-svg .gate-box { stroke: color-mix(in srgb, var(--a2f-secondary) 60%, transparent);
+.a2flow-home .dag-svg .gate-box { stroke: url(#a2f-gate);
 }
 
 .a2flow-home .dag-svg .pend-box { stroke-dasharray: 4 3;
@@ -773,7 +775,7 @@ to { opacity: 1; transform: none;
 }
 
 .a2flow-home .arch-node {
-  border-radius: 0.875rem;
+  border-radius: 1rem;
   padding: 1rem 1.375rem;
   text-align: center;
   min-width: 11rem;
@@ -906,7 +908,7 @@ to { opacity: 1; transform: none;
  */
 .a2flow-home {
   isolation: isolate;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* The standalone page used html { scroll-padding-top }; here the sticky navbar
@@ -940,7 +942,7 @@ to { opacity: 1; transform: none;
   font-size: 0.9rem;
   font-weight: 500;
   text-decoration: none;
-  transition: color 160ms ease;
+  transition: color 150ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .a2flow-home .page-nav a:hover {

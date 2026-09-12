@@ -324,6 +324,13 @@ export default function Home(): ReactNode {
                   <span className="views"><span>Table</span> · <span className="cur">Graph</span></span>
                 </div>
                 <svg className="dag-svg" viewBox="0 0 440 340" role="img" aria-label="A task graph: identify target and notify channel completed, prod approval gated, rolling restart in progress, verify rollout pending.">
+                  {/* the approval gate is the one node drawn in the accent-to-secondary gradient — the violet never stands alone */}
+                  <defs>
+                    <linearGradient id="a2f-gate" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0" stopColor="var(--a2f-accent)"/>
+                      <stop offset="1" stopColor="var(--a2f-secondary)"/>
+                    </linearGradient>
+                  </defs>
                   {/* edges */}
                   <path className="edge" d="M220 66 C 220 84, 130 88, 128 106"/>
                   <path className="edge" d="M220 66 C 220 84, 310 88, 312 106"/>
@@ -340,9 +347,9 @@ export default function Home(): ReactNode {
                   {/* left branch: approval gate */}
                   <g>
                     <rect className="node-box gate-box" x="38" y="106" width="180" height="56" rx="14"/>
-                    <path d="M64 29.5v6.8c0 5-4.5 7.4-6.8 8.2-2.3-.8-6.8-3.2-6.8-8.2v-6.8l6.8-2.5 6.8 2.5z" transform="translate(6 101)" fill="none" stroke="var(--a2f-secondary)" strokeWidth="1.8" strokeLinejoin="round"/>
+                    <path d="M64 29.5v6.8c0 5-4.5 7.4-6.8 8.2-2.3-.8-6.8-3.2-6.8-8.2v-6.8l6.8-2.5 6.8 2.5z" transform="translate(6 101)" fill="none" stroke="url(#a2f-gate)" strokeWidth="1.8" strokeLinejoin="round"/>
                     <text className="node-label" x="86" y="131">Approve prod change</text>
-                    <text className="node-sub" x="86" y="146" fill="var(--a2f-secondary)">WAITING · SAM</text>
+                    <text className="node-sub" x="86" y="146" fill="var(--a2f-accent)">WAITING · SAM</text>
                   </g>
                   {/* right branch: completed */}
                   <g>
@@ -371,7 +378,7 @@ export default function Home(): ReactNode {
                 <div className="dag-legend">
                   <span><i style={{background: 'var(--a2f-success)'}}></i>completed</span>
                   <span><i style={{background: 'var(--a2f-accent-bright)'}}></i>in progress</span>
-                  <span><i style={{background: 'var(--a2f-secondary)'}}></i>approval gate</span>
+                  <span><i style={{background: 'linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary))'}}></i>approval gate</span>
                   <span><i style={{border: '1.5px dashed var(--a2f-muted)', background: 'transparent'}}></i>pending</span>
                 </div>
               </div>

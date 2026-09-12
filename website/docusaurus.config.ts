@@ -50,7 +50,8 @@ const config: Config = {
     },
   },
 
-  // Inter (body) and Space Grotesk (display) are the application's own faces.
+  // Inter (body), Space Grotesk (display) and JetBrains Mono (data) are the
+  // application's own faces.
   headTags: [
     {
       tagName: 'link',
@@ -63,7 +64,7 @@ const config: Config = {
   ],
 
   stylesheets: [
-    'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap',
+    'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;700&display=swap',
   ],
 
   presets: [
