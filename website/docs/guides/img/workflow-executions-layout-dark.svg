@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-executions-layout-dark-title workflow-executions-layout-dark-desc">
+      <title id="workflow-executions-layout-dark-title">The workflow session screen</title>
+      <desc id="workflow-executions-layout-dark-desc">Flowchart showing the workflow session screen layout: the task timeline and the messages grouped by task sit side by side, and messages lead into the chat input.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="240" y1="114" x2="300" y2="114" stroke="#9aa1ab" stroke-width="1.2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+      <line x1="500" y1="114" x2="560" y2="114" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Task timeline -->
+      <rect x="40" y="80" width="200" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="140" y="107" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Task timeline</text>
+      <text x="140" y="126" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">collapsible, left edge</text>
+
+      <!-- Messages -->
+      <rect x="300" y="80" width="200" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="400" y="107" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Messages</text>
+      <text x="400" y="126" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">grouped by task</text>
+
+      <!-- Chat input -->
+      <rect x="560" y="80" width="160" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="640" y="120" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Chat input</text>
+    </svg>

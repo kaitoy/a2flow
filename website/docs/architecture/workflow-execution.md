@@ -7,13 +7,8 @@ sidebar_position: 3
 
 Running a workflow does not point a run at the workflow. It **copies** the published design onto a new [workflow execution](../guides/workflow-executions.md), and that record is what the run lives in from then on.
 
-```mermaid
-flowchart LR
-  W["Workflow<br/>the published version"] -->|"Run"| X["Workflow execution<br/>the snapshot"]
-  MK["Chosen tool mocks<br/>test runs only"] -->|"copied by value"| X
-  X --> C["Workflow session<br/>the chat the run happens in"]
-  C --> T["Tasks<br/>all pending at the start"]
-```
+![Flowchart showing a published Workflow and its chosen tool mocks copied onto a new Workflow execution snapshot, which opens a Workflow session with all tasks pending at the start.](./img/workflow-execution-snapshot.svg#gh-light-mode-only)
+![Flowchart showing a published Workflow and its chosen tool mocks copied onto a new Workflow execution snapshot, which opens a Workflow session with all tasks pending at the start.](./img/workflow-execution-snapshot-dark.svg#gh-dark-mode-only)
 
 | Copied onto the run | Taken from |
 |---|---|
@@ -28,15 +23,8 @@ Nothing in that list is read back from its source later. Editing the workflow, p
 
 The workflow session opens with a fixed kickoff message and the execution agent already working. Publishing was the approval of the plan, so there is nothing to confirm before starting.
 
-```mermaid
-flowchart TD
-  L["List the run's tasks"] --> N{"A pending task whose<br/>dependencies have all completed?"}
-  N -->|"yes"| I["Mark it in_progress"]
-  I --> D["Do the work<br/>tools, approvals, conversation"]
-  D --> E["Mark it completed, failed or skipped"]
-  E --> L
-  N -->|"no"| F["Every task has ended<br/>the run settles"]
-```
+![Flowchart of the run-advancement loop: list the run's tasks, pick one whose dependencies have completed, mark it in progress, do the work, mark it completed, failed, or skipped, and loop, or settle once every task has ended.](./img/workflow-execution-run-loop.svg#gh-light-mode-only)
+![Flowchart of the run-advancement loop: list the run's tasks, pick one whose dependencies have completed, mark it in progress, do the work, mark it completed, failed, or skipped, and loop, or settle once every task has ended.](./img/workflow-execution-run-loop-dark.svg#gh-dark-mode-only)
 
 A run ends `completed` when every task reached a terminal status with no failure among them, and `failed` when at least one failed. The statuses can be watched live in the run's read-only task view, as a table or as the dependency graph.
 

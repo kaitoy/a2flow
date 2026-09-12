@@ -7,14 +7,8 @@ sidebar_position: 8
 
 A [secret](../guides/secrets.md) is a named bundle of key/value entries, and every reference names exactly one entry — `${secret:name/key}` in an MCP server's headers or environment, a name and a key on an agent skill. References are held by name and **resolved only when they are used**, so nothing that needs a credential ever stores one.
 
-```mermaid
-flowchart LR
-  R["A reference<br/>name/key"] --> V{"Which type?"}
-  V -->|"local"| L["Decrypt the stored value"]
-  V -->|"vault"| H["Read it live from Vault"]
-  L --> U["An MCP server connection<br/>or a skill repository clone"]
-  H --> U
-```
+![Flowchart showing a secret reference branching by type: local decrypts the stored value, vault reads it live from Vault, and both feed an MCP server connection or a skill repository clone.](./img/secrets-resolution.svg#gh-light-mode-only)
+![Flowchart showing a secret reference branching by type: local decrypts the stored value, vault reads it live from Vault, and both feed an MCP server connection or a skill repository clone.](./img/secrets-resolution-dark.svg#gh-dark-mode-only)
 
 | | **Local** | **HashiCorp Vault** |
 |---|---|---|

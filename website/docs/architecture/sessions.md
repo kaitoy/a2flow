@@ -18,24 +18,8 @@ An approval addressed to a group brings in every member holding `approver`, so t
 
 ## How a turn runs
 
-```mermaid
-sequenceDiagram
-  participant U as User
-  participant F as Frontend
-  participant B as Backend
-  participant M as Model
-  U->>F: Writes a message
-  F->>B: The message, plus the render_a2ui tool and the A2UI component catalog
-  B->>M: Bridges the conversation to the Google ADK agent
-  M-->>B: Text, tool calls and reasoning, streamed
-  B-->>F: Streamed onward as it arrives
-  Note over B,M: A render_a2ui call is executed by nobody — it is forwarded
-  F-->>U: Draws each surface from styled components
-  U->>F: Fills the surface in and clicks a button
-  F->>B: The surface's full data model, as that call's result
-  B->>M: Matched to the pending call
-  M-->>F: Responds to what the user did
-```
+![Sequence diagram of one chat turn: the user's message travels from Frontend to Backend to the Model, the model's streamed reply and any render_a2ui surface flow back, and the user's filled-in surface makes the same round trip again.](./img/sessions-turn-flow.svg#gh-light-mode-only)
+![Sequence diagram of one chat turn: the user's message travels from Frontend to Backend to the Model, the model's streamed reply and any render_a2ui surface flow back, and the user's filled-in surface makes the same round trip again.](./img/sessions-turn-flow-dark.svg#gh-dark-mode-only)
 
 The backend bridges the AG-UI protocol to a Google ADK agent: it translates events both ways, keeps the conversation in step, and streams events back to the browser as they arrive, so text appears incrementally rather than in one block at the end. Conversation state is kept under the chat's id, so reopening it continues where it left off.
 

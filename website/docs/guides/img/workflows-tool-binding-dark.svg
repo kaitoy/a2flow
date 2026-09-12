@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1010 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflows-tool-binding-dark-title workflows-tool-binding-dark-desc">
+      <title id="workflows-tool-binding-dark-title">Tool binding: design time vs run time</title>
+      <desc id="workflows-tool-binding-dark-desc">Flowchart showing a design-time tool binding copied at run onto the task, then checked at call time: if the tool is bound to an in-progress task the call goes through, otherwise it is refused with the tools that are allowed.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3bf5c4"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="240" y1="92" x2="320" y2="92" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="520" y1="92" x2="570" y2="92" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="750" y1="92" x2="790" y2="92" stroke="#3bf5c4" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <line x1="660" y1="148" x2="660" y2="220" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="253" y="70" width="54" height="14" rx="2" fill="#030711"/>
+      <text x="280" y="81" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">COPIED</text>
+
+      <rect x="752" y="70" width="36" height="14" rx="2" fill="#030711"/>
+      <text x="770" y="81" fill="#3bf5c4" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">YES</text>
+
+      <rect x="670" y="177" width="32" height="14" rx="2" fill="#030711"/>
+      <text x="686" y="188" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">NO</text>
+
+      <!-- Design time -->
+      <rect x="40" y="60" width="200" height="64" rx="6" fill="#e3e3e3" fill-opacity="0.03" stroke="#e3e3e3" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="140" y="87" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Design time</text>
+      <text x="140" y="104" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">binds server + tool</text>
+
+      <!-- Run time -->
+      <rect x="320" y="60" width="200" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="420" y="87" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Run time</text>
+      <text x="420" y="104" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">task carries binding</text>
+
+      <!-- Decision -->
+      <polygon points="660,36 750,92 660,148 570,92" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="660" y="88" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Bound to a task</text>
+      <text x="660" y="103" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">in progress?</text>
+
+      <!-- Call goes through (focal) -->
+      <rect x="790" y="64" width="180" height="56" rx="28" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="880" y="98" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Goes through</text>
+
+      <!-- Refused -->
+      <rect x="570" y="220" width="180" height="64" rx="28" fill="#e3e3e3" fill-opacity="0.03" stroke="#e3e3e3" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="660" y="247" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Refused</text>
+      <text x="660" y="264" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">lists what's allowed</text>
+    </svg>

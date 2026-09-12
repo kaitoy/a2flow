@@ -7,15 +7,8 @@ sidebar_position: 10
 
 Tags are the labels records are classified by. One vocabulary is shared by all six taggable registries, so an `aws` tag narrows secrets and MCP servers alike.
 
-```mermaid
-flowchart LR
-  T["One tag vocabulary<br/>per tenant"] --> S["Secrets"]
-  T --> M["MCP Servers"]
-  T --> A["Agent Skills"]
-  T --> W["Workflows"]
-  T --> K["Tool Mocks"]
-  T --> G["User Groups"]
-```
+![Flowchart showing one shared tag vocabulary per tenant applied to six taggable registries: Secrets, MCP Servers, Agent Skills, Workflows, Tool Mocks, and User Groups.](./img/tags-vocabulary.svg#gh-light-mode-only)
+![Flowchart showing one shared tag vocabulary per tenant applied to six taggable registries: Secrets, MCP Servers, Agent Skills, Workflows, Tool Mocks, and User Groups.](./img/tags-vocabulary-dark.svg#gh-dark-mode-only)
 
 Open **Tags** in the admin sidebar to curate the vocabulary. Each tag has a **Name**, unique within the tenant, an optional **Description**, and a **color** picked from a fixed eight-slot palette — an arbitrary color value is refused.
 

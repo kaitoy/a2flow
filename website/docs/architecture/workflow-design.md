@@ -7,16 +7,8 @@ sidebar_position: 2
 
 A workflow is never created bare. It is generated from an [Agent Skill](../guides/agent-skills.md) — a Git repository A2Flow clones and keeps up to date — and then refined until the design is worth freezing.
 
-```mermaid
-flowchart LR
-  S["Agent Skill<br/>a published revision"] -->|"Generate workflow"| G["generating<br/>the design run is writing"]
-  G --> D["draft<br/>task templates and tool bindings exist"]
-  G -->|"nothing registered"| F["failed<br/>the reason is on the record"]
-  F -->|"written by chat or by hand"| D
-  D -->|"Publish"| P["published version<br/>the design is frozen"]
-  P -->|"any edit"| MOD["modified<br/>runs still use the published version"]
-  MOD -->|"Publish"| P
-```
+![State machine showing a workflow moving from a published Agent Skill through generating to draft or failed, then from draft through published and modified, with publish looping back from modified.](./img/workflow-design-status.svg#gh-light-mode-only)
+![State machine showing a workflow moving from a published Agent Skill through generating to draft or failed, then from draft through published and modified, with publish looping back from modified.](./img/workflow-design-status-dark.svg#gh-dark-mode-only)
 
 A skill with no published revision can be neither generated from nor run against. The clone is what both agents follow, so until one exists there is nothing to follow.
 

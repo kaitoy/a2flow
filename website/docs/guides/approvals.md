@@ -11,18 +11,8 @@ An approval is how a run stops and waits for a person. The agent asks for one mi
 
 When a task needs an explicit go-ahead before the agent acts — a destructive or irreversible operation, say — the agent asks for an approval and pauses.
 
-```mermaid
-sequenceDiagram
-  participant A as Execution agent
-  participant F as A2Flow
-  participant P as Approver
-  A->>F: Requests approval, naming one person or one group
-  F->>P: Notification, and email if it is switched on
-  Note over A,P: The run pauses. Approve / Reject / Return appear in the chat
-  P->>F: Decides, with an optional comment
-  Note over F: On Approve, each covered step is granted a certificate as it starts
-  F-->>A: The decision. The run resumes
-```
+![Sequence diagram of an approval request: the execution agent asks for approval, A2Flow notifies the approver and the run pauses, the approver decides, and A2Flow grants a certificate to each covered step and resumes the run.](./img/approvals-sequence.svg#gh-light-mode-only)
+![Sequence diagram of an approval request: the execution agent asks for approval, A2Flow notifies the approver and the run pauses, the approver decides, and A2Flow grants a certificate to each covered step and resumes the run.](./img/approvals-sequence-dark.svg#gh-dark-mode-only)
 
 ### Who is asked
 

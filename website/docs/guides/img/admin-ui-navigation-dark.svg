@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 800 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="admin-ui-navigation-dark-title admin-ui-navigation-dark-desc">
+      <title id="admin-ui-navigation-dark-title">Admin UI navigation</title>
+      <desc id="admin-ui-navigation-dark-desc">Flowchart of the admin UI navigation model: the welcome page leads to a section list, which opens a create form or a detail page by clicking a name, and a breadcrumb on the detail page returns to the list.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="220" y1="116" x2="280" y2="116" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="370" y1="152" x2="370" y2="220" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M460,252 L460,204 Q460,196 468,196 L652,196 Q660,196 660,188 L660,152" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="460" y1="104" x2="560" y2="104" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="560" y1="128" x2="460" y2="128" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="382" y="180" width="32" height="14" rx="2" fill="#030711"/>
+      <text x="398" y="191" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">ADD</text>
+
+      <rect x="492" y="84" width="40" height="14" rx="2" fill="#030711"/>
+      <text x="512" y="95" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NAME</text>
+
+      <rect x="476" y="134" width="72" height="14" rx="2" fill="#030711"/>
+      <text x="512" y="145" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">BREADCRUMB</text>
+
+      <!-- Welcome page -->
+      <rect x="40" y="80" width="180" height="72" rx="6" fill="#e3e3e3" fill-opacity="0.03" stroke="#e3e3e3" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="130" y="110" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Welcome page</text>
+      <text x="130" y="130" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">quick-action cards</text>
+
+      <!-- Section list (focal) -->
+      <rect x="280" y="80" width="180" height="72" rx="6" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="370" y="110" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Section list</text>
+      <text x="370" y="130" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">e.g. Workflows</text>
+
+      <!-- Create form -->
+      <rect x="280" y="220" width="180" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="370" y="258" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Create form</text>
+
+      <!-- Detail page -->
+      <rect x="560" y="80" width="200" height="72" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="660" y="110" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Detail page</text>
+      <text x="660" y="130" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">titled by name</text>
+    </svg>

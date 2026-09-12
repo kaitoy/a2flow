@@ -27,40 +27,10 @@ the agent takes part in — it is what the agent does.
 
 ## Architecture
 
-```mermaid
-flowchart TD
-  subgraph FE["Frontend"]
-    UI["Chat and admin UI"]
-    A2["A2UI surfaces<br/>forms, buttons, tables<br/>drawn into the chat"]
-  end
-
-  subgraph BE["Backend"]
-    AG["AI agent<br/>generates the workflow<br/>from a Skill, then runs it"]
-    GW["MCP gateway<br/>authorizes every tool call"]
-    AG --> GW
-  end
-
-  subgraph GR["Git Repos"]
-    AS["Agent Skills"]
-  end
-
-  LLM["LLM<br/>Gemini, OpenAI, Claude, etc."]
-  DB[("PostgreSQL<br/>records, audit logs, session files,<br/>local secrets (encrypted)")]
-  V[("HashiCorp Vault<br/>secrets read live")]
-  PX["MCP proxy<br/>runs third-party server code"]
-  MS["MCP servers"]
-
-  AG --> AS
-  UI <-->|"AG-UI over SSE"| AG
-  AG -.->|"renders"| A2
-  AG --> LLM
-  A2 -.->|"what the user chose"| UI
-  BE --> DB
-  GW -->|"a secret resolves<br/>here or in the DB"| V
-  GW -->|"every call, allowed or refused,<br/>is appended to the audit log"| DB
-  GW -->|"HTTPS, client certificate"| PX
-  PX --> MS
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/img/readme-architecture-dark.svg">
+  <img src="assets/img/readme-architecture.svg" alt="Architecture diagram of A2Flow: the frontend talks to the backend's AI agent over AG-UI/SSE, the agent clones Agent Skills and calls an LLM, and the backend's MCP gateway resolves secrets from HashiCorp Vault, writes to PostgreSQL, and routes tool calls through the MCP proxy sandbox to registered MCP servers.">
+</picture>
 
 The UI talks to the agent over the
 [AG-UI protocol](https://docs.ag-ui.com/concepts/events), and the agent answers with more

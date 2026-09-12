@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Running a workflow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f2f8fc;
+      --color-ink:     #1c1e21;
+      --color-muted:   #525860;
+      --color-accent:  #00877a;
+      --font-sans:     'Inter', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: var(--color-ink); margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Flowchart · Diagram Design</p>
+    <h1>Running a workflow copies its design</h1>
+
+    <svg viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-execution-snapshot-title workflow-execution-snapshot-desc">
+      <title id="workflow-execution-snapshot-title">Running a workflow copies its design</title>
+      <desc id="workflow-execution-snapshot-desc">Flowchart showing a published workflow and its chosen tool mocks copied by value onto a new workflow execution snapshot, which opens a workflow session containing tasks that all start pending.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <path d="M380,124 L380,144 Q380,152 388,152 L452,152 Q460,152 460,160 L460,180" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M660,124 L660,144 Q660,152 652,152 L548,152 Q540,152 540,160 L540,180" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="244" x2="500" y2="300" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="364" x2="500" y2="420" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Arrow labels -->
+      <rect x="404" y="136" width="32" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="420" y="145" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">RUN</text>
+
+      <rect x="556" y="136" width="96" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="604" y="145" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">COPIED BY VALUE</text>
+
+      <!-- Workflow -->
+      <rect x="280" y="60" width="200" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="380" y="88" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflow</text>
+      <text x="380" y="104" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">published version</text>
+
+      <!-- Chosen tool mocks -->
+      <rect x="560" y="60" width="200" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="660" y="88" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Chosen tool mocks</text>
+      <text x="660" y="104" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">test runs only</text>
+
+      <!-- Workflow execution (focal) -->
+      <rect x="380" y="180" width="240" height="64" rx="6" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
+      <text x="500" y="208" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflow execution</text>
+      <text x="500" y="224" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">the snapshot</text>
+
+      <!-- Workflow session -->
+      <rect x="380" y="300" width="240" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="328" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflow session</text>
+      <text x="500" y="344" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">the run's chat</text>
+
+      <!-- Tasks -->
+      <rect x="380" y="420" width="240" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="448" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tasks</text>
+      <text x="500" y="464" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">all pending at the start</text>
+    </svg>
+  </div>
+</body>
+</html>

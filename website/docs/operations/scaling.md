@@ -27,24 +27,8 @@ Reads are the part that needs help. The ADK `Runner` holds one in-memory session
 
 So each agent run (`POST /api/v1/workflow-executions/{id}/agent`, `POST /api/v1/workflows/{id}/agent`) takes a **PostgreSQL session-level advisory lock** and holds it for the whole SSE stream:
 
-```mermaid
-sequenceDiagram
-  participant A as Client A
-  participant R1 as Replica 1
-  participant PG as PostgreSQL
-  participant R2 as Replica 2
-  participant B as Client B
-  A->>R1: POST .../agent
-  R1->>PG: take advisory lock for this session
-  PG-->>R1: acquired
-  R1-->>A: SSE stream opens
-  B->>R2: POST .../agent (same session)
-  R2->>PG: take advisory lock for this session
-  PG-->>R2: held elsewhere
-  R2-->>B: 409 SESSION_RUN_IN_PROGRESS
-  R1-->>A: stream ends
-  R1->>PG: lock released with the connection
-```
+![Sequence diagram of two replicas racing to run the same session: Replica 1 takes a PostgreSQL advisory lock and opens the stream for Client A, while Replica 2's later request for the same session is refused with 409 while the lock is held, and the lock is released only when Replica 1's stream ends.](./img/scaling-lock-race.svg#gh-light-mode-only)
+![Sequence diagram of two replicas racing to run the same session: Replica 1 takes a PostgreSQL advisory lock and opens the stream for Client A, while Replica 2's later request for the same session is refused with 409 while the lock is held, and the lock is released only when Replica 1's stream ends.](./img/scaling-lock-race-dark.svg#gh-dark-mode-only)
 
 A second concurrent run of the same session is refused before any SSE headers are sent, rather than being left to diverge quietly. Different sessions never contend, and the lock is briefly waited on before it gives up, so a client that aborts a stream and immediately retries is not rejected while the abandoned run is still tearing down.
 

@@ -9,12 +9,8 @@ A tool mock is a stand-in that lets a **draft** workflow run be exercised end to
 
 Open **Tool Mocks** in the admin sidebar to manage them.
 
-```mermaid
-flowchart LR
-  A["The agent calls a tool"] --> P{"Is this tool mocked<br/>for this run?"}
-  P -->|"no"| S["The MCP server<br/>the real side effect"]
-  P -->|"yes"| M["The mock's next response<br/>no server is contacted"]
-```
+![Flowchart showing the agent calling a tool, checking whether it is mocked for this run, and either reaching the real MCP server or receiving the mock's next response with no server contacted.](./img/tool-mocks-decision.svg#gh-light-mode-only)
+![Flowchart showing the agent calling a tool, checking whether it is mocked for this run, and either reaching the real MCP server or receiving the mock's next response with no server contacted.](./img/tool-mocks-decision-dark.svg#gh-dark-mode-only)
 
 ## Using one
 

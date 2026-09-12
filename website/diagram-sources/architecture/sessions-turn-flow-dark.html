@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How a turn runs</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #030711;
+      --color-ink:     #e3e3e3;
+      --color-muted:   #9aa1ab;
+      --color-accent:  #3bf5c4;
+      --font-sans:     'Inter', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: var(--color-ink); margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Sequence · Diagram Design</p>
+    <h1>How a turn runs</h1>
+
+    <svg viewBox="0 0 1000 680" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="sessions-turn-flow-dark-title sessions-turn-flow-dark-desc">
+      <title id="sessions-turn-flow-dark-title">How a turn runs</title>
+      <desc id="sessions-turn-flow-dark-desc">Sequence diagram of one chat turn: the user's message travels from Frontend to Backend to the Model, the model's streamed reply and any render_a2ui surface flow back, and the user's filled-in surface makes the same round trip again.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3bf5c4"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Lifelines: User 128, Frontend 352, Backend 584, Model 800 -->
+      <line x1="128" y1="128" x2="128" y2="568" stroke="rgba(227,227,227,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="352" y1="128" x2="352" y2="568" stroke="rgba(227,227,227,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="584" y1="128" x2="584" y2="568" stroke="rgba(227,227,227,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="800" y1="128" x2="800" y2="568" stroke="rgba(227,227,227,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+
+      <!-- Messages -->
+      <line x1="128" y1="176" x2="352" y2="176" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="352" y1="216" x2="584" y2="216" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="584" y1="256" x2="800" y2="256" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="800" y1="296" x2="584" y2="296" stroke="#9aa1ab" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <line x1="584" y1="336" x2="352" y2="336" stroke="#9aa1ab" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <line x1="352" y1="376" x2="128" y2="376" stroke="#9aa1ab" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <line x1="128" y1="416" x2="352" y2="416" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="352" y1="456" x2="584" y2="456" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="584" y1="496" x2="800" y2="496" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="800" y1="536" x2="352" y2="536" stroke="#3bf5c4" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+
+      <!-- Labels -->
+      <rect x="190" y="160" width="100" height="12" rx="2" fill="#030711"/>
+      <text x="240" y="170" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">WRITES MESSAGE</text>
+
+      <rect x="396" y="200" width="144" height="12" rx="2" fill="#030711"/>
+      <text x="468" y="210" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MESSAGE + TOOL SCHEMA</text>
+
+      <rect x="626" y="240" width="132" height="12" rx="2" fill="#030711"/>
+      <text x="692" y="250" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">BRIDGE TO ADK AGENT</text>
+
+      <rect x="632" y="280" width="120" height="12" rx="2" fill="#030711"/>
+      <text x="692" y="290" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">TEXT + TOOL CALLS</text>
+
+      <rect x="414" y="320" width="108" height="12" rx="2" fill="#030711"/>
+      <text x="468" y="330" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STREAMED ONWARD</text>
+
+      <rect x="192" y="360" width="96" height="12" rx="2" fill="#030711"/>
+      <text x="240" y="370" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DRAWS SURFACE</text>
+
+      <rect x="186" y="400" width="108" height="12" rx="2" fill="#030711"/>
+      <text x="240" y="410" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FILLS + SUBMITS</text>
+
+      <rect x="414" y="440" width="108" height="12" rx="2" fill="#030711"/>
+      <text x="468" y="450" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FULL DATA MODEL</text>
+
+      <rect x="638" y="480" width="108" height="12" rx="2" fill="#030711"/>
+      <text x="692" y="490" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MATCHED TO CALL</text>
+
+      <rect x="412" y="520" width="112" height="12" rx="2" fill="#030711"/>
+      <text x="468" y="530" fill="#3bf5c4" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">RESPONDS TO USER</text>
+
+      <!-- Editorial callout: render_a2ui is forwarded, not executed. Placed in the
+           clear margin right of the Model lifeline so it never crosses an arrow. -->
+      <path d="M 900 180 Q 852 180 800 292" fill="none" stroke="rgba(227,227,227,0.40)" stroke-width="1" stroke-dasharray="4,3"/>
+      <circle cx="800" cy="296" r="2" fill="#e3e3e3"/>
+      <text x="980" y="152" fill="#e3e3e3" font-size="16" font-style="italic" font-family="'Instrument Serif', serif" text-anchor="end">a render_a2ui call is</text>
+      <text x="980" y="170" fill="#e3e3e3" font-size="16" font-style="italic" font-family="'Instrument Serif', serif" text-anchor="end">forwarded, never executed</text>
+
+      <!-- Actor boxes -->
+      <rect x="56" y="72" width="144" height="56" rx="6" fill="rgba(154,161,171,0.10)" stroke="#7e8794" stroke-width="1"/>
+      <rect x="64" y="80" width="28" height="12" rx="2" fill="transparent" stroke="rgba(126,135,148,0.40)" stroke-width="0.8"/>
+      <text x="78" y="89" fill="#7e8794" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+      <text x="128" y="104" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">User</text>
+      <text x="128" y="119" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">Browser</text>
+
+      <rect x="280" y="72" width="144" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <rect x="288" y="80" width="30" height="12" rx="2" fill="transparent" stroke="rgba(227,227,227,0.30)" stroke-width="0.8"/>
+      <text x="303" y="89" fill="#9aa1ab" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">APP</text>
+      <text x="352" y="104" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Frontend</text>
+      <text x="352" y="119" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">Next.js UI</text>
+
+      <rect x="512" y="72" width="144" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <rect x="520" y="80" width="28" height="12" rx="2" fill="transparent" stroke="rgba(227,227,227,0.30)" stroke-width="0.8"/>
+      <text x="534" y="89" fill="#9aa1ab" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">API</text>
+      <text x="584" y="104" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Backend</text>
+      <text x="584" y="119" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">FastAPI</text>
+
+      <rect x="728" y="72" width="144" height="56" rx="6" fill="rgba(227,227,227,0.03)" stroke="rgba(227,227,227,0.30)" stroke-width="1"/>
+      <rect x="736" y="80" width="28" height="12" rx="2" fill="transparent" stroke="rgba(227,227,227,0.22)" stroke-width="0.8"/>
+      <text x="750" y="89" fill="#9aa1ab" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">LLM</text>
+      <text x="800" y="104" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Model</text>
+      <text x="800" y="119" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">Google ADK</text>
+
+      <!-- Legend -->
+      <line x1="56" y1="600" x2="944" y2="600" stroke="rgba(227,227,227,0.10)" stroke-width="0.8"/>
+      <text x="56" y="616" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <line x1="56" y1="640" x2="84" y2="640" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <text x="92" y="643" fill="#9aa1ab" font-size="9.5" font-family="'Inter', sans-serif">Call</text>
+
+      <line x1="180" y1="640" x2="208" y2="640" stroke="#9aa1ab" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <text x="216" y="643" fill="#9aa1ab" font-size="9.5" font-family="'Inter', sans-serif">Streamed return</text>
+
+      <line x1="360" y1="640" x2="388" y2="640" stroke="#3bf5c4" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <text x="396" y="643" fill="#9aa1ab" font-size="9.5" font-family="'Inter', sans-serif">Response to user</text>
+    </svg>
+  </div>
+</body>
+</html>

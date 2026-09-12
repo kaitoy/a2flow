@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tenant, users, and groups</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f2f8fc; color: #1c1e21; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #525860; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #1c1e21; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Flowchart · Diagram Design</p>
+    <h1>Tenant, users, and groups</h1>
+
+    <svg viewBox="0 0 600 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="users-groups-relationship-title users-groups-relationship-desc">
+      <title id="users-groups-relationship-title">Tenant, users, and groups</title>
+      <desc id="users-groups-relationship-desc">Flowchart showing a tenant containing users and user groups, group membership granting a user its group, and both the user's own roles and its groups' roles feeding the user's effective roles.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <line x1="220" y1="94" x2="320" y2="94" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="130" y1="128" x2="130" y2="220" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M170,220 L170,196 Q170,188 178,188 L362,188 Q370,188 370,180 L370,128" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="410" y1="128" x2="410" y2="220" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="220" y1="254" x2="320" y2="254" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="244" y="166" width="52" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="270" y="177" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">MEMBER</text>
+
+      <rect x="420" y="162" width="44" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="442" y="173" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ROLES</text>
+
+      <rect x="244" y="232" width="44" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="266" y="243" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ROLES</text>
+
+      <!-- Tenant -->
+      <rect x="40" y="60" width="180" height="68" rx="6" fill="rgba(28,30,33,0.03)" stroke="rgba(28,30,33,0.30)" stroke-width="1"/>
+      <text x="130" y="89" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tenant</text>
+      <text x="130" y="108" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">org boundary</text>
+
+      <!-- User Group -->
+      <rect x="40" y="220" width="180" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="130" y="249" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">User Group</text>
+      <text x="130" y="268" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">named bundle</text>
+
+      <!-- User -->
+      <rect x="320" y="60" width="180" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="410" y="89" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">User</text>
+      <text x="410" y="108" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">one account</text>
+
+      <!-- Effective roles (focal) -->
+      <rect x="320" y="220" width="200" height="68" rx="6" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
+      <text x="420" y="258" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Effective roles</text>
+    </svg>
+  </div>
+</body>
+</html>

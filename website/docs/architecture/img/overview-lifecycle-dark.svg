@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 760" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="overview-lifecycle-dark-title overview-lifecycle-dark-desc">
+      <title id="overview-lifecycle-dark-title">How a workflow moves</title>
+      <desc id="overview-lifecycle-dark-desc">Flowchart showing an Agent Skill generated into a Workflow, run as a Workflow execution inside a Workflow session, whose Tasks request human approval or call an MCP tool through the MCP proxy to reach an MCP server.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Spine arrows -->
+      <line x1="500" y1="104" x2="500" y2="144" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="208" x2="500" y2="248" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="312" x2="500" y2="352" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="416" x2="500" y2="456" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Spine labels (beside the line) -->
+      <rect x="508" y="118" width="90" height="12" rx="2" fill="#030711"/>
+      <text x="516" y="127" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.06em">GENERATE</text>
+      <rect x="508" y="222" width="100" height="12" rx="2" fill="#030711"/>
+      <text x="516" y="231" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.06em">PUBLISH/RUN</text>
+
+      <!-- Branch elbows: Tasks -> Approval gate / MCP proxy -->
+      <path d="M460,512 L460,532 Q460,540 452,540 L298,540 Q290,540 290,548 L290,552" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M540,512 L540,532 Q540,540 548,540 L702,540 Q710,540 710,548 L710,552" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <rect x="315" y="520" width="120" height="12" rx="2" fill="#030711"/>
+      <text x="375" y="529" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NEEDS A PERSON</text>
+      <rect x="565" y="520" width="120" height="12" rx="2" fill="#030711"/>
+      <text x="625" y="529" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NEEDS A TOOL</text>
+
+      <!-- Approval gate -> MCP proxy -->
+      <line x1="380" y1="580" x2="620" y2="580" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="460" y="560" width="80" height="12" rx="2" fill="#030711"/>
+      <text x="500" y="569" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CERTIFICATE</text>
+
+      <!-- MCP proxy -> MCP server -->
+      <line x1="710" y1="608" x2="710" y2="648" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Nodes: main spine -->
+      <rect x="400" y="40" width="200" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="68" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Agent Skill</text>
+      <text x="500" y="88" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">a Git repository</text>
+
+      <rect x="390" y="144" width="220" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="172" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflow</text>
+      <text x="500" y="192" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">templates + tool bindings</text>
+
+      <rect x="380" y="248" width="240" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="276" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflow execution</text>
+      <text x="500" y="296" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">a snapshot of the design</text>
+
+      <rect x="390" y="352" width="220" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="380" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflow session</text>
+      <text x="500" y="400" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">the run's shared chat</text>
+
+      <rect x="420" y="456" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="480" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tasks</text>
+      <text x="500" y="500" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">one at a time</text>
+
+      <!-- Nodes: branch row -->
+      <rect x="200" y="552" width="180" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="290" y="585" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Approval gate</text>
+
+      <rect x="620" y="552" width="180" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="710" y="585" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP proxy</text>
+
+      <!-- Node: MCP server -->
+      <rect x="620" y="648" width="180" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="710" y="681" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP server</text>
+    </svg>

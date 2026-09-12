@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Where a notification goes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f2f8fc; color: #1c1e21; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #525860; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #1c1e21; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Flowchart · Diagram Design</p>
+    <h1>Where a notification goes</h1>
+
+    <svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="notifications-routing-title notifications-routing-desc">
+      <title id="notifications-routing-title">Where a notification goes</title>
+      <desc id="notifications-routing-desc">Flowchart showing a workflow event routing to the one concerned user, or every eligible approver-group member, and fanning out to the bell, the Notifications page, and email if it is enabled.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <line x1="350" y1="96" x2="350" y2="160" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M300,232 L300,244 Q300,252 292,252 L158,252 Q150,252 150,260 L150,300" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="350" y1="232" x2="350" y2="300" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M400,232 L400,244 Q400,252 408,252 L542,252 Q550,252 550,260 L550,300" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Event -->
+      <rect x="260" y="40" width="180" height="56" rx="28" fill="rgba(28,30,33,0.03)" stroke="rgba(28,30,33,0.30)" stroke-width="1"/>
+      <text x="350" y="72" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflow event</text>
+
+      <!-- Concerned user(s) (focal) -->
+      <rect x="250" y="160" width="200" height="72" rx="6" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
+      <text x="350" y="190" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Concerned user(s)</text>
+      <text x="350" y="210" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">or approver group</text>
+
+      <!-- Bell -->
+      <rect x="70" y="300" width="160" height="72" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="150" y="330" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Bell</text>
+      <text x="150" y="350" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">unread notifications</text>
+
+      <!-- Notifications page -->
+      <rect x="270" y="300" width="160" height="72" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="350" y="330" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Notifications page</text>
+      <text x="350" y="350" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">full history</text>
+
+      <!-- Email -->
+      <rect x="470" y="300" width="160" height="72" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="550" y="330" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Email</text>
+      <text x="550" y="350" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">if enabled</text>
+    </svg>
+  </div>
+</body>
+</html>

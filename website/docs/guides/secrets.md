@@ -11,12 +11,8 @@ Open **Secrets** in the admin sidebar to manage them. Each record has a **Name**
 
 ## Where a secret is used
 
-```mermaid
-flowchart LR
-  S["Secret<br/>name"] --> K["Entry<br/>key"]
-  K -->|"${secret:name/key}"| H["MCP server headers<br/>and environment variables"]
-  K -->|"Auth Password picker"| G["Agent Skill<br/>repository clone"]
-```
+![Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.](./img/secrets-usage.svg#gh-light-mode-only)
+![Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.](./img/secrets-usage-dark.svg#gh-dark-mode-only)
 
 - **[MCP servers](./mcp-servers.md)** — any header value or environment variable value may embed `${secret:name/key}`, expanded when connecting.
 - **[Agent Skills](./agent-skills.md)** — a skill's **Auth Password** is a reference to one entry, chosen from dropdowns rather than typed.

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 920 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflows-status-dark-title workflows-status-dark-desc">
+      <title id="workflows-status-dark-title">Detailed workflow status</title>
+      <desc id="workflows-status-dark-desc">State machine of a workflow's detailed status: generating leads to draft or failed, failed can be rewritten back to draft, draft publishes to published, published and modified toggle on further edits and publishes, and either can be deactivated back to draft.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3bf5c4"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="20" y1="92" x2="60" y2="92" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="220" y1="92" x2="280" y2="92" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M140,124 L140,172 Q140,180 148,180 L242,180 Q250,180 250,188 L250,220" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M290,220 L290,180 Q290,172 298,172 L352,172 Q360,172 360,164 L360,124" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="440" y1="92" x2="500" y2="92" stroke="#3bf5c4" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <line x1="660" y1="76" x2="720" y2="76" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="720" y1="108" x2="660" y2="108" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M580,124 L580,312 Q580,320 572,320 L388,320 Q380,320 380,312 L380,124" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M800,124 L800,332 Q800,340 792,340 L436,340 Q428,340 428,332 L428,328 a8,8 0 0,0 0,-16 L428,124" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="168" y="162" width="54" height="14" rx="2" fill="#030711"/>
+      <text x="195" y="173" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">FAILED</text>
+
+      <rect x="294" y="154" width="62" height="14" rx="2" fill="#030711"/>
+      <text x="325" y="165" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">BY HAND</text>
+
+      <rect x="445" y="70" width="50" height="14" rx="2" fill="#030711"/>
+      <text x="470" y="81" fill="#3bf5c4" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PUBLISH</text>
+
+      <rect x="663" y="54" width="54" height="14" rx="2" fill="#030711"/>
+      <text x="690" y="65" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">EDITED</text>
+
+      <rect x="663" y="116" width="54" height="14" rx="2" fill="#030711"/>
+      <text x="690" y="125" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">PUBLISH</text>
+
+      <rect x="445" y="302" width="70" height="14" rx="2" fill="#030711"/>
+      <text x="480" y="313" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">DEACTIVATE</text>
+
+      <rect x="579" y="322" width="70" height="14" rx="2" fill="#030711"/>
+      <text x="614" y="333" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">DEACTIVATE</text>
+
+      <!-- Start -->
+      <circle cx="16" cy="92" r="6" fill="#e3e3e3"/>
+
+      <!-- generating -->
+      <rect x="60" y="60" width="160" height="64" rx="8" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="140" y="99" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">generating</text>
+
+      <!-- draft -->
+      <rect x="280" y="60" width="160" height="64" rx="8" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="360" y="99" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">draft</text>
+
+      <!-- published (focal) -->
+      <rect x="500" y="60" width="160" height="64" rx="8" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="580" y="99" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">published</text>
+
+      <!-- modified -->
+      <rect x="720" y="60" width="160" height="64" rx="8" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="800" y="99" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">modified</text>
+
+      <!-- failed -->
+      <rect x="170" y="220" width="160" height="64" rx="8" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="250" y="259" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">failed</text>
+    </svg>

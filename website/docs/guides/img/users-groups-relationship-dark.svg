@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 600 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="users-groups-relationship-dark-title users-groups-relationship-dark-desc">
+      <title id="users-groups-relationship-dark-title">Tenant, users, and groups</title>
+      <desc id="users-groups-relationship-dark-desc">Flowchart showing a tenant containing users and user groups, group membership granting a user its group, and both the user's own roles and its groups' roles feeding the user's effective roles.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="220" y1="94" x2="320" y2="94" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="130" y1="128" x2="130" y2="220" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M170,220 L170,196 Q170,188 178,188 L362,188 Q370,188 370,180 L370,128" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="410" y1="128" x2="410" y2="220" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="220" y1="254" x2="320" y2="254" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="244" y="166" width="52" height="14" rx="2" fill="#030711"/>
+      <text x="270" y="177" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">MEMBER</text>
+
+      <rect x="420" y="162" width="44" height="14" rx="2" fill="#030711"/>
+      <text x="442" y="173" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ROLES</text>
+
+      <rect x="244" y="232" width="44" height="14" rx="2" fill="#030711"/>
+      <text x="266" y="243" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ROLES</text>
+
+      <!-- Tenant -->
+      <rect x="40" y="60" width="180" height="68" rx="6" fill="#e3e3e3" fill-opacity="0.03" stroke="#e3e3e3" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="130" y="89" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tenant</text>
+      <text x="130" y="108" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">org boundary</text>
+
+      <!-- User Group -->
+      <rect x="40" y="220" width="180" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="130" y="249" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">User Group</text>
+      <text x="130" y="268" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">named bundle</text>
+
+      <!-- User -->
+      <rect x="320" y="60" width="180" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="410" y="89" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">User</text>
+      <text x="410" y="108" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">one account</text>
+
+      <!-- Effective roles (focal) -->
+      <rect x="320" y="220" width="200" height="68" rx="6" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="420" y="258" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Effective roles</text>
+    </svg>

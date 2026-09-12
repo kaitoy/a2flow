@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resolving effective roles</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f2f8fc; color: #1c1e21; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #525860; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #1c1e21; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Flowchart · Diagram Design</p>
+    <h1>Resolving effective roles</h1>
+
+    <svg viewBox="0 0 840 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="authorization-effective-roles-title authorization-effective-roles-desc">
+      <title id="authorization-effective-roles-title">Resolving effective roles</title>
+      <desc id="authorization-effective-roles-desc">Flowchart showing direct role grants on the user record and roles inherited from user groups both feeding a user's effective roles, the union used by every authorization check.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <path d="M240,74 L272,74 Q280,74 280,82 L280,115 Q280,123 288,123 L320,123" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M240,194 L272,194 Q280,194 280,186 L280,153 Q280,145 288,145 L320,145" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="520" y1="134" x2="600" y2="134" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="254" y="83" width="52" height="13" rx="2" fill="#f2f8fc"/>
+      <text x="280" y="92" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">DIRECT</text>
+
+      <rect x="254" y="178" width="52" height="13" rx="2" fill="#f2f8fc"/>
+      <text x="280" y="187" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">GROUP</text>
+
+      <!-- Direct grants -->
+      <rect x="40" y="40" width="200" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="140" y="69" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Direct grants</text>
+      <text x="140" y="88" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">on the user record</text>
+
+      <!-- Group grants -->
+      <rect x="40" y="160" width="200" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="140" y="189" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Group grants</text>
+      <text x="140" y="208" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">inherited</text>
+
+      <!-- Effective roles (focal) -->
+      <rect x="320" y="100" width="200" height="68" rx="6" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
+      <text x="420" y="139" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Effective roles</text>
+
+      <!-- Every auth check -->
+      <rect x="600" y="100" width="200" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="700" y="128" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Every auth</text>
+      <text x="700" y="146" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">check</text>
+    </svg>
+  </div>
+</body>
+</html>

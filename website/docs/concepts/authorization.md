@@ -14,12 +14,8 @@ A role reaches a user in one of two ways, and every authorization check uses the
 - **Directly**, granted on the user record from the [Users](../guides/users-and-groups.md#users) page.
 - **Inherited** from a [user group](../guides/users-and-groups.md#user-groups) they belong to: assigning a role to a group grants it to every member.
 
-```mermaid
-flowchart LR
-  D["Roles on the user record<br/>(direct grants)"] --> E
-  G["Roles on every user group<br/>they belong to (inherited)"] --> E
-  E["Effective roles<br/>the union, resolved per request"] --> C["Every authorization check"]
-```
+![Flowchart showing direct role grants on the user record and roles inherited from user groups both feeding a user's effective roles, the union used by every authorization check.](./img/authorization-effective-roles.svg#gh-light-mode-only)
+![Flowchart showing direct role grants on the user record and roles inherited from user groups both feeding a user's effective roles, the union used by every authorization check.](./img/authorization-effective-roles-dark.svg#gh-dark-mode-only)
 
 A role held only through a group is worth exactly as much as a directly granted one: it passes the same gates, makes the user eligible as an approver, and protects them from [impersonation](./impersonation.md) the same way. Nothing is cached — the union is resolved on every request — so adding someone to a group, or removing them, takes effect immediately with no re-sync step.
 
@@ -64,26 +60,8 @@ A2Flow has two kinds of chat, and they are gated in two different ways:
 - A **design session** is the chat a workflow is designed in. Access is decided by **role**: designing is developer work, so the tenant's Developers share it.
 - A **workflow session** is the chat one run happens in. Access is decided by **participation**: the person who started the run and the people asked to approve something in it share it, whatever their roles.
 
-```mermaid
-flowchart LR
-  DEV["Any Developer<br/>in the tenant"]
-  CRE["The workflow's creator<br/>(createdBy)"]
-  INI["The execution's initiator"]
-  APR["A designated approver of<br/>one of its approvals"]
-  ADM["Any Admin<br/>in the tenant"]
-  SA["Super Admin"]
-
-  DS["Design session<br/>a workflow's design chat<br/>— gated by role —"]
-  WS["Workflow session<br/>one run's shared chat<br/>— gated by participation —"]
-
-  DEV --> DS
-  CRE --> DS
-  SA --> DS
-  INI --> WS
-  APR --> WS
-  SA --> WS
-  ADM -. "read only" .-> WS
-```
+![Access matrix showing that Developers, the workflow's creator, and Super Admin reach a Design session, while the run's initiator, its designated approvers, and Super Admin reach a Workflow session, with Admin holding read-only access to the Workflow session.](./img/authorization-session-matrix.svg#gh-light-mode-only)
+![Access matrix showing that Developers, the workflow's creator, and Super Admin reach a Design session, while the run's initiator, its designated approvers, and Super Admin reach a Workflow session, with Admin holding read-only access to the Workflow session.](./img/authorization-session-matrix-dark.svg#gh-dark-mode-only)
 
 ### Design session {#design-session-access}
 

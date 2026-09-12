@@ -22,12 +22,8 @@ The [**Columns** menu](./admin-ui.md#choosing-columns) offers two more columns t
 
 ## Run status
 
-```mermaid
-stateDiagram-v2
-  [*] --> running: Run
-  running --> completed: every task ended, none failed
-  running --> failed: every task ended, at least one failed
-```
+![State machine showing a run starting as running, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.](./img/workflow-executions-status.svg#gh-light-mode-only)
+![State machine showing a run starting as running, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.](./img/workflow-executions-status-dark.svg#gh-dark-mode-only)
 
 A run starts `running` and settles once it has at least one task and every task has reached a terminal state — `completed`, `failed` or `skipped`. A run whose tasks include a failure ends `failed`. The finish time is stamped at that moment and is never moved by a later edit, and a run with no tasks at all stays `running`. These are the numbers the [operations metrics](../operations/metrics.md) count.
 
@@ -37,11 +33,8 @@ When a task fails, any task still waiting on it — directly or down the chain �
 
 The workflow session is the chat one run happens in. It opens with the run's kickoff message and the agent already working.
 
-```mermaid
-flowchart LR
-  T["Task timeline<br/>collapsible, down the left edge"] <--> M["Messages<br/>grouped by task"]
-  M --> I["Chat input"]
-```
+![Flowchart showing the workflow session screen layout: the task timeline and the messages grouped by task sit side by side, and messages lead into the chat input.](./img/workflow-executions-layout.svg#gh-light-mode-only)
+![Flowchart showing the workflow session screen layout: the task timeline and the messages grouped by task sit side by side, and messages lead into the chat input.](./img/workflow-executions-layout-dark.svg#gh-dark-mode-only)
 
 ### Who shares it
 

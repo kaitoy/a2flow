@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-design-status-title workflow-design-status-desc">
+      <title id="workflow-design-status-title">Workflow status lifecycle</title>
+      <desc id="workflow-design-status-desc">State machine showing a workflow moving from a published Agent Skill through generating to draft or failed, then from draft through published and modified, with publish looping back from modified.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Transitions (drawn first) -->
+      <line x1="16" y1="112" x2="40" y2="112" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="200" y1="112" x2="240" y2="112" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="400" y1="112" x2="440" y2="112" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M320,152 L320,178 Q320,186 328,186 L472,186 Q480,186 480,194 L480,220" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="560" y1="220" x2="560" y2="152" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="600" y1="112" x2="640" y2="112" stroke="#00877a" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <line x1="700" y1="152" x2="700" y2="220" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="760" y1="220" x2="760" y2="152" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Transition labels -->
+      <rect x="196" y="96" width="48" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="220" y="105" fill="#525860" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">GENERATE</text>
+
+      <rect x="366" y="180" width="56" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="394" y="190" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NO STEPS</text>
+
+      <rect x="568" y="180" width="48" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="592" y="190" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">REVISED</text>
+
+      <rect x="596" y="96" width="48" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="620" y="105" fill="#00877a" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PUBLISH</text>
+
+      <rect x="676" y="180" width="48" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="700" y="190" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">EDITED</text>
+
+      <rect x="736" y="180" width="48" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="760" y="190" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PUBLISH</text>
+
+      <!-- Start dot -->
+      <circle cx="10" cy="112" r="6" fill="#1c1e21"/>
+
+      <!-- Agent Skill (precondition, dashed) -->
+      <rect x="40" y="72" width="160" height="80" rx="8" fill="#1c1e21" fill-opacity="0.02" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="120" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Agent Skill</text>
+      <text x="120" y="124" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">published revision</text>
+
+      <!-- generating -->
+      <rect x="240" y="72" width="160" height="80" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="320" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">generating</text>
+      <text x="320" y="124" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">design run in progress</text>
+
+      <!-- draft -->
+      <rect x="440" y="72" width="160" height="80" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="520" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">draft</text>
+      <text x="520" y="124" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">templates + bindings</text>
+
+      <!-- published (focal) -->
+      <rect x="640" y="72" width="160" height="80" rx="8" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="720" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">published</text>
+      <text x="720" y="124" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">design is frozen</text>
+
+      <!-- failed -->
+      <rect x="440" y="220" width="160" height="80" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="520" y="256" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">failed</text>
+      <text x="520" y="272" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">reason on record</text>
+
+      <!-- modified -->
+      <rect x="640" y="220" width="160" height="80" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="720" y="256" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">modified</text>
+      <text x="720" y="272" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">runs use published</text>
+
+      <!-- Legend -->
+      <line x1="40" y1="340" x2="960" y2="340" stroke="#1c1e21" stroke-opacity="0.10" stroke-width="0.8"/>
+      <text x="40" y="356" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+
+      <rect x="40" y="368" width="24" height="14" rx="8" fill="#1c1e21" fill-opacity="0.02" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="76" y="379" fill="#525860" font-size="9.5" font-family="'Inter', sans-serif">Precondition</text>
+
+      <rect x="220" y="368" width="24" height="14" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="256" y="379" fill="#525860" font-size="9.5" font-family="'Inter', sans-serif">Status</text>
+
+      <rect x="360" y="368" width="24" height="14" rx="8" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="396" y="379" fill="#525860" font-size="9.5" font-family="'Inter', sans-serif">Live version</text>
+    </svg>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="approvals-guide-sequence-title approvals-guide-sequence-desc">
+      <title id="approvals-guide-sequence-title">Requesting a human approval</title>
+      <desc id="approvals-guide-sequence-desc">Sequence diagram of an approval request: the execution agent asks for approval, A2Flow notifies the approver and the run pauses, the approver decides, and A2Flow grants a certificate to each covered step and resumes the run.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Lifelines -->
+      <line x1="130" y1="136" x2="130" y2="380" stroke="#1c1e21" stroke-opacity="0.20" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="430" y1="136" x2="430" y2="380" stroke="#1c1e21" stroke-opacity="0.20" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="700" y1="136" x2="700" y2="380" stroke="#1c1e21" stroke-opacity="0.20" stroke-width="1" stroke-dasharray="3,3"/>
+
+      <!-- Messages -->
+      <line x1="130" y1="176" x2="430" y2="176" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="430" y1="236" x2="700" y2="236" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="700" y1="296" x2="430" y2="296" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="430" y1="356" x2="130" y2="356" stroke="#00877a" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+
+      <!-- Labels -->
+      <rect x="221" y="156" width="118" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="280" y="167" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">REQUEST APPROVAL</text>
+
+      <rect x="539" y="216" width="52" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="565" y="227" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">NOTIFY</text>
+
+      <rect x="539" y="276" width="52" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="565" y="287" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">DECIDE</text>
+
+      <rect x="238" y="336" width="84" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="280" y="347" fill="#00877a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">RUN RESUMES</text>
+
+      <!-- Editorial callouts, kept clear of the lifelines and each other -->
+      <path d="M 900 182 Q 852 182 700 228" fill="none" stroke="#1c1e21" stroke-opacity="0.40" stroke-width="1" stroke-dasharray="4,3"/>
+      <circle cx="700" cy="236" r="2" fill="#1c1e21"/>
+      <text x="960" y="150" fill="#1c1e21" font-size="16" font-style="italic" font-family="'Instrument Serif', serif" text-anchor="end">the whole run</text>
+      <text x="960" y="172" fill="#1c1e21" font-size="16" font-style="italic" font-family="'Instrument Serif', serif" text-anchor="end">pauses to wait</text>
+
+      <path d="M 900 262 Q 852 262 700 288" fill="none" stroke="#1c1e21" stroke-opacity="0.40" stroke-width="1" stroke-dasharray="4,3"/>
+      <circle cx="700" cy="296" r="2" fill="#1c1e21"/>
+      <text x="960" y="230" fill="#1c1e21" font-size="16" font-style="italic" font-family="'Instrument Serif', serif" text-anchor="end">a certificate is</text>
+      <text x="960" y="252" fill="#1c1e21" font-size="16" font-style="italic" font-family="'Instrument Serif', serif" text-anchor="end">granted per step</text>
+
+      <!-- Actor boxes -->
+      <rect x="58" y="72" width="144" height="64" rx="6" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="130" y="100" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Execution</text>
+      <text x="130" y="120" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">agent</text>
+
+      <rect x="358" y="72" width="144" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="430" y="110" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">A2Flow</text>
+
+      <rect x="628" y="72" width="144" height="64" rx="6" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="700" y="110" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Approver</text>
+
+      <!-- Legend -->
+      <line x1="58" y1="400" x2="944" y2="400" stroke="#1c1e21" stroke-opacity="0.10" stroke-width="0.8"/>
+      <text x="58" y="416" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <line x1="58" y1="440" x2="86" y2="440" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <text x="94" y="443" fill="#525860" font-size="9.5" font-family="'Inter', sans-serif">Call</text>
+
+      <line x1="180" y1="440" x2="208" y2="440" stroke="#00877a" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+      <text x="216" y="443" fill="#525860" font-size="9.5" font-family="'Inter', sans-serif">Run resumes</text>
+    </svg>

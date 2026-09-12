@@ -7,18 +7,8 @@ sidebar_position: 5
 
 An [approval](../guides/approvals.md) does two things at once. It stops a run at one step until a person decides, and it turns that decision into a signed grant saying exactly what the steps it covers may do afterwards.
 
-```mermaid
-sequenceDiagram
-  participant A as Execution agent
-  participant F as A2Flow
-  participant P as Approver
-  A->>F: Requests approval, naming one person or one group
-  F->>P: Notification, and email if it is switched on
-  Note over A,P: The covered steps cannot act. Approve / Reject / Return appear in the chat
-  P->>F: Decides, with an optional comment
-  Note over F: On Approve, each covered step is granted a certificate as it starts
-  F-->>A: The decision. The run continues
-```
+![Sequence diagram of an approval: the execution agent requests approval, A2Flow notifies the approver while the covered steps stay blocked, the approver decides, and A2Flow grants a certificate to each covered step as it starts and lets the run continue.](./img/approvals-sequence.svg#gh-light-mode-only)
+![Sequence diagram of an approval: the execution agent requests approval, A2Flow notifies the approver while the covered steps stay blocked, the approver decides, and A2Flow grants a certificate to each covered step as it starts and lets the run continue.](./img/approvals-sequence-dark.svg#gh-dark-mode-only)
 
 ## What "blocked" means
 
@@ -80,16 +70,8 @@ tools, and the certificate's signed grant.
 
 An approval covers **the step it names and every step after it, up to the next approval**. So a workflow can put the request in a step of its own and let the decision reach the work that follows:
 
-```mermaid
-flowchart LR
-  A1([Approval A]):::gate --> T1[Ask for a go-ahead]
-  T1 --> T2[Launch instance]
-  T2 --> T3[Tag instance]
-  T3 --> T4[Ask again]
-  A2([Approval B]):::gate --> T4
-  T4 --> T5[Delete snapshot]
-  classDef gate fill:#0000,stroke-dasharray: 4 3
-```
+![Flowchart of a five-step task chain where Approval A covers the first three steps and Approval B takes over from the fourth step onward, showing that an approval covers its named step and everything after it up to the next approval.](./img/approvals-step-coverage.svg#gh-light-mode-only)
+![Flowchart of a five-step task chain where Approval A covers the first three steps and Approval B takes over from the fourth step onward, showing that an approval covers its named step and everything after it up to the next approval.](./img/approvals-step-coverage-dark.svg#gh-dark-mode-only)
 
 Approval A covers *Ask for a go-ahead*, *Launch instance* and *Tag instance*. Approval B takes over from *Ask again* onwards. Nothing above a request is ever covered by it — an approval reaches forward only.
 

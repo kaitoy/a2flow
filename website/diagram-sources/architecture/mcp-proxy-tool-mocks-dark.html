@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Where the mock sits</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #030711; color: #e3e3e3; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #9aa1ab; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #e3e3e3; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Flowchart · Diagram Design</p>
+    <h1>Where the mock sits</h1>
+
+    <svg viewBox="0 0 1000 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mcp-proxy-tool-mocks-dark-title mcp-proxy-tool-mocks-dark-desc">
+      <title id="mcp-proxy-tool-mocks-dark-title">Where the mock sits</title>
+      <desc id="mcp-proxy-tool-mocks-dark-desc">Flowchart showing that a tool mock is consulted only after the same policy chain a production call faces: a denied call is refused exactly as in production, and an allowed call is answered from a mock's next response or the real MCP server.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="500" y1="88" x2="500" y2="104" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="600" y1="160" x2="680" y2="160" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="216" x2="500" y2="264" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="608" y1="320" x2="820" y2="320" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="376" x2="500" y2="416" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Arrow labels -->
+      <rect x="612" y="140" width="56" height="12" rx="2" fill="#030711"/>
+      <text x="640" y="149" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">DENIED</text>
+
+      <rect x="508" y="234" width="64" height="12" rx="2" fill="#030711"/>
+      <text x="540" y="243" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ALLOWED</text>
+
+      <rect x="698" y="300" width="32" height="12" rx="2" fill="#030711"/>
+      <text x="714" y="309" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">YES</text>
+
+      <rect x="508" y="390" width="28" height="12" rx="2" fill="#030711"/>
+      <text x="522" y="399" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">NO</text>
+
+      <!-- start oval -->
+      <rect x="420" y="40" width="160" height="48" rx="24" fill="rgba(227,227,227,0.03)" stroke="rgba(227,227,227,0.30)" stroke-width="1"/>
+      <text x="500" y="60" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">The agent</text>
+      <text x="500" y="74" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">calls a tool</text>
+
+      <!-- decision: policy chain -->
+      <polygon points="500,104 600,160 500,216 400,160" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="164" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Policy chain</text>
+
+      <!-- refused (end oval) -->
+      <rect x="680" y="132" width="160" height="56" rx="28" fill="rgba(227,227,227,0.03)" stroke="rgba(227,227,227,0.30)" stroke-width="1"/>
+      <text x="760" y="156" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Refused</text>
+      <text x="760" y="170" fill="#9aa1ab" font-size="9.5" font-family="'Geist Mono', monospace" text-anchor="middle">exactly as production</text>
+
+      <!-- decision: mocked? -->
+      <polygon points="500,264 608,320 500,376 392,320" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="316" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Mocked for</text>
+      <text x="500" y="330" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">this run?</text>
+
+      <!-- mock response (end oval, focal — this diagram's whole point) -->
+      <rect x="820" y="292" width="160" height="56" rx="28" fill="rgba(59,245,196,0.10)" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="900" y="316" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Mock's response</text>
+      <text x="900" y="330" fill="#9aa1ab" font-size="9.5" font-family="'Geist Mono', monospace" text-anchor="middle">no server contacted</text>
+
+      <!-- MCP server (the no branch) -->
+      <rect x="420" y="416" width="160" height="48" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="440" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP server</text>
+      <text x="500" y="454" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">the real side effect</text>
+    </svg>
+  </div>
+</body>
+</html>

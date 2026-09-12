@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1020 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflows-lifecycle-title workflows-lifecycle-desc">
+      <title id="workflows-lifecycle-title">From skill to running workflow</title>
+      <desc id="workflows-lifecycle-desc">Flowchart showing an Agent Skill generating a Workflow, refined into an adjusted draft, published, and run as a Workflow execution.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <line x1="200" y1="94" x2="232" y2="94" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="402" y1="94" x2="434" y2="94" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="604" y1="94" x2="636" y2="94" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="808" y1="94" x2="840" y2="94" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Agent Skill -->
+      <rect x="60" y="60" width="140" height="68" rx="6" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="130" y="100" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Agent Skill</text>
+
+      <!-- Workflow -->
+      <rect x="232" y="60" width="170" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="317" y="87" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflow</text>
+      <text x="317" y="106" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">AI-designed templates</text>
+
+      <!-- Adjusted draft -->
+      <rect x="434" y="60" width="170" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="519" y="100" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Adjusted draft</text>
+
+      <!-- Published (focal) -->
+      <rect x="636" y="60" width="172" height="68" rx="6" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="722" y="87" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Published</text>
+      <text x="722" y="106" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">design is frozen</text>
+
+      <!-- Workflow execution -->
+      <rect x="840" y="60" width="140" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="910" y="87" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflow</text>
+      <text x="910" y="103" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">execution</text>
+    </svg>

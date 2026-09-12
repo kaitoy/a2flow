@@ -7,25 +7,8 @@ sidebar_position: 1
 
 A deployment is the frontend, the backend, and one relational database; [Run with Docker Compose](../getting-started/docker-compose.md) is the shortest path to all three. What follows is what changes once the stack sits behind a proxy and holds data worth keeping.
 
-```mermaid
-flowchart LR
-  U["Browser"] -->|HTTPS| RP["Reverse proxy / LB"]
-  RP --> F["Frontend<br/>Next.js, proxies /api/* server-side"]
-  F -->|BACKEND_BASE_URL| A["Backend API<br/>uvicorn"]
-  A --> LLM["LLM provider"]
-  A --> MCP["MCP servers"]
-  A --> DB
-  A --> SK
-  A --> KEY
-  EW["Email worker"] --> DB
-  EW --> SMTP["SMTP relay"]
-
-  subgraph durable ["Durable state"]
-    DB[("Database<br/>DB_URL")]
-    SK[("Agent skill store<br/>SKILLS_DIR")]
-    KEY["Secret encryption key<br/>SECRET_KEY_FILE"]
-  end
-```
+![Architecture diagram showing the browser reaching the frontend through a reverse proxy, the frontend calling the backend API, and the backend API — which also runs the email worker — reaching durable state (database, skill store, secret key), external services (LLM provider, MCP servers), and an SMTP relay.](./img/deployment-topology.svg#gh-light-mode-only)
+![Architecture diagram showing the browser reaching the frontend through a reverse proxy, the frontend calling the backend API, and the backend API — which also runs the email worker — reaching durable state (database, skill store, secret key), external services (LLM provider, MCP servers), and an SMTP relay.](./img/deployment-topology-dark.svg#gh-dark-mode-only)
 
 The browser only ever talks to the frontend. Its server-side proxy forwards `/api/*` to the backend, which keeps the auth cookies first-party — so the backend needs no public route of its own. Every variable named here is described under [Configuration reference](./configuration.md).
 

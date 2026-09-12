@@ -9,30 +9,15 @@ A workflow is a reusable unit of work: an [Agent Skill](./agent-skills.md) paire
 
 Open **Workflows** in the admin sidebar to manage them.
 
-```mermaid
-flowchart LR
-  S["Agent Skill"] -->|"Generate workflow"| G["Workflow<br/>task templates designed by AI"]
-  G -->|"design chat or admin forms"| A["Adjusted draft"]
-  A -->|"Publish"| P["Published<br/>the design is frozen"]
-  P -->|"Run"| E["Workflow execution<br/>one run, with its own copy of the tasks"]
-```
+![Flowchart showing an Agent Skill generating a Workflow, refined into an adjusted draft, published, and run as a Workflow execution.](./img/workflows-lifecycle.svg#gh-light-mode-only)
+![Flowchart showing an Agent Skill generating a Workflow, refined into an adjusted draft, published, and run as a Workflow execution.](./img/workflows-lifecycle-dark.svg#gh-dark-mode-only)
 
 There is no way to create a bare workflow: generating one from a skill is how a workflow is born.
 
 ## Statuses
 
-```mermaid
-stateDiagram-v2
-  [*] --> generating: Generate workflow
-  generating --> draft: task templates registered
-  generating --> failed: generation failed
-  failed --> draft: templates written by hand or by chat
-  draft --> published: Publish
-  published --> modified: any edit
-  modified --> published: Publish
-  modified --> draft: Deactivate
-  published --> draft: Deactivate
-```
+![State machine of a workflow's detailed status: generating leads to draft or failed, failed can be rewritten back to draft, draft publishes to published, published and modified toggle on further edits and publishes, and either can be deactivated back to draft.](./img/workflows-status.svg#gh-light-mode-only)
+![State machine of a workflow's detailed status: generating leads to draft or failed, failed can be rewritten back to draft, draft publishes to published, published and modified toggle on further edits and publishes, and either can be deactivated back to draft.](./img/workflows-status-dark.svg#gh-dark-mode-only)
 
 | Status | What it means | Who can run it |
 |---|---|---|
@@ -127,12 +112,8 @@ Everyone without the Developer role is served the published version instead, thr
 
 Clicking **Run** in the workflows list creates a **workflow execution** — an independent record that captures a snapshot of the workflow at that moment.
 
-```mermaid
-flowchart LR
-  W["Workflow<br/>(published version)"] -->|"Run"| X["Workflow execution<br/>the snapshot"]
-  M["Chosen tool mocks"] -->|"copied by value"| X
-  X --> C["Workflow session<br/>the chat the run happens in"]
-```
+![Flowchart showing the published Workflow and its chosen tool mocks copied by value onto a new Workflow execution snapshot, which opens a Workflow session.](./img/workflows-snapshot.svg#gh-light-mode-only)
+![Flowchart showing the published Workflow and its chosen tool mocks copied by value onto a new Workflow execution snapshot, which opens a Workflow session.](./img/workflows-snapshot-dark.svg#gh-dark-mode-only)
 
 For a **test run** the Run dialog additionally lists, under **Mock tools**, the [tool mocks](./tool-mocks.md) for a tool one of the workflow's tasks uses, plus every mock of a built-in tool; checking one stubs that tool for this run, so a pre-publish test can be repeated without the tool's side effects. A test run means a `draft` workflow, or the unpublished edits of a `modified` one (below). The dialog offers no mocks otherwise, and asking for one anyway is refused — a run that looked real and quietly did nothing would be worse than no run at all.
 
@@ -168,13 +149,8 @@ You can watch the statuses update live in the read-only **Workflow Tasks** view 
 
 Tasks can use tools from the servers registered under [MCP Servers](./mcp-servers.md). Tools are bound at design time and enforced at execution time.
 
-```mermaid
-flowchart LR
-  D["Design time<br/>a template binds (server, tool) pairs"] -->|"copied at Run"| R["Run time<br/>the task carries the same bindings"]
-  R --> P{"Is the tool bound to a task<br/>that is in progress?"}
-  P -->|"yes"| OK["The call goes through to the server"]
-  P -->|"no"| NO["Refused, listing the tools that are allowed"]
-```
+![Flowchart showing a design-time tool binding copied at run onto the task, then checked at call time: if the tool is bound to an in-progress task the call goes through, otherwise it is refused with the tools that are allowed.](./img/workflows-tool-binding.svg#gh-light-mode-only)
+![Flowchart showing a design-time tool binding copied at run onto the task, then checked at call time: if the tool is bound to an in-progress task the call goes through, otherwise it is refused with the tools that are allowed.](./img/workflows-tool-binding-dark.svg#gh-dark-mode-only)
 
 While designing, the agent can list the tools every registered server advertises and give a step the ones it needs. Those bindings live on the template and are copied onto the run's tasks when it starts.
 

@@ -124,3 +124,15 @@
 :target {
   scroll-margin-top: calc(var(--ifm-navbar-height) + 1rem);
 }
+
+/*
+ * Docs are plain .md (not .mdx), so light/dark diagram pairs can't use
+ * <ThemedImage>. This is Docusaurus's own documented alternative: two
+ * ![]() images per diagram, disambiguated by a #gh-*-mode-only fragment
+ * (the same convention GitHub uses), toggled by the theme it already
+ * stamps on <html>.
+ */
+[data-theme='light'] img[src$='#gh-dark-mode-only'],
+[data-theme='dark'] img[src$='#gh-light-mode-only'] {
+  display: none;
+}

@@ -7,18 +7,8 @@ sidebar_position: 6
 
 The agent never talks to a registered [MCP server](../guides/mcp-servers.md) directly. Every call goes through A2Flow's own proxy, which decides whether the call is allowed, whether it should be answered from a stub, and what credentials the connection needs — and records what it decided.
 
-```mermaid
-flowchart LR
-  A["Execution agent<br/>calls a tool"] --> C{"Policy chain"}
-  C -->|"denied"| R["Refused, listing what is allowed"]
-  C -->|"allowed"| K{"Mocked for this run?"}
-  K -->|"yes"| MO["The mock's next response<br/>no server is contacted"]
-  K -->|"no"| I["Credential injection"]
-  I --> X["Sandbox"]
-  X --> S["MCP server"]
-  R --> AU["Audit record"]
-  S --> AU
-```
+![Flowchart of the policy chain deciding a tool call: denied calls are refused with what is allowed, allowed calls are answered from a mock or go through credential injection and the sandbox to the MCP server, and both a refusal and a real call produce an audit record.](./img/mcp-proxy-policy-chain.svg#gh-light-mode-only)
+![Flowchart of the policy chain deciding a tool call: denied calls are refused with what is allowed, allowed calls are answered from a mock or go through credential injection and the sandbox to the MCP server, and both a refusal and a real call produce an audit record.](./img/mcp-proxy-policy-chain-dark.svg#gh-dark-mode-only)
 
 | The proxy owns | What it does |
 |---|---|
@@ -44,17 +34,8 @@ So it does not run where A2Flow's own secrets are. In a Docker Compose deploymen
 
 What the sandbox gets is one call at a time: the address or command for the one server being reached, the values that server needs — already expanded from your secret references — and the tool and arguments. Nothing else is there to find.
 
-```mermaid
-flowchart LR
-  subgraph agent ["Runs the agent"]
-    G["Decides: allowed, mocked, which credentials"]
-  end
-  subgraph sandbox ["Sandbox"]
-    P["Starts or connects to the MCP server"]
-  end
-  G -->|"one authorized call,<br/>proven to come from A2Flow"| P
-  P --> S["Your MCP server"]
-```
+![Architecture diagram showing the execution agent, which decides whether a call is allowed, mocked, and which credentials it needs, handing exactly one authorized call across a trust boundary into the sandbox, which starts or connects to the real MCP server.](./img/mcp-proxy-trust-boundary.svg#gh-light-mode-only)
+![Architecture diagram showing the execution agent, which decides whether a call is allowed, mocked, and which credentials it needs, handing exactly one authorized call across a trust boundary into the sandbox, which starts or connects to the real MCP server.](./img/mcp-proxy-trust-boundary-dark.svg#gh-dark-mode-only)
 
 **The two ends prove who they are to each other.** The channel between them is encrypted, and neither end accepts an unidentified peer: the sandbox refuses a connection from anything that does not hold a certificate this deployment issued. Each individual call additionally carries the [certificate](#who-authorized-a-call) of the task making it, and the sandbox checks that certificate again before it reaches anything — that it was issued here, has not expired, belongs to the caller, and covers this exact tool.
 
@@ -105,14 +86,8 @@ That record is the run's Tool Invocations page, and it is what makes "who author
 
 A [tool mock](../guides/tool-mocks.md) lets a **draft** workflow be exercised end to end without its tools' side effects. What matters here is *where* the stub sits.
 
-```mermaid
-flowchart LR
-  A["The agent calls a tool"] --> C{"Policy chain"}
-  C -->|"denied"| R["Refused, exactly as in production"]
-  C -->|"allowed"| K{"Mocked for this run?"}
-  K -->|"yes"| M["The mock's next response"]
-  K -->|"no"| S["The MCP server<br/>the real side effect"]
-```
+![Flowchart showing that a tool mock is consulted only after the same policy chain a production call faces: a denied call is refused exactly as in production, and an allowed call is answered from a mock's next response or the real MCP server.](./img/mcp-proxy-tool-mocks.svg#gh-light-mode-only)
+![Flowchart showing that a tool mock is consulted only after the same policy chain a production call faces: a denied call is refused exactly as in production, and an allowed call is answered from a mock's next response or the real MCP server.](./img/mcp-proxy-tool-mocks-dark.svg#gh-dark-mode-only)
 
 The stub is consulted **after** the policy chain, never before it. A dry run therefore rehearses the same authorization a real run faces: the tool must still be bound to a task in progress, and the call must still present that task's certificate. The only thing a mock skips is the part that has an effect outside A2Flow.
 

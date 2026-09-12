@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>One driver per conversation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f2f8fc; color: #1c1e21; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #525860; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #1c1e21; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Sequence · Diagram Design</p>
+    <h1>One driver per conversation</h1>
+
+    <svg viewBox="0 0 1100 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="scaling-lock-race-title scaling-lock-race-desc">
+      <title id="scaling-lock-race-title">One driver per conversation</title>
+      <desc id="scaling-lock-race-desc">Sequence diagram of two replicas racing to run the same session: Replica 1 takes a PostgreSQL advisory lock and opens the stream for Client A, while Replica 2's later request for the same session is refused with 409 while the lock is held, and the lock is released only when Replica 1's stream ends.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Lifelines -->
+      <line x1="110" y1="128" x2="110" y2="600" stroke="rgba(28,30,33,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="330" y1="128" x2="330" y2="600" stroke="rgba(28,30,33,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="550" y1="128" x2="550" y2="600" stroke="rgba(28,30,33,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="770" y1="128" x2="770" y2="600" stroke="rgba(28,30,33,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="990" y1="128" x2="990" y2="600" stroke="rgba(28,30,33,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+
+      <!-- Messages -->
+      <line x1="110" y1="160" x2="330" y2="160" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="330" y1="204" x2="550" y2="204" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="550" y1="248" x2="330" y2="248" stroke="#525860" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <line x1="330" y1="292" x2="110" y2="292" stroke="#525860" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <line x1="990" y1="336" x2="770" y2="336" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="770" y1="380" x2="550" y2="380" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="550" y1="424" x2="770" y2="424" stroke="#525860" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <line x1="770" y1="468" x2="990" y2="468" stroke="#00877a" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+      <line x1="330" y1="512" x2="110" y2="512" stroke="#525860" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <line x1="330" y1="556" x2="550" y2="556" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="173" y="144" width="94" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="220" y="153" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">POST /AGENT</text>
+
+      <rect x="401" y="188" width="78" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="440" y="197" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">TAKE LOCK</text>
+
+      <rect x="401" y="232" width="78" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="440" y="241" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">ACQUIRED</text>
+
+      <rect x="147" y="276" width="146" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="220" y="285" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">SSE STREAM OPENS</text>
+
+      <rect x="833" y="320" width="94" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="880" y="329" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">POST /AGENT</text>
+
+      <rect x="621" y="364" width="78" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="660" y="373" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">TAKE LOCK</text>
+
+      <rect x="609" y="408" width="102" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="660" y="417" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.01em">HELD ELSEWHERE</text>
+
+      <rect x="833" y="452" width="94" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="880" y="461" fill="#00877a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.01em">409 REFUSED</text>
+
+      <rect x="161" y="496" width="118" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="220" y="505" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">STREAM ENDS</text>
+
+      <rect x="401" y="540" width="78" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="440" y="549" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">RELEASED</text>
+
+      <!-- Actor boxes -->
+      <rect x="38" y="72" width="144" height="56" rx="6" fill="rgba(28,30,33,0.03)" stroke="rgba(28,30,33,0.30)" stroke-width="1"/>
+      <text x="110" y="104" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Client A</text>
+
+      <rect x="258" y="72" width="144" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="330" y="104" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Replica 1</text>
+
+      <rect x="478" y="72" width="144" height="56" rx="6" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
+      <text x="550" y="104" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">PostgreSQL</text>
+
+      <rect x="698" y="72" width="144" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="770" y="104" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Replica 2</text>
+
+      <rect x="918" y="72" width="144" height="56" rx="6" fill="rgba(28,30,33,0.03)" stroke="rgba(28,30,33,0.30)" stroke-width="1"/>
+      <text x="990" y="104" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Client B</text>
+
+      <!-- Legend -->
+      <line x1="38" y1="620" x2="1062" y2="620" stroke="rgba(28,30,33,0.10)" stroke-width="0.8"/>
+      <text x="38" y="636" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <line x1="38" y1="660" x2="66" y2="660" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <text x="74" y="663" fill="#525860" font-size="9.5" font-family="'Inter', sans-serif">Call</text>
+
+      <line x1="160" y1="660" x2="188" y2="660" stroke="#525860" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <text x="196" y="663" fill="#525860" font-size="9.5" font-family="'Inter', sans-serif">Return</text>
+
+      <line x1="300" y1="660" x2="328" y2="660" stroke="#00877a" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+      <text x="336" y="663" fill="#525860" font-size="9.5" font-family="'Inter', sans-serif">Refused</text>
+    </svg>
+  </div>
+</body>
+</html>

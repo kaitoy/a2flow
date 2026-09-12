@@ -9,13 +9,8 @@ Workflow work happens in the background — a design run finishes while you are 
 
 A **bell icon** sits in the top toolbar, on both the chat header and the admin sidebar, with an unread-count badge.
 
-```mermaid
-flowchart LR
-  E["A workflow event"] --> R["The one user it concerns<br/>(or every eligible member of an approver group)"]
-  R --> B["The bell<br/>unread notifications"]
-  R --> P["The Notifications page<br/>the full history"]
-  R --> M["Email<br/>if a super admin has switched it on"]
-```
+![Flowchart showing a workflow event routing to the one concerned user, or every eligible approver-group member, and fanning out to the bell, the Notifications page, and email if it is enabled.](./img/notifications-routing.svg#gh-light-mode-only)
+![Flowchart showing a workflow event routing to the one concerned user, or every eligible approver-group member, and fanning out to the bell, the Notifications page, and email if it is enabled.](./img/notifications-routing-dark.svg#gh-dark-mode-only)
 
 ## The four events
 

@@ -11,14 +11,8 @@ The admin area is where every record in A2Flow is created, inspected and edited.
 
 The welcome page is the landing screen: you arrive here after signing in, when you open the site root, and whenever you click the **A2Flow** logo in the app bar. It greets you with quick-action cards, one per admin section your roles allow.
 
-```mermaid
-flowchart LR
-  W["Welcome page<br/>quick-action cards"] --> L["Section list<br/>e.g. Workflows"]
-  L -->|"Add"| N["Create form"]
-  L -->|"click the name"| D["Detail page<br/>titled with the record's name"]
-  N --> D
-  D -->|"breadcrumb"| L
-```
+![Flowchart of the admin UI navigation model: the welcome page leads to a section list, which opens a create form or a detail page by clicking a name, and a breadcrumb on the detail page returns to the list.](./img/admin-ui-navigation.svg#gh-light-mode-only)
+![Flowchart of the admin UI navigation model: the welcome page leads to a section list, which opens a create form or a detail page by clicking a name, and a breadcrumb on the detail page returns to the list.](./img/admin-ui-navigation-dark.svg#gh-dark-mode-only)
 
 The breadcrumb trail above every title mirrors that path — `Admin › Workflows › my-workflow` — and every crumb but the last one links back up.
 

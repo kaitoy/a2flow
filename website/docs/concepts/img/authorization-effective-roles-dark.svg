@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 840 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="authorization-effective-roles-dark-title authorization-effective-roles-dark-desc">
+      <title id="authorization-effective-roles-dark-title">Resolving effective roles</title>
+      <desc id="authorization-effective-roles-dark-desc">Flowchart showing direct role grants on the user record and roles inherited from user groups both feeding a user's effective roles, the union used by every authorization check.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <path d="M240,74 L272,74 Q280,74 280,82 L280,115 Q280,123 288,123 L320,123" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M240,194 L272,194 Q280,194 280,186 L280,153 Q280,145 288,145 L320,145" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="520" y1="134" x2="600" y2="134" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="254" y="83" width="52" height="13" rx="2" fill="#030711"/>
+      <text x="280" y="92" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">DIRECT</text>
+
+      <rect x="254" y="178" width="52" height="13" rx="2" fill="#030711"/>
+      <text x="280" y="187" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">GROUP</text>
+
+      <!-- Direct grants -->
+      <rect x="40" y="40" width="200" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="140" y="69" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Direct grants</text>
+      <text x="140" y="88" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">on the user record</text>
+
+      <!-- Group grants -->
+      <rect x="40" y="160" width="200" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="140" y="189" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Group grants</text>
+      <text x="140" y="208" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">inherited</text>
+
+      <!-- Effective roles (focal) -->
+      <rect x="320" y="100" width="200" height="68" rx="6" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="420" y="139" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Effective roles</text>
+
+      <!-- Every auth check -->
+      <rect x="600" y="100" width="200" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="700" y="128" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Every auth</text>
+      <text x="700" y="146" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">check</text>
+    </svg>

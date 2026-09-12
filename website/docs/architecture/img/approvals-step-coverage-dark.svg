@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="approvals-step-coverage-dark-title approvals-step-coverage-dark-desc">
+      <title id="approvals-step-coverage-dark-title">What one approval covers</title>
+      <desc id="approvals-step-coverage-dark-desc">Flowchart of a five-step task chain where Approval A covers the first three steps and Approval B takes over from the fourth step onward, showing that an approval covers its named step and everything after it up to the next approval.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="120" y1="88" x2="120" y2="140" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="200" y1="168" x2="220" y2="168" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="380" y1="168" x2="400" y2="168" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="560" y1="168" x2="580" y2="168" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="660" y1="88" x2="660" y2="140" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="740" y1="168" x2="760" y2="168" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Gates -->
+      <rect x="40" y="40" width="160" height="48" rx="24" fill="#e3e3e3" fill-opacity="0.02" stroke="#e3e3e3" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="120" y="60" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Approval A</text>
+      <text x="120" y="76" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">gate</text>
+
+      <rect x="580" y="40" width="160" height="48" rx="24" fill="#e3e3e3" fill-opacity="0.02" stroke="#e3e3e3" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="660" y="60" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Approval B</text>
+      <text x="660" y="76" fill="#9aa1ab" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">gate</text>
+
+      <!-- Steps -->
+      <rect x="40" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="120" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Ask for a go-ahead</text>
+
+      <rect x="220" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="300" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Launch instance</text>
+
+      <rect x="400" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="480" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tag instance</text>
+
+      <rect x="580" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="660" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Ask again</text>
+
+      <rect x="760" y="140" width="160" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="840" y="172" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Delete snapshot</text>
+
+      <!-- Coverage brackets -->
+      <path d="M40,208 L40,214 L560,214 L560,208" fill="none" stroke="#3bf5c4" stroke-width="1.2"/>
+      <text x="300" y="230" fill="#3bf5c4" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">APPROVAL A COVERS</text>
+
+      <path d="M580,208 L580,214 L920,214 L920,208" fill="none" stroke="#3bf5c4" stroke-width="1.2"/>
+      <text x="750" y="230" fill="#3bf5c4" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">APPROVAL B COVERS</text>
+
+      <!-- Legend -->
+      <line x1="40" y1="256" x2="960" y2="256" stroke="#e3e3e3" stroke-opacity="0.10" stroke-width="0.8"/>
+      <text x="40" y="272" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+
+      <rect x="40" y="284" width="24" height="14" rx="7" fill="#e3e3e3" fill-opacity="0.02" stroke="#e3e3e3" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="76" y="295" fill="#9aa1ab" font-size="9.5" font-family="'Inter', sans-serif">Approval gate</text>
+    </svg>

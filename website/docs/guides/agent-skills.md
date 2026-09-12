@@ -9,15 +9,8 @@ An Agent Skill is what an agent knows how to do, kept in a Git repository. A2Flo
 
 Open **Agent Skills** in the admin sidebar to manage the catalog.
 
-```mermaid
-flowchart LR
-  N["Register a skill<br/>the form returns immediately"] --> C["Cloning<br/>in the background"]
-  C --> R["ready<br/>a revision is published"]
-  C --> F["failed<br/>the reason is on the record"]
-  F -->|"Pull, after fixing the URL or credentials"| C
-  R -->|"Pull"| C
-  R -->|"Generate workflow"| W["A new workflow"]
-```
+![State machine showing an Agent Skill registered, cloning in the background, becoming ready or failed, pulling to retry from either state, and a ready skill generating a new workflow.](./img/agent-skills-lifecycle.svg#gh-light-mode-only)
+![State machine showing an Agent Skill registered, cloning in the background, becoming ready or failed, pulling to retry from either state, and a ready skill generating a new workflow.](./img/agent-skills-lifecycle-dark.svg#gh-dark-mode-only)
 
 A skill is usable only once it has published a revision. Until then, generating or running a workflow against it is refused.
 

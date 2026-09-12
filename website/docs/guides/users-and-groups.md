@@ -7,14 +7,8 @@ sidebar_position: 2
 
 Three admin sections cover who may sign in and what they belong to: the individual accounts, the named bundles that grant roles in bulk, and the tenant every one of them sits inside.
 
-```mermaid
-flowchart LR
-  T["Tenant<br/>the organizational boundary"] --> U["User<br/>one account"]
-  T --> G["User Group<br/>a named bundle"]
-  G -->|"membership"| U
-  U -->|"roles on the record"| E["Effective roles"]
-  G -->|"roles it grants"| E
-```
+![Flowchart showing a tenant containing users and user groups, group membership granting a user its group, and both the user's own roles and its groups' roles feeding the user's effective roles.](./img/users-groups-relationship.svg#gh-light-mode-only)
+![Flowchart showing a tenant containing users and user groups, group membership granting a user its group, and both the user's own roles and its groups' roles feeding the user's effective roles.](./img/users-groups-relationship-dark.svg#gh-dark-mode-only)
 
 A user belongs to at most one tenant and to any number of that tenant's groups. Every authorization check uses the **union** of the roles granted on the account and the roles inherited from its groups — see [Roles and authorization](../concepts/authorization.md).
 

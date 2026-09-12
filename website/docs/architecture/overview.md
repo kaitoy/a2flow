@@ -7,17 +7,8 @@ sidebar_position: 1
 
 A2Flow turns an [Agent Skill](../guides/agent-skills.md) into a workflow whose steps are settled before anything runs, and then executes that workflow inside a chat the agent and the people involved share. Each stage hands the next one a frozen copy of what came before, so a run stays faithful to what was published even after the design moves on.
 
-```mermaid
-flowchart LR
-  S["Agent Skill<br/>a Git repository"] -->|"Generate workflow"| W["Workflow<br/>task templates and tool bindings"]
-  W -->|"Publish, then Run"| X["Workflow execution<br/>a snapshot of the design"]
-  X --> C["Workflow session<br/>the chat the run happens in"]
-  C --> T["Tasks<br/>one at a time"]
-  T -->|"needs a person"| A["Approval gate"]
-  T -->|"needs a tool"| P["MCP proxy"]
-  A -->|"issues a certificate"| P
-  P --> M["MCP server"]
-```
+![Flowchart showing an Agent Skill generated into a Workflow, run as a Workflow execution inside a Workflow session, whose Tasks request human approval or call an MCP tool through the MCP proxy to reach an MCP server.](./img/overview-lifecycle.svg#gh-light-mode-only)
+![Flowchart showing an Agent Skill generated into a Workflow, run as a Workflow execution inside a Workflow session, whose Tasks request human approval or call an MCP tool through the MCP proxy to reach an MCP server.](./img/overview-lifecycle-dark.svg#gh-dark-mode-only)
 
 | Stage | What happens | Read on |
 |---|---|---|
