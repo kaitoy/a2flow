@@ -236,6 +236,27 @@ under `website/i18n/ja/docusaurus-plugin-content-docs/current/`; **both are upda
 the same change**. What belongs on the site and what stays in this repository is
 described in [website/README.md](website/README.md).
 
+### Diagrams
+
+The manual's diagrams are [diagram-design](https://github.com/cathrynlavery/diagram-design)
+renders, not Mermaid. Each has an editable HTML source under
+`website/diagram-sources/<section>/` (light and `-dark` variants) and an exported
+light/dark SVG pair next to the page under `img/`, referenced with a `#gh-light-mode-only`
+/ `#gh-dark-mode-only` fragment that `website/src/css/custom.css` toggles on.
+
+The Japanese diagrams are **derived, not drawn**: `website/diagram-sources/ja/` and the SVGs
+under `website/i18n/ja/…/img/` are rebuilt from the English sources by
+
+```bash
+python website/scripts/ja-diagrams/render.py                       # every diagram
+python website/scripts/ja-diagrams/render.py guides/secrets-usage  # one diagram
+```
+
+which applies the label translations in `website/scripts/ja-diagrams/specs.py`, recolours
+the result into the dark variant, and exports both SVGs. After changing an English diagram,
+update its entry in `specs.py` (the script fails if a translated string no longer matches)
+and rerun it; never hand-edit the generated Japanese files.
+
 ## Further reading
 
 - [backend/README.md](backend/README.md) — API reference, implementation notes, environment variables
