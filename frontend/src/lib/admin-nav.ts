@@ -109,7 +109,7 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Workflows",
     icon: Workflow,
     description: "Design multi-step flows",
-    roles: [Role.DEVELOPER, Role.REQUESTER, Role.ADMIN],
+    roles: [Role.DEVELOPER, Role.REVIEWER, Role.REQUESTER, Role.ADMIN],
   },
   {
     href: "/admin/workflow-executions",

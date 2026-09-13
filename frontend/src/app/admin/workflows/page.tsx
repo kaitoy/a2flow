@@ -84,6 +84,7 @@ function buildColumns(
   onDelete: (id: string, name: string) => void,
   onOpenDesign: (id: string) => void,
   permissions: WorkflowExecutePermissions,
+  canPublish: boolean,
   tagsById: Map<string, Tag>,
   tenantNames: Map<string, string>,
   isAllTenantsView: boolean
@@ -96,10 +97,10 @@ function buildColumns(
       sortField: "name",
       filterField: "name",
       visibility: "always",
-      // Anyone who can edit or run a workflow has a reason to open its
-      // detail page; everyone else sees a plain name.
+      // Anyone who can edit, run, or review a workflow has a reason to open
+      // its detail page; everyone else sees a plain name.
       cell: (w) =>
-        permissions.canEdit || permissions.canRun ? (
+        permissions.canEdit || permissions.canRun || canPublish ? (
           <Link
             href={`/admin/workflows/${w.id}`}
             className="font-medium text-accent transition-colors hover:underline"
@@ -127,7 +128,7 @@ function buildColumns(
       sortField: "status",
       filterField: "status",
       filterOp: "eq",
-      filterOptions: visibleWorkflowStatuses(permissions.canEdit).map((s) => ({
+      filterOptions: visibleWorkflowStatuses(permissions.canEdit || canPublish).map((s) => ({
         label: formatWorkflowStatusLabel(s),
         value: s,
       })),
@@ -192,6 +193,7 @@ export default function WorkflowsPage() {
   const router = useRouter();
   const canRun = useHasRole(Role.REQUESTER, Role.DEVELOPER);
   const canEdit = useHasRole(Role.DEVELOPER);
+  const canPublish = useHasRole(Role.REVIEWER);
   const {
     rows,
     loading,
@@ -294,6 +296,7 @@ export default function WorkflowsPage() {
     handleDelete,
     handleOpenDesign,
     { canRun, canEdit },
+    canPublish,
     tagsById,
     tenantNames,
     isAllTenantsView

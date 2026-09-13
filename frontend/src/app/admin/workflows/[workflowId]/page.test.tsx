@@ -3,7 +3,7 @@ import { delay, http } from "msw";
 import { useParams, useRouter } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
-import { DEVELOPER, REQUESTER, SUPER_ADMIN } from "@/test/auth-state";
+import { DEVELOPER, REQUESTER, REVIEWER, SUPER_ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -133,8 +133,8 @@ describe("WorkflowDetailPage", () => {
       })
     );
 
-    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
+    await screen.findByRole("heading", { name: "my-workflow" });
     await user.click(screen.getByRole("button", { name: /publish/i }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /^publish$/i }));
@@ -257,8 +257,8 @@ describe("WorkflowDetailPage", () => {
       http.post("http://localhost:8000/api/v1/workflows/:id/publish", publishSpy)
     );
 
-    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
+    await screen.findByRole("heading", { name: "my-workflow" });
     await user.click(screen.getByRole("button", { name: /publish/i }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /^publish$/i }));
@@ -291,8 +291,8 @@ describe("WorkflowDetailPage", () => {
       )
     );
 
-    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
+    await screen.findByRole("heading", { name: "my-workflow" });
     await user.click(screen.getByRole("button", { name: /publish/i }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: /^publish$/i }));
@@ -887,6 +887,59 @@ describe("WorkflowDetailPage", () => {
     expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
   });
 
+  it("hides Publish and Deactivate from a developer regardless of status", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: null,
+          agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
+          status: "modified",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "user",
+          updatedBy: "",
+        })
+      )
+    );
+
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() => expect(screen.getByText("modified")).toBeInTheDocument());
+    // A developer still edits the workflow -- Discard changes stays -- but
+    // publishing and deactivating are a reviewer's job now.
+    expect(screen.getByRole("button", { name: /discard changes/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /deactivate/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
+  });
+
+  it("hides Save, Delete, Discard changes, and edit access from a reviewer, but offers Publish/Deactivate and read-only design/template views", async () => {
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
+    await screen.findByRole("heading", { name: "my-workflow" });
+    expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /discard changes/i })).not.toBeInTheDocument();
+    // A reviewer reads the design session and task templates but cannot edit
+    // either, so both header buttons keep their "view" labels.
+    expect(screen.getByRole("button", { name: /^view design session$/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^open design session$/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^view task templates$/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^manage task templates$/i })
+    ).not.toBeInTheDocument();
+    // Name/Description render read-only, same as any non-developer viewer.
+    expect(screen.queryByLabelText(/^name/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^description/i)).not.toBeInTheDocument();
+    // Publish/Deactivate are exactly what the role is for.
+    expect(screen.getByRole("button", { name: /deactivate/i })).toBeInTheDocument();
+  });
+
   it("disables the generate action while the task templates are still generating", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows/:id", () =>
@@ -1026,8 +1079,8 @@ describe("WorkflowDetailPage", () => {
   });
 
   it("hides the Publish action while the workflow is published", async () => {
-    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
   });
 
@@ -1100,8 +1153,8 @@ describe("WorkflowDetailPage", () => {
   });
 
   it("offers a Deactivate action while the workflow is published", async () => {
-    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
-    await waitFor(() => screen.getByLabelText(/^name/i));
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
+    await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.getByRole("button", { name: /deactivate/i })).toBeInTheDocument();
   });
 
@@ -1152,7 +1205,7 @@ describe("WorkflowDetailPage", () => {
     );
     server.use(http.post("http://localhost:8000/api/v1/workflows/:id/deactivate", deactivateSpy));
 
-    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /deactivate/i }));
     const dialog = await screen.findByRole("dialog");

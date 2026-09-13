@@ -114,6 +114,18 @@ async def test_design_session_messages_forbidden_without_developer_role(
     assert_err(response, code="FORBIDDEN", status=403)
 
 
+async def test_design_session_messages_allowed_for_reviewer(
+    workflow_client: AsyncClient,
+) -> None:
+    """A reviewer reads the design chat too, to review before publishing."""
+    _skill, wf = await _design_session(workflow_client)
+    response = await workflow_client.get(
+        f"/api/v1/workflows/{wf['id']}/messages",
+        headers={"X-User-Id": "alice", "X-User-Roles": "reviewer"},
+    )
+    assert_ok(response)
+
+
 async def test_design_session_messages_allowed_for_super_admin(
     workflow_client: AsyncClient,
 ) -> None:
@@ -231,6 +243,20 @@ async def test_design_session_agent_forbidden_without_developer_role(
         f"/api/v1/workflows/{wf['id']}/agent",
         json=_make_run_agent_input(),
         headers={"X-User-Id": "alice", "X-User-Roles": "requester"},
+    )
+    assert_err(response, code="FORBIDDEN", status=403)
+
+
+async def test_design_session_agent_forbidden_for_reviewer(
+    workflow_client: AsyncClient,
+    mock_agent_registry: MagicMock,
+) -> None:
+    """A reviewer may read the design chat but not drive it -- that stays edit work."""
+    _skill, wf = await _design_session(workflow_client)
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/agent",
+        json=_make_run_agent_input(),
+        headers={"X-User-Id": "alice", "X-User-Roles": "reviewer"},
     )
     assert_err(response, code="FORBIDDEN", status=403)
 

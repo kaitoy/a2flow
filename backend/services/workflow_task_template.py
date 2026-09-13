@@ -67,11 +67,12 @@ class WorkflowTaskTemplateService:
             caller_roles: The caller's effective roles.
 
         Returns:
-            ``True`` when the workflow is ``modified`` and the caller is not a
-            ``developer`` (nor, via the bypass, a ``super_admin``).
+            ``True`` when the workflow is ``modified`` and the caller is
+            neither a ``developer`` nor a ``reviewer`` (nor, via the bypass, a
+            ``super_admin``).
         """
         return workflow.status is WorkflowStatus.modified and not has_any_role(
-            caller_roles, Role.developer
+            caller_roles, Role.developer, Role.reviewer
         )
 
     async def _get_live(self, template_id: str) -> WorkflowTaskTemplateRead:

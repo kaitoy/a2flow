@@ -27,14 +27,14 @@ There is no way to create a bare workflow: generating one from a skill is how a 
 | `published` | The design is frozen and executable. | Anyone holding `requester` or above |
 | `modified` | Published once, then edited. Runs still use the published version. | Same as `published` |
 
-`modified` is a status only a **Developer** or **Super Admin** ever sees. To everyone else the workflow reads as `published`, showing the name, description and task templates recorded at the last publish — the unpublished edits are not theirs to see, and the design they *can* see is the one their run would execute.
+`modified` is a status only a **Developer**, **Reviewer**, or **Super Admin** ever sees. To everyone else the workflow reads as `published`, showing the name, description and task templates recorded at the last publish — the unpublished edits are not theirs to see, and the design they *can* see is the one their run would execute.
 
 ## The screens
 
 | Screen | How to get there | What you do there |
 |---|---|---|
 | **Workflows** list | Admin sidebar → Workflows | Browse, filter by [tag](./tags.md), and **Run** a workflow |
-| Workflow detail | Click a workflow's name | Edit its fields, **Publish**, **Deactivate**, **Discard changes**, **Open design session** |
+| Workflow detail | Click a workflow's name | Edit its fields, **Discard changes**, **Open design session** (Developer); **Publish**, **Deactivate** (Reviewer) |
 | **Task Templates** | The workflow detail page's Task Templates link | Add, edit and reorder the steps by hand, as a Table or a Graph |
 | Design session | **Open design session** on the detail page | Refine the steps by talking to the design agent |
 
@@ -76,7 +76,7 @@ Both are Developer actions. Rewriting the summary of a `published` workflow move
 
 A draft's task templates can be refined in two ways, in any mix.
 
-**By chat.** **Open design session** on the workflow detail page opens the design chat: the same chat as a run, with the template list down the left edge, driven by a design agent that edits the templates directly. The design agent never executes anything. The session is shared by every **Developer** in the tenant, plus Super Admins and the workflow's creator, so a team can refine a design together — with the same shared-chat behavior as a [workflow session](./workflow-executions.md#the-workflow-session-screen), including per-message sender avatars.
+**By chat.** **Open design session** on the workflow detail page opens the design chat: the same chat as a run, with the template list down the left edge, driven by a design agent that edits the templates directly. The design agent never executes anything. The session is shared by every **Developer** in the tenant, plus Super Admins and the workflow's creator, so a team can refine a design together — with the same shared-chat behavior as a [workflow session](./workflow-executions.md#the-workflow-session-screen), including per-message sender avatars. A **Reviewer** can open the same chat to read its history before deciding whether to publish, but the message box is hidden — reviewing a design does not include steering it.
 
 **By hand.** The **Task Templates** pages offer a **Table** and a **Graph** view, a create form, and a detail page per template with **Depends on** and **MCP Tools** pickers. The Graph stacks the templates in one vertical column in dependency order, each branching rightward into the MCP servers it binds tools from and then into the individual tools.
 
@@ -84,7 +84,7 @@ Templates mirror a run's tasks structurally — title, description, dependency e
 
 ## Publishing
 
-**Publish**, on the workflow detail page, is what makes a workflow executable. It needs at least one template, and no generation in flight.
+**Publish**, on the workflow detail page, is what makes a workflow executable. It is a **Reviewer** action — a Developer builds and edits a workflow but no longer publishes it, so the person promoting a design is not the same person who wrote it. It needs at least one template, and no generation in flight.
 
 Publishing **freezes the design**: the workflow's name, its effective description, and its full template list — dependency edges and tool bindings included — are captured as the published version, replacing the previous one. No AI runs here; refreshing the summary is a [separate action](./workflows.md#regenerating-the-description). Re-adjust and re-publish as often as you like: runs already started are unaffected, because each run took its own copy of the tasks.
 
@@ -96,17 +96,17 @@ Editing a workflow after it has been published does not silently change what run
 |---|---|
 | What runs use | The **last published version** — its name, effective description, and templates — not the edits, unless a Developer asks for them (see [Trying the edits out](#trying-the-edits-out)) |
 | Who can run it | The same people as while `published`; the Run button is not gated differently |
-| Who sees the edits | Developer and Super Admin only |
-| **Publish** | Promotes the edits into future runs, and into what everyone else sees |
-| **Discard changes** | Throws the edits away: the templates are rewritten from the published version, the name is restored, the published version's description is written back, and the workflow returns to `published` |
+| Who sees the edits | Developer, Reviewer, and Super Admin only |
+| **Publish** (Reviewer) | Promotes the edits into future runs, and into what everyone else sees |
+| **Discard changes** (Developer) | Throws the edits away: the templates are rewritten from the published version, the name is restored, the published version's description is written back, and the workflow returns to `published` |
 
 **Discard changes** is the undo icon in the detail page's status bar, next to Publish. Discarding a workflow that has no unpublished changes does nothing but report as much.
 
-Everyone without the Developer role is served the published version instead, throughout: the workflow's name and description on the list and detail pages, its **Task Templates** screens, and even what a name search in the list matches. Its status reads `published`, and a task template added since the last publish is simply not there for them. So an unfinished redesign never confuses the people who only need to run the workflow — and what they see always matches what their run would do.
+Everyone without the Developer or Reviewer role is served the published version instead, throughout: the workflow's name and description on the list and detail pages, its **Task Templates** screens, and even what a name search in the list matches. Its status reads `published`, and a task template added since the last publish is simply not there for them. So an unfinished redesign never confuses the people who only need to run the workflow — and what they see always matches what their run would do.
 
 ## Deactivating a workflow
 
-**Deactivate** — the power-off icon that appears next to Publish while a workflow is `published` or `modified` — returns it to `draft`. That revokes the `requester` role's execute access, the same gate a never-published workflow starts under, while a Developer or Super Admin can still run it for testing. Task templates, both description fields, and the published snapshot are left exactly as they were, so publishing again promotes it straight back.
+**Deactivate** — the power-off icon that appears next to Publish while a workflow is `published` or `modified`, and available to the same **Reviewer** role as Publish — returns it to `draft`. That revokes the `requester` role's execute access, the same gate a never-published workflow starts under, while a Developer or Super Admin can still run it for testing. Task templates, both description fields, and the published snapshot are left exactly as they were, so publishing again promotes it straight back.
 
 ## Running a workflow {#running-a-workflow}
 

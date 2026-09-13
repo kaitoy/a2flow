@@ -186,10 +186,11 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     ``session_id`` is the workflow's design session and is indexed so the
     design agent's tools can map the session they run in back to the workflow
     whose templates they edit. ``created_by`` doubles as that chat's owner: it
-    keys the ADK session, so every developer driving the conversation through
-    ``/messages`` and ``/agent`` shares one history instead of forking a private
-    session. Access itself is not tied to it — the chat is open to every
-    ``developer`` in the tenant (see
+    keys the ADK session, so everyone reading or driving the conversation
+    through ``/messages`` and ``/agent`` shares one history instead of forking
+    a private session. Access itself is not tied to it — reading it
+    (``/messages``) is open to every ``developer`` and ``reviewer`` in the
+    tenant, while driving it (``/agent``) stays ``developer``-only (see
     ``services.workflow.WorkflowService._assert_design_access``), and each
     message is attributed to its real sender through ``models.message_meta``.
     """

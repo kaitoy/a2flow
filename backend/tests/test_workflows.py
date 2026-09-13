@@ -289,6 +289,18 @@ async def test_list_workflows_includes_draft_for_developer(
     assert len(assert_ok(response)) == 1
 
 
+async def test_list_workflows_includes_draft_for_reviewer(
+    workflow_client: AsyncClient,
+) -> None:
+    """A reviewer sees the same drafts a developer does, to review before publishing."""
+    skill = await create_skill(workflow_client)
+    await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        "/api/v1/workflows", headers={"X-User-Roles": "reviewer"}
+    )
+    assert len(assert_ok(response)) == 1
+
+
 async def test_list_workflows_includes_draft_for_super_admin(
     workflow_client: AsyncClient,
 ) -> None:
@@ -367,6 +379,17 @@ async def test_get_workflow_draft_returns_200_for_developer(
     wf = await generate_workflow(workflow_client, skill["id"])
     response = await workflow_client.get(
         f"/api/v1/workflows/{wf['id']}", headers={"X-User-Roles": "developer"}
+    )
+    assert response.status_code == 200
+
+
+async def test_get_workflow_draft_returns_200_for_reviewer(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    response = await workflow_client.get(
+        f"/api/v1/workflows/{wf['id']}", headers={"X-User-Roles": "reviewer"}
     )
     assert response.status_code == 200
 

@@ -5,7 +5,7 @@ sidebar_position: 3
 
 # Roles and authorization
 
-Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy — with one exception: **Super Admin bypasses every role-based check** and, for that reason, is **mutually exclusive** with every other role — a user is either a Super Admin or holds some combination of the other four roles, never both. Two ownership-layer checks are a deliberate exception to the bypass, and both are visible in the [session access matrix](./authorization.md#workflow-execution-access) below. A user with **no roles at all** is valid: they can still manage their own [account](../guides/users-and-groups.md#users) (avatar), but nothing else.
+Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy — with one exception: **Super Admin bypasses every role-based check** and, for that reason, is **mutually exclusive** with every other role — a user is either a Super Admin or holds some combination of the other five roles, never both. Two ownership-layer checks are a deliberate exception to the bypass, and both are visible in the [session access matrix](./authorization.md#workflow-execution-access) below. A user with **no roles at all** is valid: they can still manage their own [account](../guides/users-and-groups.md#users) (avatar), but nothing else.
 
 ## Effective roles {#effective-roles}
 
@@ -29,7 +29,8 @@ A group is also addressable in its own right: an [approval](../guides/approvals.
 |---|---|
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the two designated-approver checks in the [matrix below](./authorization.md#workflow-execution-access)) |
 | `admin` | User CRUD, secrets CRUD, deleting workflow executions, and read-only visibility into every workflow execution, its tasks, and its chat history, and every approval, in their tenant (see [Workflow execution and its workflow session](./authorization.md#workflow-execution-access) — apart from deleting one, an Admin cannot drive an execution's agent, change one of its tasks' status, or resolve an approval) |
-| `developer` | Secrets CRUD, MCP server CRUD, [tool-mock](../guides/tool-mocks.md) CRUD, agent-skill CRUD, workflow generation/editing/publishing/deactivating — including regenerating a workflow's AI-generated `generatedDescription`, though only a Super Admin may edit that field directly — task-template CRUD, design-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows and the unpublished edits of a `modified` one, for pre-publish testing. It is also the only role that can **see** those unpublished edits: a workflow's name, description and task templates read as they were at the last publish for every other role |
+| `developer` | Secrets CRUD, MCP server CRUD, [tool-mock](../guides/tool-mocks.md) CRUD, agent-skill CRUD, workflow generation/editing — including regenerating a workflow's AI-generated `generatedDescription`, though only a Super Admin may edit that field directly — task-template CRUD, driving the design-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows and the unpublished edits of a `modified` one, for pre-publish testing. Publishing and deactivating are **not** included — that's `reviewer`'s job |
+| `reviewer` | Publishing and deactivating a workflow — the two operations `developer` no longer performs. Shares `developer`'s full read visibility into a workflow: a `draft` workflow, a `modified` workflow's unpublished edits, and the design-session chat history all read the same way for a Reviewer as for a Developer. Cannot edit a workflow, its task templates, or drive its design session |
 | `requester` | Running **published** (and `modified`) workflows (`POST /workflows/{id}/execute`), always against the last published design |
 | `approver` | Eligibility to be a workflow approval's designated approver — individually, or as a member of a group an approval is addressed to — and resolving their own approvals |
 
@@ -59,11 +60,11 @@ Because reads stay open, a detail page can be opened by someone who may not writ
 
 A2Flow has two kinds of chat, and they are gated in two different ways:
 
-- A **design session** is the chat a workflow is designed in. Access is decided by **role**: designing is developer work, so the tenant's Developers share it.
+- A **design session** is the chat a workflow is designed in. Access is decided by **role**: designing is developer work, so the tenant's Developers share it and may drive it; Reviewers may read it too, to review the design before publishing, but not drive it.
 - A **workflow session** is the chat one run happens in. Access is decided by **participation**: the person who started the run and the people asked to approve something in it share it, whatever their roles.
 
-![Access matrix showing that Developers, the workflow's creator, and Super Admin reach a Design session, while the run's initiator, its designated approvers, and Super Admin reach a Workflow session, with Admin holding read-only access to the Workflow session.](./img/authorization-session-matrix.svg#gh-light-mode-only)
-![Access matrix showing that Developers, the workflow's creator, and Super Admin reach a Design session, while the run's initiator, its designated approvers, and Super Admin reach a Workflow session, with Admin holding read-only access to the Workflow session.](./img/authorization-session-matrix-dark.svg#gh-dark-mode-only)
+![Access matrix showing that Developers, the workflow's creator, and Super Admin reach a Design session, with Reviewers holding read-only access to it, while the run's initiator, its designated approvers, and Super Admin reach a Workflow session, with Admin holding read-only access to the Workflow session.](./img/authorization-session-matrix.svg#gh-light-mode-only)
+![Access matrix showing that Developers, the workflow's creator, and Super Admin reach a Design session, with Reviewers holding read-only access to it, while the run's initiator, its designated approvers, and Super Admin reach a Workflow session, with Admin holding read-only access to the Workflow session.](./img/authorization-session-matrix-dark.svg#gh-dark-mode-only)
 
 ### Design session {#design-session-access}
 
@@ -72,6 +73,7 @@ A workflow's design chat (`GET /workflows/{id}/messages`, `POST /workflows/{id}/
 | Who | Read the history | Drive the agent |
 |---|---|---|
 | Any **Developer** in the tenant | ✅ | ✅ |
+| Any **Reviewer** in the tenant | ✅ | ❌ 403 |
 | The workflow's **creator** (`createdBy`), even after losing `developer` | ✅ | ✅ |
 | **Super Admin** | ✅ | ✅ |
 | Everyone else | ❌ 403 | ❌ 403 |

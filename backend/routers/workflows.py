@@ -5,15 +5,21 @@ Workflows are not created here — they are born from
 ``routers/agent_skills.py``), which registers a draft and generates its task
 templates in the background. This router covers everything after that:
 inspecting a workflow and its templates, editing name/description, publishing
-it, deactivating it back to draft, and executing it.
+it, deactivating it back to draft, and executing it. Editing (name/description,
+task templates, discarding changes) requires ``developer``; publishing and
+deactivating instead require ``reviewer`` — the two roles have disjoint write
+access but the same read visibility, so a ``reviewer`` sees exactly what a
+``developer`` sees before deciding whether to publish.
 
 The *design session* is the LLM chat a workflow's task templates are produced
 and refined in — the ADK session named by ``Workflow.session_id``. It has no
 table of its own, so it is identified by its workflow and served from this
 router's ``/messages`` and ``/agent`` sub-resources, mirroring
-``routers/workflow_executions.py``. It is shared by every ``developer`` in the
-tenant (plus super admins and the workflow's creator), so — like a workflow
-session — each message is attributed to the user who actually sent it.
+``routers/workflow_executions.py``. Reading it (``GET /messages``) is shared by
+every ``developer`` and ``reviewer`` in the tenant (plus super admins and the
+workflow's creator); driving it (``POST /agent``) stays ``developer``-only, so
+— like a workflow session — each message is attributed to the user who
+actually sent it.
 """
 
 from collections.abc import AsyncGenerator
@@ -61,6 +67,10 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 #: Route dependency gating workflow writes behind the ``developer`` role.
 _requires_developer = [Depends(require_roles(Role.developer))]
 
+#: Route dependency gating publish/deactivate behind the ``reviewer`` role —
+#: the one pair of write actions ``developer`` no longer performs.
+_requires_reviewer = [Depends(require_roles(Role.reviewer))]
+
 #: Route dependency gating workflow execution behind the ``requester`` or
 #: ``developer`` role. ``developer`` (and, via the ``super_admin`` bypass,
 #: ``super_admin``) additionally unlocks executing ``draft`` workflows — see
@@ -78,10 +88,10 @@ async def list_workflows(
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[WorkflowRead]]:
-    """List Workflows, excluding ``draft`` ones for non-developer callers.
+    """List Workflows, excluding ``draft`` ones for callers who cannot see them.
 
-    Only a ``developer`` (or ``super_admin``) may create, edit, or execute a
-    ``draft`` workflow, so it is also hidden from the page for every other
+    Only a ``developer`` or ``reviewer`` (or ``super_admin``) may see a
+    ``draft`` workflow at all -- it is hidden from the page for every other
     role -- see ``WorkflowService.list``.
     """
     items = await service.list(
@@ -107,9 +117,9 @@ async def get_workflow(
     """Return a Workflow, raising HTTP 404 if it is a ``draft`` the caller
     may not see (see ``WorkflowService.get_for_read``).
 
-    A caller who is not a ``developer`` reads a ``modified`` workflow through
-    its published snapshot and sees its status as ``published`` — see
-    ``WorkflowService.to_read``.
+    A caller who is neither a ``developer`` nor a ``reviewer`` reads a
+    ``modified`` workflow through its published snapshot and sees its status
+    as ``published`` — see ``WorkflowService.to_read``.
     """
     workflow = await service.get_for_read(workflow_id, caller_roles=caller_roles)
     return ApiResponse(
@@ -136,9 +146,9 @@ async def list_workflow_task_templates(
     callers can distinguish "no such workflow" from "workflow has no
     templates".
 
-    A caller who is not a ``developer`` is served the templates recorded in the
-    workflow's published snapshot whenever it is ``modified``, so unpublished
-    edits stay inside the design session.
+    A caller who is neither a ``developer`` nor a ``reviewer`` is served the
+    templates recorded in the workflow's published snapshot whenever it is
+    ``modified``, so unpublished edits stay inside the design session.
     """
     items = await service.list_for_workflow(
         workflow_id,
@@ -161,11 +171,13 @@ async def get_design_session_messages(
 ) -> ApiResponse[list[dict[str, Any]]]:
     """Return the chat history of a Workflow's design session.
 
-    Restricted to the tenant's developers (plus super admins and the workflow's
-    creator). The history is keyed by the session owner (the workflow's
-    ``createdBy``), so every developer opening the chat sees the one shared
-    conversation rather than an empty, separate session, and each message
-    carries the ``senderUserId`` recorded for it. Returns an empty list when the
+    Restricted to the tenant's developers and reviewers (plus super admins and
+    the workflow's creator) — a read, unlike ``POST /workflows/{id}/agent``
+    below, so ``reviewer`` is admitted alongside ``developer``. The history is
+    keyed by the session owner (the workflow's ``createdBy``), so everyone
+    opening the chat sees the one shared conversation rather than an empty,
+    separate session, and each message carries the ``senderUserId`` recorded
+    for it. Returns an empty list when the
     ADK session has not been created yet (the background generation run has not
     started). Raises HTTP 404 if the workflow does not exist.
 
@@ -194,7 +206,9 @@ async def design_session_agent(
     """Stream AG-UI events from the agent driving a Workflow's design session.
 
     Restricted to the tenant's developers (plus super admins and the workflow's
-    creator). The skill directory is resolved from the Workflow record (pinned
+    creator) — driving the chat is a write, so unlike ``GET
+    /workflows/{id}/messages`` above, ``reviewer`` is not admitted here. The
+    skill directory is resolved from the Workflow record (pinned
     revision) and the agent runs with the interactive design instruction and
     toolset, editing the workflow's task templates. SystemMessages are stripped
     to prevent prompt injection, and the run is keyed by the session owner
@@ -325,7 +339,7 @@ async def delete_workflow(
 @router.post(
     "/{workflow_id}/publish",
     response_model=ApiResponse[WorkflowRead],
-    dependencies=_requires_developer,
+    dependencies=_requires_reviewer,
 )
 async def publish_workflow(
     workflow_id: str,
@@ -335,10 +349,11 @@ async def publish_workflow(
 ) -> ApiResponse[WorkflowRead]:
     """Publish a workflow, making it executable.
 
-    Freezes the current design into the workflow's published snapshot. Raises
-    HTTP 409 (``WORKFLOW_NOT_RUNNABLE``) while generation is in flight, when
-    the workflow has no task templates, or when it is already ``published``
-    and therefore has no changes to promote.
+    Requires the ``reviewer`` role (or ``super_admin``) — ``developer`` alone
+    no longer suffices. Freezes the current design into the workflow's
+    published snapshot. Raises HTTP 409 (``WORKFLOW_NOT_RUNNABLE``) while
+    generation is in flight, when the workflow has no task templates, or when
+    it is already ``published`` and therefore has no changes to promote.
     """
     workflow = await service.publish(workflow_id, user_id=user_id)
     return ApiResponse(meta=meta, data=await service.to_read(workflow))
@@ -394,7 +409,7 @@ async def discard_workflow_changes(
 @router.post(
     "/{workflow_id}/deactivate",
     response_model=ApiResponse[WorkflowRead],
-    dependencies=_requires_developer,
+    dependencies=_requires_reviewer,
 )
 async def deactivate_workflow(
     workflow_id: str,
@@ -405,8 +420,9 @@ async def deactivate_workflow(
 ) -> ApiResponse[WorkflowRead]:
     """Deactivate a workflow, returning it to draft.
 
-    Raises HTTP 409 (``WORKFLOW_NOT_DEACTIVATABLE``) unless the workflow is
-    currently ``published`` or ``modified``.
+    Requires the ``reviewer`` role (or ``super_admin``) — ``developer`` alone
+    no longer suffices. Raises HTTP 409 (``WORKFLOW_NOT_DEACTIVATABLE``)
+    unless the workflow is currently ``published`` or ``modified``.
     """
     workflow = await service.deactivate(workflow_id, user_id=user_id)
     return ApiResponse(

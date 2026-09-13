@@ -62,14 +62,26 @@ class Role(StrEnum):
     super_admin = "super_admin"
     #: User CRUD and secrets CRUD.
     admin = "admin"
-    #: Secrets CRUD, MCP server CRUD, workflow CRUD, and agent-skill CRUD.
-    #: Also grants workflow execution (``POST /workflows/{id}/execute``),
-    #: including on ``draft`` workflows and on a ``modified`` workflow's
-    #: unpublished edits, for pre-publish testing — see
-    #: :meth:`services.workflow.WorkflowService.execute`. It is likewise the
-    #: role that can *read* those unpublished edits at all: every other role
-    #: sees a ``modified`` workflow as its last published version.
+    #: Secrets CRUD, MCP server CRUD, workflow CRUD, and agent-skill CRUD —
+    #: except publishing and deactivating a workflow, which belong to
+    #: :attr:`reviewer` instead. Also grants workflow execution (``POST
+    #: /workflows/{id}/execute``), including on ``draft`` workflows and on a
+    #: ``modified`` workflow's unpublished edits, for pre-publish testing —
+    #: see :meth:`services.workflow.WorkflowService.execute`. It is likewise
+    #: the role that can *read* those unpublished edits at all: every other
+    #: role but :attr:`reviewer` sees a ``modified`` workflow as its last
+    #: published version.
     developer = "developer"
+    #: Publishing and deactivating a workflow (``POST
+    #: /workflows/{id}/publish`` and ``.../deactivate``) — the two operations
+    #: :attr:`developer` no longer performs. Shares ``developer``'s full read
+    #: visibility into a workflow (``draft`` status, a ``modified``
+    #: workflow's unpublished edits, and its design session chat history —
+    #: see :meth:`services.workflow.WorkflowService.get_for_read`,
+    #: ``.list``, ``._published_view``, and ``.get_messages``), but has no
+    #: create/update/delete access to workflows or their task templates, and
+    #: cannot drive a design session (``POST /workflows/{id}/agent``).
+    reviewer = "reviewer"
     #: Workflow execution (``POST /workflows/{id}/execute``), restricted to the
     #: published design — a ``modified`` workflow runs, and reads as, the
     #: snapshot taken when it was last published.

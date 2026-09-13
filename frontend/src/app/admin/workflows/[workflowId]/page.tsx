@@ -130,23 +130,32 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * back to `draft`, revoking `requester` execute access until it is published
  * again.
  *
- * None of that reaches a viewer without the developer role: the backend serves
- * them a `modified` workflow as `published`, carrying its last published name,
- * description, and task templates. So this page never has to hide the edits
- * itself — it simply never receives them, and `modified` is a status only a
- * developer ever sees here.
+ * Publishing and deactivating are `reviewer` actions, not `developer` ones —
+ * the two roles have disjoint write access to a workflow but the same read
+ * visibility. A `developer` sees and edits the live design (including a
+ * `modified` workflow's unpublished edits) but no longer has Publish or
+ * Deactivate buttons; a `reviewer` sees the exact same live design — enough to
+ * decide whether it's ready — and gets Publish/Deactivate instead, with every
+ * editing action hidden.
  *
- * A viewer without the developer role (e.g. `requester`, who can only reach
- * this page to check on or run a workflow) gets a read-only rendering: Name
- * and Description show as plain text, and every action that would hit a
- * developer-only endpoint — Open design session, Discard changes, Deactivate,
- * Publish, Save, Delete — is hidden rather than left to fail with a 403 on
- * click. Task templates stay reachable read-only for such a viewer too — the
- * header button is labeled "View task templates" instead of "Manage task
- * templates" and the templates screens it opens hide their own write actions
- * the same way. The "Workflow status" bar itself stays visible for such a
- * viewer — the status is useful context regardless of role — but its
- * developer-only actions (Discard changes, Deactivate, Publish) are hidden
+ * Neither the live design nor `modified` reaches anyone else: the backend
+ * serves a plain viewer (e.g. `requester`) a `modified` workflow as
+ * `published`, carrying its last published name, description, and task
+ * templates. So this page never has to hide the edits itself for them — it
+ * simply never receives them.
+ *
+ * A viewer who cannot edit (`requester`, or a `reviewer` who cannot edit
+ * either) gets a read-only rendering: Name and Description show as plain
+ * text, and every action that would hit a developer-only endpoint — Open
+ * design session (for driving it), Discard changes, Save, Delete — is hidden
+ * rather than left to fail with a 403 on click. Task templates and the design
+ * session's chat history stay reachable read-only for a `developer` or
+ * `reviewer` — the header button is labeled "View task templates" (or "View
+ * design session") instead of "Manage"/"Open" for whichever of the two they
+ * lack, and the templates screens it opens hide their own write actions the
+ * same way. The "Workflow status" bar itself stays visible for every viewer —
+ * the status is useful context regardless of role — but Discard changes
+ * (developer-only) and Deactivate/Publish (reviewer-only) are hidden
  * individually the same way as elsewhere on the page.
  */
 export default function WorkflowDetailPage() {
@@ -156,7 +165,9 @@ export default function WorkflowDetailPage() {
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   const canRun = useHasRole(Role.REQUESTER, Role.DEVELOPER);
   const canEdit = useHasRole(Role.DEVELOPER);
-  const canViewTemplates = useHasRole(Role.REQUESTER, Role.DEVELOPER);
+  const canPublish = useHasRole(Role.REVIEWER);
+  const canViewDesign = useHasRole(Role.DEVELOPER, Role.REVIEWER);
+  const canViewTemplates = useHasRole(Role.REQUESTER, Role.DEVELOPER, Role.REVIEWER);
   const isAllTenantsView = useIsAllTenantsView();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -408,9 +419,9 @@ export default function WorkflowDetailPage() {
             icon={WorkflowIcon}
             secondaryAction={
               <>
-                {canEdit && (
+                {canViewDesign && (
                   <HeaderIconButton
-                    label="Open design session"
+                    label={canEdit ? "Open design session" : "View design session"}
                     onClick={handleOpenDesign}
                     disabled={generating}
                   >
@@ -481,7 +492,7 @@ export default function WorkflowDetailPage() {
                   spinning={discard.inFlight}
                 />
               )}
-              {canEdit && canDeactivate && (
+              {canPublish && canDeactivate && (
                 <ActionIconButton
                   icon={PowerOff}
                   label="Deactivate"
@@ -490,7 +501,7 @@ export default function WorkflowDetailPage() {
                   spinning={deactivate.inFlight}
                 />
               )}
-              {canEdit && workflow.status !== "published" && (
+              {canPublish && workflow.status !== "published" && (
                 <ActionIconButton
                   icon={Rocket}
                   label="Publish"

@@ -20,16 +20,17 @@ export const WORKFLOW_STATUSES: WorkflowStatus[] = [
 /**
  * The statuses a viewer can actually encounter, for the status filter options.
  *
- * Someone who cannot edit workflows never sees `draft` (the backend hides those
- * rows) and never sees `modified` (the backend reports such a workflow as
- * `published`, showing its last published version). Offering either would be a
- * filter that always comes back empty.
+ * Someone who can neither edit nor publish workflows never sees `draft` (the
+ * backend hides those rows) and never sees `modified` (the backend reports
+ * such a workflow as `published`, showing its last published version).
+ * Offering either would be a filter that always comes back empty.
  *
- * @param canEdit - True when the viewer holds `developer` (or `super_admin`).
+ * @param canViewDraft - True when the viewer holds `developer` or `reviewer`
+ *   (or `super_admin`) — the roles that see a workflow's live design.
  * @returns The statuses worth offering, in lifecycle order.
  */
-export function visibleWorkflowStatuses(canEdit: boolean): WorkflowStatus[] {
-  if (canEdit) return WORKFLOW_STATUSES;
+export function visibleWorkflowStatuses(canViewDraft: boolean): WorkflowStatus[] {
+  if (canViewDraft) return WORKFLOW_STATUSES;
   return WORKFLOW_STATUSES.filter((s) => s !== "draft" && s !== "modified");
 }
 

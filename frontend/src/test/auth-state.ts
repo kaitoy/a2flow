@@ -23,3 +23,5 @@ export const ADMIN = authState(["admin"]);
 export const REQUESTER = authState(["requester"]);
 /** Preloaded state for a signed-in `developer`. */
 export const DEVELOPER = authState(["developer"]);
+/** Preloaded state for a signed-in `reviewer`. */
+export const REVIEWER = authState(["reviewer"]);

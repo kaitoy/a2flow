@@ -56,9 +56,9 @@ async def get_workflow_task_template(
 ) -> ApiResponse[WorkflowTaskTemplateRead]:
     """Return the template with the given ID, or HTTP 404 if missing.
 
-    While the parent workflow is ``modified``, a caller who is not a
-    ``developer`` gets the template as it was published; one added since the
-    last publish reads as missing.
+    While the parent workflow is ``modified``, a caller who is neither a
+    ``developer`` nor a ``reviewer`` gets the template as it was published;
+    one added since the last publish reads as missing.
     """
     template = await service.get(template_id, caller_roles=caller_roles)
     return ApiResponse(meta=meta, data=template)

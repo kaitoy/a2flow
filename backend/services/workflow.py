@@ -9,9 +9,10 @@ workflow and served here through :meth:`WorkflowService.get_messages` and
 :meth:`WorkflowService.resolve_agent`, mirroring how
 ``services/workflow_execution.py`` serves an execution's workflow session.
 Like a workflow session, a design session is shared: every ``developer`` in the
-tenant may read and drive it, and each message is attributed to the user who
-actually sent it. Sharing follows from the role rather than from a per-record
-list of participants, so no separate access policy object is needed — see
+tenant may read and drive it, every ``reviewer`` may also read it, and each
+message is attributed to the user who actually sent it. Sharing follows from
+the role rather than from a per-record list of participants, so no separate
+access policy object is needed — see
 :meth:`WorkflowService._assert_design_access`.
 
 Workflows are not created here: they are born from the generation flow in
@@ -230,10 +231,12 @@ class WorkflowService:
     ) -> Workflow:
         """Return the Workflow with the given ID, authorizing draft visibility.
 
-        A ``draft`` workflow can only be created, edited, or executed
-        (pre-publish) by a ``developer`` (or, via the ``super_admin`` bypass,
-        a ``super_admin``) -- see :meth:`execute`. This extends the same
-        restriction to *viewing* it: any other caller (``requester``,
+        A ``draft`` workflow can only be created or edited by a ``developer``
+        (or, via the ``super_admin`` bypass, a ``super_admin``), and only a
+        ``developer`` may execute it pre-publish -- see :meth:`execute`. A
+        ``reviewer`` cannot edit or execute it, but shares the same *view* of
+        it, since reviewing a draft is the point of the role. This extends
+        that same visibility rule: any other caller (``requester``,
         ``approver``, plain ``admin``) gets a 404 rather than a 403, so a
         draft's existence is never confirmed to someone who couldn't act on
         it, matching ``services.user._assert_tenant_visible``'s convention.
@@ -248,25 +251,33 @@ class WorkflowService:
 
         Raises:
             NotFoundError: If no workflow exists with the given ID, or it is
-                ``draft`` and the caller is not a developer or super admin.
+                ``draft`` and the caller is not a developer, reviewer, or
+                super admin.
         """
         workflow = await self.get(workflow_id)
         if workflow.status == WorkflowStatus.draft and not has_any_role(
-            caller_roles, Role.developer
+            caller_roles, Role.developer, Role.reviewer
         ):
             raise NotFoundError("Workflow", workflow_id)
         return workflow
 
     @staticmethod
     def _assert_design_access(
-        workflow: Workflow, caller: User, caller_roles: Collection[str]
+        workflow: Workflow,
+        caller: User,
+        caller_roles: Collection[str],
+        *,
+        write: bool = True,
     ) -> None:
         """Reject callers with no business in this workflow's design session.
 
-        Designing a workflow is developer work — the same role that gates
-        editing and publishing it — so every ``developer`` in the tenant may
-        read and drive the chat, just as an execution's approvers share its
-        workflow session. ``has_any_role`` lets a ``super_admin`` through. The
+        Driving the chat (``write=True``, the default) is developer work — the
+        same role that gates editing and publishing a workflow — so every
+        ``developer`` in the tenant may drive it, just as an execution's
+        approvers share its workflow session. Reading it (``write=False``) is
+        also open to ``reviewer``, since the design conversation is part of
+        what a reviewer needs to see before deciding whether to publish.
+        ``has_any_role`` lets a ``super_admin`` through either way. The
         workflow's ``created_by`` is admitted explicitly as well, so the user
         who generated it is not locked out of their own conversation if their
         ``developer`` role is later revoked.
@@ -291,19 +302,27 @@ class WorkflowService:
             caller_roles: The caller's effective roles — direct grants plus
                 everything inherited from their groups — so a ``developer``
                 held only through a group still admits them.
+            write: Whether this is a write (driving the chat) rather than a
+                read (fetching its history). Only a read admits ``reviewer``.
 
         Raises:
-            ForbiddenError: If the caller is neither a developer, a super admin,
-                nor the workflow's creator.
+            ForbiddenError: If the caller is neither an admitted role nor the
+                workflow's creator.
         """
-        if caller.id == workflow.created_by or has_any_role(
-            caller_roles, Role.developer
-        ):
+        if caller.id == workflow.created_by:
+            return
+        allowed = (Role.developer,) if write else (Role.developer, Role.reviewer)
+        if has_any_role(caller_roles, *allowed):
             return
         raise ForbiddenError("Only developers can access this design session")
 
     async def get_for_design(
-        self, workflow_id: str, *, caller: User, caller_roles: Collection[str]
+        self,
+        workflow_id: str,
+        *,
+        caller: User,
+        caller_roles: Collection[str],
+        write: bool = True,
     ) -> Workflow:
         """Return a Workflow, authorizing the caller against its design session.
 
@@ -312,17 +331,19 @@ class WorkflowService:
             caller: The authenticated user requesting the design session.
             caller_roles: The caller's effective roles, including any inherited
                 from their groups.
+            write: Whether this is a write (driving the chat) rather than a
+                read (fetching its history) — see :meth:`_assert_design_access`.
 
         Returns:
             The matching Workflow.
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
-            ForbiddenError: If the caller is neither a developer, a super admin,
-                nor the workflow's creator.
+            ForbiddenError: If the caller is neither an admitted role nor the
+                workflow's creator.
         """
         workflow = await self.get(workflow_id)
-        self._assert_design_access(workflow, caller, caller_roles)
+        self._assert_design_access(workflow, caller, caller_roles, write=write)
         return workflow
 
     async def resolve_agent(
@@ -432,11 +453,11 @@ class WorkflowService:
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
-            ForbiddenError: If the caller is neither a developer, a super admin,
-                nor the workflow's creator.
+            ForbiddenError: If the caller is none of developer, reviewer,
+                super admin, or the workflow's creator.
         """
         workflow = await self.get_for_design(
-            workflow_id, caller=caller, caller_roles=caller_roles
+            workflow_id, caller=caller, caller_roles=caller_roles, write=False
         )
         session = await self._adk_session(workflow)
         if session is None:
@@ -521,7 +542,8 @@ class WorkflowService:
         ``status:ne:draft`` filter is appended to ``filters``, combining with
         (never widening) whatever the caller supplied -- mirrors
         ``UserService.list``'s tenant-scoping filter
-        (``services/user.py``).
+        (``services/user.py``). A ``reviewer`` is treated the same as a
+        ``developer`` here, since reviewing a draft is the point of the role.
 
         The same caller is also served the published view (see
         :meth:`to_read`), so the query is asked to filter and sort on the
@@ -541,7 +563,7 @@ class WorkflowService:
         Returns:
             The requested page of workflows.
         """
-        if not has_any_role(caller_roles, Role.developer):
+        if not has_any_role(caller_roles, Role.developer, Role.reviewer):
             filters = (
                 *filters,
                 FilterSpec(field="status", op="ne", value=WorkflowStatus.draft.value),
@@ -563,10 +585,10 @@ class WorkflowService:
             caller_roles: The caller's effective roles.
 
         Returns:
-            ``True`` for everyone but a ``developer`` (and, via the
-            ``super_admin`` bypass, a ``super_admin``).
+            ``True`` for everyone but a ``developer`` or ``reviewer`` (and,
+            via the ``super_admin`` bypass, a ``super_admin``).
         """
-        return not has_any_role(caller_roles, Role.developer)
+        return not has_any_role(caller_roles, Role.developer, Role.reviewer)
 
     async def _versions_for(
         self, workflows: Sequence[Workflow], *, caller_roles: Collection[str]

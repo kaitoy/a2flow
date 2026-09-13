@@ -16,6 +16,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   [Role.SUPER_ADMIN]: "Super Admin",
   [Role.ADMIN]: "Admin",
   [Role.DEVELOPER]: "Developer",
+  [Role.REVIEWER]: "Reviewer",
   [Role.REQUESTER]: "Requester",
   [Role.APPROVER]: "Approver",
 };
@@ -25,6 +26,7 @@ export const ALL_ROLES: Role[] = [
   Role.SUPER_ADMIN,
   Role.ADMIN,
   Role.DEVELOPER,
+  Role.REVIEWER,
   Role.REQUESTER,
   Role.APPROVER,
 ];

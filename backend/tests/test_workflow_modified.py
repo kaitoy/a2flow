@@ -6,6 +6,8 @@ one is the whole subject of this file.
 
 * A ``developer`` sees the live rows, and may run either — the published design
   as a real request, or the edits as a draft run (``designSource: "live"``).
+* A ``reviewer`` also sees the live rows (the point of the role is to review
+  them before publishing), but may not run either design.
 * Everybody else sees only the published snapshot, reported as ``published``.
   The edits do not exist for them: not in the workflow, not in its task
   templates, not in what a name search matches.
@@ -36,6 +38,10 @@ REQUESTER = {"X-User-Roles": "requester"}
 #: Acts as a developer without the ``super_admin`` bypass the default test
 #: caller carries, so the developer-only paths are exercised on their own merit.
 DEVELOPER = {"X-User-Roles": "developer"}
+
+#: Acts as a reviewer — shares a developer's view of the live edits, but may
+#: not run either design.
+REVIEWER = {"X-User-Roles": "reviewer"}
 
 
 async def _modified(client: AsyncClient, **overrides: str) -> Any:
@@ -238,6 +244,16 @@ async def test_a_developer_sees_the_unpublished_edits(
     assert body["name"] == "Renamed"
 
 
+async def test_a_reviewer_sees_the_unpublished_edits(
+    workflow_client: AsyncClient,
+) -> None:
+    """A reviewer shares the developer's view, to review before publishing."""
+    wf = await _modified(workflow_client)
+    body = await _get(workflow_client, wf["id"], REVIEWER)
+    assert body["status"] == "modified"
+    assert body["name"] == "Renamed"
+
+
 async def test_a_requester_sees_the_published_workflow_instead(
     workflow_client: AsyncClient,
 ) -> None:
@@ -414,6 +430,14 @@ async def test_a_developer_lists_the_edited_task_templates(
     titles = [
         t["title"] for t in await _templates(workflow_client, wf["id"], DEVELOPER)
     ]
+    assert titles == ["Edited step", "Brand new step"]
+
+
+async def test_a_reviewer_lists_the_edited_task_templates(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _modified(workflow_client)
+    titles = [t["title"] for t in await _templates(workflow_client, wf["id"], REVIEWER)]
     assert titles == ["Edited step", "Brand new step"]
 
 

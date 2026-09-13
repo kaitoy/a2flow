@@ -187,7 +187,7 @@ async def test_generate_workflow_requires_developer_role(
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_publish_workflow_requires_developer_role(
+async def test_publish_workflow_requires_reviewer_role(
     workflow_client: AsyncClient,
 ) -> None:
     wf = await _create_workflow(workflow_client)
@@ -195,6 +195,27 @@ async def test_publish_workflow_requires_developer_role(
         f"/api/v1/workflows/{wf['id']}/publish", headers=_roles("requester")
     )
     assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_publish_workflow_forbidden_for_developer(
+    workflow_client: AsyncClient,
+) -> None:
+    """Developer edits and designs a workflow, but no longer publishes it."""
+    wf = await _create_draft_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/publish", headers=_roles("developer")
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_publish_workflow_allowed_for_reviewer(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_draft_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/publish", headers=_roles("reviewer")
+    )
+    assert_ok(res)
 
 
 async def test_generate_workflow_description_requires_developer_role(
@@ -208,7 +229,7 @@ async def test_generate_workflow_description_requires_developer_role(
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_deactivate_workflow_requires_developer_role(
+async def test_deactivate_workflow_requires_reviewer_role(
     workflow_client: AsyncClient,
 ) -> None:
     wf = await _create_workflow(workflow_client)
@@ -216,6 +237,27 @@ async def test_deactivate_workflow_requires_developer_role(
         f"/api/v1/workflows/{wf['id']}/deactivate", headers=_roles("requester")
     )
     assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_deactivate_workflow_forbidden_for_developer(
+    workflow_client: AsyncClient,
+) -> None:
+    """Developer edits and designs a workflow, but no longer deactivates it."""
+    wf = await _create_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/deactivate", headers=_roles("developer")
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_deactivate_workflow_allowed_for_reviewer(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/deactivate", headers=_roles("reviewer")
+    )
+    assert_ok(res)
 
 
 async def test_discard_workflow_changes_requires_developer_role(
@@ -478,6 +520,16 @@ async def test_group_inherited_developer_may_execute_a_draft_workflow(
         f"/api/v1/workflows/{wf['id']}/execute", headers=_inherited("developer")
     )
     assert_ok(res, status=201)
+
+
+async def test_group_inherited_reviewer_may_publish_a_workflow(
+    workflow_client: AsyncClient,
+) -> None:
+    wf = await _create_draft_workflow(workflow_client)
+    res = await workflow_client.post(
+        f"/api/v1/workflows/{wf['id']}/publish", headers=_inherited("reviewer")
+    )
+    assert_ok(res)
 
 
 async def test_a_group_cannot_carry_the_caller_past_a_role_they_lack(
