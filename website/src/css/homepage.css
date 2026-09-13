@@ -221,11 +221,62 @@
 }
 
 /* ------------------------------------------------------------.a2f-hero demo */
+/*
+ * Two acts in one window, switched by `data-act` on .demo: "design" is the
+ * design session (act-1 messages, status-less templates in the rail) and
+ * "run" the workflow session (act-1 messages gone, the rail showing task
+ * statuses). Everything else is a class the page effect toggles per beat.
+ */
 .a2flow-home .demo {
+  position: relative;
   border-radius: 1rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* Run navigates to another screen: the whole window slides out, then back in. */
+.a2flow-home .demo.leaving .demo-titlebar,
+.a2flow-home .demo.leaving .demo-main { animation: screen-out 600ms cubic-bezier(0.3, 0, 0, 1) both;
+}
+
+.a2flow-home .demo.entering .demo-titlebar,
+.a2flow-home .demo.entering .demo-main { animation: screen-in 700ms cubic-bezier(0.3, 0, 0, 1) both;
+}
+
+@keyframes screen-out {
+to { opacity: 0; transform: translateX(-8%);
+}
+
+}
+
+@keyframes screen-in {
+from { opacity: 0; transform: translateX(8%);
+}
+
+}
+
+.a2flow-home .demo-switch {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .demo.leaving .demo-switch { display: flex; animation: message-in 360ms 400ms cubic-bezier(0.3, 0, 0, 1) both;
+}
+
+.a2flow-home .spin {
+  width: 0.75rem; height: 0.75rem;
+  border-radius: 50%;
+  border: 2px solid var(--a2f-glass-border);
+  border-top-color: var(--a2f-accent);
+  animation: spin 800ms linear infinite;
 }
 
 .a2flow-home .demo-titlebar {
@@ -236,6 +287,18 @@
   border-bottom: 1px solid var(--a2f-glass-border);
   font-size: 0.8125rem;
   font-weight: 600;
+}
+
+.a2flow-home .demo-title {
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.a2flow-home .demo[data-act="design"] .demo-title.design,
+.a2flow-home .demo[data-act="run"] .demo-title.run { display: block;
 }
 
 .a2flow-home .demo-titlebar .live {
@@ -268,10 +331,137 @@
 
 }
 
+@keyframes spin {
+to { transform: rotate(360deg);
+}
+
+}
+
 .a2flow-home .demo-mark { width: 1.375rem; height: 1.375rem; border-radius: 0.375rem;
 }
 
+.a2flow-home .demo-main { display: grid; grid-template-columns: 8.5rem 1fr;
+}
+
+/* the task timeline down the left, as in both session screens */
+.a2flow-home .demo-rail {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.875rem 0.625rem;
+  border-right: 1px solid var(--a2f-glass-border);
+}
+
+.a2flow-home .rail-head {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--a2f-muted);
+  padding: 0 0.25rem;
+}
+
+.a2flow-home .demo-rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem;
+}
+
+.a2flow-home .rail-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .demo.live .rail-task { opacity: 0;
+}
+
+.a2flow-home .demo.live .rail-task.on {
+  opacity: 1;
+  animation: message-in 360ms cubic-bezier(0.3, 0, 0, 1) both;
+}
+
+.a2flow-home .demo.live .rail-task.on:nth-child(2) { animation-delay: 120ms;
+}
+
+.a2flow-home .demo.live .rail-task.on:nth-child(3) { animation-delay: 240ms;
+}
+
+.a2flow-home .demo.live .rail-task.on:nth-child(4) { animation-delay: 360ms;
+}
+
+.a2flow-home .rail-n {
+  flex: none;
+  width: 1.25rem; height: 1.25rem;
+  border-radius: 50%;
+  border: 2px solid var(--a2f-muted);
+  opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--a2f-ink);
+  transition: all 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.a2flow-home .rail-task.doing .rail-n {
+  border-color: var(--a2f-accent-bright);
+  opacity: 1;
+  box-shadow: 0 0 10px rgba(var(--a2f-accent-rgb), 0.6);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.a2flow-home .rail-task.done .rail-n { border-color: var(--a2f-success); opacity: 1;
+}
+
+.a2flow-home .rail-task.doing,
+.a2flow-home .rail-task.done { color: var(--a2f-ink);
+}
+
+.a2flow-home .rail-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+}
+
+.a2flow-home .rail-title { display: block; font-weight: 600; line-height: 1.3;
+}
+
+/* Statuses belong to a run: templates in the design session have none. */
+.a2flow-home .demo[data-act="run"] .rail-title::after {
+  content: "pending";
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .demo[data-act="run"] .rail-task.doing .rail-title::after { content: "in progress"; color: var(--a2f-accent-bright);
+}
+
+.a2flow-home .demo[data-act="run"] .rail-task.done .rail-title::after { content: "completed"; color: var(--a2f-success);
+}
+
+.a2flow-home .rail-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.625rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 9999px;
+  border: 1px solid var(--a2f-glass-border);
+  background: var(--a2f-glass);
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .rail-tools svg { width: 0.625rem; height: 0.625rem;
+}
+
 .a2flow-home .demo-body {
+  min-width: 0;
   padding: 1.125rem;
   display: flex;
   flex-direction: column;
@@ -293,6 +483,10 @@
 .a2flow-home .demo.live .dmsg.on {
   display: flex;
   animation: message-in 360ms cubic-bezier(0.3, 0, 0, 1) both;
+}
+
+/* Act 1 leaves with the design session; without scripting the run is the still. */
+.a2flow-home .demo[data-act="run"] .dmsg.act-design { display: none;
 }
 
 @keyframes message-in {
@@ -359,48 +553,51 @@ to { opacity: 1; transform: none;
   margin-bottom: 0.25rem;
 }
 
-.a2flow-home .plan { list-style: none; margin: 0.625rem 0 0.75rem; display: grid; gap: 0.4375rem;
-}
-
-.a2flow-home .plan li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--a2f-muted);
-}
-
-.a2flow-home .plan .tick {
-  flex: none;
-  width: 1.0625rem; height: 1.0625rem;
-  border-radius: 50%;
-  border: 1.5px solid var(--a2f-muted);
-  opacity: 0.55;
+/* one agent tool call: spinner while running, check mark once done */
+.a2flow-home .toolpill {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  transition: all 240ms cubic-bezier(0.2, 0, 0, 1);
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--a2f-glass-border);
+  background: var(--a2f-glass);
+  font-size: 0.75rem;
+  color: var(--a2f-muted);
+  transition: border-color 360ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-.a2flow-home .plan .tick svg { width: 0.625rem; height: 0.625rem; opacity: 0; transition: opacity 240ms cubic-bezier(0.2, 0, 0, 1);
+.a2flow-home .toolpill code { font-size: 0.75rem; font-weight: 500; color: var(--a2f-ink);
 }
 
-.a2flow-home .plan li.doing .tick {
-  border-color: var(--a2f-accent-bright);
-  opacity: 1;
-  box-shadow: 0 0 10px rgba(var(--a2f-accent-rgb), 0.6);
-  animation: breathe 1.6s ease-in-out infinite;
+.a2flow-home .toolpill .ok { color: var(--a2f-accent); font-weight: 700;
 }
 
-.a2flow-home .plan li.doing { color: var(--a2f-ink);
+.a2flow-home .toolpill .spin { display: none;
 }
 
-.a2flow-home .plan li.done .tick {
-  background: var(--a2f-success);
-  border-color: var(--a2f-success);
-  opacity: 1;
-  color: #fff;
+.a2flow-home .toolpill::after { content: "done";
 }
 
-.a2flow-home .plan li.done .tick svg { opacity: 1;
+.a2flow-home .toolpill.running { border-color: color-mix(in srgb, var(--a2f-accent) 45%, transparent);
 }
 
-.a2flow-home .plan li.done { color: var(--a2f-ink);
+.a2flow-home .toolpill.running .ok { display: none;
+}
+
+.a2flow-home .toolpill.running .spin { display: inline-block;
+}
+
+.a2flow-home .toolpill.running::after { content: "running…";
+}
+
+.a2flow-home .toolpill .badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--a2f-glass-border);
 }
 
 .a2flow-home .chip {
@@ -428,8 +625,10 @@ to { opacity: 1; transform: none;
 .a2flow-home .demo-sys b { color: var(--a2f-ink); font-weight: 600;
 }
 
+/* the cards the agent draws into the chat: an A2UI surface and an approval */
+.a2flow-home .a2ui,
 .a2flow-home .approval {
-  border: 1px solid color-mix(in srgb, var(--a2f-accent) 45%, transparent);
+  border: 1px solid var(--a2f-glass-border);
   border-radius: 1rem;
   padding: 0.8125rem 0.9375rem;
   background: var(--a2f-glass);
@@ -437,17 +636,39 @@ to { opacity: 1; transform: none;
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
   max-width: 78%;
   font-size: 0.8125rem;
-  transition: border-color 360ms cubic-bezier(0.2, 0, 0, 1);
+  transition: border-color 360ms cubic-bezier(0.2, 0, 0, 1), opacity 360ms cubic-bezier(0.2, 0, 0, 1);
 }
 
+.a2flow-home .a2ui .ttl,
 .a2flow-home .approval .ttl {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
   font-size: 0.8125rem;
-  margin-bottom: 0.375rem;
-  color: var(--a2f-accent);
+  margin-bottom: 0.5rem;
+  color: var(--a2f-ink);
+}
+
+.a2flow-home .a2ui .choices { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-bottom: 0.625rem;
+}
+
+.a2flow-home .a2ui.resolved { opacity: 0.7;
+}
+
+.a2flow-home .a2ui.resolved .chip:not(.sel) { opacity: 0.45;
+}
+
+.a2flow-home .a2ui.resolved .chip.sel { color: var(--a2f-accent); border-color: color-mix(in srgb, var(--a2f-accent) 55%, transparent);
+}
+
+.a2flow-home .a2ui.resolved .acts { display: none;
+}
+
+.a2flow-home .approval { border-color: color-mix(in srgb, var(--a2f-accent) 45%, transparent);
+}
+
+.a2flow-home .approval .ttl { color: var(--a2f-accent);
 }
 
 .a2flow-home .approval .ttl svg { width: 1rem; height: 1rem; flex: none;
@@ -456,6 +677,29 @@ to { opacity: 1; transform: none;
 .a2flow-home .approval p { color: var(--a2f-muted); font-size: 0.8125rem; margin-bottom: 0.625rem;
 }
 
+.a2flow-home .approval .auth {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.a2flow-home .approval .auth-head {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .approval .arg { display: flex; gap: 0.5rem; padding-left: 0.25rem; font-size: 0.75rem; color: var(--a2f-muted);
+}
+
+.a2flow-home .approval .arg code { font-size: 0.75rem; color: var(--a2f-ink);
+}
+
+.a2flow-home .a2ui .acts,
 .a2flow-home .approval .acts { display: flex; gap: 0.5rem; align-items: center;
 }
 
@@ -472,7 +716,16 @@ to { opacity: 1; transform: none;
 .a2flow-home .fbtn.no { border: 1px solid var(--a2f-glass-border); color: var(--a2f-muted);
 }
 
-.a2flow-home .approval .decided { display: none; align-items: center; gap: 0.4375rem; font-weight: 700; color: var(--a2f-success); font-size: 0.8125rem;
+.a2flow-home .approval .decided {
+  display: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+  font-size: 0.8125rem;
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .approval .decided b { display: inline-flex; align-items: center; gap: 0.4375rem; font-weight: 700; color: var(--a2f-success);
 }
 
 .a2flow-home .approval .decided svg { width: 1rem; height: 1rem;
@@ -484,7 +737,7 @@ to { opacity: 1; transform: none;
 .a2flow-home .approval.approved .acts { display: none;
 }
 
-.a2flow-home .approval.approved .decided { display: inline-flex;
+.a2flow-home .approval.approved .decided { display: flex;
 }
 
 .a2flow-home .demo-caption {
@@ -492,6 +745,16 @@ to { opacity: 1; transform: none;
   font-size: 0.8125rem;
   color: var(--a2f-muted);
   margin-top: 0.875rem;
+}
+
+/* The real app folds the timeline into a drawer on phones; here it just goes. */
+@media (max-width: 30rem) {
+.a2flow-home .demo-main { grid-template-columns: 1fr;
+}
+
+.a2flow-home .demo-rail { display: none;
+}
+
 }
 
 /* ---------------------------------------------------------------- concept */

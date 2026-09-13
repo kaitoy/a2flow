@@ -58,68 +58,83 @@ export default function Home(): ReactNode {
     };
 
     const demo = root.querySelector<HTMLElement>('#demo');
-    const planList = root.querySelector<HTMLElement>('#planList');
-    const planChip = root.querySelector<HTMLElement>('#planChip');
+    const rail = root.querySelector<HTMLElement>('#demoRail');
+    const a2uiCard = root.querySelector<HTMLElement>('#a2uiCard');
     const approvalCard = root.querySelector<HTMLElement>('#approvalCard');
-    if (!demo || !planList || !planChip || !approvalCard) return cleanup;
+    const toolPill = root.querySelector<HTMLElement>('#toolPill');
+    if (!demo || !rail || !a2uiCard || !approvalCard || !toolPill) return cleanup;
 
     const msgs = Array.from(demo.querySelectorAll<HTMLElement>('.dmsg'));
-    const tasks = Array.from(planList.children) as HTMLElement[];
-
-    const settle = () => {
-      planChip.textContent = 'Plan approved';
-      planChip.classList.add('ok');
-      approvalCard.classList.add('approved');
-      for (const task of tasks) {
-        task.classList.remove('doing');
-        task.classList.add('done');
-      }
+    const tasks = Array.from(rail.querySelectorAll<HTMLElement>('.rail-task'));
+    /** Marks task `i - 1` completed and task `i` in progress, like the run loop does. */
+    const advance = (i: number) => {
+      tasks[i - 1]?.classList.replace('doing', 'done');
+      tasks[i]?.classList.add('doing');
     };
 
-    if (reduced) {
-      settle();
-      return cleanup;
-    }
-
-    // request -> plan -> plan approved -> gate -> approved -> done
+    // Act 1, the design session: prompt -> templates registered -> published.
+    // Then Run navigates away: the screen slides out, a beat of "opening…",
+    // and the workflow session slides in.
+    // Act 2, the workflow session: kickoff -> A2UI form -> approval -> MCP call -> done.
     const beats: (() => void)[] = [
-      () => msgs[0]?.classList.add('on'),
-      () => msgs[1]?.classList.add('on'),
       () => {
-        msgs[2]?.classList.add('on');
-        planChip.textContent = 'Plan approved';
-        planChip.classList.add('ok');
-        tasks[0]?.classList.add('doing');
+        demo.dataset.act = 'design';
+        msgs[0]?.classList.add('on');
       },
       () => {
-        tasks[0]?.classList.remove('doing');
-        tasks[0]?.classList.add('done');
-        tasks[1]?.classList.add('doing');
-        msgs[3]?.classList.add('on');
+        msgs[1]?.classList.add('on');
+        for (const task of tasks) task.classList.add('on');
+      },
+      () => msgs[2]?.classList.add('on'),
+      () => msgs[3]?.classList.add('on'),
+      () => msgs[4]?.classList.add('on'),
+      () => demo.classList.add('leaving'),
+      () => {
+        demo.classList.remove('leaving');
+        demo.classList.add('entering');
+        demo.dataset.act = 'run';
+        msgs[5]?.classList.add('on');
+        tasks[0]?.classList.add('doing');
+      },
+      () => msgs[6]?.classList.add('on'),
+      () => {
+        a2uiCard.classList.add('resolved');
+        advance(1);
+        msgs[7]?.classList.add('on');
       },
       () => {
         approvalCard.classList.add('approved');
-        tasks[1]?.classList.remove('doing');
-        tasks[1]?.classList.add('done');
-        tasks[2]?.classList.add('doing');
+        advance(2);
+        toolPill.classList.add('running');
+        msgs[8]?.classList.add('on');
       },
       () => {
-        tasks[2]?.classList.remove('doing');
-        tasks[2]?.classList.add('done');
-        tasks[3]?.classList.add('done');
-        msgs[4]?.classList.add('on');
+        toolPill.classList.remove('running');
+        advance(3);
+      },
+      () => {
+        advance(4);
+        msgs[9]?.classList.add('on');
       },
     ];
 
-    let beat = 0;
     demo.classList.add('live');
+
+    // Without motion, show the finished run instead of playing it.
+    if (reduced) {
+      for (const play of beats) play();
+      return cleanup;
+    }
+
+    let beat = 0;
 
     const rewind = () => {
       for (const msg of msgs) msg.classList.remove('on');
-      for (const task of tasks) task.classList.remove('doing', 'done');
-      planChip.textContent = 'Waiting for plan approval…';
-      planChip.classList.remove('ok');
+      for (const task of tasks) task.classList.remove('on', 'doing', 'done');
+      demo.classList.remove('leaving', 'entering');
+      a2uiCard.classList.remove('resolved');
       approvalCard.classList.remove('approved');
+      toolPill.classList.remove('running');
       beat = 0;
     };
 
@@ -183,62 +198,107 @@ export default function Home(): ReactNode {
             </div>
 
             <div>
-              {/* Self-playing workflow session. Decorative: the story is told in the copy. */}
-              <div className="demo glass-strong" id="demo" aria-hidden="true">
+              {/* Self-playing demo in two acts: the design session that turns a
+                  prompt into task templates, then the workflow session one run
+                  happens in. Decorative: the story is told in the copy. */}
+              <div className="demo glass-strong" id="demo" data-act="run" aria-hidden="true">
                 <div className="demo-titlebar">
                   <img className="demo-mark" src={logoUrl} alt="" />
-                  Workflow session — Restart checkout pods
+                  <span className="demo-title design">Design session — Launch an EC2 instance</span>
+                  <span className="demo-title run">Workflow session — Launch an EC2 instance #42</span>
                   <span className="live">Live</span>
                 </div>
-                <div className="demo-body" id="demoBody">
-                  <div className="dmsg from-user" data-step="1">
-                    <div className="bubble user">Restart the checkout pods in prod — payments are timing out.</div>
-                    <span className="a2f-avatar mika">M</span>
+                <div className="demo-main">
+                  <div className="demo-rail">
+                    <span className="rail-head">Tasks</span>
+                    <ol id="demoRail">
+                      <li className="rail-task"><span className="rail-n">1</span><span className="rail-body"><span className="rail-title">Configure instance</span></span></li>
+                      <li className="rail-task"><span className="rail-n">2</span><span className="rail-body"><span className="rail-title">Approve launch</span></span></li>
+                      <li className="rail-task"><span className="rail-n">3</span><span className="rail-body"><span className="rail-title">Launch instance</span><span className="rail-tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>1</span></span></li>
+                      <li className="rail-task"><span className="rail-n">4</span><span className="rail-body"><span className="rail-title">Confirm result</span></span></li>
+                    </ol>
                   </div>
-                  <div className="dmsg" data-step="2">
-                    <span className="a2f-avatar bot">✦</span>
-                    <div className="bubble agent">
-                      <span className="who">Agent</span>
-                      I read the <code>kubernetes-pod-restart</code> skill. Here is my plan:
-                      <ul className="plan" id="planList">
-                        <li><span className="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Identify the target deployment</li>
-                        <li><span className="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Get approval — prod change</li>
-                        <li><span className="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Rolling restart via kubectl</li>
-                        <li><span className="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Verify the rollout</li>
-                      </ul>
-                      <span className="chip" id="planChip">Waiting for plan approval…</span>
+                  <div className="demo-body" id="demoBody">
+                    {/* act 1 — the design session */}
+                    <div className="dmsg from-user act-design">
+                      <div className="bubble user">Spin up an EC2 instance for load testing — get a manager to approve the config first.</div>
+                      <span className="a2f-avatar mika">M</span>
                     </div>
-                  </div>
-                  <div className="dmsg demo-sys" data-step="3"><span><b>Mika</b> approved the plan</span></div>
-                  <div className="dmsg" data-step="4">
-                    <span className="a2f-avatar bot">✦</span>
-                    <div className="approval" id="approvalCard">
-                      <span className="ttl">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                        Approval required
-                      </span>
-                      <p>Rolling restart of <code>checkout</code> in <b>prod</b>. Approver: <b>Sam</b>.</p>
-                      <span className="acts">
-                        <span className="fbtn yes">Approve</span>
-                        <span className="fbtn no">Reject</span>
-                      </span>
-                      <span className="decided">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                        Approved by Sam — “Change window confirmed.”
-                      </span>
+                    <div className="dmsg act-design">
+                      <span className="toolpill"><span className="ok">✓</span><i className="spin" /><code>register_task_templates</code></span>
                     </div>
-                  </div>
-                  <div className="dmsg" data-step="6">
-                    <span className="a2f-avatar bot">✦</span>
-                    <div className="bubble agent">
-                      <span className="who">Agent</span>
-                      Rolling restart complete — 12/12 pods healthy. All tasks done.
-                      <span className="chip ok" style={{marginTop: '.5rem'}}>Session completed 🔔</span>
+                    <div className="dmsg act-design">
+                      <span className="a2f-avatar bot">✦</span>
+                      <div className="bubble agent">
+                        <span className="who">Agent</span>
+                        I followed the <code>aws-ec2-launch</code> skill and registered 4 task templates. Anything to adjust?
+                      </div>
+                    </div>
+                    <div className="dmsg from-user act-design">
+                      <div className="bubble user">Looks good.</div>
+                      <span className="a2f-avatar mika">M</span>
+                    </div>
+                    <div className="dmsg demo-sys act-design"><span><b>Published</b> · <b>Run ▶</b></span></div>
+                    {/* act 2 — the workflow session */}
+                    <div className="dmsg from-user">
+                      <div className="bubble user">Start the workflow: execute the registered tasks.</div>
+                      <span className="a2f-avatar mika">M</span>
+                    </div>
+                    <div className="dmsg">
+                      <span className="a2f-avatar bot">✦</span>
+                      <div className="a2ui" id="a2uiCard">
+                        <span className="ttl">Which instance type?</span>
+                        <span className="choices">
+                          <span className="chip sel">t3.medium</span>
+                          <span className="chip">t3.large</span>
+                          <span className="chip">m6i.large</span>
+                        </span>
+                        <span className="acts"><span className="fbtn yes">Confirm</span></span>
+                      </div>
+                    </div>
+                    <div className="dmsg">
+                      <span className="a2f-avatar bot">✦</span>
+                      <div className="approval" id="approvalCard">
+                        <span className="ttl">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                          Launch EC2 instance: loadtest-01
+                        </span>
+                        <p>Approver: <b>Sam</b>.</p>
+                        <span className="auth">
+                          <span className="auth-head">This authorizes</span>
+                          <span className="chip">AWS MCP Server: aws___run_script</span>
+                          <span className="arg"><code>ImageId</code>is "Amazon Linux 2023"</span>
+                          <span className="arg"><code>InstanceType</code>is "t3.medium"</span>
+                        </span>
+                        <span className="acts">
+                          <span className="fbtn yes">Approve</span>
+                          <span className="fbtn no">Reject</span>
+                          <span className="fbtn no">Return</span>
+                        </span>
+                        <span className="decided">
+                          <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Approved</b>
+                          <span>by Sam</span>
+                          <span>“Budget confirmed.”</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="dmsg">
+                      <span className="toolpill" id="toolPill"><span className="ok">✓</span><i className="spin" /><code>aws___run_script</code><span className="badge">MCP</span></span>
+                    </div>
+                    <div className="dmsg">
+                      <span className="a2f-avatar bot">✦</span>
+                      <div className="bubble agent">
+                        <span className="who">Agent</span>
+                        Launched i-0f3a9c2e — state: running. All 4 tasks completed.
+                        <span className="chip ok" style={{marginTop: '.5rem'}}>Workflow execution completed 🔔</span>
+                      </div>
                     </div>
                   </div>
                 </div>
+                {/* Shown while the design session slides out and the run's own screen slides in. */}
+                <div className="demo-switch"><i className="spin" />Opening the workflow session…</div>
               </div>
-              <p className="demo-caption"><Translate id="home.hero.demoCaption">{'A workflow session: the applicant, the approver, and the agent — one conversation.'}</Translate></p>
+              <p className="demo-caption"><Translate id="home.hero.demoCaption">{'Two chats, one workflow: designed with the agent, then run in its own session — forms and approvals included.'}</Translate></p>
             </div>
           </div>
         </section>
@@ -269,8 +329,8 @@ export default function Home(): ReactNode {
                 <p className="sub"><Translate id="home.concept.next.sub">{'Process as conversation: the agent drives, humans decide.'}</Translate></p>
                 <ul className="flow-steps">
                   <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5c-1.6 0-3.1-.4-4.4-1.2L3 20l1.2-5.1A8.5 8.5 0 1 1 21 11.5z"/></svg></span><span><b><Translate id="home.concept.next.intent">{'Describe the intent in chat'}</Translate></b><span className="note"><Translate id="home.concept.next.intent.note">{'No form. The Skill knows what to ask.'}</Translate></span></span></li>
-                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M6.5 7.5 10.5 16M17.5 7.5 13.5 16"/></svg></span><span><b><Translate id="home.concept.next.plan">{'The agent plans a task graph'}</Translate></b><span className="note"><Translate id="home.concept.next.plan.note">{'Concrete steps with dependencies — visible to everyone.'}</Translate></span></span></li>
-                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span><span><b><Translate id="home.concept.next.approve">{'Humans approve the moments that matter'}</Translate></b><span className="note"><Translate id="home.concept.next.approve.note">{'The plan itself, and every destructive step.'}</Translate></span></span></li>
+                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M6.5 7.5 10.5 16M17.5 7.5 13.5 16"/></svg></span><span><b><Translate id="home.concept.next.plan">{'The agent plans a task graph'}</Translate></b><span className="note"><Translate id="home.concept.next.plan.note">{'Concrete steps with dependencies. Publish once, run it as often as needed.'}</Translate></span></span></li>
+                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span><span><b><Translate id="home.concept.next.approve">{'Humans approve the moments that matter'}</Translate></b><span className="note"><Translate id="home.concept.next.approve.note">{'Publishing the design, and every tool call that changes something.'}</Translate></span></span></li>
                   <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span><span><b><Translate id="home.concept.next.execute">{'The agent executes and verifies'}</Translate></b><span className="note"><Translate id="home.concept.next.execute.note">{'Live progress in the same conversation.'}</Translate></span></span></li>
                 </ul>
               </div>
@@ -291,7 +351,7 @@ export default function Home(): ReactNode {
               <span className="eyebrow"><Translate id="home.how.eyebrow">{'How it works'}</Translate></span>
               <h2><Translate id="home.how.title" values={{execute: <span className="grad-text"><Translate id="home.how.title.execute">{'Execute.'}</Translate></span>}}>{'Plan. Approve. {execute}'}</Translate></h2>
               <p>
-                <Translate id="home.how.lead">{'Every workflow session runs under the same two-phase policy: nothing executes until a human has seen the plan, and nothing destructive executes until the designated approver has said yes.'}</Translate>
+                <Translate id="home.how.lead">{'Every run passes the same two gates: nothing runs until a human has published the design, and no tool call that changes something goes through until the designated approver has said yes.'}</Translate>
               </p>
             </div>
             <div className="how-grid">
@@ -300,30 +360,30 @@ export default function Home(): ReactNode {
                   <span className="n"><Translate id="home.how.step1.label">{'STEP 1 — PLAN'}</Translate></span>
                   <h3><Translate id="home.how.step1.title">{'The agent turns intent into a task graph'}</Translate></h3>
                   <p>
-                    <Translate id="home.how.step1.body">{'It reads the linked Agent Skill, breaks the request into WorkflowTasks with explicit dependencies, and registers the whole DAG in one call — cycle detection included. Nothing runs yet.'}</Translate>
+                    <Translate id="home.how.step1.body">{'In a design session it reads the Agent Skill, breaks your prompt into task templates with explicit dependencies, and registers the whole DAG in one call — cycle detection included. Adjust it by chat or by hand; nothing runs yet.'}</Translate>
                   </p>
                 </div>
                 <div className="step glass reveal">
                   <span className="n"><Translate id="home.how.step2.label">{'STEP 2 — APPROVE'}</Translate></span>
                   <h3><Translate id="home.how.step2.title">{'Humans gate the moments that matter'}</Translate></h3>
                   <p>
-                    <Translate id="home.how.step2.body" values={{approver: <em><Translate id="home.how.step2.body.approver">{'designated approver'}</Translate></em>, forbidden: <code>403</code>}}>{'The session owner approves the plan before execution starts. Destructive steps gate again on a {approver}: Approve / Reject controls render right in the chat, and only that person can resolve them — anyone else gets a {forbidden}.'}</Translate>
+                    <Translate id="home.how.step2.body" values={{approver: <em><Translate id="home.how.step2.body.approver">{'designated approver'}</Translate></em>, forbidden: <code>403</code>}}>{'Publishing the workflow is the approval of the plan — a run starts from it with nothing to confirm. Tool calls that change something gate on a {approver}: Approve / Reject / Return controls render right in the chat, listing exactly the calls they authorize, and only that person can resolve them — anyone else gets a {forbidden}.'}</Translate>
                   </p>
                 </div>
                 <div className="step glass reveal">
                   <span className="n"><Translate id="home.how.step3.label">{'STEP 3 — EXECUTE'}</Translate></span>
                   <h3><Translate id="home.how.step3.title">{'The agent walks the graph'}</Translate></h3>
                   <p>
-                    <Translate id="home.how.step3.body" values={{statuses: <code>pending → in_progress → completed</code>}}>{'Tasks move {statuses} in dependency order, calling only the MCP tools bound to the current task. Everyone watches live, in a table or as a graph.'}</Translate>
+                    <Translate id="home.how.step3.body" values={{statuses: <code>pending → in_progress → completed</code>}}>{'Press Run and the agent starts at once in the run\'s own workflow session. Tasks move {statuses} in dependency order, calling only the MCP tools bound to the current task, and the agent asks its questions through forms drawn right into the chat.'}</Translate>
                   </p>
                 </div>
               </div>
               <div className="dag-panel glass-strong reveal">
                 <div className="panel-title">
-                  <span>WorkflowTasks</span>
+                  <span>Workflow Tasks</span>
                   <span className="views"><span>Table</span> · <span className="cur">Graph</span></span>
                 </div>
-                <svg className="dag-svg" viewBox="0 0 440 340" role="img" aria-label="A task graph: identify target and notify channel completed, prod approval gated, rolling restart in progress, verify rollout pending.">
+                <svg className="dag-svg" viewBox="0 0 440 340" role="img" aria-label="A task graph: configure instance and notify channel completed, launch approval gated, launch instance in progress, confirm result pending.">
                   {/* the approval gate is the one node drawn in the accent-to-secondary gradient — the violet never stands alone */}
                   <defs>
                     <linearGradient id="a2f-gate" x1="0" y1="0" x2="1" y2="1">
@@ -341,14 +401,14 @@ export default function Home(): ReactNode {
                     <rect className="node-box done-box" x="130" y="10" width="180" height="56" rx="14"/>
                     <circle cx="156" cy="38" r="9" fill="var(--a2f-success)"/>
                     <path d="m152 38 3 3 5.5-6" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                    <text className="node-label" x="174" y="35">Identify target</text>
+                    <text className="node-label" x="174" y="35">Configure instance</text>
                     <text className="node-sub" x="174" y="50" fill="var(--a2f-success)">COMPLETED</text>
                   </g>
                   {/* left branch: approval gate */}
                   <g>
                     <rect className="node-box gate-box" x="38" y="106" width="180" height="56" rx="14"/>
                     <path d="M64 29.5v6.8c0 5-4.5 7.4-6.8 8.2-2.3-.8-6.8-3.2-6.8-8.2v-6.8l6.8-2.5 6.8 2.5z" transform="translate(6 101)" fill="none" stroke="url(#a2f-gate)" strokeWidth="1.8" strokeLinejoin="round"/>
-                    <text className="node-label" x="86" y="131">Approve prod change</text>
+                    <text className="node-label" x="86" y="131">Approve launch</text>
                     <text className="node-sub" x="86" y="146" fill="var(--a2f-accent)">WAITING · SAM</text>
                   </g>
                   {/* right branch: completed */}
@@ -364,14 +424,14 @@ export default function Home(): ReactNode {
                     <rect className="node-box doing-box" x="130" y="202" width="180" height="56" rx="14"/>
                     <circle className="doing-ring" cx="156" cy="230" r="9" fill="none" stroke="var(--a2f-accent-bright)" strokeWidth="2.5"/>
                     <circle cx="156" cy="230" r="3.5" fill="var(--a2f-accent-bright)"/>
-                    <text className="node-label" x="174" y="227">Rolling restart</text>
+                    <text className="node-label" x="174" y="227">Launch instance</text>
                     <text className="node-sub" x="174" y="242" fill="var(--a2f-accent-bright)">IN PROGRESS</text>
                   </g>
                   {/* pending */}
                   <g opacity="0.65">
                     <rect className="node-box pend-box" x="130" y="286" width="180" height="46" rx="14"/>
                     <circle cx="156" cy="309" r="8" fill="none" stroke="var(--a2f-muted)" strokeWidth="1.8" opacity="0.6"/>
-                    <text className="node-label" x="174" y="306">Verify rollout</text>
+                    <text className="node-label" x="174" y="306">Confirm result</text>
                     <text className="node-sub" x="174" y="320" fill="var(--a2f-muted)">PENDING</text>
                   </g>
                 </svg>
@@ -401,7 +461,7 @@ export default function Home(): ReactNode {
                 <span className="a2f-avatar mika">M</span>
                 <h3><Translate id="home.teams.applicant.title">{'The applicant'}</Translate></h3>
                 <p>
-                  <Translate id="home.teams.applicant.body">{'Owns the session. Describes the intent, answers the agent\'s questions, and approves the plan before anything runs.'}</Translate>
+                  <Translate id="home.teams.applicant.body">{'Runs a published workflow. Answers the agent\'s questions — in the forms it draws into the chat — and watches the tasks progress in the same thread.'}</Translate>
                 </p>
               </div>
               <div className="role-card glass reveal">
@@ -468,7 +528,7 @@ export default function Home(): ReactNode {
                 <span className="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
                 <h3><Translate id="home.features.gates.title">{'Approval gates mid-run'}</Translate></h3>
                 <p>
-                  <Translate id="home.features.gates.body">{'Before a destructive step, the agent requests approval from a specific user and pauses. Approve / Reject buttons appear in the chat — for that user only.'}</Translate>
+                  <Translate id="home.features.gates.body">{'Before a destructive step, the agent requests approval from a specific user and pauses. Approve / Reject / Return buttons appear in the chat — for that user only.'}</Translate>
                 </p>
               </div>
               <div className="feature glass reveal">
