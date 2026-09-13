@@ -33,17 +33,18 @@ from infrastructure.demo_data import (
     DEMO_AWS_TAG_ID,
     DEMO_AWS_TAG_NAME,
     DEMO_CALL_AWS_MOCK_ID,
+    DEMO_DELETE_POD_MOCK_ID,
     DEMO_DEVELOPER_USER_ID,
     DEMO_DEVELOPERS_GROUP_ID,
     DEMO_GCP_API_KEY_ENTRY_KEY,
-    DEMO_GCP_LOG_SKILL_ID,
-    DEMO_GCP_LOG_SKILL_NAME,
-    DEMO_GCP_MCP_SERVER_ID,
-    DEMO_GCP_MCP_SERVER_NAME,
     DEMO_GCP_SECRET_ID,
     DEMO_GCP_SECRET_NAME,
     DEMO_GCP_TAG_ID,
     DEMO_GCP_TAG_NAME,
+    DEMO_GKE_MCP_SERVER_ID,
+    DEMO_GKE_MCP_SERVER_NAME,
+    DEMO_GKE_SKILL_ID,
+    DEMO_GKE_SKILL_NAME,
     DEMO_MCP_SERVER_ID,
     DEMO_MCP_SERVER_NAME,
     DEMO_REQUEST_APPROVAL_MOCK_ID,
@@ -216,7 +217,7 @@ async def test_sync_demo_data_seeds_the_full_dataset(
     assert len(await _demo_users(engine)) == 5
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
-    assert len(await _rows(engine, MCPToolMock)) == 3
+    assert len(await _rows(engine, MCPToolMock)) == 4
     assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
 
@@ -226,7 +227,7 @@ async def test_sync_demo_data_returns_the_new_skill_ids(
 ) -> None:
     """The caller schedules the clones, so both ids come back on first seed."""
     _enable(monkeypatch)
-    assert set(await _sync(engine)) == {DEMO_AGENT_SKILL_ID, DEMO_GCP_LOG_SKILL_ID}
+    assert set(await _sync(engine)) == {DEMO_AGENT_SKILL_ID, DEMO_GKE_SKILL_ID}
 
 
 async def test_sync_demo_data_returns_no_skill_ids_on_a_second_run(
@@ -247,7 +248,7 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _demo_users(engine)) == 5
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
-    assert len(await _rows(engine, MCPToolMock)) == 3
+    assert len(await _rows(engine, MCPToolMock)) == 4
     assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
     assert len(await _rows(engine, SecretTag)) == 2
@@ -278,7 +279,7 @@ async def test_demo_tags_classify_records_across_four_taggable_kinds(
     }
     assert mcp_server_tags == {
         (DEMO_MCP_SERVER_ID, DEMO_AWS_TAG_ID),
-        (DEMO_GCP_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
+        (DEMO_GKE_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
     }
     agent_skill_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, AgentSkillTag)
@@ -286,8 +287,8 @@ async def test_demo_tags_classify_records_across_four_taggable_kinds(
     assert agent_skill_tags == {
         (DEMO_AGENT_SKILL_ID, DEMO_AWS_TAG_ID),
         (DEMO_AGENT_SKILL_ID, DEMO_APPROVAL_TAG_ID),
-        (DEMO_GCP_LOG_SKILL_ID, DEMO_GCP_TAG_ID),
-        (DEMO_GCP_LOG_SKILL_ID, DEMO_APPROVAL_TAG_ID),
+        (DEMO_GKE_SKILL_ID, DEMO_GCP_TAG_ID),
+        (DEMO_GKE_SKILL_ID, DEMO_APPROVAL_TAG_ID),
     }
     tool_mock_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, McpToolMockTag)
@@ -577,19 +578,19 @@ async def test_demo_mcp_server_defaults_the_region(
     assert server.env["AWS_REGION"] == "us-east-1"
 
 
-async def test_demo_cloud_logging_mcp_server_uses_an_api_key_header(
+async def test_demo_gke_mcp_server_uses_an_api_key_header(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
     async with AsyncSession(engine) as session:
-        server = await session.get(MCPServer, DEMO_GCP_MCP_SERVER_ID)
+        server = await session.get(MCPServer, DEMO_GKE_MCP_SERVER_ID)
     assert server is not None
-    assert server.name == DEMO_GCP_MCP_SERVER_NAME
+    assert server.name == DEMO_GKE_MCP_SERVER_NAME
     assert server.description
     assert server.tenant_id == TENANT_ID
     assert server.transport is McpTransport.streamable_http
-    assert server.url == "https://logging.googleapis.com/mcp"
+    assert server.url == "https://container.googleapis.com/mcp"
     assert server.command is None
     assert server.args == []
     assert server.env == {}
@@ -618,18 +619,18 @@ async def test_demo_agent_skill_points_at_the_sample_skill(
     assert skill.commit_sha is None
 
 
-async def test_demo_gcp_log_agent_skill_points_at_the_sample_skill(
+async def test_demo_gke_agent_skill_points_at_the_sample_skill(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
     async with AsyncSession(engine) as session:
-        skill = await session.get(AgentSkill, DEMO_GCP_LOG_SKILL_ID)
+        skill = await session.get(AgentSkill, DEMO_GKE_SKILL_ID)
     assert skill is not None
-    assert skill.name == DEMO_GCP_LOG_SKILL_NAME
+    assert skill.name == DEMO_GKE_SKILL_NAME
     assert skill.tenant_id == TENANT_ID
     assert skill.repo_url == "https://github.com/kaitoy/a2flow"
-    assert skill.repo_path == "sample_skills/gcp-log-error-analysis"
+    assert skill.repo_path == "sample_skills/gke-pod-restart"
     assert skill.repo_auth_password is None
     # Cloning is the caller's job, so the row starts out unpublished.
     assert skill.sync_status is SkillSyncStatus.pending
@@ -673,13 +674,13 @@ async def test_a_name_collision_is_skipped_without_failing(
         await session.commit()
     with caplog.at_level(logging.WARNING, logger=_DEMO_LOGGER):
         # Only the AWS secret name collided; both demo skills still register.
-        assert set(await _sync(engine)) == {DEMO_AGENT_SKILL_ID, DEMO_GCP_LOG_SKILL_ID}
+        assert set(await _sync(engine)) == {DEMO_AGENT_SKILL_ID, DEMO_GKE_SKILL_ID}
     async with AsyncSession(engine) as session:
         assert await session.get(Secret, DEMO_AWS_SECRET_ID) is None
         assert await session.get(MCPServer, DEMO_MCP_SERVER_ID) is not None
         # Only the AWS secret name collided; the Google Cloud demo records seed.
         assert await session.get(Secret, DEMO_GCP_SECRET_ID) is not None
-        assert await session.get(MCPServer, DEMO_GCP_MCP_SERVER_ID) is not None
+        assert await session.get(MCPServer, DEMO_GKE_MCP_SERVER_ID) is not None
     assert any("conflicts with an existing" in r.getMessage() for r in caplog.records)
     # The AWS tag itself is still created and attached to the AWS MCP server and
     # agent skill; only the link to the missing AWS secret is skipped. The GCP
@@ -693,7 +694,7 @@ async def test_a_name_collision_is_skipped_without_failing(
     }
     assert mcp_server_tags == {
         (DEMO_MCP_SERVER_ID, DEMO_AWS_TAG_ID),
-        (DEMO_GCP_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
+        (DEMO_GKE_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
     }
 
 
@@ -876,12 +877,14 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
     assert set(mocks) == {
         DEMO_CALL_AWS_MOCK_ID,
         DEMO_RUN_SCRIPT_MOCK_ID,
+        DEMO_DELETE_POD_MOCK_ID,
         DEMO_REQUEST_APPROVAL_MOCK_ID,
     }
     targets = {(mock.mcp_server_id, mock.tool_name) for mock in mocks.values()}
     assert targets == {
         (DEMO_MCP_SERVER_ID, "aws___call_aws"),
         (DEMO_MCP_SERVER_ID, "aws___run_script"),
+        (DEMO_GKE_MCP_SERVER_ID, "delete_k8s_resource"),
         (None, "request_approval"),
     }
     for mock in mocks.values():
@@ -894,6 +897,8 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
     assert approval.responses[0]["value"] == {"status": "approved"}
     launch = mocks[DEMO_CALL_AWS_MOCK_ID]
     assert launch.responses[0]["value"]["Instances"][0]["InstanceId"].startswith("i-")
+    pod_restart = mocks[DEMO_DELETE_POD_MOCK_ID]
+    assert pod_restart.responses[0]["value"]["status"] == "deleted"
 
 
 async def test_disabling_removes_tool_mocks_before_the_mcp_server(

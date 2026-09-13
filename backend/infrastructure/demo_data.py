@@ -2,9 +2,9 @@
 
 Gated by ``Settings.demo_data`` (the ``DEMO_DATA`` environment variable),
 this module keeps a small, self-contained example of everything two
-approval-gated workflows need -- the mutating "launch an EC2 instance" one and
-the read-only "analyse a Google Cloud project's error logs" one -- all inside
-the seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
+approval-gated, mutating workflows need -- "launch an EC2 instance" and
+"restart a GKE pod" -- all inside the seeded ``Default`` tenant (see
+:mod:`infrastructure.bootstrap`):
 
 * two Secrets -- one holding the AWS access key id and secret access key as
   two entries, and one holding a Google Cloud API key as a single entry, both
@@ -12,22 +12,25 @@ the seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
 * two MCPServers -- one stdio server reaching the managed AWS MCP Server
   through the ``mcp-proxy-for-aws`` proxy launched with ``uvx``, referencing
   the AWS entries from its ``env`` via ``${secret:NAME/KEY}``, and one
-  ``streamable_http`` server reaching the Google-managed Cloud Logging remote
-  MCP server, sending the Google Cloud API key as its ``x-goog-api-key``
-  header via the same ``${secret:NAME/KEY}`` placeholder, both described,
-* three MCPToolMocks that stub the demo run's side-effecting tools so a
-  ``draft`` workflow run plays through without reaching AWS or waiting on a
-  human -- ``call_aws`` and ``run_script`` on the AWS MCP server, each
-  returning a successful EC2 launch, and the built-in ``request_approval``,
-  returning ``approved``,
+  ``streamable_http`` server reaching the Google-managed GKE (Google
+  Kubernetes Engine) remote MCP server, sending the Google Cloud API key as
+  its ``x-goog-api-key`` header via the same ``${secret:NAME/KEY}``
+  placeholder, both described,
+* four MCPToolMocks that stub the demo run's side-effecting tools so a
+  ``draft`` workflow run plays through without reaching AWS, a real GKE
+  cluster, or waiting on a human -- ``call_aws`` and ``run_script`` on the AWS
+  MCP server, each returning a successful EC2 launch, ``delete_k8s_resource``
+  on the GKE MCP server, returning a successful pod deletion, and the
+  built-in ``request_approval``, returning ``approved``,
 * two AgentSkills pointing at ``sample_skills/aws-ec2-launch`` and
-  ``sample_skills/gcp-log-error-analysis`` in this repository,
+  ``sample_skills/gke-pod-restart`` in this repository,
 * three Tags -- ``AWS`` (attached to the AWS secret, AWS MCP server, the
   EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks,
   showing that one tag classifies across resource types), ``GCP`` (attached to
-  the Google Cloud secret, the Cloud Logging MCP server, and the log-analysis
-  agent skill), and ``Approval Required`` (attached to both agent skills,
-  calling out their approval gate),
+  the Google Cloud secret, the GKE MCP server, and the pod-restart agent
+  skill -- GKE is a Google Cloud product, so the same provider tag still
+  applies), and ``Approval Required`` (attached to both agent skills, calling
+  out their approval gate),
 * five Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
   either of whom the skill can ask for approval, two requesters,
   ``demo-requester-1`` and ``demo-requester-2``, either of whom may run the
@@ -130,14 +133,14 @@ DEMO_GCP_SECRET_ID = "00000000-0000-0000-0000-00000000d102"
 #: Fixed identifier of the demo AWS MCP server.
 DEMO_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d201"
 
-#: Fixed identifier of the demo Cloud Logging MCP server.
-DEMO_GCP_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d202"
+#: Fixed identifier of the demo GKE MCP server.
+DEMO_GKE_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d202"
 
 #: Fixed identifier of the demo ``aws-ec2-launch`` agent skill.
 DEMO_AGENT_SKILL_ID = "00000000-0000-0000-0000-00000000d301"
 
-#: Fixed identifier of the demo ``gcp-log-error-analysis`` agent skill.
-DEMO_GCP_LOG_SKILL_ID = "00000000-0000-0000-0000-00000000d302"
+#: Fixed identifier of the demo ``gke-pod-restart`` agent skill.
+DEMO_GKE_SKILL_ID = "00000000-0000-0000-0000-00000000d302"
 
 #: Fixed identifier of the demo ``AWS`` tag.
 DEMO_AWS_TAG_ID = "00000000-0000-0000-0000-00000000d501"
@@ -156,6 +159,9 @@ DEMO_RUN_SCRIPT_MOCK_ID = "00000000-0000-0000-0000-00000000d602"
 
 #: Fixed identifier of the demo ``request_approval`` built-in tool mock.
 DEMO_REQUEST_APPROVAL_MOCK_ID = "00000000-0000-0000-0000-00000000d603"
+
+#: Fixed identifier of the demo ``delete_k8s_resource`` tool mock (GKE MCP server).
+DEMO_DELETE_POD_MOCK_ID = "00000000-0000-0000-0000-00000000d604"
 
 #: Name of the demo tag shared by the secret, MCP server, and agent skill.
 DEMO_AWS_TAG_NAME = "AWS"
@@ -178,7 +184,7 @@ DEMO_ACCESS_KEY_ENTRY_KEY = "AWS_ACCESS_KEY_ID"
 DEMO_SECRET_KEY_ENTRY_KEY = "AWS_SECRET_ACCESS_KEY"
 
 #: Name of the demo Secret holding the Google Cloud API key. Its single entry
-#: is embedded in the demo Cloud Logging MCP server's ``headers`` as a
+#: is embedded in the demo GKE MCP server's ``headers`` as a
 #: ``${secret:NAME/KEY}`` placeholder.
 DEMO_GCP_SECRET_NAME = "demo-gcp-credentials"
 
@@ -188,14 +194,14 @@ DEMO_GCP_API_KEY_ENTRY_KEY = "GOOGLE_API_KEY"
 #: Name of the demo MCP server as shown in the admin UI.
 DEMO_MCP_SERVER_NAME = "AWS MCP Server"
 
-#: Name of the demo Cloud Logging MCP server as shown in the admin UI.
-DEMO_GCP_MCP_SERVER_NAME = "Cloud Logging MCP Server"
+#: Name of the demo GKE MCP server as shown in the admin UI.
+DEMO_GKE_MCP_SERVER_NAME = "GKE MCP Server"
 
 #: Name of the demo agent skill as shown in the admin UI.
 DEMO_AGENT_SKILL_NAME = "Demo AWS EC2 Launch"
 
-#: Name of the demo Cloud Logging error-analysis agent skill in the admin UI.
-DEMO_GCP_LOG_SKILL_NAME = "Demo GCP Log Error Analysis"
+#: Name of the demo GKE pod-restart agent skill in the admin UI.
+DEMO_GKE_SKILL_NAME = "Demo GKE Pod Restart"
 
 #: Name of the demo ``call_aws`` tool mock as shown in the admin UI.
 DEMO_CALL_AWS_MOCK_NAME = "Demo AWS call_aws (EC2 launch success)"
@@ -205,6 +211,9 @@ DEMO_RUN_SCRIPT_MOCK_NAME = "Demo AWS run_script (EC2 launch success)"
 
 #: Name of the demo ``request_approval`` tool mock as shown in the admin UI.
 DEMO_REQUEST_APPROVAL_MOCK_NAME = "Demo request_approval (always approved)"
+
+#: Name of the demo ``delete_k8s_resource`` tool mock as shown in the admin UI.
+DEMO_DELETE_POD_MOCK_NAME = "Demo GKE delete_k8s_resource (pod restart success)"
 
 #: Proxy package the demo MCP server is launched from. Pinned to an exact
 #: version rather than ``@latest``, which is what the upstream migration guide
@@ -222,21 +231,22 @@ _DEMO_MCP_ENDPOINT = "https://aws-mcp.us-east-1.api.aws/mcp"
 #: leaving it implicit would break signing as soon as the two differ.
 _DEMO_MCP_ENDPOINT_REGION = "us-east-1"
 
-#: Google-managed Cloud Logging remote MCP endpoint the demo ``streamable_http``
-#: server connects to. It exposes read-only tools for listing and querying log
-#: entries, buckets, and views.
-_DEMO_GCP_MCP_ENDPOINT = "https://logging.googleapis.com/mcp"
+#: Google-managed GKE (Google Kubernetes Engine) remote MCP endpoint the demo
+#: ``streamable_http`` server connects to -- the full endpoint, not the
+#: read-only or delete-only variants, so it also exposes mutating tools such
+#: as ``delete_k8s_resource``.
+_DEMO_GKE_MCP_ENDPOINT = "https://container.googleapis.com/mcp"
 
-#: Request header the demo Cloud Logging MCP server sends its Google Cloud API
-#: key in. Its value is a ``${secret:NAME/KEY}`` placeholder resolved at
-#: connection time, so the key never lands in the ``mcp_servers`` row.
+#: Request header the demo GKE MCP server sends its Google Cloud API key in.
+#: Its value is a ``${secret:NAME/KEY}`` placeholder resolved at connection
+#: time, so the key never lands in the ``mcp_servers`` row.
 _DEMO_GCP_API_KEY_HEADER = "x-goog-api-key"
 
 #: Repository the demo agent skills are cloned from, and the path within it to
 #: each one's ``SKILL.md``.
 _DEMO_SKILL_REPO_URL = "https://github.com/kaitoy/a2flow"
 _DEMO_AWS_SKILL_REPO_PATH = "sample_skills/aws-ec2-launch"
-_DEMO_GCP_LOG_SKILL_REPO_PATH = "sample_skills/gcp-log-error-analysis"
+_DEMO_GKE_SKILL_REPO_PATH = "sample_skills/gke-pod-restart"
 
 #: Stored in place of an AWS credential or Google Cloud API key when the
 #: matching ``DEMO_*`` variable is unset. The demo is then complete in shape but
@@ -251,8 +261,7 @@ _DEMO_AWS_SECRET_DESCRIPTION = (
 
 #: Description shown on the demo Google Cloud secret in the admin UI.
 _DEMO_GCP_SECRET_DESCRIPTION = (
-    "Google Cloud API key the demo Cloud Logging MCP server sends as its "
-    "x-goog-api-key header."
+    "Google Cloud API key the demo GKE MCP server sends as its x-goog-api-key header."
 )
 
 #: Description shown on the demo MCP server in the admin UI.
@@ -262,10 +271,11 @@ _DEMO_MCP_SERVER_DESCRIPTION = (
     "instances."
 )
 
-#: Description shown on the demo Cloud Logging MCP server in the admin UI.
-_DEMO_GCP_MCP_SERVER_DESCRIPTION = (
-    "Google-managed Cloud Logging remote MCP server, providing read-only tools "
-    "to list and query Cloud Logging log entries, buckets, and views."
+#: Description shown on the demo GKE MCP server in the admin UI.
+_DEMO_GKE_MCP_SERVER_DESCRIPTION = (
+    "Google-managed GKE (Google Kubernetes Engine) remote MCP server, "
+    "providing tools to manage GKE clusters and their Kubernetes resources -- "
+    "including mutating tools such as deleting a pod."
 )
 
 #: Description shown on the demo ``AWS`` tag in the admin UI.
@@ -401,6 +411,13 @@ _DEMO_CALL_AWS_TOOL = "aws___call_aws"
 #: The tool of the demo AWS MCP server that runs a script (AWS CLI + boto3).
 _DEMO_RUN_SCRIPT_TOOL = "aws___run_script"
 
+#: The tool of the demo GKE MCP server that deletes a Kubernetes resource.
+#: Connected directly over ``streamable_http`` with no proxy in between, so
+#: the tool carries the bare name the Google-managed server itself declares,
+#: unlike the AWS tools above (bridged, and namespaced, through
+#: ``mcp-proxy-for-aws``).
+_DEMO_DELETE_POD_TOOL = "delete_k8s_resource"
+
 #: Instance id shared by the ``call_aws`` and ``run_script`` mock results, so a
 #: run that happens to call both still tells one consistent story.
 _DEMO_MOCK_INSTANCE_ID = "i-0a1b2c3d4e5f67890"
@@ -445,6 +462,24 @@ _DEMO_RUN_SCRIPT_RESULT: dict[str, Any] = {
     },
 }
 
+#: Pod identity shared by the demo ``delete_k8s_resource`` mock's request and
+#: result, so the story it tells is self-consistent.
+_DEMO_MOCK_POD_NAME = "api-7d4f8-abc12"
+_DEMO_MOCK_POD_NAMESPACE = "prod"
+
+#: Structured result of the demo ``delete_k8s_resource`` mock: the pod
+#: identity and status a real deletion call against the GKE MCP server would
+#: report back.
+_DEMO_DELETE_POD_RESULT: dict[str, Any] = {
+    "kind": "Pod",
+    "name": _DEMO_MOCK_POD_NAME,
+    "namespace": _DEMO_MOCK_POD_NAMESPACE,
+    "status": "deleted",
+    "message": (
+        f"Pod {_DEMO_MOCK_POD_NAME} deleted; its owning ReplicaSet is recreating it."
+    ),
+}
+
 #: Description shown on the demo ``call_aws`` tool mock in the admin UI.
 _DEMO_CALL_AWS_MOCK_DESCRIPTION = (
     "Stubs the AWS MCP Server's call_aws tool with a successful ec2 "
@@ -463,6 +498,13 @@ _DEMO_RUN_SCRIPT_MOCK_DESCRIPTION = (
 _DEMO_REQUEST_APPROVAL_MOCK_DESCRIPTION = (
     "Stubs the built-in request_approval tool as approved, so a draft run of "
     "the demo workflow plays through without waiting on a manager's decision."
+)
+
+#: Description shown on the demo ``delete_k8s_resource`` tool mock in the admin UI.
+_DEMO_DELETE_POD_MOCK_DESCRIPTION = (
+    "Stubs the GKE MCP Server's delete_k8s_resource tool with a successful "
+    "pod deletion, so a draft run of the demo workflow completes its restart "
+    "step without reaching a real GKE cluster."
 )
 
 
@@ -490,10 +532,13 @@ class _DemoToolMockSpec:
 
 
 #: The demo tool mocks, all in the seeded ``Default`` tenant. The first two stub
-#: tools of the demo AWS MCP server (see :func:`_seed_demo_mcp_server`); the third
-#: stubs the built-in :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`.
-#: Checked in a draft run's Run dialog, together they let the sample "launch an
-#: EC2 instance" workflow run end to end without reaching AWS or an approver.
+#: tools of the demo AWS MCP server (see :func:`_seed_demo_mcp_server`); the
+#: third stubs the demo GKE MCP server's tool (see
+#: :func:`_seed_demo_gke_mcp_server`); the fourth stubs the built-in
+#: :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`. Checked in a draft
+#: run's Run dialog, together they let either sample workflow -- "launch an
+#: EC2 instance" or "restart a GKE pod" -- run end to end without reaching
+#: AWS, a real GKE cluster, or an approver.
 _DEMO_TOOL_MOCKS = (
     _DemoToolMockSpec(
         id=DEMO_CALL_AWS_MOCK_ID,
@@ -510,6 +555,14 @@ _DEMO_TOOL_MOCKS = (
         mcp_server_id=DEMO_MCP_SERVER_ID,
         tool_name=_DEMO_RUN_SCRIPT_TOOL,
         response={"kind": "structured", "value": _DEMO_RUN_SCRIPT_RESULT},
+    ),
+    _DemoToolMockSpec(
+        id=DEMO_DELETE_POD_MOCK_ID,
+        name=DEMO_DELETE_POD_MOCK_NAME,
+        description=_DEMO_DELETE_POD_MOCK_DESCRIPTION,
+        mcp_server_id=DEMO_GKE_MCP_SERVER_ID,
+        tool_name=_DEMO_DELETE_POD_TOOL,
+        response={"kind": "structured", "value": _DEMO_DELETE_POD_RESULT},
     ),
     _DemoToolMockSpec(
         id=DEMO_REQUEST_APPROVAL_MOCK_ID,
@@ -567,13 +620,13 @@ async def _seed_demo_data(session: AsyncSession) -> list[str]:
     await _seed_demo_groups(session, tenant_id)
     await _seed_demo_secrets(session, tenant_id)
     await _seed_demo_mcp_server(session, tenant_id)
-    await _seed_demo_gcp_mcp_server(session, tenant_id)
+    await _seed_demo_gke_mcp_server(session, tenant_id)
     await _seed_demo_tool_mocks(session, tenant_id)
     new_skill_ids = [
         skill_id
         for skill_id in (
             await _seed_demo_agent_skill(session, tenant_id),
-            await _seed_demo_gcp_log_agent_skill(session, tenant_id),
+            await _seed_demo_gke_agent_skill(session, tenant_id),
         )
         if skill_id is not None
     ]
@@ -617,14 +670,14 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     await _delete_demo_row(
         session,
         AgentSkill,
-        DEMO_GCP_LOG_SKILL_ID,
-        label="Cloud Logging analysis agent skill",
+        DEMO_GKE_SKILL_ID,
+        label="GKE pod-restart agent skill",
     )
     await _delete_demo_row(
         session, MCPServer, DEMO_MCP_SERVER_ID, label="AWS MCP server"
     )
     await _delete_demo_row(
-        session, MCPServer, DEMO_GCP_MCP_SERVER_ID, label="Cloud Logging MCP server"
+        session, MCPServer, DEMO_GKE_MCP_SERVER_ID, label="GKE MCP server"
     )
     await _delete_demo_row(
         session, Secret, DEMO_AWS_SECRET_ID, label="AWS credentials secret"
@@ -978,33 +1031,35 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
     )
 
 
-async def _seed_demo_gcp_mcp_server(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo Cloud Logging MCP server.
+async def _seed_demo_gke_mcp_server(session: AsyncSession, tenant_id: str) -> None:
+    """Create the demo GKE MCP server.
 
-    Google runs the Cloud Logging MCP server as a managed remote endpoint, so
-    the row is registered as a ``streamable_http`` server pointed straight at
-    :data:`_DEMO_GCP_MCP_ENDPOINT`. It authenticates with a Google Cloud API
-    key sent as the :data:`_DEMO_GCP_API_KEY_HEADER` request header; the value
-    is a ``${secret:NAME/KEY}`` placeholder resolved at connection time by
-    :class:`infrastructure.secret_resolver.SecretResolver`, so the key never
-    lands in the ``mcp_servers`` row. The server's tools only read log data, so
-    unlike the AWS demo server it cannot mutate anything.
+    Google runs the GKE MCP server as a managed remote endpoint, so the row is
+    registered as a ``streamable_http`` server pointed straight at
+    :data:`_DEMO_GKE_MCP_ENDPOINT` -- the full endpoint, not the read-only or
+    delete-only variants Google also publishes. It authenticates with a
+    Google Cloud API key sent as the :data:`_DEMO_GCP_API_KEY_HEADER` request
+    header; the value is a ``${secret:NAME/KEY}`` placeholder resolved at
+    connection time by :class:`infrastructure.secret_resolver.SecretResolver`,
+    so the key never lands in the ``mcp_servers`` row. Like the AWS demo
+    server, its tools can mutate real infrastructure -- deleting a Pod, in
+    particular.
 
     Args:
         session: Database session used to read and insert the server.
         tenant_id: Id of the ``Default`` tenant the server belongs to.
     """
-    if await session.get(MCPServer, DEMO_GCP_MCP_SERVER_ID) is not None:
+    if await session.get(MCPServer, DEMO_GKE_MCP_SERVER_ID) is not None:
         return
     await _insert(
         session,
         MCPServer(
-            id=DEMO_GCP_MCP_SERVER_ID,
+            id=DEMO_GKE_MCP_SERVER_ID,
             tenant_id=tenant_id,
-            name=DEMO_GCP_MCP_SERVER_NAME,
-            description=_DEMO_GCP_MCP_SERVER_DESCRIPTION,
+            name=DEMO_GKE_MCP_SERVER_NAME,
+            description=_DEMO_GKE_MCP_SERVER_DESCRIPTION,
             transport=McpTransport.streamable_http,
-            url=_DEMO_GCP_MCP_ENDPOINT,
+            url=_DEMO_GKE_MCP_ENDPOINT,
             headers={
                 _DEMO_GCP_API_KEY_HEADER: (
                     f"${{secret:{DEMO_GCP_SECRET_NAME}/{DEMO_GCP_API_KEY_ENTRY_KEY}}}"
@@ -1013,21 +1068,24 @@ async def _seed_demo_gcp_mcp_server(session: AsyncSession, tenant_id: str) -> No
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         ),
-        label=f"MCP server '{DEMO_GCP_MCP_SERVER_NAME}'",
+        label=f"MCP server '{DEMO_GKE_MCP_SERVER_NAME}'",
     )
 
 
 async def _seed_demo_tool_mocks(session: AsyncSession, tenant_id: str) -> None:
     """Create the demo tool mocks that let a draft run play through unattended.
 
-    Three stubs, all in the seeded ``Default`` tenant: ``call_aws`` and
-    ``run_script`` on the demo MCP server, each returning a successful EC2
-    launch, and the built-in
+    Four stubs, all in the seeded ``Default`` tenant: ``call_aws`` and
+    ``run_script`` on the demo AWS MCP server, each returning a successful EC2
+    launch, ``delete_k8s_resource`` on the demo GKE MCP server, returning a
+    successful pod deletion, and the built-in
     :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`, returning ``approved``.
-    Selected in a draft run's Run dialog, they let the "launch an EC2 instance"
-    workflow run end to end without reaching AWS or waiting on an approver.
+    Selected in a draft run's Run dialog, they let either sample workflow --
+    "launch an EC2 instance" or "restart a GKE pod" -- run end to end without
+    reaching AWS, a real GKE cluster, or waiting on an approver.
 
-    Must run after :func:`_seed_demo_mcp_server`: the first two mocks reference
+    Must run after :func:`_seed_demo_mcp_server` and
+    :func:`_seed_demo_gke_mcp_server`: the first three mocks reference
     ``mcp_servers.id``. Each mock defines a single response, so it behaves as a
     constant however many times the run calls the tool. ``responses`` is stored
     as plain ``{"kind", "value"}`` dicts because the table column cannot carry
@@ -1094,16 +1152,17 @@ async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str |
     return DEMO_AGENT_SKILL_ID if created else None
 
 
-async def _seed_demo_gcp_log_agent_skill(
+async def _seed_demo_gke_agent_skill(
     session: AsyncSession, tenant_id: str
 ) -> str | None:
-    """Create the demo agent skill pointing at the ``gcp-log-error-analysis`` sample.
+    """Create the demo agent skill pointing at the ``gke-pod-restart`` sample.
 
-    A second sample skill, this one read-only: it queries the Cloud Logging MCP
-    server for a project's log entries and reports a root cause, and its
-    approval gates the *scope* of that query rather than a mutation. Registered
-    exactly like :func:`_seed_demo_agent_skill` -- built as a table model
-    directly, left ``pending`` for the caller to clone.
+    A second sample skill, this one restarting a Kubernetes Pod on a GKE
+    cluster: it deletes a specific pod through the GKE MCP server so its
+    owning controller recreates it, gated by a manager's explicit approval of
+    exactly which pod. Registered exactly like :func:`_seed_demo_agent_skill`
+    -- built as a table model directly, left ``pending`` for the caller to
+    clone.
 
     Args:
         session: Database session used to read and insert the skill.
@@ -1112,27 +1171,28 @@ async def _seed_demo_gcp_log_agent_skill(
     Returns:
         The skill's id when this call created it, else ``None``.
     """
-    if await session.get(AgentSkill, DEMO_GCP_LOG_SKILL_ID) is not None:
+    if await session.get(AgentSkill, DEMO_GKE_SKILL_ID) is not None:
         return None
     created = await _insert(
         session,
         AgentSkill(
-            id=DEMO_GCP_LOG_SKILL_ID,
+            id=DEMO_GKE_SKILL_ID,
             tenant_id=tenant_id,
-            name=DEMO_GCP_LOG_SKILL_NAME,
+            name=DEMO_GKE_SKILL_NAME,
             repo_url=_DEMO_SKILL_REPO_URL,
-            repo_path=_DEMO_GCP_LOG_SKILL_REPO_PATH,
+            repo_path=_DEMO_GKE_SKILL_REPO_PATH,
             description=(
-                "Fetch a Google Cloud project's logs through the Cloud Logging "
-                "MCP server, single out the errors, and report the root cause, "
-                "gated by a manager's explicit approval of the query scope."
+                "Restart a specific Kubernetes Pod on a GKE cluster by "
+                "deleting it through the GKE MCP server so its owning "
+                "controller recreates it, gated by a manager's explicit "
+                "approval of exactly which pod."
             ),
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         ),
-        label=f"agent skill '{DEMO_GCP_LOG_SKILL_NAME}'",
+        label=f"agent skill '{DEMO_GKE_SKILL_NAME}'",
     )
-    return DEMO_GCP_LOG_SKILL_ID if created else None
+    return DEMO_GKE_SKILL_ID if created else None
 
 
 async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
@@ -1140,12 +1200,12 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
 
     ``AWS`` lands on the AWS secret, AWS MCP server, the EC2-launch agent skill,
     and the ``call_aws`` and ``run_script`` tool mocks; ``GCP`` lands on the
-    Google Cloud secret, the Cloud Logging MCP server, and the log-analysis
-    agent skill; ``Approval Required`` lands on both agent skills.
+    Google Cloud secret, the GKE MCP server, and the pod-restart agent skill;
+    ``Approval Required`` lands on both agent skills.
 
     Must run after :func:`_seed_demo_secrets`, :func:`_seed_demo_mcp_server`,
-    :func:`_seed_demo_gcp_mcp_server`, :func:`_seed_demo_agent_skill`,
-    :func:`_seed_demo_gcp_log_agent_skill`, and :func:`_seed_demo_tool_mocks`:
+    :func:`_seed_demo_gke_mcp_server`, :func:`_seed_demo_agent_skill`,
+    :func:`_seed_demo_gke_agent_skill`, and :func:`_seed_demo_tool_mocks`:
     attaching a tag looks up the record it attaches to. The demo Workflow does
     not exist — see the module docstring — so no tag is attached to one; an
     operator is free to attach one once they build a workflow from these
@@ -1226,21 +1286,19 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             session,
             McpServerTag,
             resource_model=MCPServer,
-            resource_id=DEMO_GCP_MCP_SERVER_ID,
+            resource_id=DEMO_GKE_MCP_SERVER_ID,
             tag_id=DEMO_GCP_TAG_ID,
             label=(
-                f"tag '{DEMO_GCP_TAG_NAME}' on MCP server '{DEMO_GCP_MCP_SERVER_NAME}'"
+                f"tag '{DEMO_GCP_TAG_NAME}' on MCP server '{DEMO_GKE_MCP_SERVER_NAME}'"
             ),
         )
         await _link_tag(
             session,
             AgentSkillTag,
             resource_model=AgentSkill,
-            resource_id=DEMO_GCP_LOG_SKILL_ID,
+            resource_id=DEMO_GKE_SKILL_ID,
             tag_id=DEMO_GCP_TAG_ID,
-            label=(
-                f"tag '{DEMO_GCP_TAG_NAME}' on agent skill '{DEMO_GCP_LOG_SKILL_NAME}'"
-            ),
+            label=(f"tag '{DEMO_GCP_TAG_NAME}' on agent skill '{DEMO_GKE_SKILL_NAME}'"),
         )
     if await _ensure_demo_tag(
         session,
@@ -1265,11 +1323,10 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             session,
             AgentSkillTag,
             resource_model=AgentSkill,
-            resource_id=DEMO_GCP_LOG_SKILL_ID,
+            resource_id=DEMO_GKE_SKILL_ID,
             tag_id=DEMO_APPROVAL_TAG_ID,
             label=(
-                f"tag '{DEMO_APPROVAL_TAG_NAME}' on agent skill "
-                f"'{DEMO_GCP_LOG_SKILL_NAME}'"
+                f"tag '{DEMO_APPROVAL_TAG_NAME}' on agent skill '{DEMO_GKE_SKILL_NAME}'"
             ),
         )
 

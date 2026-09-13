@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # デモデータ
 
-バックエンドで `DEMO_DATA=true` を設定すると、承認つきの 2 つの例 — 状態を変える「EC2 インスタンスを起動する」例と、読み取りだけの「Google Cloud プロジェクトのエラーログを分析する」例 — に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、その手順が下の「試してみる」です。
+バックエンドで `DEMO_DATA=true` を設定すると、承認つきで状態を変える 2 つの例 — 「EC2 インスタンスを起動する」例と「GKE の Pod を再起動する」例 — に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、その手順が下の「試してみる」です。
 
 ## 有効にする
 
@@ -24,24 +24,24 @@ DEMO_GCP_API_KEY=AIza...
 - AWS の認証情報と Google Cloud の API キーは任意です。未設定なら `REPLACE_ME` というプレースホルダーが保存されるので、形としてはデモが揃った状態になり、実際の値は[シークレット](../guides/secrets.md)のページから入れられます。
 - `DEMO_AWS_REGION` は、デモの AWS MCP サーバーのツールが操作する対象のリージョンです。既定は `us-east-1` です。
 
-⚠️ デモの AWS MCP サーバーは読み取りだけでなく、**状態を変える** AWS の操作も実行できます。渡した認証情報の権限で実際のリソースを作成したり削除したりできてしまうので、使い捨てのアカウントか、権限を絞った IAM ポリシーを使ってください。AWS にまったく触れずにデモを試す方法は、下の[試してみる](#trying-it-out)を参照してください。デモの Cloud Logging MCP サーバーはログデータを読むだけです。
+⚠️ どちらのデモ MCP サーバーも読み取りだけでなく、**状態を変える**操作を実行できます。AWS MCP サーバーの認証情報は実際の AWS リソースを作成・削除でき、GKE MCP サーバーの API キーは実際のクラスタの Pod を削除できます。どちらも使い捨てのアカウントか、権限を絞った認証情報を使ってください。実際のプロバイダにまったく触れずにデモを試す方法は、下の[試してみる](#trying-it-out)を参照してください。
 
 ## 登録されるもの
 
 - **[エージェントスキル](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — インスタンスの構成を聞き取り、それについて管理職の明示的な承認を得てから、MCP ツールでインスタンスを起動します。リポジトリは起動後にバックグラウンドで clone するので、使えるようになるまでの間スキルは `pending` と表示されます。
-- **[エージェントスキル](../guides/agent-skills.md) `Demo GCP Log Error Analysis`** — ログの照会範囲(プロジェクト・リソース・期間・重大度)をユーザーと合意し、その範囲について管理職の明示的な承認を得てから、Cloud Logging MCP Server の読み取り専用ツールで該当するエントリを読み、エラーを切り分けて、想定される根本原因を報告します。リポジトリの clone も同じ仕組みなので、最初は同様に `pending` と表示されます。
+- **[エージェントスキル](../guides/agent-skills.md) `Demo GKE Pod Restart`** — 対象(プロジェクト・クラスタ・namespace・Pod 名)をユーザーと合意し、その対象について管理職の明示的な承認を得てから、GKE MCP Server で対象の Pod を削除して所有コントローラーに再作成させ、結果を報告します。リポジトリの clone も同じ仕組みなので、最初は同様に `pending` と表示されます。
 - **[MCP サーバー](../guides/mcp-servers.md) `AWS MCP Server`** — AWS のマネージド AWS MCP Server に接続する `stdio` サーバーです。EC2 のツールはここから来ます。
-- **[MCP サーバー](../guides/mcp-servers.md) `Cloud Logging MCP Server`** — Google Cloud のマネージド Cloud Logging MCP サーバーに接続する `streamable_http` サーバーです。`demo-gcp-credentials` の API キーを `x-goog-api-key` ヘッダーで送ります。ツールはログエントリ・バケット・ビューを読むだけです。
+- **[MCP サーバー](../guides/mcp-servers.md) `GKE MCP Server`** — Google Cloud のマネージド GKE(Google Kubernetes Engine)MCP サーバーのフルエンドポイントに接続する `streamable_http` サーバーです。`demo-gcp-credentials` の API キーを `x-goog-api-key` ヘッダーで送ります。ツールはクラスタや Kubernetes リソースを管理でき、Pod の削除も含まれます。
 - **[シークレット](../guides/secrets.md) `demo-aws-credentials`** — AWS MCP Server が読む、AWS のアクセスキー ID とシークレットアクセスキーです。
-- **[シークレット](../guides/secrets.md) `demo-gcp-credentials`** — Cloud Logging MCP Server が送る、Google Cloud の API キーです。
-- **[ツールモック](../guides/tool-mocks.md)** — デモ実行で副作用のあるツールのスタブです。AWS MCP Server の `aws___call_aws` と `aws___run_script`(どちらも起動成功を返す)、および組み込みの `request_approval`(approved を返す)。ドラフト実行の **Run** ダイアログで選ぶと、AWS に触れることも管理職の承認を待つこともなく、ワークフローが最後まで動きます。
+- **[シークレット](../guides/secrets.md) `demo-gcp-credentials`** — GKE MCP Server が送る、Google Cloud の API キーです。
+- **[ツールモック](../guides/tool-mocks.md)** — デモ実行で副作用のあるツールのスタブです。AWS MCP Server の `aws___call_aws` と `aws___run_script`(どちらも起動成功を返す)、GKE MCP Server の `delete_k8s_resource`(Pod 削除成功を返す)、および組み込みの `request_approval`(approved を返す)。ドラフト実行の **Run** ダイアログで選ぶと、AWS や実際の GKE クラスタに触れることも管理職の承認を待つこともなく、どちらのワークフローも最後まで動きます。
 - **デモユーザーとグループ:**
 
 | ユーザー | ロール | 役割 |
 |---|---|---|
 | `demo-developer` | `developer` | ワークフローを生成して公開する |
 | `demo-requester-1`、`demo-requester-2` | `requester` | ワークフローを実行する |
-| `demo-approver-1`、`demo-approver-2` | `approver` | 起動、またはログの照会範囲を承認する |
+| `demo-approver-1`、`demo-approver-2` | `approver` | 起動、または Pod の再起動を承認する |
 
 いずれもロールを直接は持ちません。それぞれ[ユーザーグループ](../guides/users-and-groups.md#user-groups) `Demo Developers`、`Demo Requesters`、`Demo Approvers` から継承します。
 
@@ -55,9 +55,9 @@ DEMO_GCP_API_KEY=AIza...
 4. **`demo-requester-1`** でワークフローの **Run** を押します([ワークフローを実行する](../guides/workflows.md#running-a-workflow))。実行のチャットが開き、エージェントがタスクを順に進めます。
 5. スキルが承認を求めてきたら、**`demo-approver-1`** でサインインして承認します([承認](../guides/approvals.md))。エージェントはそのあと MCP ツールでインスタンスを起動します。
 
-同じ 5 ステップは **`Demo GCP Log Error Analysis`** からも実行できます。読み取りだけのログ切り分けで、承認は起動ではなく照会範囲を対象にし、最後のステップは何も作らずログを読みます。ここで実際に動かすには、ログのあるプロジェクトのキーを `DEMO_GCP_API_KEY` に設定しておく必要があります。
+同じ 5 ステップは **`Demo GKE Pod Restart`** からも実行できます。承認は起動ではなく削除する Pod そのものを対象にし、最後のステップは何かを作る代わりに Pod を再起動します。ここで実際に動かすには、実際の GKE クラスタに届く権限を持つキーを `DEMO_GCP_API_KEY` に設定しておく必要があります。
 
-**AWS アカウントがない場合。** 手順 3 を飛ばし、`draft` のまま実行してください。`developer` である `demo-developer` はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる Run ダイアログが出るのはドラフト実行のときだけです。**Mock tools** に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws___run_script` と、`request_approval`)にチェックを入れれば、AWS に届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。
+**AWS アカウントも GKE クラスタもない場合。** 手順 3 を飛ばし、`draft` のまま実行してください。`developer` である `demo-developer` はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる Run ダイアログが出るのはドラフト実行のときだけです。**Mock tools** に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws___run_script`、Pod 再起動用の `delete_k8s_resource`、`request_approval`)にチェックを入れれば、AWS や実際の GKE クラスタに届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。
 
 ## 削除する
 

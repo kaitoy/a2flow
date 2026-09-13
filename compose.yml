@@ -56,14 +56,15 @@ services:
       # tenant. Optional: same generate-and-log-once fallback as
       # ROOT_PASSWORD when unset.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      # Set DEMO_DATA=true to register the sample "launch an EC2 instance"
-      # dataset (secrets, AWS MCP server, Cloud Logging MCP server, agent
-      # skill, approver/requester users) in the Default tenant on startup;
-      # unsetting it removes those records again on the next startup.
+      # Set DEMO_DATA=true to register the sample "launch an EC2 instance" and
+      # "restart a GKE pod" datasets (secrets, AWS MCP server, GKE MCP server,
+      # agent skills, approver/requester users) in the Default tenant on
+      # startup; unsetting it removes those records again on the next startup.
       # DEMO_PASSWORD has the same generate-and-log-once fallback as the
       # passwords above. The AWS credentials and the Google Cloud API key are
-      # optional -- a placeholder is stored when they are unset -- but note the
-      # demo AWS MCP server can run mutating AWS operations, not only reads.
+      # optional -- a placeholder is stored when they are unset -- but note
+      # both the demo AWS MCP server and the demo GKE MCP server can run
+      # mutating operations, not only reads.
       DEMO_DATA: ${DEMO_DATA:-true}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       DEMO_AWS_ACCESS_KEY_ID: ${DEMO_AWS_ACCESS_KEY_ID:-}
